@@ -1,40 +1,6 @@
-# Model Router + GAL 视窗 bundle。安装到 web profile 后，Host half 负责
-# agent/pre-step / agent/request 路由，browser half 注册 GAL conversation.view。
+# Official DeepSeek Harness desktop bundle. It intentionally contributes only
+# the router assistant; provider credentials, model catalogs and Agent Teams
+# remain owned by the official desktop profile.
 - insert:
-    - id: modlens
-      name: '@liustack/modlens'
-    # ModSearch replaces the native web_search provider and adds read_page/x_search.
-    - id: modsearch
-      name: '@liustack/modsearch'
-    # Ego Browser supplies visible Chromium tools for JS-heavy and anti-bot pages.
-    - id: ego-browser
-      name: '@ljwei-stak/dsh-ego-browser'
-    # Register PPT Master in the host's native skill catalog.
-    - id: ppt-master-for-mgr
-      name: '@ljwei-stak/ppt-master-for-mgr'
-    # Watcher observes the native session log in Chat and GAL work views.
-    - id: dsh-watcher
-      name: '@ljwei-stak/dsh-watcher-for-mrg'
-    # The router annotates multi-task approval requests; dsh-approval-gate
-    # owns the Flash decision, human handoff, audit and snapshot UI.
-    - id: dsh-approval-gate
-      name: '@ljwei-stak/dsh-approval-gate'
-    # The package dependency is transitive from the profile's point of view,
-    # so this bundle entry is needed when the router is installed by itself.
     - id: model-router-galgame
       name: '@ljwei-stak/model-router-galgame'
-
-# Route DSH's native web_search seam through ModSearch's engine chain.
-- id: web
-  config:
-    searchProvider: modsearch
-
-# DSH SDK 0.1.5's package-inventory extension aborts the entire official
-# DeepSeek request when one active third-party Loader entry cannot be resolved
-# from Desktop's ASAR base URL. The field is provider metadata only; disabling
-# it keeps model input, tools, session logs and Router behavior unchanged.
-- id: plugin-package-inventory-deepseek
-  config:
-    enabled: false
-
-

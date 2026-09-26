@@ -1,795 +1,376 @@
+import z from '@deepseek-ai/schemastery'
+import { defineTool } from '@deepseek-ai/dsh-tools'
+import { DEFAULT_ROUTER_SETTINGS } from './shared/router.mjs'
+import { createPlanFromRoutes } from './shared/harness-plan.mjs'
 import {
-  buildPlan,
-  collaborationInstruction,
-  collaborationStage,
-  collectOpenCodeEndpointRepairs,
-  DEFAULT_ROUTER_SETTINGS,
-  MODEL_ROUTER_SETTINGS_NAMESPACE,
-  nextCollaborationStage,
-  selectReasoningEffort,
-  textFromMessages,
-} from './shared/router.mjs'
-import { formatErrorChain } from './shared/error-diagnostics.mjs'
-import { fetchLiveBenchSnapshot } from './shared/livebench.mjs'
-import { buildPersonaPrompt, isPersonaPrompt } from './shared/persona.mjs'
+  OFFICIAL_TOOLS,
+  getOfficialTool,
+  installCommandLine,
+} from './shared/official-tool-registry.mjs'
 import {
-  contentHasImage,
-  modLensUpstream,
-  routeThroughModLens,
-} from './shared/modlens-routing.mjs'
-import {
-  approvalGateStatus,
-  approvalSafetyContext,
-  decorateApprovalReason,
-  isApprovalGateReason,
-} from './shared/approval-gate.mjs'
-import {
-  webCapabilityForPlan,
-  webCapabilityStatus,
-  webInstruction,
-} from './shared/web-routing.mjs'
-import { registerNpmUpdateRoute } from './shared/npm-update.mjs'
-import { registerGalGameRoutes } from './shared/gal-game-service.mjs'
-import { watcherStatus } from './shared/watcher.mjs'
-import { repairLiangshenPreset, reportLiangshenCompatibility } from './shared/liangshen-compat.mjs'
-import { repairRouterSessions, reportRouterSessionCompatibility } from './shared/session-compat.mjs'
-
-let settingsRuntimePromise
-let routerSettings = { ...DEFAULT_ROUTER_SETTINGS }
-let routerSettingsReady = false
-let routerSettingsPromise = Promise.resolve(false)
-async function loadSettingsRuntime() {
-  if (settingsRuntimePromise !== undefined) return settingsRuntimePromise
-  settingsRuntimePromise = Promise.all([
-    import('@deepseek-ai/schemastery'),
-    import('@deepseek-ai/dsh-settings'),
-  ]).then(([schemaModule, settingsModule]) => ({
-    z: schemaModule.default ?? schemaModule,
-    settingsNamespace: settingsModule.settingsNamespace,
-  }))
-  return settingsRuntimePromise
-}
-
-function routerSettingsSchema(z) {
-  const price = z.object({
-    input: z.number().min(0).default(0),
-    output: z.number().min(0).default(0),
-    cacheRead: z.number().min(0).default(0),
-    cacheWrite: z.number().min(0).default(0),
-    currency: z.string().default('USD'),
-  })
-  return z.object({
-    pricing: z.dict(price).default({}),
-    liveBenchEndpoint: z.string().default(DEFAULT_ROUTER_SETTINGS.liveBenchEndpoint),
-    liveBenchTtlMs: z.number().min(30000).default(DEFAULT_ROUTER_SETTINGS.liveBenchTtlMs),
-    budgetUsd: z.number().min(0).default(DEFAULT_ROUTER_SETTINGS.budgetUsd),
-    cacheReadRatio: z.number().min(0).max(1).default(DEFAULT_ROUTER_SETTINGS.cacheReadRatio),
-    cacheWriteRatio: z.number().min(0).max(1).default(DEFAULT_ROUTER_SETTINGS.cacheWriteRatio),
-  })
-}
-
-function invalidateRouterPlans() {
-  for (const state of allStates) {
-    state.plan = null
-    state.liveBenchPromise = null
-    state.liveBenchError = null
-  }
-}
-
-async function registerRouterSettings(ctx) {
-  const settings = settingsService(ctx)
-  if (settings === undefined || typeof settings.register !== 'function') return false
-  try {
-    const runtime = await loadSettingsRuntime()
-    const namespace = runtime.settingsNamespace(MODEL_ROUTER_SETTINGS_NAMESPACE)
-    const scope = settings.register(namespace, routerSettingsSchema(runtime.z), {
-      base: DEFAULT_ROUTER_SETTINGS,
-    })
-    routerSettings = scope.get()
-    routerSettingsReady = true
-    scope.watch(next => {
-      routerSettings = next
-      invalidateRouterPlans()
-    })
-    return true
-  } catch (error) {
-    ctx.logger?.warn?.(`model-router: settings registration unavailable: ${String(error)}`)
-    return false
-  }
-}
+  probeAllTools,
+  probeToolWith,
+  startInstall,
+  installStatus,
+  installedToolIds,
+  defaultRunner,
+} from './shared/official-tools-runtime.mjs'
 
 export const name = 'model-router-galgame'
-export const inject = ['commands', 'llm', 'settings']
+export const inject = ['commands', 'llm', 'tools']
 
-const LLM_SETTINGS_NAMESPACE = 'llm-pi-ai'
-const OPEN_CODE_REPAIR_DELAYS_MS = Object.freeze([25, 100, 250, 500, 1000, 2000])
+export const Config = z.object({
+  budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
+  maxConsultOutputChars: z.number().step(1).min(500).max(50_000).default(12_000).volatile(),
+})
 
-const states = new WeakMap()
-const allStates = new Set()
-
-function stateFor(agent) {
-  let state = states.get(agent)
-  if (state === undefined) {
-    state = {
-      mode: 'collective',
-      plan: null,
-      available: [],
-      directoryPromise: null,
-      turn: null,
-      failedModels: new Set(),
-      routeCooldowns: new Map(),
-      lastTarget: null,
-      lastStep: 0,
-      collaboration: null,
-      taskText: '',
-      personaInjected: false,
-      liveBench: null,
-      liveBenchFetchedAt: 0,
-      liveBenchPromise: null,
-      liveBenchError: null,
-      visionBridges: [],
-      hasImageBlocks: false,
-    }
-    states.set(agent, state)
-    allStates.add(state)
-  }
-  return state
+const JSON_OUTPUT = {
+  schema: { type: 'json' },
+  render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
 }
 
-async function discover(ctx, state) {
-  if (state.directoryPromise !== null) return state.directoryPromise
-  state.directoryPromise = (async () => {
-    const routes = []
-    const visionBridges = []
-    let providers = []
-    try { providers = ctx.llm.listProviders() } catch { providers = [] }
-    for (const provider of providers) {
-      // Synthetic ModLens routes are selectable in the native model picker,
-      // but collective routing evaluates the underlying provider only. This
-      // prevents a wrapper from competing with its own upstream route and
-      // avoids a second image conversion in collective mode.
-      const bridgeUpstream = modLensUpstream(provider?.id)
-      if (bridgeUpstream !== null) {
-        try {
-          const models = await ctx.llm.listModels(provider.id)
-          for (const model of models) visionBridges.push({ provider: provider.id, upstream: bridgeUpstream, model: model.id })
-        } catch {
-          // A failed synthetic catalog must not hide the usable upstream models.
+function jsonValue(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function valueOf(config, key, fallback) {
+  const value = config?.[key]
+  return value !== undefined && typeof value?.get === 'function' ? value.get() : value ?? fallback
+}
+
+function finiteNumber(value, fallback) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function boundedInteger(value, fallback, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, Math.floor(finiteNumber(value, fallback))))
+}
+
+function text(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function errorText(error) {
+  if (error instanceof Error && error.message) return error.message
+  try { return String(error) } catch { return 'unknown error' }
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error('operation aborted')
+}
+
+function routeKey(route) {
+  return `${route.provider}\u0000${route.model}`
+}
+
+function uniqueStrings(values) {
+  return [...new Set(values.map(text).filter(Boolean))]
+}
+
+/** Read only exact provider/model routes published by the official LLM service. */
+export async function discoverConfiguredRoutes(ctx, signal) {
+  throwIfAborted(signal)
+  let providers
+  try { providers = ctx.llm.listProviders() } catch { return [] }
+  const routes = new Map()
+  for (const entry of Array.isArray(providers) ? providers : []) {
+    const provider = text(typeof entry === 'string' ? entry : entry?.id)
+    if (!provider) continue
+    throwIfAborted(signal)
+    let models
+    try { models = await ctx.llm.listModels(provider) } catch {
+      throwIfAborted(signal)
+      continue
+    }
+    for (const listed of Array.isArray(models) ? models : []) {
+      const model = text(listed?.id ?? listed?.model)
+      if (!model) continue
+      throwIfAborted(signal)
+      let resolved = listed
+      try { resolved = await ctx.llm.resolveModelInfo(provider, model, signal) } catch {
+        throwIfAborted(signal)
+      }
+      const reasoning = resolved?.reasoning
+      const route = {
+        provider,
+        model,
+        name: text(resolved?.name ?? listed?.name) || model,
+        inputModalities: uniqueStrings(Array.isArray(resolved?.inputModalities)
+          ? resolved.inputModalities : Array.isArray(listed?.inputModalities) ? listed.inputModalities : []),
+        reasoningKnown: reasoning !== undefined && reasoning !== null,
+        reasoningEfforts: uniqueStrings(Array.isArray(reasoning?.efforts) ? reasoning.efforts.map(item => item?.id ?? item) : []),
+        ...text(reasoning?.defaultEffort) ? { defaultReasoningEffort: text(reasoning.defaultEffort) } : {},
+      }
+      routes.set(routeKey(route), route)
+    }
+  }
+  return [...routes.values()].sort((left, right) => routeKey(left).localeCompare(routeKey(right)))
+}
+
+/** Produce a route recommendation and work packages compatible with official Agent Teams. */
+export async function createRoutePlan(ctx, task, config = {}, options = {}) {
+  const taskText = text(task)
+  if (!taskText) throw new Error('task must contain text')
+  const mode = options.mode === 'team' ? 'team' : 'single'
+  const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
+  const budgetUsd = Math.max(0, finiteNumber(options.budgetUsd, finiteNumber(configuredBudget, 0)))
+  const [availableRoutes, installed] = await Promise.all([
+    discoverConfiguredRoutes(ctx, options.signal),
+    options.skipToolProbe === true
+      ? Promise.resolve(Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
+      : installedToolIds(),
+  ])
+  return createPlanFromRoutes(taskText, availableRoutes, { mode, budgetUsd, installedToolIds: installed })
+}
+
+/** One bounded, independent call through the same official LLM service. */
+export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_000, signal) {
+  const provider = text(route?.provider)
+  const model = text(route?.model)
+  const taskText = text(task)
+  if (!provider || !model) throw new Error('a configured provider and model are required')
+  if (!taskText) throw new Error('task must contain text')
+  throwIfAborted(signal)
+  const limit = boundedInteger(outputLimit, 12_000, 1, 50_000)
+  const controller = new AbortController()
+  const onAbort = () => controller.abort(signal.reason)
+  signal?.addEventListener('abort', onAbort, { once: true })
+  let answer = ''
+  let truncated = false
+  let finish = { kind: 'unknown' }
+  try {
+    const stream = ctx.llm.stream({
+      provider,
+      model,
+      messages: [{
+        role: 'user',
+        content: [{
+          type: 'text',
+          text: `You are an independent specialist consulted by another AI agent. Give a concise, evidence-oriented answer in the task's language.\n\nTask:\n${taskText}`,
+        }],
+      }],
+      maxTokens: Math.min(4_096, Math.max(256, Math.ceil(limit / 2))),
+      signal: controller.signal,
+    })
+    for await (const chunk of stream) {
+      if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') {
+        const remaining = limit - answer.length
+        if (remaining > 0) answer += chunk.text.slice(0, remaining)
+        if (chunk.text.length > remaining) {
+          truncated = true
+          controller.abort(new Error('consultation output limit reached'))
+          break
         }
-        continue
-      }
-      try {
-        const models = await ctx.llm.listModels(provider.id)
-        const resolvedRoutes = await Promise.all(models.map(async model => {
-          let resolved
-          try {
-            resolved = typeof ctx.llm.resolveModelInfo === 'function'
-              ? await ctx.llm.resolveModelInfo(provider.id, model.id)
-              : undefined
-          } catch (error) {
-            ctx.logger?.debug?.(`model-router: reasoning metadata unavailable for ${provider.id}/${model.id}: ${String(error)}`)
-          }
-          const inputModalities = resolved?.inputModalities ?? model.inputModalities ?? model.input ?? []
-          const reasoning = resolved?.reasoning
-          return {
-            provider: provider.id,
-            model: model.id,
-            inputModalities: Array.isArray(inputModalities) ? [...inputModalities] : [],
-            ...(resolved === undefined ? {} : {
-              reasoningKnown: true,
-              reasoningEfforts: Array.isArray(reasoning?.efforts) ? reasoning.efforts.map(effort => effort.id) : [],
-              ...(reasoning?.defaultEffort === undefined ? {} : { defaultReasoningEffort: reasoning.defaultEffort }),
-            }),
-          }
-        }))
-        routes.push(...resolvedRoutes)
-      } catch (error) {
-        ctx.logger?.debug?.(`model-router: model discovery failed for ${provider.id}: ${String(error)}`)
+      } else if (chunk?.type === 'finish') {
+        const reason = chunk.reason
+        finish = { kind: text(reason?.kind) || 'unknown' }
+        if (finish.kind === 'error' || finish.kind === 'aborted') {
+          finish.error = text(reason?.failure?.message) || 'model request failed'
+        }
       }
     }
-    state.available = routes
-    state.visionBridges = visionBridges
-    return routes
-  })().catch(error => {
-    state.directoryPromise = null
-    ctx.logger?.warn?.(`model-router: model discovery unavailable: ${String(error)}`)
-    return state.available
-  })
-  return state.directoryPromise
-}
-
-function inputText(messages) {
-  return textFromMessages(messages).slice(-12000)
-}
-
-async function liveBenchFor(ctx, state) {
-  if (!routerSettingsReady) return state.liveBench
-  const ttl = Math.max(30000, Number(routerSettings.liveBenchTtlMs) || DEFAULT_ROUTER_SETTINGS.liveBenchTtlMs)
-  if (state.liveBench !== null && Date.now() - state.liveBenchFetchedAt < ttl) return state.liveBench
-  if (state.liveBenchPromise !== null) return state.liveBenchPromise
-  const configuredEndpoint = String(routerSettings.liveBenchEndpoint || DEFAULT_ROUTER_SETTINGS.liveBenchEndpoint)
-  // Migrate the endpoint used by the first prototype; it returned 404 after
-  // LiveBench moved to versioned CSV/JSON assets.
-  const endpoint = configuredEndpoint === 'https://livebench.ai/api/leaderboard'
-    ? DEFAULT_ROUTER_SETTINGS.liveBenchEndpoint
-    : configuredEndpoint
-  state.liveBenchPromise = fetchLiveBenchSnapshot({
-    endpoint,
-  }).then(snapshot => {
-    state.liveBench = snapshot
-    state.liveBenchFetchedAt = snapshot.fetchedAt
-    state.liveBenchError = null
-    return snapshot
-  }).catch(error => {
-    state.liveBenchError = String(error)
-    ctx.logger?.warn?.(`model-router: LiveBench refresh failed; using ${state.liveBench === null ? 'experimental baseline' : 'last snapshot'}: ${String(error)}`)
-    return state.liveBench
-  }).finally(() => {
-    state.liveBenchPromise = null
-  })
-  return state.liveBenchPromise
-}
-
-function newMessageId() {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
-  return `model-router-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-/** Create a durable model-facing context row for a collaboration stage. */
-function stageMessage(plan, step) {
-  const text = collaborationInstruction(plan, step)
-  if (text === '') return null
-  return {
-    id: newMessageId(),
-    role: 'user',
-    content: [{ type: 'text', text }],
-    source: { kind: 'plugin', plugin: name, form: 'relay' },
+  } finally {
+    signal?.removeEventListener('abort', onAbort)
   }
-}
-
-function webMessage(plan) {
-  const text = webInstruction(plan?.web)
-  if (text === '') return null
-  return {
-    id: newMessageId(),
-    role: 'user',
-    content: [{ type: 'text', text }],
-    source: { kind: 'plugin', plugin: name, form: 'instructions' },
+  throwIfAborted(signal)
+  if (!truncated && (finish.kind === 'error' || finish.kind === 'aborted')) {
+    return { ok: false, provider, model, answer, truncated, finish, error: finish.error }
   }
-}
-
-/**
- * Persona is a final-answer context only. It is intentionally a separate
- * message so the collaboration stages and their audit records remain free of
- * stylistic instructions.
- */
-function personaMessage(state, agent, step) {
-  const plan = state.plan
-  const isCollective = state.mode === 'collective'
-  const stage = isCollective ? collaborationStage(plan, step) : null
-  const finalStage = !isCollective || stage === null || stage.purpose === 'synthesis'
-    || plan?.complexity?.band !== 'complex'
-  if (!finalStage) return null
-  let route = state.lastTarget
-  if (isCollective && plan !== null && plan !== undefined) {
-    const task = plan.complexity?.band === 'complex' ? plan.subtasks?.[Math.max(1, Number(step) || 1) - 1] : plan.subtasks?.[0]
-    if (task?.recommended) route = { provider: task.recommendedProvider, model: task.recommended }
-    if (task?.purpose === 'synthesis' && plan.synthesizer?.model) route = plan.synthesizer
-    if (route?.model === undefined || route?.model === '') route = plan.selected
+  if (!truncated && !answer.trim()) {
+    return { ok: false, provider, model, answer, truncated, finish, error: 'model returned no text' }
   }
-  if (!isCollective) {
-    const header = typeof agent.session?.requestHeader === 'function' ? agent.session.requestHeader() : null
-    route = route ?? header?.config ?? agent.options
-  }
-  const text = buildPersonaPrompt({
-    provider: route?.provider ?? '',
-    model: route?.model ?? '',
-    mode: state.mode,
-    stage: stage?.purpose === 'synthesis' ? 'synthesis' : 'answer',
-    taskText: state.taskText,
-  })
-  return {
-    id: newMessageId(),
-    role: 'user',
-    content: [{ type: 'text', text }],
-    source: { kind: 'plugin', plugin: name, form: 'instructions' },
-  }
+  return { ok: true, provider, model, answer, truncated, finish }
 }
 
-/** A short, auditable routing explanation shown before the first work stage. */
-function analysisMessage(plan) {
-  if (plan === null || plan === undefined) return null
-  const weights = plan.objectiveWeights ?? {}
-  const selected = plan.selected === null || plan.selected === undefined
-    ? '待发现模型'
-    : `${plan.selected.provider}/${plan.selected.model}`
-  const text = [
-    '[Model Router 路由分析]',
-    `任务类型：${plan.taskType}；复杂度：${plan.complexity?.band ?? 'unknown'}（${Math.round((plan.complexity?.value ?? 0) * 100)}%）`,
-    Array.isArray(plan.taskTypes) && plan.taskTypes.length > 1 ? `业务方向：${plan.taskTypes.join('、')}（分别建立执行工作包）` : '',
-    `本轮权重：质量 ${Math.round((weights.quality ?? 0) * 100)}%，成本 ${Math.round((weights.cost ?? 0) * 100)}%，推理等级 ${Math.round((weights.reasoning ?? 0) * 100)}%，延迟 ${Math.round((weights.latency ?? 0) * 100)}%，专长 ${Math.round((weights.specialty ?? 0) * 100)}%，风险 ${Math.round((weights.risk ?? 0) * 100)}%`,
-    `质量下限：${Math.round(Number(plan.optimization?.qualityFloor ?? 0) * 100)}%；首选路由：${selected}${plan.selected?.reasoningEffort ? `；推理等级：${plan.selected.reasoningEffort}` : '；推理等级：提供方默认'}`,
-    `预计总费用：$${Number(plan.estimatedCost ?? 0).toFixed(6)}；相对全高质量基线节省：$${Number((plan.optimization?.baselineAllStrongCost ?? 0) - (plan.estimatedCost ?? 0)).toFixed(6)}`,
-    `缓存计费比例：读取 ${Math.round(Number(plan.optimization?.cacheReadRatio ?? 0) * 100)}%，写入 ${Math.round(Number(plan.optimization?.cacheWriteRatio ?? 0) * 100)}%（未填写时按普通输入计费）`,
-    Number(plan.optimization?.budgetUsd ?? 0) > 0 ? `预算上限：$${Number(plan.optimization.budgetUsd).toFixed(6)}；${plan.optimization.budgetExceeded ? '仍超预算，已在质量下限内尽量压缩' : '满足预算约束'}` : '',
-    `LiveBench：${plan.optimization?.liveBench?.fetchedAt ? `快照于 ${new Date(Number(plan.optimization.liveBench.fetchedAt)).toISOString()}${plan.optimization.liveBench.stale ? '（本次刷新失败，沿用上次快照）' : ''}` : '未完成联网核验，使用实验基线'}`,
-    plan.web?.needsWeb ? `联网策略：${plan.web.directBrowser ? 'Ego Browser 可见窗口优先' : 'ModSearch 搜索/抓取，失败时 Ego Browser 窗口兜底'}；反爬处理：人工接管后继续` : '',
-    String(plan.reason ?? ''),
-  ].filter(Boolean).join('\n')
-  return {
-    id: newMessageId(),
-    role: 'user',
-    content: [{ type: 'text', text }],
-    source: { kind: 'plugin', plugin: name, form: 'notice', summary: '路由分析与任务分配' },
-  }
+function explicitRoute(args, routes) {
+  const provider = text(args.provider)
+  const model = text(args.model)
+  if (Boolean(provider) !== Boolean(model)) throw new Error('provider and model must be supplied together')
+  if (!provider) return null
+  const route = routes.find(item => item.provider === provider && item.model === model)
+  if (!route) throw new Error(`route ${provider}/${model} is not configured in DeepSeek Harness`)
+  return route
 }
 
-function hasStageMarker(messages, step) {
-  const marker = `[Model Router 协作阶段 ${step}/`
-  return messages.some(message => message?.content?.some(block => typeof block?.text === 'string' && block.text.includes(marker)))
-}
-
-function shouldCollaborate(plan, available) {
-  return plan?.complexity?.band === 'complex'
-    && Array.isArray(plan.subtasks)
-    && plan.subtasks.length >= 3
-    && plan.selected !== null
-    && plan.selected !== undefined
-    && Array.isArray(available)
-    && available.length > 0
-}
-
-function routeKey(provider, model) {
-  return `${String(provider ?? '')}/${String(model ?? '')}`
-}
-
-function modelFallbackError(failure) {
-  const text = `${String(failure?.code ?? '')} ${String(failure?.message ?? '')} ${formatErrorChain(failure)}`.toLowerCase()
-  return /unsupported[_ -]reasoning[_ -]effort|no[_ -]adapter|invalid[_ -]model|invalid[_ -]credential|missing[_ -]credential|auth(?:entication|orization)?|api key|quota|region|not available|not supported|unsupported provider stream event|provider protocol|invalid (?:stream|event)|codex\.rate_limits|freeusagelimit|rate limit|too many requests|\b(?:401|403|404|429)\b/.test(text)
-}
-
-function failureCooldownMs(failure) {
-  const text = `${String(failure?.code ?? '')} ${String(failure?.message ?? '')} ${formatErrorChain(failure)}`.toLowerCase()
-  const requested = Number(failure?.retryAfterMs)
-  if (Number.isFinite(requested) && requested > 0) return Math.min(Math.max(requested, 30000), 30 * 60 * 1000)
-  if (/auth|api key|credential|\b401\b/.test(text)) return 30 * 60 * 1000
-  if (/unsupported provider stream event|provider protocol|codex\.rate_limits/.test(text)) return 10 * 60 * 1000
-  return 2 * 60 * 1000
-}
-
-function routeTemporarilyUnavailable(state, key) {
-  if (state.failedModels.has(key)) return true
-  const deadline = Number(state.routeCooldowns.get(key) ?? 0)
-  if (deadline <= Date.now()) {
-    state.routeCooldowns.delete(key)
-    return false
-  }
-  return true
-}
-
-function nextAvailableTarget(state, step = state.lastStep) {
-  const candidates = Array.isArray(state.plan?.candidates) ? state.plan.candidates : []
-  const assignment = state.plan?.subtasks?.[Math.max(0, Number(step || 1) - 1)]
-  const preferredEffort = assignment?.preferredReasoningEffort ?? assignment?.recommendedReasoningEffort ?? 'medium'
-  for (const candidate of candidates) {
-    const key = routeKey(candidate.provider, candidate.model)
-    if (routeTemporarilyUnavailable(state, key)) continue
-    const route = state.available.find(entry => entry.provider === candidate.provider && entry.model === candidate.model)
-    if (route !== undefined) {
-      return {
-        ...route,
-        reasoningEffort: selectReasoningEffort(route.reasoningEfforts, preferredEffort),
-      }
-    }
-  }
+function currentAgentRoute(agent) {
+  try {
+    const config = agent?.session?.requestHeader?.()?.config
+    if (text(config?.provider) && text(config?.model)) return { provider: config.provider, model: config.model }
+  } catch { /* background tools need not have a session-backed agent */ }
   return null
 }
 
-function settingsService(ctx) {
-  try {
-    return ctx.get?.('settings') ?? ctx.settings
-  } catch {
-    return ctx.settings
-  }
+function chooseConsultRoute(plan, routes, agent) {
+  const current = currentAgentRoute(agent)
+  const differs = route => current === null || routeKey(route) !== routeKey(current)
+  const preferred = routes.find(route => route.provider === plan.selected?.provider && route.model === plan.selected?.model)
+  if (preferred && differs(preferred)) return preferred
+  return routes.find(differs) ?? preferred ?? routes[0]
 }
 
-/**
- * Remove an official OpenCode website URL only when it is a user override and
- * the built-in model catalog is still in use. This lets the catalog restore
- * its per-model /zen and /zen/v1 endpoints without touching custom gateways.
- */
-async function repairOpenCodeEndpoint(ctx) {
-  const settings = settingsService(ctx)
-  if (settings === undefined || typeof settings.describe !== 'function' || typeof settings.mutate !== 'function') {
-    return 'unavailable'
-  }
-  let descriptor
-  try {
-    const descriptors = settings.describe()
-    descriptor = (Array.isArray(descriptors) ? descriptors : [])
-      .find(entry => String(entry?.ns) === LLM_SETTINGS_NAMESPACE)
-  } catch (error) {
-    ctx.logger?.debug?.(`model-router: settings inspection unavailable: ${String(error)}`)
-    return 'unavailable'
-  }
-  // The settings service can be mounted after this plugin. Report this state
-  // separately so the bounded startup retry can observe the namespace later.
-  if (descriptor === undefined) return 'pending'
-  const ops = collectOpenCodeEndpointRepairs(descriptor?.user)
-  if (ops.length === 0) return 'clean'
-  try {
-    await settings.mutate(LLM_SETTINGS_NAMESPACE, ops, descriptor.revision)
-    ctx.logger?.info?.(`model-router: restored OpenCode catalog endpoints for ${ops.length} route(s)`)
-    return 'repaired'
-  } catch (error) {
-    // A concurrent settings write can make the revision stale. The next
-    // settings/updated event retries the same repair against the new revision.
-    ctx.logger?.warn?.(`model-router: could not repair OpenCode endpoint: ${String(error)}`)
-    return 'retry'
-  }
+function commandText(plan) {
+  const selected = plan.selected ? `${plan.selected.provider}/${plan.selected.model}` : '没有可用路线'
+  const channel = plan.executionChannel === 'official-cli'
+    ? `官方 CLI（${plan.channelLabel ?? plan.channelTool}）`
+    : '官方模型目录 API'
+  return [
+    `推荐路线：${selected}`,
+    `复杂度：${plan.complexity.band}；任务类型：${plan.taskType}`,
+    `执行渠道：${channel}；估算成本：$${plan.estimatedCost.toFixed(6)}（仅估算）`,
+    `工作包：${plan.subtasks.map(item => `${item.name} → ${item.recommendedProvider}/${item.recommended}`).join('；')}`,
+    plan.team.handoff,
+  ].join('\n')
 }
 
-/**
- * Serialize endpoint repairs and retry only while the settings namespace is
- * coming online or a concurrent write makes the revision stale. A bounded
- * timer avoids leaving a desktop process alive indefinitely during shutdown.
- */
-function createOpenCodeRepairScheduler(ctx) {
-  const control = { inFlight: null, retryIndex: 0 }
-
-  const wait = delay => new Promise(resolve => setTimeout(resolve, delay))
-
-  /**
-   * Keep one repair promise for all callers. Request hooks await the same
-   * bounded retry sequence, so a startup registration race cannot leak a
-   * stale OpenCode website URL into the next model request.
-   */
-  const run = async () => {
-    let result = 'retry'
-    for (let attempt = 0; attempt <= OPEN_CODE_REPAIR_DELAYS_MS.length; attempt += 1) {
-      result = await repairOpenCodeEndpoint(ctx)
-      if (result === 'clean' || result === 'repaired') {
-        control.retryIndex = 0
-        return result
-      }
-      if (attempt === OPEN_CODE_REPAIR_DELAYS_MS.length) return result
-      control.retryIndex = attempt + 1
-      await wait(OPEN_CODE_REPAIR_DELAYS_MS[attempt])
-    }
-    return result
-  }
-
-  const schedule = () => {
-    if (control.inFlight !== null) return control.inFlight
-    const promise = run().catch(error => {
-      ctx.logger?.debug?.(`model-router: OpenCode repair scheduler failed: ${String(error)}`)
-      return 'retry'
-    })
-    control.inFlight = promise
-    void promise.finally(() => {
-      if (control.inFlight === promise) control.inFlight = null
-    })
-    return promise
-  }
-
-  return schedule
-}
-
-export function apply(ctx) {
-  const repairLiangshen = () => reportLiangshenCompatibility(ctx, repairLiangshenPreset())
-  repairLiangshen()
-  reportRouterSessionCompatibility(ctx, repairRouterSessions())
-
-  ctx.inject?.(['connection', 'llm', 'webServer'], galCtx => {
-    registerGalGameRoutes(galCtx)
-  })
-
-  // Desktop-only package mutation is exposed through an authenticated,
-  // fixed-purpose route when the optional native capabilities are present.
-  ctx.inject?.(['connection', 'desktopProfiles', 'desktopPnpm', 'webServer'], desktopCtx => {
-    registerNpmUpdateRoute(desktopCtx, import.meta.url)
-  })
-
-  // Settings are optional in headless test/minimal hosts. In a full Harness
-  // process this registers the editable pricing, LiveBench and budget section;
-  // the dynamic import keeps the standalone plugin loadable during bootstrap.
-  if (typeof ctx.inject === 'function') {
-    routerSettingsPromise = new Promise(resolve => {
-      let settled = false
-      const finish = value => {
-        if (settled) return
-        settled = true
-        resolve(value)
-      }
-      const timer = setTimeout(() => finish(false), 250)
-      try {
-        ctx.inject(['settings'], settingsCtx => {
-          void registerRouterSettings(settingsCtx).then(value => {
-            clearTimeout(timer)
-            finish(value)
-          })
-        })
-      } catch {
-        clearTimeout(timer)
-        finish(false)
-      }
-    })
-  } else {
-    routerSettingsPromise = registerRouterSettings(ctx)
-  }
-  const scheduleOpenCodeRepair = createOpenCodeRepairScheduler(ctx)
-
-  // dsh-approval-gate owns the actual decision. The router adds auditable
-  // stage/route context before that waterfall so multi-task escalations are
-  // visible to the gate's Flash classifier and human reviewer. The request
-  // object is borrowed by the Host approval service for this dispatch only.
-  ctx.on('approval/request', (request, next) => {
-    if (!isApprovalGateReason(request?.reason)) return next()
-    const state = request?.agent === undefined ? null : stateFor(request.agent)
-    const context = approvalSafetyContext(state, state?.lastStep)
-    const decorated = decorateApprovalReason(request.reason, context)
-    if (decorated !== request.reason) {
-      try {
-        request.reason = decorated
-      } catch {
-        // Some hosts freeze event payloads. In that case the gate still
-        // receives the original reason and remains fully fail-safe.
-      }
-    }
-    return next()
-  }, { prepend: true })
-
+/** Register model-facing tools and the human /router command. */
+export function apply(ctx, config = {}) {
+  registerOfficialToolModels(ctx)
+  ctx.tools.register(defineTool({
+    name: 'model_router_routes',
+    description: 'List provider/model routes registered in the official DeepSeek Harness model directory. Credential and network availability are not verified. No API keys or endpoints are returned.',
+    parameters: {},
+    output: JSON_OUTPUT,
+    async execute(_args, exec) {
+      const routes = await discoverConfiguredRoutes(ctx, exec.signal)
+      return jsonValue({ routes, count: routes.length, availabilityNotice: '目录记录不证明账号凭据和网络当前可用。' })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_plan',
+    description: 'Recommend configured Harness model routes for a task and optionally produce work packages for official Agent Teams. Costs are local estimates.',
+    parameters: {
+      task: { type: 'string', required: true, description: 'Task to analyze.' },
+      mode: { type: 'string', enum: ['single', 'team'], description: 'Use team to produce Agent Teams work packages.' },
+      budgetUsd: { type: 'number', description: 'Optional local estimated cost ceiling in USD.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      return jsonValue(await createRoutePlan(ctx, args.task, config, { mode: args.mode, budgetUsd: args.budgetUsd, signal: exec.signal }))
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_consult',
+    description: 'Ask one already configured Harness model for an independent opinion. Supply both provider and model for an explicit route, or omit both for a recommended route different from the current model when available.',
+    parameters: {
+      task: { type: 'string', required: true, description: 'Task or question for the consulted model.' },
+      provider: { type: 'string', description: 'Configured provider id; pair with model.' },
+      model: { type: 'string', description: 'Configured model id; pair with provider.' },
+      outputLimit: { type: 'number', description: 'Maximum returned characters, from 500 to 50000.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const routes = await discoverConfiguredRoutes(ctx, exec.signal)
+      if (routes.length === 0) throw new Error('no configured model routes are available')
+      const requested = explicitRoute(args, routes)
+      const plan = requested ? null : await createRoutePlan(ctx, args.task, config, { signal: exec.signal })
+      const route = requested ?? chooseConsultRoute(plan, routes, exec.agent)
+      const fallback = valueOf(config, 'maxConsultOutputChars', 12_000)
+      const limit = boundedInteger(args.outputLimit, finiteNumber(fallback, 12_000), 500, 50_000)
+      return jsonValue(await consultConfiguredModel(ctx, route, args.task, limit, exec.signal))
+    },
+  }))
   ctx.commands.register({
     name: 'router',
-    description: 'switch Model Router mode or inspect the latest routing plan',
-    // A router mode command is metadata-only. Accepting an attached image
-    // lets the client execute it without the generic command gate rejecting
-    // the whole composer submission; the GAL client sends this command
-    // without image bytes so the attachment remains available for the next
-    // user turn.
-    input: { hint: 'mode collective|single | plan | safety | watcher', images: true },
-    recordInput: true,
-    handler: ({ agent, rawInput }) => {
-      const state = stateFor(agent)
-      const value = String(rawInput ?? '').trim().toLowerCase()
-      if (value === 'mode single' || value === 'single') {
-        state.mode = 'single'
-        if (state.plan !== null) state.plan = { ...state.plan, mode: 'single' }
-        return { kind: 'success', text: 'Model Router 已切换到单独会话：保留你在原生模型选择器中的选择。' }
+    description: 'Show an official-model route recommendation for a task.',
+    input: { hint: 'Describe the task to plan' },
+    async handler({ rawInput, signal }) {
+      if (!text(rawInput)) return { kind: 'error', text: '用法：/router <需要规划的任务>' }
+      try {
+        const plan = await createRoutePlan(ctx, rawInput, config, { signal })
+        return { kind: 'success', text: commandText(plan) }
+      } catch (error) {
+        return { kind: 'error', text: `无法生成路由计划：${errorText(error)}` }
       }
-      if (value === 'mode collective' || value === 'collective') {
-        state.mode = 'collective'
-        if (state.plan !== null) state.plan = { ...state.plan, mode: 'collective' }
-        return { kind: 'success', text: 'Model Router 已切换到集体合作：下一条问题将按复杂度、专长、成本和延迟自动分配。' }
-      }
-      if (value === 'plan' || value === '') {
-        return { kind: 'success', text: state.plan === null ? '还没有可展示的路由方案。' : JSON.stringify(state.plan) }
-      }
-      if (value === 'safety' || value === 'approval') {
-        return { kind: 'success', text: JSON.stringify({ ...approvalGateStatus(ctx), context: approvalSafetyContext(state, state.lastStep) }) }
-      }
-      if (value === 'watcher') {
-        const watcher = watcherStatus(ctx, agent)
-        return { kind: 'success', text: JSON.stringify({
-          ...watcher,
-          router: { mode: state.mode, lastRoute: watcher.insights?.turn?.route ?? null },
-        }) }
-      }
-      if (value === 'web' || value === 'network') {
-        return { kind: 'success', text: JSON.stringify({ ...webCapabilityStatus(ctx), context: webCapabilityForPlan(state.taskText, state.plan) }) }
-      }
-      return { kind: 'error', text: '用法：/router mode collective、/router mode single、/router plan、/router safety、/router web 或 /router watcher' }
     },
   })
-
-  ctx.on('llm/adapters-updated', () => {
-    for (const state of allStates) {
-      state.directoryPromise = null
-      state.routeCooldowns.clear()
-    }
-    void scheduleOpenCodeRepair()
-  })
-
-  // Existing settings may have been loaded before this plugin mounted. The
-  // event listener handles later edits; the initial call covers that startup
-  // ordering without requiring users to remove and re-add the route.
-  void scheduleOpenCodeRepair()
-  ctx.on('settings/updated', (namespace) => {
-    if (String(namespace) === 'dsh-liangshen') queueMicrotask(repairLiangshen)
-    if (String(namespace) === LLM_SETTINGS_NAMESPACE) void scheduleOpenCodeRepair()
-  })
-  ctx.on('settings/document-updated', (namespace) => {
-    if (String(namespace) === LLM_SETTINGS_NAMESPACE) void scheduleOpenCodeRepair()
-  })
-
-  ctx.on('agent/pre-step', async ({ agent, messages, signal, turn, step }, next) => {
-    if (signal?.aborted) return next()
-    // Repair before the mode check: single-session requests use the same
-    // OpenCode catalog and must not inherit a stale route-level website URL.
-    await scheduleOpenCodeRepair()
-    const state = stateFor(agent)
-    if (state.turn !== null && state.turn !== turn) {
-      state.failedModels.clear()
-      state.lastTarget = null
-      state.lastStep = 0
-      state.plan = null
-      state.collaboration = null
-      state.taskText = ''
-      state.personaInjected = false
-      state.hasImageBlocks = false
-    }
-    state.turn = turn
-    state.hasImageBlocks ||= messages.some(message => contentHasImage(message?.content))
-    if (state.mode !== 'collective' || signal?.aborted) {
-      if (state.taskText === '') state.taskText = inputText(messages)
-      const proposed = await next()
-      if (signal?.aborted || proposed === undefined || proposed === null || proposed.kind !== 'enter') return proposed
-      const hasPersona = proposed.messages.some(message => message?.content?.some(block => isPersonaPrompt(block?.text)))
-      if (hasPersona) state.personaInjected = true
-      const personaContext = state.personaInjected ? null : personaMessage(state, agent, Number.isFinite(Number(step)) ? Number(step) : 1)
-      if (personaContext === null) return proposed
-      if (personaContext !== null) state.personaInjected = true
-      return { ...proposed, messages: [...proposed.messages, personaContext] }
-    }
-    const available = await discover(ctx, state)
-    if (signal?.aborted) return next()
-    if (state.plan === null || state.plan.mode !== state.mode) {
-      await routerSettingsPromise
-      state.taskText = inputText(messages)
-      const liveBench = await liveBenchFor(ctx, state)
-      const readyRoutes = available.filter(route => !routeTemporarilyUnavailable(state, routeKey(route.provider, route.model)))
-      const routable = readyRoutes.length > 0 ? readyRoutes : available
-      const plan = buildPlan({
-        text: state.taskText,
-        available: routable,
-        mode: state.mode,
-        pricing: routerSettings.pricing,
-        liveBench,
-        liveBenchError: state.liveBenchError,
-        budgetUsd: routerSettings.budgetUsd,
-        cacheReadRatio: routerSettings.cacheReadRatio,
-        cacheWriteRatio: routerSettings.cacheWriteRatio,
-      })
-      state.plan = {
-        ...plan,
-        web: webCapabilityForPlan(state.taskText, plan),
-        safety: {
-          ...approvalGateStatus(ctx),
-          ...approvalSafetyContext({ ...state, plan }, Number(step)),
-          hardCategories: ['deletion', 'credential', 'remote', 'system', 'bulk'],
-          failSafe: true,
-        },
-      }
-      state.collaboration = shouldCollaborate(state.plan, routable)
-        ? { lastStep: 0, queuedStep: null }
-        : null
-    }
-    if (state.plan.selected !== null) {
-      ctx.logger?.info?.(`model-router: ${state.plan.selected.provider}/${state.plan.selected.model} selected (${state.plan.reason})`)
-    }
-    const proposed = await next()
-    if (proposed === undefined || proposed === null || proposed.kind !== 'enter') return proposed
-    const currentStep = Number.isFinite(Number(step)) ? Number(step) : state.lastStep + 1
-    const stageContext = stageMessage(state.plan, currentStep)
-    const analysisContext = currentStep === 1 ? analysisMessage(state.plan) : null
-    const webContext = currentStep === 1 ? webMessage(state.plan) : null
-    const hasPersona = proposed.messages.some(message => message?.content?.some(block => isPersonaPrompt(block?.text)))
-    if (hasPersona) state.personaInjected = true
-    const personaContext = state.personaInjected ? null : personaMessage(state, agent, currentStep)
-    const additions = []
-    if (analysisContext !== null && !hasStageMarker(proposed.messages, currentStep)) additions.push(analysisContext)
-    if (webContext !== null && !proposed.messages.some(message => message?.content?.some(block => block?.text === webContext.content[0].text))) additions.push(webContext)
-    if (personaContext !== null) {
-      additions.push(personaContext)
-      state.personaInjected = true
-    }
-    if (stageContext !== null && !hasStageMarker(proposed.messages, currentStep)) additions.push(stageContext)
-    state.lastStep = currentStep
-    return additions.length === 0 ? proposed : { ...proposed, messages: [...proposed.messages, ...additions] }
-  })
-
-  ctx.on('agent/request', async ({ agent, step, signal }, next) => {
-    // `agent/pre-step` normally runs first, but a request can be resumed while
-    // settings are still being registered. This second guard closes that race.
-    await scheduleOpenCodeRepair()
-    const proposed = await next()
-    if (signal?.aborted) return proposed
-    const state = stateFor(agent)
-    if (state.mode !== 'collective' || state.plan?.selected === null || state.plan?.selected === undefined) return proposed
-    let target = state.plan.selected
-    if (state.plan.complexity?.band === 'complex' && state.plan.subtasks?.length > 1) {
-      const assignment = state.plan.subtasks[(Math.max(1, step) - 1) % state.plan.subtasks.length]
-      const assignedRoute = state.available.find(route => route.provider === assignment?.recommendedProvider && route.model === assignment?.recommended)
-        ?? state.available.find(route => route.model === assignment?.recommended)
-      if (assignedRoute !== undefined) {
-        target = { provider: assignedRoute.provider, model: assignedRoute.model, reasoningEffort: assignment?.recommendedReasoningEffort, estimatedCost: target.estimatedCost }
-      }
-      // The final subtask is the public answer synthesis. Prefer the user's
-      // requested DeepSeek V4 Pro when it is actually available; otherwise the
-      // deterministic plan's fallback remains in force and is shown in the UI.
-      const synthesis = state.plan.synthesizer
-      if (assignment?.purpose === 'synthesis' && synthesis?.provider && synthesis?.model) {
-        const synthesisRoute = state.available.find(route => route.provider === synthesis.provider && route.model === synthesis.model)
-        if (synthesisRoute !== undefined) {
-          target = { provider: synthesisRoute.provider, model: synthesisRoute.model, reasoningEffort: synthesis.reasoningEffort, estimatedCost: target.estimatedCost }
+  ctx.commands.register({
+    name: 'tools',
+    description: 'Show official model CLI install status, or install one registry tool.',
+    input: { hint: '留空查看状态；或输入 install <工具id>' },
+    async handler({ rawInput, signal }) {
+      const input = text(rawInput)
+      const installMatch = input.match(/^install\s+([A-Za-z0-9_-]+)$/i)
+      if (!installMatch) {
+        if (input) return { kind: 'error', text: '用法：/tools 查看状态，或 /tools install <工具id>' }
+        try {
+          const probes = await probeAllTools()
+          const lines = probes.map(probe => {
+            const tool = getOfficialTool(probe.id)
+            const command = installCommandLine(tool)
+            const status = probe.status === 'installed'
+              ? `已安装 ${probe.version ?? ''}`
+              : probe.status === 'unsupported'
+                ? '不支持一键安装'
+                : '未安装'
+            return `• ${tool.label}（${probe.id}）：${status}${command && probe.status === 'not-installed' ? `\n  安装：/tools install ${probe.id}（即 ${command}）` : ''}`
+          })
+          return { kind: 'success', text: `官方工具状态：\n${lines.join('\n')}` }
+        } catch (error) {
+          return { kind: 'error', text: `探测失败：${errorText(error)}` }
         }
       }
-    }
-    if (routeTemporarilyUnavailable(state, routeKey(target.provider, target.model))) {
-      const fallback = nextAvailableTarget(state, step)
-      if (fallback !== null) {
-        target = { provider: fallback.provider, model: fallback.model, reasoningEffort: fallback.reasoningEffort, estimatedCost: target.estimatedCost }
+      try {
+        const job = startInstall(installMatch[1])
+        const tool = getOfficialTool(installMatch[1])
+        const settled = await waitForInstall(job.tool, signal)
+        if (settled.status === 'succeeded') {
+          const probe = await probeToolWith(tool, defaultRunner)
+          return { kind: 'success', text: `${tool.label} 安装完成${probe.version ? `，探测版本 ${probe.version}` : ''}。` }
+        }
+        return { kind: 'error', text: `${tool.label} 安装失败：${settled.error ?? '未知原因'}\n${settled.outputTail.slice(-6).join('\n')}` }
+      } catch (error) {
+        return { kind: 'error', text: `无法开始安装：${errorText(error)}` }
       }
-    }
-    const plannedProvider = target.provider
-    target = routeThroughModLens({
-      target,
-      available: state.available,
-      visionBridges: state.visionBridges,
-      hasImageBlocks: state.hasImageBlocks,
-    })
-    state.lastTarget = { provider: target.provider, model: target.model, reasoningEffort: target.reasoningEffort, plannedProvider }
-    state.lastStep = step
-    // Keep all non-routing request fields intact. If a route disappeared after
-    // discovery, the LLM runtime will validate the proposal and the original
-    // model remains available on the next step.
-    const routed = { ...proposed, provider: target.provider, model: target.model }
-    if (target.reasoningEffort === undefined) delete routed.reasoningEffort
-    else routed.reasoningEffort = target.reasoningEffort
-    return routed
+    },
   })
+}
 
-  // A completed work step would normally close the turn immediately. Queue the
-  // next real collaboration stage at that boundary so the Harness agent loop
-  // executes it as another logged model call. The final stage is the only one
-  // allowed to answer the owner directly.
-  ctx.on('agent/turn-stopping', ({ agent, signal }) => {
-    const state = stateFor(agent)
-    if (signal?.aborted || state.mode !== 'collective' || state.collaboration === null || state.plan === null) return
-    const nextStage = nextCollaborationStage(state.plan, state.lastStep)
-    if (nextStage === null) return
-    const nextStep = state.lastStep + 1
-    const message = stageMessage(state.plan, nextStep)
-    if (message === null) return
-    agent.inject(message)
-    state.collaboration.queuedStep = nextStep
-    ctx.logger?.info?.(`model-router: collaboration stage ${nextStep}/${state.plan.subtasks.length} queued`)
-  })
+/** Poll an install job until it settles or the signal aborts. */
+async function waitForInstall(toolId, signal) {
+  for (;;) {
+    if (signal?.aborted) throw new Error('已取消等待安装完成；安装进程仍在后台执行。')
+    const job = installStatus(toolId)
+    if (!job) throw new Error('安装任务丢失。')
+    if (job.status !== 'running') return job
+    await new Promise(resolve => setTimeout(resolve, 1_500))
+  }
+}
 
-  ctx.on('agent/request-error', async ({ agent, provider, failure, signal }, next) => {
-    const state = stateFor(agent)
-    if (signal?.aborted || state.mode !== 'collective' || !modelFallbackError(failure)) return next()
-    const failed = state.lastTarget !== null && (provider === undefined || provider === null || state.lastTarget.provider === provider) ? state.lastTarget : null
-    if (failed === null) return next()
-    const failedKey = routeKey(failed.plannedProvider ?? failed.provider, failed.model)
-    state.failedModels.add(failedKey)
-    state.routeCooldowns.set(failedKey, Date.now() + failureCooldownMs(failure))
-    const fallback = nextAvailableTarget(state, state.lastStep)
-    if (fallback === null) return next()
-    if (state.plan !== null) {
-      const plan = state.plan
-      const failedStage = plan.subtasks?.[Math.max(0, state.lastStep - 1)]
-      const failedStageIndex = Math.max(0, state.lastStep - 1)
-      const isSynthesisFailure = failedStage?.purpose === 'synthesis'
-      const subtasks = Array.isArray(plan.subtasks)
-        ? plan.subtasks.map((task, index) => index === failedStageIndex
-          ? { ...task, recommendedProvider: fallback.provider, recommended: fallback.model, recommendedReasoningEffort: fallback.reasoningEffort }
-          : task)
-        : plan.subtasks
-      state.plan = {
-        ...plan,
-        ...(plan.selected === null ? {} : { selected: { ...plan.selected, provider: fallback.provider, model: fallback.model, reasoningEffort: fallback.reasoningEffort } }),
-        subtasks,
-        ...(isSynthesisFailure ? {
-          synthesizer: { provider: fallback.provider, model: fallback.model, reasoningEffort: fallback.reasoningEffort },
-        } : {}),
-      }
-    }
-    ctx.logger?.warn?.(`model-router: ${routeKey(failed.provider, failed.model)} unavailable; retrying with ${routeKey(fallback.provider, fallback.model)}`)
-    return { kind: 'retry' }
-  })
-
-  ctx.on('agent/error', ({ agent, error }) => {
-    ctx.logger?.warn?.(`model-router: agent ${String(agent.id)} failed: ${formatErrorChain(error)}`)
-  })
+/** Register the model-facing official-tool probes and installer. */
+function registerOfficialToolModels(ctx) {
+  ctx.tools.register(defineTool({
+    name: 'model_router_tools',
+    description: 'Probe the fixed registry of official model CLI tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build) and report which are installed with their versions. Never reads credentials.',
+    parameters: {},
+    output: JSON_OUTPUT,
+    async execute(_args, exec) {
+      throwIfAborted(exec.signal)
+      const probes = await probeAllTools()
+      return jsonValue({
+        tools: probes,
+        installHint: '未安装的工具可由 model_router_tool_install 按注册表固定命令安装；版本与包名不接受自定义。',
+      })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_tool_install',
+    description: 'Install one official model CLI tool by registry id using its pinned official command. Only registry ids are accepted; arbitrary packages or executables are refused. Returns the bounded install output.',
+    parameters: {
+      tool: { type: 'string', required: true, description: 'Registry tool id, e.g. kimi-code.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const job = startInstall(args.tool)
+      const settled = await waitForInstall(job.tool, exec.signal)
+      const tool = getOfficialTool(args.tool)
+      const probe = settled.status === 'succeeded'
+        ? await probeToolWith(tool, defaultRunner)
+        : null
+      return jsonValue({
+        ...settled,
+        postInstallProbe: probe,
+        notice: '安装命令完全来自服务端注册表；实际版本以探测横幅为准。',
+      })
+    },
+  }))
 }

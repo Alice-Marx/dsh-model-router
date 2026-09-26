@@ -673,7 +673,8 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
           model: String(entry.model ?? ''),
           reasoningEfforts: [...new Set(reasoningEfforts)],
           defaultReasoningEffort: entry.defaultReasoningEffort === undefined ? undefined : String(entry.defaultReasoningEffort),
-          reasoningKnown: entry.reasoningKnown === true || Array.isArray(entry.reasoningEfforts),
+          reasoningKnown: entry.reasoningKnown === true
+            || (entry.reasoningKnown === undefined && Array.isArray(entry.reasoningEfforts)),
         }
       })
     : []

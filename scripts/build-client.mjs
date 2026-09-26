@@ -1,152 +1,66 @@
-import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { resolve, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import * as esbuild from 'esbuild'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const CHECKOUT = resolve(ROOT, '../..')
-const HARNESS = resolve(ROOT, '../DSH-Desktop')
-const UI_PRIMITIVES = process.env.DSH_UI_PRIMITIVES_PATH
-  ? resolve(process.env.DSH_UI_PRIMITIVES_PATH)
-  : join(HARNESS, 'packages', 'client', 'ui-primitives', 'lib', 'index.js')
-const ENTRY = '.dsh-plugin/client/index.mjs'
+const ENTRY = join(ROOT, '.dsh-plugin', 'client', 'official-harness.jsx')
 const OUTPUT = join(ROOT, '.dsh-plugin', 'client.js')
 const PACKAGE = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
-const PLUGIN_ID = PACKAGE.name
-const PLUGIN_VERSION = PACKAGE.version
 
-if (typeof PLUGIN_ID !== 'string' || PLUGIN_ID.length === 0) {
-  throw new Error('package.json must define a non-empty name for the client loader id')
-}
-if (typeof PLUGIN_VERSION !== 'string' || PLUGIN_VERSION.length === 0) {
-  throw new Error('package.json must define a non-empty version for the client bundle')
-}
-
-function resolveEsbuildBin() {
-  // pnpm's Windows layout exposes the native binary as `esbuild` (without
-  // the .exe suffix), while a standalone install may use `esbuild.exe`.
-  const platformBinary = 'esbuild'
-  const pnpmRoot = join(CHECKOUT, 'node_modules', '.pnpm')
-  const pnpmCandidates = (() => {
-    try {
-      return readdirSync(pnpmRoot)
-        .filter(name => name.startsWith('esbuild@'))
-        .map(name => join(pnpmRoot, name, 'node_modules', 'esbuild', 'bin', platformBinary))
-    } catch { return [] }
-  })()
-  const nativeCandidates = (() => {
-    try {
-      const prefix = '@esbuild+' + process.platform + '-' + process.arch + '@'
-      return readdirSync(pnpmRoot)
-        .filter(name => name.startsWith(prefix))
-        .map(name => join(pnpmRoot, name, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary + (process.platform === 'win32' ? '.exe' : '')))
-        .reverse()
-    } catch { return [] }
-  })()
-  const candidates = [
-    ...(() => {
-      try {
-        const prefix = '@esbuild+' + process.platform + '-' + process.arch + '@'
-        const localPnpmRoot = join(ROOT, 'node_modules', '.pnpm')
-        return readdirSync(localPnpmRoot)
-          .filter(name => name.startsWith(prefix))
-          .map(name => join(localPnpmRoot, name, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary + (process.platform === 'win32' ? '.exe' : '')))
-          .reverse()
-      } catch { return [] }
-    })(),
-    ...nativeCandidates,
-    ...(() => {
-      try {
-        const prefix = '@esbuild+' + process.platform + '-' + process.arch + '@'
-        return readdirSync(join(HARNESS, 'node_modules', '.pnpm'))
-          .filter(name => name.startsWith(prefix))
-          .map(name => join(HARNESS, 'node_modules', '.pnpm', name, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary + (process.platform === 'win32' ? '.exe' : '')))
-          .reverse()
-      } catch { return [] }
-    })(),
-    join(ROOT, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary),
-    join(ROOT, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary + '.exe'),
-    join(HARNESS, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary),
-    join(HARNESS, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary + '.exe'),
-    join(CHECKOUT, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary),
-    join(CHECKOUT, 'node_modules', '@esbuild', `${process.platform}-${process.arch}`, platformBinary + '.exe'),
-    join(ROOT, 'node_modules/.bin/esbuild'),
-    join(HARNESS, 'node_modules/.bin/esbuild'),
-    join(CHECKOUT, 'node_modules/.bin/esbuild'),
-    ...pnpmCandidates,
-    ...(() => {
-      try {
-        return readdirSync(join(HARNESS, 'node_modules', '.pnpm'))
-          .filter(name => name.startsWith('esbuild@'))
-          .map(name => join(HARNESS, 'node_modules', '.pnpm', name, 'node_modules', 'esbuild', 'bin', platformBinary))
-      } catch { return [] }
-    })(),
-  ]
-  for (const candidate of candidates) {
-    try { if (statSync(candidate).isFile()) return candidate } catch { /* try next */ }
-  }
-  return null
+function wrapper(body) {
+  return [
+    'window.__ModuleLoader__.load({',
+    `  id: ${JSON.stringify(PACKAGE.name)},`,
+    '  factory: (require) => {',
+    '    var module = { exports: {} };',
+    '    var exports = module.exports;',
+    body.trimEnd(),
+    '    return module.exports;',
+    '  },',
+    '});',
+    '',
+  ].join('\n')
 }
 
-export function generate({ check = false } = {}) {
-  const esbuild = resolveEsbuildBin()
-  if (esbuild === null) return { ok: true, skipped: 'esbuild 不可用' }
-  const temp = mkdtempSync(join(tmpdir(), 'model-router-galgame-'))
-  const tempOut = join(temp, 'client.js')
-  const args = [
-    ENTRY, '--bundle', '--format=cjs', '--platform=browser', '--target=es2020',
-    '--external:react', '--external:react/*', '--external:react-dom', '--external:react-dom/*', '--jsx=transform', '--jsx-factory=React.createElement',
-    '--jsx-fragment=React.Fragment', '--loader:.png=dataurl', '--loader:.webp=dataurl', '--loader:.woff2=dataurl', '--loader:.woff=dataurl', '--loader:.ttf=dataurl',
-    '--define:__MODEL_ROUTER_VERSION__=' + JSON.stringify(PLUGIN_VERSION),
-    '--outfile=' + tempOut,
-  ]
-  // The source checkout is a sibling of this plugin, so pnpm's workspace
-  // symlink is not visible from the plugin directory. Use the built host
-  // package when it is present; published installs resolve the package normally.
-  if (process.env.DSH_UI_PRIMITIVES_PATH) {
-    try {
-      if (!statSync(UI_PRIMITIVES).isFile()) throw new Error('not a file')
-    } catch {
-      return { ok: false, errors: ['DSH_UI_PRIMITIVES_PATH 必须指向真实宿主 UI 包的 lib/index.js'] }
-    }
-  }
-  try {
-    if (statSync(UI_PRIMITIVES).isFile()) {
-      args.splice(args.length - 1, 0, '--alias:@deepseek-ai/dsh-client-ui-primitives=' + UI_PRIMITIVES)
-    }
-  } catch { /* package may be provided through normal node resolution */ }
-  const result = spawnSync(esbuild, args, { cwd: ROOT, stdio: 'inherit' })
-  if (result.status !== 0) return { ok: false, errors: ['esbuild 失败（exit ' + String(result.status) + '）：' + String(result.error?.message ?? '')] }
-  const body = readFileSync(tempOut, 'utf8')
-  let bundledCss = ''
-  try { bundledCss = readFileSync(tempOut.replace(/\.js$/, '.css'), 'utf8') } catch { /* CSS is optional */ }
-  const code = Buffer.from(
-    'window.__ModuleLoader__.load({\n'
-    + '\tid: ' + JSON.stringify(PLUGIN_ID) + ',\n'
-    + '\tfactory: (require) => {\n'
-    + '\t\tvar module = { exports: {} };\n'
-    + '\t\tvar exports = module.exports;\n'
-    + (bundledCss === '' ? '' : '\t\t{ if (typeof document !== "undefined" && document.querySelector("style[data-model-router-markdown]") === null) { const markdownStyleEl = document.createElement("style"); markdownStyleEl.setAttribute("data-model-router-markdown", ""); markdownStyleEl.textContent = ' + JSON.stringify(bundledCss) + '; document.head.append(markdownStyleEl); } }\n')
-    + body.replace(/\n$/, '')
-    + '\n\t\treturn module.exports;\n'
-    + '\t}\n'
-    + '});\n',
-  )
+export async function generate({ check = false } = {}) {
+  const result = await esbuild.build({
+    absWorkingDir: ROOT,
+    entryPoints: [ENTRY],
+    bundle: true,
+    format: 'cjs',
+    platform: 'browser',
+    target: 'es2020',
+    jsx: 'transform',
+    jsxFactory: 'React.createElement',
+    jsxFragment: 'React.Fragment',
+    loader: { '.css': 'text' },
+    external: [
+      'react', 'react/*', 'react-dom', 'react-dom/*',
+      '@deepseek-ai/dsh-client-ui-primitives',
+    ],
+    outfile: OUTPUT,
+    write: false,
+  })
+  const output = result.outputFiles.find(file => file.path.endsWith('.js'))
+  if (output === undefined) throw new Error('esbuild did not return a JavaScript bundle')
+  const code = wrapper(output.text)
   if (!check) {
     writeFileSync(OUTPUT, code)
-    return { ok: true }
+    return { ok: true, output: OUTPUT, bytes: Buffer.byteLength(code) }
   }
-  let committed
-  try { committed = readFileSync(OUTPUT) } catch { return { ok: false, errors: ['client.js 不存在'] } }
-  return Buffer.compare(committed, code) === 0
-    ? { ok: true }
-    : { ok: false, errors: ['client.js 与源码不一致'] }
+  let committed = ''
+  try { committed = readFileSync(OUTPUT, 'utf8') } catch { return { ok: false, errors: ['client.js does not exist'] } }
+  return committed === code ? { ok: true, output: OUTPUT, bytes: Buffer.byteLength(code) }
+    : { ok: false, errors: ['client.js is not generated from official-harness.jsx'] }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const result = generate({ check: process.argv.includes('--check') })
-  if (result.skipped) console.log('[build-client] SKIP：' + result.skipped)
-  if (!result.ok) { for (const error of result.errors ?? []) console.error('[build-client] ' + error); process.exit(1) }
-  else if (!result.skipped) console.log(process.argv.includes('--check') ? '[build-client] OK' : '[build-client] client.js 已生成')
+  const result = await generate({ check: process.argv.includes('--check') })
+  if (!result.ok) {
+    for (const error of result.errors ?? []) console.error(`[build-client] ${error}`)
+    process.exitCode = 1
+  } else {
+    console.log(process.argv.includes('--check') ? '[build-client] OK' : `[build-client] generated ${result.bytes} bytes`)
+  }
 }
