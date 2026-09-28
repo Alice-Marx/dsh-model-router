@@ -1,6 +1,6 @@
 # 从旧桌面适配迁移到官方 DeepSeek Harness
 
-目标是官方 **DeepSeek Harness Desktop 0.1.7-rc.2** 插件运行时。当前本地候选版为 **0.8.0，尚未发布**，包名继续使用 `@ljwei-stak/model-router-galgame`。
+目标是官方 **DeepSeek Harness Desktop 0.1.7-rc.2** 插件运行时。候选版 **0.8.0** 已发布到 npm `next` 与 GitHub 预发布，真实账号和 Desktop 验收仍待完成；npm `latest` 保持 0.4.32。包名继续使用 `@ljwei-stak/model-router-galgame`。
 
 ## 安装与配置
 

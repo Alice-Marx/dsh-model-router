@@ -1,6 +1,6 @@
 # Model Router Galgame · DeepSeek Harness 插件
 
-面向官方 **DeepSeek Harness Desktop 0.1.7-rc.2**。当前本地候选包为 **0.8.0，尚未发布**；npm 包名保持 `@ljwei-stak/model-router-galgame`。仓库：[Alice-Marx/model-router-galgame](https://github.com/Alice-Marx/model-router-galgame)。
+面向官方 **DeepSeek Harness Desktop 0.1.7-rc.2**。**0.8.0 候选版已发布到 npm `next` 和 GitHub 预发布**；npm `latest` 仍为 0.4.32。真实账号与 Desktop 验收尚未完成。npm 包名为 `@ljwei-stak/model-router-galgame`。仓库：[Alice-Marx/model-router-galgame](https://github.com/Alice-Marx/model-router-galgame)。
 
 ## 功能
 
@@ -29,4 +29,4 @@
 
 ## 发布状态
 
-0.8.0 仍是本地开发候选版。按用户要求，插件全部完善并完成必要的桌面与真实账号验证后，再上传 npm 和 GitHub。
+0.8.0 是候选版，已发布到 [npm `next`](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.8.0) 和 [GitHub 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.8.0)。它尚未通过真实账号和官方 Desktop 验收；npm `latest` 保持 0.4.32。

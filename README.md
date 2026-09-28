@@ -1,6 +1,6 @@
 # Model Router Galgame for DeepSeek Harness
 
-Desktop plugin for the official **DeepSeek Harness 0.1.7-rc.2**. The current local build is **0.8.0, unpublished**. The npm package name remains `@ljwei-stak/model-router-galgame`.
+Desktop plugin for the official **DeepSeek Harness 0.1.7-rc.2**. Version **0.8.0** is available as the npm `next` candidate and a GitHub prerelease; npm `latest` remains 0.4.32. Real-account and Desktop acceptance is still pending. The npm package name is `@ljwei-stak/model-router-galgame`.
 
 ## Features
 

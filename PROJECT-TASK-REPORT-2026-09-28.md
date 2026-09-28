@@ -11,6 +11,7 @@
 - 源码提交 `81179a26e92f371da2d7c4b18599968b39b81350` 已快进推送到 GitHub `main`；注释标签 `v0.8.0` 指向该提交。
 - [GitHub 0.8.0 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.8.0) 已创建，附带同一 `.tgz` 安装包。GitHub 资产公布的 SHA-256 与本地包一致：`0CF4BDFB3BE8F110254C994272C19795F659BFCC9CA7D54DC4B29CC063C6D8DD`，大小 12,582,606 字节。
 - npm 包维护者 `ljwei-stak` 已完成登录及网页二次验证。[npm 0.8.0 包](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.8.0) 已以 `next` 标签发布；公开 registry 查询确认 `next=0.8.0`、`latest=0.4.32`。[公开 tarball](https://registry.npmjs.org/@ljwei-stak/model-router-galgame/-/model-router-galgame-0.8.0.tgz) 下载结果为 12,582,606 字节，其 SHA-256 为 `0CF4BDFB3BE8F110254C994272C19795F659BFCC9CA7D54DC4B29CC063C6D8DD`，与本地包及 GitHub 附件完全一致；其 SHA-512 也与 registry `dist.integrity` 一致。
+- 同步报告的 GitHub `main` 提交为 `bf30cc2`；本次再修正文档顶部的发布状态，避免仓库文档继续显示“未发布”。
 
 历史状态：0.5.1 已由官方插件管理器本地安装，侧边栏及模型路由主面板曾实际显示；0.6.0 的本地包在 `package.json.files` 中漏掉 Host 工具模块，因此该旧包**不应继续安装或发布**。0.7.0 已修正打包清单并重新构建。
 

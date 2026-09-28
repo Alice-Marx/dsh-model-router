@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop 插件安装与验证
 
-适用官方桌面版 **0.1.7-rc.2**；当前仓库版本 **0.8.0（本地候选版，尚未发布）**。包名 `@ljwei-stak/model-router-galgame`。
+适用官方桌面版 **0.1.7-rc.2**；当前候选版本 **0.8.0** 已发布到 npm `next` 与 GitHub 预发布，尚未完成真实账号和 Desktop 验收。包名 `@ljwei-stak/model-router-galgame`。安装前可从 [npm 0.8.0](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.8.0) 或 [GitHub Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.8.0) 获取安装包。
 
 ## 生成安装包
 
