@@ -11,7 +11,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { runOfficialTool, officialToolExecutionCapabilities, officialToolReadiness } from './official-tool-executor.mjs'
 import { toolForProvider } from './official-tool-registry.mjs'
 
-const MAX_GIT_OUTPUT = 12_000_000
+const MAX_GIT_OUTPUT = 64_000_000
 const GIT_TIMEOUT_MS = 120_000
 
 function within(parent, child) {
@@ -117,6 +117,11 @@ async function excludeNestedWorktrees(workspace, signal) {
 /** Keep generated worktrees beside the project so they use the same drive. */
 async function isolatedWorktree(workspace, signal, allowedRoot) {
   await cleanRepoRoot(workspace, signal)
+  const base = await git(['rev-parse', 'HEAD'], { cwd: workspace, signal })
+  if (!base.ok || !/^[0-9a-f]{40,64}$/i.test(base.output.toString('utf8').trim())) {
+    throw gitError('记录原仓库基线', base)
+  }
+  const baseCommit = base.output.toString('utf8').trim()
   const policyRoot = await canonicalDirectory(allowedRoot ?? workspace)
   const sibling = join(dirname(workspace), '.model-router-workspaces', basename(workspace))
   const parent = within(policyRoot, sibling) ? sibling : join(workspace, '.model-router-workspaces')
@@ -128,37 +133,94 @@ async function isolatedWorktree(workspace, signal, allowedRoot) {
   if (!added.ok) throw gitError('创建独立 Git 工作区', added)
   const runPath = await canonicalDirectory(target)
   if (!within(isolatedRoot, runPath) || runPath === isolatedRoot) throw new Error('独立工作区路径校验失败')
-  return { workspace: runPath, isolatedRoot }
+  return { workspace: runPath, isolatedRoot, baseCommit }
 }
 
-async function integrateWorktree(source, isolated, signal) {
+async function integrateWorktree(source, isolated, baseCommit, signal) {
   await cleanRepoRoot(source, signal)
+  const current = await git(['rev-parse', 'HEAD'], { cwd: source, signal })
+  if (!current.ok) throw gitError('复核原仓库基线', current)
+  if (current.output.toString('utf8').trim() !== baseCommit) {
+    throw new Error('原仓库 HEAD 在官方 CLI 执行期间发生变化；保留独立工作区，拒绝自动整合')
+  }
   const ignored = await git(['ls-files', '--others', '--ignored', '--exclude-standard', '-z'], { cwd: isolated, signal })
   if (!ignored.ok) throw gitError('检查独立工作区忽略文件', ignored)
-  if (ignored.output.length > 0) {
-    const paths = ignored.output.toString('utf8').split('\0').filter(Boolean)
-    throw new Error(`独立工作区包含 ${paths.length} 个被 Git 忽略的产物，尚未整合；请在保留的工作区核对：${paths.slice(0, 12).join('、')}`)
-  }
+  const ignoredPaths = ignored.output.toString('utf8').split('\0').filter(Boolean)
   const staged = await git(['add', '-A'], { cwd: isolated, signal })
   if (!staged.ok) throw gitError('收集独立工作区变更', staged)
-  const patch = await git(['diff', '--cached', '--binary', 'HEAD'], { cwd: isolated, signal })
+  // Compare the final index with the original checkout commit. Vendor agents
+  // may create commits in their worktree; diffing only its current HEAD would
+  // silently drop all committed work.
+  const patch = await git(['diff', '--cached', '--binary', baseCommit], { cwd: isolated, signal })
   if (!patch.ok) throw gitError('生成独立工作区补丁', patch)
-  const names = await git(['diff', '--cached', '--name-only', 'HEAD'], { cwd: isolated, signal })
+  const names = await git(['diff', '--cached', '--name-only', baseCommit], { cwd: isolated, signal })
   if (!names.ok) throw gitError('列出修改文件', names)
   const changedFiles = names.output.toString('utf8').trim().split(/\r?\n/).filter(Boolean)
-  if (patch.output.length === 0) return { integrated: false, changedFiles: [], notice: '官方 CLI 没有修改受 Git 管理的文件。' }
+  if (patch.output.length === 0) return { integrated: false, changedFiles: [],
+    ignoredArtifacts: ignoredPaths.length, ignoredExamples: ignoredPaths.slice(0, 12),
+    notice: ignoredPaths.length > 0
+      ? '官方 CLI 只生成了 Git 忽略的产物；它们仍在独立工作区，须人工核对。'
+      : '官方 CLI 没有修改受 Git 管理的文件。' }
   const checked = await git(['apply', '--check', '--binary', '-'], { cwd: source, input: patch.output, signal })
   if (!checked.ok) throw gitError('核对原工作区补丁', checked)
   const applied = await git(['apply', '--binary', '-'], { cwd: source, input: patch.output, signal })
   if (!applied.ok) throw gitError('整合原工作区补丁', applied)
-  return { integrated: true, changedFiles, notice: '补丁已应用至原工作区，保留独立工作区供核对。' }
+  return { integrated: true, changedFiles,
+    ignoredArtifacts: ignoredPaths.length, ignoredExamples: ignoredPaths.slice(0, 12),
+    notice: ignoredPaths.length > 0
+      ? `源文件补丁已应用；${ignoredPaths.length} 个 Git 忽略产物未整合，仍在独立工作区供核对。`
+      : '补丁已应用至原工作区，保留独立工作区供核对。' }
+}
+
+function checkedTeamCliModels(cliModels, assigned) {
+  if (cliModels == null) return Object.create(null)
+  if (typeof cliModels !== 'object' || Array.isArray(cliModels)) {
+    throw new TypeError('cliModels must map work package ids or official tool ids to configured CLI model names')
+  }
+  const packages = new Map(assigned.map(item => [item.id, item]))
+  const tools = new Set(assigned.map(item => item.toolId))
+  const checked = Object.create(null)
+  for (const [key, model] of Object.entries(cliModels)) {
+    const toolId = packages.get(key)?.toolId ?? (tools.has(key) ? key : null)
+    if (!toolId || toolId === 'zcode') {
+      throw new TypeError(`cliModels contains an unsupported package or tool id: ${key}`)
+    }
+    if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(model)) {
+      throw new TypeError(`cliModels contains an invalid model name for ${toolId}`)
+    }
+    if ((toolId === 'minimax-code' || toolId === 'mimo-code') && !model.includes('/')) {
+      throw new TypeError(`${toolId} requires a provider/model CLI name`)
+    }
+    checked[key] = model
+  }
+  return checked
+}
+
+function teamCliModel(item, cliModels) {
+  // Harness directory IDs and vendor CLI aliases are independent namespaces.
+  // Only the two CLIs with a verified direct model argument contract receive
+  // a planned ID. All other vendors use their configured default until the
+  // user supplies a verified CLI mapping through that vendor's own settings.
+  if (cliModels[item.id]) return cliModels[item.id]
+  if (cliModels[item.toolId]) return cliModels[item.toolId]
+  return item.toolId === 'claude-code' || item.toolId === 'codex'
+    ? item.recommendedModel : null
 }
 
 function packagePrompt(task, item, completed) {
   const dependencies = item.dependsOn.map(id => completed.find(result => result.id === id)).filter(Boolean)
+  const directions = {
+    analysis: '提取本工作包对应的需求、约束、依赖和验收依据。此阶段只做分析，不修改文件。',
+    execution: '依据总任务与前置分析完成当前领域的实现或交付；不要接管其他执行工作包。',
+    verification: '逐项核对前置工作包的交付与原任务要求，列出证据、失败点和未验证内容。',
+    synthesis: '整合前置工作包成果，核对冲突与遗漏，给出最终交付清单和未完成事项。',
+  }
   return [
     `总任务：\n${String(task).slice(0, 40_000)}`,
-    `当前工作包：${item.name}（${item.type}）\n目标：${item.purpose}`,
+    `当前工作包：${item.name}（${item.type}）\n工作要求：${directions[item.purpose] ?? item.purpose}`,
+    item.objective ? `当前包的具体目标：\n${item.objective}` : '',
+    Array.isArray(item.verificationChecklist) && item.verificationChecklist.length
+      ? `验收要点：\n${item.verificationChecklist.map(point => `- ${point}`).join('\n')}` : '',
     dependencies.length
       ? `依赖工作包结果：\n${dependencies.map(dep => `${dep.name}: ${dep.finalText.slice(0, 2_500)}`).join('\n\n')}`
       : '当前工作包无前置依赖。',
@@ -167,18 +229,19 @@ function packagePrompt(task, item, completed) {
 }
 
 /** Preflight every assignment before any model request or workspace write. */
-export function executableTeamPackages(plan, installedIds = []) {
+export function executableTeamPackages(plan, installedIds = [], mode = 'read-only') {
   const capabilities = new Map(officialToolExecutionCapabilities().map(item => [item.id, item]))
   const packages = Array.isArray(plan?.team?.workPackages) ? plan.team.workPackages : []
   const blocking = []
   const assigned = packages.map(item => {
     const tool = toolForProvider(item.recommendedProvider)
     const capability = tool ? capabilities.get(tool.id) : null
-    if (!tool || !capability?.supported || !installedIds.includes(tool.id)) {
+    if (!tool || !capability?.supported || !capability.modes?.includes(mode) || !installedIds.includes(tool.id)) {
       blocking.push({ id: item.id, name: item.name, provider: item.recommendedProvider,
         toolId: tool?.id ?? null,
         reason: !tool ? '该供应商没有注册表中的官方 CLI。'
           : !capability?.supported ? capability?.reason ?? '此 CLI 暂不支持托管执行。'
+            : !capability.modes?.includes(mode) ? `此 CLI 不支持 ${mode} 模式；请选择已审批的可编辑隔离工作区模式。`
             : '此 CLI 尚未安装。' })
     }
     return { ...item, toolId: tool?.id ?? null }
@@ -187,11 +250,12 @@ export function executableTeamPackages(plan, installedIds = []) {
 }
 
 /** Sequential execution preserves DAG dependencies and avoids edit conflicts. */
-export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], signal, sandbox }) {
-  const { assigned, blocking } = executableTeamPackages(plan, installedIds)
+export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], cliModels, signal, sandbox }) {
+  const { assigned, blocking } = executableTeamPackages(plan, installedIds, mode)
   if (assigned.length === 0) return { status: 'blocked', blocking: [{ reason: '计划没有工作包。' }], results: [] }
   if (blocking.length > 0) return { status: 'blocked', blocking, results: [] }
   if (mode !== 'read-only' && mode !== 'workspace-write') throw new TypeError('team mode must be read-only or workspace-write')
+  const configuredCliModels = checkedTeamCliModels(cliModels, assigned)
   const source = await canonicalDirectory(workspace)
   if (typeof sandbox?.confine !== 'function') return { status: 'blocked', blocking: [{ reason: '官方 Harness 进程沙箱不可用。' }], results: [] }
   const readiness = await Promise.all([...new Set(assigned.map(item => item.toolId))].map(id => officialToolReadiness(id, source)))
@@ -202,9 +266,10 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   const completed = []
   for (const item of assigned) {
     if (signal?.aborted) return { status: 'cancelled', workspace: runWorkspace, results: completed }
+    const cliModel = teamCliModel(item, configuredCliModels)
     const result = await runOfficialTool({
       toolId: item.toolId,
-      modelId: item.recommendedModel,
+      modelId: cliModel,
       task: packagePrompt(task, item, completed),
       workspace: runWorkspace,
       mode,
@@ -212,10 +277,14 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       sandbox,
       signal,
     })
-    completed.push({ id: item.id, name: item.name, provider: item.recommendedProvider,
+    completed.push({ id: item.id, name: item.name,
+      ...(item.objective ? { objective: item.objective } : {}), provider: item.recommendedProvider,
       recommendedModel: item.recommendedModel, toolId: item.toolId,
       requestedCliModel: result.requestedModel ?? null,
-      actualModel: '已请求推荐模型；实际模型仍须以该厂商 CLI 返回记录核对',
+      actualModel: result.reportedModel ?? null,
+      modelNotice: result.modelNotice ?? (!cliModel
+        ? 'Harness 推荐模型 ID 未经此厂商 CLI 验证；本包使用厂商 CLI 已配置的默认模型。'
+        : result.reportedModel ? null : '该 CLI 未返回可核验的实际模型 ID；请以厂商运行记录核对。'),
       status: result.status, finalText: result.finalText ?? '',
       error: result.error ?? result.reason ?? null,
       outputTail: result.status === 'succeeded' ? null : result.stderrTail ?? result.stdoutTail ?? null })
@@ -224,9 +293,12 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   if (!isolated) return { status: 'cli-completed', workspace: runWorkspace, results: completed,
     notice: '只读模式已收集各工作包结果；模型输出仍需人工验收。' }
   try {
-    const integration = await integrateWorktree(source, runWorkspace, signal)
-    return { status: 'cli-completed', workspace: runWorkspace, results: completed, integration,
-      notice: '各 CLI 进程成功结束且可用补丁已整合；文件内容仍需按任务要求验收。' }
+    const integration = await integrateWorktree(source, runWorkspace, isolated.baseCommit, signal)
+    return { status: integration.ignoredArtifacts > 0 ? 'integration-pending' : 'cli-completed',
+      workspace: runWorkspace, results: completed, integration,
+      notice: integration.ignoredArtifacts > 0
+        ? '受 Git 管理的源文件已整合；忽略产物保留在独立工作区，仍需核对和补交。'
+        : '各 CLI 进程成功结束且可用补丁已整合；文件内容仍需按任务要求验收。' }
   } catch (error) {
     return { status: 'integration-pending', workspace: runWorkspace, results: completed,
       error: String(error?.message ?? error), notice: '独立工作区已保留；原工作区未自动整合。' }
@@ -244,8 +316,10 @@ export async function runOfficialTask({ toolId, task, workspace, allowedRoot, mo
     mode, isolatedRoot: isolated?.isolatedRoot, signal, sandbox })
   if (!isolated || result.status !== 'succeeded') return { ...result, ...(isolated ? { isolatedWorkspace: isolated.workspace } : {}) }
   try {
-    return { ...result, isolatedWorkspace: isolated.workspace,
-      integration: await integrateWorktree(source, isolated.workspace, signal) }
+    const integration = await integrateWorktree(source, isolated.workspace, isolated.baseCommit, signal)
+    return { ...result,
+      ...(integration.ignoredArtifacts > 0 ? { status: 'integration-pending' } : {}),
+      isolatedWorkspace: isolated.workspace, integration }
   } catch (error) {
     return { ...result, status: 'integration-pending', isolatedWorkspace: isolated.workspace,
       integrationError: String(error?.message ?? error) }

@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/model-router-galgame",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "description": "Official DeepSeek Harness desktop plugin: complexity-based model routing with official CLI tool probe/install, Agent Teams work packages, and a standalone Gal module (story & free modes)",
   "repository": {
@@ -48,6 +48,10 @@
     ".dsh-plugin/shared/official-tools-runtime.mjs",
     ".dsh-plugin/shared/official-tools-remote.mjs",
     ".dsh-plugin/shared/official-tool-executor.mjs",
+    ".dsh-plugin/shared/vendor-minimax-adapter.mjs",
+    ".dsh-plugin/shared/vendor-mimo-grok-adapter.mjs",
+    ".dsh-plugin/shared/zcode-bundle.mjs",
+    ".dsh-plugin/shared/zcode-installer.mjs",
     ".dsh-plugin/shared/official-team-runtime.mjs",
     "cordis.patch.yml",
     "README.md",

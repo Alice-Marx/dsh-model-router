@@ -2,9 +2,72 @@
 
 ## 项目方向与当前结论
 
-原 Rustagent/Wonderland 的复杂度路由、预算估算、跨模型分工与交付验收构想，现集中到 `model-router-galgame`，作为**官方 DeepSeek Harness Desktop 0.1.7-rc.2 的插件**继续开发。当前代码与本地安装候选包版本为 **0.7.0**。它尚未在用户真实账号及官方桌面版完成本轮验收，**未上传 npm，也未推送 GitHub**。用户要求的是全部完善可用后再发布；本报告列明可用能力与尚未达成的部分。
+原 Rustagent/Wonderland 的复杂度路由、预算估算、跨模型分工与交付验收构想，现集中到 `model-router-galgame`，作为**官方 DeepSeek Harness Desktop 0.1.7-rc.2 的插件**继续开发。当前代码与本地安装候选包版本为 **0.8.0**。它尚未在用户真实账号及官方桌面版完成本轮验收，**未上传 npm，也未推送 GitHub**。用户要求的是全部完善可用后再发布；本报告列明可用能力与尚未达成的部分。下文先记录 0.8.0，后面的 0.7.0 段落保留上一轮历史，不代表当前限制。
+
+2026-09-28 用户更新发布顺序，要求**先上传 npm 和 GitHub**。因此本轮以候选版身份发布，明确保留真实账号与桌面验收未完成的状态；发布结果会在完成后追加记录。构建时核对 npm 最高稳定版与 GitHub 最新 Release 均为 0.4.32，0.8.0 无同号冲突。
 
 历史状态：0.5.1 已由官方插件管理器本地安装，侧边栏及模型路由主面板曾实际显示；0.6.0 的本地包在 `package.json.files` 中漏掉 Host 工具模块，因此该旧包**不应继续安装或发布**。0.7.0 已修正打包清单并重新构建。
+
+## 0.8.0：七家官方工具执行与 ZCode 安装（本轮）
+
+### 完成的工作
+
+1. **Claude Code/Codex 完整工具入口**：可编辑 Claude 移除旧的 restricted、仅 Read/Glob/Grep、禁用技能/MCP/子代理的参数，改为经 Harness 工具审批后在独立 Git 工作区以官方 CLI 的正常工具集运行。Codex 恢复加载用户配置和其中的 MCP。审批文案明确会使用终端、技能与已配置 MCP。Windows 官方沙箱报告 `partial` 时，不能据此宣称所有磁盘和网络效果被完整封闭；原仓库仍通过干净工作区与补丁整合闸门保护。
+2. **Kimi Code 2.1.1**：固定官方 npm 包与 Node 入口，按 `-p` 和 `stream-json` 解析助手答复，要求退出码和最终答复。该模式自动处理工具权限，因此只开放经审批的独立工作区可编辑任务；过长的 Windows 命令行任务会明确拒绝并建议拆分。
+3. **MiniMax Code 0.5.5**：固定官方 npm 入口，使用 `mcode exec --input - --permission full --output-format stream-json`；解析任务起始、会话、回合与 `exec.completed` 结果，拒绝不完整或失败终态。仅开放经审批的独立工作区可编辑任务。模型参数要求 CLI 的 `provider/model` 格式。
+4. **MiMo Code 0.1.15 与 Grok Build 1.0.41**：绕过可变的 npm `.cmd`/JS 包装器，查找固定版本官方可选包的 Windows 原生程序并按发行文件 SHA-256 校验。MiMo 用 `mimo run --format json`，可编辑模式才使用官方 `--dangerously-skip-permissions`；解析 `error`、`step_finish` 和最终文本。Grok 用官方 `-p` 与 `streaming-json`，只读模式限读工具，可编辑模式启用 `--always-approve`；解析 `end/EndTurn`，长任务明确拒绝。Grok 原生程序和账号目录在本机非 C 盘 npm prefix 下使用 `.model-router-grok`。
+5. **ZCode 3.14.3**：按用户给出的官方仓库，识别 Windows 注册表、标准目录或显式安装目录；仅接受厂商签名有效、版本匹配、GLM 资源位于同一安装根目录，且实际执行的 `zcode.cjs` SHA-256 与固定官方安装器解包文件一致的桌面版。本机 `D:\Program Files\ZCode` 的 14,820,819 字节脚本与验签、验整包 SHA-256 的安装器解出文件逐字节相同，SHA-256 为 `B1DF2EF3E5BD76C4AF3ECB296BC003A10D3F13191A26610BD0BA940FEADAD529`。一键安装先下载到非 C 盘目录，核对安装器 SHA-256 与智谱签名，再打开原厂交互窗口供用户选择目标目录；“安装器已打开”不冒充“已安装”。编程任务使用 `--output-format stream-json`，要求同一会话中有匹配回合的 `turn.started`、`turn.completed` 且 `resultType=success`，没有失败事件，最后收到有效 `result` 与退出码 0；`projection.status=idle` 只作辅证。ZCode CLI 无 `--model`，使用其配置的默认模型。
+6. **计划、团队与界面**：七张工具卡分别显示安装与执行就绪状态；复杂任务的明确编号、分行、分号或独立中文动作句会形成最多六个有具体 `objective` 的执行包，超出六项的剩余需求集中在最后一包，代码围栏里的示例不参与拆分。目标贯穿计划卡、协作指令和 CLI 提示词，保留分析→执行→可选验证→整合的依赖。团队筛选执行模式允许的供应商，工作包失败立即停止。Harness 目录的模型 ID 与厂商 CLI 模型名不直接互通：团队默认仅对 Claude/Codex 请求推荐 ID，其余使用各自 CLI 默认模型并在每包结果中说明；可选 `cliModelsJson` 按工具或工作包绑定该 CLI 已配置的准确模型名，工作包优先，执行前验证格式。单工具调用提供 `cliModel`；MiniMax/MiMo 均要求 `provider/model`。可编辑团队以运行前原提交为基线生成补丁，覆盖厂商 CLI 自己提交过的改动；即使有 Git 忽略产物，也会整合可追踪源文件，同时把团队或单工具结果标为 `integration-pending` 并列出未整合产物。工具重探测使用新鲜状态。
+7. **Gal 自由模式接线修复**：Host Remote 的请求 ID 原先只接受四段 UUID，客户端发出的标准五段 UUID 都被拒绝；已修正格式校验，使发送消息可到达官方模型服务。仍须在用户真实账号与 Desktop 中验证回复、取消和切换模型行为。
+
+### 本轮文件说明
+
+| 文件 | 说明 |
+| --- | --- |
+| `.dsh-plugin/shared/official-tool-registry.mjs` | 七家固定来源、版本和供应商映射；ZCode 为交互式已签名安装器。 |
+| `.dsh-plugin/shared/official-tools-runtime.mjs` | ZCode 发现/下载安装作业；非 C 盘 Grok home；保留原有 npm 探测、安装与取消。 |
+| `.dsh-plugin/shared/official-tool-executor.mjs` | 七家 CLI 的统一受限启动、模式、账号环境、超时、取消、结果解析与官方沙箱包装。 |
+| `.dsh-plugin/shared/vendor-minimax-adapter.mjs` | MiniMax 固定 headless 参数与严格 JSONL 终态解析。 |
+| `.dsh-plugin/shared/vendor-mimo-grok-adapter.mjs` | MiMo/Grok 固定原生程序哈希、参数及机器可读终态解析。 |
+| `.dsh-plugin/shared/zcode-bundle.mjs` | Windows ZCode 桌面版注册表/目录发现、签名、版本与实际 CLI 脚本哈希核对。 |
+| `.dsh-plugin/shared/zcode-installer.mjs` | 非 C 盘缓存下载、固定哈希与签名校验、打开可选目录安装窗口。 |
+| `.dsh-plugin/shared/router.mjs` | 复杂任务显式需求拆分、具体目标与依赖工作包生成；过滤代码围栏中的样例。 |
+| `.dsh-plugin/shared/official-team-runtime.mjs` | 执行模式预筛、工具/工作包 CLI 模型绑定及回退提示、具体包指令、原提交到最终索引的补丁整合及忽略产物清单。 |
+| `.dsh-plugin/shared/harness-plan.mjs` | 各厂商 CLI 模型名与 Harness 推荐 ID 可能不同的渠道说明；把具体目标投射到工作包。 |
+| `.dsh-plugin/official-tools-remote-service.mjs` | 新鲜探测工具状态；修复 Gal 自由模式五段 UUID 请求 ID 校验。 |
+| `.dsh-plugin/index.mjs` | 七家工具说明、单工具 `cliModel` 与团队 `cliModelsJson` 绑定、安装与可编辑执行审批文案、团队模式筛选。 |
+| `.dsh-plugin/client/router-main.jsx`、`.dsh-plugin/client.js` | 七张工具卡、ZCode 安装窗口状态、工作包具体目标与模型回退说明及构建结果。 |
+| `package.json`、`README.md`、`README.zh.md`、`INSTALLATION_GUIDE.zh.md`、`MIGRATION.md` | 0.8.0 候选版号、四个新增模块的包清单及实际能力/验收步骤。 |
+
+### 已完成的静态检查与交付包
+
+`npm run build:client` 已生成 17,089,134 字节客户端文件；`node --check` 通过 Host 入口、路由与计划、执行器、工具运行时、团队运行时、MiniMax 与 MiMo/Grok 适配器、ZCode 安装器和发现模块；`npm pack --pack-destination dist --json` 生成 **23 文件**的 0.8.0 本地候选包，并确认四个新增 Host 模块均在清单中。`git diff --check` 无空白错误。**本轮未添加或运行自动化测试；未在用户账号上调用模型；未在官方桌面版安装本包；未发布 npm/GitHub。**
+
+发布前另完成 `pnpm install --frozen-lockfile`、`npm run check:client` 和 `pnpm peers check`；三项均通过。`npm test` 未运行，不能用历史测试结果代表 0.8.0。
+
+安装包：`dist/ljwei-stak-model-router-galgame-0.8.0.tgz`，12,582,606 字节，SHA-256：`0CF4BDFB3BE8F110254C994272C19795F659BFCC9CA7D54DC4B29CC063C6D8DD`。
+
+### 需要做的测试及方法
+
+1. 用官方插件管理器从本地 `.tgz` 升级，确认 Host 无加载错误、模型路由/Gal 两个侧边栏分块及七张工具卡显示；确认原模型设置和 Gal 存档保留。
+2. 在专用干净 Git 仓库逐家运行一个只读或可编辑的小任务，检查厂商账号登录、实际模型、工具调用、结构化终态、独立工作区、补丁整合与费用；Kimi、MiniMax、ZCode 只能选择可编辑模式。检查失败/取消不会把原仓库误标为完成，再让 CLI 在隔离工作区自行提交一次、生成一次 Git 忽略产物，确认提交的源文件仍被整合且忽略产物被显式报告。用明确列出的多项需求检查工作包数、具体目标、前置依赖和 `cliModelsJson` 工具/包级覆盖。
+3. 在一台未装目标 CLI 的环境分别点 npm 安装、取消与重试；ZCode 点击后确认非 C 盘下载缓存、官方签名、安装目录选择与安装后重新探测。核对 Grok 的 `GROK_HOME` 与 npm prefix 同在非 C 盘。
+4. 运行仓库单元与边界测试，并补齐各厂商 JSONL 成功/失败、签名/哈希拒绝、安装取消和团队混合厂商工作包案例。此轮遵照用户当前任务未运行测试，历史通过记录不能代表 0.8.0。
+5. Gal 剧情、自由对话与真实账号行为按上一轮清单复查，尤其是中止请求、跨剧目存档和安装升级后的状态。
+
+### 尚未完成及思路
+
+1. **真实账号和官方 Desktop 验收**：开发接线不等于真实供应商凭据可用。由账号持有人在官方桌面版安装候选包，逐家完成最小调用，记录厂商返回的模型、授权、费用和失败原因；据此修正适配器后才标记可发布。
+2. **CLI 模型 ID 映射**：当前团队针对 Kimi/MiniMax/MiMo/Grok/ZCode 默认使用各自已配置模型，允许操作者用 `cliModelsJson` 明确覆盖，但不能自动证明与 Harness 建议模型相同。Claude/Codex 的 ID 也仍要以真实账号记录核对。下一步读取各厂商配置/结构化记录建立自动、可验证映射，并对不同包按实际模型估算成本；ZCode 如需逐项切换模型，应改接其 Agent Server 的模型控制协议。
+3. **更细的权限与进度桥**：当前可编辑无界面入口在一次 Harness 审批后运行厂商自身工具，Windows 沙箱仍报告部分隔离。下一步把支持 ACP/Agent Server 的厂商接入逐项权限回调与任务事件流，再考虑从工作台直接启动/暂停团队任务；Remote 必须绑定官方会话身份和工作区，不能让普通面板 RPC 任意改写文件。
+4. **工作包实质验收和成本**：目前团队按终态/补丁做机器检查，无法证明需求本身已达成，也无法硬限真实费用。应把计划的验收项与实际文件、命令记录和厂商 token/费用记录逐项核对；不通过保留隔离工作区并明确列出差距。
+5. **发布**：完成上述开发与真实账号验证后，按仓库 `AGENTS.md` 的发布同步规则运行完整检查，再提交推送 GitHub、创建对应 Release 并发布 npm；不可把当前候选包标作已验收发行版。
+
+### 本轮官方依据与本机核对
+
+ZCode `v3.14.3` 的流输出和终态来自[官方 CLI 输出实现](https://github.com/zai-org/ZCode/blob/v3.14.3/apps/zcode-cli/packages/cli/src/prompt-command.ts)、[事件映射](https://github.com/zai-org/ZCode/blob/v3.14.3/apps/zcode-cli/packages/bootstrap/src/zcode-protocol/session-mapper.ts)和[回合结果类型](https://github.com/zai-org/ZCode/blob/v3.14.3/apps/zcode-cli/packages/contracts/src/events/session.events.ts)。本机固定安装器经 SHA-256 与 Authenticode 核对后，用 `D:\Program Files\7-Zip\7z.exe` 解包，安装件及解包件的 `zcode.cjs` 逐字节比较相同；该哈希随后写入启动前检查。此核对证明本机文件与该固定发行件一致，不等同于已经通过 ZCode 账号调用。
+
+## 0.7.0 历史记录
 
 ## 本轮完成的工作
 

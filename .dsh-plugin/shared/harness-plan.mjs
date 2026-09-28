@@ -17,7 +17,9 @@ export function channelForProvider(provider, installedToolIds = [], runnableTool
   const installed = Array.isArray(installedToolIds) && installedToolIds.includes(tool.id)
   const runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id)
   return runnable
-    ? { kind: 'official-cli', tool: tool.id, label: tool.label, detail: `${tool.label} 已安装，插件可托管调用其官方 CLI；团队执行会请求推荐模型 ID，实际模型仍须核对运行记录。` }
+    ? { kind: 'official-cli', tool: tool.id, label: tool.label, detail: tool.id === 'zcode'
+      ? 'ZCode 已安装，插件可调用其官方编程代理；3.14.3 的 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。'
+      : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。` }
     : {
       kind: 'harness-llm',
       tool: tool.id,
@@ -85,6 +87,7 @@ export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', b
       workPackages: plan.subtasks.map(item => ({
         id: item.id,
         name: item.name,
+        ...(item.objective ? { objective: item.objective } : {}),
         type: item.type,
         purpose: item.purpose,
         dependsOn: item.dependsOn,

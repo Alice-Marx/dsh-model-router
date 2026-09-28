@@ -214,6 +214,47 @@ function taskQualityFloor(band, task) {
   if (band !== "complex") return base;
   return clamp(base + Math.max(0, Number(task.criticality ?? 0.75) - 0.65) * 0.12);
 }
+function requirementText(value) {
+  return String(value ?? "").trim().replace(/[。；;\s]+$/u, "").trim();
+}
+function looksLikeRequirement(value) {
+  const item = requirementText(value);
+  return item.length >= 3 && !/[:：]$/u.test(item) && !/(?:以下|下列|如下)(?:的)?(?:任务|需求|工作|事项|要求)/u.test(item) && REQUIREMENT_ACTION.test(item.slice(0, 32));
+}
+function explicitRequirements(text2) {
+  const visibleLines = [];
+  let fence = null;
+  for (const line of String(text2 ?? "").split(/\r?\n/u)) {
+    const marker2 = /^\s*(`{3,}|~{3,})/u.exec(line);
+    if (fence) {
+      if (marker2 && marker2[1][0] === fence.char && marker2[1].length >= fence.length && !line.slice(marker2[0].length).trim()) fence = null;
+      continue;
+    }
+    if (marker2) {
+      fence = { char: marker2[1][0], length: marker2[1].length };
+      continue;
+    }
+    visibleLines.push(line);
+  }
+  const value = visibleLines.join("\n");
+  const lines = visibleLines.map((line) => line.trim()).filter(Boolean);
+  const marker = /^(?:[-*•]\s+|\d{1,2}[.)、](?!\d)\s*|[一二三四五六七八九十]{1,3}[、.)]\s*)(.+)$/u;
+  const marked = lines.map((line) => marker.exec(line)?.[1]).filter(Boolean).map(requirementText).filter((item) => item.length >= 3);
+  if (marked.length >= 2) return marked;
+  const plain2 = lines.filter((line) => !/^#{1,6}\s|^```|[:：]$/u.test(line));
+  if (plain2.length >= 2 && plain2.every(looksLikeRequirement)) {
+    return plain2.map(requirementText).filter((item) => item.length >= 3);
+  }
+  const clauses = value.split(/[;；]/u).map(requirementText).filter(Boolean);
+  if (clauses.length >= 2 && clauses.every(looksLikeRequirement)) {
+    return clauses;
+  }
+  const sentences = value.split(/[。！？]/u).map(requirementText).filter(Boolean);
+  if (sentences.length >= 2 && sentences.every(looksLikeRequirement)) {
+    return sentences;
+  }
+  return [];
+}
 function taskPackages(taskType, text2, band) {
   if (band !== "complex") {
     const task = { id: "execution", name: "\u76F4\u63A5\u56DE\u7B54\u4E0E\u5FC5\u8981\u6821\u9A8C", type: taskType, purpose: "execution", criticality: 0.65, dependsOn: [], preferredReasoningEffort: band === "simple" ? "low" : "medium" };
@@ -223,17 +264,39 @@ function taskPackages(taskType, text2, band) {
   const packages = [
     { id: "analysis", name: "\u95EE\u9898\u5EFA\u6A21\u4E0E\u7EA6\u675F\u63D0\u53D6", type: "reasoning", purpose: "analysis", criticality: 0.92, dependsOn: [], preferredReasoningEffort: "high" }
   ];
-  const domains = [...new Set([...detectTaskTypes(text2), taskType].filter((type) => type !== "general"))];
-  for (const type of domains.length > 0 ? domains : [taskType]) {
-    packages.push({
-      id: `execution-${type}`,
-      name: `${TASK_TYPE_LABELS[type] ?? type}\u65B9\u5411\u5904\u7406`,
-      type,
-      purpose: "execution",
-      criticality: domains.length > 1 ? 0.8 : 0.78,
-      dependsOn: ["analysis"],
-      preferredReasoningEffort: "high"
+  const requirements = explicitRequirements(text2);
+  if (requirements.length >= 2) {
+    const groups = requirements.length > MAX_EXPLICIT_EXECUTION_PACKAGES ? [
+      ...requirements.slice(0, MAX_EXPLICIT_EXECUTION_PACKAGES - 1).map((item) => [item]),
+      requirements.slice(MAX_EXPLICIT_EXECUTION_PACKAGES - 1)
+    ] : requirements.map((item) => [item]);
+    groups.forEach((group, index) => {
+      const objective = group.length === 1 ? group[0] : group.map((item, offset) => `${MAX_EXPLICIT_EXECUTION_PACKAGES + offset}. ${item}`).join("\n");
+      const type = detectTaskTypes(objective)[0] ?? taskType;
+      packages.push({
+        id: `execution-${index + 1}`,
+        name: group.length === 1 ? `\u9700\u6C42 ${index + 1}\uFF1A${group[0].slice(0, 28)}` : `\u9700\u6C42 ${index + 1}\uFF1A\u5176\u4F59 ${group.length} \u9879`,
+        objective,
+        type,
+        purpose: "execution",
+        criticality: 0.8,
+        dependsOn: ["analysis"],
+        preferredReasoningEffort: "high"
+      });
     });
+  } else {
+    const domains = [...new Set([...detectTaskTypes(text2), taskType].filter((type) => type !== "general"))];
+    for (const type of domains.length > 0 ? domains : [taskType]) {
+      packages.push({
+        id: `execution-${type}`,
+        name: `${TASK_TYPE_LABELS[type] ?? type}\u65B9\u5411\u5904\u7406`,
+        type,
+        purpose: "execution",
+        criticality: domains.length > 1 ? 0.8 : 0.78,
+        dependsOn: ["analysis"],
+        preferredReasoningEffort: "high"
+      });
+    }
   }
   if (/(测试|验证|评估|对比|benchmark|test|verify|audit)/i.test(value)) {
     packages.push({
@@ -548,6 +611,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
   const subtasks = assignments.map(({ task, row, decision }) => ({
     id: task.id,
     name: task.name,
+    ...task.objective ? { objective: task.objective } : {},
     type: task.type,
     recommended: row?.model ?? "\u5F85\u53D1\u73B0\u6A21\u578B",
     recommendedProvider: row?.provider ?? "",
@@ -627,7 +691,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
     generatedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
 }
-var OBJECTIVE_WEIGHTS, REASONING_EFFORT_ORDER, REASONING_EFFORT_MULTIPLIERS, QUALITY_FLOORS, DEFAULT_ROUTER_SETTINGS, MODEL_CATALOG, clamp, normalize, routeKey, OPENCODE_CATALOG_PROVIDERS, TASK_TYPE_RULES, TASK_TYPE_LABELS, SYNTHESIS_WEIGHTS, ROUTING_BEAM_WIDTH, ROUTING_CANDIDATE_LIMIT;
+var OBJECTIVE_WEIGHTS, REASONING_EFFORT_ORDER, REASONING_EFFORT_MULTIPLIERS, QUALITY_FLOORS, DEFAULT_ROUTER_SETTINGS, MODEL_CATALOG, clamp, normalize, routeKey, OPENCODE_CATALOG_PROVIDERS, TASK_TYPE_RULES, TASK_TYPE_LABELS, MAX_EXPLICIT_EXECUTION_PACKAGES, REQUIREMENT_ACTION, SYNTHESIS_WEIGHTS, ROUTING_BEAM_WIDTH, ROUTING_CANDIDATE_LIMIT;
 var init_router = __esm({
   ".dsh-plugin/shared/router.mjs"() {
     init_livebench();
@@ -702,6 +766,8 @@ var init_router = __esm({
       summarization: "\u6458\u8981\u4E0E\u6574\u7406",
       writing: "\u5199\u4F5C\u4E0E\u8868\u8FBE"
     });
+    MAX_EXPLICIT_EXECUTION_PACKAGES = 6;
+    REQUIREMENT_ACTION = /(?:实现|新增|添加|修复|更新|构建|设计|完成|编写|优化|接入|支持|配置|部署|测试|验证|检查|整理|创建|移除|替换|迁移|适配|开发|调研|安装|下载|上传|发布|生成|集成|改造|封装|显示|提供|允许|确保|处理|解决|分析|探测|检测|选择|分配|拆分|对接|加入|保留|记录|输出|审查|核对|对比|可以|能够|需要|进行|implement|add|fix|update|build|design|write|improve|support|configure|deploy|test|verify|check|create|remove|replace|migrate|install|publish|generate|integrate|review|should|must|need)/i;
     SYNTHESIS_WEIGHTS = Object.freeze({ quality: 0.58, cost: 0.08, latency: 0.04, specialty: 0.08, reasoning: 0.16, risk: 0.06 });
     ROUTING_BEAM_WIDTH = 256;
     ROUTING_CANDIDATE_LIMIT = 12;
@@ -722,6 +788,7 @@ function toolForProvider(provider) {
 }
 function installCommandLine(tool) {
   if (!tool || tool.unsupported) return null;
+  if (tool.manager === "signed-windows-installer") return "\u6253\u5F00\u5B98\u65B9\u7B7E\u540D\u5B89\u88C5\u5668\uFF08\u9009\u62E9\u5B89\u88C5\u76EE\u5F55\uFF09";
   return tool.manager === "npm" ? `npm ${tool.installArgs.join(" ")}` : `${tool.manager} ${tool.installArgs.join(" ")}`;
 }
 var OFFICIAL_TOOLS, TOOL_BY_ID;
@@ -801,6 +868,18 @@ var init_official_tool_registry = __esm({
         installArgs: ["install", "-g", "@xai-official/grok@1.0.41", "--registry=https://registry.npmjs.org/"],
         probeExecutables: ["grok"],
         providerHints: ["xai", "grok"]
+      }),
+      Object.freeze({
+        id: "zcode",
+        label: "ZCode",
+        vendor: "Z.ai",
+        purpose: "\u667A\u8C31\u5B98\u65B9 ZCode \u684C\u9762\u7248\uFF0C\u5185\u542B GLM \u7F16\u7A0B\u4EE3\u7406\u3002Windows \u5B89\u88C5\u5668\u53EF\u9009\u62E9 D \u76D8\u76EE\u5F55\u3002",
+        version: "3.14.3",
+        manager: "signed-windows-installer",
+        installArgs: [],
+        probeExecutables: [],
+        probeNote: "\u68C0\u6D4B\u7ECF\u8FC7\u6709\u6548\u7B7E\u540D\u7684 ZCode.exe \u548C\u540C\u76EE\u5F55 GLM \u8D44\u6E90\uFF1B\u684C\u9762\u5B89\u88C5\u5668\u9700\u4EBA\u5DE5\u9009\u62E9\u5B89\u88C5\u4F4D\u7F6E\u3002",
+        providerHints: ["zai", "z.ai", "zcode", "glm", "zhipu"]
       })
     ]);
     TOOL_BY_ID = new Map(OFFICIAL_TOOLS.map((tool) => [tool.id, tool]));
@@ -815,7 +894,7 @@ function channelForProvider(provider, installedToolIds = [], runnableToolIds = [
   }
   const installed = Array.isArray(installedToolIds) && installedToolIds.includes(tool.id);
   const runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id);
-  return runnable ? { kind: "official-cli", tool: tool.id, label: tool.label, detail: `${tool.label} \u5DF2\u5B89\u88C5\uFF0C\u63D2\u4EF6\u53EF\u6258\u7BA1\u8C03\u7528\u5176\u5B98\u65B9 CLI\uFF1B\u56E2\u961F\u6267\u884C\u4F1A\u8BF7\u6C42\u63A8\u8350\u6A21\u578B ID\uFF0C\u5B9E\u9645\u6A21\u578B\u4ECD\u987B\u6838\u5BF9\u8FD0\u884C\u8BB0\u5F55\u3002` } : {
+  return runnable ? { kind: "official-cli", tool: tool.id, label: tool.label, detail: tool.id === "zcode" ? "ZCode \u5DF2\u5B89\u88C5\uFF0C\u63D2\u4EF6\u53EF\u8C03\u7528\u5176\u5B98\u65B9\u7F16\u7A0B\u4EE3\u7406\uFF1B3.14.3 \u7684 CLI \u4F7F\u7528\u81EA\u8EAB\u914D\u7F6E\u7684\u9ED8\u8BA4\u6A21\u578B\uFF0C\u4E0D\u80FD\u4FDD\u8BC1\u4E0E Harness \u5EFA\u8BAE\u6A21\u578B\u4E00\u81F4\u3002" : `${tool.label} \u5DF2\u5B89\u88C5\uFF0C\u63D2\u4EF6\u53EF\u6258\u7BA1\u8C03\u7528\u5176\u5B98\u65B9 CLI\uFF1BHarness \u6A21\u578B\u76EE\u5F55\u4E0E\u5382\u5546 CLI \u540D\u79F0\u53EF\u80FD\u4E0D\u540C\uFF0C\u56E2\u961F\u65E0\u6CD5\u786E\u8BA4\u6620\u5C04\u65F6\u4F7F\u7528 CLI \u9ED8\u8BA4\u6A21\u578B\uFF0C\u5B9E\u9645\u6A21\u578B\u4ECD\u987B\u6838\u5BF9\u8FD0\u884C\u8BB0\u5F55\u3002` } : {
     kind: "harness-llm",
     tool: tool.id,
     label: tool.label,
@@ -867,6 +946,7 @@ function createPlanFromRoutes(task, availableRoutes, { mode = "single", budgetUs
       workPackages: plan.subtasks.map((item) => ({
         id: item.id,
         name: item.name,
+        ...item.objective ? { objective: item.objective } : {},
         type: item.type,
         purpose: item.purpose,
         dependsOn: item.dependsOn,
@@ -983,7 +1063,7 @@ function ChannelBadge({ item }) {
 }
 function PlanResults({ plan }) {
   const selected = plan.selected;
-  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8DEF\u7531\u5EFA\u8BAE" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u672C\u5730\u8BA1\u7B97\u5B8C\u6210\uFF0C\u672A\u5411\u6A21\u578B\u53D1\u9001\u4EFB\u52A1\u5185\u5BB9\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u63A8\u8350\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "\u6682\u65E0\u8DEF\u7EBF")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u4EFB\u52A1\u590D\u6742\u5EA6"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u590D\u6742" }[plan.complexity.band] || plan.complexity.band)), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u4F30\u7B97\u603B\u6210\u672C"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, money(plan.estimatedCost)))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-control-label" }, "\u6267\u884C\u6E20\u9053"), /* @__PURE__ */ import_react.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, plan.reason), plan.optimization.budgetExceeded && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error" }, "\u6309\u5F53\u524D\u5B9E\u9A8C\u4EF7\u683C\u4F30\u7B97\uFF0C\u4EFB\u52A1\u53EF\u80FD\u8D85\u8FC7\u672C\u6B21\u9884\u7B97\u3002\u9884\u7B97\u53EA\u5F71\u54CD\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u963B\u6B62\u5B9E\u9645\u6263\u8D39\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("h3", { className: "mr-section-title" }, "\u56E2\u961F\u5DE5\u4F5C\u5305"), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-empty" }, "\u5F53\u524D\u76EE\u5F55\u6CA1\u6709\u53EF\u5206\u914D\u7684\u6A21\u578B\u8DEF\u7EBF\u3002") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react.default.createElement("article", { className: "mr-package", key: item.id }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-top" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel)), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, item.purpose, item.dependsOn.length > 0 ? ` \xB7 \u4F9D\u8D56\uFF1A${item.dependsOn.join("\u3001")}` : ""), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, "\u9A8C\u6536\uFF1A", item.verificationChecklist.join("\uFF1B")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react.default.createElement(ChannelBadge, { item }))))), plan.mode === "team" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, plan.team.handoff), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-notice" }, plan.pricingNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")));
+  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8DEF\u7531\u5EFA\u8BAE" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u672C\u5730\u8BA1\u7B97\u5B8C\u6210\uFF0C\u672A\u5411\u6A21\u578B\u53D1\u9001\u4EFB\u52A1\u5185\u5BB9\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u63A8\u8350\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "\u6682\u65E0\u8DEF\u7EBF")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u4EFB\u52A1\u590D\u6742\u5EA6"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u590D\u6742" }[plan.complexity.band] || plan.complexity.band)), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u4F30\u7B97\u603B\u6210\u672C"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, money(plan.estimatedCost)))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-control-label" }, "\u6267\u884C\u6E20\u9053"), /* @__PURE__ */ import_react.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, plan.reason), plan.optimization.budgetExceeded && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error" }, "\u6309\u5F53\u524D\u5B9E\u9A8C\u4EF7\u683C\u4F30\u7B97\uFF0C\u4EFB\u52A1\u53EF\u80FD\u8D85\u8FC7\u672C\u6B21\u9884\u7B97\u3002\u9884\u7B97\u53EA\u5F71\u54CD\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u963B\u6B62\u5B9E\u9645\u6263\u8D39\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("h3", { className: "mr-section-title" }, "\u56E2\u961F\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u4E0B\u65B9\u6A21\u578B\u662F\u89C4\u5212\u5EFA\u8BAE\uFF1B\u6258\u7BA1\u6267\u884C\u4F1A\u6309\u5382\u5546 CLI \u7684\u6A21\u578B\u540D\u89C4\u5219\u9009\u7528\uFF0C\u672A\u6838\u9A8C\u6620\u5C04\u65F6\u4F7F\u7528\u8BE5 CLI \u7684\u9ED8\u8BA4\u6A21\u578B\u3002"), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-empty" }, "\u5F53\u524D\u76EE\u5F55\u6CA1\u6709\u53EF\u5206\u914D\u7684\u6A21\u578B\u8DEF\u7EBF\u3002") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react.default.createElement("article", { className: "mr-package", key: item.id }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-top" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel)), item.objective && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, "\u5177\u4F53\u76EE\u6807\uFF1A", item.objective), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, item.purpose, item.dependsOn.length > 0 ? ` \xB7 \u4F9D\u8D56\uFF1A${item.dependsOn.join("\u3001")}` : ""), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, "\u9A8C\u6536\uFF1A", item.verificationChecklist.join("\uFF1B")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react.default.createElement(ChannelBadge, { item }))))), plan.mode === "team" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, plan.team.handoff), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-notice" }, plan.pricingNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")));
 }
 var remoteError = (response, fallback) => text(response?.error?.message) || text(response?.value?.error) || fallback;
 function probeLabel(probe) {
@@ -1119,9 +1199,9 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   const byId = Object.fromEntries(probeState.probes.map((probe) => [probe.id, probe]));
   const capabilitiesById = Object.fromEntries(probeState.capabilities.map((item) => [item.id, item]));
   const readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item]));
-  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9 CLI\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u4E0B\u8F7D\u5B89\u88C5\u3002\u5B89\u88C5\u5B8C\u6210\u540E\u91CD\u65B0\u68C0\u6D4B\u7248\u672C\u3002")), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
+  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u4E0B\u8F7D\u5B89\u88C5\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u68C0\u6D4B\u7248\u672C\u3002")), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     void refresh();
-  } }, "\u91CD\u65B0\u68C0\u6D4B")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, probeState.status === "loading" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.status === "error" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9 CLI \u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
+  } }, "\u91CD\u65B0\u68C0\u6D4B")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, probeState.status === "loading" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.status === "error" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
     const command = installCommandLine(tool);
     const probe = byId[tool.id];
     const capability = capabilitiesById[tool.id];
@@ -1132,14 +1212,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
     const current = versionOrder === 0;
     const newerOrUncertain = probe?.installed && (versionOrder === null || versionOrder > 0);
     const verified = job?.status === "succeeded" && job.postInstallProbe?.installed === true;
-    const status = running ? job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u5B89\u88C5\u2026" : "\u5B89\u88C5\u4E2D\u2026" : job?.status === "cancelled" ? "\u5B89\u88C5\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B" : verified ? "\u5B89\u88C5\u6210\u529F\u5E76\u9A8C\u8BC1" : probeLabel(probe);
-    const buttonLabel = running ? "\u5B89\u88C5\u4E2D\u2026" : current ? "\u5DF2\u662F\u76EE\u6807\u7248\u672C" : newerOrUncertain ? "\u8BF7\u4EBA\u5DE5\u6838\u5BF9\u7248\u672C" : probe?.installed ? "\u66F4\u65B0\u5230\u76EE\u6807\u7248\u672C" : job?.status === "failed" ? "\u91CD\u8BD5\u5B89\u88C5" : "\u4E0B\u8F7D\u5B89\u88C5";
-    return /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, tool.version ? ` \xB7 \u76EE\u6807 ${tool.version}` : ""), probe?.installed && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-tool-detail" }, readiness?.ready ? "\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002" : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react.default.createElement("code", { className: "mr-tool-command" }, command) : /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, tool.unsupportedReason), probe?.detail && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), command && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: probeState.status !== "ready" || running || current || newerOrUncertain, onClick: () => {
+    const status = running ? job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u5B89\u88C5\u2026" : "\u5B89\u88C5\u4E2D\u2026" : job?.status === "installer-opened" ? "\u5B98\u65B9\u5B89\u88C5\u5668\u5DF2\u6253\u5F00\uFF0C\u8BF7\u5B8C\u6210\u5B89\u88C5\u540E\u91CD\u65B0\u68C0\u6D4B" : job?.status === "cancelled" ? "\u5B89\u88C5\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B" : verified ? "\u5B89\u88C5\u6210\u529F\u5E76\u9A8C\u8BC1" : probeLabel(probe);
+    const buttonLabel = running ? "\u5B89\u88C5\u4E2D\u2026" : current ? "\u5DF2\u662F\u76EE\u6807\u7248\u672C" : newerOrUncertain ? "\u8BF7\u4EBA\u5DE5\u6838\u5BF9\u7248\u672C" : probe?.installed ? "\u66F4\u65B0\u5230\u76EE\u6807\u7248\u672C" : job?.status === "failed" ? "\u91CD\u8BD5\u5B89\u88C5" : tool.manager === "signed-windows-installer" ? "\u4E0B\u8F7D\u5B89\u88C5\u5668" : "\u4E0B\u8F7D\u5B89\u88C5";
+    return /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, tool.version ? ` \xB7 \u76EE\u6807 ${tool.version}` : ""), probe?.installed && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-tool-detail" }, readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react.default.createElement("code", { className: "mr-tool-command" }, command) : /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, tool.unsupportedReason), probe?.detail && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), command && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: probeState.status !== "ready" || running || current || newerOrUncertain, onClick: () => {
       void install(tool.id);
     } }, buttonLabel), running && /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
       void cancel(tool.id);
     } }, job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u2026" : "\u53D6\u6D88\u5B89\u88C5")));
-  })), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u7531 Host \u6309\u6CE8\u518C\u8868\u56FA\u5B9A\u547D\u4EE4\u6267\u884C\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\uFF1B\u53EF\u70B9\u201C\u53D6\u6D88\u5B89\u88C5\u201D\u7EC8\u6B62\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u5B9E\u9645\u7248\u672C\u3002Agent \u4E5F\u53EF\u8C03\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_tool_install"), "\uFF0C\u6216\u5728\u4F1A\u8BDD\u4F7F\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "/tools"), "\u3002")));
+  })), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u7531 Host \u6309\u6CE8\u518C\u8868\u56FA\u5B9A\u6765\u6E90\u6267\u884C\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\uFF1B\u53EF\u70B9\u201C\u53D6\u6D88\u5B89\u88C5\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u5B9E\u9645\u7248\u672C\u3002ZCode \u5B89\u88C5\u5668\u542F\u52A8\u540E\u4ECD\u9700\u5728\u539F\u5382\u7A97\u53E3\u9009\u62E9\u76EE\u5F55\u5E76\u5B8C\u6210\u5B89\u88C5\u3002Agent \u4E5F\u53EF\u8C03\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_tool_install"), "\uFF0C\u6216\u5728\u4F1A\u8BDD\u4F7F\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "/tools"), "\u3002")));
 }
 function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus }) {
   const [catalogState, setCatalogState] = import_react.default.useState({ status: "loading", catalog: null, error: "" });
@@ -1239,7 +1319,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     budgetValue.current = event.target.value;
     setBudget(event.target.value);
     invalidatePlan();
-  } }))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-caption" }, toolProbes === null ? "\u6B63\u5728\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u2026" : "0 \u8868\u793A\u4E0D\u9650\u5236\u672C\u6B21\u5EFA\u8BAE\uFF1B\u4E0D\u4F1A\u8BBE\u7F6E\u771F\u5B9E\u652F\u51FA\u4E0A\u9650\u3002")), planError && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card", "aria-label": "\u6A21\u578B\u76EE\u5F55" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u6A21\u578B\u76EE\u5F55"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u53EA\u663E\u793A\u5B98\u65B9\u5DF2\u767B\u8BB0\u7684 provider/model\uFF0C\u4E0D\u8BFB\u53D6 API Key\u3002")), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: refresh }, "\u5237\u65B0")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u52A0\u8F7D\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026"), catalogState.status === "ready" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "\u641C\u7D22\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "\u6A21\u578B\u6216\u4F9B\u5E94\u5546" }), /* @__PURE__ */ import_react.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " \u4E2A\u4F9B\u5E94\u5546\u7684\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u9875\u68C0\u67E5\u914D\u7F6E\u3002")), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "\u76EE\u5F55\u767B\u8BB0\u4E0D\u4EE3\u8868\u51ED\u636E\u6216\u7F51\u7EDC\u5F53\u524D\u53EF\u7528\uFF1B\u56FE\u50CF\u80FD\u529B\u9700\u8981\u5728\u5B9E\u9645\u4F7F\u7528\u524D\u6838\u5BF9\u3002")))), plan && /* @__PURE__ */ import_react.default.createElement(PlanResults, { plan }), /* @__PURE__ */ import_react.default.createElement(OfficialToolsCard, { listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes: handleToolProbes }), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-notice" }, "\u5B9E\u9645\u8C03\u7528\u8BF7\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u4F7F\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_consult"), "\u3001", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_tool_run"), " \u6216 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_team_execute"), "\u3002\u6258\u7BA1\u6267\u884C\u76EE\u524D\u652F\u6301 Claude Code \u4E0E Codex\uFF1B\u56E2\u961F\u6267\u884C\u4F1A\u5411 CLI \u8BF7\u6C42\u63A8\u8350\u6A21\u578B\uFF0C\u5B9E\u9645\u6A21\u578B\u4EE5\u5382\u5546\u8BB0\u5F55\u4E3A\u51C6\u3002\u53EF\u7F16\u8F91\u56E2\u961F\u4EFB\u52A1\u8981\u6C42\u5E72\u51C0\u7684 Git \u4ED3\u5E93\uFF0C\u5E76\u7ECF\u5B98\u65B9\u5DE5\u5177\u5BA1\u6279\u3002\u8BBE\u7F6E\u4F4D\u4E8E\u201C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5 \u2192 @ljwei-stak/model-router-galgame\u201D\u3002")));
+  } }))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-caption" }, toolProbes === null ? "\u6B63\u5728\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u2026" : "0 \u8868\u793A\u4E0D\u9650\u5236\u672C\u6B21\u5EFA\u8BAE\uFF1B\u4E0D\u4F1A\u8BBE\u7F6E\u771F\u5B9E\u652F\u51FA\u4E0A\u9650\u3002")), planError && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card", "aria-label": "\u6A21\u578B\u76EE\u5F55" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u6A21\u578B\u76EE\u5F55"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u53EA\u663E\u793A\u5B98\u65B9\u5DF2\u767B\u8BB0\u7684 provider/model\uFF0C\u4E0D\u8BFB\u53D6 API Key\u3002")), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: refresh }, "\u5237\u65B0")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u52A0\u8F7D\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026"), catalogState.status === "ready" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "\u641C\u7D22\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "\u6A21\u578B\u6216\u4F9B\u5E94\u5546" }), /* @__PURE__ */ import_react.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " \u4E2A\u4F9B\u5E94\u5546\u7684\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u9875\u68C0\u67E5\u914D\u7F6E\u3002")), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "\u76EE\u5F55\u767B\u8BB0\u4E0D\u4EE3\u8868\u51ED\u636E\u6216\u7F51\u7EDC\u5F53\u524D\u53EF\u7528\uFF1B\u56FE\u50CF\u80FD\u529B\u9700\u8981\u5728\u5B9E\u9645\u4F7F\u7528\u524D\u6838\u5BF9\u3002")))), plan && /* @__PURE__ */ import_react.default.createElement(PlanResults, { plan }), /* @__PURE__ */ import_react.default.createElement(OfficialToolsCard, { listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes: handleToolProbes }), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-notice" }, "\u5B9E\u9645\u8C03\u7528\u8BF7\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u4F7F\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_consult"), "\u3001", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_tool_run"), " \u6216 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_team_execute"), "\u3002\u6258\u7BA1\u6267\u884C\u80FD\u529B\u548C\u5C31\u7EEA\u72B6\u6001\u89C1\u4E0A\u65B9\u5404\u5DE5\u5177\u5361\u7247\uFF1B\u5B9E\u9645\u4F7F\u7528\u7684\u6A21\u578B\u4EE5\u5382\u5546\u8BB0\u5F55\u4E3A\u51C6\u3002ZCode 3.14.3 \u4F7F\u7528\u5176\u81EA\u8EAB\u914D\u7F6E\u7684\u9ED8\u8BA4\u6A21\u578B\u3002\u53EF\u7F16\u8F91\u56E2\u961F\u4EFB\u52A1\u8981\u6C42\u5E72\u51C0\u7684 Git \u4ED3\u5E93\uFF0C\u5E76\u7ECF\u5B98\u65B9\u5DE5\u5177\u5BA1\u6279\u3002\u8BBE\u7F6E\u4F4D\u4E8E\u201C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5 \u2192 @ljwei-stak/model-router-galgame\u201D\u3002")));
 }
 
 // .dsh-plugin/client/gal-module-page.jsx

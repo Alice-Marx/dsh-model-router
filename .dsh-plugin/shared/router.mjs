@@ -328,6 +328,7 @@ export function collaborationInstruction(plan, step) {
   return [
     `[Model Router 协作阶段 ${stage.index}/${stage.total}：${stage.name}]`,
     `请阅读主人原问题和上一阶段报告，完成 ${taskType} 任务中负责的资料、代码、证据或方案处理。`,
+    ...(stage.objective ? [`本工作包的具体目标：${stage.objective}`] : []),
     '只提交可核验的结构化工作报告，列出结论、依据、待确认项和可直接复用的产物；不要直接替主人输出最终答案。',
   ].join('\n')
 }
@@ -361,6 +362,64 @@ function taskQualityFloor(band, task) {
   return clamp(base + Math.max(0, Number(task.criticality ?? 0.75) - 0.65) * 0.12)
 }
 
+const MAX_EXPLICIT_EXECUTION_PACKAGES = 6
+const REQUIREMENT_ACTION = /(?:实现|新增|添加|修复|更新|构建|设计|完成|编写|优化|接入|支持|配置|部署|测试|验证|检查|整理|创建|移除|替换|迁移|适配|开发|调研|安装|下载|上传|发布|生成|集成|改造|封装|显示|提供|允许|确保|处理|解决|分析|探测|检测|选择|分配|拆分|对接|加入|保留|记录|输出|审查|核对|对比|可以|能够|需要|进行|implement|add|fix|update|build|design|write|improve|support|configure|deploy|test|verify|check|create|remove|replace|migrate|install|publish|generate|integrate|review|should|must|need)/i
+
+function requirementText(value) {
+  return String(value ?? '').trim().replace(/[。；;\s]+$/u, '').trim()
+}
+
+function looksLikeRequirement(value) {
+  const item = requirementText(value)
+  return item.length >= 3 && !/[:：]$/u.test(item)
+    && !/(?:以下|下列|如下)(?:的)?(?:任务|需求|工作|事项|要求)/u.test(item)
+    && REQUIREMENT_ACTION.test(item.slice(0, 32))
+}
+
+function explicitRequirements(text) {
+  const visibleLines = []
+  let fence = null
+  for (const line of String(text ?? '').split(/\r?\n/u)) {
+    const marker = /^\s*(`{3,}|~{3,})/u.exec(line)
+    if (fence) {
+      if (marker && marker[1][0] === fence.char && marker[1].length >= fence.length
+        && !line.slice(marker[0].length).trim()) fence = null
+      continue
+    }
+    if (marker) {
+      fence = { char: marker[1][0], length: marker[1].length }
+      continue
+    }
+    visibleLines.push(line)
+  }
+  const value = visibleLines.join('\n')
+  const lines = visibleLines.map(line => line.trim()).filter(Boolean)
+  const marker = /^(?:[-*•]\s+|\d{1,2}[.)、](?!\d)\s*|[一二三四五六七八九十]{1,3}[、.)]\s*)(.+)$/u
+  const marked = lines.map(line => marker.exec(line)?.[1]).filter(Boolean).map(requirementText)
+    .filter(item => item.length >= 3)
+  if (marked.length >= 2) return marked
+
+  // A newline is an item boundary only when each line looks like a request.
+  // This avoids decomposing wrapped prose, logs, examples, or a single paragraph.
+  const plain = lines.filter(line => !/^#{1,6}\s|^```|[:：]$/u.test(line))
+  if (plain.length >= 2 && plain.every(looksLikeRequirement)) {
+    return plain.map(requirementText).filter(item => item.length >= 3)
+  }
+
+  // Semicolons need two action clauses; sentence punctuation is not a boundary.
+  const clauses = value.split(/[;；]/u).map(requirementText).filter(Boolean)
+  if (clauses.length >= 2 && clauses.every(looksLikeRequirement)) {
+    return clauses
+  }
+  // Complete Chinese action sentences can also be separate requirements.
+  // Do not split on ASCII periods, which commonly occur in paths and URLs.
+  const sentences = value.split(/[。！？]/u).map(requirementText).filter(Boolean)
+  if (sentences.length >= 2 && sentences.every(looksLikeRequirement)) {
+    return sentences
+  }
+  return []
+}
+
 function taskPackages(taskType, text, band) {
   if (band !== 'complex') {
     const task = { id: 'execution', name: '直接回答与必要校验', type: taskType, purpose: 'execution', criticality: 0.65, dependsOn: [], preferredReasoningEffort: band === 'simple' ? 'low' : 'medium' }
@@ -370,17 +429,43 @@ function taskPackages(taskType, text, band) {
   const packages = [
     { id: 'analysis', name: '问题建模与约束提取', type: 'reasoning', purpose: 'analysis', criticality: 0.92, dependsOn: [], preferredReasoningEffort: 'high' },
   ]
-  const domains = [...new Set([...(detectTaskTypes(text)), taskType].filter(type => type !== 'general'))]
-  for (const type of domains.length > 0 ? domains : [taskType]) {
-    packages.push({
-      id: `execution-${type}`,
-      name: `${TASK_TYPE_LABELS[type] ?? type}方向处理`,
-      type,
-      purpose: 'execution',
-      criticality: domains.length > 1 ? 0.80 : 0.78,
-      dependsOn: ['analysis'],
-      preferredReasoningEffort: 'high',
+  const requirements = explicitRequirements(text)
+  if (requirements.length >= 2) {
+    // Preserve every stated requirement when the list exceeds the package cap.
+    const groups = requirements.length > MAX_EXPLICIT_EXECUTION_PACKAGES
+      ? [...requirements.slice(0, MAX_EXPLICIT_EXECUTION_PACKAGES - 1).map(item => [item]),
+        requirements.slice(MAX_EXPLICIT_EXECUTION_PACKAGES - 1)]
+      : requirements.map(item => [item])
+    groups.forEach((group, index) => {
+      const objective = group.length === 1 ? group[0]
+        : group.map((item, offset) => `${MAX_EXPLICIT_EXECUTION_PACKAGES + offset}. ${item}`).join('\n')
+      const type = detectTaskTypes(objective)[0] ?? taskType
+      packages.push({
+        id: `execution-${index + 1}`,
+        name: group.length === 1
+          ? `需求 ${index + 1}：${group[0].slice(0, 28)}`
+          : `需求 ${index + 1}：其余 ${group.length} 项`,
+        objective,
+        type,
+        purpose: 'execution',
+        criticality: 0.80,
+        dependsOn: ['analysis'],
+        preferredReasoningEffort: 'high',
+      })
     })
+  } else {
+    const domains = [...new Set([...(detectTaskTypes(text)), taskType].filter(type => type !== 'general'))]
+    for (const type of domains.length > 0 ? domains : [taskType]) {
+      packages.push({
+        id: `execution-${type}`,
+        name: `${TASK_TYPE_LABELS[type] ?? type}方向处理`,
+        type,
+        purpose: 'execution',
+        criticality: domains.length > 1 ? 0.80 : 0.78,
+        dependsOn: ['analysis'],
+        preferredReasoningEffort: 'high',
+      })
+    }
   }
   if (/(测试|验证|评估|对比|benchmark|test|verify|audit)/i.test(value)) {
     packages.push({
@@ -772,6 +857,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
   const subtasks = assignments.map(({ task, row, decision }) => ({
     id: task.id,
     name: task.name,
+    ...(task.objective ? { objective: task.objective } : {}),
     type: task.type,
     recommended: row?.model ?? '待发现模型',
     recommendedProvider: row?.provider ?? '',

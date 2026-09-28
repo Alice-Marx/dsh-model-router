@@ -74,11 +74,13 @@ function PlanResults({ plan }) {
         {plan.mode === 'team' && (
           <>
             <h3 className="mr-section-title">团队工作包</h3>
+            <p className="mr-caption">下方模型是规划建议；托管执行会按厂商 CLI 的模型名规则选用，未核验映射时使用该 CLI 的默认模型。</p>
             {plan.team.workPackages.length === 0
               ? <div className="mr-empty">当前目录没有可分配的模型路线。</div>
               : plan.team.workPackages.map((item, index) => (
                 <article className="mr-package" key={item.id}>
                   <div className="mr-package-top"><div className="mr-package-name">{index + 1}. {item.name}</div><div className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</div></div>
+                  {item.objective && <p className="mr-package-copy">具体目标：{item.objective}</p>}
                   <p className="mr-package-copy">{item.purpose}{item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.join('、')}` : ''}</p>
                   <p className="mr-package-copy">验收：{item.verificationChecklist.join('；')}</p>
                   <div className="mr-channel-line"><ChannelBadge item={item} /></div>
@@ -230,12 +232,12 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
     <section className="mr-card" aria-label="官方工具">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">官方工具</h2>
-        <p className="mr-card-copy">检测本机官方 CLI，并从固定注册表一键下载安装。安装完成后重新检测版本。</p>
+        <p className="mr-card-copy">检测本机官方工具，并从固定注册表一键下载安装。ZCode 会打开官方安装窗口供你选择目录；完成后重新检测版本。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新检测</button></div>
       <div className="mr-card-body">
         {probeState.status === 'loading' && <p className="mr-empty" role="status">正在检测本机官方工具…</p>}
         {probeState.status === 'error' && <p className="mr-error" role="alert">{probeState.error}</p>}
-        <div className="mr-tools" role="list" aria-label="官方 CLI 工具注册表">
+        <div className="mr-tools" role="list" aria-label="官方工具注册表">
           {OFFICIAL_TOOLS.map(tool => {
             const command = installCommandLine(tool)
             const probe = byId[tool.id]
@@ -248,8 +250,9 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
             const newerOrUncertain = probe?.installed && (versionOrder === null || versionOrder > 0)
             const verified = job?.status === 'succeeded' && job.postInstallProbe?.installed === true
             const status = running ? job.cancelRequested ? '正在取消安装…' : '安装中…'
-              : job?.status === 'cancelled' ? '安装已取消，请重新检测' : verified ? '安装成功并验证' : probeLabel(probe)
-            const buttonLabel = running ? '安装中…' : current ? '已是目标版本' : newerOrUncertain ? '请人工核对版本' : probe?.installed ? '更新到目标版本' : job?.status === 'failed' ? '重试安装' : '下载安装'
+              : job?.status === 'installer-opened' ? '官方安装器已打开，请完成安装后重新检测'
+                : job?.status === 'cancelled' ? '安装已取消，请重新检测' : verified ? '安装成功并验证' : probeLabel(probe)
+            const buttonLabel = running ? '安装中…' : current ? '已是目标版本' : newerOrUncertain ? '请人工核对版本' : probe?.installed ? '更新到目标版本' : job?.status === 'failed' ? '重试安装' : tool.manager === 'signed-windows-installer' ? '下载安装器' : '下载安装'
             return (
               <div className="mr-tool" role="listitem" key={tool.id}>
                 <div className="mr-tool-info">
@@ -257,7 +260,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
                   <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{tool.version ? ` · 目标 ${tool.version}` : ''}</div>
                   {probe?.installed && <p className="mr-caption mr-tool-detail">{readiness?.ready
-                    ? '官方执行入口已核验，可在会话中调用 model_router_tool_run；账号及模型仍需实测。'
+                    ? `官方执行入口已核验，可在会话中调用 model_router_tool_run；${capability?.modes?.includes('read-only') ? '支持只读和经审批的可编辑任务' : '仅支持经审批的可编辑隔离工作区任务'}，账号及模型仍需实测。`
                     : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || '执行入口尚未核验。'}`}</p>}
                   {command
                     ? <code className="mr-tool-command">{command}</code>
@@ -283,7 +286,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
           })}
         </div>
         <p className="mr-caption" style={{ marginTop: 12 }}>
-          安装由 Host 按注册表固定命令执行，不接受自定义包名；可点“取消安装”终止任务，随后重新检测实际版本。Agent 也可调用 <code>model_router_tool_install</code>，或在会话使用 <code>/tools</code>。
+          安装由 Host 按注册表固定来源执行，不接受自定义包名；可点“取消安装”终止下载任务，随后重新检测实际版本。ZCode 安装器启动后仍需在原厂窗口选择目录并完成安装。Agent 也可调用 <code>model_router_tool_install</code>，或在会话使用 <code>/tools</code>。
         </p>
       </div>
     </section>
@@ -417,7 +420,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
         {plan && <PlanResults plan={plan} />}
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} />
-        <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。托管执行目前支持 Claude Code 与 Codex；团队执行会向 CLI 请求推荐模型，实际模型以厂商记录为准。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
+        <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
       </div>
     </main>
   )

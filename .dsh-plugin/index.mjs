@@ -253,12 +253,19 @@ export function apply(ctx, config = {}) {
     if (exec.name === 'model_router_tool_install') {
       const requested = getOfficialTool(text(exec.arguments?.tool))
       const label = requested?.label ?? '官方 CLI'
+      const desktopInstaller = requested?.manager === 'signed-windows-installer'
       return {
         kind: 'ask',
-        reason: `Install ${label} globally with the plugin's fixed official command`,
+        reason: desktopInstaller
+          ? `Download and open the verified official ${label} desktop installer`
+          : `Install ${label} globally with the plugin's fixed official command`,
         displayReason: {
-          en: `Install ${label} globally using the fixed official package?`,
-          zh: `使用插件固定的官方软件包，在本机全局安装 ${label}？`,
+          en: desktopInstaller
+            ? `Download and open the verified ${label} installer? You can select the installation directory in its window.`
+            : `Install ${label} globally using the fixed official package?`,
+          zh: desktopInstaller
+            ? `下载并打开已验签的 ${label} 安装器？安装窗口中可选择非 C 盘目录。`
+            : `使用插件固定的官方软件包，在本机全局安装 ${label}？`,
         },
       }
     }
@@ -266,10 +273,10 @@ export function apply(ctx, config = {}) {
       && exec.arguments?.mode === 'workspace-write') {
       return {
         kind: 'ask',
-        reason: 'Official CLI models will edit an isolated Git worktree and integrate their patch into the current workspace',
+        reason: 'Official CLI models will use their normal tools in an isolated Git worktree and integrate their patch into the current workspace',
         displayReason: {
-          en: 'Allow the official CLI model to edit an isolated Git worktree and apply its changes to this workspace?',
-          zh: '允许官方 CLI 模型在独立 Git 工作区修改文件，并将补丁应用回当前工作区？',
+          en: 'Allow the official CLI model to use shell, skills, configured MCP and other normal tools in an isolated Git worktree, then apply its patch to this workspace?',
+          zh: '允许官方 CLI 模型在独立 Git 工作区使用终端、技能、已配置 MCP 等工具，并将改动补丁应用回当前工作区？',
         },
       }
     }
@@ -349,7 +356,7 @@ export function apply(ctx, config = {}) {
       if (!installMatch) {
         if (input) return { kind: 'error', text: '用法：/tools 查看状态，或 /tools install/cancel <工具id>' }
         try {
-          const probes = await probeAllTools()
+          const probes = await probeAllTools({ fresh: true })
           const lines = probes.map(probe => {
             const tool = getOfficialTool(probe.id)
             const command = installCommandLine(tool)
@@ -372,6 +379,9 @@ export function apply(ctx, config = {}) {
         if (settled.status === 'succeeded') {
           const probe = await probeToolWith(tool, defaultRunner)
           return { kind: 'success', text: `${tool.label} 安装完成${probe.version ? `，探测版本 ${probe.version}` : ''}。` }
+        }
+        if (settled.status === 'installer-opened') {
+          return { kind: 'success', text: `${tool.label} 官方安装器已验证并打开。请在安装窗口选择非 C 盘目录并完成安装，然后运行 /tools 重新检测；当前尚未确认安装完成。` }
         }
         return { kind: 'error', text: `${tool.label} 安装失败：${settled.error ?? '未知原因'}\n${settled.outputTail.slice(-6).join('\n')}` }
       } catch (error) {
@@ -399,7 +409,7 @@ async function waitForInstall(toolId, signal) {
 function registerOfficialToolModels(ctx, config) {
   ctx.tools.register(defineTool({
     name: 'model_router_tools',
-    description: 'Probe the fixed registry of official model CLI tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build) and report which are installed with their versions. Never reads credentials.',
+    description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, ZCode) and report which are installed with their versions. Never reads credentials.',
     parameters: {},
     output: JSON_OUTPUT,
     async execute(_args, exec) {
@@ -417,7 +427,7 @@ function registerOfficialToolModels(ctx, config) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_tool_install',
-    description: 'Install one official model CLI tool by registry id using its pinned official command. Only registry ids are accepted; arbitrary packages or executables are refused. Returns the bounded install output.',
+    description: 'Install one official model tool by registry id using its pinned official source. ZCode opens a verified interactive desktop installer with a directory picker. Only registry ids are accepted; arbitrary packages or executables are refused.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Registry tool id, e.g. kimi-code.' },
     },
@@ -432,19 +442,22 @@ function registerOfficialToolModels(ctx, config) {
       return jsonValue({
         ...settled,
         postInstallProbe: probe,
-        notice: '安装命令完全来自服务端注册表；实际版本以探测横幅为准。',
+        notice: settled.status === 'installer-opened'
+          ? '已打开 ZCode 官方安装窗口，请选择安装目录并完成安装，之后重新检测；此状态不代表安装完成。'
+          : '安装命令完全来自服务端注册表；实际版本以探测横幅为准。',
       })
     },
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_tool_run',
-    description: 'Run one supported official model CLI in the current Harness session workspace. read-only analyzes files; workspace-write requires a clean Git repository, runs in an isolated worktree, and applies a verified patch. Optional provider/model must match a configured Harness route and the selected tool vendor.',
+    description: 'Run one supported official model CLI in the current Harness session workspace. Claude, Codex, MiMo and Grok support read-only; Kimi, MiniMax and ZCode require workspace-write. Write mode needs approval and a clean Git repository. Optional provider/model must match a configured Harness route and selected vendor; cliModel can specify that vendor CLI’s own configured model name. Without cliModel, Kimi, MiniMax, MiMo, Grok and ZCode use the CLI default.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Fixed registry tool id, e.g. claude-code or codex.' },
       task: { type: 'string', required: true, description: 'Concrete task for the official CLI model.' },
       provider: { type: 'string', description: 'Optional configured provider, paired with model.' },
-      model: { type: 'string', description: 'Optional configured model identifier passed to the official CLI, paired with provider.' },
-      mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default is read-only. Write mode requires official approval and a clean Git repository.' },
+      model: { type: 'string', description: 'Optional model ID from the Harness directory, paired with provider. This ID is advisory for CLIs except Claude/Codex.' },
+      cliModel: { type: 'string', description: 'Optional model name already configured in this vendor CLI; requires provider and model. MiniMax/MiMo require provider/model format. ZCode 3.14.3 cannot switch models per call.' },
+      mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default is read-only. Kimi, MiniMax and ZCode require workspace-write. Write mode requires official approval and a clean Git repository.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
@@ -458,18 +471,28 @@ function registerOfficialToolModels(ctx, config) {
         if (tool?.id !== args.tool) throw new Error('所选模型供应商与官方 CLI 工具不匹配')
         const routes = await discoverConfiguredRoutes(ctx, exec.signal)
         if (!routes.some(route => route.provider === args.provider && route.model === args.model)) throw new Error('所选 provider/model 不在官方模型目录中')
-        modelId = args.model
+        modelId = args.tool === 'claude-code' || args.tool === 'codex' ? args.model : null
       }
-      return jsonValue(await runOfficialTask({ toolId: args.tool, task: args.task, modelId, workspace: cwd, allowedRoot: root, mode, signal: exec.signal, sandbox: ctx.sandbox }))
+      if (text(args.cliModel)) {
+        if (!text(args.provider) || !text(args.model)) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
+        if (args.tool === 'zcode') throw new Error('ZCode 3.14.3 不支持在单次调用中指定 CLI 模型')
+        modelId = args.cliModel
+      }
+      const result = await runOfficialTask({ toolId: args.tool, task: args.task, modelId, workspace: cwd, allowedRoot: root, mode, signal: exec.signal, sandbox: ctx.sandbox })
+      return jsonValue({ ...result,
+        ...(!modelId && text(args.model) ? { modelNotice: result.modelNotice
+          ?? 'Harness 模型 ID 未经此厂商 CLI 验证；本次使用厂商 CLI 已配置的默认模型。' } : {}),
+      })
     },
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_team_execute',
-    description: 'Plan a complex task into dependent work packages, route only among configured providers whose supported official CLI is installed, then run each package sequentially with that vendor CLI and request the planned model id. Editable runs use one isolated Git worktree and integrate only after every CLI exits successfully. Confirm the actual model from vendor records.',
+    description: 'Plan a complex task into dependent work packages, route among configured providers with ready official CLIs, and run each package sequentially. Claude/Codex request the planned model ID; other CLIs use their configured default unless cliModelsJson supplies exact CLI names. Editable runs use one isolated Git worktree and integrate source changes after CLI success. Confirm the actual model from vendor records.',
     parameters: {
       task: { type: 'string', required: true, description: 'Full task to plan, distribute and execute.' },
       mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default read-only; workspace-write needs a clean Git repository and approval.' },
       budgetUsd: { type: 'number', description: 'Estimated planning ceiling only, not a vendor billing limit.' },
+      cliModelsJson: { type: 'string', description: 'Optional JSON object mapping official tool IDs or work package IDs to exact model names configured in those CLIs. MiniMax/MiMo require provider/model; ZCode 3.14.3 cannot switch per call.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
@@ -479,12 +502,14 @@ function registerOfficialToolModels(ctx, config) {
       const [routes, installed] = await Promise.all([discoverConfiguredRoutes(ctx, exec.signal), installedToolIds()])
       const readiness = await Promise.all(installed.map(id => officialToolReadiness(id, cwd)))
       const supported = new Set(readiness.filter(item => item.ready).map(item => item.id))
+      const capabilities = new Map(officialToolExecutionCapabilities().map(item => [item.id, item]))
       const executableRoutes = routes.filter(route => {
         const tool = toolForProvider(route.provider)
         return tool && installed.includes(tool.id) && supported.has(tool.id)
+          && capabilities.get(tool.id)?.modes?.includes(mode)
       })
       if (executableRoutes.length === 0) return jsonValue({ status: 'blocked',
-        reason: '官方模型目录中没有同时满足已配置路线、已安装 CLI 和托管执行适配器的供应商。',
+        reason: `官方模型目录中没有同时满足已配置路线、已安装 CLI、托管执行适配器与 ${mode} 模式的供应商；Kimi、MiniMax、ZCode 仅支持经审批的 workspace-write。`,
         installed, executionCapabilities: officialToolExecutionCapabilities(), executionReadiness: readiness })
       const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
       const budgetUsd = Math.max(0, finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)))
@@ -492,9 +517,17 @@ function registerOfficialToolModels(ctx, config) {
         mode: 'team', budgetUsd, installedToolIds: installed,
         runnableToolIds: installed.filter(id => supported.has(id)),
       })
-      const execution = await runOfficialTeam({ plan, task: args.task, workspace: cwd, allowedRoot: root, mode, installedIds: installed, signal: exec.signal, sandbox: ctx.sandbox })
+      const bindingsText = text(args.cliModelsJson)
+      if (bindingsText.length > 4_000) throw new Error('cliModelsJson 超过 4000 字符上限')
+      let cliModels = null
+      if (bindingsText) {
+        try { cliModels = JSON.parse(bindingsText) }
+        catch { throw new Error('cliModelsJson 不是有效的 JSON 对象') }
+      }
+      const execution = await runOfficialTeam({ plan, task: args.task, workspace: cwd,
+        allowedRoot: root, mode, installedIds: installed, cliModels, signal: exec.signal, sandbox: ctx.sandbox })
       return jsonValue({ plan, execution,
-        modelNotice: '已向官方 CLI 传入推荐模型 ID；若厂商 CLI 不接受该 ID，会返回失败。实际使用模型仍须以厂商运行记录核对。',
+        modelNotice: '团队向 Claude/Codex 请求 Harness 推荐模型 ID；其他厂商默认使用 CLI 已配置模型。cliModelsJson 可按工具或工作包指定准确 CLI 模型名。实际模型须以各厂商记录核对。',
         billingNotice: 'budgetUsd 仅影响估算与路由，无法限制官方 CLI 账号实际费用。' })
     },
   }))

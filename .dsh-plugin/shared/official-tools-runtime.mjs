@@ -9,7 +9,10 @@
  * always confirmed by a fresh probe rather than the installer's exit code.
  */
 import { spawn } from 'node:child_process'
+import { join } from 'node:path'
 import { getOfficialTool, installCommandLine, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
+import { discoverZCodeBundle } from './zcode-bundle.mjs'
+import { openZCodeInstaller } from './zcode-installer.mjs'
 
 const PROBE_TIMEOUT_MS = 8_000
 const INSTALL_TIMEOUT_MS = 900_000
@@ -140,6 +143,14 @@ async function probeUncached(tool, runner) {
   if (tool.unsupported) {
     return { id: tool.id, installed: false, version: null, status: 'unsupported', detail: tool.unsupportedReason }
   }
+  if (tool.manager === 'signed-windows-installer') {
+    const bundle = await discoverZCodeBundle()
+    return bundle
+      ? { id: tool.id, installed: true, version: bundle.version, status: 'installed',
+        detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} ${bundle.buildVersion}` }
+      : { id: tool.id, installed: false, version: null, status: 'not-installed',
+        detail: '未找到官方签名、版本和 CLI 脚本哈希均匹配的 ZCode 桌面版。' }
+  }
   for (const executable of tool.probeExecutables) {
     // Existence check first: a missing command is indistinguishable from a
     // broken one by exit code alone once a shell is involved.
@@ -201,6 +212,12 @@ export function ensureNpmPrefixOnPath() {
         let prefix = outcome.stdout.trim()
         if (!prefix) return
         if (prefix.startsWith('\\\\?\\')) prefix = prefix.slice(4)
+        if (IS_WINDOWS && !process.env.GROK_HOME && /^[D-Z]:[\\/]/i.test(prefix)) {
+          // Grok's npm bootstrap otherwise expands its native binary under
+          // the Windows user profile on C. Keep plugin-managed downloads on
+          // the same non-C drive as this user's npm global prefix.
+          process.env.GROK_HOME = join(prefix, '.model-router-grok')
+        }
         const current = process.env.PATH ?? ''
         if (current.split(IS_WINDOWS ? ';' : ':').includes(prefix)) return
         process.env.PATH = current ? `${current}${IS_WINDOWS ? ';' : ':'}${prefix}` : prefix
@@ -221,9 +238,10 @@ export async function installedToolIds() {
  * Probe every registry tool in parallel (the slowest single probe bounds the
  * wall time; the cache keeps repeat calls instant).
  */
-export async function probeAllTools() {
+export async function probeAllTools({ fresh = false } = {}) {
   await ensureNpmPrefixOnPath()
-  return Promise.all(OFFICIAL_TOOLS.map(tool => probeToolWith(tool, defaultRunner)))
+  return Promise.all(OFFICIAL_TOOLS.map(tool => probeToolWith(tool, defaultRunner,
+    fresh ? { cacheMs: 0 } : {})))
 }
 
 export function probeSnapshot() {
@@ -270,7 +288,7 @@ export function startInstall(toolId) {
   const command = installCommandLine(tool)
   if (!command) throw new Error(tool.unsupportedReason)
   // With shell mode on Windows the bare name resolves npm.cmd/uv.exe.
-  const manager = tool.manager === 'npm' ? 'npm' : 'uv'
+  const manager = tool.manager === 'npm' ? 'npm' : tool.manager === 'signed-windows-installer' ? 'signed-windows-installer' : 'uv'
   const job = {
     tool,
     command,
@@ -289,7 +307,8 @@ export function startInstall(toolId) {
   }
   installJobs.set(tool.id, job)
   probeCache.delete(tool.id)
-  installChain = installChain.then(() => runInstallJob(manager, tool.installArgs, job)).catch(error => {
+  installChain = installChain.then(() => manager === 'signed-windows-installer'
+    ? runZCodeInstallJob(job) : runInstallJob(manager, tool.installArgs, job)).catch(error => {
     if (job.status === 'cancelled') return
     job.status = 'failed'
     job.finishedAt = new Date().toISOString()
@@ -361,6 +380,53 @@ async function runInstallJob(manager, args, job) {
   } else {
     job.status = 'failed'
     job.error = `安装命令失败（退出码 ${outcome.code ?? '信号终止'}）。${outcome.stderr.split('\n').find(Boolean)?.slice(0, 200) ?? ''}`
+  }
+}
+
+async function runZCodeInstallJob(job) {
+  if (job.status !== 'running') return
+  job.phase = 'preflight'
+  probeCache.delete(job.tool.id)
+  const before = await probeToolWith(job.tool, defaultRunner)
+  if (job.cancelRequested) { markCancelled(job); return }
+  if (before.installed && before.version === job.tool.version) {
+    job.status = 'succeeded'
+    job.phase = 'done'
+    job.finishedAt = new Date().toISOString()
+    job.postInstallProbe = before
+    pushLine(job, `— 已找到 ZCode ${before.version}，无需重复打开安装器 —`)
+    return
+  }
+  const prefix = await runCapture('npm', ['config', 'get', 'prefix'], {
+    timeoutMs: 5_000, useShell: IS_WINDOWS, signal: job.controller.signal,
+  })
+  if (job.cancelRequested) { markCancelled(job); return }
+  job.phase = 'downloading-and-verifying'
+  let lastProgress = 0
+  try {
+    const opened = await openZCodeInstaller({
+      npmPrefix: prefix.ok ? prefix.stdout.trim() : undefined,
+      signal: job.controller.signal,
+      onProgress({ receivedBytes, declaredBytes }) {
+        const now = Date.now()
+        if (now - lastProgress < 3_000) return
+        lastProgress = now
+        pushLine(job, `已下载 ${(receivedBytes / 1_000_000).toFixed(1)} MB${declaredBytes ? ` / ${(declaredBytes / 1_000_000).toFixed(1)} MB` : ''}`)
+      },
+    })
+    if (job.cancelRequested) { markCancelled(job); return }
+    job.status = opened.status
+    job.phase = 'installer-opened'
+    job.finishedAt = new Date().toISOString()
+    probeCache.delete(job.tool.id)
+    pushLine(job, `已验证并打开官方安装器：${opened.installerPath}`)
+    pushLine(job, '请在原厂安装界面选择非 C 盘目录；完成后点击“重新检测”。')
+  } catch (error) {
+    if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }
+    job.status = 'failed'
+    job.phase = 'done'
+    job.finishedAt = new Date().toISOString()
+    job.error = `ZCode 安装器未打开：${String(error?.message ?? error).slice(0, 300)}`
   }
 }
 

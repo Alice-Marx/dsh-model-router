@@ -3,9 +3,8 @@
  * (probe + install) and the Desktop panel (display). Pure data: no Node or
  * browser APIs, so both sides and the test suite import it unchanged.
  *
- * The registry is fail-closed by design: only tools with a verified official
- * npm distribution channel are installable, versions are pinned to the
- * releases checked for this registry, and clients can only name a
+ * The registry is fail-closed by design: versions and installer sources are
+ * pinned to the releases checked for this registry, and clients can only name a
  * registry id — never an arbitrary package or command.
  */
 
@@ -84,6 +83,18 @@ export const OFFICIAL_TOOLS = Object.freeze([
     probeExecutables: ['grok'],
     providerHints: ['xai', 'grok'],
   }),
+  Object.freeze({
+    id: 'zcode',
+    label: 'ZCode',
+    vendor: 'Z.ai',
+    purpose: '智谱官方 ZCode 桌面版，内含 GLM 编程代理。Windows 安装器可选择 D 盘目录。',
+    version: '3.14.3',
+    manager: 'signed-windows-installer',
+    installArgs: [],
+    probeExecutables: [],
+    probeNote: '检测经过有效签名的 ZCode.exe 和同目录 GLM 资源；桌面安装器需人工选择安装位置。',
+    providerHints: ['zai', 'z.ai', 'zcode', 'glm', 'zhipu'],
+  }),
 ])
 
 const TOOL_BY_ID = new Map(OFFICIAL_TOOLS.map(tool => [tool.id, tool]))
@@ -105,6 +116,7 @@ export function toolForProvider(provider) {
 /** Human-readable install command line for one registry entry. */
 export function installCommandLine(tool) {
   if (!tool || tool.unsupported) return null
+  if (tool.manager === 'signed-windows-installer') return '打开官方签名安装器（选择安装目录）'
   return tool.manager === 'npm'
     ? `npm ${tool.installArgs.join(' ')}`
     : `${tool.manager} ${tool.installArgs.join(' ')}`

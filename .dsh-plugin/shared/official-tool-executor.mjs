@@ -20,13 +20,16 @@ import { StringDecoder } from 'node:string_decoder'
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { getOfficialTool, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
 import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
+import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
+import { discoverZCodeBundle } from './zcode-bundle.mjs'
+import { resolveMiMoGrokLaunch, createMiMoGrokParser } from './vendor-mimo-grok-adapter.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
-const MAX_OUTPUT_BYTES = 2_000_000
+const MAX_OUTPUT_BYTES = 32_000_000
 const OUTPUT_TAIL_CHARS = 32_000
-const DEFAULT_TIMEOUT_MS = 10 * 60_000
-const MAX_TIMEOUT_MS = 30 * 60_000
+const DEFAULT_TIMEOUT_MS = 45 * 60_000
+const MAX_TIMEOUT_MS = 2 * 60 * 60_000
 const STOP_GRACE_MS = 5_000
 const CLAUDE_MIN_RESTRICTED_VERSION = [2, 1, 259]
 const CLAUDE_SIGNER = 'Anthropic, PBC'
@@ -48,12 +51,18 @@ const CAPABILITIES = Object.freeze({
     ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
     : { supported: false, reason: 'Codex 的签名原生入口目前仅在 Windows 完成适配。' }),
   'kimi-code': Object.freeze({
-    supported: false,
-    reason: 'Kimi -p 默认自动批准工具调用；尚无经验证的安全非交互权限适配器。',
+    supported: true, modes: Object.freeze(['workspace-write']),
   }),
-  'minimax-code': Object.freeze({ supported: false, reason: 'MiniMax headless 权限和终态尚未按固定版本核验。' }),
-  'mimo-code': Object.freeze({ supported: false, reason: 'MiMo Windows 工作区和终态行为尚未按固定版本核验。' }),
-  'grok-build': Object.freeze({ supported: false, reason: 'Grok 官方沙箱仅实现于 Linux/macOS；Windows 工作区隔离和固定版本终态尚未核验。' }),
+  'minimax-code': Object.freeze({ supported: true, modes: Object.freeze(['workspace-write']) }),
+  'mimo-code': Object.freeze(IS_WINDOWS
+    ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
+    : { supported: false, reason: 'MiMo 原生执行入口目前仅在 Windows 完成适配。' }),
+  'grok-build': Object.freeze(IS_WINDOWS
+    ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
+    : { supported: false, reason: 'Grok 原生执行入口目前仅在 Windows 完成适配。' }),
+  zcode: Object.freeze(IS_WINDOWS
+    ? { supported: true, modes: Object.freeze(['workspace-write']) }
+    : { supported: false, reason: 'ZCode 固定桌面发行版目前仅核验了 Windows x64。' }),
 })
 
 /** A UI/Host can show this without implying that installation means execution readiness. */
@@ -118,9 +127,16 @@ function checkedTimeout(timeoutMs) {
 }
 
 function executionEnvironment(toolId) {
-  const keys = [...ENVIRONMENT_KEYS, ...(toolId === 'claude-code'
-    ? ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR']
-    : ['CODEX_API_KEY', 'OPENAI_API_KEY', 'CODEX_HOME'])]
+  const vendorKeys = {
+    'claude-code': ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR'],
+    codex: ['CODEX_API_KEY', 'OPENAI_API_KEY', 'CODEX_HOME'],
+    'kimi-code': ['KIMI_CODE_HOME', 'KIMI_API_KEY', 'MOONSHOT_API_KEY'],
+    'minimax-code': ['MINIMAX_API_KEY', 'MINIMAX_BASE_URL'],
+    'mimo-code': ['MIMO_API_KEY'],
+    'grok-build': ['XAI_API_KEY', 'GROK_HOME'],
+    zcode: ['ZAI_API_KEY', 'ZCODE_HOME'],
+  }
+  const keys = [...ENVIRONMENT_KEYS, ...(vendorKeys[toolId] ?? [])]
   const env = {}
   for (const key of keys) {
     if (process.env[key] !== undefined) env[key] = process.env[key]
@@ -188,6 +204,44 @@ async function findCodexExecutable(workspace) {
   return null
 }
 
+function nodeVersion(entry) {
+  return new Promise(resolveVersion => {
+    let child
+    try { child = spawn(entry, ['--version'], { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }) }
+    catch { resolveVersion(null); return }
+    let output = ''
+    let settled = false
+    const finish = value => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolveVersion(value)
+    }
+    const timer = setTimeout(() => { child.kill('SIGTERM'); finish(null) }, 4_000)
+    child.stdout.on('data', bytes => { output = tail(output, String(bytes)) })
+    child.on('error', () => finish(null))
+    child.on('close', code => finish(code === 0 ? /^v(\d+\.\d+\.\d+)/.exec(output.trim())?.[1] ?? null : null))
+  })
+}
+
+async function findNodeExecutable(workspace, minimum = [22, 19, 0], acceptedVersion = () => true) {
+  await ensureNpmPrefixOnPath()
+  const candidates = [process.execPath, ...pathDirectories().map(directory => join(directory, IS_WINDOWS ? 'node.exe' : 'node'))]
+  for (const candidate of candidates) {
+    if (basename(candidate).toLowerCase() !== (IS_WINDOWS ? 'node.exe' : 'node')) continue
+    try {
+      const entry = await realpath(candidate)
+      if (inside(workspace, entry) || !(await stat(entry)).isFile()) continue
+      await access(entry, IS_WINDOWS ? constants.F_OK : constants.X_OK)
+      if (IS_WINDOWS && !(await hasOfficialWindowsSignature(entry, 'OpenJS Foundation'))) continue
+      const version = await nodeVersion(entry)
+      if (!versionAtLeast(version, minimum) || !acceptedVersion(version)) continue
+      return entry
+    } catch { /* inspect next candidate */ }
+  }
+  return null
+}
+
 /** Resolve the signed native binary carried by the official npm wrapper. */
 async function findSignedPackagedCodex(packageRoot, workspace) {
   if (!IS_WINDOWS) return null
@@ -239,7 +293,7 @@ function hasOfficialWindowsSignature(entry, expectedSigner) {
   })
 }
 
-async function launchSpec(toolId, workspace, mode, modelId) {
+async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readiness.') {
   if (toolId === 'claude-code') {
     const entries = await findGlobalPackageEntries('@anthropic-ai/claude-code', 'claude', 'bin/claude.exe', workspace)
     const compatible = entries.filter(entry => versionAtLeast(entry.version, CLAUDE_MIN_RESTRICTED_VERSION))
@@ -257,15 +311,16 @@ async function launchSpec(toolId, workspace, mode, modelId) {
     return {
       file: found.entry,
       args: [
-        '--restricted', '--disable-slash-commands', '--strict-mcp-config',
-        '--no-session-persistence', '--permission-prompts', 'none',
-        '--tools', mode === 'workspace-write' ? 'Read,Glob,Grep,Edit,Write' : 'Read,Glob,Grep',
-        '--disallowedTools', 'mcp__*',
-        '--permission-mode', mode === 'workspace-write' ? 'acceptEdits' : 'dontAsk',
+        '--no-session-persistence',
+        ...(mode === 'read-only' ? [
+          '--restricted', '--disable-slash-commands', '--strict-mcp-config',
+          '--tools', 'Read,Glob,Grep', '--disallowedTools', 'mcp__*',
+        ] : []),
+        '--permission-mode', mode === 'workspace-write' ? 'bypassPermissions' : 'dontAsk',
         ...(modelId ? ['--model', modelId] : []),
         '-p', '--output-format', 'json',
         mode === 'workspace-write'
-          ? 'Carry out the task supplied on standard input. Edit files only in this workspace. Shell and external tools are unavailable. Report what changed and what still needs verification.'
+          ? 'Carry out the task supplied on standard input. Work inside this isolated Git workspace. You may use your normal official tools, including shell, skills and configured MCP. Report what changed, commands run, and what still needs verification.'
           : 'Read the task supplied on standard input. Analyze the workspace without changing files and give a clear final answer.',
       ],
       format: 'claude-json',
@@ -285,12 +340,74 @@ async function launchSpec(toolId, workspace, mode, modelId) {
     return {
       file: found.entry,
       args: [
-        '--ask-for-approval', 'never', 'exec', '--ignore-user-config',
+        '--ask-for-approval', 'never', 'exec',
         ...(modelId ? ['--model', modelId] : []),
         '--sandbox', mode, '--json', '-',
       ],
       format: 'codex-jsonl',
       source: found.source,
+    }
+  }
+  if (toolId === 'kimi-code') {
+    const tool = getOfficialTool(toolId)
+    const entries = await findGlobalPackageEntries(tool.package, 'kimi', 'dist/main.mjs', workspace)
+    const found = entries.find(entry => entry.version === tool.version)
+    if (!found) return { unsupported: `未找到固定版本 ${tool.package}@${tool.version} 的官方入口。` }
+    const nodeExecutable = await findNodeExecutable(workspace)
+    if (!nodeExecutable) return { unsupported: '未找到工作区外的 Node.js 可执行文件。' }
+    if (Buffer.byteLength(task, 'utf8') > 16_000) {
+      return { unsupported: 'Kimi 单次 -p 参数超过 16 KB；请先拆分任务。' }
+    }
+    return {
+      file: nodeExecutable,
+      args: [found.entry, ...(modelId ? ['--model', modelId] : []),
+        '--prompt', task, '--output-format', 'stream-json'],
+      format: 'kimi-stream-json', source: found.source, stdinTask: false,
+    }
+  }
+  if (toolId === 'minimax-code') {
+    const tool = getOfficialTool(toolId)
+    const entries = await findGlobalPackageEntries(tool.package, 'mcode', 'cli.js', workspace)
+    const found = entries.find(entry => entry.version === tool.version)
+    if (!found) return { unsupported: `未找到固定版本 ${tool.package}@${tool.version} 的官方入口。` }
+    const nodeExecutable = await findNodeExecutable(workspace, [22, 19, 0], version => {
+      const major = Number(String(version).split('.')[0])
+      return major === 22 || (major >= 24 && major < 27)
+    })
+    if (!nodeExecutable) return { unsupported: '未找到工作区外的 Node.js 可执行文件。' }
+    if (modelId && !modelId.includes('/')) {
+      return { unsupported: 'MiniMax CLI 要求 provider/model；当前模型目录 ID 不能直接传入，请在 MiniMax 中配置别名。' }
+    }
+    return buildMiniMaxInvocation({
+      nodeExecutable, cliEntry: found.entry, workspace, mode,
+      modelReference: modelId, permission: mode === 'workspace-write' ? 'full' : 'smart',
+    })
+  }
+  if (toolId === 'mimo-code' || toolId === 'grok-build') {
+    try {
+      return await resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, task })
+    } catch (error) {
+      return { unsupported: `官方原生入口校验失败：${String(error?.message ?? error).slice(0, 240)}` }
+    }
+  }
+  if (toolId === 'zcode') {
+    const found = await discoverZCodeBundle()
+    if (!found) return { unsupported: '未找到已签名、版本匹配且 CLI 脚本哈希正确的 ZCode 桌面版。' }
+    const nodeExecutable = await findNodeExecutable(workspace, [24, 14, 0], version =>
+      Number(String(version).split('.')[0]) === 24)
+    if (!nodeExecutable) return { unsupported: '未找到工作区外的 Node.js 可执行文件。' }
+    if (Buffer.byteLength(task, 'utf8') > 16_000) {
+      return { unsupported: 'ZCode 单次 --prompt 参数超过 16 KB；请先拆分任务。' }
+    }
+    return {
+      file: nodeExecutable,
+      args: [found.cliEntry, '--prompt', task, '--cwd', workspace,
+        '--mode', mode === 'workspace-write' ? 'yolo' : 'plan', '--output-format', 'stream-json'],
+      format: 'zcode-stream-json', source: found.source, stdinTask: false,
+      requestedModel: null,
+      modelNotice: modelId
+        ? 'ZCode 3.14.3 的 CLI 没有 --model 参数；本次使用 ZCode 已配置的默认模型，不能保证与 Harness 建议模型一致。'
+        : '本次使用 ZCode 已配置的默认模型。',
     }
   }
   return { unsupported: CAPABILITIES[toolId]?.reason ?? '此官方工具尚无已核验的安全执行适配器。' }
@@ -304,10 +421,10 @@ export async function officialToolReadiness(toolId, workspace = process.cwd()) {
   if (!capability?.supported) return { id: tool.id, ready: false, reason: capability?.reason ?? '当前平台不支持托管执行。' }
   try {
     const directory = await checkedWorkspace(workspace)
-    const spec = await launchSpec(tool.id, directory, 'read-only', null)
+    const spec = await launchSpec(tool.id, directory, capability.modes[0], null)
     return spec.unsupported
       ? { id: tool.id, ready: false, reason: spec.unsupported }
-      : { id: tool.id, ready: true, source: spec.source }
+      : { id: tool.id, ready: true, source: spec.source, modes: capability.modes }
   } catch (error) {
     return { id: tool.id, ready: false, reason: String(error?.message ?? error).slice(0, 300) }
   }
@@ -368,13 +485,64 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
     let failedEvent = false
     let finalText = ''
     let protocolError = null
+    let zcodeResult = null
+    let zcodeSession = null
+    const zcodeStarted = new Set()
+    const zcodeCompleted = new Set()
+    const miniMaxParser = spec.format === 'minimax-stream-json' ? createMiniMaxStreamParser() : null
+    const nativeParser = spec.format === 'mimo-jsonl' || spec.format === 'grok-jsonl'
+      ? createMiMoGrokParser(toolId) : null
+    let kimiAssistant = false
     const stdoutDecoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
 
     const readJsonlLine = line => {
       if (!line.trim()) return
+      if (nativeParser) { nativeParser.push(line); return }
       try {
         const event = JSON.parse(line)
+        if (spec.format === 'zcode-stream-json') {
+          if (!event || typeof event !== 'object' || Array.isArray(event)
+            || typeof event.type !== 'string' || typeof event.sessionId !== 'string'
+            || !event.sessionId) {
+            protocolError = 'ZCode 返回了无效事件。'
+            return
+          }
+          if (zcodeResult) {
+            protocolError = 'ZCode 在最终结果之后仍返回事件。'
+            return
+          }
+          if (zcodeSession && zcodeSession !== event.sessionId) {
+            protocolError = 'ZCode 混入了其他会话的事件。'
+            return
+          }
+          zcodeSession = event.sessionId
+          if (event.type === 'result') {
+            zcodeResult = event
+            return
+          }
+          if (event.type === 'turn.failed') failedEvent = true
+          if (event.type === 'turn.started' || event.type === 'turn.completed') {
+            if (typeof event.turnId !== 'string' || !event.turnId) {
+              protocolError = 'ZCode 回合事件缺少 turnId。'
+              return
+            }
+            if (event.type === 'turn.started') zcodeStarted.add(event.turnId)
+            else if (event.payload?.resultType === 'success') zcodeCompleted.add(event.turnId)
+            else failedEvent = true
+          }
+          return
+        }
+        if (spec.format === 'kimi-stream-json') {
+          if (event.role === 'meta' && /error|failed/i.test(String(event.type ?? ''))) failedEvent = true
+          if (event.role === 'assistant' && !event.tool_calls?.length) {
+            const content = typeof event.content === 'string' ? event.content
+              : Array.isArray(event.content) ? event.content.filter(part => part?.type === 'text')
+                .map(part => String(part.text ?? '')).join('') : ''
+            if (content.trim()) { finalText = content; kimiAssistant = true }
+          }
+          return
+        }
         if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
         if (event.type === 'turn.failed' || event.type === 'error') {
           failedEvent = true
@@ -382,7 +550,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
         }
         if (event.type === 'item.completed' && event.item?.type === 'agent_message'
           && typeof event.item.text === 'string') finalText = event.item.text
-      } catch { protocolError = 'Codex 输出了无效 JSONL。' }
+      } catch { protocolError = `${toolId} 输出了无效 JSONL。` }
     }
     const readJsonl = chunk => {
       jsonlBuffer += chunk
@@ -392,7 +560,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
         readJsonlLine(jsonlBuffer.slice(0, newline))
         jsonlBuffer = jsonlBuffer.slice(newline + 1)
       }
-      if (jsonlBuffer.length > OUTPUT_TAIL_CHARS) protocolError = 'Codex JSONL 单行超过限制。'
+      if (jsonlBuffer.length > 4_000_000) protocolError = `${toolId} JSONL 单行超过限制。`
     }
 
     let timeoutTimer
@@ -406,7 +574,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
       clearTimeout(graceTimer)
       clearTimeout(escalationTimer)
       signal?.removeEventListener('abort', onAbort)
-      resolveResult({ ...result, stdoutTail, stderrTail, terminalEvent: terminal, finalText })
+      resolveResult({ stdoutTail, stderrTail, terminalEvent: terminal, finalText, ...result })
     }
     function requestStop(reason) {
       if (finished || stopReason) return
@@ -422,6 +590,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
       const chunk = stdoutDecoder.write(bytes)
       stdoutTail = tail(stdoutTail, chunk)
       if (spec.format === 'claude-json') stdout += chunk
+      else if (miniMaxParser) miniMaxParser.push(chunk)
       else readJsonl(chunk)
       if (outputBytes > MAX_OUTPUT_BYTES) requestStop('output-limit')
     })
@@ -439,12 +608,21 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
       if (finalStdout) {
         stdoutTail = tail(stdoutTail, finalStdout)
         if (spec.format === 'claude-json') stdout += finalStdout
+        else if (miniMaxParser) miniMaxParser.push(finalStdout)
         else readJsonl(finalStdout)
       }
       stderrTail = tail(stderrTail, stderrDecoder.end())
       if (jsonlBuffer.trim()) readJsonlLine(jsonlBuffer)
       if (stopReason) {
         settle({ status: stopReason, exitCode: code, exitSignal })
+        return
+      }
+      if (miniMaxParser) {
+        settle(miniMaxParser.finish(code))
+        return
+      }
+      if (nativeParser) {
+        settle({ exitCode: code, ...nativeParser.finish(code) })
         return
       }
       if (code !== 0) {
@@ -465,6 +643,24 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
           settle({ status: 'failed', exitCode: code, error: 'Claude 未返回有效的结果 JSON。' })
           return
         }
+      } else if (spec.format === 'zcode-stream-json') {
+        const turnId = zcodeResult?.turnId
+        if (protocolError || failedEvent || !zcodeResult || typeof turnId !== 'string'
+          || !turnId || !zcodeStarted.has(turnId) || !zcodeCompleted.has(turnId)
+          || zcodeResult.projection?.status !== 'idle'
+          || typeof zcodeResult.response !== 'string' || !zcodeResult.response.trim()) {
+          settle({ status: 'failed', exitCode: code,
+            error: protocolError ?? 'ZCode 未返回匹配回合的成功终态和最终答复。' })
+          return
+        }
+        terminal = 'completed'
+        finalText = zcodeResult.response
+      } else if (spec.format === 'kimi-stream-json') {
+        if (protocolError || failedEvent || !kimiAssistant) {
+          settle({ status: 'failed', exitCode: code, error: protocolError ?? 'Kimi 未返回完整的助手答复。' })
+          return
+        }
+        terminal = 'completed'
       } else if (protocolError || terminal !== 'completed' || !finalText.trim()) {
         settle({ status: 'failed', exitCode: code, error: protocolError ?? 'Codex 未返回完整成功终态和回答。' })
         return
@@ -475,7 +671,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
     timeoutTimer = setTimeout(() => requestStop('timed-out'), timeoutMs)
     signal?.addEventListener('abort', onAbort, { once: true })
     if (signal?.aborted) requestStop('cancelled')
-    if (!stopReason) child.stdin.end(task, 'utf8')
+    if (!stopReason) child.stdin.end(spec.stdinTask === false ? '' : task, 'utf8')
   })
 }
 
@@ -496,10 +692,13 @@ export async function runOfficialTool({
   const requestedModel = checkedModel(modelId)
   const cwd = await checkedWorkspace(workspace)
   const executionMode = checkedMode(mode)
+  if (!capability.modes.includes(executionMode)) {
+    return { toolId: tool.id, status: 'unsupported', reason: `${tool.label} 的无界面模式会自动执行工具；当前仅允许经审批的独立 Git 工作区可编辑执行。` }
+  }
   if (executionMode === 'workspace-write') await checkedWriteWorkspace(cwd, isolatedRoot)
   const timeout = checkedTimeout(timeoutMs)
   if (signal?.aborted) return { toolId: tool.id, status: 'cancelled', workspace: cwd }
-  const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel)
+  const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel, prompt)
   if (spec.unsupported) return { toolId: tool.id, status: 'unsupported', reason: spec.unsupported }
   if (typeof sandbox?.confine !== 'function') {
     return { toolId: tool.id, status: 'unsupported', reason: '官方 Harness 进程沙箱不可用，拒绝直接启动 CLI。' }
@@ -521,7 +720,8 @@ export async function runOfficialTool({
   return {
     toolId: tool.id,
     mode: executionMode,
-    requestedModel,
+    requestedModel: spec.requestedModel === undefined ? requestedModel : spec.requestedModel,
+    ...(spec.modelNotice ? { modelNotice: spec.modelNotice } : {}),
     workspace: cwd,
     source: spec.source,
     sandboxEnforcement: confined.enforcement,
