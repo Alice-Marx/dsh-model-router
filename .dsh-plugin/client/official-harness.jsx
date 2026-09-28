@@ -10,6 +10,10 @@ import React from 'react'
 import { RouterMainPage, RouterPanelIcon } from './router-main.jsx'
 import { GalModulePage, GalPanelIcon } from './gal-module-page.jsx'
 import {
+  OFFICIAL_TOOLS_CLIENT_REMOTE,
+  OFFICIAL_TOOLS_REMOTE_NAMESPACE,
+} from '../shared/official-tools-remote.mjs'
+import {
   Button,
   SettingsForm,
   SettingsFormModel,
@@ -157,7 +161,12 @@ function OpenRouterWorkspace({ subject, openPanel }) {
  * settings form belongs to this installed bundle; the matching main/sidebar
  * registrations create a visible root-level Desktop workspace.
  */
-export function apply(ctx) {
+export async function apply(ctx) {
+  // The official Client Gateway owns this typed namespace and withdraws it
+  // with the plugin fiber. Host methods accept only fixed registry tool IDs.
+  const disposeOfficialToolsRemote = await ctx.remote.$mount(OFFICIAL_TOOLS_CLIENT_REMOTE)
+  ctx.effect(() => disposeOfficialToolsRemote, 'model-router-galgame: official tools client remote')
+  const officialToolsRemote = ctx.remote[OFFICIAL_TOOLS_REMOTE_NAMESPACE]
   const settingsScope = ctx.configForms.get(ROUTER_NAMESPACE)
   const card = new RouterSettingsCardController(settingsScope)
   ctx.effect(() => () => { card.dispose() }, 'model-router-galgame: settings form subscription')
@@ -169,7 +178,14 @@ export function apply(ctx) {
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main',
     key: ROUTER_PANEL,
-    inject: () => ({ loadCatalog: () => ctx.remote.session.modelCatalog(), settingsScope }),
+    inject: () => ({
+      loadCatalog: () => ctx.remote.session.modelCatalog(),
+      settingsScope,
+      listOfficialTools: () => officialToolsRemote.list(),
+      installOfficialTool: toolId => officialToolsRemote.install(toolId),
+      cancelOfficialToolInstall: toolId => officialToolsRemote.cancel(toolId),
+      officialToolInstallStatus: toolId => officialToolsRemote.status(toolId),
+    }),
   }, RouterMainPage))), 'model-router-galgame: main workspace')
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',
@@ -180,7 +196,11 @@ export function apply(ctx) {
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main',
     key: GAL_PANEL,
-    inject: () => ({ loadCatalog: () => ctx.remote.session.modelCatalog() }),
+    inject: () => ({
+      loadCatalog: () => ctx.remote.session.modelCatalog(),
+      galReply: request => officialToolsRemote.galReply(request),
+      cancelGalReply: requestId => officialToolsRemote.cancelGalReply(requestId),
+    }),
   }, GalModulePage))), 'model-router-galgame: gal module workspace')
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',

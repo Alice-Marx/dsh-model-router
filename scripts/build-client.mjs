@@ -34,7 +34,9 @@ export async function generate({ check = false } = {}) {
     jsx: 'transform',
     jsxFactory: 'React.createElement',
     jsxFragment: 'React.Fragment',
-    loader: { '.css': 'text' },
+    // The desktop loader consumes a single self-contained client.js file.
+    // Selected Gal artwork is embedded so installed plugins have no source-path dependency.
+    loader: { '.css': 'text', '.png': 'dataurl', '.webp': 'dataurl' },
     external: [
       'react', 'react/*', 'react-dom', 'react-dom/*',
       '@deepseek-ai/dsh-client-ui-primitives',

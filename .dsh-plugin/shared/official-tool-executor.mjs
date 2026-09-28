@@ -1,0 +1,534 @@
+/**
+ * Bounded, non-interactive execution of verified official CLI entry points.
+ *
+ * The Host must authorize the request and create an isolated workspace before
+ * offering the write mode. The caller supplies a registry id, task text, and
+ * an absolute workspace, never a command or arbitrary arguments. Write mode
+ * additionally needs a trusted isolation root supplied by the Host;
+ * this module rejects a workspace outside that root.
+ *
+ * Claude: https://code.claude.com/docs/en/headless
+ *         https://code.claude.com/docs/en/cli-reference
+ * Codex:  https://learn.chatgpt.com/docs/non-interactive-mode
+ * Kimi's `-p` enables auto permissions:
+ * https://moonshotai.github.io/kimi-code/en/reference/kimi-command.html
+ */
+import { spawn } from 'node:child_process'
+import { access, readFile, realpath, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { StringDecoder } from 'node:string_decoder'
+import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { getOfficialTool, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
+import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
+
+const IS_WINDOWS = process.platform === 'win32'
+const MAX_TASK_BYTES = 64_000
+const MAX_OUTPUT_BYTES = 2_000_000
+const OUTPUT_TAIL_CHARS = 32_000
+const DEFAULT_TIMEOUT_MS = 10 * 60_000
+const MAX_TIMEOUT_MS = 30 * 60_000
+const STOP_GRACE_MS = 5_000
+const CLAUDE_MIN_RESTRICTED_VERSION = [2, 1, 259]
+const CLAUDE_SIGNER = 'Anthropic, PBC'
+const CODEX_SIGNER = 'OpenAI OpCo, LLC'
+const WINDOWS_SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
+const ENVIRONMENT_KEYS = Object.freeze([
+  'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec',
+  'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
+  'PROGRAMDATA', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy',
+  'SSL_CERT_FILE', 'NODE_EXTRA_CA_CERTS',
+])
+
+const CAPABILITIES = Object.freeze({
+  'claude-code': Object.freeze(IS_WINDOWS
+    ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
+    : { supported: false, reason: 'Claude 的受限原生入口目前仅在 Windows 完成适配。' }),
+  codex: Object.freeze(IS_WINDOWS
+    ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
+    : { supported: false, reason: 'Codex 的签名原生入口目前仅在 Windows 完成适配。' }),
+  'kimi-code': Object.freeze({
+    supported: false,
+    reason: 'Kimi -p 默认自动批准工具调用；尚无经验证的安全非交互权限适配器。',
+  }),
+  'minimax-code': Object.freeze({ supported: false, reason: 'MiniMax headless 权限和终态尚未按固定版本核验。' }),
+  'mimo-code': Object.freeze({ supported: false, reason: 'MiMo Windows 工作区和终态行为尚未按固定版本核验。' }),
+  'grok-build': Object.freeze({ supported: false, reason: 'Grok 官方沙箱仅实现于 Linux/macOS；Windows 工作区隔离和固定版本终态尚未核验。' }),
+})
+
+/** A UI/Host can show this without implying that installation means execution readiness. */
+export function officialToolExecutionCapabilities() {
+  return OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ...CAPABILITIES[tool.id] }))
+}
+
+function inside(parent, child) {
+  const part = relative(parent, child)
+  return part !== '' && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
+}
+
+async function checkedWorkspace(workspace) {
+  if (typeof workspace !== 'string' || !isAbsolute(workspace) || workspace.includes('\0')) {
+    throw new TypeError('workspace must be an absolute directory path')
+  }
+  const canonical = await realpath(workspace)
+  if (!(await stat(canonical)).isDirectory()) throw new TypeError('workspace must be a directory')
+  if (resolve(canonical) === resolve(canonical, '..')) {
+    throw new TypeError('a filesystem root is not an acceptable workspace')
+  }
+  return canonical
+}
+
+async function checkedWriteWorkspace(workspace, isolatedRoot) {
+  if (typeof isolatedRoot !== 'string' || !isAbsolute(isolatedRoot)) {
+    throw new TypeError('workspace-write requires a trusted absolute isolatedRoot')
+  }
+  const root = await checkedWorkspace(isolatedRoot)
+  if (!inside(root, workspace)) {
+    throw new TypeError('workspace-write is allowed only inside isolatedRoot')
+  }
+}
+
+function checkedMode(mode) {
+  if (mode !== 'read-only' && mode !== 'workspace-write') {
+    throw new TypeError('mode must be read-only or workspace-write')
+  }
+  return mode
+}
+
+function checkedTask(task) {
+  if (typeof task !== 'string' || !task.trim() || task.includes('\0') || Buffer.byteLength(task, 'utf8') > MAX_TASK_BYTES) {
+    throw new TypeError(`task must be nonempty text of at most ${MAX_TASK_BYTES} UTF-8 bytes`)
+  }
+  return task
+}
+
+function checkedModel(modelId) {
+  if (modelId === undefined || modelId === null || modelId === '') return null
+  if (typeof modelId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(modelId)) {
+    throw new TypeError('modelId must be a bounded model identifier')
+  }
+  return modelId
+}
+
+function checkedTimeout(timeoutMs) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > MAX_TIMEOUT_MS) {
+    throw new TypeError(`timeoutMs must be an integer between 1000 and ${MAX_TIMEOUT_MS}`)
+  }
+  return timeoutMs
+}
+
+function executionEnvironment(toolId) {
+  const keys = [...ENVIRONMENT_KEYS, ...(toolId === 'claude-code'
+    ? ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR']
+    : ['CODEX_API_KEY', 'OPENAI_API_KEY', 'CODEX_HOME'])]
+  const env = {}
+  for (const key of keys) {
+    if (process.env[key] !== undefined) env[key] = process.env[key]
+  }
+  return env
+}
+
+function pathDirectories() {
+  const value = process.env.PATH ?? process.env.Path ?? ''
+  return [...new Set(value.split(delimiter).map(part => part.trim().replace(/^"|"$/g, '')).filter(Boolean))]
+}
+
+function versionAtLeast(value, minimum) {
+  const found = /^(\d+)\.(\d+)\.(\d+)(?:$|-)/.exec(String(value ?? ''))
+  if (!found) return false
+  for (let index = 0; index < 3; index += 1) {
+    const difference = Number(found[index + 1]) - minimum[index]
+    if (difference !== 0) return difference > 0
+  }
+  return true
+}
+
+/** Resolve the package's real `bin` file, never its Windows .cmd shim. */
+async function findGlobalPackageEntries(packageName, binName, expectedBin, workspace) {
+  await ensureNpmPrefixOnPath()
+  const packageParts = packageName.split('/')
+  const found = []
+  const seen = new Set()
+  for (const directory of pathDirectories()) {
+    const moduleParents = [join(directory, 'node_modules')]
+    if (basename(directory).toLowerCase() === '.bin') moduleParents.push(resolve(directory, '..'))
+    if (!IS_WINDOWS) moduleParents.push(resolve(directory, '..', 'lib', 'node_modules'))
+    for (const modules of moduleParents) {
+      const packageDirectory = join(modules, ...packageParts)
+      try {
+        const manifest = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
+        if (manifest.name !== packageName || manifest.bin?.[binName] !== expectedBin) continue
+        const packageRoot = await realpath(packageDirectory)
+        if (packageRoot === workspace || inside(workspace, packageRoot)) continue
+        if (seen.has(packageRoot)) continue
+        const entry = await realpath(join(packageRoot, expectedBin))
+        if (!inside(packageRoot, entry) || !(await stat(entry)).isFile()) continue
+        seen.add(packageRoot)
+        found.push({ entry, packageRoot, version: manifest.version, source: 'verified-npm-package' })
+      } catch { /* this PATH entry is not the requested package */ }
+    }
+  }
+  return found
+}
+
+async function findCodexExecutable(workspace) {
+  await ensureNpmPrefixOnPath()
+  const filename = IS_WINDOWS ? 'codex.exe' : 'codex'
+  for (const directory of pathDirectories()) {
+    try {
+      const pathRoot = await realpath(directory)
+      if (pathRoot === workspace || inside(workspace, pathRoot)) continue
+      const entry = await realpath(join(directory, filename))
+      if (inside(workspace, entry) || !(await stat(entry)).isFile()) continue
+      await access(entry, IS_WINDOWS ? constants.F_OK : constants.X_OK)
+      if (IS_WINDOWS && !(await hasOfficialWindowsSignature(entry, CODEX_SIGNER))) continue
+      return { entry, source: IS_WINDOWS ? 'signed-native-executable' : 'path-native-executable' }
+    } catch { /* try the next PATH entry */ }
+  }
+  return null
+}
+
+/** Resolve the signed native binary carried by the official npm wrapper. */
+async function findSignedPackagedCodex(packageRoot, workspace) {
+  if (!IS_WINDOWS) return null
+  const target = process.arch === 'arm64' ? ['codex-win32-arm64', 'aarch64-pc-windows-msvc']
+    : process.arch === 'x64' ? ['codex-win32-x64', 'x86_64-pc-windows-msvc'] : null
+  if (!target) return null
+  const candidate = join(packageRoot, 'node_modules', '@openai', target[0], 'vendor', target[1], 'bin', 'codex.exe')
+  try {
+    const entry = await realpath(candidate)
+    if (!inside(packageRoot, entry) || inside(workspace, entry) || !(await stat(entry)).isFile()) return null
+    if (!(await hasOfficialWindowsSignature(entry, CODEX_SIGNER))) return null
+    return { entry, source: 'signed-official-npm-native' }
+  } catch { return null }
+}
+
+/** PATH or package metadata alone is insufficient: verify the Windows EXE publisher. */
+function hasOfficialWindowsSignature(entry, expectedSigner) {
+  const script = '$s=Get-AuthenticodeSignature -LiteralPath $env:MODEL_ROUTER_VERIFY_PATH; '
+    + '@{status=[string]$s.Status;subject=[string]$s.SignerCertificate.Subject} | ConvertTo-Json -Compress'
+  const powershell = join(WINDOWS_SYSTEM32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  return new Promise(resolveSignature => {
+    let child
+    try {
+      child = spawn(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
+        shell: false,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: { ...process.env, MODEL_ROUTER_VERIFY_PATH: entry },
+      })
+    } catch { resolveSignature(false); return }
+    let output = ''
+    let done = false
+    const settle = valid => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      resolveSignature(valid)
+    }
+    const timer = setTimeout(() => { child.kill('SIGTERM'); settle(false) }, 8_000)
+    child.stdout.on('data', bytes => { output = tail(output, String(bytes)).slice(-4_096) })
+    child.on('error', () => settle(false))
+    child.on('close', code => {
+      if (code !== 0) { settle(false); return }
+      try {
+        const signature = JSON.parse(output.trim().replace(/^\uFEFF/, ''))
+        settle(signature.status === 'Valid' && String(signature.subject).includes(expectedSigner))
+      } catch { settle(false) }
+    })
+  })
+}
+
+async function launchSpec(toolId, workspace, mode, modelId) {
+  if (toolId === 'claude-code') {
+    const entries = await findGlobalPackageEntries('@anthropic-ai/claude-code', 'claude', 'bin/claude.exe', workspace)
+    const compatible = entries.filter(entry => versionAtLeast(entry.version, CLAUDE_MIN_RESTRICTED_VERSION))
+    let found = null
+    for (const entry of compatible) {
+      if (!IS_WINDOWS || await hasOfficialWindowsSignature(entry.entry, CLAUDE_SIGNER)) {
+        found = entry
+        break
+      }
+    }
+    if (!found) return { unsupported: compatible.length > 0
+      ? '未找到具有有效 Anthropic 签名的 claude.exe。'
+      : entries.length > 0 ? 'Claude Code 版本过旧，受限执行所需参数要求 >= 2.1.259。'
+        : '未找到官方 @anthropic-ai/claude-code 包的原生 claude.exe；不会调用 .cmd 包装器。' }
+    return {
+      file: found.entry,
+      args: [
+        '--restricted', '--disable-slash-commands', '--strict-mcp-config',
+        '--no-session-persistence', '--permission-prompts', 'none',
+        '--tools', mode === 'workspace-write' ? 'Read,Glob,Grep,Edit,Write' : 'Read,Glob,Grep',
+        '--disallowedTools', 'mcp__*',
+        '--permission-mode', mode === 'workspace-write' ? 'acceptEdits' : 'dontAsk',
+        ...(modelId ? ['--model', modelId] : []),
+        '-p', '--output-format', 'json',
+        mode === 'workspace-write'
+          ? 'Carry out the task supplied on standard input. Edit files only in this workspace. Shell and external tools are unavailable. Report what changed and what still needs verification.'
+          : 'Read the task supplied on standard input. Analyze the workspace without changing files and give a clear final answer.',
+      ],
+      format: 'claude-json',
+      source: found.source,
+    }
+  }
+  if (toolId === 'codex') {
+    if (!IS_WINDOWS) return { unsupported: CAPABILITIES.codex.reason }
+    const packages = await findGlobalPackageEntries('@openai/codex', 'codex', 'bin/codex.js', workspace)
+    let found = null
+    for (const entry of packages) {
+      found = await findSignedPackagedCodex(entry.packageRoot, workspace)
+      if (found) break
+    }
+    found ??= await findCodexExecutable(workspace)
+    if (!found) return { unsupported: '未找到具有 OpenAI 有效签名的 codex.exe。' }
+    return {
+      file: found.entry,
+      args: [
+        '--ask-for-approval', 'never', 'exec', '--ignore-user-config',
+        ...(modelId ? ['--model', modelId] : []),
+        '--sandbox', mode, '--json', '-',
+      ],
+      format: 'codex-jsonl',
+      source: found.source,
+    }
+  }
+  return { unsupported: CAPABILITIES[toolId]?.reason ?? '此官方工具尚无已核验的安全执行适配器。' }
+}
+
+/** Check the actual trusted launch entry without starting an account call. */
+export async function officialToolReadiness(toolId, workspace = process.cwd()) {
+  const tool = getOfficialTool(toolId)
+  if (!tool) return { id: String(toolId), ready: false, reason: '工具不在固定官方注册表中。' }
+  const capability = CAPABILITIES[tool.id]
+  if (!capability?.supported) return { id: tool.id, ready: false, reason: capability?.reason ?? '当前平台不支持托管执行。' }
+  try {
+    const directory = await checkedWorkspace(workspace)
+    const spec = await launchSpec(tool.id, directory, 'read-only', null)
+    return spec.unsupported
+      ? { id: tool.id, ready: false, reason: spec.unsupported }
+      : { id: tool.id, ready: true, source: spec.source }
+  } catch (error) {
+    return { id: tool.id, ready: false, reason: String(error?.message ?? error).slice(0, 300) }
+  }
+}
+
+function tail(current, addition) {
+  const next = current + addition
+  return next.length > OUTPUT_TAIL_CHARS ? next.slice(-OUTPUT_TAIL_CHARS) : next
+}
+
+function stopProcessTree(child) {
+  if (child.pid === undefined) return null
+  if (IS_WINDOWS) {
+    try {
+      const killer = spawn(join(WINDOWS_SYSTEM32, 'taskkill.exe'), ['/PID', String(child.pid), '/T', '/F'], {
+        shell: false, windowsHide: true, stdio: 'ignore',
+      })
+      killer.on('error', () => { try { child.kill('SIGTERM') } catch { /* gone */ } })
+      killer.on('close', code => {
+        if (code !== 0) try { child.kill('SIGTERM') } catch { /* gone */ }
+      })
+    } catch { try { child.kill('SIGTERM') } catch { /* gone */ } }
+    return null
+  } else {
+    try { process.kill(-child.pid, 'SIGTERM') } catch { try { child.kill('SIGTERM') } catch { /* gone */ } }
+    const timer = setTimeout(() => {
+      try { process.kill(-child.pid, 'SIGKILL') } catch { /* gone */ }
+    }, 2_000)
+    return timer
+  }
+}
+
+function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
+  return new Promise(resolveResult => {
+    let child
+    try {
+      child = spawn(spec.file, spec.args, {
+        cwd: workspace,
+        shell: false,
+        windowsHide: true,
+        detached: !IS_WINDOWS,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: executionEnvironment(toolId),
+      })
+    } catch (error) {
+      resolveResult({ status: 'failed', error: String(error?.message ?? error), exitCode: null })
+      return
+    }
+
+    let finished = false
+    let stopReason = null
+    let stdout = ''
+    let stdoutTail = ''
+    let stderrTail = ''
+    let outputBytes = 0
+    let jsonlBuffer = ''
+    let terminal = null
+    let failedEvent = false
+    let finalText = ''
+    let protocolError = null
+    const stdoutDecoder = new StringDecoder('utf8')
+    const stderrDecoder = new StringDecoder('utf8')
+
+    const readJsonlLine = line => {
+      if (!line.trim()) return
+      try {
+        const event = JSON.parse(line)
+        if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
+        if (event.type === 'turn.failed' || event.type === 'error') {
+          failedEvent = true
+          terminal = 'failed'
+        }
+        if (event.type === 'item.completed' && event.item?.type === 'agent_message'
+          && typeof event.item.text === 'string') finalText = event.item.text
+      } catch { protocolError = 'Codex 输出了无效 JSONL。' }
+    }
+    const readJsonl = chunk => {
+      jsonlBuffer += chunk
+      for (;;) {
+        const newline = jsonlBuffer.indexOf('\n')
+        if (newline < 0) break
+        readJsonlLine(jsonlBuffer.slice(0, newline))
+        jsonlBuffer = jsonlBuffer.slice(newline + 1)
+      }
+      if (jsonlBuffer.length > OUTPUT_TAIL_CHARS) protocolError = 'Codex JSONL 单行超过限制。'
+    }
+
+    let timeoutTimer
+    let graceTimer
+    let escalationTimer
+    const onAbort = () => requestStop('cancelled')
+    const settle = result => {
+      if (finished) return
+      finished = true
+      clearTimeout(timeoutTimer)
+      clearTimeout(graceTimer)
+      clearTimeout(escalationTimer)
+      signal?.removeEventListener('abort', onAbort)
+      resolveResult({ ...result, stdoutTail, stderrTail, terminalEvent: terminal, finalText })
+    }
+    function requestStop(reason) {
+      if (finished || stopReason) return
+      stopReason = reason
+      escalationTimer = stopProcessTree(child)
+      graceTimer = setTimeout(() => settle({ status: reason, exitCode: null, error: '进程终止等待超时。' }), STOP_GRACE_MS)
+      graceTimer.unref?.()
+    }
+
+    child.stdout.on('data', bytes => {
+      if (finished || stopReason) return
+      outputBytes += bytes.length
+      const chunk = stdoutDecoder.write(bytes)
+      stdoutTail = tail(stdoutTail, chunk)
+      if (spec.format === 'claude-json') stdout += chunk
+      else readJsonl(chunk)
+      if (outputBytes > MAX_OUTPUT_BYTES) requestStop('output-limit')
+    })
+    child.stderr.on('data', bytes => {
+      if (finished || stopReason) return
+      outputBytes += bytes.length
+      stderrTail = tail(stderrTail, stderrDecoder.write(bytes))
+      if (outputBytes > MAX_OUTPUT_BYTES) requestStop('output-limit')
+    })
+    child.stdin.on('error', () => { /* a process can exit before reading stdin */ })
+    child.on('error', error => settle({ status: stopReason ?? 'failed', exitCode: null, error: error.message }))
+    child.on('close', (code, exitSignal) => {
+      if (finished) return
+      const finalStdout = stdoutDecoder.end()
+      if (finalStdout) {
+        stdoutTail = tail(stdoutTail, finalStdout)
+        if (spec.format === 'claude-json') stdout += finalStdout
+        else readJsonl(finalStdout)
+      }
+      stderrTail = tail(stderrTail, stderrDecoder.end())
+      if (jsonlBuffer.trim()) readJsonlLine(jsonlBuffer)
+      if (stopReason) {
+        settle({ status: stopReason, exitCode: code, exitSignal })
+        return
+      }
+      if (code !== 0) {
+        settle({ status: 'failed', exitCode: code, exitSignal, error: '官方 CLI 退出码非零。' })
+        return
+      }
+      if (spec.format === 'claude-json') {
+        try {
+          const result = JSON.parse(stdout)
+          if (result.type !== 'result' || result.is_error === true || result.subtype !== 'success'
+            || typeof result.result !== 'string') {
+            settle({ status: 'failed', exitCode: code, error: 'Claude 未返回成功终态。' })
+            return
+          }
+          terminal = 'completed'
+          finalText = result.result
+        } catch {
+          settle({ status: 'failed', exitCode: code, error: 'Claude 未返回有效的结果 JSON。' })
+          return
+        }
+      } else if (protocolError || terminal !== 'completed' || !finalText.trim()) {
+        settle({ status: 'failed', exitCode: code, error: protocolError ?? 'Codex 未返回完整成功终态和回答。' })
+        return
+      }
+      settle({ status: 'succeeded', exitCode: code })
+    })
+
+    timeoutTimer = setTimeout(() => requestStop('timed-out'), timeoutMs)
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) requestStop('cancelled')
+    if (!stopReason) child.stdin.end(task, 'utf8')
+  })
+}
+
+/**
+ * Run one official CLI. The Host must authorize `workspace` against its
+ * session; for write mode, it must supply its own isolated workspace root and
+ * obtain the appropriate approval before calling this function. No arbitrary
+ * executable, shell command, or CLI flag can be supplied by the caller.
+ */
+export async function runOfficialTool({
+  toolId, task, workspace, mode = 'read-only', isolatedRoot, modelId, signal, sandbox, timeoutMs = DEFAULT_TIMEOUT_MS,
+}) {
+  const tool = getOfficialTool(toolId)
+  if (!tool) return { toolId, status: 'unsupported', reason: '未知的官方工具注册表 ID。' }
+  const capability = CAPABILITIES[tool.id]
+  if (!capability?.supported) return { toolId: tool.id, status: 'unsupported', reason: capability?.reason ?? '尚无执行适配器。' }
+  const prompt = checkedTask(task)
+  const requestedModel = checkedModel(modelId)
+  const cwd = await checkedWorkspace(workspace)
+  const executionMode = checkedMode(mode)
+  if (executionMode === 'workspace-write') await checkedWriteWorkspace(cwd, isolatedRoot)
+  const timeout = checkedTimeout(timeoutMs)
+  if (signal?.aborted) return { toolId: tool.id, status: 'cancelled', workspace: cwd }
+  const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel)
+  if (spec.unsupported) return { toolId: tool.id, status: 'unsupported', reason: spec.unsupported }
+  if (typeof sandbox?.confine !== 'function') {
+    return { toolId: tool.id, status: 'unsupported', reason: '官方 Harness 进程沙箱不可用，拒绝直接启动 CLI。' }
+  }
+  let confined
+  try {
+    confined = await sandbox.confine([spec.file, ...spec.args], {
+      mode: executionMode, workspaceRoot: cwd,
+    }, signal)
+  } catch (error) {
+    return { toolId: tool.id, status: 'unsupported', reason: `官方进程沙箱拒绝启动：${String(error?.message ?? error).slice(0, 300)}` }
+  }
+  if (!Array.isArray(confined?.argv) || confined.argv.length < 2 || !['full', 'partial'].includes(confined.enforcement)) {
+    return { toolId: tool.id, status: 'unsupported', reason: '官方进程沙箱未返回有效的受限启动参数。' }
+  }
+  const startedAt = Date.now()
+  const outcome = await captureProcess({ ...spec, file: confined.argv[0], args: confined.argv.slice(1) },
+    prompt, cwd, signal, timeout, tool.id)
+  return {
+    toolId: tool.id,
+    mode: executionMode,
+    requestedModel,
+    workspace: cwd,
+    source: spec.source,
+    sandboxEnforcement: confined.enforcement,
+    startedAt,
+    finishedAt: Date.now(),
+    ...outcome,
+  }
+}
+
+export const runOfficialToolTask = runOfficialTool

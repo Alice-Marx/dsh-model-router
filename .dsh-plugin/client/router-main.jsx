@@ -73,7 +73,7 @@ function PlanResults({ plan }) {
         {plan.optimization.budgetExceeded && <p className="mr-error">按当前实验价格估算，任务可能超过本次预算。预算只影响建议，不会阻止实际扣费。</p>}
         {plan.mode === 'team' && (
           <>
-            <h3 className="mr-section-title">交给官方 Agent Teams 的工作包</h3>
+            <h3 className="mr-section-title">团队工作包</h3>
             {plan.team.workPackages.length === 0
               ? <div className="mr-empty">当前目录没有可分配的模型路线。</div>
               : plan.team.workPackages.map((item, index) => (
@@ -86,53 +86,204 @@ function PlanResults({ plan }) {
               ))}
           </>
         )}
+        {plan.mode === 'team' && <p className="mr-caption">{plan.team.handoff}</p>}
         <div className="mr-notice">{plan.pricingNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</div>
       </div>
     </section>
   )
 }
 
-function OfficialToolsCard() {
-  const [copied, setCopied] = React.useState('')
-  const copy = async tool => {
-    const command = installCommandLine(tool)
-    if (!command) return
-    try {
-      await navigator.clipboard.writeText(command)
-      setCopied(tool.id)
-      setTimeout(() => setCopied(current => (current === tool.id ? '' : current)), 2_000)
-    } catch { /* clipboard unavailable; the command is visible for manual copy */ }
+const remoteError = (response, fallback) => text(response?.error?.message) || text(response?.value?.error) || fallback
+
+function probeLabel(probe) {
+  if (!probe) return '尚未检测'
+  if (probe.installed) return `已安装${probe.version ? ` · ${probe.version}` : ''}`
+  if (probe.status === 'not-installed') return '未安装'
+  if (probe.status === 'probe-timeout') return '检测超时'
+  if (probe.status === 'probe-failed') return '检测失败'
+  return probe.detail || '未安装'
+}
+
+function stableVersionOrder(left, right) {
+  const parse = value => /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(value ?? ''))
+  const current = parse(left)
+  const target = parse(right)
+  if (!current || !target) return null
+  for (let index = 1; index <= 3; index += 1) {
+    const delta = Number(current[index]) - Number(target[index])
+    if (delta) return Math.sign(delta)
   }
+  return 0
+}
+
+function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes }) {
+  const [probeState, setProbeState] = React.useState({ status: 'loading', probes: [], capabilities: [], readiness: [], error: '' })
+  const [jobs, setJobs] = React.useState({})
+  const [rowErrors, setRowErrors] = React.useState({})
+  const mounted = React.useRef(false)
+  const request = React.useRef(0)
+  const submitting = React.useRef(new Set())
+  const polling = React.useRef(new Set())
+
+  const refresh = async () => {
+    const current = ++request.current
+    setProbeState(previous => ({ ...previous, status: 'loading', error: '' }))
+    try {
+      if (typeof listOfficialTools !== 'function') throw new Error('官方工具安装桥尚未加载。')
+      const response = await listOfficialTools()
+      if (!mounted.current || current !== request.current) return
+      if (!response?.ok) throw new Error(remoteError(response, '无法检测官方工具。'))
+      const probes = Array.isArray(response.value?.tools) ? response.value.tools : []
+      const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : []
+      const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : []
+      setProbeState({ status: 'ready', probes, capabilities, readiness, error: '' })
+      onProbes({ probes, capabilities, readiness })
+    } catch (error) {
+      if (!mounted.current || current !== request.current) return
+      setProbeState({ status: 'error', probes: [], capabilities: [], readiness: [], error: text(error?.message) || '无法检测官方工具。' })
+      onProbes({ probes: [], capabilities: [], readiness: [] })
+    }
+  }
+
+  React.useEffect(() => {
+    mounted.current = true
+    void refresh()
+    if (typeof officialToolInstallStatus === 'function') {
+      void Promise.all(OFFICIAL_TOOLS.map(async tool => {
+        try {
+          const response = await officialToolInstallStatus(tool.id)
+          return response?.ok && response.value?.job ? [tool.id, response.value.job] : null
+        } catch { return null }
+      })).then(entries => {
+        if (mounted.current) setJobs(previous => ({ ...Object.fromEntries(entries.filter(Boolean)), ...previous }))
+      })
+    }
+    return () => { mounted.current = false; request.current += 1 }
+  }, [])
+
+  React.useEffect(() => {
+    const active = Object.values(jobs).filter(job => job?.status === 'running').map(job => job.tool)
+    if (active.length === 0 || typeof officialToolInstallStatus !== 'function') return undefined
+    let listening = true
+    const poll = async id => {
+      if (polling.current.has(id)) return
+      polling.current.add(id)
+      try {
+        const response = await officialToolInstallStatus(id)
+        if (!listening || !mounted.current) return
+        if (!response?.ok) throw new Error(remoteError(response, '无法获取安装进度。'))
+        const job = response.value?.job
+        if (!job) throw new Error('安装任务状态暂不可用。')
+        setJobs(previous => ({ ...previous, [id]: job }))
+        setRowErrors(previous => ({ ...previous, [id]: '' }))
+        if (job.status !== 'running') void refresh()
+      } catch (error) {
+        if (listening && mounted.current) setRowErrors(previous => ({ ...previous, [id]: text(error?.message) || '安装状态读取失败，将继续重试。' }))
+      } finally {
+        polling.current.delete(id)
+      }
+    }
+    const timer = setInterval(() => active.forEach(id => { void poll(id) }), 1_500)
+    return () => { listening = false; clearInterval(timer) }
+  }, [jobs, officialToolInstallStatus])
+
+  const install = async id => {
+    const tool = OFFICIAL_TOOLS.find(item => item.id === id)
+    if (!tool || tool.unsupported || submitting.current.has(id) || jobs[id]?.status === 'running') return
+    submitting.current.add(id)
+    setRowErrors(previous => ({ ...previous, [id]: '' }))
+    setJobs(previous => ({ ...previous, [id]: { tool: id, status: 'running', outputTail: [] } }))
+    try {
+      if (typeof installOfficialTool !== 'function') throw new Error('官方工具安装桥尚未加载。')
+      const response = await installOfficialTool(id)
+      if (!mounted.current) return
+      if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, '安装任务未被接受。'))
+      setJobs(previous => ({ ...previous, [id]: response.value.job }))
+    } catch (error) {
+      if (mounted.current) {
+        setJobs(previous => ({ ...previous, [id]: { tool: id, status: 'failed', error: text(error?.message) || '安装启动失败。' } }))
+        setRowErrors(previous => ({ ...previous, [id]: text(error?.message) || '安装启动失败。' }))
+      }
+    } finally {
+      submitting.current.delete(id)
+    }
+  }
+
+  const cancel = async id => {
+    if (typeof cancelOfficialToolInstall !== 'function' || jobs[id]?.status !== 'running' || jobs[id]?.cancelRequested) return
+    setRowErrors(previous => ({ ...previous, [id]: '' }))
+    try {
+      const response = await cancelOfficialToolInstall(id)
+      if (!mounted.current) return
+      if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, '取消请求未被接受。'))
+      setJobs(previous => ({ ...previous, [id]: response.value.job }))
+      if (response.value.job.status !== 'running') void refresh()
+    } catch (error) {
+      if (mounted.current) setRowErrors(previous => ({ ...previous, [id]: text(error?.message) || '无法取消安装。' }))
+    }
+  }
+
+  const byId = Object.fromEntries(probeState.probes.map(probe => [probe.id, probe]))
+  const capabilitiesById = Object.fromEntries(probeState.capabilities.map(item => [item.id, item]))
+  const readinessById = Object.fromEntries(probeState.readiness.map(item => [item.id, item]))
   return (
     <section className="mr-card" aria-label="官方工具">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">官方工具</h2>
-        <p className="mr-card-copy">各厂商官方 CLI 的固定版本安装命令。已安装的工具可直接执行对应模型的任务。</p>
-      </div></div>
+        <p className="mr-card-copy">检测本机官方 CLI，并从固定注册表一键下载安装。安装完成后重新检测版本。</p>
+      </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新检测</button></div>
       <div className="mr-card-body">
+        {probeState.status === 'loading' && <p className="mr-empty" role="status">正在检测本机官方工具…</p>}
+        {probeState.status === 'error' && <p className="mr-error" role="alert">{probeState.error}</p>}
         <div className="mr-tools" role="list" aria-label="官方 CLI 工具注册表">
           {OFFICIAL_TOOLS.map(tool => {
             const command = installCommandLine(tool)
+            const probe = byId[tool.id]
+            const capability = capabilitiesById[tool.id]
+            const readiness = readinessById[tool.id]
+            const job = jobs[tool.id]
+            const running = job?.status === 'running'
+            const versionOrder = probe?.installed ? stableVersionOrder(probe.version, tool.version) : null
+            const current = versionOrder === 0
+            const newerOrUncertain = probe?.installed && (versionOrder === null || versionOrder > 0)
+            const verified = job?.status === 'succeeded' && job.postInstallProbe?.installed === true
+            const status = running ? job.cancelRequested ? '正在取消安装…' : '安装中…'
+              : job?.status === 'cancelled' ? '安装已取消，请重新检测' : verified ? '安装成功并验证' : probeLabel(probe)
+            const buttonLabel = running ? '安装中…' : current ? '已是目标版本' : newerOrUncertain ? '请人工核对版本' : probe?.installed ? '更新到目标版本' : job?.status === 'failed' ? '重试安装' : '下载安装'
             return (
               <div className="mr-tool" role="listitem" key={tool.id}>
-                <div style={{ minWidth: 0 }}>
+                <div className="mr-tool-info">
                   <div className="mr-route-name" title={tool.purpose}>{tool.label}</div>
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
+                  <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{tool.version ? ` · 目标 ${tool.version}` : ''}</div>
+                  {probe?.installed && <p className="mr-caption mr-tool-detail">{readiness?.ready
+                    ? '官方执行入口已核验，可在会话中调用 model_router_tool_run；账号及模型仍需实测。'
+                    : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || '执行入口尚未核验。'}`}</p>}
                   {command
                     ? <code className="mr-tool-command">{command}</code>
                     : <p className="mr-caption" style={{ margin: '6px 0 0' }}>{tool.unsupportedReason}</p>}
+                  {probe?.detail && <p className="mr-caption mr-tool-detail">{probe.detail}</p>}
+                  {(rowErrors[tool.id] || job?.error) && <p className="mr-error mr-tool-error" role="alert">{rowErrors[tool.id] || job.error}</p>}
+                  {Array.isArray(job?.outputTail) && job.outputTail.length > 0 && (
+                    <details className="mr-tool-log"><summary>安装日志</summary><pre>{job.outputTail.slice(-6).join('\n')}</pre></details>
+                  )}
                 </div>
                 {command && (
-                  <button className="mr-button mr-button-secondary mr-tool-button" type="button" onClick={() => copy(tool)}>
-                    {copied === tool.id ? '已复制' : '复制命令'}
-                  </button>
+                  <div className="mr-tool-actions">
+                    <button className="mr-button mr-tool-button" type="button" disabled={probeState.status !== 'ready' || running || current || newerOrUncertain} onClick={() => { void install(tool.id) }}>
+                      {buttonLabel}
+                    </button>
+                    {running && <button className="mr-button mr-button-secondary mr-tool-button" type="button" disabled={job.cancelRequested} onClick={() => { void cancel(tool.id) }}>
+                      {job.cancelRequested ? '正在取消…' : '取消安装'}
+                    </button>}
+                  </div>
                 )}
               </div>
             )
           })}
         </div>
         <p className="mr-caption" style={{ marginTop: 12 }}>
-          一键安装：在官方会话输入 <code>/tools</code> 查看检测状态、<code>/tools install kimi-code</code> 一条命令安装（Agent 也可自动调用 <code>model_router_tool_install</code>）。检测与安装由 Host 按注册表固定命令执行，不接受自定义包名。
+          安装由 Host 按注册表固定命令执行，不接受自定义包名；可点“取消安装”终止任务，随后重新检测实际版本。Agent 也可调用 <code>model_router_tool_install</code>，或在会话使用 <code>/tools</code>。
         </p>
       </div>
     </section>
@@ -140,7 +291,7 @@ function OfficialToolsCard() {
 }
 
 /** Root-scoped official Desktop panel. The plan is local; real calls remain in Host tools. */
-export function RouterMainPage({ loadCatalog, settingsScope }) {
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus }) {
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')
   const [mode, setMode] = React.useState('single')
@@ -148,13 +299,22 @@ export function RouterMainPage({ loadCatalog, settingsScope }) {
   const [query, setQuery] = React.useState('')
   const [plan, setPlan] = React.useState(null)
   const [planError, setPlanError] = React.useState('')
+  const [toolProbes, setToolProbes] = React.useState(null)
   const budgetEdited = React.useRef(false)
+  const budgetValue = React.useRef(budget)
   const mounted = React.useRef(false)
   const catalogRequest = React.useRef(0)
 
   React.useEffect(() => {
     const syncBudget = () => {
-      if (!budgetEdited.current) setBudget(String(settingsScope.getSnapshot().value?.budgetUsd ?? 0))
+      if (budgetEdited.current) return
+      const next = String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)
+      if (next !== budgetValue.current) {
+        budgetValue.current = next
+        setBudget(next)
+        setPlan(null)
+        setPlanError('')
+      }
     }
     syncBudget()
     return settingsScope.subscribe(syncBudget)
@@ -188,6 +348,15 @@ export function RouterMainPage({ loadCatalog, settingsScope }) {
       if (mounted.current && request === catalogRequest.current) setCatalogState({ status: 'error', catalog: null, error: text(error?.message) || '模型目录读取失败' })
     }
   }
+  const invalidatePlan = () => {
+    setPlan(null)
+    setPlanError('')
+  }
+  const handleToolProbes = React.useCallback(snapshot => {
+    setToolProbes(snapshot)
+    setPlan(null)
+    setPlanError('')
+  }, [])
   const generate = () => {
     setPlanError('')
     try {
@@ -195,7 +364,12 @@ export function RouterMainPage({ loadCatalog, settingsScope }) {
       if (routes.length === 0) throw new Error('请先在官方“模型”页配置至少一条模型路线。')
       const parsedBudget = Number(budget)
       if (!Number.isFinite(parsedBudget) || parsedBudget < 0) throw new Error('预算必须是不小于 0 的数字。')
-      setPlan(createWorkspacePlan(task, catalogState.catalog, { mode, budgetUsd: parsedBudget }))
+      setPlan(createWorkspacePlan(task, catalogState.catalog, {
+        mode,
+        budgetUsd: parsedBudget,
+        installedToolIds: (toolProbes?.probes ?? []).filter(probe => probe.installed).map(probe => probe.id),
+        runnableToolIds: (toolProbes?.readiness ?? []).filter(item => item.ready).map(item => item.id),
+      }))
     } catch (error) {
       setPlan(null)
       setPlanError(text(error?.message) || '无法生成路由建议。')
@@ -220,12 +394,12 @@ export function RouterMainPage({ loadCatalog, settingsScope }) {
             <div className="mr-card-head"><div><h2 className="mr-card-title">任务规划</h2><p className="mr-card-copy">规划在本机完成，不会启动模型或团队任务。</p></div></div>
             <div className="mr-card-body">
               <label className="mr-label" htmlFor="mr-task">任务描述</label>
-              <textarea className="mr-textarea" id="mr-task" value={task} onChange={event => setTask(event.target.value)} placeholder="例如：分析项目架构，分工修复关键问题，并给出验收清单" />
+              <textarea className="mr-textarea" id="mr-task" value={task} onChange={event => { setTask(event.target.value); invalidatePlan() }} placeholder="例如：分析项目架构，分工修复关键问题，并给出验收清单" />
               <div className="mr-controls">
-                <div className="mr-control-group"><span className="mr-control-label">规划模式</span><div className="mr-segment" role="group" aria-label="规划模式"><button type="button" aria-pressed={mode === 'single'} onClick={() => setMode('single')}>单任务</button><button type="button" aria-pressed={mode === 'team'} onClick={() => setMode('team')}>团队分工</button></div></div>
-                <div className="mr-control-group mr-budget"><label className="mr-control-label" htmlFor="mr-budget">本次估算预算（USD）</label><input className="mr-input" id="mr-budget" type="number" min="0" step="0.01" value={budget} onChange={event => { budgetEdited.current = true; setBudget(event.target.value) }} /></div>
+                <div className="mr-control-group"><span className="mr-control-label">规划模式</span><div className="mr-segment" role="group" aria-label="规划模式"><button type="button" aria-pressed={mode === 'single'} onClick={() => { setMode('single'); invalidatePlan() }}>单任务</button><button type="button" aria-pressed={mode === 'team'} onClick={() => { setMode('team'); invalidatePlan() }}>团队分工</button></div></div>
+                <div className="mr-control-group mr-budget"><label className="mr-control-label" htmlFor="mr-budget">本次估算预算（USD）</label><input className="mr-input" id="mr-budget" type="number" min="0" step="0.01" value={budget} onChange={event => { budgetEdited.current = true; budgetValue.current = event.target.value; setBudget(event.target.value); invalidatePlan() }} /></div>
               </div>
-              <div className="mr-actions"><button className="mr-button" type="button" disabled={catalogState.status !== 'ready' || routes.length === 0} onClick={generate}>生成路由建议</button><span className="mr-caption">0 表示不限制本次建议；不会设置真实支出上限。</span></div>
+              <div className="mr-actions"><button className="mr-button" type="button" disabled={catalogState.status !== 'ready' || routes.length === 0 || toolProbes === null} onClick={generate}>生成路由建议</button><span className="mr-caption">{toolProbes === null ? '正在检测官方工具…' : '0 表示不限制本次建议；不会设置真实支出上限。'}</span></div>
               {planError && <p className="mr-error" role="alert">{planError}</p>}
             </div>
           </section>
@@ -242,8 +416,8 @@ export function RouterMainPage({ loadCatalog, settingsScope }) {
         </div>
 
         {plan && <PlanResults plan={plan} />}
-        <OfficialToolsCard />
-        <div className="mr-notice">需要其他模型的实际意见时，在官方会话中请 Agent 调用 <code>model_router_consult</code>；需要执行团队分工时，由官方 Agent Teams 接管成员与任务生命周期。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
+        <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} />
+        <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。托管执行目前支持 Claude Code 与 Codex；团队执行会向 CLI 请求推荐模型，实际模型以厂商记录为准。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
       </div>
     </main>
   )

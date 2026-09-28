@@ -5,7 +5,7 @@
  *
  * The registry is fail-closed by design: only tools with a verified official
  * npm distribution channel are installable, versions are pinned to the
- * releases each integration was checked against, and clients can only name a
+ * releases checked for this registry, and clients can only name a
  * registry id — never an arbitrary package or command.
  */
 
@@ -16,11 +16,11 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'Moonshot AI',
     purpose: 'Kimi 官方编程 CLI，提供 kimi 命令与 ACP 会话。',
     package: '@moonshot-ai/kimi-code',
-    version: '2.0.2',
+    version: '2.1.1',
     manager: 'npm',
-    installArgs: ['install', '-g', '@moonshot-ai/kimi-code@2.0.2'],
+    installArgs: ['install', '-g', '@moonshot-ai/kimi-code@2.1.1', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['kimi'],
-    probeNote: 'kimi --version 输出 2.0.2 即官方 Node 版；注意与 Python 版 kimi-cli 同名。',
+    probeNote: 'kimi 与旧 Python 版 kimi-cli 同名；请核对可执行文件来源和版本。',
     providerHints: ['moonshot', 'kimi'],
   }),
   Object.freeze({
@@ -29,9 +29,9 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'Anthropic',
     purpose: 'Anthropic 官方编程 CLI，提供 claude 命令。',
     package: '@anthropic-ai/claude-code',
-    version: '2.1.193',
+    version: '2.1.283',
     manager: 'npm',
-    installArgs: ['install', '-g', '@anthropic-ai/claude-code@2.1.193'],
+    installArgs: ['install', '-g', '@anthropic-ai/claude-code@2.1.283', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['claude'],
     providerHints: ['anthropic', 'claude'],
   }),
@@ -41,11 +41,11 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'OpenAI',
     purpose: 'OpenAI 官方编程 CLI，提供 codex 命令。',
     package: '@openai/codex',
-    version: null,
-    installArgs: ['install', '-g', '@openai/codex'],
+    version: '0.157.1',
+    installArgs: ['install', '-g', '@openai/codex@0.157.1', '--registry=https://registry.npmjs.org/'],
     manager: 'npm',
     probeExecutables: ['codex'],
-    probeNote: 'Codex 跟随上游最新版；版本横幅由适配层宽匹配。',
+    probeNote: 'Codex 版本横幅由适配层宽匹配；安装时固定版本。',
     providerHints: ['openai', 'gpt', 'codex'],
   }),
   Object.freeze({
@@ -53,10 +53,10 @@ export const OFFICIAL_TOOLS = Object.freeze([
     label: 'MiniMax Code',
     vendor: 'MiniMax',
     purpose: 'MiniMax 官方编程 CLI，提供 mcode 命令。',
-    package: 'minimax-code',
-    version: '0.5.2',
+    package: '@minimax-ai/code',
+    version: '0.5.5',
     manager: 'npm',
-    installArgs: ['install', '-g', 'minimax-code@0.5.2'],
+    installArgs: ['install', '-g', '@minimax-ai/code@0.5.5', '--registry=https://registry.npmjs.org/', '--ignore-scripts=false', '--include=optional', '--allow-scripts=@minimax-ai/code,better-sqlite3'],
     probeExecutables: ['mcode'],
     providerHints: ['minimax'],
   }),
@@ -68,7 +68,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
     package: '@mimo-ai/cli',
     version: '0.1.15',
     manager: 'npm',
-    installArgs: ['install', '-g', '@mimo-ai/cli@0.1.15'],
+    installArgs: ['install', '-g', '@mimo-ai/cli@0.1.15', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['mimo'],
     providerHints: ['mimo', 'xiaomi'],
   }),
@@ -76,9 +76,12 @@ export const OFFICIAL_TOOLS = Object.freeze([
     id: 'grok-build',
     label: 'Grok Build',
     vendor: 'xAI',
-    purpose: 'xAI 官方编程 CLI。',
-    unsupported: true,
-    unsupportedReason: 'Grok Build 由 xAI 官方渠道分发，没有可核验的 npm 安装渠道；请按官方说明安装。',
+    purpose: 'xAI 官方编程 CLI，提供 grok 命令与 ACP 会话。',
+    package: '@xai-official/grok',
+    version: '1.0.41',
+    manager: 'npm',
+    installArgs: ['install', '-g', '@xai-official/grok@1.0.41', '--registry=https://registry.npmjs.org/'],
+    probeExecutables: ['grok'],
     providerHints: ['xai', 'grok'],
   }),
 ])

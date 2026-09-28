@@ -31,13 +31,15 @@ test('registry stays fail-closed and internally consistent', () => {
   assert.equal(getOfficialTool('does-not-exist'), null)
 })
 
-test('pinned versions match the integration-checked releases', () => {
-  assert.equal(getOfficialTool('kimi-code').version, '2.0.2')
-  assert.equal(getOfficialTool('claude-code').version, '2.1.193')
-  assert.equal(getOfficialTool('minimax-code').version, '0.5.2')
+test('registry pins the verified official npm distributions', () => {
+  assert.equal(getOfficialTool('kimi-code').version, '2.1.1')
+  assert.equal(getOfficialTool('claude-code').version, '2.1.283')
+  assert.equal(getOfficialTool('minimax-code').version, '0.5.5')
+  assert.equal(getOfficialTool('minimax-code').package, '@minimax-ai/code')
   assert.equal(getOfficialTool('mimo-code').version, '0.1.15')
-  assert.equal(getOfficialTool('codex').version, null, 'codex follows upstream')
-  assert.equal(getOfficialTool('kimi-code').installArgs.at(-1), '@moonshot-ai/kimi-code@2.0.2')
+  assert.equal(getOfficialTool('codex').version, '0.157.1')
+  assert.equal(getOfficialTool('grok-build').version, '1.0.41')
+  assert.ok(getOfficialTool('kimi-code').installArgs.includes('@moonshot-ai/kimi-code@2.1.1'))
 })
 
 test('provider keywords map conservatively to registry tools', () => {
@@ -55,14 +57,16 @@ test('provider keywords map conservatively to registry tools', () => {
 
 test('channel annotation reflects probe truth and never invents tools', () => {
   const installed = channelForProvider('moonshot-main', ['kimi-code'])
-  assert.equal(installed.kind, 'official-cli')
+  assert.equal(installed.kind, 'harness-llm', 'installed alone does not prove a runnable adapter')
   assert.equal(installed.tool, 'kimi-code')
+  const runnable = channelForProvider('anthropic', ['claude-code'], ['claude-code'])
+  assert.equal(runnable.kind, 'official-cli')
   const missing = channelForProvider('moonshot-main', [])
   assert.equal(missing.kind, 'harness-llm')
   assert.match(missing.detail, /tools install kimi-code/)
   const grok = channelForProvider('xai', [])
   assert.equal(grok.kind, 'harness-llm')
-  assert.equal(grok.tool, undefined, 'unsupported tools are not offered as channels')
+  assert.equal(grok.tool, 'grok-build')
   const deepseek = channelForProvider('deepseek-account', [])
   assert.equal(deepseek.kind, 'harness-llm')
   assert.equal(deepseek.tool, undefined)
@@ -79,7 +83,7 @@ test('plan annotates selected route and work packages with channels', () => {
   assert.ok(packages.length > 0)
   for (const item of packages) {
     if (item.recommendedProvider === 'moonshot') {
-      assert.equal(item.executionChannel, 'official-cli')
+      assert.equal(item.executionChannel, 'harness-llm')
       assert.equal(item.channelTool, 'kimi-code')
     } else {
       assert.equal(item.executionChannel, 'harness-llm')
@@ -137,10 +141,9 @@ test('probe cache prevents duplicate spawns and expires', async () => {
   assert.equal(spawns, 4, 'cache expired, probe runs again')
 })
 
-test('installer refuses unknown and unsupported tools outright', () => {
+test('installer refuses unknown tools outright', () => {
   resetForTests()
   assert.throws(() => startInstall('not-a-tool'), /未知工具/)
-  assert.throws(() => startInstall('grok-build'), /xAI 官方渠道/)
   assert.equal(installStatus('kimi-code'), null)
   assert.equal(installStatus(''), null)
 })

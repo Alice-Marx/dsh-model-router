@@ -18,24 +18,22 @@ const IS_WINDOWS = process.platform === 'win32'
 const CREATE_NO_WINDOW = 0x0800_0000
 /** Windows ships where.exe in System32; POSIX which is ubiquitous. */
 const LOCATOR = IS_WINDOWS ? 'where' : 'which'
-const NOT_FOUND_MARKERS = [
-  '不是内部或外部命令',
-  'is not recognized',
-  'command not found',
-  '无法将',
-]
-
 /** Cached probe results keep plan generation fast; installs invalidate them. */
 const probeCache = new Map()
 const PROBE_CACHE_MS = 60_000
 const installJobs = new Map()
 let installChain = Promise.resolve()
 
-function runCapture(executable, args, { timeoutMs, onOutput, useShell = false } = {}) {
+function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, signal } = {}) {
   return new Promise(resolve => {
+    if (signal?.aborted) {
+      resolve({ ok: false, code: null, stdout: '', stderr: '', timedOut: false, cancelled: true })
+      return
+    }
     let stdout = ''
     let stderr = ''
     let settled = false
+    let stopReason = null
     let child
     try {
       child = spawn(executable, args, {
@@ -47,34 +45,58 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false } 
         shell: useShell,
       })
     } catch (error) {
-      resolve({ ok: false, code: null, stdout: '', stderr: String(error?.message ?? error), timedOut: false })
+      resolve({ ok: false, code: null, stdout: '', stderr: String(error?.message ?? error), timedOut: false, cancelled: false })
       return
     }
-    const timer = setTimeout(() => {
+    let graceTimer
+    const finish = result => {
       if (settled) return
       settled = true
-      try { child.kill('killed') } catch { /* already gone */ }
-      resolve({ ok: false, code: null, stdout, stderr, timedOut: true })
-    }, timeoutMs)
+      clearTimeout(timer)
+      clearTimeout(graceTimer)
+      signal?.removeEventListener('abort', onAbort)
+      resolve(result)
+    }
+    const stop = reason => {
+      if (settled || stopReason) return
+      stopReason = reason
+      if (IS_WINDOWS && useShell && Number.isInteger(child.pid)) {
+        try {
+          const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+            windowsHide: true,
+            stdio: 'ignore',
+          })
+          killer.on('error', () => { try { child.kill('SIGTERM') } catch { /* already gone */ } })
+          killer.on('close', code => { if (code !== 0) try { child.kill('SIGTERM') } catch { /* already gone */ } })
+        } catch { try { child.kill('SIGTERM') } catch { /* already gone */ } }
+      } else {
+        try { child.kill('SIGTERM') } catch { /* already gone */ }
+      }
+      graceTimer = setTimeout(() => finish({ ok: false, code: null, stdout, stderr,
+        timedOut: reason === 'timeout', cancelled: reason === 'cancel' }), 5_000)
+      graceTimer.unref?.()
+    }
+    const onAbort = () => stop('cancel')
+    const timer = setTimeout(() => stop('timeout'), timeoutMs)
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) onAbort()
     child.stdout?.on('data', data => {
+      if (settled || stopReason) return
       stdout = appendBounded(stdout, String(data))
       onOutput?.(String(data))
     })
     child.stderr?.on('data', data => {
+      if (settled || stopReason) return
       stderr = appendBounded(stderr, String(data))
       onOutput?.(String(data))
     })
     child.on('error', error => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolve({ ok: false, code: null, stdout, stderr: `${stderr}${error.message}`.trim(), timedOut: false })
+      finish({ ok: false, code: null, stdout, stderr: `${stderr}${error.message}`.trim(),
+        timedOut: stopReason === 'timeout', cancelled: stopReason === 'cancel' })
     })
     child.on('close', (code, signal) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolve({ ok: code === 0, code, stdout, stderr, timedOut: false, signal })
+      finish({ ok: !stopReason && code === 0, code, stdout, stderr,
+        timedOut: stopReason === 'timeout', cancelled: stopReason === 'cancel', signal })
     })
   })
 }
@@ -82,6 +104,18 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false } 
 function appendBounded(current, addition) {
   const merged = current + addition
   return merged.length > 64_000 ? merged.slice(merged.length - 32_000) : merged
+}
+
+function compareStableVersions(left, right) {
+  const parse = value => /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(value ?? ''))
+  const a = parse(left)
+  const b = parse(right)
+  if (!a || !b) return null
+  for (let index = 1; index <= 3; index += 1) {
+    const difference = Number(a[index]) - Number(b[index])
+    if (difference) return Math.sign(difference)
+  }
+  return 0
 }
 
 /** Extract the first version-looking token from a CLI banner. */
@@ -110,17 +144,11 @@ async function probeUncached(tool, runner) {
     // Existence check first: a missing command is indistinguishable from a
     // broken one by exit code alone once a shell is involved.
     const located = await runner(LOCATOR, [executable], { timeoutMs: PROBE_TIMEOUT_MS })
+    if (located.timedOut) {
+      return { id: tool.id, installed: false, version: null, status: 'probe-timeout', detail: `定位 ${executable} 超时（${PROBE_TIMEOUT_MS / 1000}s）` }
+    }
     if (!located.ok || !located.stdout.trim()) {
-      const missing = !located.ok
-        || NOT_FOUND_MARKERS.some(marker => located.stderr.includes(marker))
-      if (missing) continue
-      return {
-        id: tool.id,
-        installed: false,
-        version: null,
-        status: 'probe-timeout',
-        detail: `定位 ${executable} 超时（${PROBE_TIMEOUT_MS / 1000}s）`,
-      }
+      continue
     }
     const attempt = await runner(executable, ['--version'], { timeoutMs: PROBE_TIMEOUT_MS })
     if (attempt.timedOut) {
@@ -208,6 +236,8 @@ function jobView(job) {
     tool: job.tool.id,
     command: job.command,
     status: job.status,
+    phase: job.phase,
+    cancelRequested: job.cancelRequested,
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
     exitCode: job.exitCode,
@@ -215,6 +245,7 @@ function jobView(job) {
     error: job.error,
     outputTail: [...job.outputTail],
     outputTruncated: job.outputTruncated,
+    postInstallProbe: job.postInstallProbe,
   }
 }
 
@@ -244,6 +275,9 @@ export function startInstall(toolId) {
     tool,
     command,
     status: 'running',
+    phase: 'queued',
+    cancelRequested: false,
+    controller: new AbortController(),
     startedAt: new Date().toISOString(),
     finishedAt: null,
     exitCode: null,
@@ -251,18 +285,49 @@ export function startInstall(toolId) {
     error: null,
     outputTail: [`$ ${command}`],
     outputTruncated: false,
+    postInstallProbe: null,
   }
   installJobs.set(tool.id, job)
   probeCache.delete(tool.id)
-  installChain = installChain.then(() => runInstallJob(manager, tool.installArgs, job))
+  installChain = installChain.then(() => runInstallJob(manager, tool.installArgs, job)).catch(error => {
+    if (job.status === 'cancelled') return
+    job.status = 'failed'
+    job.finishedAt = new Date().toISOString()
+    job.error = `安装流程失败：${String(error?.message ?? error).slice(0, 200)}`
+  })
   return jobView(job)
 }
 
 async function runInstallJob(manager, args, job) {
   if (job.status !== 'running') return
+  job.phase = 'preflight'
+  await ensureNpmPrefixOnPath()
+  if (job.cancelRequested) { markCancelled(job); return }
+  probeCache.delete(job.tool.id)
+  const before = await probeToolWith(job.tool, defaultRunner)
+  if (job.cancelRequested) { markCancelled(job); return }
+  if (before.installed && job.tool.version) {
+    const order = compareStableVersions(before.version, job.tool.version)
+    if (order === null || order > 0) {
+      job.status = 'failed'
+      job.finishedAt = new Date().toISOString()
+      job.postInstallProbe = before
+      job.error = `已安装 ${before.version ?? '未知版本'}，无法证明升级到 ${job.tool.version} 不会降级；请先人工核对。`
+      return
+    }
+    if (order === 0) {
+      job.status = 'succeeded'
+      job.finishedAt = new Date().toISOString()
+      job.postInstallProbe = before
+      pushLine(job, `— ${job.tool.label} ${before.version} 已安装，无需重复安装 —`)
+      return
+    }
+  }
+  job.phase = 'installing'
   const outcome = await runCapture(manager, args, {
     timeoutMs: INSTALL_TIMEOUT_MS,
     useShell: IS_WINDOWS,
+    signal: job.controller.signal,
     onOutput: chunk => {
       for (const line of chunk.split(/\r?\n/)) {
         if (line.trim()) pushLine(job, line.slice(0, 500))
@@ -270,6 +335,7 @@ async function runInstallJob(manager, args, job) {
     },
   })
   if (job.status !== 'running') return
+  if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
   job.finishedAt = new Date().toISOString()
   job.exitCode = outcome.code
   job.timedOut = outcome.timedOut
@@ -277,12 +343,48 @@ async function runInstallJob(manager, args, job) {
     job.status = 'failed'
     job.error = `安装超时（${INSTALL_TIMEOUT_MS / 1000}s），已终止。`
   } else if (outcome.ok) {
-    job.status = 'succeeded'
-    pushLine(job, '— 安装命令执行完成 —')
+    job.phase = 'verifying'
+    await ensureNpmPrefixOnPath()
+    probeCache.delete(job.tool.id)
+    const probe = await probeToolWith(job.tool, defaultRunner)
+    if (job.cancelRequested) { markCancelled(job); return }
+    job.postInstallProbe = probe
+    if (!probe.installed || (job.tool.version && probe.version !== job.tool.version)) {
+      job.status = 'failed'
+      job.error = probe.installed
+        ? `安装命令已完成，但 PATH 上读到 ${probe.version ?? '未知版本'}；预期 ${job.tool.version}。请检查重复安装。`
+        : `安装命令已完成，但重探测失败：${probe.detail}`
+    } else {
+      job.status = 'succeeded'
+      pushLine(job, '— 安装并重探测完成 —')
+    }
   } else {
     job.status = 'failed'
     job.error = `安装命令失败（退出码 ${outcome.code ?? '信号终止'}）。${outcome.stderr.split('\n').find(Boolean)?.slice(0, 200) ?? ''}`
   }
+}
+
+function markCancelled(job) {
+  job.status = 'cancelled'
+  job.phase = 'done'
+  job.finishedAt = new Date().toISOString()
+  job.error = '已取消安装。若 npm 已开始写入，可能需要重新检测或修复该工具。'
+  probeCache.delete(job.tool.id)
+  pushLine(job, '— 安装已取消；请重新检测实际状态 —')
+}
+
+/** Cancel a queued or running install; cancellation is reflected after its process exits. */
+export function cancelInstall(toolId) {
+  const tool = getOfficialTool(toolId)
+  if (!tool) throw new Error(`未知工具：${toolId}。`)
+  const job = installJobs.get(tool.id)
+  if (!job || job.status !== 'running') throw new Error(`${tool.label} 当前没有进行中的安装任务。`)
+  if (!job.cancelRequested) {
+    job.cancelRequested = true
+    job.controller.abort()
+    if (job.phase === 'queued') markCancelled(job)
+  }
+  return jobView(job)
 }
 
 export function installStatus(toolId) {
@@ -308,8 +410,8 @@ export async function executionChannels(providers) {
     }
     const probe = await probeToolWith(tool, defaultRunner)
     resolved.set(provider, probe.installed
-      ? { kind: 'official-cli', tool: tool.id, label: tool.label, version: probe.version, detail: '官方 CLI 已安装，可由该工具直接执行任务。' }
-      : { kind: 'harness-llm', tool: tool.id, label: tool.label, detail: `${tool.label} 未安装；将回退为官方模型目录 API 调用。可在会话中运行 /tools install ${tool.id} 安装。` })
+      ? { kind: 'harness-llm', tool: tool.id, label: tool.label, version: probe.version, detail: 'CLI 已安装；执行入口仍须单独核验，当前使用官方模型目录 API。' }
+      : { kind: 'harness-llm', tool: tool.id, label: tool.label, detail: `${tool.label} 未安装；将使用官方模型目录 API 调用。可在会话中运行 /tools install ${tool.id} 安装。` })
   }
   return resolved
 }

@@ -9,19 +9,22 @@ const clean = value => typeof value === 'string' ? value.trim() : ''
  * that the caller reports as installed, `harness-llm` otherwise. The probe
  * snapshot comes from the Host caller, which owns the real process boundary.
  */
-export function channelForProvider(provider, installedToolIds = []) {
+export function channelForProvider(provider, installedToolIds = [], runnableToolIds = []) {
   const tool = toolForProvider(provider)
   if (!tool || tool.unsupported) {
     return { kind: 'harness-llm', detail: '通过官方模型目录 API 调用。' }
   }
   const installed = Array.isArray(installedToolIds) && installedToolIds.includes(tool.id)
-  return installed
-    ? { kind: 'official-cli', tool: tool.id, label: tool.label, detail: `${tool.label} 已安装，可由官方 CLI 直接执行任务。` }
+  const runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id)
+  return runnable
+    ? { kind: 'official-cli', tool: tool.id, label: tool.label, detail: `${tool.label} 已安装，插件可托管调用其官方 CLI；团队执行会请求推荐模型 ID，实际模型仍须核对运行记录。` }
     : {
       kind: 'harness-llm',
       tool: tool.id,
       label: tool.label,
-      detail: `${tool.label} 未安装；回退为官方模型目录 API 调用。可在会话中运行 /tools install ${tool.id}，或让 Agent 调用 model_router_tool_install。`,
+      detail: installed
+        ? `${tool.label} 已安装，但当前平台缺少经核验的托管执行适配器；实际调用使用官方模型目录 API。`
+        : `${tool.label} 未安装；实际调用使用官方模型目录 API。可在工作台一键安装，或运行 /tools install ${tool.id}。`,
     }
 }
 
@@ -39,7 +42,7 @@ function annotate(channel) {
  * by the Desktop panel. Model discovery stays on the official side of each
  * runtime and only the public provider/model directory crosses this boundary.
  */
-export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', budgetUsd = 0, installedToolIds = [] } = {}) {
+export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', budgetUsd = 0, installedToolIds = [], runnableToolIds = [] } = {}) {
   const taskText = clean(task)
   if (!taskText) throw new Error('task must contain text')
   const selectedMode = mode === 'team' ? 'team' : 'single'
@@ -48,7 +51,7 @@ export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', b
   const channelCache = new Map()
   const channelOf = provider => {
     const key = String(provider ?? '')
-    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(key, installedIds))
+    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(key, installedIds, runnableToolIds))
     return channelCache.get(key)
   }
   const needsImage = detectTaskTypes(taskText).includes('vision')
@@ -74,11 +77,11 @@ export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', b
     modalityNotice: needsImage && eligibleRoutes.length < routes.length
       ? '图像任务已排除明确声明不接受图像输入的模型；未声明能力的模型仍需人工验证。'
       : null,
-    toolNotice: '执行渠道按官方工具注册表标注：official-cli 表示该厂商官方 CLI 已安装，harness-llm 表示经官方模型目录调用。可用 /tools 或 model_router_tools 查看安装状态。',
+    toolNotice: '执行渠道按官方工具注册表和已核验适配器标注：official-cli 表示该厂商官方 CLI 已安装且可托管执行；harness-llm 表示通过官方模型目录调用。可在工作台查看安装与执行支持状态。',
     team: {
       requested: selectedMode === 'team',
       recommended: selectedMode === 'team' && plan.complexity.band === 'complex' && plan.subtasks.length > 1,
-      handoff: '工作包可交给官方 Agent Teams 的 spawn_teammate、team_task_*、send_message 和 wait_agent 工具执行。',
+      handoff: '可在官方会话调用 model_router_team_execute 托管执行当前平台支持的官方 CLI 工作包；官方 Agent Teams 可协作管理任务，但成员模型由宿主配置，不能直接按本计划逐个切换。',
       workPackages: plan.subtasks.map(item => ({
         id: item.id,
         name: item.name,

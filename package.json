@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/model-router-galgame",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "Official DeepSeek Harness desktop plugin: complexity-based model routing with official CLI tool probe/install, Agent Teams work packages, and a standalone Gal module (story & free modes)",
   "repository": {
@@ -39,16 +39,16 @@
   },
   "files": [
     ".dsh-plugin/index.mjs",
+    ".dsh-plugin/official-tools-remote-service.mjs",
     ".dsh-plugin/client.js",
-    ".dsh-plugin/client/official-harness.jsx",
-    ".dsh-plugin/client/router-main.jsx",
-    ".dsh-plugin/client/router-main.css",
-    ".dsh-plugin/client/catalog.mjs",
     ".dsh-plugin/shared/harness-plan.mjs",
     ".dsh-plugin/shared/router.mjs",
     ".dsh-plugin/shared/livebench.mjs",
-    "scripts/build-client.mjs",
-    "scripts/prepack.mjs",
+    ".dsh-plugin/shared/official-tool-registry.mjs",
+    ".dsh-plugin/shared/official-tools-runtime.mjs",
+    ".dsh-plugin/shared/official-tools-remote.mjs",
+    ".dsh-plugin/shared/official-tool-executor.mjs",
+    ".dsh-plugin/shared/official-team-runtime.mjs",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
@@ -71,8 +71,10 @@
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh-commands": "0.1.7-rc.2",
     "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-sandbox": "0.1.7-rc.2",
     "@deepseek-ai/dsh-settings": "0.1.7-rc.2",
     "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4"
   },
   "devDependencies": {

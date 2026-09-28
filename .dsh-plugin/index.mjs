@@ -2,22 +2,26 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_ROUTER_SETTINGS } from './shared/router.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
+import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
 import {
-  OFFICIAL_TOOLS,
   getOfficialTool,
   installCommandLine,
+  toolForProvider,
 } from './shared/official-tool-registry.mjs'
+import { officialToolExecutionCapabilities, officialToolReadiness } from './shared/official-tool-executor.mjs'
+import { runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
 import {
   probeAllTools,
   probeToolWith,
   startInstall,
+  cancelInstall,
   installStatus,
   installedToolIds,
   defaultRunner,
 } from './shared/official-tools-runtime.mjs'
 
 export const name = 'model-router-galgame'
-export const inject = ['commands', 'llm', 'tools']
+export const inject = ['commands', 'llm', 'tools', 'typert', 'sandboxPolicy', 'sandbox']
 
 export const Config = z.object({
   budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
@@ -120,7 +124,14 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
       ? Promise.resolve(Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
       : installedToolIds(),
   ])
-  return createPlanFromRoutes(taskText, availableRoutes, { mode, budgetUsd, installedToolIds: installed })
+  const readiness = options.skipToolProbe === true ? []
+    : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
+  const executable = new Set(Array.isArray(options.runnableToolIds)
+    ? options.runnableToolIds : readiness.filter(item => item.ready).map(item => item.id))
+  return createPlanFromRoutes(taskText, availableRoutes, {
+    mode, budgetUsd, installedToolIds: installed,
+    runnableToolIds: installed.filter(id => executable.has(id)),
+  })
 }
 
 /** One bounded, independent call through the same official LLM service. */
@@ -136,7 +147,7 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   const onAbort = () => controller.abort(signal.reason)
   signal?.addEventListener('abort', onAbort, { once: true })
   let answer = ''
-  let truncated = false
+  let characterLimitReached = false
   let finish = { kind: 'unknown' }
   try {
     const stream = ctx.llm.stream({
@@ -157,7 +168,7 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
         const remaining = limit - answer.length
         if (remaining > 0) answer += chunk.text.slice(0, remaining)
         if (chunk.text.length > remaining) {
-          truncated = true
+          characterLimitReached = true
           controller.abort(new Error('consultation output limit reached'))
           break
         }
@@ -173,13 +184,22 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
     signal?.removeEventListener('abort', onAbort)
   }
   throwIfAborted(signal)
-  if (!truncated && (finish.kind === 'error' || finish.kind === 'aborted')) {
+  const tokenLimitReached = finish.kind === 'max-tokens'
+  const truncated = characterLimitReached || tokenLimitReached
+  if (!characterLimitReached && (finish.kind === 'error' || finish.kind === 'aborted')) {
     return { ok: false, provider, model, answer, truncated, finish, error: finish.error }
   }
-  if (!truncated && !answer.trim()) {
+  if (!answer.trim()) {
     return { ok: false, provider, model, answer, truncated, finish, error: 'model returned no text' }
   }
-  return { ok: true, provider, model, answer, truncated, finish }
+  return {
+    ok: true, provider, model, answer, truncated, finish,
+    ...(tokenLimitReached
+      ? { truncationReason: 'model-token-limit', notice: '模型达到本次调用的输出 token 上限，回答可能不完整。' }
+      : characterLimitReached
+        ? { truncationReason: 'output-character-limit', notice: '回答达到字符上限，后续内容已截断。' }
+        : {}),
+  }
 }
 
 function explicitRoute(args, routes) {
@@ -224,7 +244,38 @@ function commandText(plan) {
 
 /** Register model-facing tools and the human /router command. */
 export function apply(ctx, config = {}) {
-  registerOfficialToolModels(ctx)
+  // The official Host injects typert; direct lightweight uses of apply may
+  // supply only the model/command services and do not expose the Desktop RPC.
+  if (ctx.typert) registerOfficialToolsRemote(ctx)
+  ctx.on('tools/pre-execute', async (exec, next) => {
+    const decision = await next()
+    if (decision.kind !== 'allow') return decision
+    if (exec.name === 'model_router_tool_install') {
+      const requested = getOfficialTool(text(exec.arguments?.tool))
+      const label = requested?.label ?? '官方 CLI'
+      return {
+        kind: 'ask',
+        reason: `Install ${label} globally with the plugin's fixed official command`,
+        displayReason: {
+          en: `Install ${label} globally using the fixed official package?`,
+          zh: `使用插件固定的官方软件包，在本机全局安装 ${label}？`,
+        },
+      }
+    }
+    if ((exec.name === 'model_router_tool_run' || exec.name === 'model_router_team_execute')
+      && exec.arguments?.mode === 'workspace-write') {
+      return {
+        kind: 'ask',
+        reason: 'Official CLI models will edit an isolated Git worktree and integrate their patch into the current workspace',
+        displayReason: {
+          en: 'Allow the official CLI model to edit an isolated Git worktree and apply its changes to this workspace?',
+          zh: '允许官方 CLI 模型在独立 Git 工作区修改文件，并将补丁应用回当前工作区？',
+        },
+      }
+    }
+    return decision
+  })
+  registerOfficialToolModels(ctx, config)
   ctx.tools.register(defineTool({
     name: 'model_router_routes',
     description: 'List provider/model routes registered in the official DeepSeek Harness model directory. Credential and network availability are not verified. No API keys or endpoints are returned.',
@@ -286,12 +337,17 @@ export function apply(ctx, config = {}) {
   ctx.commands.register({
     name: 'tools',
     description: 'Show official model CLI install status, or install one registry tool.',
-    input: { hint: '留空查看状态；或输入 install <工具id>' },
+    input: { hint: '留空查看状态；或输入 install/cancel <工具id>' },
     async handler({ rawInput, signal }) {
       const input = text(rawInput)
       const installMatch = input.match(/^install\s+([A-Za-z0-9_-]+)$/i)
+      const cancelMatch = input.match(/^cancel\s+([A-Za-z0-9_-]+)$/i)
+      if (cancelMatch) {
+        try { return { kind: 'success', text: `已请求取消 ${cancelInstall(cancelMatch[1]).tool} 的安装；请使用 /tools 查看最新状态。` } }
+        catch (error) { return { kind: 'error', text: `无法取消安装：${errorText(error)}` } }
+      }
       if (!installMatch) {
-        if (input) return { kind: 'error', text: '用法：/tools 查看状态，或 /tools install <工具id>' }
+        if (input) return { kind: 'error', text: '用法：/tools 查看状态，或 /tools install/cancel <工具id>' }
         try {
           const probes = await probeAllTools()
           const lines = probes.map(probe => {
@@ -328,7 +384,10 @@ export function apply(ctx, config = {}) {
 /** Poll an install job until it settles or the signal aborts. */
 async function waitForInstall(toolId, signal) {
   for (;;) {
-    if (signal?.aborted) throw new Error('已取消等待安装完成；安装进程仍在后台执行。')
+    if (signal?.aborted) {
+      try { cancelInstall(toolId) } catch { /* install may already have finished */ }
+      throw new Error('已请求取消安装；请重新检测实际安装状态。')
+    }
     const job = installStatus(toolId)
     if (!job) throw new Error('安装任务丢失。')
     if (job.status !== 'running') return job
@@ -337,7 +396,7 @@ async function waitForInstall(toolId, signal) {
 }
 
 /** Register the model-facing official-tool probes and installer. */
-function registerOfficialToolModels(ctx) {
+function registerOfficialToolModels(ctx, config) {
   ctx.tools.register(defineTool({
     name: 'model_router_tools',
     description: 'Probe the fixed registry of official model CLI tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build) and report which are installed with their versions. Never reads credentials.',
@@ -348,6 +407,10 @@ function registerOfficialToolModels(ctx) {
       const probes = await probeAllTools()
       return jsonValue({
         tools: probes,
+        executionCapabilities: officialToolExecutionCapabilities(),
+        executionReadiness: await Promise.all(probes.map(probe => probe.installed
+          ? officialToolReadiness(probe.id)
+          : Promise.resolve({ id: probe.id, ready: false, reason: 'CLI 尚未安装或版本检测失败。' }))),
         installHint: '未安装的工具可由 model_router_tool_install 按注册表固定命令安装；版本与包名不接受自定义。',
       })
     },
@@ -371,6 +434,68 @@ function registerOfficialToolModels(ctx) {
         postInstallProbe: probe,
         notice: '安装命令完全来自服务端注册表；实际版本以探测横幅为准。',
       })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_tool_run',
+    description: 'Run one supported official model CLI in the current Harness session workspace. read-only analyzes files; workspace-write requires a clean Git repository, runs in an isolated worktree, and applies a verified patch. Optional provider/model must match a configured Harness route and the selected tool vendor.',
+    parameters: {
+      tool: { type: 'string', required: true, description: 'Fixed registry tool id, e.g. claude-code or codex.' },
+      task: { type: 'string', required: true, description: 'Concrete task for the official CLI model.' },
+      provider: { type: 'string', description: 'Optional configured provider, paired with model.' },
+      model: { type: 'string', description: 'Optional configured model identifier passed to the official CLI, paired with provider.' },
+      mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default is read-only. Write mode requires official approval and a clean Git repository.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
+      const mode = args.mode === 'workspace-write' ? 'workspace-write' : 'read-only'
+      if (mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑 CLI 执行')
+      let modelId = null
+      if (text(args.provider) || text(args.model)) {
+        if (!text(args.provider) || !text(args.model)) throw new Error('provider 和 model 必须同时提供')
+        const tool = toolForProvider(args.provider)
+        if (tool?.id !== args.tool) throw new Error('所选模型供应商与官方 CLI 工具不匹配')
+        const routes = await discoverConfiguredRoutes(ctx, exec.signal)
+        if (!routes.some(route => route.provider === args.provider && route.model === args.model)) throw new Error('所选 provider/model 不在官方模型目录中')
+        modelId = args.model
+      }
+      return jsonValue(await runOfficialTask({ toolId: args.tool, task: args.task, modelId, workspace: cwd, allowedRoot: root, mode, signal: exec.signal, sandbox: ctx.sandbox }))
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_team_execute',
+    description: 'Plan a complex task into dependent work packages, route only among configured providers whose supported official CLI is installed, then run each package sequentially with that vendor CLI and request the planned model id. Editable runs use one isolated Git worktree and integrate only after every CLI exits successfully. Confirm the actual model from vendor records.',
+    parameters: {
+      task: { type: 'string', required: true, description: 'Full task to plan, distribute and execute.' },
+      mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default read-only; workspace-write needs a clean Git repository and approval.' },
+      budgetUsd: { type: 'number', description: 'Estimated planning ceiling only, not a vendor billing limit.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
+      const mode = args.mode === 'workspace-write' ? 'workspace-write' : 'read-only'
+      if (mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑团队执行')
+      const [routes, installed] = await Promise.all([discoverConfiguredRoutes(ctx, exec.signal), installedToolIds()])
+      const readiness = await Promise.all(installed.map(id => officialToolReadiness(id, cwd)))
+      const supported = new Set(readiness.filter(item => item.ready).map(item => item.id))
+      const executableRoutes = routes.filter(route => {
+        const tool = toolForProvider(route.provider)
+        return tool && installed.includes(tool.id) && supported.has(tool.id)
+      })
+      if (executableRoutes.length === 0) return jsonValue({ status: 'blocked',
+        reason: '官方模型目录中没有同时满足已配置路线、已安装 CLI 和托管执行适配器的供应商。',
+        installed, executionCapabilities: officialToolExecutionCapabilities(), executionReadiness: readiness })
+      const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
+      const budgetUsd = Math.max(0, finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)))
+      const plan = createPlanFromRoutes(args.task, executableRoutes, {
+        mode: 'team', budgetUsd, installedToolIds: installed,
+        runnableToolIds: installed.filter(id => supported.has(id)),
+      })
+      const execution = await runOfficialTeam({ plan, task: args.task, workspace: cwd, allowedRoot: root, mode, installedIds: installed, signal: exec.signal, sandbox: ctx.sandbox })
+      return jsonValue({ plan, execution,
+        modelNotice: '已向官方 CLI 传入推荐模型 ID；若厂商 CLI 不接受该 ID，会返回失败。实际使用模型仍须以厂商运行记录核对。',
+        billingNotice: 'budgetUsd 仅影响估算与路由，无法限制官方 CLI 账号实际费用。' })
     },
   }))
 }

@@ -1,58 +1,34 @@
-# Model Router for DeepSeek Harness
+# Model Router Galgame for DeepSeek Harness
 
-A model-routing plugin for the official **DeepSeek Harness Desktop 0.1.7-rc.2**.
+Desktop plugin for the official **DeepSeek Harness 0.1.7-rc.2**. The current local build is **0.7.0, unpublished**. The npm package name remains `@ljwei-stak/model-router-galgame`.
 
-Repository: [Alice-Marx/model-router-galgame](https://github.com/Alice-Marx/model-router-galgame)
-The npm package remains `@ljwei-stak/model-router-galgame` to preserve continuity for existing installations.
+## Features
 
-## What it provides
+- **Model Router** sidebar panel: reads the official configured model catalog, estimates task complexity and cost, recommends routes, and decomposes team tasks into dependent work packages. Planning is local and does not call a model.
+- **Official CLI tools** panel: probes six vendor tools and offers one-click npm installation from fixed package/version entries, with progress, cancellation, a fresh version probe, and separate trusted launch-entry readiness. No arbitrary package or command can be supplied through the panel.
+- **Model tools**: `model_router_routes`, `model_router_plan`, `model_router_consult`, `model_router_tools`, `model_router_tool_install`, `model_router_tool_run`, and `model_router_team_execute`. `/router` and `/tools` are also available in sessions.
+- **Gal Module** sidebar panel: illustrated, offline story mode with choices and local save slots; free mode can chat through a model configured in the official Models page, stop a pending reply, or copy the opening prompt to an official session. The plugin does not store provider credentials.
 
-The plugin reads routes registered in the official DeepSeek Harness model directory. It does not store API keys or create a second provider configuration system. A listed route still needs working credentials and network access for a live call.
+`model_router_tool_run` can invoke verified **Claude Code** or **Codex** CLI entry points for read-only work. Every launch is wrapped by the official Harness process sandbox; its Windows ACL backend reports partial file-effect enforcement. Editable work runs in an isolated Git worktree and applies its patch to the original checkout only after the CLI succeeds, the original checkout is still clean, and no Git-ignored artifacts would be silently left behind. `model_router_team_execute` chooses among configured routes whose CLI launch entry is actually ready, requests the planned model ID, and runs dependent packages in order. The actual model should be checked in the vendor's run record. Its budget is an estimate, not a billing limit.
 
-The 0.5.1 desktop workspace is designed to appear as **Model Router** in the official sidebar. It shows the configured model catalog, a local route recommendation for a task, and optional Agent Teams work packages. Catalog display and planning do not make a model request. The package's budget and consultation-output settings belong on its detail page in **Plugin Manager**. This 0.5.1 UI path still needs validation in the installed desktop app.
+All six tools can be installed from the panel. On Windows, Kimi Code, MiniMax Code, MiMo Code, and Grok Build are **not yet supported for unattended task execution** because their permissions, workspace confinement, or machine-readable completion have not been verified for the pinned versions. An installed CLI is therefore distinct from a runnable CLI in the panel and route plan. The official Harness Agent Teams lifecycle remains under Harness control; this plugin's CLI team runner is a separate sequential workflow.
 
-| Tool | Purpose |
-| --- | --- |
-| `model_router_routes` | Lists routes registered in the official model directory. |
-| `model_router_plan` | Recommends a route for a task and can produce work packages for Agent Teams. |
-| `model_router_consult` | Sends one independent consultation to a configured alternative model. |
+## Install and use
 
-Configure providers, models, and credentials on the official **Models** page before using these tools.
+1. Build a local package with `npm run build:client` and `npm pack --pack-destination dist`.
+2. Install and enable the `.tgz` in the official Desktop **Plugin Manager**.
+3. Configure providers, models, and credentials on the official **Models** page.
+4. Open **Model Router** for the catalog, plan, and tool installer; open **Gal Module** for story or free mode.
+5. In an official session, use `model_router_consult` for a live second opinion, `model_router_tool_run` for one supported CLI, or `model_router_team_execute` for sequential work packages. Editable CLI work needs a clean Git repository and the Host tool approval.
 
-## Agent Teams
-
-The official DeepSeek Harness **Agent Teams** feature owns team lifecycle operations. The router can propose work packages and model choices, while the official tools and UI create teammates, exchange messages, wait for results, and stop teammates.
-
-## Routing behavior
-
-The 0.5.1 design does not automatically replace the model selected for the main session. Inspect a local recommendation in the Model Router workspace or use `model_router_plan` from an agent session. When a second model's opinion is useful, ask the agent to use `model_router_consult`; consultation is an agent tool, not a button that runs automatically when the workspace opens. The user chooses the main-session model in the official interface.
-
-## Install
-
-Install through the official DeepSeek Harness Desktop **Plugin Manager**:
-
-1. Obtain a local `.tgz` package or prepare a local checkout.
-2. Add the local directory or `.tgz` from Plugin Manager and enable the plugin there.
-3. Configure providers, models, and API keys on the official **Models** page.
-4. Open **Model Router** in the sidebar to inspect models, plan a task, and view optional team work packages.
-5. Open this package's detail page in **Plugin Manager** to adjust the local planning budget and consultation-output limit.
-6. Use `model_router_consult` through an agent session for a live cross-model consultation.
-
-Do not edit the installed DeepSeek Harness application, its `app.asar`, or bundled desktop files. Install, enable, update, and remove the plugin through Plugin Manager.
-
-See the Chinese [installation guide](INSTALLATION_GUIDE.zh.md) and [migration guide](MIGRATION.md) for details.
-
-## Archived legacy integration
-
-The former GAL interface, automatic-update flow, and integration for the earlier desktop target are archived. They are not part of the official DeepSeek Harness Desktop runtime path.
+Do not edit the DeepSeek Harness installation or `app.asar`. Update this plugin through Plugin Manager. See [installation details](INSTALLATION_GUIDE.zh.md) and [migration notes](MIGRATION.md).
 
 ## Development
 
 ```powershell
 pnpm install --frozen-lockfile
 npm run build:client
-npm test
 npm pack --pack-destination dist
 ```
 
-Install the resulting `.tgz` through the official Plugin Manager.
+Publishing to npm and GitHub is deferred until the plugin and required real-account flows are verified. The [project task report](PROJECT-TASK-REPORT-2026-09-28.md) tracks completed work, file roles, verification steps, and remaining tasks.

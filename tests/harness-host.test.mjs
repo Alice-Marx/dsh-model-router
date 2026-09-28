@@ -160,7 +160,9 @@ test('registers router tools and manual command without intercepting the main ag
     'model_router_consult',
     'model_router_plan',
     'model_router_routes',
+    'model_router_team_execute',
     'model_router_tool_install',
+    'model_router_tool_run',
     'model_router_tools',
   ])
   assert.equal(events.some(({ name }) => String(name).startsWith('agent/')), false)
