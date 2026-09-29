@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1120" role="img" aria-labelledby="title description">
+  <title id="title">模型路由工作台操作示意</title>
+  <desc id="description">示意图而非实机截图。操作顺序为：输入任务描述，选择单任务或团队分工，填写仅用于估算的预算，生成路由建议；向下滚动，经过逐模型价格与能力配置，再查看路由建议；实际执行须在官方会话中显式调用工具。</desc>
+  <defs>
+    <linearGradient id="page" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5f8fd"/>
+      <stop offset="1" stop-color="#edf5f3"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#5379be" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #1c2a3c; }
+      .page-title { font-size: 34px; font-weight: 740; }
+      .sub { font-size: 17px; fill: #586b81; }
+      .section { font-size: 22px; font-weight: 720; }
+      .label { font-size: 17px; font-weight: 690; }
+      .ui { font-size: 17px; fill: #536274; }
+      .note { font-size: 16px; fill: #62758a; }
+      .num { font-size: 18px; font-weight: 800; fill: #fff; }
+      .button-label { font-size: 18px; font-weight: 720; fill: #fff; }
+      .card { fill: #fff; stroke: #d5e0eb; stroke-width: 2; }
+      .field { fill: #fbfcff; stroke: #cdd9e6; stroke-width: 2; }
+      .arrow { fill: none; stroke: #7393c3; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1500" height="1120" rx="25" fill="url(#page)"/>
+  <text x="42" y="59" class="page-title">模型路由工作台：从填写任务到查看建议</text>
+  <rect x="1180" y="25" width="278" height="42" rx="21" fill="#fff2dc" stroke="#dfb36e" stroke-width="2"/>
+  <text x="1208" y="53" font-size="18" font-weight="730" fill="#8b591b">操作示意 · 非实机截图</text>
+  <text x="42" y="91" class="sub">按 0.9.0 工作台控件顺序绘制；示例文字不含真实项目、账号或模型信息。</text>
+
+  <rect x="41" y="119" width="238" height="920" rx="18" fill="#e8edf4" stroke="#d2dce8" stroke-width="2"/>
+  <text x="68" y="162" font-size="20" font-weight="750">DeepSeek Harness</text>
+  <rect x="57" y="204" width="206" height="48" rx="10" fill="#d7e2f5"/>
+  <text x="78" y="235" font-size="18" font-weight="720">模型路由</text>
+  <text x="78" y="292" class="ui">Gal 模块</text>
+  <text x="68" y="352" class="note">示意导航</text>
+
+  <text x="320" y="145" font-size="29" font-weight="740">模型路由工作台</text>
+  <text x="320" y="177" class="sub">任务规划在本机完成；右侧仅显示官方已配置的模型路线。</text>
+
+  <rect x="320" y="204" width="726" height="392" rx="17" class="card"/>
+  <text x="346" y="242" class="section">任务规划</text>
+  <text x="346" y="269" class="note">生成建议不会自动启动模型或团队任务。</text>
+
+  <circle cx="351" cy="308" r="17" fill="#3d65c1"/>
+  <text x="351" y="314" text-anchor="middle" class="num">1</text>
+  <text x="380" y="315" class="label">任务描述</text>
+  <rect x="346" y="328" width="672" height="106" rx="11" class="field"/>
+  <text x="365" y="361" class="ui">例如：梳理需求，完成实现并给出验收清单</text>
+  <text x="365" y="391" class="note">复杂任务可按编号或分行列出独立要求</text>
+
+  <circle cx="351" cy="472" r="17" fill="#3d65c1"/>
+  <text x="351" y="478" text-anchor="middle" class="num">2</text>
+  <text x="380" y="478" class="label">规划模式</text>
+  <rect x="346" y="494" width="275" height="44" rx="10" fill="#edf1f7"/>
+  <rect x="350" y="498" width="125" height="36" rx="8" fill="#fff" stroke="#d7e1ef"/>
+  <text x="381" y="522" class="ui">单任务</text>
+  <text x="497" y="522" class="ui">团队分工</text>
+
+  <circle cx="675" cy="472" r="17" fill="#3d65c1"/>
+  <text x="675" y="478" text-anchor="middle" class="num">3</text>
+  <text x="704" y="478" class="label">本次估算预算（USD）</text>
+  <rect x="671" y="494" width="320" height="44" rx="10" class="field"/>
+  <text x="691" y="522" class="ui">0</text>
+  <text x="346" y="568" class="note">0 表示建议不限预算；这里不设置真实支出上限。</text>
+
+  <rect x="1066" y="204" width="392" height="392" rx="17" class="card"/>
+  <text x="1092" y="242" class="section">模型目录</text>
+  <text x="1092" y="269" class="note">只显示已登记的 provider/model。</text>
+  <rect x="1092" y="295" width="340" height="42" rx="9" class="field"/>
+  <text x="1110" y="322" class="ui">搜索路线</text>
+  <rect x="1092" y="356" width="340" height="72" rx="9" fill="#f8fbff" stroke="#dce5ef"/>
+  <text x="1110" y="385" class="label">已配置路线 A</text>
+  <text x="1110" y="409" class="note">provider / model</text>
+  <rect x="1092" y="440" width="340" height="72" rx="9" fill="#f8fbff" stroke="#dce5ef"/>
+  <text x="1110" y="469" class="label">已配置路线 B</text>
+  <text x="1110" y="493" class="note">provider / model</text>
+  <text x="1092" y="548" class="note">路线可见 ≠ 凭据和网络可用</text>
+
+  <circle cx="351" cy="627" r="17" fill="#3d65c1"/>
+  <text x="351" y="633" text-anchor="middle" class="num">4</text>
+  <rect x="379" y="604" width="177" height="45" rx="10" fill="#315cc8"/>
+  <text x="404" y="633" class="button-label">生成路由建议</text>
+  <text x="577" y="632" class="note">先有任务描述与至少一条官方模型路线</text>
+
+  <path d="M881 652 V690" class="arrow"/>
+  <circle cx="351" cy="694" r="17" fill="#3d65c1"/>
+  <text x="351" y="700" text-anchor="middle" class="num">5</text>
+  <text x="380" y="700" class="label">向下滚动：先经过“逐模型价格与能力”，再看“路由建议”</text>
+
+  <rect x="320" y="714" width="1138" height="125" rx="17" class="card"/>
+  <text x="346" y="748" class="section">逐模型价格与能力</text>
+  <text x="346" y="773" class="note">可为准确的官方路线填写质量评分、输入/输出单价与 CLI 模型名；缺失价格保持未知。</text>
+  <rect x="346" y="793" width="260" height="28" rx="7" class="field"/>
+  <text x="357" y="813" class="note">选择模型路线</text>
+  <rect x="620" y="793" width="245" height="28" rx="7" class="field"/>
+  <text x="631" y="813" class="note">质量评分（可选）</text>
+  <rect x="879" y="793" width="245" height="28" rx="7" class="field"/>
+  <text x="890" y="813" class="note">输入单价（可选）</text>
+  <rect x="1138" y="793" width="294" height="28" rx="7" class="field"/>
+  <text x="1149" y="813" class="note">输出单价（可选）</text>
+
+  <path d="M881 839 V861" class="arrow"/>
+  <rect x="320" y="864" width="1138" height="110" rx="17" fill="#e6eefc" stroke="#92addd" stroke-width="2"/>
+  <text x="346" y="899" class="section">路由建议</text>
+  <text x="346" y="929" class="ui">推荐路线 · 任务复杂度 · 估算总成本</text>
+  <text x="346" y="954" class="note">团队模式还显示工作包、依赖、推荐模型、执行渠道与验收项。</text>
+
+  <circle cx="351" cy="1015" r="17" fill="#259477"/>
+  <text x="351" y="1021" text-anchor="middle" class="num">6</text>
+  <rect x="379" y="987" width="1079" height="66" rx="14" fill="#fff" stroke="#77b6a5" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="405" y="1016" class="label">需要实际执行时，转到官方会话并显式调用工具</text>
+  <text x="405" y="1042" class="note">model_router_consult · model_router_tool_run · model_router_team_execute</text>
+
+  <text x="320" y="1090" class="sub">示意图只说明操作位置与顺序；生成计划是本地计算，官方 CLI 执行、账号可用性与实际费用需分别核验。</text>
+</svg>
