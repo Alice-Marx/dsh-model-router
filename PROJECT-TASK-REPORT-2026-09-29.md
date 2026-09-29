@@ -62,4 +62,4 @@
 
 ## 发布记录
 
-0.9.0 计划作为 npm `next` 与 GitHub 预发布，保留 0.8.0 历史。本地安装包 `dist/ljwei-stak-model-router-galgame-0.9.0.tgz`，SHA-256 `110BB0679170EF67AF67D320900090E3E23D527ACC0DEA8AF2885688CF8AE4F4`。最终提交、npm tarball 和 GitHub Release 的核对结果在发布后补记。
+0.9.0 计划作为 npm `next` 与 GitHub 预发布，保留 0.8.0 历史。本地安装包 `dist/ljwei-stak-model-router-galgame-0.9.0.tgz`，SHA-256 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`。包内 24 个文件已与 Git 提交逐文件比较，字节全部相同。最终提交、npm tarball 和 GitHub Release 的核对结果在发布后补记。
