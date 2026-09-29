@@ -4,7 +4,7 @@
 
 [简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [v0.9.0 release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0) · [npm package](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.9.0)
 
-> **Current compatibility:** plugin **0.9.0** targets DeepSeek Harness Desktop **0.2.0-rc.1**. The plugin was installed and its two panels opened in an isolated profile using that Desktop version's runtime. Vendor account sign-in, paid model calls, actual model selection inside each CLI, and billing still need user verification.
+> **Published compatibility:** plugin **0.9.0** targets DeepSeek Harness Desktop **0.2.0-rc.1**. The plugin was installed and its two panels opened in an isolated profile using that Desktop version's runtime. This source branch is an unpublished **0.9.1-dev.0** development build with a new Gal story. Vendor account sign-in, paid model calls, actual model selection inside each CLI, and billing still need user verification.
 
 ![Diagram of the local routing plan and the separate official-tool execution step](docs/assets/routing-workflow.svg)
 
@@ -247,7 +247,11 @@ The planned Harness model ID is not necessarily the vendor CLI's model name. A s
 
 *Story artwork from the plugin's Gal assets; it is not a capture of the running interface.*
 
-The **Story** tab runs locally: stage backgrounds, characters, dialogue, choices, history, endings, and three local save slots. The **Free** tab uses an official configured model route for in-panel chat, can stop a pending response, or copies the opening prompt into a Harness session. Free-mode replies are real model calls and may incur charges. The plugin does not store provider credentials.
+The **Story** tab runs locally: stage backgrounds, characters, dialogue, choices, history, endings, autosave, and three manual local save slots. It needs no model account. The source tree now includes **Echo City: Letter by Snowlight** (`回声之城：雪灯来信`), a standalone five-chapter adaptation with nine choice points and two reachable endings. To play it in a build that contains the new story, open **Gal Module → Story mode**, choose **雪灯来信** from the episode dropdown, and click through dialogue and choices. The adjacent chapter selector starts that chapter with fresh state; it does **not** inherit choices from earlier chapters. Autosave resumes the selected episode; the new story has three manual slots separate from the older episodes.
+
+This adaptation draws on the locally authored *Echo City* materials, especially scenes S0/S4 of the expanded common story and *Shadow and Self* (`影与身`). It does not port the original eight chapters, six character routes, or original TRUE END. Company and model characters are fictional personifications. See the [Chinese story and play guide](docs/ECHO_CITY_STORY.zh.md) for the chapter map, choice effects, save behavior, and manual checks. **This source-development feature is in a local 0.9.1-dev.0 package; the published npm 0.9.0 package does not contain this episode.**
+
+The **Free** tab uses an official configured model route for in-panel chat, can stop a pending response, or copies the opening prompt into a Harness session. Free-mode replies are real model calls and may incur charges. The plugin does not store provider credentials.
 
 ## Verification status and further reading
 

@@ -81,7 +81,7 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
   const history = useMemo(() => storyHistory(state), [state])
   const portraitLine = [...history].reverse().find(line => line.location === node.location && CHARACTER_IMAGES[line.speaker])
   const character = CHARACTER_IMAGES[node.speaker] ? node.speaker : portraitLine?.speaker
-  const background = STORY_BACKGROUNDS[node.backgroundId || node.chapterId]
+  const background = STORY_BACKGROUNDS[node.backgroundId || node.chapterId] || (episodeId === 'echo-city' ? STORY_BACKGROUNDS.title : null)
   const emotion = node.speaker === character ? node.emotion || 'neutral' : 'neutral'
   const complete = !animate || shown >= node.text.length
   const hasChoices = Boolean(node.choices?.length)
@@ -284,17 +284,17 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
       <img className="gg-title-character gg-title-character-claude" src={CHARACTER_IMAGES.claude} alt="" aria-hidden="true" />
       <div className="gg-title-copy">
         <p className="gg-title-kicker">MODEL CITY VISUAL NOVEL</p>
-        <h1 id="gg-title-heading">未写完的约定</h1>
-        <p className="gg-title-subtitle">千桥协议</p>
-        <p className="gg-title-description">八章主线 · 六种黎明 · 二十二条角色支线</p>
+        <h1 id="gg-title-heading">{episode.title}</h1>
+        <p className="gg-title-subtitle">{episode.label}</p>
+        <p className="gg-title-description">{episode.description}</p>
         <div className="gg-title-actions">
           {hasProgress && <button type="button" className="gg-title-primary" onClick={continueFromTitle}><Play size={17} />继续旅程</button>}
-          <button type="button" className={hasProgress ? '' : 'gg-title-primary'} onClick={startFromTitle}><RotateCcw size={17} />从序章开始</button>
+          <button type="button" className={hasProgress ? '' : 'gg-title-primary'} onClick={startFromTitle}><RotateCcw size={17} />从开篇开始</button>
           {episodeId === 'bridges' && <button type="button" onClick={() => { unlockAudio(); setPanel('routes') }}><BookOpen size={17} />角色支线</button>}
           <button type="button" onClick={() => { unlockAudio(); setPanel('episodes') }}><MapPin size={17} />剧目与章节</button>
           <button type="button" onClick={() => { unlockAudio(); setPanel('settings') }}><Accessibility size={17} />无障碍与声音</button>
         </div>
-        <p className="gg-title-audio"><Music2 size={14} />{audioUnlocked && preferences.music ? `正在演奏：${currentTheme?.title || '千桥城序曲'}` : '选择任一入口后启用音乐'}</p>
+        <p className="gg-title-audio"><Music2 size={14} />{audioUnlocked && preferences.music ? `正在演奏：${currentTheme?.title || '城市序曲'}` : '选择任一入口后启用音乐'}</p>
       </div>
     </section>}
     {!home && <><header className="gg-header">
@@ -339,7 +339,7 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
         <h3>{item.label}{item.id === episodeId ? ' · 当前剧目' : ''}</h3><p>{item.description}</p>
         <button className="gg-button" type="button" onClick={() => { if (item.id === episodeId) setPanel(null); else onChooseEpisode(item.id) }}>继续{item.label}</button>
       </article>)}</div>
-      {episode.chapters.length > 0 && <div className="gg-chapter-list"><h3>八章主线试玩</h3><p>从序章顺序阅读可保留所有选择的后续影响。也可直接从以下主线章节开始。</p>{episode.chapters.filter(chapter => !chapter.optional).map(chapter => <button className="gg-button" type="button" key={chapter.id} onClick={() => startChapter(chapter)}>试玩：{chapter.title}<ArrowRight size={14} /></button>)}</div>}
+      {episode.chapters.length > 0 && <div className="gg-chapter-list"><h3>章节试玩</h3><p>从开篇顺序阅读可保留所有选择的后续影响。也可直接从以下章节开始。</p>{episode.chapters.filter(chapter => !chapter.optional).map(chapter => <button className="gg-button" type="button" key={chapter.id} onClick={() => startChapter(chapter)}>试玩：{chapter.title}<ArrowRight size={14} /></button>)}</div>}
       {episodeId === 'bridges' && <div className="gg-panel-actions"><button className="gg-button" type="button" onClick={() => setPanel('routes')}><BookOpen size={16} />打开角色支线</button></div>}
     </Panel>}
 

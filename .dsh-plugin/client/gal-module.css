@@ -4,6 +4,7 @@
 .gm-story { display: grid; gap: 12px; min-width: 0; }
 
 .gm-story-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gm-episode-description { margin: 0; color: var(--dsw-alias-text-secondary, #566576); font-size: 13px; line-height: 1.6; }
 .gm-select { padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.08)); color: inherit; font-size: 13px; max-width: 340px; }
 
 .gm-stage, .gm-free-stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 16px; border: 1px solid rgba(124, 153, 203, .38); background: #101626; color: #f4f4fb; box-shadow: 0 14px 36px rgba(10, 12, 25, .22); }

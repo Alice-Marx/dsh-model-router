@@ -1,16 +1,22 @@
-import { createStory, normalizeStory, getStoryEpisode } from '../shared/gal-story-catalog.mjs'
+import { createStory, normalizeStory, getStoryEpisode, STORY_EPISODES } from '../shared/gal-story-catalog.mjs'
 
 export const STORY_STORAGE_KEY = 'model-router:gal-story:v1'
 export const storyStorageKey = freeKey => freeKey === 'model-router:gal-game:v1' ? STORY_STORAGE_KEY : `${freeKey}:story`
 export const episodeStorageKey = (baseKey, episodeId) => {
   if (episodeId === 'legacy') return baseKey
-  if (episodeId === 'bridges') return `${baseKey}:episode:bridges`
+  if (STORY_EPISODES.some(episode => episode.id === episodeId)) return `${baseKey}:episode:${episodeId}`
   throw new Error('未知的剧情剧目。')
 }
 
+// The first two episodes originally shared three manual slots. Keep that key
+// readable and reserve independent slots for the new story.
+export const storySlotsKey = (baseKey, episodeId) => episodeId === 'echo-city'
+  ? episodeStorageKey(baseKey, episodeId)
+  : baseKey
+
 export function selectedStoryEpisode(storage, baseKey = STORY_STORAGE_KEY) {
   const selected = storage?.getItem(`${baseKey}:episode`)
-  if (['legacy', 'bridges'].includes(selected)) return selected
+  if (STORY_EPISODES.some(episode => episode.id === selected)) return selected
   return storage?.getItem(baseKey) ? 'legacy' : 'bridges'
 }
 

@@ -21,6 +21,7 @@ import {
 import {
   STORY_STORAGE_KEY,
   episodeStorageKey,
+  storySlotsKey,
   selectedStoryEpisode,
   readStory,
   writeStory,
@@ -50,6 +51,9 @@ import chatgptPortrait from '../../aipicture/ChatGPT1.png'
 import kimiPortrait from '../../aipicture/Kimi1.png'
 import perplexityPortrait from '../../aipicture/perplexity.webp'
 import githubPortrait from '../../aipicture/github.webp'
+import cloudflarePortrait from '../../aipicture/cloudflare.webp'
+import llamaPortrait from '../../aipicture/llama.webp'
+import huggingfacePortrait from '../../aipicture/huggingface.webp'
 
 const SPEAKER_LABELS = { player: '你', narrator: '' }
 const SPEAKER_COLORS = ['hsl(152,45%,44%)', 'hsl(208,60%,52%)', 'hsl(27,70%,55%)', 'hsl(262,45%,58%)', 'hsl(340,55%,56%)', 'hsl(190,50%,42%)', 'hsl(88,40%,42%)', 'hsl(315,40%,52%)']
@@ -77,6 +81,9 @@ const CHARACTER_ART = Object.freeze({
   kimi: kimiPortrait,
   perplexity: perplexityPortrait,
   github: githubPortrait,
+  cloudflare: cloudflarePortrait,
+  llama: llamaPortrait,
+  huggingface: huggingfacePortrait,
 })
 
 /** Sidebar glyph for the Gal module: a dialogue bubble over a spark. */
@@ -201,7 +208,7 @@ function StoryMode() {
   const [error, setError] = React.useState('')
   const [showHistory, setShowHistory] = React.useState(false)
   const [slots, setSlots] = React.useState(() => {
-    try { return readStorySlots(storage, STORY_STORAGE_KEY, episodeId) } catch { return [null, null, null] }
+    try { return readStorySlots(storage, storySlotsKey(STORY_STORAGE_KEY, episodeId), episodeId) } catch { return [null, null, null] }
   })
   const node = React.useMemo(() => {
     try { return currentStoryNode(story) } catch { return null }
@@ -223,7 +230,7 @@ function StoryMode() {
     try {
       const key = episodeStorageKey(STORY_STORAGE_KEY, nextId)
       setStory(readStory(storage, key, nextId))
-      setSlots(readStorySlots(storage, STORY_STORAGE_KEY, nextId))
+      setSlots(readStorySlots(storage, storySlotsKey(STORY_STORAGE_KEY, nextId), nextId))
     } catch {
       setStory(createStory(nextId))
       setSlots([null, null, null])
@@ -233,16 +240,17 @@ function StoryMode() {
     setError('')
     try {
       if (!storage) throw new Error('浏览器存储不可用，无法保存剧情。')
-      const current = JSON.parse(storage?.getItem(`${STORY_STORAGE_KEY}:slots`) || '[]')
+      const slotsKey = storySlotsKey(STORY_STORAGE_KEY, episodeId)
+      const current = JSON.parse(storage?.getItem(`${slotsKey}:slots`) || '[]')
       current[index] = { state: JSON.parse(JSON.stringify(story)), savedAt: new Date().toLocaleString() }
-      storage?.setItem(`${STORY_STORAGE_KEY}:slots`, JSON.stringify(current))
-      setSlots(readStorySlots(storage, STORY_STORAGE_KEY, episodeId))
+      storage?.setItem(`${slotsKey}:slots`, JSON.stringify(current))
+      setSlots(readStorySlots(storage, slotsKey, episodeId))
     } catch (slotError) { setError(slotError.message) }
   }
   const loadSlot = index => {
     setError('')
     try {
-      const slot = readStorySlots(storage, STORY_STORAGE_KEY, episodeId)[index]
+      const slot = readStorySlots(storage, storySlotsKey(STORY_STORAGE_KEY, episodeId), episodeId)[index]
       if (!slot || slot.invalid) throw new Error('该存档槽为空或已损坏。')
       persist(normalizeStory(slot.state))
     } catch (loadError) { setError(loadError.message) }
@@ -281,7 +289,7 @@ function StoryMode() {
               try {
                 const chapterId = event.target.value
                 const routeId = chapterId === 'side-routes' ? STORY_SIDE_ROUTES[0]?.id : null
-                persist(createStory('bridges', { chapterId, routeId }))
+                persist(createStory(episodeId, { chapterId, routeId }))
               } catch (chapterError) { setError(chapterError.message) }
             }}
             aria-label="选择章节"
@@ -306,6 +314,7 @@ function StoryMode() {
         <button className="mr-button mr-button-secondary" type="button" onClick={() => setShowHistory(value => !value)}>{showHistory ? '收起历史' : '历史'}</button>
         <button className="mr-button mr-button-secondary" type="button" onClick={restart}>重新开始</button>
       </div>
+      <p className="gm-episode-description"><strong>{episode?.title}</strong> · {episode?.description}</p>
 
       <div className="gm-stage" data-chapter={node?.chapterId ?? story?.chapterId ?? ''}>
         <StageArtwork background={stageBackground} speaker={stageSpeaker} />
