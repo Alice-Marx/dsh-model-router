@@ -11,8 +11,10 @@
 .gm-stage { min-height: 500px; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding: 22px; }
 .gm-stage::after, .gm-free-stage::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(180deg, rgba(10, 12, 30, .42) 0%, rgba(11, 15, 31, .04) 28%, rgba(8, 10, 23, .22) 51%, rgba(7, 10, 23, .88) 100%); }
 .gm-stage-art { position: absolute; inset: 0; z-index: 0; background-position: center; background-repeat: no-repeat; background-size: cover; }
-.gm-stage-portrait { position: absolute; z-index: 1; height: 87%; width: auto; max-width: 56%; right: 3%; bottom: 5%; object-fit: contain; object-position: bottom; pointer-events: none; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .4)); }
-.gm-stage > :not(.gm-stage-art):not(.gm-stage-portrait), .gm-free-stage > :not(.gm-stage-art):not(.gm-stage-portrait) { position: relative; z-index: 2; }
+.gm-stage-portrait { position: absolute; z-index: 2; height: 87%; width: auto; max-width: 56%; right: 3%; bottom: 5%; object-fit: contain; object-position: bottom; pointer-events: none; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .4)); }
+.gm-stage-portrait-companion { left: 2%; right: auto; height: 75%; max-width: 44%; opacity: .78; filter: brightness(.78) drop-shadow(0 9px 15px rgba(0, 0, 0, .4)); }
+.gm-stage-portrait-fallback { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: min(42%, 240px); height: 58%; padding: 20px; border-radius: 80px 80px 20px 20px; background: linear-gradient(155deg, rgba(188, 208, 232, .74), rgba(77, 92, 133, .72)); color: #fff; font-size: 17px; font-weight: 700; text-align: center; }
+.gm-stage > :not(.gm-stage-art):not(.gm-stage-portrait), .gm-free-stage > :not(.gm-stage-art):not(.gm-stage-portrait) { position: relative; z-index: 3; }
 .gm-stage-head { display: grid; gap: 4px; margin-bottom: auto; align-self: flex-start; padding: 11px 14px; border-radius: 10px; background: rgba(8, 13, 29, .63); backdrop-filter: blur(8px); }
 .gm-stage-place { display: flex; align-items: baseline; gap: 10px; font-size: 14px; color: #dce6f8; }
 .gm-stage-place strong { font-size: 16px; color: #fff; }
@@ -69,7 +71,8 @@
 .gm-free-prompt { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.7; font-family: inherit; }
 @media (max-width: 760px) {
   .gm-stage { min-height: 440px; padding: 14px; }
-  .gm-stage-portrait { right: -6%; max-width: 78%; height: 72%; bottom: 16%; }
+  .gm-stage-portrait { right: -6%; max-width: 72%; height: 72%; bottom: 16%; }
+  .gm-stage-portrait-companion { left: -8%; right: auto; max-width: 48%; height: 61%; bottom: 16%; }
   .gm-stage-head { max-width: 90%; }
   .gm-free-controls { grid-template-columns: 1fr; }
   .gm-free-stage { min-height: 340px; padding: 14px; }

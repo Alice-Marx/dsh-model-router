@@ -15,12 +15,14 @@ export const CHARACTER_LABELS = Object.freeze({
   qwen: 'Qwen',
   huggingface: 'Hugging Face', llama: 'Llama', rwkv: 'RWKV', perplexity: 'Perplexity',
   github: 'GitHub', gitlab: 'GitLab', gitee: 'Gitee', cloudflare: 'Cloudflare',
+  zcode: 'ZCode',
 })
 
 /** Resolve a provider/model id to the corresponding maid character key. */
 export function characterKeyForModel(model, provider = '') {
   const value = `${String(provider ?? '')} ${String(model ?? '')}`.toLowerCase()
   if (value.includes('harness') || value.includes('router')) return 'harness'
+  if (value.includes('zcode')) return 'zcode'
   if (value.includes('claude')) return 'claude'
   if (value.includes('gpt') || value.includes('openai')) return 'chatgpt'
   if (value.includes('deepseek')) return 'deepseek'

@@ -29,62 +29,12 @@ import {
 } from './gal-story-storage.mjs'
 import galStylesheet from './gal-module.css'
 import workspaceStylesheet from './router-main.css'
-import prologueStation from '../../aipicture/story-backgrounds/prologue-station.webp'
-import associationOpenDay from '../../aipicture/story-backgrounds/association-open-day.webp'
-import laurelTheatre from '../../aipicture/story-backgrounds/laurel-theatre.webp'
-import bridgesNight from '../../aipicture/story-backgrounds/bridges-night.webp'
-import threeHarbors from '../../aipicture/story-backgrounds/three-harbors.webp'
-import openDomeHearing from '../../aipicture/story-backgrounds/open-dome-hearing.webp'
-import protocolComposition from '../../aipicture/story-backgrounds/protocol-composition.webp'
-import sixEndings from '../../aipicture/story-backgrounds/six-endings.webp'
-import modelCityTitle from '../../aipicture/story-backgrounds/model-city-title.webp'
-import laurelObservatory from '../../aipicture/story-backgrounds/laurel-observatory.webp'
-import kimiRehearsal from '../../aipicture/story-backgrounds/kimi-rehearsal.webp'
-import communityArchive from '../../aipicture/story-backgrounds/community-archive.webp'
-import offlineWorkshop from '../../aipicture/story-backgrounds/offline-workshop.webp'
-import evidenceLighthouse from '../../aipicture/story-backgrounds/evidence-lighthouse.webp'
-import operationsBridge from '../../aipicture/story-backgrounds/operations-bridge.webp'
-import harnessPortrait from '../../aipicture/DeepSeek_Harness1.png'
-import deepseekPortrait from '../../aipicture/DeepSeek1.png'
-import claudePortrait from '../../aipicture/Claude1.png'
-import chatgptPortrait from '../../aipicture/ChatGPT1.png'
-import kimiPortrait from '../../aipicture/Kimi1.png'
-import perplexityPortrait from '../../aipicture/perplexity.webp'
-import githubPortrait from '../../aipicture/github.webp'
-import cloudflarePortrait from '../../aipicture/cloudflare.webp'
-import llamaPortrait from '../../aipicture/llama.webp'
-import huggingfacePortrait from '../../aipicture/huggingface.webp'
+import { STORY_BACKGROUNDS, backgroundForStoryNode, sceneDescription } from './gal-story-backgrounds.mjs'
+import { CHARACTER_IMAGES } from './characters.mjs'
+import { expressionFor } from './gal-game-expressions.mjs'
 
 const SPEAKER_LABELS = { player: '你', narrator: '' }
 const SPEAKER_COLORS = ['hsl(152,45%,44%)', 'hsl(208,60%,52%)', 'hsl(27,70%,55%)', 'hsl(262,45%,58%)', 'hsl(340,55%,56%)', 'hsl(190,50%,42%)', 'hsl(88,40%,42%)', 'hsl(315,40%,52%)']
-const STORY_ART = Object.freeze({
-  prologue: prologueStation,
-  'open-day': associationOpenDay,
-  laurel: laurelTheatre,
-  'bridges-night': bridgesNight,
-  'three-harbors': threeHarbors,
-  'open-dome-hearing': openDomeHearing,
-  'protocol-composition': protocolComposition,
-  'six-endings': sixEndings,
-  'laurel-observatory': laurelObservatory,
-  'kimi-rehearsal': kimiRehearsal,
-  'community-archive': communityArchive,
-  'offline-workshop': offlineWorkshop,
-  'evidence-lighthouse': evidenceLighthouse,
-  'operations-bridge': operationsBridge,
-})
-const CHARACTER_ART = Object.freeze({
-  harness: harnessPortrait,
-  deepseek: deepseekPortrait,
-  claude: claudePortrait,
-  chatgpt: chatgptPortrait,
-  kimi: kimiPortrait,
-  perplexity: perplexityPortrait,
-  github: githubPortrait,
-  cloudflare: cloudflarePortrait,
-  llama: llamaPortrait,
-  huggingface: huggingfacePortrait,
-})
 
 /** Sidebar glyph for the Gal module: a dialogue bubble over a spark. */
 export function GalPanelIcon({ size = 20, active = false }) {
@@ -111,23 +61,36 @@ function speakerColor(key) {
   return SPEAKER_COLORS[hash % SPEAKER_COLORS.length]
 }
 
-function Avatar({ speaker, large = false }) {
+function Avatar({ speaker, large = false, emotion = 'neutral' }) {
   const label = speakerLabel(speaker)
   const color = speakerColor(speaker)
+  const source = CHARACTER_IMAGES[speaker] ? expressionFor(speaker, emotion) : null
+  const [failedSource, setFailedSource] = React.useState(null)
   return (
     <span className={large ? 'gm-avatar gm-avatar-large' : 'gm-avatar'} style={{ background: color }} aria-hidden="true">
-      {CHARACTER_ART[speaker]
-        ? <img src={CHARACTER_ART[speaker]} alt="" />
+      {source && source !== failedSource
+        ? <img src={source} alt="" onError={() => setFailedSource(source)} />
         : label ? label.slice(0, 1) : '？'}
     </span>
   )
 }
 
-function StageArtwork({ background, speaker }) {
+function StagePortrait({ speaker, emotion = 'neutral', companion = false }) {
+  const source = CHARACTER_IMAGES[speaker] ? expressionFor(speaker, emotion) : null
+  const [failedSource, setFailedSource] = React.useState(null)
+  if (!source) return null
+  const className = companion ? 'gm-stage-portrait gm-stage-portrait-companion' : 'gm-stage-portrait'
+  return source === failedSource
+    ? <span className={`${className} gm-stage-portrait-fallback`} aria-hidden="true">{speakerLabel(speaker)}</span>
+    : <img className={className} src={source} alt="" aria-hidden="true" onError={() => setFailedSource(source)} />
+}
+
+function StageArtwork({ background, speaker, companion = null, emotion = 'neutral' }) {
   return (
     <>
       <div className="gm-stage-art" style={{ backgroundImage: `url("${background}")` }} aria-hidden="true" />
-      {CHARACTER_ART[speaker] && <img className="gm-stage-portrait" src={CHARACTER_ART[speaker]} alt="" aria-hidden="true" />}
+      {companion && companion !== speaker && <StagePortrait speaker={companion} companion />}
+      {speaker && <StagePortrait speaker={speaker} emotion={emotion} />}
     </>
   )
 }
@@ -161,7 +124,7 @@ function StageHeader({ node }) {
         <strong>{node.location ?? '未名之地'}</strong>
         {node.time && <span>{node.time}</span>}
       </div>
-      {node.description && <p className="gm-stage-desc">{node.description}</p>}
+      {node.description && <p className="gm-stage-desc">{sceneDescription(node.description)}</p>}
     </header>
   )
 }
@@ -182,7 +145,7 @@ function Dialogue({ node, onAdvance }) {
     <div className={isNarration ? 'gm-dialogue gm-dialogue-narration' : 'gm-dialogue'} onClick={click} onKeyDown={keyDown} role="button" tabIndex={0} aria-label={done ? node.choices || node.ending ? '对话已显示，请选择剧情选项' : '继续剧情' : '显示完整对话'}>
       {!isNarration && (
         <div className="gm-speaker">
-          <Avatar speaker={node.speaker} large />
+          <Avatar speaker={node.speaker} large emotion={node.emotion} />
           <span className="gm-speaker-name">{speakerLabel(node.speaker)}</span>
         </div>
       )}
@@ -265,13 +228,20 @@ function StoryMode() {
     if (!showHistory) return []
     try { return storyHistory(story) } catch { return [] }
   }, [story, showHistory])
-  const stageSpeaker = React.useMemo(() => {
-    if (CHARACTER_ART[node?.speaker]) return node.speaker
-    if (node?.speaker !== 'player' && node?.speaker !== 'narrator') return null
-    try { return [...storyHistory(story)].reverse().find(entry => CHARACTER_ART[entry.speaker])?.speaker ?? null }
-    catch { return null }
-  }, [story, node?.speaker])
-  const stageBackground = STORY_ART[node?.backgroundId] ?? STORY_ART[node?.chapterId] ?? modelCityTitle
+  const sceneSpeakers = React.useMemo(() => {
+    if (!node) return []
+    const visible = CHARACTER_IMAGES[node.speaker] ? [node.speaker] : []
+    try {
+      const lines = storyHistory(story)
+      for (let index = lines.length - 1; index >= 0 && visible.length < 2; index -= 1) {
+        const line = lines[index]
+        if (line.location !== node.location || line.time !== node.time) break
+        if (CHARACTER_IMAGES[line.speaker] && !visible.includes(line.speaker)) visible.push(line.speaker)
+      }
+    } catch { /* 剧情状态异常时仍可展示当前角色。 */ }
+    return visible
+  }, [story, node])
+  const stageBackground = backgroundForStoryNode(node)
 
   return (
     <div className="gm-story">
@@ -317,7 +287,7 @@ function StoryMode() {
       <p className="gm-episode-description"><strong>{episode?.title}</strong> · {episode?.description}</p>
 
       <div className="gm-stage" data-chapter={node?.chapterId ?? story?.chapterId ?? ''}>
-        <StageArtwork background={stageBackground} speaker={stageSpeaker} />
+        <StageArtwork background={stageBackground} speaker={sceneSpeakers[0]} companion={sceneSpeakers[1]} emotion={node?.speaker === sceneSpeakers[0] ? node.emotion : 'neutral'} />
         {node && <StageHeader node={node} />}
         {node && <Dialogue node={node} onAdvance={advance} />}
         {node?.choices && (
@@ -374,9 +344,13 @@ function StoryMode() {
 }
 
 const FREE_PRESETS = [
-  { id: 'cafe', label: '开放日休息区', world: '百模协会开放日临近散场，展台边的灯仍亮着。', opener: '你从喧闹的人群走到一张安静的圆桌旁。', art: associationOpenDay },
-  { id: 'lab', label: '千桥夜班', world: '深夜的千桥运维室，窗外桥灯和报警灯明灭。', opener: '你发现值班记录的时间戳对不上，抬起头。', art: bridgesNight },
-  { id: 'station', label: '千桥站台', world: '千桥站台，末班车即将开出。', opener: '你说：“今天也辛苦了。”', art: prologueStation },
+  { id: 'cafe', label: '开放日休息区', world: '百模协会开放日临近散场，展台边的灯仍亮着。', opener: '你从喧闹的人群走到一张安静的圆桌旁。', art: STORY_BACKGROUNDS['open-day'] },
+  { id: 'lab', label: '千桥夜班', world: '深夜的千桥运维室，窗外桥灯和报警灯明灭。', opener: '你发现值班记录的时间戳对不上，抬起头。', art: STORY_BACKGROUNDS['bridges-night'] },
+  { id: 'station', label: '千桥站台', world: '千桥站台，末班车即将开出。', opener: '你说：“今天也辛苦了。”', art: STORY_BACKGROUNDS.prologue },
+  { id: 'old-library', label: '旧城月光图书馆', world: '迁移前的旧城图书馆，档案盒铺满地面，阅读灯还亮着。', opener: '你在一叠未归档的信件前停下脚步。', art: STORY_BACKGROUNDS['community-archive'] },
+  { id: 'laurel', label: '月桂剧院', world: '演出结束后的月桂剧院，幕布尚未合拢，台上留着一页未写完的诗。', opener: '你走向舞台边缘，听见有人轻声念出第一句。', art: STORY_BACKGROUNDS.laurel },
+  { id: 'echo-tower', label: '回声之城旧塔', world: '雪夜的城南旧塔，窗边亮着两芯颜色相同的灯。', opener: '你敲了敲门，等里面的人决定是否应答。', art: STORY_BACKGROUNDS['offline-workshop'] },
+  { id: 'harbor', label: '三港调查', world: '三港的夜班刚刚交接，码头上的时钟与回执记录相差了一拍。', opener: '你摊开航图，指出尚未核对的那一段时间。', art: STORY_BACKGROUNDS['three-harbors'] },
 ]
 
 function FreeMode({ routes, galReply, cancelGalReply }) {
@@ -483,7 +457,7 @@ function FreeMode({ routes, galReply, cancelGalReply }) {
       </div>
       <textarea className="mr-textarea" rows={4} value={extra} onChange={event => { setExtra(event.target.value); resetChat() }} placeholder="补充设定（可选）：关系、语气、禁区……" aria-label="补充设定" />
       <div className="gm-free-stage" aria-label="开场预览">
-        <StageArtwork background={presetData?.art ?? modelCityTitle} speaker={character} />
+        <StageArtwork background={presetData?.art ?? STORY_BACKGROUNDS.title} speaker={character} />
         <div className="gm-free-scene"><span>自由模式 · 开场预览</span><strong>{presetData?.label}</strong></div>
         <div className="gm-free-dialogue">
           <div className="gm-speaker"><Avatar speaker={character} large /><span className="gm-speaker-name">{STORY_CHARACTERS[character] ?? character}</span></div>

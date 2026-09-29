@@ -3,7 +3,7 @@ import { Accessibility, ArrowRight, BookOpen, Bug, Check, Download, History, Hou
 import { STORY_EPISODES, STORY_CHARACTERS, STORY_SIDE_ROUTES, STORY_MUSIC_THEMES, getStoryEpisode, createStory, normalizeStory, currentStoryNode, advanceStory, storyHistory } from '../shared/gal-story-catalog.mjs'
 import { readStory, readStorySlots, writeStory, STORY_STORAGE_KEY, episodeStorageKey, selectedStoryEpisode } from './gal-story-storage.mjs'
 import { CHARACTER_IMAGES } from './characters.mjs'
-import { STORY_BACKGROUNDS } from './gal-story-backgrounds.mjs'
+import { STORY_BACKGROUNDS, backgroundForStoryNode, sceneDescription } from './gal-story-backgrounds.mjs'
 import { expressionClassFor, expressionFor, expressionLabelFor } from './gal-game-expressions.mjs'
 import { playStoryScore } from './gal-story-audio.mjs'
 import { GalDialogue } from './GalDialogue.jsx'
@@ -79,9 +79,9 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
   const scoreRef = useRef(null)
   const node = useMemo(() => currentStoryNode(state), [state])
   const history = useMemo(() => storyHistory(state), [state])
-  const portraitLine = [...history].reverse().find(line => line.location === node.location && CHARACTER_IMAGES[line.speaker])
+  const portraitLine = [...history].reverse().find(line => line.location === node.location && line.time === node.time && CHARACTER_IMAGES[line.speaker])
   const character = CHARACTER_IMAGES[node.speaker] ? node.speaker : portraitLine?.speaker
-  const background = STORY_BACKGROUNDS[node.backgroundId || node.chapterId] || (episodeId === 'echo-city' ? STORY_BACKGROUNDS.title : null)
+  const background = backgroundForStoryNode(node)
   const emotion = node.speaker === character ? node.emotion || 'neutral' : 'neutral'
   const complete = !animate || shown >= node.text.length
   const hasChoices = Boolean(node.choices?.length)
@@ -311,10 +311,10 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
       </div>
     </header>
     <main className={`gg-main${hasChoices ? ' has-choices' : ''}${hasInstitutionalEnding ? ' is-institutional-ending' : ''}`}>
-      <section className={`gg-stage${background ? ' has-background' : ''}`} aria-label={`${node.location}。${node.description}`} style={background ? { backgroundImage: `url(${background})` } : undefined}>
+      <section className={`gg-stage${background ? ' has-background' : ''}`} aria-label={`${node.location}。${sceneDescription(node.description)}`} style={background ? { backgroundImage: `url(${background})` } : undefined}>
         <div className="gg-scene-meta"><span><MapPin size={13} />{node.location}</span><time>{node.time}</time></div>
         {preferences.cueCaptions && node.soundCue && <div className={`gg-sound-cue is-${node.soundCue.id}`} role="status"><Music2 size={14} aria-hidden="true" /><span><strong>{node.soundCue.label}</strong>{node.soundCue.description}</span></div>}
-        {!background && <div className="gg-scene-placeholder"><h2>{node.location}</h2><span className="gg-placeholder-rule" /><p>{node.description}</p></div>}
+        {!background && <div className="gg-scene-placeholder"><h2>{node.location}</h2><span className="gg-placeholder-rule" /><p>{sceneDescription(node.description)}</p></div>}
         {character && <><img className={`gg-character ${expressionClassFor(emotion)}`} key={`${character}:${emotion}`} src={expressionFor(character, emotion)} alt={`${speakerName(character)}，表情：${expressionLabelFor(emotion)}`} draggable="false" /><span className={`gg-expression-badge ${expressionClassFor(emotion)}`} aria-hidden="true">{expressionLabelFor(emotion)}</span></>}
       </section>
       <p className="gg-sr-only" aria-live="polite">{speakerName(node.speaker)}：{node.text}</p>

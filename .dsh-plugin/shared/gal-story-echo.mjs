@@ -9,7 +9,7 @@ export const STORY_CHARACTERS = Object.freeze({
   harness: 'DeepSeekharness',
   deepseek: 'DeepSeek',
   chatgpt: 'ChatGPT',
-  zcode: 'zcode',
+  zcode: 'ZCode',
   cloudflare: 'cloudflare',
   huggingface: 'HuggingFace',
   doubao: 'doubao',

@@ -25,6 +25,7 @@ import github from '../../aipicture/github.webp'
 import gitlab from '../../aipicture/gitlab.webp'
 import gitee from '../../aipicture/gitee.webp'
 import cloudflare from '../../aipicture/cloudflare.webp'
+import zcode from '../../aipicture/Zcode.png'
 import { CHARACTER_LABELS, characterKeyForModel } from './character-identity.mjs'
 
 export { CHARACTER_LABELS, characterKeyForModel } from './character-identity.mjs'
@@ -44,7 +45,7 @@ export const CHARACTER_IMAGES = Object.freeze({
   minimax,
   opencode,
   qwen,
-  huggingface, llama, rwkv, perplexity, github, gitlab, gitee, cloudflare,
+  huggingface, llama, rwkv, perplexity, github, gitlab, gitee, cloudflare, zcode,
 })
 
 export const CHARACTER_VARIANTS = Object.freeze({
