@@ -64,4 +64,35 @@
 
 0.9.0 已发布到 [npm 0.9.0](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.9.0)，`next` 指向 0.9.0；`latest` 保持 0.4.32，不自动替换旧稳定版。其公开 registry 版本元数据为 0.9.0，`dist.shasum` 为 `117d189c31c03bb2195f2f429c5057fe6a25c460`，共 24 个文件。重新从 npm 下载 tarball 后，SHA-256 与本地安装包一致：`FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`。
 
-[GitHub v0.9.0 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0) 已创建并附上同名 `.tgz` 安装包；从 Release 重新下载的附件 SHA-256 同样一致。验证过的源码提交为 `f47355e2a242e0eead08060d13a9902cad023f67`，`v0.9.0` 指向该提交，`main` 已推送。包内 24 个文件已与该 Git 提交逐文件比较，字节全部相同。后续仅追加本发布记录，不改变 `v0.9.0` 的已发布源码和安装包。
+[GitHub v0.9.0 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0) 已创建并附上同名 `.tgz` 安装包；从 Release 重新下载的附件 SHA-256 同样一致。验证过的源码提交为 `f47355e2a242e0eead08060d13a9902cad023f67`，`v0.9.0` 指向该提交，`main` 已推送。包内 24 个文件已与该 Git 提交逐文件比较，字节全部相同。后续文档可在 `main` 上继续更新，`v0.9.0` 的已发布源码和安装包不改写。
+
+## README 图文与算法说明更新（2026-09-29）
+
+### 完成的工作
+
+- 重写英文 `README.md` 与中文 `README.zh.md`：先说明 0.9.0 的宿主兼容范围、插件用途和真实账号验收边界，再按“安装 → 配置 → 规划 → 显式执行 → Gal 模块”组织使用步骤。给出 npm 显式版本、GitHub Release `.tgz` 绝对路径和固定 Git 标签源码构建三种安装方式，说明 npm `next` 与 `latest` 的差别，并保留 0.8.0/0.4.32 历史版本对应关系。
+- 把代码实际采用的复杂度公式、质量门槛、不同难度权重、费用估算、Pareto 候选筛选和束宽 256 的有界组合搜索写入 README；解释这些值是规则、用户估值和预计 token，不是厂商保证的质量/报价或真实账单。使用测试用例原文和两条虚构路线逐项推导六工作包计划。
+- 加入 0.9.0 隔离运行时实拍工具面板、规划/执行流程图和质量门槛/Pareto 示意图；Gal 场景图明确标注为素材，避免把旧版界面图误当当前产品截图。
+- 更新 `INSTALLATION_GUIDE.zh.md`，同步当前已发布状态、安装入口、版本矩阵和验收步骤。
+
+### 文件说明
+
+| 文件 | 本轮作用 |
+| --- | --- |
+| `README.md`、`README.zh.md` | 英文/中文 GitHub 入口，图文说明、源码可复算的算法推导、版本安装方法和能力边界。 |
+| `INSTALLATION_GUIDE.zh.md` | Windows 插件管理器逐步安装、0.9.0/旧版宿主依赖对应关系、下载哈希与用户验证清单。 |
+| `docs/assets/routing-workflow.svg` | 区分本地规划与需显式触发的官方工具执行。 |
+| `docs/assets/candidate-pruning.svg` | 质量门槛和多维候选筛选的示意；图中点位不是实测模型数据。 |
+| `docs/assets/desktop-official-tools-0.9.0.png` | 0.9.0 在隔离 Desktop 0.2.0-rc.1 运行时中的官方工具卡片实拍。 |
+| `PROJECT-TASK-REPORT-2026-09-29.md` | 补记文档工作、验证、待测与后续思路。 |
+
+### 已核对与需要做的测试
+
+- 对照 `router.mjs`、`model-profiles.mjs`、`harness-plan.mjs` 和官方工具注册表核对公式、质量/成本字段、固定工具版本及执行边界。直接运行 `buildPlan` 的演示输入，返回复杂度 `0.705`、六个工作包、估价 `$0.125295`、全强模型基线 `$0.148085`、演示节省率 `15.39%`，与 README 相同。
+- 三份文档的本地图片与文件链接已检查；两张 SVG 已解析、渲染并目视核对，实机截图已核对为本轮隔离安装环境。`git diff --check` 已检查。本轮只改文档与素材，没有修改运行代码，也没有重新运行 70 项实现测试。
+- 推送后仍需在 GitHub 页面查看桌面与窄屏下的 Markdown、SVG 字体和图片加载；用户在自己的 Desktop 0.2.0-rc.1 中按 README 安装，核对侧边栏与后续真实账号验收。真实厂商 CLI/账单测试步骤仍以上文清单为准。
+
+### 尚未完成与处理思路
+
+- npm 0.9.0 已发布，其归档内仍是发布当时的 README；npm 版本不可覆盖。若需要 npm 页面也展示本轮新图文，下一版应先把文档素材纳入发布包、完成既定构建和兼容验证，再以新版本发布 npm 并创建对应 GitHub 标签与 Release；保留 0.9.0 历史。
+- 算法参数目前属于可解释启发式。真实质量/价格、实际输出 token 与 CLI 模型选择需用户按厂商记录校准；未来可在有可复现的任务样本和账单数据后调整权重，不以本轮演示数字作为效果承诺。

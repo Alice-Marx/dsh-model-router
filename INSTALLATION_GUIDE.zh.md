@@ -1,16 +1,56 @@
 # DeepSeek Harness Desktop 插件安装与验证
 
-适用官方桌面版 **0.2.0-rc.1**；候选版本为 **0.9.0**。原 0.8.0 的 DSH peer 依赖固定在 0.1.7-rc.2，不能在你当前桌面版安装。包名 `@ljwei-stak/model-router-galgame`。
+当前发布的 **0.9.0** 适配官方 DeepSeek Harness Desktop **0.2.0-rc.1**。npm 的 `next` 指向 0.9.0，而 `latest` 仍指向历史版 0.4.32；在插件管理器安装时务必填写完整版本号。包名为 `@ljwei-stak/model-router-galgame`。0.9.0 已发布到 [npm](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.9.0) 和 [GitHub v0.9.0 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0)。
 
-## 生成安装包
+## 版本与宿主对应关系
+
+| 插件版本 | 发布渠道 | 声明的 DeepSeek Harness 依赖 | 安装建议 |
+| --- | --- | --- | --- |
+| **0.9.0** | npm `next`、GitHub v0.9.0 预发布 | `0.2.0-rc.1` | 当前官方桌面版 0.2.0-rc.1 使用此版，并显式指定 `@0.9.0`。 |
+| 0.8.0 | 历史发布 | `0.1.7-rc.2` | 与桌面版 0.2.0-rc.1 不兼容。 |
+| 0.4.32 | npm `latest` | `@deepseek-ai/dsh-settings` 的 `^0.1.1-rc.1 || ^0.1.2-rc.1 || ^0.1.5-rc.1` | 历史版本；不适用于当前桌面版 0.2.0-rc.1。 |
+
+表中列的是包声明的兼容依赖，并非对所有旧桌面版本的实机验收。先在 DeepSeek Harness 的插件页确认宿主版本；不要只输入不带版本的包名，否则会按 npm `latest` 安装 0.4.32。
+
+## 安装 0.9.0
+
+以下方法均在官方桌面版的 **插件 → 添加插件** 中操作。安装完成后启用插件；若页面提示重启后生效，则重启 DeepSeek Harness。已装旧版本时，先在插件页禁用重复的旧实例，再安装指定版本。不要手工改动应用安装目录、`app.asar` 或 profile 文件。
+
+### 方法一：从 npm 安装（推荐）
+
+在“包名或地址”中完整填写：
+
+```text
+@ljwei-stak/model-router-galgame@0.9.0
+```
+
+“安装源”选择可以连通的 **npm 官方源**；若网络无法访问，可按插件管理器提示改选中国大陆镜像源，但镜像需要已同步 0.9.0。确认预览显示 **0.9.0** 且没有宿主依赖不兼容提示，再点“安装”。普通用户不需要在系统终端运行 `npm install -g`：全局安装 npm 包不会自动把插件加入当前 DeepSeek Harness profile。
+
+### 方法二：安装 GitHub Release 的固定安装包
+
+从 [GitHub v0.9.0 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0)下载 `ljwei-stak-model-router-galgame-0.9.0.tgz`，保存到你选择的目录。然后在“包名或地址”中填写**下载后文件的绝对路径**，例如：
+
+```text
+D:\Plugins\ljwei-stak-model-router-galgame-0.9.0.tgz
+```
+
+这里的 `D:\Plugins\` 只是示例，实际输入须与文件所在位置一致。官方插件管理器支持本地 `.tgz` 路径。发布包的 SHA-256 为 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`；需要核对下载文件时，可在 PowerShell 运行 `Get-FileHash -Algorithm SHA256 -LiteralPath "D:\Plugins\ljwei-stak-model-router-galgame-0.9.0.tgz"`（按实际路径替换）。
+
+### 方法三：从源码自行打包（开发者可选）
+
+在已安装 Node.js 22.19 或更新版本与 pnpm 的环境中，检出 `v0.9.0` 后执行：
 
 ```powershell
-Set-Location F:\everyAI\all\model-router-galgame
+git clone https://github.com/Alice-Marx/model-router-galgame.git
+Set-Location model-router-galgame
+git checkout v0.9.0
+pnpm install --frozen-lockfile
 npm run build:client
+New-Item -ItemType Directory -Force dist | Out-Null
 npm pack --pack-destination dist
 ```
 
-在官方 DeepSeek Harness Desktop 的**插件管理器**选择生成的 `ljwei-stak-model-router-galgame-0.9.0.tgz`，安装并启用。若从 npm 安装，在输入框填 `@ljwei-stak/model-router-galgame@0.9.0`，安装源选中国大陆镜像或可连接的 HTTPS npm 源。升级时仍使用官方插件管理器；不要手工替换应用安装目录、`app.asar` 或 profile 中的文件。
+随后按方法二，在插件管理器中填写生成的 `dist\ljwei-stak-model-router-galgame-0.9.0.tgz` **绝对路径**并安装。源码安装需能下载开发依赖；仅想使用插件时优先选择方法一或二。
 
 ## 配置与使用
 

@@ -1,32 +1,194 @@
-# Model Router Galgame · DeepSeek Harness 插件
+# Model Router Galgame · DeepSeek Harness 桌面插件
 
-面向官方 **DeepSeek Harness Desktop 0.2.0-rc.1**。0.8.0 的依赖版本与该桌面版不兼容，现已在 **0.9.0 候选版**修复。真实账号调用仍需账号持有人验收。npm 包名为 `@ljwei-stak/model-router-galgame`。仓库：[Alice-Marx/model-router-galgame](https://github.com/Alice-Marx/model-router-galgame)。
+[English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [v0.9.0 发布包](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0)
 
-## 功能
+**当前版本：0.9.0（npm `next` / GitHub 预发布） · 适配 DeepSeek Harness Desktop 0.2.0-rc.1。** 插件先分析问题，把复合任务拆成工作包，再在用户已配置的模型中权衡质量、预计费用和任务类型。用户明确调用执行工具时，插件才启动相应的官方 CLI。规划、工具安装状态与 Gal 剧情入口都在桌面侧边栏。
 
-- **模型路由**：只读取官方已配置的 provider/model，分析任务类型、复杂度和具体步骤；简单包优先比较低价与足够的质量，困难包优先质量与专长。复杂复合任务拆成有依赖、难度、推荐模型和验收项的工作包。生成计划只在本机计算，不发起模型调用。官方目录不提供价格或比较质量分，因此可在插件设置中为准确的 provider/model 填写自己的质量评分及美元每百万 token 单价。未填价格时显示“价格待配置”，不编造节省额。
-- **官方工具**：界面检测 Kimi Code、Claude Code、Codex、MiniMax Code、MiMo Code、Grok Build 与 ZCode。前六项按固定官方 npm 包和版本安装；MiniMax 在 Windows 上遇到 npm 原生依赖失败时，自动下载并校验固定哈希的官方安装脚本，将其 npm 版本选择锁定为 0.5.5，在 npm 全局前缀的 `.minimax-code` 目录完成安装并复核入口。已有的官方 Windows 安装器版本也能识别。ZCode 下载固定版本安装器，校验 SHA-256 与厂商签名后打开原厂安装窗口，由用户选择安装目录。安装状态、取消、日志与执行入口就绪状态分别显示。界面与 Host 均不接受任意包名或命令。
-- **模型可调用工具**：`model_router_routes`、`model_router_plan`、`model_router_consult`、`model_router_tools`、`model_router_tool_install`、`model_router_tool_run`、`model_router_team_execute`。人工命令有 `/router` 与 `/tools`。
-- **Gal 模块**：独立侧边栏分块。剧情模式复用原项目场景图和人物立绘，包含选项、历史、结局与三槽本地存档；自由模式可选官方已配置模型在插件面板内对话、停止当前生成，也可复制开场提示词到官方会话。插件不保存供应商凭据。
+> 0.8.0 的宿主依赖针对 0.1.7-rc.2，无法安装到 0.2.0-rc.1。**不要只填包名**：npm 的 `latest` 仍为旧版 0.4.32。当前桌面版请填 `@ljwei-stak/model-router-galgame@0.9.0`。
 
-`model_router_tool_run` 已接入七家官方工具的固定执行入口。Claude Code、Codex、MiMo Code 和 Grok Build 支持只读及可编辑模式；Kimi Code、MiniMax Code、ZCode 的无界面模式会自动处理工具权限，因此仅允许经审批的独立 Git 工作区可编辑执行。每次启动都经过 Harness 进程沙箱；Windows ACL 后端报告部分文件效果隔离。可编辑模式要求干净 Git 仓库，先在独立工作区执行，CLI 成功结束且原仓库仍干净时应用源文件补丁；被 Git 忽略的产物保留在独立工作区，结果标为 `integration-pending` 供核对。`model_router_team_execute` 按依赖顺序调用就绪的官方工具，单项失败立即停止。可在模型价格与能力配置中为每条路线设置 `cliModel`，供对应厂商 CLI 接收；临时 `cliModelsJson` 的工作包设置优先于工具设置，工具设置优先于保存的映射。未建立映射时 Claude/Codex 请求 Harness 模型 ID，其他工具使用自己的默认模型；ZCode 3.14.3 不支持逐次切换模型。多数 CLI 尚不回报可核验的实际模型 ID，执行结果会明示这一点，实际模型仍须核对厂商记录。预算估算不限制真实账号费用。
+![从任务分析到官方工具执行的流程](docs/assets/routing-workflow.svg)
 
-单独调用 `model_router_tool_run` 时，如已知道厂商 CLI 中配置的准确模型名，可同时给出官方目录中的 `provider`/`model` 路线与 `cliModel`；MiniMax/MiMo 的 `cliModel` 要用 `provider/model` 格式。ZCode 3.14.3 无法逐次切换模型。
+*图：浅色阶段在本地生成计划；“执行”需要用户在会话中明确调用工具。计划中的估价不是实际账单。*
 
-团队任务可按编号、分行、分号或完整动作句列出独立需求，插件最多生成六个有具体目标的执行包。`model_router_team_execute` 可选填 `cliModelsJson`，内容是按官方工具 ID 或工作包 ID 指定 CLI 已配置模型名的 JSON 对象。格式示例：`{"minimax-code":"minimax/your-configured-model"}`，实际调用时替换成 MiniMax CLI 中已配置的名称；工作包设置优先。插件在开始执行前核对模型名格式。
+## 目录
 
-**安装成功不等于账号可用。** 0.9.0 已对 0.2.0-rc.1 的依赖及关键 API 作兼容核对，并运行离线规划、CLI 模拟执行与隔离工作区测试；用户真实账号的逐家调用仍需验证。官方 Agent Teams 的成员生命周期仍由 Harness 管理；插件提供的 CLI 团队执行器是独立的顺序执行流程。
+- [安装与版本选择](#安装与版本选择)
+- [开始使用](#开始使用)
+- [路由算法：从输入到分配](#路由算法从输入到分配)
+- [官方工具与执行边界](#官方工具与执行边界)
+- [Gal 模块](#gal-模块)
+- [验证与开发](#验证与开发)
 
-## 本地安装
+## 安装与版本选择
 
-1. 在仓库执行 `npm run build:client` 和 `npm pack --pack-destination dist`。
-2. 通过官方桌面版**插件管理器**安装并启用生成的 `.tgz`。
-3. 在官方**模型**页配置供应商、模型和凭据。
-4. 左侧打开**模型路由**查看目录、规划与工具安装；打开**Gal 模块**游玩剧情或自由对话。
-5. 在官方会话调用 `model_router_consult` 获取跨模型意见，调用 `model_router_tool_run` 或 `model_router_team_execute` 进行受支持的 CLI 执行。可编辑任务要求干净 Git 仓库，并经过官方工具审批。
+| DeepSeek Harness Desktop / 宿主依赖 | 插件版本 | 安装说明 |
+| --- | --- | --- |
+| **0.2.0-rc.1** | **0.9.0** | 本轮适配并用该桌面安装件的运行时代码隔离安装验证；从 npm 指定 `@0.9.0`。 |
+| 0.1.7-rc.2 | 0.8.0 | 历史版本；其宿主 peer 与 0.2.0-rc.1 不兼容。 |
+| 声明的旧 `dsh-settings` 范围：`^0.1.1-rc.1 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` | 0.4.32（npm `latest`） | 旧版发布记录；不要凭 `latest` 给 0.2.0-rc.1 安装。 |
 
-所有插件更新都走官方插件管理器，不修改 DeepSeek Harness 安装目录或 `app.asar`。若工具版本已是目标版本、执行入口却未就绪，工具卡片提供“修复官方执行入口”，按固定官方来源重装。详见[安装指南](INSTALLATION_GUIDE.zh.md)和[总项目任务报告](PROJECT-TASK-REPORT-2026-09-29.md)。
+**方式 A：插件管理器从 npm 安装（推荐）**
 
-## 发布状态
+1. 打开 DeepSeek Harness Desktop → **插件** → **添加插件**。
+2. 输入 **`@ljwei-stak/model-router-galgame@0.9.0`**，安装源选择可连接的 HTTPS npm 源；国内镜像尚未同步时，改用 `https://registry.npmjs.org/`。
+3. 安装并启用后，左侧应出现 **“模型路由”** 和 **“Gal 模块”**。若仍提示宿主不兼容，核对桌面版和插件详情中显示的准确版本。
 
-0.9.0 为 0.2.0-rc.1 兼容候选版；实际包及验证状态见[安装指南](INSTALLATION_GUIDE.zh.md)与[最新总项目报告](PROJECT-TASK-REPORT-2026-09-29.md)。
+**方式 B：下载固定版本的安装包**
+
+从 [GitHub v0.9.0 Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0) 下载 `ljwei-stak-model-router-galgame-0.9.0.tgz`。在“添加插件”输入框填下载后文件的**绝对路径**，例如 `D:\Downloads\ljwei-stak-model-router-galgame-0.9.0.tgz`，再启用。也可直接填该 Release 附件的 HTTPS `.tgz` 地址。Windows 可先核对下载文件：
+
+```powershell
+(Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Downloads\ljwei-stak-model-router-galgame-0.9.0.tgz').Hash
+```
+
+0.9.0 包的 SHA-256 为 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`；npm 与 GitHub 重新下载的包已核对为相同字节。旧版不被覆盖或删除。`npm install -g` 只安装 npm 包，**不会**在当前 Harness profile 注册和启用插件；正常使用请走插件管理器。不要修改桌面安装目录或 `app.asar`。
+
+**方式 C：从经验证的源码构建**
+
+开发者安装 Node.js 22.19+ 与 pnpm 后，可检出固定标签 `v0.9.0`，在仓库根目录运行：
+
+```powershell
+git checkout v0.9.0
+pnpm install --frozen-lockfile
+npm run build:client
+New-Item -ItemType Directory -Force dist | Out-Null
+npm pack --pack-destination dist
+```
+
+随后通过插件管理器安装 `dist` 中生成的 `.tgz`。主分支可能继续更新；要复现 0.9.0，请使用固定标签。更多界面步骤与排障见[安装指南](INSTALLATION_GUIDE.zh.md)。
+
+## 开始使用
+
+1. 在宿主的**模型**页配置要用的供应商、模型和凭据。插件只从官方目录读取准确的 `provider/model` 路线，不替用户创建模型账号，也不另存 API Key。
+2. 打开**模型路由 → 逐模型价格与能力**。为准备比较的每条路线填写自己认可的质量评分（0–100）、输入/输出单价（USD / 百万 token）、擅长方向；有缓存价格时可另外填写。未知项可以留空，界面会说明估价缺失。
+3. 输入任务，先查看单任务或团队计划：复杂度、工作包目标与依赖、质量门槛、推荐路线、预计费用及 `official-cli` / `harness-llm` 渠道。规划本身**不会调用付费模型**。
+4. 在**官方工具**卡片上检测、一键下载安装或修复执行入口。工具就绪只说明安装与可信入口通过核验；首次登录、模型权限和真实费用仍要在对应厂商账号中验证。
+5. 在官方会话里明确使用 `model_router_consult` 获取另一模型意见，使用 `model_router_tool_run` 跑一个官方 CLI，或用 `model_router_team_execute` 按依赖顺序执行多个工作包。可编辑任务需要干净的测试 Git 仓库，并经过宿主的工具审批。
+
+![0.9.0 隔离安装后的桌面官方工具面板](docs/assets/desktop-official-tools-0.9.0.png)
+
+*图：0.9.0 使用 Desktop 0.2.0-rc.1 运行时代码的隔离 profile 实拍，展示“模型路由”“Gal 模块”入口与官方工具卡片；截图中的账号与安装状态仅属于验证环境。*
+
+## 路由算法：从输入到分配
+
+路由器是**可复查的规则和有界搜索**，不把模型自称的能力、未经配置的价格当作测量结果。实现位于 [`router.mjs`](.dsh-plugin/shared/router.mjs)、[`harness-plan.mjs`](.dsh-plugin/shared/harness-plan.mjs) 和 [`model-profiles.mjs`](.dsh-plugin/shared/model-profiles.mjs)。
+
+### 1. 判断复杂度并拆任务
+
+令 `clip(x)=min(1,max(0,x))`。对任务文本计算：
+
+```text
+C = clip(
+  0.10
+  + 0.30·clip(字符数 / 2200)
+  + 0.18·clip(列表项数 / 8)
+  + 0.28·clip(领域词命中数 / 5)
+  + [含代码/工程词 ? 0.22 : 0]
+  + [含高推理词 ? 0.20 : 0]
+  + [含图像词 ? 0.12 : 0]
+)
+```
+
+在没有特殊关键词覆盖时，`C < 0.34` 为简单，`0.34 ≤ C < 0.66` 为均衡，其余为复杂。明确的高风险/高难要求可直接判复杂；短小的翻译、摘要、提取等变换请求可直接判简单；识别出的复合需求也会提高到复杂。该值只衡量文本特征，**不等于真实难度测量**。
+
+复合任务从可执行的列表、逐行指令或动作子句中提取需求，避开代码块和作为摘要材料的清单。复杂计划形成“问题分析 → 具体执行包 → 必要验证 → 结果整合”的依赖图；显式执行包最多六个，超出会合并且保留原文。每个包重新评定难度，因而总任务复杂也可以含有便宜模型胜任的简单包。
+
+### 2. 设质量下限，再比较效用
+
+简单、均衡、复杂工作包的基础质量下限分别为 `0.75`、`0.78`、`0.82`。复杂包再按 `clip(0.82 + 0.12·max(0,关键程度 - 0.65))` 提高下限，复杂整合包至少 `0.84`。界面填写的质量分会除以 100 参与计算。算法先筛过下限的路线；全部不达标时标记**约束放宽**，而不是声称已经满足质量要求。
+
+候选的效用由任务难度对应的权重计算：
+
+```text
+U = wq·质量 + wc·成本得分 + wl·(1 - 延迟估值)
+  + ws·专长匹配 + wr·推理匹配 - wx·风险估值
+  - 关键程度·max(0, 质量下限 - 质量)
+```
+
+| 工作包 | 质量 `wq` | 成本 `wc` | 延迟 `wl` | 专长 `ws` | 推理 `wr` | 风险 `wx` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 简单 | 0.28 | **0.45** | 0.14 | 0.04 | 0.07 | 0.02 |
+| 均衡 | 0.40 | 0.26 | 0.10 | 0.09 | 0.10 | 0.05 |
+| 复杂 | **0.48** | 0.14 | 0.06 | 0.14 | 0.11 | 0.07 |
+| 整合 | **0.58** | 0.08 | 0.04 | 0.08 | 0.16 | 0.06 |
+
+缓存读/写比例为 `r`、`w` 时，有效输入价 `p_eff=(1-r-w)·p_in+r·p_read+w·p_write`。设 `M=max(1,max候选(p_eff+p_out))`，推理档位的输出倍率为 `m_out`，则成本得分为 `clip((1-(p_eff+p_out)/(2M))/sqrt(m_out))`。它是**排序分数，不是美元费用**；缺价时内部打分为 0，但公开费用仍显示未知。由此，简单包重视成本，复杂包重视质量和专长。图像包还要经过输入能力筛选；没有合适路线时明确报无法分配。
+
+![质量门槛与候选筛选示意](docs/assets/candidate-pruning.svg)
+
+*图为算法示意，点位不是厂商实测。实际 Pareto 筛选还同时考虑延迟、专长、推理匹配与风险。*
+
+### 3. 估算费用和搜索组合
+
+文本长度先近似成输入 token：`T_in=max(80,ceil(字符数/3.7))`。分析、执行、验证、整合各阶段再按源码中的倍率调整输入与输出 token，推理档位也影响输出估算。给定用户填写的 USD / 百万 token 价格：
+
+```text
+预计费用 USD =
+  ((普通输入token × 输入单价)
+ + (缓存读取token × 缓存读取单价)
+ + (缓存写入token × 缓存写入单价)
+ + (预计输出token × 输出单价)) / 1,000,000
+```
+
+未填价格或货币不是 USD 时，这一路线的费用保持**未知**，不会写成 0 或虚构节省比例。算法逐包做质量筛选和多维 Pareto 筛选，每包最多保留 12 个候选，再以束宽 256 搜索依赖图；跨依赖换路线有交接惩罚。若给定预算，先找估价可行方案；找不到时返回低成本方案并标明预算超出。这个有界启发式**不保证全局最优**；预算也不是厂商账户的硬支出上限。
+
+### 4. 一个可以复算的演示
+
+假设用户**自己**在官方目录中配置两条虚构路线，且两者都可用：
+
+| 路线 | 自报质量 | 输入价 / 输出价（USD / 百万 token） | 擅长 |
+| --- | ---: | ---: | --- |
+| `cheap-provider/Flash Custom` | 79/100 | 0.10 / 0.20 | 摘要与提取 |
+| `strong-provider/Reasoning Custom` | 97/100 | 5 / 25 | 推理与代码 |
+
+输入下面的测试用例原文，规则得出 `C≈0.705`，形成六个工作包：
+
+```text
+请处理项目。
+- 请提取关键词
+- 请设计复杂系统架构
+- 最后验证架构安全性
+```
+
+关键词提取包是简单任务，下限 `0.75`，两模型都达标。只看该包，在默认缓存比例 0 的演示条件下，成本得分约为 Flash `0.995`、Reasoning `0.5`；带入简单任务权重，效用约为 `0.81345` 与 `0.6163`，因此推荐 Flash。架构设计和安全验证包给强模型。
+
+该提取包预计输入 96、输出 900 token，于是 Flash 的估价为 `(96×0.10+900×0.20)/1,000,000 = $0.0001896`。六包计划的源码示例估价约 **$0.125295**；若六包都选各包最高质量路线，估价约 **$0.148085**；演示节省率约 **15.39%**。这些数字只来自假设价格、假设质量和 token 估算，**不是两家真实产品报价，也不是已经发生的节省**。实际输出量、重试、缓存和厂商计费可能改变账单。
+
+## 官方工具与执行边界
+
+| 工具 | 本版固定目标版本 | 安装与可编辑执行 |
+| --- | --- | --- |
+| Kimi Code | 2.1.1 | 固定官方 npm 包；无界面模式只允许经审批的独立 Git 工作区可编辑任务。 |
+| Claude Code | 2.1.283 | 固定官方 npm 包；支持只读及可编辑模式。 |
+| Codex CLI | 0.157.1 | 固定官方 npm 包；支持只读及可编辑模式。 |
+| MiniMax Code | 0.5.5 | 固定官方 npm 包；Windows 原生依赖安装失败时使用已核验脚本兜底；只允许经审批的独立 Git 工作区可编辑任务。 |
+| MiMo Code | 0.1.15 | 固定官方 npm 包；支持只读及可编辑模式。 |
+| Grok Build | 1.0.41 | 固定官方 npm 包；支持只读及可编辑模式。 |
+| ZCode | 3.14.3 | 固定、校验哈希和签名的 Windows 安装器；用户在原厂窗口选目录；只允许经审批的独立 Git 工作区可编辑任务。 |
+
+插件界面只能请求注册表内的工具 ID，不能传入任意 npm 包名或 shell 命令。下载后还会核验版本和可信执行入口；仅显示版本号但入口不可信时，卡片提供“修复官方执行入口”。MiniMax 已由官方 Windows 安装器管理的 0.5.5 版本也可识别。若 npm 全局前缀在 C 盘，CLI 安装可能占用 C 盘；请先按自己的空间规划调整此前缀。
+
+`model_router_tool_run` 用于单工具调用；`model_router_team_execute` 为**插件自有的顺序 CLI 团队执行器**：按依赖运行，失败或回报模型不匹配即停。可编辑工作先在独立 Git worktree 执行，并在原仓库保持干净时整合；被 Git 忽略的输出需单独检查。官方 Harness Agent Teams 的成员生命周期与成员模型仍由宿主管理。
+
+Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设置可填写 `cliModel`；团队执行时临时的“工作包映射 > 工具映射 > 保存映射”。ZCode 3.14.3 不能逐次切换模型。多数 CLI 不回报可核验的实际模型 ID，执行后要对照厂商运行记录、权限和账单。Windows Harness 沙箱的 ACL 文件效果报告为部分隔离，涉及敏感仓库时应先用测试环境验证。
+
+## Gal 模块
+
+![《千桥协议》的剧情场景素材](aipicture/story-backgrounds/model-city-title.webp)
+
+*图：《千桥协议》剧情场景美术素材，非 0.9.0 桌面界面截图。*
+
+侧边栏中的 **Gal 模块**与模型路由平级：
+
+- **剧情模式**：插画场景、人物立绘、分支选择、历史回看、结局与三槽本地存档；剧情引擎可离线运行。
+- **自由模式**：选择宿主已配置的模型、角色与场景，在面板内发送消息、停止生成，也可复制开场提示词到官方会话。面板内对话会真实调用模型并可能计费。
+
+剧情存档是本机数据；自由模式沿用官方模型设置，插件不另存厂商密钥。玩法背景见 [Gal 预览说明](GAL_GAME_PREVIEW.md)。
+
+## 验证与开发
+
+0.9.0 已通过 **70 项自动测试**，并在使用 Desktop 0.2.0-rc.1 安装件运行时代码的隔离 profile 中，从发布 `.tgz` 安装并打开两个侧边栏模块；npm 与 GitHub 附件哈希一致。Kimi、MiniMax、MiMo、Grok 等做过固定版本入口/安装链路的本机验证。**尚未以用户真实账号完成七家 CLI 的付费任务与账单核对**，也未证明所有厂商会回报实际模型 ID。安装后请先用测试仓库和小任务逐家核对，再跑多步骤团队任务。
+
+开发者可运行 `pnpm install --frozen-lockfile`、`npm test`、`npm run check:client` 和 `pnpm peers check`。本轮文件职责、详细验证、用户需要做的测试和剩余任务见[总项目任务报告](PROJECT-TASK-REPORT-2026-09-29.md)。欢迎通过 [Issues](https://github.com/Alice-Marx/model-router-galgame/issues) 附插件安装详情、宿主版本和脱敏后的错误日志反馈问题。
+
+许可证：[MIT](LICENSE)。

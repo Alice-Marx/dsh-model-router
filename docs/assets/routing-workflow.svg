@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 835" role="img" aria-labelledby="title description">
+  <title id="title">Model Router Galgame 的任务规划与执行流程</title>
+  <desc id="description">插件读取用户任务、DeepSeek Harness 已配置的模型目录和用户填写的模型画像，在本地识别复杂度、拆分工作包、按质量约束与 Pareto 候选筛选，最后使用有界组合搜索生成建议。官方工具执行需要在会话中另行触发。</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5f8ff"/>
+      <stop offset="1" stop-color="#eef6f5"/>
+    </linearGradient>
+    <linearGradient id="plan" x2="1" y2="0">
+      <stop offset="0" stop-color="#e4edff"/>
+      <stop offset="1" stop-color="#e5f4ef"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#6385aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #1e314d; }
+      .heading { font-size: 35px; font-weight: 730; }
+      .subheading { font-size: 19px; fill: #59718d; }
+      .eyebrow { font-size: 17px; font-weight: 700; fill: #355da7; letter-spacing: 2px; }
+      .card-title { font-size: 24px; font-weight: 700; }
+      .card-copy { font-size: 19px; fill: #53667f; }
+      .small { font-size: 17px; fill: #5a6f86; }
+      .stage-number { font-size: 18px; font-weight: 750; fill: #fff; }
+      .link { fill: none; stroke: #7c9bb9; stroke-width: 3; marker-end: url(#arrow); }
+      .divider { fill: none; stroke: #bdccdc; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="835" rx="24" fill="url(#background)"/>
+  <text x="52" y="66" class="heading">一个任务如何变成可执行工作包</text>
+  <text x="52" y="103" class="subheading">0.9.0 实现路径 · 规划在本地完成 · 执行须在官方会话中显式调用</text>
+
+  <text x="53" y="154" class="eyebrow">输入</text>
+  <rect x="51" y="174" width="425" height="105" rx="17" fill="#fff" stroke="#d7e3ef" stroke-width="2"/>
+  <circle cx="83" cy="210" r="10" fill="#5e7fda"/>
+  <text x="108" y="218" class="card-title">用户任务</text>
+  <text x="83" y="252" class="card-copy">问题描述、显式步骤、建议预算</text>
+
+  <rect x="507" y="174" width="425" height="105" rx="17" fill="#fff" stroke="#d7e3ef" stroke-width="2"/>
+  <circle cx="539" cy="210" r="10" fill="#38a993"/>
+  <text x="564" y="218" class="card-title">官方模型目录</text>
+  <text x="539" y="252" class="card-copy">已配置的 provider / model 路线</text>
+
+  <rect x="963" y="174" width="425" height="105" rx="17" fill="#fff" stroke="#d7e3ef" stroke-width="2"/>
+  <circle cx="995" cy="210" r="10" fill="#e0a047"/>
+  <text x="1020" y="218" class="card-title">用户提供的模型画像</text>
+  <text x="995" y="252" class="card-copy">质量、单价、专长、CLI 模型名</text>
+
+  <path d="M263 279 V303 H720 M720 279 V303 M1176 279 V303 H720 V329" class="divider"/>
+  <text x="52" y="351" class="eyebrow">本地规划</text>
+
+  <rect x="51" y="372" width="313" height="134" rx="17" fill="#fff" stroke="#cdddee" stroke-width="2"/>
+  <circle cx="84" cy="406" r="18" fill="#5477cf"/>
+  <text x="84" y="412" class="stage-number" text-anchor="middle">1</text>
+  <text x="113" y="414" class="card-title">识别难度</text>
+  <text x="77" y="453" class="card-copy">任务类型与复杂度分级</text>
+  <text x="77" y="481" class="small">简单 / 中等 / 复杂</text>
+
+  <path d="M366 439 H390" class="link"/>
+  <rect x="392" y="372" width="313" height="134" rx="17" fill="#fff" stroke="#cdddee" stroke-width="2"/>
+  <circle cx="425" cy="406" r="18" fill="#5477cf"/>
+  <text x="425" y="412" class="stage-number" text-anchor="middle">2</text>
+  <text x="454" y="414" class="card-title">拆分工作包</text>
+  <text x="418" y="453" class="card-copy">目标、难度与依赖关系</text>
+  <text x="418" y="481" class="small">分析 → 执行 → 校验与整合</text>
+
+  <path d="M707 439 H731" class="link"/>
+  <rect x="733" y="372" width="313" height="134" rx="17" fill="#fff" stroke="#cdddee" stroke-width="2"/>
+  <circle cx="766" cy="406" r="18" fill="#5477cf"/>
+  <text x="766" y="412" class="stage-number" text-anchor="middle">3</text>
+  <text x="795" y="414" class="card-title">筛选模型</text>
+  <text x="759" y="453" class="card-copy">质量门槛、任务能力</text>
+  <text x="759" y="481" class="small">Pareto 候选剪枝</text>
+
+  <path d="M1048 439 H1072" class="link"/>
+  <rect x="1074" y="372" width="313" height="134" rx="17" fill="#fff" stroke="#cdddee" stroke-width="2"/>
+  <circle cx="1107" cy="406" r="18" fill="#5477cf"/>
+  <text x="1107" y="412" class="stage-number" text-anchor="middle">4</text>
+  <text x="1136" y="414" class="card-title">全局分配</text>
+  <text x="1100" y="453" class="card-copy">预算与交接代价约束</text>
+  <text x="1100" y="481" class="small">有界组合搜索</text>
+
+  <path d="M1230 506 V528 H720 V548" class="link"/>
+  <rect x="51" y="551" width="1336" height="91" rx="17" fill="url(#plan)" stroke="#8daccd" stroke-width="2"/>
+  <text x="77" y="587" class="card-title">路由计划</text>
+  <text x="77" y="619" class="card-copy">每包推荐模型、推理等级、估算成本、依赖和验收项；缺失单价或质量证据时明确提示</text>
+
+  <path d="M720 642 V680" class="link" stroke-dasharray="8 6"/>
+  <text x="749" y="671" class="small">会话中显式触发</text>
+  <rect x="51" y="685" width="1336" height="88" rx="17" fill="#fff" stroke="#83b9a8" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="77" y="721" class="card-title">可选：调用官方工具执行</text>
+  <text x="77" y="753" class="card-copy">Host 审批 → 已核验的官方 CLI → 独立 Git 工作区 → 按依赖顺序整合结果</text>
+
+  <text x="53" y="812" class="small">预算只影响规划建议，不是实际扣费上限；实际调用模型需核对厂商记录。</text>
+</svg>
