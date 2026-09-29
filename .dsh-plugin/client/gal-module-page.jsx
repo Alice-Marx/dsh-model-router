@@ -17,6 +17,9 @@ import {
   advanceStory,
   storyHistory,
   normalizeStory,
+  switchStoryChapter,
+  storyChapterStates,
+  storyAffinityPanel,
 } from '../shared/gal-story-catalog.mjs'
 import {
   STORY_STORAGE_KEY,
@@ -155,6 +158,15 @@ function Dialogue({ node, onAdvance }) {
   )
 }
 
+/** 章节下拉的锁/完成装饰；仅 echo-chronicle 提供锁定语义。 */
+function chapterStatesFor(episodeId, story, episode) {
+  const states = storyChapterStates(story)
+  if (episodeId === 'echo-chronicle' && states.length > 0) {
+    return states.map(state => ({ chapter: { id: state.id, title: state.title }, locked: state.locked === true, completed: state.completed === true, unlockHint: state.unlockHint }))
+  }
+  return (episode?.chapters ?? []).map(chapter => ({ chapter, locked: false, completed: false, unlockHint: null }))
+}
+
 function StoryMode() {
   const storage = React.useMemo(() => {
     try { return typeof window !== 'undefined' ? window.localStorage : null }
@@ -170,6 +182,8 @@ function StoryMode() {
   })
   const [error, setError] = React.useState('')
   const [showHistory, setShowHistory] = React.useState(false)
+  const [showAffinity, setShowAffinity] = React.useState(false)
+  const [nameDraft, setNameDraft] = React.useState('')
   const [slots, setSlots] = React.useState(() => {
     try { return readStorySlots(storage, storySlotsKey(STORY_STORAGE_KEY, episodeId), episodeId) } catch { return [null, null, null] }
   })
@@ -242,6 +256,16 @@ function StoryMode() {
     return visible
   }, [story, node])
   const stageBackground = backgroundForStoryNode(node)
+  const affinity = React.useMemo(() => {
+    if (!showAffinity || episodeId !== 'echo-chronicle') return []
+    try { return storyAffinityPanel(story) } catch { return [] }
+  }, [story, showAffinity, episodeId])
+
+  // 命名之夜：文本输入节点（echo-chronicle 专属）。
+  const submitName = () => {
+    advance(`__input__:${nameDraft.trim()}`)
+    setNameDraft('')
+  }
 
   return (
     <div className="gm-story">
@@ -258,14 +282,27 @@ function StoryMode() {
               setError('')
               try {
                 const chapterId = event.target.value
+                if (switchStoryChapter(story, chapterId) !== null) {
+                  persist(switchStoryChapter(story, chapterId))
+                  return
+                }
                 const routeId = chapterId === 'side-routes' ? STORY_SIDE_ROUTES[0]?.id : null
                 persist(createStory(episodeId, { chapterId, routeId }))
               } catch (chapterError) { setError(chapterError.message) }
             }}
             aria-label="选择章节"
           >
-            {episode.chapters.map(chapter => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}
+            {chapterStatesFor(episodeId, story, episode).map(({ chapter, locked, completed, unlockHint }) => (
+              <option key={chapter.id} value={chapter.id} disabled={locked}>
+                {locked ? '🔒 ' : ''}{completed && !locked ? '✓ ' : ''}{chapter.title}{locked && unlockHint ? '（未解锁）' : ''}
+              </option>
+            ))}
           </select>
+        )}
+        {episodeId === 'echo-chronicle' && (
+          <button className="mr-button mr-button-secondary" type="button" onClick={() => setShowAffinity(value => !value)}>
+            {showAffinity ? '收起好感度' : '好感度'}
+          </button>
         )}
         {episodeId === 'bridges' && story?.chapterId === 'side-routes' && (
           <select
@@ -290,6 +327,20 @@ function StoryMode() {
         <StageArtwork background={stageBackground} speaker={sceneSpeakers[0]} companion={sceneSpeakers[1]} emotion={node?.speaker === sceneSpeakers[0] ? node.emotion : 'neutral'} />
         {node && <StageHeader node={node} />}
         {node && <Dialogue node={node} onAdvance={advance} />}
+        {node?.input && (
+          <div className="gm-choices gm-input-row" role="group" aria-label="输入">
+            <input
+              className="mr-input"
+              value={nameDraft}
+              maxLength={12}
+              placeholder={node.input.placeholder ?? '请输入…'}
+              aria-label={node.input.placeholder ?? '输入'}
+              onChange={event => setNameDraft(event.target.value)}
+              onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); submitName() } }}
+            />
+            <button className="mr-button" type="button" onClick={submitName}>就用这个名字</button>
+          </div>
+        )}
         {node?.choices && (
           <div className="gm-choices" role="group" aria-label="剧情选项">
             {node.choices.map(choice => (
@@ -313,6 +364,18 @@ function StoryMode() {
         )}
         {!node && <div className="mr-empty">剧情引擎无法读取当前存档，请重新开始。</div>}
       </div>
+
+      {showAffinity && affinity.length > 0 && (
+        <div className="gm-affinity" role="group" aria-label="好感度">
+          {affinity.map(item => (
+            <span key={item.key} className="gm-affinity-item">
+              <strong>{item.label}</strong>
+              <span className={item.value >= 0 ? 'gm-affinity-plus' : 'gm-affinity-minus'}>{item.value >= 0 ? `+${item.value}` : item.value}</span>
+            </span>
+          ))}
+          <span className="mr-caption">好感度由本章选择累积；跨章节保留。</span>
+        </div>
+      )}
 
       {showHistory && (
         <div className="gm-history" role="log" aria-label="剧情历史">

@@ -10,9 +10,9 @@ export const episodeStorageKey = (baseKey, episodeId) => {
 
 // The first two episodes originally shared three manual slots. Keep that key
 // readable and reserve independent slots for the new story.
-export const storySlotsKey = (baseKey, episodeId) => episodeId === 'echo-city'
-  ? episodeStorageKey(baseKey, episodeId)
-  : baseKey
+export const storySlotsKey = (baseKey, episodeId) => ['legacy', 'bridges'].includes(episodeId)
+  ? baseKey
+  : episodeStorageKey(baseKey, episodeId)
 
 export function selectedStoryEpisode(storage, baseKey = STORY_STORAGE_KEY) {
   const selected = storage?.getItem(`${baseKey}:episode`)

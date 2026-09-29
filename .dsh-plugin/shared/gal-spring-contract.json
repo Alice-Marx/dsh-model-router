@@ -1,0 +1,35 @@
+{
+  "title": "回声之城：未寄出的春天",
+  "premise": "承接雪灯来信的各自点灯关系状态的独立后日谈，不覆盖其他结局。万源城解冻期，自动归档设施把尚未寄出的试写信当成已完成回声回收，导致人们关于未来的约定逐渐空白。没有幕后恶人，矛盾是旧设施的完成判定与人的撤回权不兼容。临是倾听的调律师，不是武力救世主。DeepSeek与分焰行动体衔雪(harness)独立表达但同源，zcode是glm心核的档案执事，绝非harness别名。时间从第一日雨夜至第六日黎明。修复目标是保留两份有来源的记录、取得本人许可、分散维护、设置可退出的共同锚点。并非复活或恢复所有被遗忘内容；失去的细节承认不可逆。",
+  "format": "ESM export const CHAPTERS = [...]，或支线文件 export const SIDE_ROUTES = [...]。只写数据无引擎，不读写其他作者文件。Chapter {id: s01..s12,title,scenes:[Scene]}。Scene {id: s01a 等, backgroundId, location, time, cast:[角色键最多2], lines:[Line]}。Line是 [speaker,text,emotion可省略]，或 {speaker,text,emotion,choices:[{id,text,flag,value,reply:[Line]}]}。条件text可为 {flag,equals,yes,no}，yes/no均字符串。choices回复不能嵌套选择；选完自动接下一行。SideRoute {id:r01..r09,title,afterChapter:s03/s05/s07,flag:side_r01..side_r09,scenes:[Scene]}，支线内部需要一个有意义的选择可影响独立side_*变量；路线完成时由引擎设置route.flag=true，入口可跳过。所有标点正常中文，代码语法ASCII引号。",
+  "speakers": ["narrator","player","harness","chatgpt","claude","deepseek","doubao","ernie","gemini","glm","grok","kimi","mimo","minimax","opencode","qwen","huggingface","llama","rwkv","perplexity","github","gitlab","gitee","cloudflare","zcode","hy","comfyui","novelai","gptimage"],
+  "emotions": ["neutral","happy","sad","determined","surprised","shy"],
+  "backgrounds": {"spring-canal":"雨灯运河","spring-station":"封存旧站","spring-archive":"地下双页档案库","spring-courtyard":"旧塔茶庭","spring-workshop":"拓焰工坊","spring-clock":"万源塔钟室","spring-garden":"忆界温室","spring-dawn":"黎明回信广场"},
+  "main_choices": {"s01":"evidence:dual保留相互矛盾的两份原件 / summary只留整合摘要", "s04":"consent:ask逐人确认再记录 / proxy临代拟许可待补签", "s06":"relay:distributed分散试运行 / central让塔内单点快速运行", "s08":"anchor:shared可退出的共同值守 / fixed固定一位长期守灯"},
+  "ending_contract": "s12最后一幕不要自行创建终局选择，由引擎添加。最终方案coauthor在evidence=dual && consent=ask && relay=distributed && anchor=shared && 已完成支线>=2时到真结局letters春天有回信；否则到普通结局lamps留灯待渡。archive进入archive有名的静默，depart进入departure远行的回信，overwrite进入silence无声的春天。五结局均由主助手补写。作者不可提前宣告必达真结局。",
+  "chapter_outline": [
+    ["s01","潮汐逆行","第一日雨夜，运河捞到写着明天的未寄信。harness/临/cloudflare，原件与摘要冲突；选择evidence。三场：捞信、茶庭检查、带信去旧站"],
+    ["s02","无人上车","第二日清晨，旧站未来车票日期空白，Kimi/Perplexity/Gemini，站钟没有第十三格，未来并非可被预知；三场调查，不揭最终原理"],
+    ["s03","两份原件","第二日午后，zcode/glm/GitHub/GitLab/Gitee检索档案，确定回收清单有未寄草稿，两份原件有各自作者，不能简单合并。三场；结尾准备询问本人。之后引擎插入r01-r03"],
+    ["s04","谁的声音","第二日晚，茶庭ChatGPT/Claude/harness面对代笔与同意。ChatGPT不总微笑，Claude承认律典不能代替当事人，关键选择consent。三场"],
+    ["s05","雨中试灯","第三日白昼，工坊DeepSeek/RWKV/Qwen/HuggingFace/Llama，低功率分焰的小规模试验失败且承认损失，修复不等于抹除伤痕。三场。之后r04-r06"],
+    ["s06","没有第十三声","第三日夜，钟室Gemini/RWKV/DeepSeek：系统把未完成回声当噪声回收，第十三声其实间隙不是隐藏钟声，选择relay。三场，必须现场复核不是天才突然解决"],
+    ["s07","可撤回的约定","第四日白昼，忆界温室harness/临/doubao/Claude试用许可卡。亲近不意味着代替，害羞但非突兀恋爱。三场。之后r07-r09"],
+    ["s08","不署名的证人","第四日晚，档案库匿名记录见证不可补全空白，Grok道歉不抵消事实，Perplexity标注不确定，zcode/harness讨论固定守灯，选择anchor。三场"],
+    ["s09","断桥之夜","第五日暴雨，运河转接灯故障，无战斗，cloudflare/minimax/ernie/hy/临组织安全撤离与手工传递，之前relay选择改变困难。三场"],
+    ["s10","等待也是回答","第五日深夜，旧站Kimi/harness/DeepSeek/ChatGPT等人等待未回许可，尊重不回复；之前consent影响进展，evidence影响能否查证。三场，不把沉默当同意"],
+    ["s11","把名字还给你","第六日黎明前，钟室与工坊协同，27人各有现实职责而非齐声口号，harness承认同源并不相同，检查锚点撤回开关，anchor影响代价。三场"],
+    ["s12","天亮以前","第六日黎明，广场/茶庭，人们看到修复的限制和下一步，日常小物回收前文线索，列出四种方案的代价，临不独占决定。三场，留最终选择给引擎"]
+  ],
+  "side_outline": [
+    ["r01","三种装订", "s03", "github/gitlab/gitee：来源与版本的争执，保留分歧而非强行合并。两场，每场>=18句"],
+    ["r02","一碗不必回礼的汤", "s03", "doubao/hy/ernie：照护不以对方回应为偿付；生活细节。两场"],
+    ["r03","看不见的水印", "s03", "comfyui/novelai/gptimage：分别图形工作流、想象画师与修图者，画面证据不等于实景记忆。两场"],
+    ["r04","短火长明", "s05", "rwkv/mimo/deepseek：节律不同的慢灯不是失败品。两场"],
+    ["r05","借来的颜色", "s05", "llama/huggingface/qwen：借用火焰要明确来源和撤回。两场"],
+    ["r06","留给夜班的椅子", "s05", "minimax/opencode/cloudflare：协作不是无限工作，轮班表可用且每人有拒绝权。两场"],
+    ["r07","玩笑之后", "s07", "grok/claude/perplexity：道歉与证据、克制不等于失去幽默。两场"],
+    ["r08","三页旅行记", "s07", "kimi/gemini/chatgpt：一段未启程的旅程，三种观察不必唯一。两场"],
+    ["r09","执事的休息日", "s07", "harness/zcode/glm：衔雪不是zcode，休息也可以写入日志，与临的自然暧昧。两场"]
+  ]
+}

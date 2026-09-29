@@ -16,7 +16,20 @@ export const CHARACTER_LABELS = Object.freeze({
   huggingface: 'Hugging Face', llama: 'Llama', rwkv: 'RWKV', perplexity: 'Perplexity',
   github: 'GitHub', gitlab: 'GitLab', gitee: 'Gitee', cloudflare: 'Cloudflare',
   zcode: 'ZCode',
+  hy: 'HY', comfyui: 'ComfyUI', novelai: 'NovelAI', gptimage: 'GPT-image',
 })
+
+// Story script aliases and model routing are separate contracts. Narrators and
+// unknown IDs deliberately stay unknown instead of becoming another character.
+const CHARACTER_ALIASES = Object.freeze({
+  deepseekharness: 'harness', deepseek_harness: 'harness', xianxue: 'harness', '衔雪': 'harness',
+  ds_myst: 'deepseek', 'ds-myst': 'deepseek', minmax: 'minimax', perp: 'perplexity', cf: 'cloudflare', hf: 'huggingface',
+  comfy: 'comfyui', nai: 'novelai', 'gpt-image': 'gptimage', gpt_image: 'gptimage', gittee: 'gitee',
+})
+export function normalizeCharacterKey(value) {
+  const key = String(value ?? '').trim().toLowerCase().replace(/^c_/, '')
+  return CHARACTER_ALIASES[key] || key
+}
 
 /** Resolve a provider/model id to the corresponding maid character key. */
 export function characterKeyForModel(model, provider = '') {

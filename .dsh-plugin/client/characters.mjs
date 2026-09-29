@@ -26,7 +26,8 @@ import gitlab from '../../aipicture/gitlab.webp'
 import gitee from '../../aipicture/gitee.webp'
 import cloudflare from '../../aipicture/cloudflare.webp'
 import zcode from '../../aipicture/Zcode.png'
-import { CHARACTER_LABELS, characterKeyForModel } from './character-identity.mjs'
+import { CHARACTER_LABELS, characterKeyForModel, normalizeCharacterKey } from './character-identity.mjs'
+import { SPRING_ORIGINALS } from './gal-spring-portraits.mjs'
 
 export { CHARACTER_LABELS, characterKeyForModel } from './character-identity.mjs'
 
@@ -46,7 +47,12 @@ export const CHARACTER_IMAGES = Object.freeze({
   opencode,
   qwen,
   huggingface, llama, rwkv, perplexity, github, gitlab, gitee, cloudflare, zcode,
+  hy: SPRING_ORIGINALS.hy, comfyui: SPRING_ORIGINALS.comfyui,
+  novelai: SPRING_ORIGINALS.novelai, gptimage: SPRING_ORIGINALS.gptimage,
 })
+
+export const hasCharacterImage = key => Boolean(CHARACTER_IMAGES[normalizeCharacterKey(key)])
+export const characterImageFor = key => CHARACTER_IMAGES[normalizeCharacterKey(key)] || null
 
 export const CHARACTER_VARIANTS = Object.freeze({
   claude: Object.freeze({ default: claude, special: claudeSpecial }),

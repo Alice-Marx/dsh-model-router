@@ -77,3 +77,11 @@
   .gm-free-controls { grid-template-columns: 1fr; }
   .gm-free-stage { min-height: 340px; padding: 14px; }
 }
+
+/* 好感度面板与命名输入（回声之城·正篇） */
+.gm-affinity { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; align-items: center; }
+.gm-affinity-item { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.1)); font-size: 12px; }
+.gm-affinity-plus { color: var(--dsw-alias-success, #2f9e63); font-weight: 700; }
+.gm-affinity-minus { color: #d0604f; font-weight: 700; }
+.gm-input-row { display: flex; gap: 8px; align-items: center; }
+.gm-input-row .mr-input { max-width: 320px; }

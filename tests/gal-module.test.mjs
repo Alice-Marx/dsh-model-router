@@ -83,3 +83,67 @@ test('story history replays the walked path with player choices', () => {
     assert.equal(history.some(entry => entry.speaker === 'player'), true)
   }
 })
+
+
+test('echo-chronicle plays the full journey through every route', async () => {
+  const echo = await import('../.dsh-plugin/shared/gal-story-echocity.mjs')
+  const catalog = await import('../.dsh-plugin/shared/gal-story-catalog.mjs')
+  assert.equal(echo.storyGraphIssues().length, 0)
+  const episode = catalog.STORY_EPISODES.find(item => item.id === 'echo-chronicle')
+  assert.ok(episode, 'echo-chronicle registered in catalog')
+  const play = (story, pick) => {
+    let state = story
+    let hops = 0
+    while (hops < 400) {
+      const node = catalog.currentStoryNode(state)
+      if (node.ending) break
+      if (node.input) state = catalog.advanceStory(state, '__input__:衔雪')
+      else if (node.choices) state = catalog.advanceStory(state, pick(node, state))
+      else state = catalog.advanceStory(state, null)
+      hops += 1
+    }
+    return { state, hops }
+  }
+  let state = catalog.createStory('echo-chronicle')
+  assert.equal(state.version, 5)
+  const pick = node => ({
+    'petition-01': 'c', 'note-03': 'a', 'stele-01': 'a', 'diary-01': 'b', 'follow-01': 'a',
+  })[node.id] ?? node.choices[0].id
+  const common = play(state, pick)
+  state = common.state
+  assert.equal(state.flags.flag_recite_names, true)
+  assert.equal(state.flags.flag_transcribe_light, true)
+  assert.equal(state.flags.flag_x4_count, 2)
+  const chapters = catalog.storyChapterStates(state)
+  assert.equal(chapters.find(item => item.id === 'hidden-harness').locked, true, 'hidden locked before DeepSeek route')
+  for (const chapterId of ['route-deepseek', 'route-chatgpt', 'route-claude', 'route-llama', 'route-grok', 'route-rwkv', 'hidden-harness', 'true-end']) {
+    state = catalog.switchStoryChapter(state, chapterId)
+    assert.ok(state, `${chapterId} switch supported`)
+    const run = play(state, node => node.choices[0].id)
+    state = run.state
+  }
+  const finale = catalog.currentStoryNode(state)
+  assert.match(finale.ending?.title ?? '', /回声之城/)
+  assert.equal(state.flags.hidden_true, true)
+  assert.equal(state.flags.harness_name, '衔雪')
+  const loaded = catalog.normalizeStory(JSON.parse(JSON.stringify(state)))
+  assert.equal(loaded.nodeId, state.nodeId)
+  const affinity = catalog.storyAffinityPanel(state)
+  assert.ok(affinity.length >= 14)
+  assert.ok(affinity[0].value >= affinity[1].value)
+})
+
+test('spring compiles with bridged acts and reaches the finale choice', async () => {
+  const catalog = await import('../.dsh-plugin/shared/gal-story-catalog.mjs')
+  const spring = await import('../.dsh-plugin/shared/gal-story-spring.mjs')
+  assert.ok(spring.STORY_CHAPTERS.length === 12, 'spring has all 12 chapters')
+  let state = catalog.createStory('echo-spring')
+  let hops = 0
+  while (hops < 400) {
+    const node = catalog.currentStoryNode(state)
+    if (node.ending || node.choices) break
+    state = catalog.advanceStory(state, null)
+    hops += 1
+  }
+  assert.ok(hops > 0, 'spring plays from s01')
+})

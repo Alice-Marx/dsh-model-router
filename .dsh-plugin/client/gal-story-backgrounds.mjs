@@ -14,7 +14,10 @@ import offlineWorkshop from '../../aipicture/story-backgrounds/offline-workshop.
 import evidenceLighthouse from '../../aipicture/story-backgrounds/evidence-lighthouse.webp'
 import operationsBridge from '../../aipicture/story-backgrounds/operations-bridge.webp'
 
+import { SPRING_BACKGROUNDS } from './gal-spring-backgrounds.mjs'
+
 export const STORY_BACKGROUNDS = Object.freeze({
+  ...SPRING_BACKGROUNDS,
   title: modelCityTitle,
   prologue: prologueStation,
   'open-day': associationOpenDay,
