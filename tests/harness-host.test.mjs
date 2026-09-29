@@ -6,6 +6,7 @@ import {
   consultConfiguredModel,
   createRoutePlan,
   discoverConfiguredRoutes,
+  resolveTeamCliModelBindings,
 } from '../.dsh-plugin/index.mjs'
 
 const signal = new AbortController().signal
@@ -168,7 +169,7 @@ test('registers router tools and manual command without intercepting the main ag
   assert.equal(events.some(({ name }) => String(name).startsWith('agent/')), false)
   assert.deepEqual(commands.map(command => command.name), ['router', 'tools'])
   const commandResult = await commands[0].handler({ rawInput: '请审阅实现方案', signal })
-  assert.equal(commandResult.kind, 'success')
+  assert.equal(commandResult.kind, 'success', JSON.stringify(commandResult))
   assert.match(commandResult.text, /推荐路线/)
 
   const byName = new Map(tools.map(tool => [tool.name, tool]))
@@ -191,4 +192,38 @@ test('registers router tools and manual command without intercepting the main ag
   assert.equal(consulted.ok, true)
   assert.equal(streamCalls.at(-1).provider, 'openai')
   assert.equal(streamCalls.at(-1).model, 'gpt-5.6-sol')
+})
+
+test('Host route plan uses saved user prices and quality only for configured routes', async () => {
+  const { ctx } = createHarnessContext()
+  const config = routerConfig({ modelProfilesJson: JSON.stringify([
+    { provider: 'deepseek', model: 'deepseek-v4-pro', quality: 72, pricing: { input: 0.2, output: 0.6 } },
+    { provider: 'openai', model: 'gpt-5.6-sol', quality: 97, pricing: { input: 5, output: 20 } },
+    { provider: 'other', model: 'unconfigured', quality: 100, pricing: { input: 0, output: 0 } },
+  ]) })
+  const plan = await createRoutePlan(ctx, '请总结这段文字。', config,
+    { skipToolProbe: true, signal })
+  assert.equal(plan.availableRoutes.length, 2)
+  assert.equal(plan.availableRoutes[0].pricingSource, 'user')
+  assert.equal(plan.optimization.pricingComplete, true)
+  assert.ok(plan.estimatedCost > 0)
+  assert.ok(plan.candidates.every(item => item.pricingSource === 'user'))
+})
+
+test('manual CLI mapping overrides saved route mapping in package then tool order', () => {
+  const plan = { team: { workPackages: [
+    { id: 'task-a', recommendedProvider: 'kimi', recommendedModel: 'cheap' },
+    { id: 'task-b', recommendedProvider: 'kimi', recommendedModel: 'strong' },
+  ] } }
+  const routes = [
+    { provider: 'kimi', model: 'cheap', cliModel: 'profile-cheap' },
+    { provider: 'kimi', model: 'strong', cliModel: 'profile-strong' },
+  ]
+  const bindings = resolveTeamCliModelBindings(plan, routes, {
+    'kimi-code': 'manual-tool', 'task-b': 'manual-package',
+  })
+  assert.equal(bindings['task-a'], 'manual-tool')
+  assert.equal(bindings['task-b'], 'manual-package')
+  assert.equal(bindings['kimi-code'], 'manual-tool')
+  assert.throws(() => resolveTeamCliModelBindings(plan, routes, []), /JSON 对象/)
 })

@@ -12,6 +12,7 @@ import {
   selectReasoningEffort,
 } from '../.dsh-plugin/shared/router.mjs'
 import { fetchLiveBenchSnapshot, normalizeLiveBenchPayload, parseCsv } from '../.dsh-plugin/shared/livebench.mjs'
+import { createPlanFromRoutes } from '../.dsh-plugin/shared/harness-plan.mjs'
 
 const routes = [
   { provider: 'zen', model: 'DeepSeek V4 Flash' },
@@ -25,10 +26,17 @@ test('classifies simple and specialized tasks', () => {
   assert.equal(classifyTask('请实现一个带测试的 REST API'), 'code')
   assert.equal(assessComplexity('请简要解释什么是缓存').band, 'simple')
   assert.equal(assessComplexity('请设计系统架构，拆分模块并编写测试与部署方案').band, 'complex')
+  assert.equal(assessComplexity('请证明这个定理').band, 'complex')
+  assert.equal(assessComplexity('请总结架构文档').band, 'simple')
 })
 
-test('scores available routes and returns a cost estimate', () => {
-  const plan = buildPlan({ text: '请设计系统架构，拆分模块并编写测试与部署方案', available: routes })
+test('scores configured routes and estimates cost only from supplied USD prices', () => {
+  const available = routes.map((route, index) => ({
+    ...route,
+    quality: [0.82, 0.98, 0.87][index],
+    pricing: { input: [0.14, 5, 0.4][index], output: [0.28, 30, 1.6][index], currency: 'USD' },
+  }))
+  const plan = buildPlan({ text: '请设计系统架构，拆分模块并编写测试与部署方案', available })
   assert.equal(plan.taskType, 'code')
   assert.equal(plan.complexity.band, 'complex')
   assert.equal(plan.candidates.length, 3)
@@ -37,8 +45,11 @@ test('scores available routes and returns a cost estimate', () => {
   assert.ok(plan.synthesizer)
   assert.equal(plan.subtasks.at(-1).purpose, 'synthesis')
   assert.equal(modelMetadata('GPT 5.6 Sol').id, 'gpt-5.6-sol')
+  assert.equal(modelMetadata('gpt'), null, 'partial names cannot borrow another model score')
   assert.ok(plan.optimization.qualityFloor >= 0.78)
   assert.ok(Number.isFinite(plan.optimization.estimatedSavings))
+  assert.equal(plan.optimization.pricingComplete, true)
+  assert.equal(plan.optimization.qualityEvidenceComplete, true)
 })
 
 test('reasoning level is a normalized optimization objective', () => {
@@ -69,7 +80,7 @@ test('plans an exact supported reasoning effort for every collaboration stage', 
     assert.ok(route.reasoningEfforts.includes(task.recommendedReasoningEffort))
     assert.ok(task.reasoningFit > 0)
   }
-  assert.equal(plan.subtasks[0].preferredReasoningEffort, 'high')
+  assert.equal(plan.subtasks[0].preferredReasoningEffort, 'medium')
   assert.equal(plan.subtasks.at(-1).preferredReasoningEffort, 'xhigh')
   assert.equal(plan.synthesizer.reasoningEffort, plan.subtasks.at(-1).recommendedReasoningEffort)
   assert.ok(plan.costBreakdown.every(row => row.reasoningOutputMultiplier >= 0.9))
@@ -136,12 +147,120 @@ test('applies user pricing overrides and task-specific LiveBench scores', () => 
 test('budget fallback lowers low-criticality stage cost without violating quality floor', () => {
   const plan = buildPlan({
     text: '请设计一个复杂工程架构，拆分模块，编写代码和测试，并给出部署方案',
-    available: routes,
+    available: routes.map((route, index) => ({
+      ...route,
+      quality: [0.82, 0.98, 0.87][index],
+      pricing: { input: [0.14, 5, 0.4][index], output: [0.28, 30, 1.6][index] },
+    })),
     budgetUsd: 0.001,
   })
   assert.equal(plan.optimization.budgetUsd, 0.001)
+  assert.ok(plan.estimatedCost > 0)
   assert.ok(plan.subtasks.every(task => task.qualityFloor >= 0.78 || plan.optimization.constraintRelaxed))
   assert.ok(plan.optimization.budgetExceeded || plan.estimatedCost <= 0.001)
+})
+
+test('decomposes a compound task and assigns affordable and strong models by stage difficulty', () => {
+  const available = [
+    { provider: 'cheap-provider', model: 'Flash Custom', quality: 0.79, qualitySource: 'user', specialties: ['summarization'], pricing: { input: 0.1, output: 0.2 }, pricingSource: 'user' },
+    { provider: 'strong-provider', model: 'Reasoning Custom', quality: 0.97, qualitySource: 'user', specialties: ['reasoning', 'code'], pricing: { input: 5, output: 25 }, pricingSource: 'user' },
+  ]
+  const plan = buildPlan({
+    text: '请处理项目。\n- 请提取关键词\n- 请设计复杂系统架构\n- 最后验证架构安全性',
+    available,
+    mode: 'team',
+  })
+  const extraction = plan.subtasks.find(task => task.objective === '请提取关键词')
+  const design = plan.subtasks.find(task => task.objective === '请设计复杂系统架构')
+  const verification = plan.subtasks.find(task => task.objective === '最后验证架构安全性')
+  assert.equal(plan.compound, true)
+  assert.equal(plan.complexity.band, 'complex')
+  assert.equal(extraction.difficulty, 'simple')
+  assert.equal(extraction.recommended, 'Flash Custom')
+  assert.equal(extraction.qualitySource, 'user')
+  assert.equal(extraction.pricingSource, 'user')
+  assert.equal(design.difficulty, 'complex')
+  assert.equal(design.recommended, 'Reasoning Custom')
+  assert.equal(verification.recommended, 'Reasoning Custom')
+  assert.ok(verification.dependsOn.includes(design.id))
+  assert.ok(plan.estimatedCost < plan.optimization.baselineAllStrongCost)
+  assert.ok(plan.optimization.estimatedSavings > 0)
+})
+
+test('plain bullet examples are not treated as executable work packages', () => {
+  const plan = buildPlan({
+    text: '请总结这段清单：\n- 一级缓存\n- 二级缓存',
+    available: [{ provider: 'mine', model: 'Summarizer', quality: 0.85, pricing: { input: 0.1, output: 0.2 } }],
+  })
+  assert.equal(plan.compound, false)
+  assert.equal(plan.subtasks.length, 1)
+  const quotedRequirements = buildPlan({
+    text: '请总结以下需求：\n- 实现登录\n- 验证权限\n- 部署服务',
+    available: [{ provider: 'mine', model: 'Summarizer', quality: 0.85, pricing: { input: 0.1, output: 0.2 } }],
+  })
+  assert.equal(quotedRequirements.compound, false)
+  assert.ok(quotedRequirements.subtasks.every(task => !task.objective || !/实现登录|部署服务/.test(task.objective)))
+})
+
+test('unknown model metadata does not become a fictional zero-dollar saving or quality score', () => {
+  const plan = buildPlan({
+    text: '请简要解释缓存',
+    available: [{ provider: 'custom', model: 'Private Model' }],
+    budgetUsd: 0.001,
+  })
+  assert.equal(plan.selected.model, 'Private Model')
+  assert.equal(plan.selected.estimatedCost, null)
+  assert.equal(plan.candidates[0].quality, null)
+  assert.equal(plan.candidates[0].inputPrice, null)
+  assert.equal(plan.estimatedCost, null)
+  assert.equal(plan.optimization.estimatedSavings, null)
+  assert.equal(plan.optimization.pricingComplete, false)
+  assert.equal(plan.optimization.budgetFeasible, false)
+  assert.equal(plan.optimization.constraintRelaxed, true)
+})
+
+test('non-USD route price cannot silently satisfy a USD budget', () => {
+  const plan = buildPlan({
+    text: '请提取关键词',
+    available: [{ provider: 'custom', model: 'Custom', quality: 0.9, pricing: { input: 0.01, output: 0.02, currency: 'CNY' } }],
+    budgetUsd: 0.001,
+  })
+  assert.equal(plan.candidates[0].pricingSource, 'unknown')
+  assert.equal(plan.estimatedCost, null)
+  assert.equal(plan.optimization.budgetFeasible, false)
+})
+
+test('desktop plan retains configured route profiles and labels missing prices', () => {
+  const provided = createPlanFromRoutes('请提取关键词', [
+    { provider: 'mine', model: 'Budget', quality: 0.85, qualitySource: 'user', pricing: { input: 0.1, output: 0.2 }, pricingSource: 'user' },
+  ], { mode: 'team' })
+  assert.ok(provided.estimatedCost > 0)
+  assert.equal(provided.team.workPackages[0].difficulty, 'simple')
+  assert.equal(provided.team.workPackages[0].pricingSource, 'user')
+  assert.equal(provided.team.workPackages[0].qualitySource, 'user')
+
+  const missing = createPlanFromRoutes('请提取关键词', [{ provider: 'mine', model: 'Budget', quality: 0.85 }])
+  assert.equal(missing.estimatedCost, null)
+  assert.match(missing.pricingNotice, /无法计算可靠的总费用/)
+})
+
+test('only the image work package needs an image-capable model', () => {
+  const routes = [
+    { provider: 'text', model: 'Economy', quality: 0.8, pricing: { input: 0.1, output: 0.2 }, inputModalities: ['text'] },
+    { provider: 'vision', model: 'Visual Pro', quality: 0.95, pricing: { input: 5, output: 25 }, inputModalities: ['text', 'image'] },
+  ]
+  const plan = createPlanFromRoutes('请处理资料。\n- 请提取关键词\n- 请分析图片中的内容\n- 最后验证输出', routes, { mode: 'team' })
+  const extraction = plan.team.workPackages.find(item => item.objective === '请提取关键词')
+  const imageWork = plan.team.workPackages.find(item => item.objective === '请分析图片中的内容')
+  assert.equal(extraction.recommendedModel, 'Economy')
+  assert.equal(imageWork.recommendedModel, 'Visual Pro')
+  assert.deepEqual(plan.unassignableTasks, [])
+  assert.match(plan.modalityNotice, /其他文本工作包/)
+
+  const unsupported = createPlanFromRoutes('请分析图片中的内容', routes.slice(0, 1))
+  assert.equal(unsupported.selected, null)
+  assert.ok(unsupported.unassignableTasks.length > 0)
+  assert.match(unsupported.modalityNotice, /无法完整分配/)
 })
 
 test('recognizes an official OpenCode website override but preserves custom routes', () => {

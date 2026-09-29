@@ -207,6 +207,18 @@ function teamCliModel(item, cliModels) {
     ? item.recommendedModel : null
 }
 
+function reportedCliModel(toolId, value) {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  // MiniMax's verified exec.result.model is a structured selection, while
+  // its --model argument is one provider/model string.
+  if (toolId === 'minimax-code' && value && typeof value === 'object'
+    && typeof value.providerId === 'string' && value.providerId
+    && typeof value.modelId === 'string' && value.modelId) {
+    return `${value.providerId}/${value.modelId}`
+  }
+  return null
+}
+
 function packagePrompt(task, item, completed) {
   const dependencies = item.dependsOn.map(id => completed.find(result => result.id === id)).filter(Boolean)
   const directions = {
@@ -250,7 +262,7 @@ export function executableTeamPackages(plan, installedIds = [], mode = 'read-onl
 }
 
 /** Sequential execution preserves DAG dependencies and avoids edit conflicts. */
-export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], cliModels, signal, sandbox }) {
+export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], cliModels, signal, sandbox, runtime }) {
   const { assigned, blocking } = executableTeamPackages(plan, installedIds, mode)
   if (assigned.length === 0) return { status: 'blocked', blocking: [{ reason: '计划没有工作包。' }], results: [] }
   if (blocking.length > 0) return { status: 'blocked', blocking, results: [] }
@@ -258,7 +270,11 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   const configuredCliModels = checkedTeamCliModels(cliModels, assigned)
   const source = await canonicalDirectory(workspace)
   if (typeof sandbox?.confine !== 'function') return { status: 'blocked', blocking: [{ reason: '官方 Harness 进程沙箱不可用。' }], results: [] }
-  const readiness = await Promise.all([...new Set(assigned.map(item => item.toolId))].map(id => officialToolReadiness(id, source)))
+  // The Host passes no runtime override. Tests can inject inert CLI adapters to
+  // exercise assignment, stopping, and Git integration without provider accounts.
+  const readinessCheck = runtime?.readiness ?? officialToolReadiness
+  const runTool = runtime?.runTool ?? runOfficialTool
+  const readiness = await Promise.all([...new Set(assigned.map(item => item.toolId))].map(id => readinessCheck(id, source)))
   const unready = readiness.filter(item => !item.ready)
   if (unready.length > 0) return { status: 'blocked', blocking: unready.map(item => ({ toolId: item.id, reason: item.reason })), results: [] }
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
@@ -267,7 +283,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   for (const item of assigned) {
     if (signal?.aborted) return { status: 'cancelled', workspace: runWorkspace, results: completed }
     const cliModel = teamCliModel(item, configuredCliModels)
-    const result = await runOfficialTool({
+    const result = await runTool({
       toolId: item.toolId,
       modelId: cliModel,
       task: packagePrompt(task, item, completed),
@@ -277,18 +293,24 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       sandbox,
       signal,
     })
+    const reportedModel = reportedCliModel(item.toolId, result.reportedModel)
+    const modelMismatch = result.status === 'succeeded' && cliModel && reportedModel
+      && cliModel !== reportedModel
+    const packageStatus = modelMismatch ? 'model-mismatch' : result.status
     completed.push({ id: item.id, name: item.name,
       ...(item.objective ? { objective: item.objective } : {}), provider: item.recommendedProvider,
       recommendedModel: item.recommendedModel, toolId: item.toolId,
       requestedCliModel: result.requestedModel ?? null,
-      actualModel: result.reportedModel ?? null,
-      modelNotice: result.modelNotice ?? (!cliModel
+      actualModel: reportedModel,
+      modelNotice: modelMismatch
+        ? `官方 CLI 回报模型 ${reportedModel}，与本包指定的 ${cliModel} 不一致；后续工作包已停止。`
+        : result.modelNotice ?? (!cliModel
         ? 'Harness 推荐模型 ID 未经此厂商 CLI 验证；本包使用厂商 CLI 已配置的默认模型。'
-        : result.reportedModel ? null : '该 CLI 未返回可核验的实际模型 ID；请以厂商运行记录核对。'),
-      status: result.status, finalText: result.finalText ?? '',
-      error: result.error ?? result.reason ?? null,
+        : reportedModel ? null : '该 CLI 未返回可核验的实际模型 ID；请以厂商运行记录核对。'),
+      status: packageStatus, finalText: result.finalText ?? '',
+      error: modelMismatch ? '官方 CLI 实际模型与指定模型不一致。' : result.error ?? result.reason ?? null,
       outputTail: result.status === 'succeeded' ? null : result.stderrTail ?? result.stdoutTail ?? null })
-    if (result.status !== 'succeeded') return { status: 'incomplete', workspace: runWorkspace, results: completed }
+    if (packageStatus !== 'succeeded') return { status: 'incomplete', workspace: runWorkspace, results: completed }
   }
   if (!isolated) return { status: 'cli-completed', workspace: runWorkspace, results: completed,
     notice: '只读模式已收集各工作包结果；模型输出仍需人工验收。' }

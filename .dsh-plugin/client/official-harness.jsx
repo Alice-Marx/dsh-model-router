@@ -7,6 +7,7 @@
  */
 
 import React from 'react'
+import { parseModelProfilesJson } from '../shared/model-profiles.mjs'
 import { RouterMainPage, RouterPanelIcon } from './router-main.jsx'
 import { GalModulePage, GalPanelIcon } from './gal-module-page.jsx'
 import {
@@ -20,6 +21,7 @@ import {
   SettingsValueField,
   Tag,
   settingsNumberField,
+  settingsTextField,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /** The Host plugin name is also the live configuration-form namespace. */
@@ -29,7 +31,12 @@ export const ROUTER_PANEL = 'model-router-galgame'
 export const GAL_PANEL = 'model-router-gal'
 
 /** Required Cordis services supplied by the official desktop client. */
-export const inject = ['slots', 'configForms', 'remote', 'remote.session', 'layout']
+export const inject = ['remote']
+
+const UI_INJECT = [
+  'slots', 'configForms', 'remote', 'remote.session',
+  `remote.${OFFICIAL_TOOLS_REMOTE_NAMESPACE}`, 'layout',
+]
 
 const FORM_LABELS = Object.freeze({
   unavailable: '该插件当前未加载，暂时无法配置。',
@@ -64,6 +71,17 @@ function boundedNumberField(field, { minimum = 0, maximum = Number.MAX_SAFE_INTE
   }
 }
 
+function modelProfilesField() {
+  const field = settingsTextField('modelProfilesJson')
+  return {
+    ...field,
+    parse: text => {
+      try { parseModelProfilesJson(text); return field.parse(text) }
+      catch { return undefined }
+    },
+  }
+}
+
 /**
  * Bridges the Host config form onto a slot-friendly snapshot store.
  *
@@ -75,11 +93,13 @@ export class RouterSettingsCardController {
     this.form = new SettingsFormModel(scope, [
       boundedNumberField('budgetUsd', { minimum: 0 }),
       boundedNumberField('maxConsultOutputChars', { minimum: 500, maximum: 50_000, integer: true }),
+      modelProfilesField(),
     ])
     this.store = this.form.bind(() => ({
       ...this.form.shell(),
       budgetUsd: this.form.field('budgetUsd'),
       maxConsultOutputChars: this.form.field('maxConsultOutputChars'),
+      modelProfilesJson: this.form.field('modelProfilesJson'),
     }))
   }
 
@@ -110,7 +130,7 @@ export function RouterSettingsCard(props) {
       <SettingsValueField
         id="model-router-budget-usd"
         label="单次计划预算上限（USD）"
-        hint="0 表示不设预算上限。价格是目录中的估算值，实际账单以服务商为准；预算只影响路由建议。"
+        hint="0 表示不设预算上限。只有填写下方实际使用的单价后，才能估算费用；预算只影响路由建议。"
         help={{
           label: '预算说明',
           content: '预算只影响路由建议，不会限制服务商扣费，也不会读取或保存 API Key。',
@@ -138,6 +158,23 @@ export function RouterSettingsCard(props) {
         onReset={() => { props.resetField('maxConsultOutputChars') }}
       />
 
+      <div style={styles.profileEditor}>
+        <label htmlFor="model-router-profiles-json" style={styles.profileLabel}>模型价格与能力配置（JSON）</label>
+        <p style={styles.noticeText}>按“模型目录”中的准确 provider/model 填写。quality 为自定的 0–100 分；input/output 是美元每百万 token。缺少价格时只给路线建议，不显示虚构费用。</p>
+        <textarea
+          id="model-router-profiles-json"
+          value={state.modelProfilesJson.text}
+          disabled={disabled}
+          aria-invalid={state.modelProfilesJson.invalid}
+          onChange={event => props.edit('modelProfilesJson', event.target.value)}
+          spellCheck={false}
+          style={styles.profileTextarea}
+        />
+        {state.modelProfilesJson.invalid && <p style={styles.profileError} role="alert">JSON 格式或某项配置无效。每项需提供准确的 provider/model，单价为非负 USD 数字，质量为 0–100。</p>}
+        <details style={styles.profileExample}><summary>查看配置格式</summary><pre>{`[\n  {\n    "provider": "模型目录中的供应商 ID",\n    "model": "模型目录中的模型 ID",\n    "quality": 80,\n    "pricing": { "input": 0.2, "output": 0.8 },\n    "specialties": ["code"],\n    "cliModel": "厂商 CLI 使用的模型名（可选）"\n  }\n]`}</pre></details>
+        <button type="button" disabled={disabled} onClick={() => props.resetField('modelProfilesJson')}>恢复默认配置</button>
+      </div>
+
       <aside style={styles.notice} aria-label="模型路由使用说明">
         <div style={styles.titleLine}><Tag tone="info">官方模型配置</Tag></div>
         <p style={styles.noticeText}>
@@ -161,11 +198,7 @@ function OpenRouterWorkspace({ subject, openPanel }) {
  * settings form belongs to this installed bundle; the matching main/sidebar
  * registrations create a visible root-level Desktop workspace.
  */
-export async function apply(ctx) {
-  // The official Client Gateway owns this typed namespace and withdraws it
-  // with the plugin fiber. Host methods accept only fixed registry tool IDs.
-  const disposeOfficialToolsRemote = await ctx.remote.$mount(OFFICIAL_TOOLS_CLIENT_REMOTE)
-  ctx.effect(() => disposeOfficialToolsRemote, 'model-router-galgame: official tools client remote')
+function registerUi(ctx) {
   const officialToolsRemote = ctx.remote[OFFICIAL_TOOLS_REMOTE_NAMESPACE]
   const settingsScope = ctx.configForms.get(ROUTER_NAMESPACE)
   const card = new RouterSettingsCardController(settingsScope)
@@ -182,7 +215,7 @@ export async function apply(ctx) {
       loadCatalog: () => ctx.remote.session.modelCatalog(),
       settingsScope,
       listOfficialTools: () => officialToolsRemote.list(),
-      installOfficialTool: toolId => officialToolsRemote.install(toolId),
+      installOfficialTool: toolId => officialToolsRemote.installTool(toolId),
       cancelOfficialToolInstall: toolId => officialToolsRemote.cancel(toolId),
       officialToolInstallStatus: toolId => officialToolsRemote.status(toolId),
     }),
@@ -216,6 +249,24 @@ export async function apply(ctx) {
   }, OpenRouterWorkspace))), 'model-router-galgame: bundle open action')
 }
 
+export async function apply(ctx) {
+  // Mount first; the namespace becomes injectable only after its descriptors
+  // are registered. UI registrations live in the dependent child fiber.
+  const disposeRemote = await ctx.remote.$mount(OFFICIAL_TOOLS_CLIENT_REMOTE)
+  const ui = ctx.inject(UI_INJECT, registerUi)
+  try {
+    await ui
+  } catch (error) {
+    await ui.dispose()
+    await disposeRemote()
+    throw error
+  }
+  return async () => {
+    await ui.dispose()
+    await disposeRemote()
+  }
+}
+
 const styles = Object.freeze({
   titleLine: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' },
   notice: {
@@ -231,4 +282,9 @@ const styles = Object.freeze({
     fontSize: '13px',
     lineHeight: '20px',
   },
+  profileEditor: { display: 'grid', gap: '8px', marginTop: '14px' },
+  profileLabel: { fontSize: '13px', fontWeight: 600 },
+  profileTextarea: { width: '100%', minHeight: '150px', padding: '10px', fontFamily: 'monospace', fontSize: '12px', borderRadius: '7px', border: '1px solid var(--dsw-alias-border-l1)', boxSizing: 'border-box' },
+  profileError: { color: 'var(--dsw-alias-label-danger)', fontSize: '12px', margin: 0 },
+  profileExample: { fontSize: '12px', whiteSpace: 'pre-wrap' },
 })

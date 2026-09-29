@@ -115,7 +115,7 @@ const galRequestIdParameter = Object.freeze({
 
 export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('list', [], listResultCodec),
-  descriptor('install', [toolIdParameter], installResultCodec),
+  descriptor('installTool', [toolIdParameter], installResultCodec),
   descriptor('cancel', [toolIdParameter], installResultCodec),
   descriptor('status', [toolIdParameter], statusResultCodec),
   descriptor('galReply', [galRequestParameter], galResultCodec),

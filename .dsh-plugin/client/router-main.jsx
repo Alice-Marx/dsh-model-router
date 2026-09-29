@@ -1,9 +1,11 @@
 import React from 'react'
 import { createWorkspacePlan, routesFromModelCatalog } from './catalog.mjs'
+import { ModelProfileEditor } from './model-profile-editor.jsx'
+import { toolInstallAction } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine } from '../shared/official-tool-registry.mjs'
 import stylesheet from './router-main.css'
 
-const money = value => `$${Number(value || 0).toFixed(4)}`
+const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
 const text = value => typeof value === 'string' ? value.trim() : ''
 
 /** The sidebar owns button layout and selection; this is only its glyph. */
@@ -70,7 +72,7 @@ function PlanResults({ plan }) {
           <ChannelBadge item={plan} />
         </div>
         <p className="mr-caption">{plan.reason}</p>
-        {plan.optimization.budgetExceeded && <p className="mr-error">按当前实验价格估算，任务可能超过本次预算。预算只影响建议，不会阻止实际扣费。</p>}
+        {plan.optimization.budgetExceeded && <p className="mr-error">按已提供单价估算，任务可能超过本次预算。预算只影响建议，不会阻止实际扣费。</p>}
         {plan.mode === 'team' && (
           <>
             <h3 className="mr-section-title">团队工作包</h3>
@@ -82,6 +84,7 @@ function PlanResults({ plan }) {
                   <div className="mr-package-top"><div className="mr-package-name">{index + 1}. {item.name}</div><div className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</div></div>
                   {item.objective && <p className="mr-package-copy">具体目标：{item.objective}</p>}
                   <p className="mr-package-copy">{item.purpose}{item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.join('、')}` : ''}</p>
+                  <p className="mr-package-copy">难度：{{ simple: '简单', balanced: '中等', complex: '困难' }[item.difficulty] || item.difficulty || '待评估'} · 费用：{money(item.estimatedCost)}</p>
                   <p className="mr-package-copy">验收：{item.verificationChecklist.join('；')}</p>
                   <div className="mr-channel-line"><ChannelBadge item={item} /></div>
                 </article>
@@ -89,7 +92,7 @@ function PlanResults({ plan }) {
           </>
         )}
         {plan.mode === 'team' && <p className="mr-caption">{plan.team.handoff}</p>}
-        <div className="mr-notice">{plan.pricingNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</div>
+        <div className="mr-notice">{plan.pricingNotice} {plan.qualityNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</div>
       </div>
     </section>
   )
@@ -104,18 +107,6 @@ function probeLabel(probe) {
   if (probe.status === 'probe-timeout') return '检测超时'
   if (probe.status === 'probe-failed') return '检测失败'
   return probe.detail || '未安装'
-}
-
-function stableVersionOrder(left, right) {
-  const parse = value => /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(value ?? ''))
-  const current = parse(left)
-  const target = parse(right)
-  if (!current || !target) return null
-  for (let index = 1; index <= 3; index += 1) {
-    const delta = Number(current[index]) - Number(target[index])
-    if (delta) return Math.sign(delta)
-  }
-  return 0
 }
 
 function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes }) {
@@ -245,14 +236,11 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
             const readiness = readinessById[tool.id]
             const job = jobs[tool.id]
             const running = job?.status === 'running'
-            const versionOrder = probe?.installed ? stableVersionOrder(probe.version, tool.version) : null
-            const current = versionOrder === 0
-            const newerOrUncertain = probe?.installed && (versionOrder === null || versionOrder > 0)
+            const action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status })
             const verified = job?.status === 'succeeded' && job.postInstallProbe?.installed === true
             const status = running ? job.cancelRequested ? '正在取消安装…' : '安装中…'
               : job?.status === 'installer-opened' ? '官方安装器已打开，请完成安装后重新检测'
                 : job?.status === 'cancelled' ? '安装已取消，请重新检测' : verified ? '安装成功并验证' : probeLabel(probe)
-            const buttonLabel = running ? '安装中…' : current ? '已是目标版本' : newerOrUncertain ? '请人工核对版本' : probe?.installed ? '更新到目标版本' : job?.status === 'failed' ? '重试安装' : tool.manager === 'signed-windows-installer' ? '下载安装器' : '下载安装'
             return (
               <div className="mr-tool" role="listitem" key={tool.id}>
                 <div className="mr-tool-info">
@@ -273,8 +261,8 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
                 </div>
                 {command && (
                   <div className="mr-tool-actions">
-                    <button className="mr-button mr-tool-button" type="button" disabled={probeState.status !== 'ready' || running || current || newerOrUncertain} onClick={() => { void install(tool.id) }}>
-                      {buttonLabel}
+                    <button className="mr-button mr-tool-button" type="button" disabled={action.disabled} onClick={() => { void install(tool.id) }}>
+                      {action.label}
                     </button>
                     {running && <button className="mr-button mr-button-secondary mr-tool-button" type="button" disabled={job.cancelRequested} onClick={() => { void cancel(tool.id) }}>
                       {job.cancelRequested ? '正在取消…' : '取消安装'}
@@ -370,6 +358,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
       setPlan(createWorkspacePlan(task, catalogState.catalog, {
         mode,
         budgetUsd: parsedBudget,
+        modelProfilesJson: settingsScope.getSnapshot().value?.modelProfilesJson ?? '[]',
         installedToolIds: (toolProbes?.probes ?? []).filter(probe => probe.installed).map(probe => probe.id),
         runnableToolIds: (toolProbes?.readiness ?? []).filter(item => item.ready).map(item => item.id),
       }))
@@ -418,6 +407,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           </section>
         </div>
 
+        <ModelProfileEditor routes={routes} settingsScope={settingsScope} onSaved={invalidatePlan} />
         {plan && <PlanResults plan={plan} />}
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} />
         <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>

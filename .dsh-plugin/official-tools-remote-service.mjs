@@ -40,7 +40,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   }
 
   /** Start one serialized fixed-registry install; return immediately for UI polling. */
-  async install(toolId) {
+  async installTool(toolId) {
     try {
       await ensureNpmPrefixOnPath()
       return { accepted: true, job: startInstall(toolId) }

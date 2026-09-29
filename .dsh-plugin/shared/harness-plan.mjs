@@ -44,7 +44,10 @@ function annotate(channel) {
  * by the Desktop panel. Model discovery stays on the official side of each
  * runtime and only the public provider/model directory crosses this boundary.
  */
-export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', budgetUsd = 0, installedToolIds = [], runnableToolIds = [] } = {}) {
+export function createPlanFromRoutes(task, availableRoutes, {
+  mode = 'single', budgetUsd = 0, installedToolIds = [], runnableToolIds = [],
+  pricing = {}, liveBench = null, cacheReadRatio = 0, cacheWriteRatio = 0,
+} = {}) {
   const taskText = clean(task)
   if (!taskText) throw new Error('task must contain text')
   const selectedMode = mode === 'team' ? 'team' : 'single'
@@ -57,16 +60,15 @@ export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', b
     return channelCache.get(key)
   }
   const needsImage = detectTaskTypes(taskText).includes('vision')
-  const eligibleRoutes = needsImage
-    ? routes.filter(route => !Array.isArray(route.inputModalities)
-      || route.inputModalities.length === 0
-      || route.inputModalities.includes('image'))
-    : routes
   const plan = buildPlan({
     text: taskText,
-    available: eligibleRoutes,
+    available: routes,
     mode: selectedMode,
     budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0),
+    pricing,
+    liveBench,
+    cacheReadRatio,
+    cacheWriteRatio,
   })
   const selectedChannel = plan.selected ? channelOf(plan.selected.provider) : null
   return {
@@ -75,24 +77,37 @@ export function createPlanFromRoutes(task, availableRoutes, { mode = 'single', b
     availableRoutes: routes,
     ...(selectedChannel ? annotate(selectedChannel) : {}),
     availabilityNotice: '模型目录列出的路线尚未验证当前凭据和网络；实际可用性以官方适配器调用结果为准。',
-    pricingNotice: '费用是本地估算，不是供应商账单，也不是硬性支出上限。',
-    modalityNotice: needsImage && eligibleRoutes.length < routes.length
-      ? '图像任务已排除明确声明不接受图像输入的模型；未声明能力的模型仍需人工验证。'
+    pricingNotice: plan.estimatedCost === null
+      ? '部分路线尚未配置该供应商的美元输入/输出单价，无法计算可靠的总费用与节省比例；请在模型价格设置中补齐。'
+      : '费用按已提供的美元单价和估计 token 数计算，不是供应商账单，也不是硬性支出上限。',
+    qualityNotice: plan.optimization.qualityEvidenceComplete
+      ? '模型质量使用已提供评分或基准数据估计，仍需实际任务验证。'
+      : '部分模型质量缺少可核验评分；目录启发式只供选择参考，质量门槛和节省比例无法保证。',
+    modalityNotice: needsImage
+      ? plan.unassignableTasks.length > 0
+        ? '图像工作包没有可确认支持图像输入的路线，当前计划无法完整分配；请在官方模型目录配置支持图像的模型。'
+        : routes.some(route => !Array.isArray(route.inputModalities) || route.inputModalities.length === 0)
+          ? '图像工作包只分给已声明图像能力或未声明输入能力的模型；未声明能力的模型仍需实际验证。其他文本工作包可继续使用经济型文本模型。'
+          : '图像工作包只分给明确支持图像输入的模型；其他文本工作包可继续使用经济型文本模型。'
       : null,
     toolNotice: '执行渠道按官方工具注册表和已核验适配器标注：official-cli 表示该厂商官方 CLI 已安装且可托管执行；harness-llm 表示通过官方模型目录调用。可在工作台查看安装与执行支持状态。',
     team: {
       requested: selectedMode === 'team',
       recommended: selectedMode === 'team' && plan.complexity.band === 'complex' && plan.subtasks.length > 1,
       handoff: '可在官方会话调用 model_router_team_execute 托管执行当前平台支持的官方 CLI 工作包；官方 Agent Teams 可协作管理任务，但成员模型由宿主配置，不能直接按本计划逐个切换。',
-      workPackages: plan.subtasks.map(item => ({
+      workPackages: plan.subtasks.map((item, index) => ({
         id: item.id,
         name: item.name,
         ...(item.objective ? { objective: item.objective } : {}),
         type: item.type,
         purpose: item.purpose,
+        difficulty: item.difficulty,
+        qualitySource: item.qualitySource,
+        pricingSource: item.pricingSource,
         dependsOn: item.dependsOn,
         recommendedProvider: item.recommendedProvider,
         recommendedModel: item.recommended,
+        estimatedCost: plan.costBreakdown[index]?.estimatedCost ?? null,
         ...item.recommendedReasoningEffort ? { recommendedReasoningEffort: item.recommendedReasoningEffort } : {},
         ...annotate(channelOf(item.recommendedProvider)),
         verificationChecklist: item.purpose === 'synthesis'

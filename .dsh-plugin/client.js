@@ -39,744 +39,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// .dsh-plugin/shared/livebench.mjs
-function normalized(value) {
-  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-function liveBenchRow(snapshot, model) {
-  return snapshot?.models?.[normalized(model)] ?? null;
-}
-var TASK_ALIASES, CATEGORY_TO_TASK;
-var init_livebench = __esm({
-  ".dsh-plugin/shared/livebench.mjs"() {
-    TASK_ALIASES = Object.freeze({
-      reasoning: ["reasoning", "reasoning_score", "hard_reasoning"],
-      code: ["code", "coding", "coding_score"],
-      math: ["math", "mathematics", "math_score"],
-      research: ["research", "retrieval", "knowledge", "data_analysis"],
-      writing: ["writing", "creative_writing", "language"],
-      vision: ["vision", "multimodal", "visual"],
-      summarization: ["summarization", "summary", "if"],
-      classification: ["classification", "instruction_following"]
-    });
-    CATEGORY_TO_TASK = Object.freeze({
-      reasoning: "reasoning",
-      coding: "code",
-      "agentic coding": "code",
-      mathematics: "math",
-      "data analysis": "research",
-      language: "writing",
-      if: "summarization",
-      vision: "vision",
-      multimodal: "vision"
-    });
-  }
-});
-
-// .dsh-plugin/shared/router.mjs
-function classifyTask(text2) {
-  const value = String(text2 ?? "");
-  if (value.length < 80 && /翻译|解释|translate|explain/i.test(value)) return "general";
-  return detectTaskTypes(value)[0] ?? "general";
-}
-function detectTaskTypes(text2) {
-  const value = String(text2 ?? "");
-  const ranked = TASK_TYPE_RULES.map(([type, pattern]) => ({
-    type,
-    signals: value.match(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`))?.length ?? 0
-  })).filter((item) => item.signals > 0);
-  ranked.sort((left, right) => right.signals - left.signals || left.type.localeCompare(right.type));
-  return ranked.map((item) => item.type);
-}
-function assessComplexity(text2) {
-  const value = String(text2 ?? "");
-  const lengthScore = clamp(value.length / 2200);
-  const requirementScore = clamp((value.match(/(?:^|\n)\s*(?:[-*]|\d+[.)]|[一二三四五六七八九十]+[、.])/g) ?? []).length / 8);
-  const codeScore = /(代码|工程|架构|接口|实现|部署|测试|code|api|debug)/i.test(value) ? 0.22 : 0;
-  const highReasoningScore = /(数学|证明|定理|研究|论文|复杂|多步骤|约束|比较|评估|架构|模块|部署|math|proof|research)/i.test(value) ? 0.2 : 0;
-  const visionScore = /(图片|图像|照片|截图|视觉|image|vision)/i.test(value) ? 0.12 : 0;
-  const domainMarkers = (value.match(/代码|工程|架构|接口|实现|部署|测试|模块|拆分|约束|评估|证明|定理|研究|论文|图片|图像|照片|视觉|code|api|debug|proof|research|vision/gi) ?? []).length;
-  const domainComplexity = clamp(domainMarkers / 5) * 0.28;
-  const raw = clamp(0.1 + lengthScore * 0.3 + requirementScore * 0.18 + domainComplexity + codeScore + highReasoningScore + visionScore);
-  const band = raw < 0.34 ? "simple" : raw < 0.66 ? "balanced" : "complex";
-  return { value: raw, band };
-}
-function specialtyMatch(model, taskType, liveScores = {}) {
-  const benchmark = asScore(liveScores?.[taskType]);
-  if (benchmark !== void 0) return benchmark;
-  if (model.specialties.includes(taskType)) return 1;
-  if (taskType === "general") return 0.58;
-  if (taskType === "research" && model.specialties.includes("writing")) return 0.68;
-  if (taskType === "writing" && model.specialties.includes("reasoning")) return 0.62;
-  return 0.38;
-}
-function qualityForTask(row, taskType) {
-  return asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0;
-}
-function specialtyForTask(row, taskType) {
-  return specialtyMatch(row.metadata, taskType, row.liveScores);
-}
-function asScore(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return void 0;
-  return clamp(number > 1 ? number / 100 : number);
-}
-function normalizePricing(pricing) {
-  if (pricing === null || typeof pricing !== "object" || Array.isArray(pricing)) return {};
-  const normalized2 = {};
-  for (const [id, raw] of Object.entries(pricing)) {
-    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
-    const input = Number(raw.input ?? raw.costIn);
-    const output = Number(raw.output ?? raw.costOut);
-    const cacheRead = Number(raw.cacheRead ?? 0);
-    const cacheWrite = Number(raw.cacheWrite ?? 0);
-    if (![input, output, cacheRead, cacheWrite].every((value) => Number.isFinite(value) && value >= 0)) continue;
-    normalized2[normalize(id)] = {
-      input,
-      output,
-      cacheRead,
-      cacheWrite,
-      currency: String(raw.currency ?? "USD").toUpperCase()
-    };
-  }
-  return normalized2;
-}
-function pricingFor(model, pricing, provider = "") {
-  const normalizedPricing = normalizePricing(pricing);
-  const providerOverride = provider === "" ? void 0 : normalizedPricing[normalize(`${provider}/${model.id}`)];
-  const override = providerOverride ?? normalizedPricing[normalize(model.id)];
-  return override ?? {
-    input: Number(model.costIn ?? 0),
-    output: Number(model.costOut ?? 0),
-    cacheRead: Number(model.cacheRead ?? 0),
-    cacheWrite: Number(model.cacheWrite ?? 0),
-    currency: "USD"
-  };
-}
-function normalizedCacheRatios(cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const read = Number.isFinite(Number(cacheReadRatio)) ? clamp(Number(cacheReadRatio)) : 0;
-  const write = Number.isFinite(Number(cacheWriteRatio)) ? Math.min(clamp(Number(cacheWriteRatio)), 1 - read) : 0;
-  return { read, write };
-}
-function effectivePricing(pricing, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const { read, write } = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
-  return {
-    input: (1 - read - write) * Number(pricing.input) + read * Number(pricing.cacheRead) + write * Number(pricing.cacheWrite),
-    output: Number(pricing.output)
-  };
-}
-function costScore(pricing, maxCost, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const effective = effectivePricing(pricing, cacheReadRatio, cacheWriteRatio);
-  const mean = (effective.input + effective.output) / 2;
-  if (maxCost <= 0) return mean === 0 ? 1 : 0;
-  return clamp(1 - mean / maxCost);
-}
-function estimateCost(model, text2, outputTokens = 900, pricingOverrides = {}, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const pricing = pricingFor(model, pricingOverrides);
-  const inputTokens = Math.max(80, Math.ceil(String(text2 ?? "").length / 3.7));
-  const ratios = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
-  const cacheReadTokens = Math.min(inputTokens, Math.max(0, Math.round(inputTokens * ratios.read)));
-  const cacheWriteTokens = Math.min(inputTokens - cacheReadTokens, Math.max(0, Math.round(inputTokens * ratios.write)));
-  const billableInputTokens = inputTokens - cacheReadTokens - cacheWriteTokens;
-  return (billableInputTokens * pricing.input + cacheReadTokens * pricing.cacheRead + cacheWriteTokens * pricing.cacheWrite + outputTokens * pricing.output) / 1e6;
-}
-function modelMetadata(name) {
-  const key = normalize(name);
-  return MODEL_CATALOG.find((model) => model.aliases.some((alias) => {
-    const candidate = normalize(alias);
-    return key === candidate || key.includes(candidate) || candidate.includes(key);
-  })) ?? null;
-}
-function taskTokenBudget(text2, task, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const inputTokens = Math.max(80, Math.ceil(String(text2 ?? "").length / 3.7));
-  const multipliers = {
-    analysis: { input: 0.9, output: 0.55 },
-    execution: { input: 1.2, output: complexity === "complex" ? 1.45 : 1 },
-    verification: { input: 1.15, output: 0.7 },
-    synthesis: { input: 1.65, output: 1.3 }
-  };
-  const multiplier = multipliers[task.purpose] ?? { input: 1, output: 1 };
-  const effortMultiplier = reasoningEffortMultiplier(task.reasoningEffort);
-  const totalInputTokens = Math.max(80, Math.round(inputTokens * multiplier.input));
-  const ratios = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
-  const cacheReadTokens = Math.min(totalInputTokens, Math.max(0, Math.round(totalInputTokens * ratios.read)));
-  const cacheWriteTokens = Math.min(totalInputTokens - cacheReadTokens, Math.max(0, Math.round(totalInputTokens * ratios.write)));
-  return {
-    inputTokens: totalInputTokens,
-    cacheReadTokens,
-    cacheWriteTokens,
-    outputTokens: Math.max(220, Math.round(900 * multiplier.output * effortMultiplier.output))
-  };
-}
-function taskQualityFloor(band, task) {
-  const base = QUALITY_FLOORS[band] ?? QUALITY_FLOORS.balanced;
-  if (task.purpose === "synthesis") return Math.max(base, band === "complex" ? 0.84 : base);
-  if (band !== "complex") return base;
-  return clamp(base + Math.max(0, Number(task.criticality ?? 0.75) - 0.65) * 0.12);
-}
-function requirementText(value) {
-  return String(value ?? "").trim().replace(/[。；;\s]+$/u, "").trim();
-}
-function looksLikeRequirement(value) {
-  const item = requirementText(value);
-  return item.length >= 3 && !/[:：]$/u.test(item) && !/(?:以下|下列|如下)(?:的)?(?:任务|需求|工作|事项|要求)/u.test(item) && REQUIREMENT_ACTION.test(item.slice(0, 32));
-}
-function explicitRequirements(text2) {
-  const visibleLines = [];
-  let fence = null;
-  for (const line of String(text2 ?? "").split(/\r?\n/u)) {
-    const marker2 = /^\s*(`{3,}|~{3,})/u.exec(line);
-    if (fence) {
-      if (marker2 && marker2[1][0] === fence.char && marker2[1].length >= fence.length && !line.slice(marker2[0].length).trim()) fence = null;
-      continue;
-    }
-    if (marker2) {
-      fence = { char: marker2[1][0], length: marker2[1].length };
-      continue;
-    }
-    visibleLines.push(line);
-  }
-  const value = visibleLines.join("\n");
-  const lines = visibleLines.map((line) => line.trim()).filter(Boolean);
-  const marker = /^(?:[-*•]\s+|\d{1,2}[.)、](?!\d)\s*|[一二三四五六七八九十]{1,3}[、.)]\s*)(.+)$/u;
-  const marked = lines.map((line) => marker.exec(line)?.[1]).filter(Boolean).map(requirementText).filter((item) => item.length >= 3);
-  if (marked.length >= 2) return marked;
-  const plain2 = lines.filter((line) => !/^#{1,6}\s|^```|[:：]$/u.test(line));
-  if (plain2.length >= 2 && plain2.every(looksLikeRequirement)) {
-    return plain2.map(requirementText).filter((item) => item.length >= 3);
-  }
-  const clauses = value.split(/[;；]/u).map(requirementText).filter(Boolean);
-  if (clauses.length >= 2 && clauses.every(looksLikeRequirement)) {
-    return clauses;
-  }
-  const sentences = value.split(/[。！？]/u).map(requirementText).filter(Boolean);
-  if (sentences.length >= 2 && sentences.every(looksLikeRequirement)) {
-    return sentences;
-  }
-  return [];
-}
-function taskPackages(taskType, text2, band) {
-  if (band !== "complex") {
-    const task = { id: "execution", name: "\u76F4\u63A5\u56DE\u7B54\u4E0E\u5FC5\u8981\u6821\u9A8C", type: taskType, purpose: "execution", criticality: 0.65, dependsOn: [], preferredReasoningEffort: band === "simple" ? "low" : "medium" };
-    return [{ ...task, qualityFloor: taskQualityFloor(band, task) }];
-  }
-  const value = String(text2 ?? "");
-  const packages = [
-    { id: "analysis", name: "\u95EE\u9898\u5EFA\u6A21\u4E0E\u7EA6\u675F\u63D0\u53D6", type: "reasoning", purpose: "analysis", criticality: 0.92, dependsOn: [], preferredReasoningEffort: "high" }
-  ];
-  const requirements = explicitRequirements(text2);
-  if (requirements.length >= 2) {
-    const groups = requirements.length > MAX_EXPLICIT_EXECUTION_PACKAGES ? [
-      ...requirements.slice(0, MAX_EXPLICIT_EXECUTION_PACKAGES - 1).map((item) => [item]),
-      requirements.slice(MAX_EXPLICIT_EXECUTION_PACKAGES - 1)
-    ] : requirements.map((item) => [item]);
-    groups.forEach((group, index) => {
-      const objective = group.length === 1 ? group[0] : group.map((item, offset) => `${MAX_EXPLICIT_EXECUTION_PACKAGES + offset}. ${item}`).join("\n");
-      const type = detectTaskTypes(objective)[0] ?? taskType;
-      packages.push({
-        id: `execution-${index + 1}`,
-        name: group.length === 1 ? `\u9700\u6C42 ${index + 1}\uFF1A${group[0].slice(0, 28)}` : `\u9700\u6C42 ${index + 1}\uFF1A\u5176\u4F59 ${group.length} \u9879`,
-        objective,
-        type,
-        purpose: "execution",
-        criticality: 0.8,
-        dependsOn: ["analysis"],
-        preferredReasoningEffort: "high"
-      });
-    });
-  } else {
-    const domains = [...new Set([...detectTaskTypes(text2), taskType].filter((type) => type !== "general"))];
-    for (const type of domains.length > 0 ? domains : [taskType]) {
-      packages.push({
-        id: `execution-${type}`,
-        name: `${TASK_TYPE_LABELS[type] ?? type}\u65B9\u5411\u5904\u7406`,
-        type,
-        purpose: "execution",
-        criticality: domains.length > 1 ? 0.8 : 0.78,
-        dependsOn: ["analysis"],
-        preferredReasoningEffort: "high"
-      });
-    }
-  }
-  if (/(测试|验证|评估|对比|benchmark|test|verify|audit)/i.test(value)) {
-    packages.push({
-      id: "verification",
-      name: "\u9A8C\u8BC1\u3001\u53CD\u4F8B\u4E0E\u98CE\u9669\u5BA1\u67E5",
-      type: "reasoning",
-      purpose: "verification",
-      criticality: 0.88,
-      dependsOn: packages.filter((task) => task.purpose === "execution").map((task) => task.id),
-      preferredReasoningEffort: "high"
-    });
-  }
-  packages.push({
-    id: "synthesis",
-    name: "\u7ED3\u679C\u6821\u9A8C\u4E0E\u6574\u5408",
-    type: "reasoning",
-    purpose: "synthesis",
-    criticality: 1,
-    dependsOn: packages.filter((task) => task.purpose !== "analysis").map((task) => task.id),
-    preferredReasoningEffort: "xhigh"
-  });
-  return packages.map((task) => ({ ...task, qualityFloor: taskQualityFloor(band, task) }));
-}
-function weightsForTask(weights, task) {
-  return task.purpose === "synthesis" ? SYNTHESIS_WEIGHTS : weights;
-}
-function compareText(left, right) {
-  const a = String(left);
-  const b = String(right);
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-function compareRowsStable(left, right) {
-  return compareText(routeKey(left.provider, left.model), routeKey(right.provider, right.model));
-}
-function reasoningEffortRank(effort) {
-  const normalized2 = String(effort ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
-  const aliases = { none: "off", disabled: "off", extra: "xhigh", extrahigh: "xhigh", maximum: "max" };
-  const canonical = aliases[normalized2] ?? normalized2;
-  const index = REASONING_EFFORT_ORDER.indexOf(canonical);
-  return index < 0 ? REASONING_EFFORT_ORDER.indexOf("medium") : index;
-}
-function reasoningEffortMultiplier(effort) {
-  const normalized2 = String(effort ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
-  const aliases = { none: "off", disabled: "off", extra: "xhigh", extrahigh: "xhigh", maximum: "max" };
-  return REASONING_EFFORT_MULTIPLIERS[aliases[normalized2] ?? normalized2] ?? REASONING_EFFORT_MULTIPLIERS.medium;
-}
-function selectReasoningEffort(efforts, preferred = "medium") {
-  const exact = Array.isArray(efforts) ? [...new Set(efforts.map((effort) => String(effort?.id ?? effort ?? "")).filter(Boolean))] : [];
-  if (exact.length === 0) return void 0;
-  const preferredRank = reasoningEffortRank(preferred);
-  return exact.slice().sort((left, right) => {
-    const distance = Math.abs(reasoningEffortRank(left) - preferredRank) - Math.abs(reasoningEffortRank(right) - preferredRank);
-    if (distance !== 0) return distance;
-    return reasoningEffortRank(left) - reasoningEffortRank(right) || compareText(left, right);
-  })[0];
-}
-function reasoningDecision(row, task) {
-  const preferred = String(task.preferredReasoningEffort ?? "medium");
-  const efforts = Array.isArray(row.reasoningEfforts) ? row.reasoningEfforts : [];
-  if (efforts.length === 0) {
-    const knownUnsupported = row.reasoningKnown === true;
-    const preferredRank2 = reasoningEffortRank(preferred);
-    return {
-      reasoningEffort: void 0,
-      reasoningFit: knownUnsupported ? clamp(0.78 - preferredRank2 * 0.08) : 0.55,
-      preferredReasoningEffort: preferred,
-      multiplier: REASONING_EFFORT_MULTIPLIERS.medium
-    };
-  }
-  const preferredRank = reasoningEffortRank(preferred);
-  const chosen = selectReasoningEffort(efforts, preferred);
-  const distance = Math.abs(reasoningEffortRank(chosen) - preferredRank);
-  return {
-    reasoningEffort: chosen,
-    reasoningFit: clamp(1 - distance / (REASONING_EFFORT_ORDER.length - 1)),
-    preferredReasoningEffort: preferred,
-    multiplier: reasoningEffortMultiplier(chosen)
-  };
-}
-function candidateUtility(row, task, weights, maxCost, usedRoutes, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const quality = qualityForTask(row, task.type);
-  const floor = Number(task.qualityFloor ?? taskQualityFloor("complex", task));
-  const qualityGap = Math.max(0, floor - quality);
-  const duplicatePenalty = usedRoutes.has(routeKey(row.provider, row.model)) ? 0.08 : 0;
-  const synthesisPreference = task.purpose === "synthesis" && /deepseek[- ]?v4[- ]?pro/i.test(row.model) ? 0.025 : 0;
-  const reasoning = reasoningDecision(row, task);
-  const cost = clamp(costScore(row.pricing, maxCost, cacheReadRatio, cacheWriteRatio) / Math.sqrt(reasoning.multiplier.output));
-  const score = weights.quality * quality + weights.cost * cost + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency)) + weights.specialty * specialtyForTask(row, task.type) + (weights.reasoning ?? 0) * reasoning.reasoningFit - weights.risk * row.risk - duplicatePenalty - qualityGap * (task.criticality ?? 0.75) + synthesisPreference;
-  return { score, floor, qualityGap, ...reasoning };
-}
-function taskCost(row, task, text2, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const decision = row === null ? null : reasoningDecision(row, task);
-  const tokens = taskTokenBudget(text2, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity, cacheReadRatio, cacheWriteRatio);
-  return row === null ? 0 : ((tokens.inputTokens - tokens.cacheReadTokens - tokens.cacheWriteTokens) * row.pricing.input + tokens.cacheReadTokens * row.pricing.cacheRead + tokens.cacheWriteTokens * row.pricing.cacheWrite + tokens.outputTokens * row.pricing.output) / 1e6;
-}
-function dominates(left, right, task, text2, complexity, cacheReadRatio, cacheWriteRatio) {
-  const leftReasoning = reasoningDecision(left, task);
-  const rightReasoning = reasoningDecision(right, task);
-  const leftValues = {
-    quality: qualityForTask(left, task.type),
-    cost: taskCost(left, task, text2, complexity, cacheReadRatio, cacheWriteRatio),
-    latency: clamp(left.latency * leftReasoning.multiplier.latency),
-    specialty: specialtyForTask(left, task.type),
-    reasoning: leftReasoning.reasoningFit,
-    risk: clamp(left.risk)
-  };
-  const rightValues = {
-    quality: qualityForTask(right, task.type),
-    cost: taskCost(right, task, text2, complexity, cacheReadRatio, cacheWriteRatio),
-    latency: clamp(right.latency * rightReasoning.multiplier.latency),
-    specialty: specialtyForTask(right, task.type),
-    reasoning: rightReasoning.reasoningFit,
-    risk: clamp(right.risk)
-  };
-  const noWorse = leftValues.quality >= rightValues.quality && leftValues.cost <= rightValues.cost && leftValues.latency <= rightValues.latency && leftValues.specialty >= rightValues.specialty && leftValues.reasoning >= rightValues.reasoning && leftValues.risk <= rightValues.risk;
-  const strictlyBetter = leftValues.quality > rightValues.quality || leftValues.cost < rightValues.cost || leftValues.latency < rightValues.latency || leftValues.specialty > rightValues.specialty || leftValues.reasoning > rightValues.reasoning || leftValues.risk < rightValues.risk;
-  return noWorse && strictlyBetter;
-}
-function candidatePool(rows, task, weights, maxCost, text2, complexity, cacheReadRatio, cacheWriteRatio) {
-  const floor = Number(task.qualityFloor ?? 0);
-  const feasible = rows.filter((row) => qualityForTask(row, task.type) >= floor);
-  const source = feasible.length > 0 ? feasible : rows.slice().sort((left, right) => qualityForTask(right, task.type) - qualityForTask(left, task.type) || compareRowsStable(left, right)).slice(0, 3);
-  const taskWeights = weightsForTask(weights, task);
-  const scored = source.map((row) => ({
-    row,
-    decision: candidateUtility(row, task, taskWeights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio),
-    cost: taskCost(row, task, text2, complexity, cacheReadRatio, cacheWriteRatio)
-  }));
-  const frontier = scored.filter((item) => !source.some((other) => other !== item.row && dominates(other, item.row, task, text2, complexity, cacheReadRatio, cacheWriteRatio)));
-  const essential = [
-    scored.slice().sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
-    scored.slice().sort((left, right) => right.decision.score - left.decision.score || compareRowsStable(left.row, right.row))[0],
-    scored.slice().sort((left, right) => qualityForTask(right.row, task.type) - qualityForTask(left.row, task.type) || compareRowsStable(left.row, right.row))[0]
-  ].filter(Boolean);
-  const ordered = [...frontier, ...essential].filter((item, index, all) => all.findIndex((candidate) => candidate.row === item.row) === index).sort((left, right) => right.decision.score - left.decision.score || left.cost - right.cost || compareRowsStable(left.row, right.row)).slice(0, ROUTING_CANDIDATE_LIMIT);
-  return {
-    options: ordered,
-    relaxed: feasible.length === 0,
-    pruned: Math.max(0, rows.length - ordered.length)
-  };
-}
-function stateSignature(state) {
-  return state.assignments.map((assignment) => `${routeKey(assignment.row?.provider, assignment.row?.model)}@${assignment.decision?.reasoningEffort ?? "provider-default"}`).join("|");
-}
-function compareUtilityStates(left, right) {
-  return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || right.score - left.score || left.cost - right.cost || left.switches - right.switches || compareText(stateSignature(left), stateSignature(right));
-}
-function compareCostStates(left, right) {
-  return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || left.cost - right.cost || right.score - left.score || left.switches - right.switches || compareText(stateSignature(left), stateSignature(right));
-}
-function solveAssignments({ rows, tasks, weights, maxCost, text: text2, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
-  const pools = tasks.map((task) => candidatePool(rows, task, weights, maxCost, text2, complexity, cacheReadRatio, cacheWriteRatio));
-  if (pools.some((pool) => pool.options.length === 0)) return null;
-  const suffixMinimum = Array(tasks.length + 1).fill(0);
-  for (let index = tasks.length - 1; index >= 0; index -= 1) {
-    suffixMinimum[index] = suffixMinimum[index + 1] + Math.min(...pools[index].options.map((option2) => option2.cost));
-  }
-  if (Number.isFinite(budget) && suffixMinimum[0] > budget + 1e-12) return null;
-  let states = [{ assignments: [], routesByTask: /* @__PURE__ */ new Map(), usedRoutes: /* @__PURE__ */ new Set(), score: 0, cost: 0, switches: 0, relaxedCount: 0, qualityShortfall: 0 }];
-  for (let index = 0; index < tasks.length; index += 1) {
-    const task = tasks[index];
-    const pool = pools[index];
-    const expanded = [];
-    for (const state of states) {
-      for (const option2 of pool.options) {
-        const nextCost = state.cost + option2.cost;
-        if (Number.isFinite(budget) && nextCost + suffixMinimum[index + 1] > budget + 1e-12) continue;
-        const taskWeights = weightsForTask(weights, task);
-        const decision = candidateUtility(option2.row, task, taskWeights, maxCost, state.usedRoutes, cacheReadRatio, cacheWriteRatio);
-        const route = routeKey(option2.row.provider, option2.row.model);
-        const dependencySwitches = (task.dependsOn ?? []).reduce((count, dependency) => {
-          const dependencyRoute = state.routesByTask.get(dependency);
-          return count + (dependencyRoute !== void 0 && dependencyRoute !== route ? 1 : 0);
-        }, 0);
-        const handoffPenalty = dependencySwitches * 0.015;
-        const qualityShortfall = Math.max(0, decision.floor - qualityForTask(option2.row, task.type));
-        const usedRoutes = new Set(state.usedRoutes);
-        usedRoutes.add(route);
-        const routesByTask = new Map(state.routesByTask);
-        routesByTask.set(task.id, route);
-        expanded.push({
-          assignments: [...state.assignments, { task, row: option2.row, decision: { ...decision, relaxed: qualityShortfall > 0 }, estimatedCost: option2.cost, handoffPenalty }],
-          routesByTask,
-          usedRoutes,
-          score: state.score + decision.score - handoffPenalty,
-          cost: nextCost,
-          switches: state.switches + dependencySwitches,
-          relaxedCount: state.relaxedCount + (qualityShortfall > 0 ? 1 : 0),
-          qualityShortfall: state.qualityShortfall + qualityShortfall
-        });
-      }
-    }
-    if (expanded.length === 0) return null;
-    expanded.sort(minimizeCost ? compareCostStates : compareUtilityStates);
-    states = expanded.slice(0, ROUTING_BEAM_WIDTH);
-  }
-  states.sort(minimizeCost ? compareCostStates : compareUtilityStates);
-  return {
-    ...states[0],
-    candidatePools: pools,
-    minimumFeasibleCost: suffixMinimum[0]
-  };
-}
-function buildPlan({ text: text2 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0 } = {}) {
-  const complexity = assessComplexity(text2);
-  const taskType = classifyTask(text2);
-  const weights = OBJECTIVE_WEIGHTS[complexity.band];
-  const discovered = Array.isArray(available) ? available.map((entry) => {
-    const rawEfforts = Array.isArray(entry.reasoningEfforts) ? entry.reasoningEfforts : [];
-    const reasoningEfforts = rawEfforts.map((effort) => String(effort?.id ?? effort ?? "")).filter(Boolean);
-    return {
-      provider: String(entry.provider ?? ""),
-      model: String(entry.model ?? ""),
-      reasoningEfforts: [...new Set(reasoningEfforts)],
-      defaultReasoningEffort: entry.defaultReasoningEffort === void 0 ? void 0 : String(entry.defaultReasoningEffort),
-      reasoningKnown: entry.reasoningKnown === true || entry.reasoningKnown === void 0 && Array.isArray(entry.reasoningEfforts)
-    };
-  }) : [];
-  const rows = [];
-  const normalizedPrices = normalizePricing(pricing);
-  const maxCost = Math.max(1, ...MODEL_CATALOG.map((model) => {
-    const row = pricingFor(model, normalizedPrices);
-    const effective = effectivePricing(row, cacheReadRatio, cacheWriteRatio);
-    return effective.input + effective.output;
-  }), ...Object.values(normalizedPrices).map((row) => {
-    const effective = effectivePricing(row, cacheReadRatio, cacheWriteRatio);
-    return effective.input + effective.output;
-  }));
-  for (const route of discovered) {
-    const metadata = modelMetadata(route.model) ?? {
-      id: route.model,
-      aliases: [route.model],
-      quality: 0.66,
-      latency: 0.55,
-      costIn: 1,
-      costOut: 4,
-      specialties: [],
-      risk: 0.24
-    };
-    const live = liveBenchRow(liveBench, route.model);
-    const liveScores = live?.scores ?? {};
-    const liveOverall = asScore(live?.overall);
-    const quality = asScore(liveScores?.[taskType]) ?? liveOverall ?? metadata.quality;
-    const pricingRow = pricingFor(metadata, normalizedPrices, route.provider);
-    const specialty = specialtyMatch(metadata, taskType, liveScores);
-    rows.push({
-      provider: route.provider,
-      model: route.model,
-      metadata,
-      quality,
-      liveScores,
-      liveOverall,
-      latency: metadata.latency,
-      risk: metadata.risk,
-      specialty,
-      reasoningEfforts: route.reasoningEfforts,
-      defaultReasoningEffort: route.defaultReasoningEffort,
-      reasoningKnown: route.reasoningKnown,
-      pricing: pricingRow,
-      score: 0,
-      estimatedCost: estimateCost(metadata, text2, 900, normalizedPrices, cacheReadRatio, cacheWriteRatio)
-    });
-  }
-  const taskNodes = taskPackages(taskType, text2, complexity.band);
-  const budget = Number(budgetUsd);
-  const utilityPlan = solveAssignments({
-    rows,
-    tasks: taskNodes,
-    weights,
-    maxCost,
-    text: text2,
-    complexity: complexity.band,
-    budget: Number.POSITIVE_INFINITY,
-    cacheReadRatio,
-    cacheWriteRatio
-  });
-  const budgetPlan = budget > 0 ? solveAssignments({
-    rows,
-    tasks: taskNodes,
-    weights,
-    maxCost,
-    text: text2,
-    complexity: complexity.band,
-    budget,
-    cacheReadRatio,
-    cacheWriteRatio
-  }) : null;
-  const minimumCostPlan = budget > 0 && budgetPlan === null ? solveAssignments({
-    rows,
-    tasks: taskNodes,
-    weights,
-    maxCost,
-    text: text2,
-    complexity: complexity.band,
-    budget: Number.POSITIVE_INFINITY,
-    cacheReadRatio,
-    cacheWriteRatio,
-    minimizeCost: true
-  }) : null;
-  const optimized = budget > 0 ? budgetPlan ?? minimumCostPlan ?? utilityPlan : utilityPlan;
-  const assignments = optimized?.assignments ?? [];
-  const usedRoutes = optimized?.usedRoutes ?? /* @__PURE__ */ new Set();
-  const constraintRelaxed = (optimized?.relaxedCount ?? 0) > 0;
-  for (const row of rows) {
-    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio).score;
-  }
-  rows.sort((left, right) => right.score - left.score || compareRowsStable(left, right));
-  const selectedAssignment = assignments[0];
-  const selected = selectedAssignment?.row ?? rows[0] ?? null;
-  const synthesizerAssignment = assignments.at(-1);
-  const synthesizer = synthesizerAssignment?.row ?? rows.find((row) => /deepseek/i.test(row.model)) ?? rows[0];
-  const subtasks = assignments.map(({ task, row, decision }) => ({
-    id: task.id,
-    name: task.name,
-    ...task.objective ? { objective: task.objective } : {},
-    type: task.type,
-    recommended: row?.model ?? "\u5F85\u53D1\u73B0\u6A21\u578B",
-    recommendedProvider: row?.provider ?? "",
-    recommendedReasoningEffort: decision?.reasoningEffort,
-    preferredReasoningEffort: decision?.preferredReasoningEffort ?? task.preferredReasoningEffort,
-    reasoningFit: Number(Number(decision?.reasoningFit ?? 0).toFixed(3)),
-    purpose: task.purpose,
-    criticality: task.criticality,
-    qualityFloor: Number(task.qualityFloor.toFixed(3)),
-    dependsOn: [...task.dependsOn ?? []]
-  }));
-  const costBreakdown = assignments.map(({ task, row, decision, estimatedCost, handoffPenalty }, index) => {
-    const tokens = taskTokenBudget(text2, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity.band, cacheReadRatio, cacheWriteRatio);
-    const taskEstimate = estimatedCost ?? taskCost(row, task, text2, complexity.band, cacheReadRatio, cacheWriteRatio);
-    return {
-      stage: index + 1,
-      purpose: task.purpose,
-      model: row?.model ?? "\u5F85\u53D1\u73B0\u6A21\u578B",
-      provider: row?.provider ?? "",
-      reasoningEffort: decision?.reasoningEffort,
-      preferredReasoningEffort: decision?.preferredReasoningEffort,
-      reasoningFit: Number(Number(decision?.reasoningFit ?? 0).toFixed(3)),
-      reasoningOutputMultiplier: Number(Number(decision?.multiplier?.output ?? 1).toFixed(2)),
-      inputTokens: tokens.inputTokens,
-      cacheReadTokens: tokens.cacheReadTokens,
-      cacheWriteTokens: tokens.cacheWriteTokens,
-      outputTokens: tokens.outputTokens,
-      estimatedCost: Number(taskEstimate.toFixed(6)),
-      quality: Number((row === null ? 0 : qualityForTask(row, task.type)).toFixed(3)),
-      handoffPenalty: Number(Number(handoffPenalty ?? 0).toFixed(3))
-    };
-  });
-  const totalEstimate = costBreakdown.reduce((sum, row) => sum + row.estimatedCost, 0);
-  const baselineCost = assignments.reduce((sum, { task }) => {
-    const strongest = rows.reduce((best, row) => qualityForTask(row, task.type) > (best === null ? -1 : qualityForTask(best, task.type)) ? row : best, null);
-    return sum + taskCost(strongest, task, text2, complexity.band, cacheReadRatio, cacheWriteRatio);
-  }, 0);
-  const budgetExceeded = Number(budgetUsd) > 0 && totalEstimate > Number(budgetUsd);
-  const savings = baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost);
-  const paretoPruned = (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.pruned, 0);
-  const minimumFeasibleCost = optimized?.minimumFeasibleCost ?? minimumCostPlan?.cost ?? 0;
-  const reason = selected === null ? "\u5C1A\u672A\u53D1\u73B0\u53EF\u7528\u6A21\u578B\uFF0C\u4FDD\u7559 Harness \u539F\u59CB\u6A21\u578B\u9009\u62E9\u3002" : `${complexity.band === "simple" ? "\u4F4E\u590D\u6742\u5EA6\u4F18\u5148\u6210\u672C\u3001\u54CD\u5E94\u901F\u5EA6\u4E0E\u8F83\u4F4E\u63A8\u7406\u5F00\u9500" : complexity.band === "balanced" ? "\u5728\u8D28\u91CF\u3001\u6210\u672C\u3001\u63A8\u7406\u7B49\u7EA7\u3001\u5EF6\u8FDF\u4E0E\u98CE\u9669\u4E4B\u95F4\u5E73\u8861" : "\u9AD8\u590D\u6742\u5EA6\u6267\u884C\u5305\u542B\u63A8\u7406\u7B49\u7EA7\u7684\u4F9D\u8D56\u611F\u77E5\u5168\u5C40\u7EA6\u675F\u5206\u914D"}\uFF1B\u4EFB\u52A1\u7C7B\u578B\u4E3A ${taskType}\uFF0C\u5DF2\u5BF9 ${String(subtasks.length)} \u4E2A\u5DE5\u4F5C\u5305\u8FDB\u884C Pareto \u526A\u679D\u548C\u6709\u754C\u7EC4\u5408\u641C\u7D22\u3002`;
-  return {
-    mode,
-    complexity: { value: Number(complexity.value.toFixed(3)), band: complexity.band },
-    taskType,
-    taskTypes: [...new Set(taskNodes.map((task) => task.type).filter((type) => type !== "reasoning"))],
-    objectiveWeights: weights,
-    candidates: rows.slice(0, 8).map((row) => {
-      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === "simple" ? "low" : "medium" }, weights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio);
-      return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), quality: Number(row.quality.toFixed(3)), specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing.input, outputPrice: row.pricing.output };
-    }),
-    selected: selected === null ? null : { provider: selected.provider, model: selected.model, reasoningEffort: selectedAssignment?.decision?.reasoningEffort, estimatedCost: Number(selected.estimatedCost.toFixed(6)) },
-    subtasks,
-    synthesizer: synthesizer === void 0 ? null : { provider: synthesizer.provider, model: synthesizer.model, reasoningEffort: synthesizerAssignment?.decision?.reasoningEffort },
-    estimatedCost: Number(totalEstimate.toFixed(6)),
-    costBreakdown,
-    optimization: {
-      solver: "pareto-pruned quality-constrained beam assignment",
-      qualityFloor: QUALITY_FLOORS[complexity.band],
-      budgetUsd: Number(Number(budgetUsd) > 0 ? Number(budgetUsd) : 0),
-      cacheReadRatio: normalizedCacheRatios(cacheReadRatio, cacheWriteRatio).read,
-      cacheWriteRatio: normalizedCacheRatios(cacheReadRatio, cacheWriteRatio).write,
-      budgetExceeded,
-      constraintRelaxed,
-      baselineAllStrongCost: Number(baselineCost.toFixed(6)),
-      estimatedSavings: Number(savings.toFixed(4)),
-      distinctRoutes: usedRoutes.size,
-      handoffCount: optimized?.switches ?? 0,
-      paretoPruned,
-      beamWidth: ROUTING_BEAM_WIDTH,
-      budgetFeasible: budget <= 0 || budgetPlan !== null,
-      minimumFeasibleCost: Number(Number(minimumFeasibleCost).toFixed(6)),
-      liveBench: liveBench?.fetchedAt ? { source: liveBench.source ?? "livebench", fetchedAt: liveBench.fetchedAt, models: Object.keys(liveBench.models ?? {}).length, stale: String(liveBenchError).length > 0, error: String(liveBenchError || "") } : { source: "experimental-baseline", fetchedAt: null, models: 0, stale: false, error: String(liveBenchError || "") }
-    },
-    reason,
-    generatedAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-}
-var OBJECTIVE_WEIGHTS, REASONING_EFFORT_ORDER, REASONING_EFFORT_MULTIPLIERS, QUALITY_FLOORS, DEFAULT_ROUTER_SETTINGS, MODEL_CATALOG, clamp, normalize, routeKey, OPENCODE_CATALOG_PROVIDERS, TASK_TYPE_RULES, TASK_TYPE_LABELS, MAX_EXPLICIT_EXECUTION_PACKAGES, REQUIREMENT_ACTION, SYNTHESIS_WEIGHTS, ROUTING_BEAM_WIDTH, ROUTING_CANDIDATE_LIMIT;
-var init_router = __esm({
-  ".dsh-plugin/shared/router.mjs"() {
-    init_livebench();
-    OBJECTIVE_WEIGHTS = Object.freeze({
-      simple: Object.freeze({ quality: 0.28, cost: 0.45, latency: 0.14, specialty: 0.04, reasoning: 0.07, risk: 0.02 }),
-      balanced: Object.freeze({ quality: 0.4, cost: 0.26, latency: 0.1, specialty: 0.09, reasoning: 0.1, risk: 0.05 }),
-      complex: Object.freeze({ quality: 0.48, cost: 0.14, latency: 0.06, specialty: 0.14, reasoning: 0.11, risk: 0.07 })
-    });
-    REASONING_EFFORT_ORDER = Object.freeze(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-    REASONING_EFFORT_MULTIPLIERS = Object.freeze({
-      off: Object.freeze({ output: 0.78, latency: 0.75 }),
-      minimal: Object.freeze({ output: 0.86, latency: 0.82 }),
-      low: Object.freeze({ output: 0.93, latency: 0.9 }),
-      medium: Object.freeze({ output: 1, latency: 1 }),
-      high: Object.freeze({ output: 1.16, latency: 1.15 }),
-      xhigh: Object.freeze({ output: 1.34, latency: 1.3 }),
-      max: Object.freeze({ output: 1.58, latency: 1.5 })
-    });
-    QUALITY_FLOORS = Object.freeze({ simple: 0.75, balanced: 0.78, complex: 0.82 });
-    DEFAULT_ROUTER_SETTINGS = Object.freeze({
-      pricing: Object.freeze({}),
-      // The official site publishes versioned table/categories assets and the
-      // adapter discovers the newest release from this root URL.
-      liveBenchEndpoint: "https://livebench.ai",
-      liveBenchTtlMs: 9e5,
-      budgetUsd: 0,
-      cacheReadRatio: 0,
-      cacheWriteRatio: 0
-    });
-    MODEL_CATALOG = Object.freeze([
-      { id: "claude-fable-5", aliases: ["claude-fable-5", "claude fable 5"], quality: 0.99, latency: 0.34, costIn: 10, costOut: 50, specialties: ["reasoning", "writing", "research"], risk: 0.06 },
-      { id: "claude-opus-4-8", aliases: ["claude-opus-4-8", "claude opus 4.8"], quality: 0.97, latency: 0.39, costIn: 5, costOut: 25, specialties: ["reasoning", "writing", "code"], risk: 0.07 },
-      { id: "gpt-5.6-sol", aliases: ["gpt-5.6-sol", "gpt 5.6 sol"], quality: 0.98, latency: 0.4, costIn: 5, costOut: 30, specialties: ["reasoning", "code", "math", "vision"], risk: 0.06 },
-      { id: "gpt-5.5", aliases: ["gpt-5.5", "gpt 5.5"], quality: 0.95, latency: 0.44, costIn: 5, costOut: 30, specialties: ["reasoning", "code", "math"], risk: 0.08 },
-      { id: "deepseek-v4-pro", aliases: ["deepseek-v4-pro", "deepseek v4 pro"], quality: 0.93, latency: 0.52, costIn: 1.74, costOut: 3.48, specialties: ["code", "math", "reasoning"], risk: 0.1 },
-      { id: "deepseek-v4-flash", aliases: ["deepseek-v4-flash", "deepseek v4 flash"], quality: 0.82, latency: 0.82, costIn: 0.14, costOut: 0.28, specialties: ["code", "summarization", "classification"], risk: 0.14 },
-      { id: "kimi-k3", aliases: ["kimi-k3", "kimi k3"], quality: 0.91, latency: 0.56, costIn: 3, costOut: 15, specialties: ["reasoning", "long-context", "code"], risk: 0.1 },
-      { id: "qwen3.7-max", aliases: ["qwen3.7-max", "qwen 3.7 max"], quality: 0.94, latency: 0.5, costIn: 2.5, costOut: 7.5, specialties: ["reasoning", "math", "code"], risk: 0.08 },
-      { id: "qwen3.7-plus", aliases: ["qwen3.7-plus", "qwen 3.7 plus"], quality: 0.87, latency: 0.72, costIn: 0.4, costOut: 1.6, specialties: ["code", "math", "writing"], risk: 0.12 },
-      { id: "glm-5.2", aliases: ["glm-5.2", "glm 5.2"], quality: 0.89, latency: 0.64, costIn: 1.4, costOut: 4.4, specialties: ["reasoning", "writing", "math"], risk: 0.11 },
-      { id: "gpt-5.6-luna", aliases: ["gpt-5.6-luna", "gpt 5.6 luna"], quality: 0.84, latency: 0.86, costIn: 0.2, costOut: 1.2, specialties: ["classification", "summarization", "code"], risk: 0.14 },
-      { id: "gpt-5.6-terra", aliases: ["gpt-5.6-terra", "gpt 5.6 terra"], quality: 0.91, latency: 0.66, costIn: 2, costOut: 12, specialties: ["code", "writing", "reasoning"], risk: 0.1 },
-      { id: "minimax-m3", aliases: ["minimax-m3", "minimax m3"], quality: 0.86, latency: 0.69, costIn: 0.3, costOut: 1.2, specialties: ["writing", "code", "summarization"], risk: 0.13 },
-      { id: "gemini-3-flash", aliases: ["gemini 3 flash", "gemini-3-flash"], quality: 0.88, latency: 0.73, costIn: 0.5, costOut: 3, specialties: ["vision", "research", "summarization"], risk: 0.12 },
-      { id: "big-pickle", aliases: ["big pickle"], quality: 0.7, latency: 0.88, costIn: 0, costOut: 0, specialties: ["classification", "summarization"], risk: 0.24 }
-    ]);
-    clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
-    normalize = (value) => String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-    routeKey = (provider, model) => `${String(provider ?? "")}/${String(model ?? "")}`;
-    OPENCODE_CATALOG_PROVIDERS = Object.freeze([
-      "opencode",
-      "opencode-go",
-      // Some OpenCode-compatible configuration examples use the product name as
-      // the route id. Treat those aliases as catalog routes too; the pi-ai catalog
-      // still owns the actual model endpoints.
-      "opencode-zen",
-      "opencode-go-zen"
-    ]);
-    TASK_TYPE_RULES = Object.freeze([
-      ["vision", /图片|图像|照片|视觉|image|vision|截图|识图/i],
-      ["math", /数学|证明|定理|公式|方程|math|proof|theorem/i],
-      ["code", /代码|编程|工程|项目|架构|接口|api|debug|实现|部署|测试|code/i],
-      ["research", /研究|论文|文献|联网|检索|research|source|引用/i],
-      ["summarization", /总结|摘要|提炼|分类|翻译|summar|classif|extract/i],
-      ["writing", /写作|润色|小说|文案|报告|writing|draft/i]
-    ]);
-    TASK_TYPE_LABELS = Object.freeze({
-      vision: "\u89C6\u89C9\u5904\u7406",
-      math: "\u6570\u5B66\u63A8\u5BFC",
-      code: "\u5DE5\u7A0B\u4E0E\u4EE3\u7801",
-      research: "\u7814\u7A76\u4E0E\u68C0\u7D22",
-      summarization: "\u6458\u8981\u4E0E\u6574\u7406",
-      writing: "\u5199\u4F5C\u4E0E\u8868\u8FBE"
-    });
-    MAX_EXPLICIT_EXECUTION_PACKAGES = 6;
-    REQUIREMENT_ACTION = /(?:实现|新增|添加|修复|更新|构建|设计|完成|编写|优化|接入|支持|配置|部署|测试|验证|检查|整理|创建|移除|替换|迁移|适配|开发|调研|安装|下载|上传|发布|生成|集成|改造|封装|显示|提供|允许|确保|处理|解决|分析|探测|检测|选择|分配|拆分|对接|加入|保留|记录|输出|审查|核对|对比|可以|能够|需要|进行|implement|add|fix|update|build|design|write|improve|support|configure|deploy|test|verify|check|create|remove|replace|migrate|install|publish|generate|integrate|review|should|must|need)/i;
-    SYNTHESIS_WEIGHTS = Object.freeze({ quality: 0.58, cost: 0.08, latency: 0.04, specialty: 0.08, reasoning: 0.16, risk: 0.06 });
-    ROUTING_BEAM_WIDTH = 256;
-    ROUTING_CANDIDATE_LIMIT = 12;
-  }
-});
-
 // .dsh-plugin/shared/official-tool-registry.mjs
-function getOfficialTool(id) {
-  return TOOL_BY_ID.get(String(id ?? "").trim()) ?? null;
+function getOfficialTool(id2) {
+  return TOOL_BY_ID.get(String(id2 ?? "").trim()) ?? null;
 }
 function toolForProvider(provider) {
   const value = String(provider ?? "").trim().toLowerCase();
@@ -886,6 +151,927 @@ var init_official_tool_registry = __esm({
   }
 });
 
+// .dsh-plugin/shared/model-profiles.mjs
+function nonnegative(value, label) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1e6) {
+    throw new Error(`${label} \u5FC5\u987B\u662F 0 \u5230 1000000 \u4E4B\u95F4\u7684\u6709\u9650\u6570\u5B57`);
+  }
+  return value;
+}
+function normalizeProfile(entry, index) {
+  const label = `\u7B2C ${index + 1} \u4E2A\u6A21\u578B`;
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error(`${label} \u5FC5\u987B\u662F\u5BF9\u8C61`);
+  const allowed = /* @__PURE__ */ new Set(["provider", "model", "quality", "pricing", "specialties", "cliModel"]);
+  const unknown = Object.keys(entry).find((key) => !allowed.has(key));
+  if (unknown) throw new Error(`${label} \u542B\u4E0D\u652F\u6301\u7684\u5B57\u6BB5 ${unknown}\uFF1B\u4E0D\u8981\u5728\u8FD9\u91CC\u586B\u5199\u5BC6\u94A5\u6216\u547D\u4EE4`);
+  const provider = id(entry.provider);
+  const model = id(entry.model);
+  if (!provider || !model || provider.length > 160 || model.length > 240) {
+    throw new Error(`${label} \u9700\u8981\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u51C6\u786E provider \u548C model`);
+  }
+  const profile = { provider, model };
+  if (entry.quality !== void 0) {
+    const value = nonnegative(entry.quality, `${label} \u7684 quality`);
+    if (value > 100) throw new Error(`${label} \u7684 quality \u5E94\u5728 0 \u5230 100 \u4E4B\u95F4`);
+    profile.quality = value / 100;
+  }
+  if (entry.pricing !== void 0) {
+    const prices = entry.pricing;
+    if (!prices || typeof prices !== "object" || Array.isArray(prices)) throw new Error(`${label} \u7684 pricing \u5FC5\u987B\u662F\u5BF9\u8C61`);
+    const priceFields = /* @__PURE__ */ new Set(["input", "output", "cacheRead", "cacheWrite", "currency"]);
+    const unknownPrice = Object.keys(prices).find((key) => !priceFields.has(key));
+    if (unknownPrice) throw new Error(`${label} \u7684 pricing \u542B\u4E0D\u652F\u6301\u7684\u5B57\u6BB5 ${unknownPrice}`);
+    if (prices.currency !== void 0 && prices.currency !== "USD") throw new Error(`${label} \u7684\u4EF7\u683C\u5E01\u79CD\u76EE\u524D\u4EC5\u652F\u6301 USD`);
+    profile.pricing = {
+      input: nonnegative(prices.input, `${label} \u7684\u8F93\u5165\u5355\u4EF7`),
+      output: nonnegative(prices.output, `${label} \u7684\u8F93\u51FA\u5355\u4EF7`),
+      currency: "USD"
+    };
+    if (prices.cacheRead !== void 0) profile.pricing.cacheRead = nonnegative(prices.cacheRead, `${label} \u7684\u7F13\u5B58\u8BFB\u53D6\u5355\u4EF7`);
+    if (prices.cacheWrite !== void 0) profile.pricing.cacheWrite = nonnegative(prices.cacheWrite, `${label} \u7684\u7F13\u5B58\u5199\u5165\u5355\u4EF7`);
+  }
+  if (entry.specialties !== void 0) {
+    if (!Array.isArray(entry.specialties) || entry.specialties.length > 16 || entry.specialties.some((value) => !/^[a-z][a-z0-9-]{0,39}$/.test(value))) {
+      throw new Error(`${label} \u7684 specialties \u5FC5\u987B\u662F\u81F3\u591A 16 \u4E2A\u82F1\u6587\u4EFB\u52A1\u6807\u7B7E`);
+    }
+    profile.specialties = [...new Set(entry.specialties)];
+  }
+  if (entry.cliModel !== void 0) {
+    const cliModel = id(entry.cliModel);
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(cliModel)) throw new Error(`${label} \u7684 cliModel \u65E0\u6548`);
+    if (toolForProvider(provider)?.id === "zcode") throw new Error(`${label} \u5BF9\u5E94\u7684 ZCode CLI \u6682\u4E0D\u652F\u6301\u9010\u6B21\u5207\u6362\u6A21\u578B`);
+    profile.cliModel = cliModel;
+  }
+  if (Object.keys(profile).length === 2) throw new Error(`${label} \u81F3\u5C11\u63D0\u4F9B quality\u3001pricing\u3001specialties \u6216 cliModel \u4E4B\u4E00`);
+  return profile;
+}
+function parseModelProfilesJson(value) {
+  const source = value == null || value === "" ? "[]" : value;
+  if (typeof source !== "string" || source.length > MAX_TEXT) throw new Error("\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E\u8D85\u8FC7 32000 \u5B57\u7B26\u4E0A\u9650");
+  let input;
+  try {
+    input = JSON.parse(source);
+  } catch {
+    throw new Error("\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E\u4E0D\u662F\u6709\u6548\u7684 JSON");
+  }
+  if (!Array.isArray(input) || input.length > MAX_PROFILES) throw new Error("\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E\u5FC5\u987B\u662F\u6700\u591A 200 \u9879\u7684 JSON \u6570\u7EC4");
+  const profiles = input.map(normalizeProfile);
+  const seen = /* @__PURE__ */ new Set();
+  for (const profile of profiles) {
+    const key = `${profile.provider}\0${profile.model}`;
+    if (seen.has(key)) throw new Error(`\u6A21\u578B ${profile.provider}/${profile.model} \u91CD\u590D\u914D\u7F6E`);
+    seen.add(key);
+  }
+  return profiles;
+}
+function applyModelProfiles(routes, profiles) {
+  const input = Array.isArray(routes) ? routes : [];
+  const values = typeof profiles === "string" ? parseModelProfilesJson(profiles) : profiles;
+  if (!Array.isArray(values)) throw new Error("\u6A21\u578B\u914D\u7F6E\u5FC5\u987B\u662F\u6570\u7EC4");
+  const byKey = new Map(values.map((profile) => [`${profile.provider}\0${profile.model}`, profile]));
+  return input.map((route) => {
+    const profile = byKey.get(`${route.provider}\0${route.model}`);
+    if (!profile) return route;
+    return {
+      ...route,
+      ...profile.quality === void 0 ? {} : { quality: profile.quality, qualitySource: "user" },
+      ...profile.pricing === void 0 ? {} : { pricing: { ...profile.pricing }, pricingSource: "user" },
+      ...profile.specialties === void 0 ? {} : { specialties: [...profile.specialties] },
+      ...profile.cliModel === void 0 ? {} : { cliModel: profile.cliModel }
+    };
+  });
+}
+var MAX_TEXT, MAX_PROFILES, id;
+var init_model_profiles = __esm({
+  ".dsh-plugin/shared/model-profiles.mjs"() {
+    init_official_tool_registry();
+    MAX_TEXT = 32e3;
+    MAX_PROFILES = 200;
+    id = (value) => typeof value === "string" ? value.trim() : "";
+  }
+});
+
+// .dsh-plugin/shared/livebench.mjs
+function normalized(value) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+function liveBenchRow(snapshot, model) {
+  return snapshot?.models?.[normalized(model)] ?? null;
+}
+var TASK_ALIASES, CATEGORY_TO_TASK;
+var init_livebench = __esm({
+  ".dsh-plugin/shared/livebench.mjs"() {
+    TASK_ALIASES = Object.freeze({
+      reasoning: ["reasoning", "reasoning_score", "hard_reasoning"],
+      code: ["code", "coding", "coding_score"],
+      math: ["math", "mathematics", "math_score"],
+      research: ["research", "retrieval", "knowledge", "data_analysis"],
+      writing: ["writing", "creative_writing", "language"],
+      vision: ["vision", "multimodal", "visual"],
+      summarization: ["summarization", "summary", "if"],
+      classification: ["classification", "instruction_following"]
+    });
+    CATEGORY_TO_TASK = Object.freeze({
+      reasoning: "reasoning",
+      coding: "code",
+      "agentic coding": "code",
+      mathematics: "math",
+      "data analysis": "research",
+      language: "writing",
+      if: "summarization",
+      vision: "vision",
+      multimodal: "vision"
+    });
+  }
+});
+
+// .dsh-plugin/shared/router.mjs
+function classifyTask(text2) {
+  const value = String(text2 ?? "");
+  if (value.length < 80 && /翻译|解释|translate|explain/i.test(value)) return "general";
+  return detectTaskTypes(value)[0] ?? "general";
+}
+function detectTaskTypes(text2) {
+  const value = String(text2 ?? "");
+  const ranked = TASK_TYPE_RULES.map(([type, pattern]) => ({
+    type,
+    signals: value.match(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`))?.length ?? 0
+  })).filter((item) => item.signals > 0);
+  ranked.sort((left, right) => right.signals - left.signals || left.type.localeCompare(right.type));
+  return ranked.map((item) => item.type);
+}
+function assessComplexity(text2) {
+  const value = String(text2 ?? "");
+  const lengthScore = clamp(value.length / 2200);
+  const requirementScore = clamp((value.match(/(?:^|\n)\s*(?:[-*]|\d+[.)]|[一二三四五六七八九十]+[、.])/g) ?? []).length / 8);
+  const codeScore = /(代码|工程|架构|接口|实现|部署|测试|code|api|debug)/i.test(value) ? 0.22 : 0;
+  const highReasoningScore = /(数学|证明|定理|研究|论文|复杂|多步骤|约束|比较|评估|架构|模块|部署|math|proof|research)/i.test(value) ? 0.2 : 0;
+  const visionScore = /(图片|图像|照片|截图|视觉|image|vision)/i.test(value) ? 0.12 : 0;
+  const domainMarkers = (value.match(/代码|工程|架构|接口|实现|部署|测试|模块|拆分|约束|评估|证明|定理|研究|论文|图片|图像|照片|视觉|code|api|debug|proof|research|vision/gi) ?? []).length;
+  const domainComplexity = clamp(domainMarkers / 5) * 0.28;
+  const raw = clamp(0.1 + lengthScore * 0.3 + requirementScore * 0.18 + domainComplexity + codeScore + highReasoningScore + visionScore);
+  const band = isHardRequirement(value) ? "complex" : isSimpleRequirement(value) && value.length <= 180 ? "simple" : raw < 0.34 ? "simple" : raw < 0.66 ? "balanced" : "complex";
+  return { value: raw, band };
+}
+function specialtyMatch(model, taskType, liveScores = {}) {
+  const benchmark = asScore(liveScores?.[taskType]);
+  if (benchmark !== void 0) return benchmark;
+  if (model.specialties.includes(taskType)) return 1;
+  if (taskType === "general") return 0.58;
+  if (taskType === "research" && model.specialties.includes("writing")) return 0.68;
+  if (taskType === "writing" && model.specialties.includes("reasoning")) return 0.62;
+  return 0.38;
+}
+function qualityForTask(row, taskType) {
+  return asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0;
+}
+function specialtyForTask(row, taskType) {
+  return specialtyMatch(row.metadata, taskType, row.liveScores);
+}
+function asScore(value) {
+  if (value === null || value === void 0 || value === "") return void 0;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return void 0;
+  return clamp(number > 1 ? number / 100 : number);
+}
+function normalizePricing(pricing) {
+  if (pricing === null || typeof pricing !== "object" || Array.isArray(pricing)) return {};
+  const normalized2 = {};
+  for (const [id2, raw] of Object.entries(pricing)) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
+    if ((raw.input ?? raw.costIn) === null || (raw.input ?? raw.costIn) === void 0) continue;
+    if ((raw.output ?? raw.costOut) === null || (raw.output ?? raw.costOut) === void 0) continue;
+    const input = Number(raw.input ?? raw.costIn);
+    const output = Number(raw.output ?? raw.costOut);
+    const cacheRead = Number(raw.cacheRead ?? input);
+    const cacheWrite = Number(raw.cacheWrite ?? input);
+    if (![input, output, cacheRead, cacheWrite].every((value) => Number.isFinite(value) && value >= 0)) continue;
+    if (String(raw.currency ?? "USD").toUpperCase() !== "USD") continue;
+    normalized2[normalize(id2)] = {
+      input,
+      output,
+      cacheRead,
+      cacheWrite,
+      currency: String(raw.currency ?? "USD").toUpperCase()
+    };
+  }
+  return normalized2;
+}
+function pricingFor(model, pricing, provider = "") {
+  const normalizedPricing = normalizePricing(pricing);
+  const providerOverride = provider === "" ? void 0 : normalizedPricing[normalize(`${provider}/${model.id}`)];
+  const override = providerOverride ?? normalizedPricing[normalize(model.id)];
+  if (override) return override;
+  if (!Number.isFinite(Number(model.costIn)) || !Number.isFinite(Number(model.costOut)) || model.costIn === null || model.costIn === void 0 || model.costOut === null || model.costOut === void 0) return null;
+  return {
+    input: Number(model.costIn),
+    output: Number(model.costOut),
+    cacheRead: Number(model.cacheRead ?? model.costIn),
+    cacheWrite: Number(model.cacheWrite ?? model.costIn),
+    currency: "USD"
+  };
+}
+function normalizedCacheRatios(cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const read = Number.isFinite(Number(cacheReadRatio)) ? clamp(Number(cacheReadRatio)) : 0;
+  const write = Number.isFinite(Number(cacheWriteRatio)) ? Math.min(clamp(Number(cacheWriteRatio)), 1 - read) : 0;
+  return { read, write };
+}
+function effectivePricing(pricing, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const { read, write } = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
+  return {
+    input: (1 - read - write) * Number(pricing.input) + read * Number(pricing.cacheRead) + write * Number(pricing.cacheWrite),
+    output: Number(pricing.output)
+  };
+}
+function costScore(pricing, maxCost, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  if (pricing === null) return 0;
+  const effective = effectivePricing(pricing, cacheReadRatio, cacheWriteRatio);
+  const mean = (effective.input + effective.output) / 2;
+  if (maxCost <= 0) return mean === 0 ? 1 : 0;
+  return clamp(1 - mean / maxCost);
+}
+function estimateCost(model, text2, outputTokens = 900, pricingOverrides = {}, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const pricing = pricingFor(model, pricingOverrides);
+  if (pricing === null) return null;
+  const inputTokens = Math.max(80, Math.ceil(String(text2 ?? "").length / 3.7));
+  const ratios = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
+  const cacheReadTokens = Math.min(inputTokens, Math.max(0, Math.round(inputTokens * ratios.read)));
+  const cacheWriteTokens = Math.min(inputTokens - cacheReadTokens, Math.max(0, Math.round(inputTokens * ratios.write)));
+  const billableInputTokens = inputTokens - cacheReadTokens - cacheWriteTokens;
+  return (billableInputTokens * pricing.input + cacheReadTokens * pricing.cacheRead + cacheWriteTokens * pricing.cacheWrite + outputTokens * pricing.output) / 1e6;
+}
+function modelMetadata(name) {
+  const key = normalize(name);
+  if (!key) return null;
+  return MODEL_CATALOG.find((model) => model.aliases.some((alias) => key === normalize(alias))) ?? null;
+}
+function taskTokenBudget(text2, task, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const inputTokens = Math.max(80, Math.ceil(String(text2 ?? "").length / 3.7));
+  const multipliers = {
+    analysis: { input: 0.9, output: 0.55 },
+    execution: { input: 1.2, output: (task.difficulty ?? complexity) === "complex" ? 1.45 : 1 },
+    verification: { input: 1.15, output: 0.7 },
+    synthesis: { input: 1.65, output: 1.3 }
+  };
+  const multiplier = multipliers[task.purpose] ?? { input: 1, output: 1 };
+  const effortMultiplier = reasoningEffortMultiplier(task.reasoningEffort);
+  const totalInputTokens = Math.max(80, Math.round(inputTokens * multiplier.input));
+  const ratios = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
+  const cacheReadTokens = Math.min(totalInputTokens, Math.max(0, Math.round(totalInputTokens * ratios.read)));
+  const cacheWriteTokens = Math.min(totalInputTokens - cacheReadTokens, Math.max(0, Math.round(totalInputTokens * ratios.write)));
+  return {
+    inputTokens: totalInputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    outputTokens: Math.max(220, Math.round(900 * multiplier.output * effortMultiplier.output))
+  };
+}
+function taskQualityFloor(band, task) {
+  const difficulty = task.difficulty ?? band;
+  const base = QUALITY_FLOORS[difficulty] ?? QUALITY_FLOORS.balanced;
+  if (task.purpose === "synthesis") return Math.max(base, band === "complex" ? 0.84 : base);
+  if (difficulty !== "complex") return base;
+  return clamp(base + Math.max(0, Number(task.criticality ?? 0.75) - 0.65) * 0.12);
+}
+function isSimpleRequirement(value) {
+  const item = String(value ?? "").trim();
+  return SIMPLE_REQUEST_START.test(item) && !/(?:并|然后|最后|同时|以及|and then).{0,20}(?:设计|实现|验证|部署|证明|审计|测试|design|implement|verify|deploy|prove|audit|test)/i.test(item);
+}
+function isHardRequirement(value) {
+  const item = String(value ?? "").trim();
+  if (isSimpleRequirement(item)) return false;
+  return HIGH_STAKES_WORK.test(item) && HIGH_STAKES_ACTION.test(item);
+}
+function requirementDifficulty(objective, type, fallback = "balanced") {
+  const value = String(objective ?? "").trim();
+  if (isHardRequirement(value)) return "complex";
+  if (value.length <= 180 && SIMPLE_WORK.test(value)) return "simple";
+  const assessed = assessComplexity(value);
+  if (type === "math" && /证明|推导|proof|derive/i.test(value)) return "complex";
+  if (assessed.band === "simple" && (type === "code" || type === "research")) return "balanced";
+  return assessed.band === "simple" ? "simple" : assessed.band === "complex" ? "complex" : fallback;
+}
+function shouldSplitRequirements(requirements) {
+  if (requirements.length >= 3) return true;
+  if (requirements.length !== 2) return false;
+  const types = requirements.map((item) => detectTaskTypes(item)[0] ?? "general");
+  return types[0] !== types[1] || /^(?:最后|然后|接着|随后|再|基于|根据|测试|验证|部署|发布)|(?:完成|结束|实现)后/u.test(requirements[1]);
+}
+function requirementText(value) {
+  return String(value ?? "").trim().replace(/[。；;\s]+$/u, "").trim();
+}
+function looksLikeRequirement(value) {
+  const item = requirementText(value);
+  return item.length >= 3 && !/[:：]$/u.test(item) && !/(?:以下|下列|如下)(?:的)?(?:任务|需求|工作|事项|要求)/u.test(item) && REQUIREMENT_ACTION.test(item.slice(0, 32));
+}
+function explicitRequirements(text2) {
+  const visibleLines = [];
+  let fence = null;
+  for (const line of String(text2 ?? "").split(/\r?\n/u)) {
+    const marker2 = /^\s*(`{3,}|~{3,})/u.exec(line);
+    if (fence) {
+      if (marker2 && marker2[1][0] === fence.char && marker2[1].length >= fence.length && !line.slice(marker2[0].length).trim()) fence = null;
+      continue;
+    }
+    if (marker2) {
+      fence = { char: marker2[1][0], length: marker2[1].length };
+      continue;
+    }
+    visibleLines.push(line);
+  }
+  const value = visibleLines.join("\n");
+  const lines = visibleLines.map((line) => line.trim()).filter(Boolean);
+  if (/^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(lines[0] ?? "") && !/(?:执行|完成|实施|分配)/u.test(lines[0])) return [];
+  const marker = /^(?:[-*•]\s+|\d{1,2}[.)、](?!\d)\s*|[一二三四五六七八九十]{1,3}[、.)]\s*)(.+)$/u;
+  const marked = lines.map((line) => marker.exec(line)?.[1]).filter(Boolean).map(requirementText).filter(looksLikeRequirement);
+  if (marked.length >= 2) return marked;
+  const plain2 = lines.filter((line) => !/^#{1,6}\s|^```|[:：]$/u.test(line));
+  if (plain2.length >= 2 && plain2.every(looksLikeRequirement)) {
+    return plain2.map(requirementText).filter((item) => item.length >= 3);
+  }
+  const clauses = value.split(/[;；，,]/u).map(requirementText).filter(Boolean);
+  if (clauses.length >= 2 && clauses.every(looksLikeRequirement)) {
+    return clauses;
+  }
+  const sentences = value.split(/[。！？]/u).map(requirementText).filter(Boolean);
+  if (sentences.length >= 2 && sentences.every(looksLikeRequirement)) {
+    return sentences;
+  }
+  return [];
+}
+function taskPackages(taskType, text2, band) {
+  if (band !== "complex") {
+    const task = { id: "execution", name: "\u76F4\u63A5\u56DE\u7B54\u4E0E\u5FC5\u8981\u6821\u9A8C", type: taskType, purpose: "execution", difficulty: band, criticality: 0.65, dependsOn: [], preferredReasoningEffort: band === "simple" ? "low" : "medium" };
+    return [{ ...task, qualityFloor: taskQualityFloor(band, task) }];
+  }
+  const value = String(text2 ?? "");
+  const packages = [
+    { id: "analysis", name: "\u95EE\u9898\u5EFA\u6A21\u4E0E\u7EA6\u675F\u63D0\u53D6", type: "reasoning", purpose: "analysis", difficulty: "balanced", criticality: 0.8, dependsOn: [], preferredReasoningEffort: "medium" }
+  ];
+  const requirements = explicitRequirements(text2);
+  if (requirements.length >= 2) {
+    const groups = requirements.length > MAX_EXPLICIT_EXECUTION_PACKAGES ? [
+      ...requirements.slice(0, MAX_EXPLICIT_EXECUTION_PACKAGES - 1).map((item) => [item]),
+      requirements.slice(MAX_EXPLICIT_EXECUTION_PACKAGES - 1)
+    ] : requirements.map((item) => [item]);
+    groups.forEach((group, index) => {
+      const objective = group.length === 1 ? group[0] : group.map((item, offset) => `${MAX_EXPLICIT_EXECUTION_PACKAGES + offset}. ${item}`).join("\n");
+      const type = detectTaskTypes(objective)[0] ?? "general";
+      const difficulty = group.length > 1 ? "complex" : requirementDifficulty(objective, type);
+      const previous = packages.at(-1);
+      const sequential = /^(?:最后|然后|接着|随后|再|基于|根据|测试|验证|部署|发布)|(?:完成|结束|实现)后/u.test(objective);
+      packages.push({
+        id: `execution-${index + 1}`,
+        name: group.length === 1 ? `\u9700\u6C42 ${index + 1}\uFF1A${group[0].slice(0, 28)}` : `\u9700\u6C42 ${index + 1}\uFF1A\u5176\u4F59 ${group.length} \u9879`,
+        objective,
+        type,
+        purpose: "execution",
+        difficulty,
+        criticality: difficulty === "simple" ? 0.55 : difficulty === "balanced" ? 0.72 : 0.86,
+        dependsOn: sequential && previous?.purpose === "execution" ? ["analysis", previous.id] : ["analysis"],
+        preferredReasoningEffort: difficulty === "simple" ? "low" : difficulty === "balanced" ? "medium" : "high"
+      });
+    });
+  } else {
+    const domains = [...new Set([...detectTaskTypes(text2), taskType].filter((type) => type !== "general"))];
+    for (const type of domains.length > 0 ? domains : [taskType]) {
+      const objective = value.split(/[，,。；;]|最后|然后|接着|并且/u).map((item) => item.trim()).filter((item) => detectTaskTypes(item).includes(type)).join("\uFF1B") || value;
+      const difficulty = requirementDifficulty(objective, type);
+      packages.push({
+        id: `execution-${type}`,
+        name: `${TASK_TYPE_LABELS[type] ?? type}\u65B9\u5411\u5904\u7406`,
+        objective,
+        type,
+        purpose: "execution",
+        difficulty,
+        criticality: difficulty === "simple" ? 0.55 : difficulty === "balanced" ? 0.72 : 0.86,
+        dependsOn: ["analysis"],
+        preferredReasoningEffort: difficulty === "simple" ? "low" : difficulty === "balanced" ? "medium" : "high"
+      });
+    }
+  }
+  if (/(测试|验证|评估|对比|benchmark|test|verify|audit)/i.test(value)) {
+    packages.push({
+      id: "verification",
+      name: "\u9A8C\u8BC1\u3001\u53CD\u4F8B\u4E0E\u98CE\u9669\u5BA1\u67E5",
+      type: "reasoning",
+      purpose: "verification",
+      difficulty: "complex",
+      criticality: 0.88,
+      dependsOn: packages.filter((task) => task.purpose === "execution").map((task) => task.id),
+      preferredReasoningEffort: "high"
+    });
+  }
+  packages.push({
+    id: "synthesis",
+    name: "\u7ED3\u679C\u6821\u9A8C\u4E0E\u6574\u5408",
+    type: "reasoning",
+    purpose: "synthesis",
+    difficulty: "complex",
+    criticality: 1,
+    dependsOn: packages.filter((task) => task.purpose !== "analysis").map((task) => task.id),
+    preferredReasoningEffort: "xhigh"
+  });
+  return packages.map((task) => ({ ...task, qualityFloor: taskQualityFloor(band, task) }));
+}
+function weightsForTask(weights, task) {
+  return task.purpose === "synthesis" ? SYNTHESIS_WEIGHTS : OBJECTIVE_WEIGHTS[task.difficulty] ?? weights;
+}
+function compareText(left, right) {
+  const a = String(left);
+  const b = String(right);
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+function compareRowsStable(left, right) {
+  return compareText(routeKey(left.provider, left.model), routeKey(right.provider, right.model));
+}
+function reasoningEffortRank(effort) {
+  const normalized2 = String(effort ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const aliases = { none: "off", disabled: "off", extra: "xhigh", extrahigh: "xhigh", maximum: "max" };
+  const canonical = aliases[normalized2] ?? normalized2;
+  const index = REASONING_EFFORT_ORDER.indexOf(canonical);
+  return index < 0 ? REASONING_EFFORT_ORDER.indexOf("medium") : index;
+}
+function reasoningEffortMultiplier(effort) {
+  const normalized2 = String(effort ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const aliases = { none: "off", disabled: "off", extra: "xhigh", extrahigh: "xhigh", maximum: "max" };
+  return REASONING_EFFORT_MULTIPLIERS[aliases[normalized2] ?? normalized2] ?? REASONING_EFFORT_MULTIPLIERS.medium;
+}
+function selectReasoningEffort(efforts, preferred = "medium") {
+  const exact = Array.isArray(efforts) ? [...new Set(efforts.map((effort) => String(effort?.id ?? effort ?? "")).filter(Boolean))] : [];
+  if (exact.length === 0) return void 0;
+  const preferredRank = reasoningEffortRank(preferred);
+  return exact.slice().sort((left, right) => {
+    const distance = Math.abs(reasoningEffortRank(left) - preferredRank) - Math.abs(reasoningEffortRank(right) - preferredRank);
+    if (distance !== 0) return distance;
+    return reasoningEffortRank(left) - reasoningEffortRank(right) || compareText(left, right);
+  })[0];
+}
+function reasoningDecision(row, task) {
+  const preferred = String(task.preferredReasoningEffort ?? "medium");
+  const efforts = Array.isArray(row.reasoningEfforts) ? row.reasoningEfforts : [];
+  if (efforts.length === 0) {
+    const knownUnsupported = row.reasoningKnown === true;
+    const preferredRank2 = reasoningEffortRank(preferred);
+    return {
+      reasoningEffort: void 0,
+      reasoningFit: knownUnsupported ? clamp(0.78 - preferredRank2 * 0.08) : 0.55,
+      preferredReasoningEffort: preferred,
+      multiplier: REASONING_EFFORT_MULTIPLIERS.medium
+    };
+  }
+  const preferredRank = reasoningEffortRank(preferred);
+  const chosen = selectReasoningEffort(efforts, preferred);
+  const distance = Math.abs(reasoningEffortRank(chosen) - preferredRank);
+  return {
+    reasoningEffort: chosen,
+    reasoningFit: clamp(1 - distance / (REASONING_EFFORT_ORDER.length - 1)),
+    preferredReasoningEffort: preferred,
+    multiplier: reasoningEffortMultiplier(chosen)
+  };
+}
+function candidateUtility(row, task, weights, maxCost, usedRoutes, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const quality = qualityForTask(row, task.type);
+  const floor = Number(task.qualityFloor ?? taskQualityFloor("complex", task));
+  const qualityGap = Math.max(0, floor - quality);
+  const duplicatePenalty = 0;
+  const synthesisPreference = task.purpose === "synthesis" && /deepseek[- ]?v4[- ]?pro/i.test(row.model) ? 0.025 : 0;
+  const reasoning = reasoningDecision(row, task);
+  const cost = clamp(costScore(row.pricing, maxCost, cacheReadRatio, cacheWriteRatio) / Math.sqrt(reasoning.multiplier.output));
+  const score = weights.quality * quality + weights.cost * cost + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency)) + weights.specialty * specialtyForTask(row, task.type) + (weights.reasoning ?? 0) * reasoning.reasoningFit - weights.risk * row.risk - duplicatePenalty - qualityGap * (task.criticality ?? 0.75) + synthesisPreference;
+  return { score, floor, qualityGap, ...reasoning };
+}
+function taskCost(row, task, text2, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  if (row?.pricing === null) return 0;
+  const decision = row === null ? null : reasoningDecision(row, task);
+  const tokens = taskTokenBudget(text2, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity, cacheReadRatio, cacheWriteRatio);
+  return row === null ? 0 : ((tokens.inputTokens - tokens.cacheReadTokens - tokens.cacheWriteTokens) * row.pricing.input + tokens.cacheReadTokens * row.pricing.cacheRead + tokens.cacheWriteTokens * row.pricing.cacheWrite + tokens.outputTokens * row.pricing.output) / 1e6;
+}
+function dominates(left, right, task, text2, complexity, cacheReadRatio, cacheWriteRatio) {
+  if (left.pricing === null || right.pricing === null) return false;
+  const leftReasoning = reasoningDecision(left, task);
+  const rightReasoning = reasoningDecision(right, task);
+  const leftValues = {
+    quality: qualityForTask(left, task.type),
+    cost: taskCost(left, task, text2, complexity, cacheReadRatio, cacheWriteRatio),
+    latency: clamp(left.latency * leftReasoning.multiplier.latency),
+    specialty: specialtyForTask(left, task.type),
+    reasoning: leftReasoning.reasoningFit,
+    risk: clamp(left.risk)
+  };
+  const rightValues = {
+    quality: qualityForTask(right, task.type),
+    cost: taskCost(right, task, text2, complexity, cacheReadRatio, cacheWriteRatio),
+    latency: clamp(right.latency * rightReasoning.multiplier.latency),
+    specialty: specialtyForTask(right, task.type),
+    reasoning: rightReasoning.reasoningFit,
+    risk: clamp(right.risk)
+  };
+  const noWorse = leftValues.quality >= rightValues.quality && leftValues.cost <= rightValues.cost && leftValues.latency <= rightValues.latency && leftValues.specialty >= rightValues.specialty && leftValues.reasoning >= rightValues.reasoning && leftValues.risk <= rightValues.risk;
+  const strictlyBetter = leftValues.quality > rightValues.quality || leftValues.cost < rightValues.cost || leftValues.latency < rightValues.latency || leftValues.specialty > rightValues.specialty || leftValues.reasoning > rightValues.reasoning || leftValues.risk < rightValues.risk;
+  return noWorse && strictlyBetter;
+}
+function candidatePool(rows, task, weights, maxCost, text2, complexity, cacheReadRatio, cacheWriteRatio) {
+  const eligibleRows = task.type === "vision" ? rows.filter((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image")) : rows;
+  const floor = Number(task.qualityFloor ?? 0);
+  const feasible = eligibleRows.filter((row) => qualityForTask(row, task.type) >= floor);
+  const source = feasible.length > 0 ? feasible : eligibleRows.slice().sort((left, right) => qualityForTask(right, task.type) - qualityForTask(left, task.type) || compareRowsStable(left, right)).slice(0, 3);
+  const taskWeights = weightsForTask(weights, task);
+  const scored = source.map((row) => ({
+    row,
+    decision: candidateUtility(row, task, taskWeights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio),
+    cost: taskCost(row, task, text2, complexity, cacheReadRatio, cacheWriteRatio)
+  }));
+  const frontier = scored.filter((item) => !source.some((other) => other !== item.row && dominates(other, item.row, task, text2, complexity, cacheReadRatio, cacheWriteRatio)));
+  const essential = [
+    scored.slice().sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
+    scored.slice().sort((left, right) => right.decision.score - left.decision.score || compareRowsStable(left.row, right.row))[0],
+    scored.slice().sort((left, right) => qualityForTask(right.row, task.type) - qualityForTask(left.row, task.type) || compareRowsStable(left.row, right.row))[0]
+  ].filter(Boolean);
+  const ordered = [...frontier, ...essential].filter((item, index, all) => all.findIndex((candidate) => candidate.row === item.row) === index).sort((left, right) => right.decision.score - left.decision.score || left.cost - right.cost || compareRowsStable(left.row, right.row)).slice(0, ROUTING_CANDIDATE_LIMIT);
+  return {
+    options: ordered,
+    relaxed: feasible.length === 0,
+    pruned: Math.max(0, eligibleRows.length - ordered.length)
+  };
+}
+function stateSignature(state) {
+  return state.assignments.map((assignment) => `${routeKey(assignment.row?.provider, assignment.row?.model)}@${assignment.decision?.reasoningEffort ?? "provider-default"}`).join("|");
+}
+function compareUtilityStates(left, right) {
+  return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || right.score - left.score || left.cost - right.cost || left.switches - right.switches || compareText(stateSignature(left), stateSignature(right));
+}
+function compareCostStates(left, right) {
+  return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || left.cost - right.cost || right.score - left.score || left.switches - right.switches || compareText(stateSignature(left), stateSignature(right));
+}
+function solveAssignments({ rows, tasks, weights, maxCost, text: text2, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
+  const pools = tasks.map((task) => candidatePool(rows, task, weights, maxCost, text2, complexity, cacheReadRatio, cacheWriteRatio));
+  if (pools.some((pool) => pool.options.length === 0)) return null;
+  const suffixMinimum = Array(tasks.length + 1).fill(0);
+  for (let index = tasks.length - 1; index >= 0; index -= 1) {
+    const costOptions = Number.isFinite(budget) ? pools[index].options.filter((option2) => option2.row.pricing !== null) : pools[index].options;
+    if (costOptions.length === 0) return null;
+    suffixMinimum[index] = suffixMinimum[index + 1] + Math.min(...costOptions.map((option2) => option2.cost));
+  }
+  if (Number.isFinite(budget) && suffixMinimum[0] > budget + 1e-12) return null;
+  let states = [{ assignments: [], routesByTask: /* @__PURE__ */ new Map(), usedRoutes: /* @__PURE__ */ new Set(), score: 0, cost: 0, switches: 0, relaxedCount: 0, qualityShortfall: 0 }];
+  for (let index = 0; index < tasks.length; index += 1) {
+    const task = tasks[index];
+    const pool = pools[index];
+    const expanded = [];
+    for (const state of states) {
+      for (const option2 of pool.options) {
+        if (Number.isFinite(budget) && option2.row.pricing === null) continue;
+        const nextCost = state.cost + option2.cost;
+        if (Number.isFinite(budget) && nextCost + suffixMinimum[index + 1] > budget + 1e-12) continue;
+        const taskWeights = weightsForTask(weights, task);
+        const decision = candidateUtility(option2.row, task, taskWeights, maxCost, state.usedRoutes, cacheReadRatio, cacheWriteRatio);
+        const route = routeKey(option2.row.provider, option2.row.model);
+        const dependencySwitches = (task.dependsOn ?? []).reduce((count, dependency) => {
+          const dependencyRoute = state.routesByTask.get(dependency);
+          return count + (dependencyRoute !== void 0 && dependencyRoute !== route ? 1 : 0);
+        }, 0);
+        const handoffPenalty = dependencySwitches * 0.015;
+        const qualityShortfall = Math.max(0, decision.floor - qualityForTask(option2.row, task.type));
+        const usedRoutes = new Set(state.usedRoutes);
+        usedRoutes.add(route);
+        const routesByTask = new Map(state.routesByTask);
+        routesByTask.set(task.id, route);
+        expanded.push({
+          assignments: [...state.assignments, { task, row: option2.row, decision: { ...decision, relaxed: qualityShortfall > 0 }, estimatedCost: option2.cost, handoffPenalty }],
+          routesByTask,
+          usedRoutes,
+          score: state.score + decision.score - handoffPenalty,
+          cost: nextCost,
+          switches: state.switches + dependencySwitches,
+          relaxedCount: state.relaxedCount + (qualityShortfall > 0 ? 1 : 0),
+          qualityShortfall: state.qualityShortfall + qualityShortfall
+        });
+      }
+    }
+    if (expanded.length === 0) return null;
+    expanded.sort(minimizeCost ? compareCostStates : compareUtilityStates);
+    states = expanded.slice(0, ROUTING_BEAM_WIDTH);
+  }
+  states.sort(minimizeCost ? compareCostStates : compareUtilityStates);
+  return {
+    ...states[0],
+    candidatePools: pools,
+    minimumFeasibleCost: suffixMinimum[0]
+  };
+}
+function buildPlan({ text: text2 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0 } = {}) {
+  const firstLine = String(text2 ?? "").split(/\r?\n/u)[0].trim();
+  const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine) && !/(?:执行|完成|实施|分配)/u.test(firstLine);
+  const assessed = assessComplexity(transformOnly ? firstLine : text2);
+  const requirements = explicitRequirements(text2);
+  const compound = shouldSplitRequirements(requirements);
+  const complexity = compound && assessed.band !== "complex" ? { value: Math.max(0.66, assessed.value), band: "complex" } : assessed;
+  const taskType = classifyTask(transformOnly ? firstLine : text2);
+  const weights = OBJECTIVE_WEIGHTS[complexity.band];
+  const discovered = Array.isArray(available) ? available.map((entry) => {
+    const rawEfforts = Array.isArray(entry.reasoningEfforts) ? entry.reasoningEfforts : [];
+    const reasoningEfforts = rawEfforts.map((effort) => String(effort?.id ?? effort ?? "")).filter(Boolean);
+    return {
+      provider: String(entry.provider ?? ""),
+      model: String(entry.model ?? ""),
+      reasoningEfforts: [...new Set(reasoningEfforts)],
+      defaultReasoningEffort: entry.defaultReasoningEffort === void 0 ? void 0 : String(entry.defaultReasoningEffort),
+      reasoningKnown: entry.reasoningKnown === true || entry.reasoningKnown === void 0 && Array.isArray(entry.reasoningEfforts),
+      quality: asScore(entry.quality),
+      qualitySource: entry.qualitySource === "user" ? "user" : "route",
+      latency: asScore(entry.latency),
+      risk: asScore(entry.risk),
+      specialties: Array.isArray(entry.specialties) ? entry.specialties.filter((item) => typeof item === "string") : null,
+      pricing: normalizePricing({ route: entry.pricing ?? entry.price }).route ?? null,
+      pricingSource: entry.pricingSource === "user" ? "user" : "route",
+      inputModalities: Array.isArray(entry.inputModalities) ? entry.inputModalities.map((item) => String(item).toLowerCase()) : []
+    };
+  }) : [];
+  const rows = [];
+  const normalizedPrices = normalizePricing(pricing);
+  for (const route of discovered) {
+    if (!route.provider || !route.model) continue;
+    const catalog = modelMetadata(route.model);
+    const metadata = {
+      ...catalog ?? { id: route.model, aliases: [route.model], specialties: [] },
+      ...route.quality === void 0 ? {} : { quality: route.quality },
+      ...route.latency === void 0 ? {} : { latency: route.latency },
+      ...route.risk === void 0 ? {} : { risk: route.risk },
+      ...route.specialties === null ? {} : { specialties: route.specialties }
+    };
+    const live = liveBenchRow(liveBench, route.model);
+    const liveScores = live?.scores ?? {};
+    const liveOverall = asScore(live?.overall);
+    const quality = asScore(liveScores?.[taskType]) ?? liveOverall ?? asScore(metadata.quality) ?? 0;
+    const qualitySource = liveOverall !== void 0 || asScore(liveScores?.[taskType]) !== void 0 ? "livebench" : route.quality !== void 0 ? route.qualitySource : catalog ? "catalog-heuristic" : "unknown";
+    const userPrice = normalizedPrices[normalize(`${route.provider}/${route.model}`)] ?? normalizedPrices[normalize(route.model)];
+    const pricingRow = userPrice ?? route.pricing ?? null;
+    const pricingSource = userPrice ? "user" : route.pricing ? route.pricingSource : "unknown";
+    const specialty = specialtyMatch(metadata, taskType, liveScores);
+    rows.push({
+      provider: route.provider,
+      model: route.model,
+      metadata,
+      quality,
+      qualitySource,
+      pricingSource,
+      liveScores,
+      liveOverall,
+      latency: metadata.latency ?? 0.5,
+      risk: metadata.risk ?? 0.2,
+      specialty,
+      reasoningEfforts: route.reasoningEfforts,
+      defaultReasoningEffort: route.defaultReasoningEffort,
+      reasoningKnown: route.reasoningKnown,
+      inputModalities: route.inputModalities,
+      pricing: pricingRow,
+      score: 0,
+      estimatedCost: pricingRow === null ? null : estimateCost({
+        id: route.model,
+        costIn: pricingRow.input,
+        costOut: pricingRow.output,
+        cacheRead: pricingRow.cacheRead,
+        cacheWrite: pricingRow.cacheWrite
+      }, text2, 900, {}, cacheReadRatio, cacheWriteRatio)
+    });
+  }
+  const maxCost = Math.max(1, ...rows.filter((row) => row.pricing !== null).map((row) => {
+    const effective = effectivePricing(row.pricing, cacheReadRatio, cacheWriteRatio);
+    return effective.input + effective.output;
+  }));
+  const taskNodes = taskPackages(taskType, text2, complexity.band);
+  const unassignableTasks = taskNodes.filter((task) => task.type === "vision" && !rows.some((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image"))).map((task) => task.id);
+  const budget = Number(budgetUsd);
+  const utilityPlan = solveAssignments({
+    rows,
+    tasks: taskNodes,
+    weights,
+    maxCost,
+    text: text2,
+    complexity: complexity.band,
+    budget: Number.POSITIVE_INFINITY,
+    cacheReadRatio,
+    cacheWriteRatio
+  });
+  const budgetPlan = budget > 0 ? solveAssignments({
+    rows,
+    tasks: taskNodes,
+    weights,
+    maxCost,
+    text: text2,
+    complexity: complexity.band,
+    budget,
+    cacheReadRatio,
+    cacheWriteRatio
+  }) : null;
+  const minimumCostPlan = budget > 0 && budgetPlan === null ? solveAssignments({
+    rows,
+    tasks: taskNodes,
+    weights,
+    maxCost,
+    text: text2,
+    complexity: complexity.band,
+    budget: Number.POSITIVE_INFINITY,
+    cacheReadRatio,
+    cacheWriteRatio,
+    minimizeCost: true
+  }) : null;
+  const optimized = budget > 0 ? budgetPlan ?? minimumCostPlan ?? utilityPlan : utilityPlan;
+  const assignments = optimized?.assignments ?? [];
+  const usedRoutes = optimized?.usedRoutes ?? /* @__PURE__ */ new Set();
+  const constraintRelaxed = (optimized?.relaxedCount ?? 0) > 0;
+  for (const row of rows) {
+    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio).score;
+  }
+  rows.sort((left, right) => right.score - left.score || compareRowsStable(left, right));
+  const selectedAssignment = assignments[0];
+  const selected = selectedAssignment?.row ?? (unassignableTasks.length > 0 ? null : rows[0] ?? null);
+  const synthesizerAssignment = assignments.at(-1);
+  const synthesizer = synthesizerAssignment?.row ?? (unassignableTasks.length > 0 ? null : rows.find((row) => /deepseek/i.test(row.model)) ?? rows[0]);
+  const subtasks = assignments.map(({ task, row, decision }) => ({
+    id: task.id,
+    name: task.name,
+    ...task.objective ? { objective: task.objective } : {},
+    type: task.type,
+    difficulty: task.difficulty,
+    recommended: row?.model ?? "\u5F85\u53D1\u73B0\u6A21\u578B",
+    recommendedProvider: row?.provider ?? "",
+    qualitySource: row?.qualitySource ?? "unknown",
+    pricingSource: row?.pricingSource ?? "unknown",
+    recommendedReasoningEffort: decision?.reasoningEffort,
+    preferredReasoningEffort: decision?.preferredReasoningEffort ?? task.preferredReasoningEffort,
+    reasoningFit: Number(Number(decision?.reasoningFit ?? 0).toFixed(3)),
+    purpose: task.purpose,
+    criticality: task.criticality,
+    qualityFloor: Number(task.qualityFloor.toFixed(3)),
+    dependsOn: [...task.dependsOn ?? []]
+  }));
+  const costBreakdown = assignments.map(({ task, row, decision, estimatedCost, handoffPenalty }, index) => {
+    const tokens = taskTokenBudget(text2, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity.band, cacheReadRatio, cacheWriteRatio);
+    const taskEstimate = estimatedCost ?? taskCost(row, task, text2, complexity.band, cacheReadRatio, cacheWriteRatio);
+    return {
+      stage: index + 1,
+      purpose: task.purpose,
+      difficulty: task.difficulty,
+      model: row?.model ?? "\u5F85\u53D1\u73B0\u6A21\u578B",
+      provider: row?.provider ?? "",
+      reasoningEffort: decision?.reasoningEffort,
+      preferredReasoningEffort: decision?.preferredReasoningEffort,
+      reasoningFit: Number(Number(decision?.reasoningFit ?? 0).toFixed(3)),
+      reasoningOutputMultiplier: Number(Number(decision?.multiplier?.output ?? 1).toFixed(2)),
+      inputTokens: tokens.inputTokens,
+      cacheReadTokens: tokens.cacheReadTokens,
+      cacheWriteTokens: tokens.cacheWriteTokens,
+      outputTokens: tokens.outputTokens,
+      estimatedCost: row?.pricing === null || row === null ? null : Number(taskEstimate.toFixed(6)),
+      quality: row?.qualitySource === "unknown" || row === null ? null : Number(qualityForTask(row, task.type).toFixed(3)),
+      qualitySource: row?.qualitySource ?? "unknown",
+      pricingSource: row?.pricingSource ?? "unknown",
+      handoffPenalty: Number(Number(handoffPenalty ?? 0).toFixed(3))
+    };
+  });
+  const pricingComplete = assignments.length > 0 && assignments.every(({ row }) => row?.pricing !== null);
+  const totalEstimate = pricingComplete ? costBreakdown.reduce((sum, row) => sum + row.estimatedCost, 0) : null;
+  const baselineRows = assignments.map(({ task }) => {
+    const strongest = rows.reduce((best, row) => qualityForTask(row, task.type) > (best === null ? -1 : qualityForTask(best, task.type)) ? row : best, null);
+    return { task, strongest };
+  });
+  const baselineCost = baselineRows.every((item) => item.strongest?.pricing !== null && item.strongest !== null) ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text2, complexity.band, cacheReadRatio, cacheWriteRatio), 0) : null;
+  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row }) => ["livebench", "route", "user"].includes(row?.qualitySource)) && baselineRows.every(({ strongest }) => ["livebench", "route", "user"].includes(strongest?.qualitySource));
+  const budgetExceeded = Number(budgetUsd) > 0 && totalEstimate !== null ? totalEstimate > Number(budgetUsd) : null;
+  const savings = baselineCost === null || totalEstimate === null || !qualityEvidenceComplete ? null : baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost);
+  const paretoPruned = (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.pruned, 0);
+  const minimumFeasibleCost = rows.every((row) => row.pricing !== null) ? optimized?.minimumFeasibleCost ?? minimumCostPlan?.cost ?? 0 : null;
+  const reason = selected === null ? unassignableTasks.length > 0 ? `\u56FE\u50CF\u5DE5\u4F5C\u5305 ${unassignableTasks.join("\u3001")} \u6CA1\u6709\u53EF\u7528\u7684\u56FE\u50CF\u6A21\u578B\uFF0C\u65E0\u6CD5\u5F62\u6210\u5B8C\u6574\u5206\u914D\u8BA1\u5212\u3002` : "\u5C1A\u672A\u53D1\u73B0\u53EF\u7528\u6A21\u578B\uFF0C\u4FDD\u7559 Harness \u539F\u59CB\u6A21\u578B\u9009\u62E9\u3002" : `${complexity.band === "simple" ? "\u4F4E\u590D\u6742\u5EA6\u4F18\u5148\u6210\u672C\u3001\u54CD\u5E94\u901F\u5EA6\u4E0E\u8F83\u4F4E\u63A8\u7406\u5F00\u9500" : complexity.band === "balanced" ? "\u5728\u8D28\u91CF\u3001\u6210\u672C\u3001\u63A8\u7406\u7B49\u7EA7\u3001\u5EF6\u8FDF\u4E0E\u98CE\u9669\u4E4B\u95F4\u5E73\u8861" : "\u9AD8\u590D\u6742\u5EA6\u6267\u884C\u5305\u542B\u63A8\u7406\u7B49\u7EA7\u7684\u4F9D\u8D56\u611F\u77E5\u5168\u5C40\u7EA6\u675F\u5206\u914D"}\uFF1B\u4EFB\u52A1\u7C7B\u578B\u4E3A ${taskType}\uFF0C\u5DF2\u5BF9 ${String(subtasks.length)} \u4E2A\u5DE5\u4F5C\u5305\u8FDB\u884C Pareto \u526A\u679D\u548C\u6709\u754C\u7EC4\u5408\u641C\u7D22\u3002`;
+  return {
+    mode,
+    complexity: { value: Number(complexity.value.toFixed(3)), band: complexity.band },
+    compound,
+    unassignableTasks,
+    taskType,
+    taskTypes: [...new Set(taskNodes.map((task) => task.type).filter((type) => type !== "reasoning"))],
+    objectiveWeights: weights,
+    candidates: rows.slice(0, 8).map((row) => {
+      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === "simple" ? "low" : "medium" }, weights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio);
+      return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), quality: row.qualitySource === "unknown" ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource };
+    }),
+    selected: selected === null ? null : { provider: selected.provider, model: selected.model, reasoningEffort: selectedAssignment?.decision?.reasoningEffort, estimatedCost: selected.estimatedCost === null ? null : Number(selected.estimatedCost.toFixed(6)), qualitySource: selected.qualitySource, pricingSource: selected.pricingSource },
+    subtasks,
+    synthesizer: synthesizer == null ? null : { provider: synthesizer.provider, model: synthesizer.model, reasoningEffort: synthesizerAssignment?.decision?.reasoningEffort },
+    estimatedCost: totalEstimate === null ? null : Number(totalEstimate.toFixed(6)),
+    costBreakdown,
+    optimization: {
+      solver: "pareto-pruned quality-constrained beam assignment",
+      qualityFloor: QUALITY_FLOORS[complexity.band],
+      budgetUsd: Number(Number(budgetUsd) > 0 ? Number(budgetUsd) : 0),
+      cacheReadRatio: normalizedCacheRatios(cacheReadRatio, cacheWriteRatio).read,
+      cacheWriteRatio: normalizedCacheRatios(cacheReadRatio, cacheWriteRatio).write,
+      budgetExceeded,
+      constraintRelaxed,
+      pricingComplete,
+      qualityEvidenceComplete,
+      baselineAllStrongCost: baselineCost === null ? null : Number(baselineCost.toFixed(6)),
+      estimatedSavings: savings === null ? null : Number(savings.toFixed(4)),
+      distinctRoutes: usedRoutes.size,
+      handoffCount: optimized?.switches ?? 0,
+      paretoPruned,
+      beamWidth: ROUTING_BEAM_WIDTH,
+      budgetFeasible: budget <= 0 ? pricingComplete ? true : null : budgetPlan !== null,
+      minimumFeasibleCost: minimumFeasibleCost === null ? null : Number(Number(minimumFeasibleCost).toFixed(6)),
+      liveBench: liveBench?.fetchedAt ? { source: liveBench.source ?? "livebench", fetchedAt: liveBench.fetchedAt, models: Object.keys(liveBench.models ?? {}).length, stale: String(liveBenchError).length > 0, error: String(liveBenchError || "") } : { source: "experimental-baseline", fetchedAt: null, models: 0, stale: false, error: String(liveBenchError || "") }
+    },
+    reason,
+    generatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+var OBJECTIVE_WEIGHTS, REASONING_EFFORT_ORDER, REASONING_EFFORT_MULTIPLIERS, QUALITY_FLOORS, DEFAULT_ROUTER_SETTINGS, MODEL_CATALOG, clamp, normalize, routeKey, OPENCODE_CATALOG_PROVIDERS, TASK_TYPE_RULES, TASK_TYPE_LABELS, MAX_EXPLICIT_EXECUTION_PACKAGES, REQUIREMENT_ACTION, HIGH_STAKES_WORK, SIMPLE_WORK, HIGH_STAKES_ACTION, SIMPLE_REQUEST_START, SYNTHESIS_WEIGHTS, ROUTING_BEAM_WIDTH, ROUTING_CANDIDATE_LIMIT;
+var init_router = __esm({
+  ".dsh-plugin/shared/router.mjs"() {
+    init_livebench();
+    OBJECTIVE_WEIGHTS = Object.freeze({
+      simple: Object.freeze({ quality: 0.28, cost: 0.45, latency: 0.14, specialty: 0.04, reasoning: 0.07, risk: 0.02 }),
+      balanced: Object.freeze({ quality: 0.4, cost: 0.26, latency: 0.1, specialty: 0.09, reasoning: 0.1, risk: 0.05 }),
+      complex: Object.freeze({ quality: 0.48, cost: 0.14, latency: 0.06, specialty: 0.14, reasoning: 0.11, risk: 0.07 })
+    });
+    REASONING_EFFORT_ORDER = Object.freeze(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+    REASONING_EFFORT_MULTIPLIERS = Object.freeze({
+      off: Object.freeze({ output: 0.78, latency: 0.75 }),
+      minimal: Object.freeze({ output: 0.86, latency: 0.82 }),
+      low: Object.freeze({ output: 0.93, latency: 0.9 }),
+      medium: Object.freeze({ output: 1, latency: 1 }),
+      high: Object.freeze({ output: 1.16, latency: 1.15 }),
+      xhigh: Object.freeze({ output: 1.34, latency: 1.3 }),
+      max: Object.freeze({ output: 1.58, latency: 1.5 })
+    });
+    QUALITY_FLOORS = Object.freeze({ simple: 0.75, balanced: 0.78, complex: 0.82 });
+    DEFAULT_ROUTER_SETTINGS = Object.freeze({
+      pricing: Object.freeze({}),
+      // The official site publishes versioned table/categories assets and the
+      // adapter discovers the newest release from this root URL.
+      liveBenchEndpoint: "https://livebench.ai",
+      liveBenchTtlMs: 9e5,
+      budgetUsd: 0,
+      cacheReadRatio: 0,
+      cacheWriteRatio: 0
+    });
+    MODEL_CATALOG = Object.freeze([
+      { id: "claude-fable-5", aliases: ["claude-fable-5", "claude fable 5"], quality: 0.99, latency: 0.34, costIn: 10, costOut: 50, specialties: ["reasoning", "writing", "research"], risk: 0.06 },
+      { id: "claude-opus-4-8", aliases: ["claude-opus-4-8", "claude opus 4.8"], quality: 0.97, latency: 0.39, costIn: 5, costOut: 25, specialties: ["reasoning", "writing", "code"], risk: 0.07 },
+      { id: "gpt-5.6-sol", aliases: ["gpt-5.6-sol", "gpt 5.6 sol"], quality: 0.98, latency: 0.4, costIn: 5, costOut: 30, specialties: ["reasoning", "code", "math", "vision"], risk: 0.06 },
+      { id: "gpt-5.5", aliases: ["gpt-5.5", "gpt 5.5"], quality: 0.95, latency: 0.44, costIn: 5, costOut: 30, specialties: ["reasoning", "code", "math"], risk: 0.08 },
+      { id: "deepseek-v4-pro", aliases: ["deepseek-v4-pro", "deepseek v4 pro"], quality: 0.93, latency: 0.52, costIn: 1.74, costOut: 3.48, specialties: ["code", "math", "reasoning"], risk: 0.1 },
+      { id: "deepseek-v4-flash", aliases: ["deepseek-v4-flash", "deepseek v4 flash"], quality: 0.82, latency: 0.82, costIn: 0.14, costOut: 0.28, specialties: ["code", "summarization", "classification"], risk: 0.14 },
+      { id: "kimi-k3", aliases: ["kimi-k3", "kimi k3"], quality: 0.91, latency: 0.56, costIn: 3, costOut: 15, specialties: ["reasoning", "long-context", "code"], risk: 0.1 },
+      { id: "qwen3.7-max", aliases: ["qwen3.7-max", "qwen 3.7 max"], quality: 0.94, latency: 0.5, costIn: 2.5, costOut: 7.5, specialties: ["reasoning", "math", "code"], risk: 0.08 },
+      { id: "qwen3.7-plus", aliases: ["qwen3.7-plus", "qwen 3.7 plus"], quality: 0.87, latency: 0.72, costIn: 0.4, costOut: 1.6, specialties: ["code", "math", "writing"], risk: 0.12 },
+      { id: "glm-5.2", aliases: ["glm-5.2", "glm 5.2"], quality: 0.89, latency: 0.64, costIn: 1.4, costOut: 4.4, specialties: ["reasoning", "writing", "math"], risk: 0.11 },
+      { id: "gpt-5.6-luna", aliases: ["gpt-5.6-luna", "gpt 5.6 luna"], quality: 0.84, latency: 0.86, costIn: 0.2, costOut: 1.2, specialties: ["classification", "summarization", "code"], risk: 0.14 },
+      { id: "gpt-5.6-terra", aliases: ["gpt-5.6-terra", "gpt 5.6 terra"], quality: 0.91, latency: 0.66, costIn: 2, costOut: 12, specialties: ["code", "writing", "reasoning"], risk: 0.1 },
+      { id: "minimax-m3", aliases: ["minimax-m3", "minimax m3"], quality: 0.86, latency: 0.69, costIn: 0.3, costOut: 1.2, specialties: ["writing", "code", "summarization"], risk: 0.13 },
+      { id: "gemini-3-flash", aliases: ["gemini 3 flash", "gemini-3-flash"], quality: 0.88, latency: 0.73, costIn: 0.5, costOut: 3, specialties: ["vision", "research", "summarization"], risk: 0.12 },
+      { id: "big-pickle", aliases: ["big pickle"], quality: 0.7, latency: 0.88, costIn: 0, costOut: 0, specialties: ["classification", "summarization"], risk: 0.24 }
+    ]);
+    clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+    normalize = (value) => String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    routeKey = (provider, model) => `${String(provider ?? "")}/${String(model ?? "")}`;
+    OPENCODE_CATALOG_PROVIDERS = Object.freeze([
+      "opencode",
+      "opencode-go",
+      // Some OpenCode-compatible configuration examples use the product name as
+      // the route id. Treat those aliases as catalog routes too; the pi-ai catalog
+      // still owns the actual model endpoints.
+      "opencode-zen",
+      "opencode-go-zen"
+    ]);
+    TASK_TYPE_RULES = Object.freeze([
+      ["vision", /图片|图像|照片|视觉|image|vision|截图|识图/i],
+      ["math", /数学|证明|定理|公式|方程|math|proof|theorem/i],
+      ["code", /代码|编程|工程|项目|架构|接口|api|debug|实现|部署|测试|code/i],
+      ["research", /研究|论文|文献|联网|检索|research|source|引用/i],
+      ["summarization", /总结|摘要|提炼|提取|关键词|分类|翻译|summar|classif|extract/i],
+      ["writing", /写作|润色|小说|文案|报告|writing|draft/i]
+    ]);
+    TASK_TYPE_LABELS = Object.freeze({
+      vision: "\u89C6\u89C9\u5904\u7406",
+      math: "\u6570\u5B66\u63A8\u5BFC",
+      code: "\u5DE5\u7A0B\u4E0E\u4EE3\u7801",
+      research: "\u7814\u7A76\u4E0E\u68C0\u7D22",
+      summarization: "\u6458\u8981\u4E0E\u6574\u7406",
+      writing: "\u5199\u4F5C\u4E0E\u8868\u8FBE"
+    });
+    MAX_EXPLICIT_EXECUTION_PACKAGES = 6;
+    REQUIREMENT_ACTION = /(?:实现|新增|添加|修复|更新|构建|设计|完成|编写|优化|接入|支持|配置|部署|测试|验证|检查|整理|创建|移除|替换|迁移|适配|开发|调研|安装|下载|上传|发布|生成|集成|改造|封装|显示|提供|允许|确保|处理|解决|分析|探测|检测|选择|分配|拆分|对接|加入|保留|记录|输出|审查|核对|对比|提取|摘要|总结|分类|翻译|格式化|润色|可以|能够|需要|进行|implement|add|fix|update|build|design|write|improve|support|configure|deploy|test|verify|check|create|remove|replace|migrate|install|publish|generate|integrate|review|extract|summarize|classify|translate|format|should|must|need)/i;
+    HIGH_STAKES_WORK = /架构|安全|隐私|权限|并发|事务|迁移|生产|部署|发布|证明|定理|科研|论文|复杂|多步骤|跨系统|系统设计|architecture|security|migration|production|proof|theorem|research/i;
+    SIMPLE_WORK = /翻译|摘要|总结|提取|分类|格式化|列出|改写|润色|拼写|校对|translate|summarize|extract|classify|format|proofread/i;
+    HIGH_STAKES_ACTION = /设计|实现|修复|审计|测试|验证|证明|推导|部署|迁移|规划|研究|解决|推理|design|implement|fix|audit|verify|prove|derive|deploy|migrate|research|solve/i;
+    SIMPLE_REQUEST_START = /^(?:请|帮我)?(?:翻译|摘要|总结|提取|分类|格式化|列出|改写|润色|拼写|校对|translate|summarize|extract|classify|format|proofread)/i;
+    SYNTHESIS_WEIGHTS = Object.freeze({ quality: 0.58, cost: 0.08, latency: 0.04, specialty: 0.08, reasoning: 0.16, risk: 0.06 });
+    ROUTING_BEAM_WIDTH = 256;
+    ROUTING_CANDIDATE_LIMIT = 12;
+  }
+});
+
 // .dsh-plugin/shared/harness-plan.mjs
 function channelForProvider(provider, installedToolIds = [], runnableToolIds = []) {
   const tool = toolForProvider(provider);
@@ -909,7 +1095,16 @@ function annotate(channel) {
     channelDetail: channel.detail
   };
 }
-function createPlanFromRoutes(task, availableRoutes, { mode = "single", budgetUsd = 0, installedToolIds = [], runnableToolIds = [] } = {}) {
+function createPlanFromRoutes(task, availableRoutes, {
+  mode = "single",
+  budgetUsd = 0,
+  installedToolIds = [],
+  runnableToolIds = [],
+  pricing = {},
+  liveBench = null,
+  cacheReadRatio = 0,
+  cacheWriteRatio = 0
+} = {}) {
   const taskText = clean(task);
   if (!taskText) throw new Error("task must contain text");
   const selectedMode = mode === "team" ? "team" : "single";
@@ -922,12 +1117,15 @@ function createPlanFromRoutes(task, availableRoutes, { mode = "single", budgetUs
     return channelCache.get(key);
   };
   const needsImage = detectTaskTypes(taskText).includes("vision");
-  const eligibleRoutes = needsImage ? routes.filter((route) => !Array.isArray(route.inputModalities) || route.inputModalities.length === 0 || route.inputModalities.includes("image")) : routes;
   const plan = buildPlan({
     text: taskText,
-    available: eligibleRoutes,
+    available: routes,
     mode: selectedMode,
-    budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0)
+    budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0),
+    pricing,
+    liveBench,
+    cacheReadRatio,
+    cacheWriteRatio
   });
   const selectedChannel = plan.selected ? channelOf(plan.selected.provider) : null;
   return {
@@ -936,22 +1134,27 @@ function createPlanFromRoutes(task, availableRoutes, { mode = "single", budgetUs
     availableRoutes: routes,
     ...selectedChannel ? annotate(selectedChannel) : {},
     availabilityNotice: "\u6A21\u578B\u76EE\u5F55\u5217\u51FA\u7684\u8DEF\u7EBF\u5C1A\u672A\u9A8C\u8BC1\u5F53\u524D\u51ED\u636E\u548C\u7F51\u7EDC\uFF1B\u5B9E\u9645\u53EF\u7528\u6027\u4EE5\u5B98\u65B9\u9002\u914D\u5668\u8C03\u7528\u7ED3\u679C\u4E3A\u51C6\u3002",
-    pricingNotice: "\u8D39\u7528\u662F\u672C\u5730\u4F30\u7B97\uFF0C\u4E0D\u662F\u4F9B\u5E94\u5546\u8D26\u5355\uFF0C\u4E5F\u4E0D\u662F\u786C\u6027\u652F\u51FA\u4E0A\u9650\u3002",
-    modalityNotice: needsImage && eligibleRoutes.length < routes.length ? "\u56FE\u50CF\u4EFB\u52A1\u5DF2\u6392\u9664\u660E\u786E\u58F0\u660E\u4E0D\u63A5\u53D7\u56FE\u50CF\u8F93\u5165\u7684\u6A21\u578B\uFF1B\u672A\u58F0\u660E\u80FD\u529B\u7684\u6A21\u578B\u4ECD\u9700\u4EBA\u5DE5\u9A8C\u8BC1\u3002" : null,
+    pricingNotice: plan.estimatedCost === null ? "\u90E8\u5206\u8DEF\u7EBF\u5C1A\u672A\u914D\u7F6E\u8BE5\u4F9B\u5E94\u5546\u7684\u7F8E\u5143\u8F93\u5165/\u8F93\u51FA\u5355\u4EF7\uFF0C\u65E0\u6CD5\u8BA1\u7B97\u53EF\u9760\u7684\u603B\u8D39\u7528\u4E0E\u8282\u7701\u6BD4\u4F8B\uFF1B\u8BF7\u5728\u6A21\u578B\u4EF7\u683C\u8BBE\u7F6E\u4E2D\u8865\u9F50\u3002" : "\u8D39\u7528\u6309\u5DF2\u63D0\u4F9B\u7684\u7F8E\u5143\u5355\u4EF7\u548C\u4F30\u8BA1 token \u6570\u8BA1\u7B97\uFF0C\u4E0D\u662F\u4F9B\u5E94\u5546\u8D26\u5355\uFF0C\u4E5F\u4E0D\u662F\u786C\u6027\u652F\u51FA\u4E0A\u9650\u3002",
+    qualityNotice: plan.optimization.qualityEvidenceComplete ? "\u6A21\u578B\u8D28\u91CF\u4F7F\u7528\u5DF2\u63D0\u4F9B\u8BC4\u5206\u6216\u57FA\u51C6\u6570\u636E\u4F30\u8BA1\uFF0C\u4ECD\u9700\u5B9E\u9645\u4EFB\u52A1\u9A8C\u8BC1\u3002" : "\u90E8\u5206\u6A21\u578B\u8D28\u91CF\u7F3A\u5C11\u53EF\u6838\u9A8C\u8BC4\u5206\uFF1B\u76EE\u5F55\u542F\u53D1\u5F0F\u53EA\u4F9B\u9009\u62E9\u53C2\u8003\uFF0C\u8D28\u91CF\u95E8\u69DB\u548C\u8282\u7701\u6BD4\u4F8B\u65E0\u6CD5\u4FDD\u8BC1\u3002",
+    modalityNotice: needsImage ? plan.unassignableTasks.length > 0 ? "\u56FE\u50CF\u5DE5\u4F5C\u5305\u6CA1\u6709\u53EF\u786E\u8BA4\u652F\u6301\u56FE\u50CF\u8F93\u5165\u7684\u8DEF\u7EBF\uFF0C\u5F53\u524D\u8BA1\u5212\u65E0\u6CD5\u5B8C\u6574\u5206\u914D\uFF1B\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u914D\u7F6E\u652F\u6301\u56FE\u50CF\u7684\u6A21\u578B\u3002" : routes.some((route) => !Array.isArray(route.inputModalities) || route.inputModalities.length === 0) ? "\u56FE\u50CF\u5DE5\u4F5C\u5305\u53EA\u5206\u7ED9\u5DF2\u58F0\u660E\u56FE\u50CF\u80FD\u529B\u6216\u672A\u58F0\u660E\u8F93\u5165\u80FD\u529B\u7684\u6A21\u578B\uFF1B\u672A\u58F0\u660E\u80FD\u529B\u7684\u6A21\u578B\u4ECD\u9700\u5B9E\u9645\u9A8C\u8BC1\u3002\u5176\u4ED6\u6587\u672C\u5DE5\u4F5C\u5305\u53EF\u7EE7\u7EED\u4F7F\u7528\u7ECF\u6D4E\u578B\u6587\u672C\u6A21\u578B\u3002" : "\u56FE\u50CF\u5DE5\u4F5C\u5305\u53EA\u5206\u7ED9\u660E\u786E\u652F\u6301\u56FE\u50CF\u8F93\u5165\u7684\u6A21\u578B\uFF1B\u5176\u4ED6\u6587\u672C\u5DE5\u4F5C\u5305\u53EF\u7EE7\u7EED\u4F7F\u7528\u7ECF\u6D4E\u578B\u6587\u672C\u6A21\u578B\u3002" : null,
     toolNotice: "\u6267\u884C\u6E20\u9053\u6309\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868\u548C\u5DF2\u6838\u9A8C\u9002\u914D\u5668\u6807\u6CE8\uFF1Aofficial-cli \u8868\u793A\u8BE5\u5382\u5546\u5B98\u65B9 CLI \u5DF2\u5B89\u88C5\u4E14\u53EF\u6258\u7BA1\u6267\u884C\uFF1Bharness-llm \u8868\u793A\u901A\u8FC7\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u8C03\u7528\u3002\u53EF\u5728\u5DE5\u4F5C\u53F0\u67E5\u770B\u5B89\u88C5\u4E0E\u6267\u884C\u652F\u6301\u72B6\u6001\u3002",
     team: {
       requested: selectedMode === "team",
       recommended: selectedMode === "team" && plan.complexity.band === "complex" && plan.subtasks.length > 1,
       handoff: "\u53EF\u5728\u5B98\u65B9\u4F1A\u8BDD\u8C03\u7528 model_router_team_execute \u6258\u7BA1\u6267\u884C\u5F53\u524D\u5E73\u53F0\u652F\u6301\u7684\u5B98\u65B9 CLI \u5DE5\u4F5C\u5305\uFF1B\u5B98\u65B9 Agent Teams \u53EF\u534F\u4F5C\u7BA1\u7406\u4EFB\u52A1\uFF0C\u4F46\u6210\u5458\u6A21\u578B\u7531\u5BBF\u4E3B\u914D\u7F6E\uFF0C\u4E0D\u80FD\u76F4\u63A5\u6309\u672C\u8BA1\u5212\u9010\u4E2A\u5207\u6362\u3002",
-      workPackages: plan.subtasks.map((item) => ({
+      workPackages: plan.subtasks.map((item, index) => ({
         id: item.id,
         name: item.name,
         ...item.objective ? { objective: item.objective } : {},
         type: item.type,
         purpose: item.purpose,
+        difficulty: item.difficulty,
+        qualitySource: item.qualitySource,
+        pricingSource: item.pricingSource,
         dependsOn: item.dependsOn,
         recommendedProvider: item.recommendedProvider,
         recommendedModel: item.recommended,
+        estimatedCost: plan.costBreakdown[index]?.estimatedCost ?? null,
         ...item.recommendedReasoningEffort ? { recommendedReasoningEffort: item.recommendedReasoningEffort } : {},
         ...annotate(channelOf(item.recommendedProvider)),
         verificationChecklist: item.purpose === "synthesis" ? ["\u6838\u5BF9\u5404\u5DE5\u4F5C\u5305\u4EA4\u4ED8\u7269\u4E0E\u4F9D\u8D56", "\u8BB0\u5F55\u51B2\u7A81\u3001\u672A\u89E3\u51B3\u4E8B\u9879\u548C\u6700\u7EC8\u9A8C\u6536\u7ED3\u679C"] : item.type === "code" ? ["\u8BF4\u660E\u6539\u52A8\u6587\u4EF6\u4E0E\u63A5\u53E3", "\u8FD0\u884C\u4E0E\u6539\u52A8\u76F8\u5173\u7684\u9A8C\u8BC1\u5E76\u8BB0\u5F55\u7ED3\u679C", "\u5217\u51FA\u5C1A\u672A\u5B8C\u6210\u7684\u8FB9\u754C\u60C5\u51B5"] : item.type === "research" ? ["\u5217\u51FA\u6765\u6E90\u3001\u65E5\u671F\u548C\u53EF\u6838\u5BF9\u7684\u7ED3\u8BBA", "\u6807\u51FA\u63A8\u65AD\u4E0E\u4E0D\u786E\u5B9A\u4E8B\u9879"] : ["\u5217\u51FA\u4EA4\u4ED8\u5185\u5BB9\u548C\u9A8C\u6536\u4F9D\u636E", "\u6807\u51FA\u672A\u5B8C\u6210\u4E8B\u9879"]
@@ -1008,13 +1211,17 @@ function routesFromModelCatalog(catalog) {
   return routes;
 }
 function createWorkspacePlan(task, catalog, options = {}) {
-  const routes = routesFromModelCatalog(catalog);
+  const routes = applyModelProfiles(
+    routesFromModelCatalog(catalog),
+    parseModelProfilesJson(options.modelProfilesJson ?? "[]")
+  );
   return createPlanFromRoutes(task, routes, options);
 }
 var clean2;
 var init_catalog = __esm({
   ".dsh-plugin/client/catalog.mjs"() {
     init_harness_plan();
+    init_model_profiles();
     clean2 = (value) => typeof value === "string" ? value.trim() : "";
   }
 });
@@ -1032,48 +1239,170 @@ __export(official_harness_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(official_harness_exports);
-var import_react3 = __toESM(require("react"), 1);
+var import_react4 = __toESM(require("react"), 1);
+init_model_profiles();
 
 // .dsh-plugin/client/router-main.jsx
-var import_react = __toESM(require("react"), 1);
+var import_react2 = __toESM(require("react"), 1);
 init_catalog();
-init_official_tool_registry();
 
-// .dsh-plugin/client/router-main.css
-var router_main_default = ".mr-workspace {\n  --mr-card: rgba(255, 255, 255, .94);\n  --mr-ink: #182232;\n  --mr-muted: #526174;\n  --mr-line: rgba(38, 55, 75, .13);\n  --mr-accent: #315cc8;\n  --mr-soft: #edf3ff;\n  box-sizing: border-box;\n  width: 100%;\n  height: 100%;\n  min-height: 0;\n  overflow-y: auto;\n  background: rgba(246, 249, 253, .9);\n  backdrop-filter: blur(18px);\n  color: var(--mr-ink);\n  font-family: inherit;\n}\n.mr-workspace *, .mr-workspace *::before, .mr-workspace *::after { box-sizing: border-box; }\n.mr-shell { width: min(1160px, 100%); margin: 0 auto; padding: 36px 32px 64px; }\n.mr-header { display: flex; flex-wrap: wrap; gap: 20px; align-items: end; justify-content: space-between; margin-bottom: 24px; }\n.mr-eyebrow { margin: 0 0 8px; color: var(--mr-accent); font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }\n.mr-title { margin: 0; font-size: clamp(25px, 3vw, 34px); letter-spacing: -.035em; line-height: 1.16; }\n.mr-subtitle { margin: 10px 0 0; color: var(--mr-muted); font-size: 14px; line-height: 1.65; }\n.mr-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--mr-line); border-radius: 999px; background: var(--mr-card); color: var(--mr-muted); font-size: 12px; white-space: nowrap; }\n.mr-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #2cba83; }\n.mr-status-dot.loading { background: #e9a640; }\n.mr-status-dot.error { background: #d95360; }\n.mr-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr); gap: 18px; align-items: start; }\n.mr-card { min-width: 0; border: 1px solid var(--mr-line); border-radius: 18px; background: var(--mr-card); box-shadow: 0 12px 42px rgba(25, 45, 76, .08); }\n.mr-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 22px 0; }\n.mr-card-title { margin: 0; font-size: 16px; font-weight: 700; }\n.mr-card-copy { margin: 5px 0 0; color: var(--mr-muted); font-size: 12px; line-height: 1.55; }\n.mr-card-body { padding: 18px 22px 22px; }\n.mr-label { display: block; margin: 0 0 8px; font-size: 12px; font-weight: 700; }\n.mr-textarea, .mr-input { width: 100%; border: 1px solid var(--mr-line); border-radius: 11px; background: #fff; color: var(--mr-ink); font: inherit; outline: none; }\n.mr-textarea { min-height: 154px; padding: 13px 14px; resize: vertical; line-height: 1.6; font-size: 14px; }\n.mr-input { min-height: 38px; padding: 8px 11px; font-size: 13px; }\n.mr-textarea:focus, .mr-input:focus { border-color: var(--mr-accent); box-shadow: 0 0 0 3px rgba(49, 92, 200, .13); }\n.mr-controls { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; margin-top: 17px; }\n.mr-control-group { display: flex; flex-direction: column; gap: 7px; }\n.mr-control-label { color: var(--mr-muted); font-size: 11px; font-weight: 650; }\n.mr-segment { display: inline-flex; padding: 3px; border-radius: 10px; background: #edf1f7; }\n.mr-segment button { border: 0; border-radius: 8px; padding: 8px 12px; background: transparent; color: var(--mr-muted); font: inherit; font-size: 12px; cursor: pointer; }\n.mr-segment button[aria-pressed='true'] { background: #fff; color: var(--mr-ink); box-shadow: 0 2px 8px rgba(20, 35, 56, .1); font-weight: 700; }\n.mr-budget { width: 140px; }\n.mr-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 18px; }\n.mr-button { border: 1px solid transparent; border-radius: 10px; min-height: 38px; padding: 8px 14px; background: var(--mr-accent); color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }\n.mr-button:hover:not(:disabled) { filter: brightness(.94); }\n.mr-button:disabled { cursor: not-allowed; opacity: .5; }\n.mr-button-secondary { border-color: var(--mr-line); background: #fff; color: var(--mr-ink); }\n.mr-caption { color: var(--mr-muted); font-size: 11px; line-height: 1.5; }\n.mr-search { margin-top: 14px; }\n.mr-list { display: grid; gap: 8px; margin-top: 13px; max-height: 395px; overflow-y: auto; }\n.mr-route { display: flex; justify-content: space-between; gap: 10px; padding: 10px 11px; border: 1px solid var(--mr-line); border-radius: 10px; background: #f9fbfe; }\n.mr-route-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }\n.mr-route-provider { margin-top: 2px; color: var(--mr-muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.mr-pill { align-self: start; flex: none; padding: 3px 7px; border-radius: 7px; background: var(--mr-soft); color: var(--mr-accent); font-size: 10px; font-weight: 700; }\n.mr-empty, .mr-error { padding: 14px; border-radius: 10px; background: #f4f6fa; color: var(--mr-muted); font-size: 12px; line-height: 1.6; }\n.mr-error { background: #fff0f1; color: #a52d3c; }\n.mr-results { margin-top: 18px; }\n.mr-result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }\n.mr-metric { padding: 13px; border-radius: 12px; background: #f5f8fd; }\n.mr-metric-label { color: var(--mr-muted); font-size: 10px; }\n.mr-metric-value { margin-top: 5px; font-size: 15px; font-weight: 750; word-break: break-word; }\n.mr-section-title { margin: 20px 0 10px; font-size: 13px; font-weight: 750; }\n.mr-package { padding: 13px 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: #fafcff; }\n.mr-package + .mr-package { margin-top: 8px; }\n.mr-package-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }\n.mr-package-name { font-size: 12px; font-weight: 750; }\n.mr-package-route { color: var(--mr-accent); font-size: 11px; font-weight: 700; }\n.mr-package-copy { margin: 7px 0 0; color: var(--mr-muted); font-size: 11px; line-height: 1.6; }\n.mr-notice { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(49, 92, 200, .16); border-radius: 12px; background: #eff4ff; color: #354d7a; font-size: 11px; line-height: 1.65; }\n.mr-notice code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }\n@media (max-width: 850px) { .mr-grid { grid-template-columns: 1fr; } .mr-shell { padding: 24px 18px 48px; } }\n@media (prefers-color-scheme: dark) {\n  .mr-workspace { --mr-card: rgba(30, 38, 51, .94); --mr-ink: #ecf2ff; --mr-muted: #aebbd0; --mr-line: rgba(210, 224, 245, .15); --mr-accent: #91adff; --mr-soft: rgba(97, 132, 222, .18); background: rgba(18, 23, 32, .91); }\n  .mr-textarea, .mr-input, .mr-segment button[aria-pressed='true'], .mr-button-secondary { background: #273245; color: var(--mr-ink); }\n  .mr-segment, .mr-empty, .mr-metric { background: #222d3e; }\n  .mr-route, .mr-package { background: #222d3e; }\n  .mr-notice { background: #243454; color: #c9d6fa; }\n  .mr-error { background: #4a2730; color: #ffd4da; }\n}\n\n/* \u5B98\u65B9\u5DE5\u5177\u5361\u7247 */\n.mr-tools { display: grid; gap: 9px; }\n.mr-tool { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: var(--mr-card); }\n.mr-tool-info { min-width: 0; flex: 1; }\n.mr-tool-status { display: flex; align-items: center; gap: 6px; margin-top: 7px; color: var(--mr-muted); font-size: 11px; }\n.mr-tool-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #8d9aaa; }\n.mr-tool-dot.installed { background: #2cba83; }\n.mr-tool-dot.running { background: #e9a640; }\n.mr-tool-command { display: block; margin-top: 6px; padding: 4px 8px; font-size: 12px; background: var(--dsw-alias-markdown-code-block); border-radius: 6px; overflow-wrap: anywhere; }\n.mr-tool-button { flex-shrink: 0; }\n.mr-tool-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }\n.mr-tool-detail { margin: 7px 0 0; }\n.mr-tool-error { margin: 8px 0 0; padding: 9px 11px; }\n.mr-tool-log { margin-top: 7px; color: var(--mr-muted); font-size: 11px; }\n.mr-tool-log summary { cursor: pointer; }\n.mr-tool-log pre { max-height: 140px; overflow: auto; padding: 8px; border-radius: 7px; background: var(--dsw-alias-markdown-code-block); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }\n.mr-channel-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }\n.mr-pill-channel-ok { border-color: var(--dsw-alias-success, #2f9e63); color: var(--dsw-alias-success, #2f9e63); }\n@media (max-width: 560px) { .mr-tool { align-items: stretch; flex-direction: column; gap: 10px; } .mr-tool-button { align-self: flex-start; } }\n";
+// .dsh-plugin/client/model-profile-editor.jsx
+var import_react = __toESM(require("react"), 1);
+init_model_profiles();
 
-// .dsh-plugin/client/router-main.jsx
-var money = (value) => `$${Number(value || 0).toFixed(4)}`;
-var text = (value) => typeof value === "string" ? value.trim() : "";
-function RouterPanelIcon({ size = 20, active = false }) {
-  return /* @__PURE__ */ import_react.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react.default.createElement("path", { d: "M7 6.5h7M7 17.5h7M15 6.5v11", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }), /* @__PURE__ */ import_react.default.createElement("circle", { cx: "5", cy: "6.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react.default.createElement("circle", { cx: "5", cy: "17.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react.default.createElement("circle", { cx: "17", cy: "12", r: "3", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7" }));
+// .dsh-plugin/client/model-profile-editor-state.mjs
+init_model_profiles();
+var PROFILE_SPECIALTY_HINT = "code, math, research, summarization, writing, vision, reasoning";
+var profileRouteKey = (route) => `${String(route?.provider ?? "")}\0${String(route?.model ?? "")}`;
+var field = (value) => String(value ?? "").trim();
+function nonnegativeField(value, label, max = 1e6) {
+  const raw = field(value);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > max) throw new Error(`${label} \u5FC5\u987B\u662F 0 \u5230 ${max} \u7684\u6570\u5B57\u3002`);
+  return parsed;
 }
-function RouteList({ routes, query }) {
-  const filtered = routes.filter((route) => {
-    const haystack = `${route.providerName} ${route.provider} ${route.name} ${route.model}`.toLowerCase();
-    return haystack.includes(query.toLowerCase());
-  });
-  if (filtered.length === 0) return /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-empty" }, routes.length === 0 ? "\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u5C1A\u65E0\u53EF\u89C4\u5212\u7684\u8DEF\u7EBF\u3002\u8BF7\u5148\u5728\u201C\u6A21\u578B\u201D\u9875\u5B8C\u6210\u914D\u7F6E\u3002" : "\u6CA1\u6709\u5339\u914D\u7684\u6A21\u578B\u3002");
-  return /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-list", role: "list", "aria-label": "\u5B98\u65B9\u5DF2\u767B\u8BB0\u6A21\u578B\u8DEF\u7EBF" }, filtered.map((route) => /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route", role: "listitem", key: `${route.provider}/${route.model}` }, /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-name", title: route.name }, route.name), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-provider", title: `${route.provider}/${route.model}` }, route.provider, "/", route.model)), route.reasoningKnown && /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-pill" }, "\u63A8\u7406\u7B49\u7EA7"))));
+function profileDraft(profile) {
+  return {
+    quality: profile?.quality === void 0 ? "" : String(Number((profile.quality * 100).toFixed(4))),
+    input: profile?.pricing?.input === void 0 ? "" : String(profile.pricing.input),
+    output: profile?.pricing?.output === void 0 ? "" : String(profile.pricing.output),
+    cacheRead: profile?.pricing?.cacheRead === void 0 ? "" : String(profile.pricing.cacheRead),
+    cacheWrite: profile?.pricing?.cacheWrite === void 0 ? "" : String(profile.pricing.cacheWrite),
+    specialties: Array.isArray(profile?.specialties) ? profile.specialties.join(", ") : "",
+    cliModel: profile?.cliModel ?? ""
+  };
 }
-function ChannelBadge({ item }) {
-  if (!item?.executionChannel) return null;
-  const official = item.executionChannel === "official-cli";
-  return /* @__PURE__ */ import_react.default.createElement("span", { className: official ? "mr-pill mr-pill-channel-ok" : "mr-pill", title: item.channelDetail ?? "" }, official ? `\u5B98\u65B9 CLI \xB7 ${item.channelLabel ?? item.channelTool}` : "\u6A21\u578B\u76EE\u5F55 API");
+function profileFromDraft(route, draft) {
+  const provider = field(route?.provider);
+  const model = field(route?.model);
+  if (!provider || !model) throw new Error("\u8BF7\u5148\u4ECE\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u9009\u62E9\u4E00\u6761\u51C6\u786E\u7684\u6A21\u578B\u8DEF\u7EBF\u3002");
+  const profile = { provider, model };
+  const quality = nonnegativeField(draft?.quality, "\u8D28\u91CF\u8BC4\u5206", 100);
+  if (quality !== null) profile.quality = quality;
+  const input = nonnegativeField(draft?.input, "\u8F93\u5165\u5355\u4EF7");
+  const output = nonnegativeField(draft?.output, "\u8F93\u51FA\u5355\u4EF7");
+  const cacheRead = nonnegativeField(draft?.cacheRead, "\u7F13\u5B58\u8BFB\u53D6\u5355\u4EF7");
+  const cacheWrite = nonnegativeField(draft?.cacheWrite, "\u7F13\u5B58\u5199\u5165\u5355\u4EF7");
+  if (input === null !== (output === null)) throw new Error("\u8F93\u5165\u548C\u8F93\u51FA\u5355\u4EF7\u9700\u8981\u540C\u65F6\u586B\u5199\uFF1B\u7559\u7A7A\u8868\u793A\u4EF7\u683C\u672A\u77E5\u3002");
+  if (input === null && (cacheRead !== null || cacheWrite !== null)) throw new Error("\u586B\u5199\u7F13\u5B58\u5355\u4EF7\u524D\uFF0C\u8BF7\u5148\u586B\u5199\u8F93\u5165\u548C\u8F93\u51FA\u5355\u4EF7\u3002");
+  if (input !== null) {
+    profile.pricing = { input, output, currency: "USD" };
+    if (cacheRead !== null) profile.pricing.cacheRead = cacheRead;
+    if (cacheWrite !== null) profile.pricing.cacheWrite = cacheWrite;
+  }
+  const rawSpecialties = field(draft?.specialties);
+  if (rawSpecialties) {
+    const specialties = [...new Set(rawSpecialties.split(/[,，\s]+/u).filter(Boolean))];
+    if (specialties.length > 16 || specialties.some((item) => !/^[a-z][a-z0-9-]{0,39}$/.test(item))) {
+      throw new Error("\u64C5\u957F\u65B9\u5411\u6700\u591A 16 \u9879\uFF0C\u7528\u82F1\u6587\u5C0F\u5199\u6807\u7B7E\u5E76\u4EE5\u9017\u53F7\u5206\u9694\uFF0C\u4F8B\u5982 code, research\u3002");
+    }
+    profile.specialties = specialties;
+  }
+  const cliModel = field(draft?.cliModel);
+  if (cliModel) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(cliModel)) throw new Error("CLI \u6A21\u578B\u540D\u9700\u7531\u5B57\u6BCD\u6570\u5B57\u5F00\u5934\uFF0C\u4E14\u53EA\u5305\u542B\u5B57\u6BCD\u3001\u6570\u5B57\u3001\u70B9\u3001\u4E0B\u5212\u7EBF\u3001\u5192\u53F7\u3001\u659C\u6760\u6216\u8FDE\u5B57\u7B26\u3002");
+    profile.cliModel = cliModel;
+  }
+  return profile;
 }
-function PlanResults({ plan }) {
-  const selected = plan.selected;
-  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8DEF\u7531\u5EFA\u8BAE" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u672C\u5730\u8BA1\u7B97\u5B8C\u6210\uFF0C\u672A\u5411\u6A21\u578B\u53D1\u9001\u4EFB\u52A1\u5185\u5BB9\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u63A8\u8350\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "\u6682\u65E0\u8DEF\u7EBF")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u4EFB\u52A1\u590D\u6742\u5EA6"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u590D\u6742" }[plan.complexity.band] || plan.complexity.band)), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-label" }, "\u4F30\u7B97\u603B\u6210\u672C"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-metric-value" }, money(plan.estimatedCost)))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-control-label" }, "\u6267\u884C\u6E20\u9053"), /* @__PURE__ */ import_react.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, plan.reason), plan.optimization.budgetExceeded && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error" }, "\u6309\u5F53\u524D\u5B9E\u9A8C\u4EF7\u683C\u4F30\u7B97\uFF0C\u4EFB\u52A1\u53EF\u80FD\u8D85\u8FC7\u672C\u6B21\u9884\u7B97\u3002\u9884\u7B97\u53EA\u5F71\u54CD\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u963B\u6B62\u5B9E\u9645\u6263\u8D39\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("h3", { className: "mr-section-title" }, "\u56E2\u961F\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u4E0B\u65B9\u6A21\u578B\u662F\u89C4\u5212\u5EFA\u8BAE\uFF1B\u6258\u7BA1\u6267\u884C\u4F1A\u6309\u5382\u5546 CLI \u7684\u6A21\u578B\u540D\u89C4\u5219\u9009\u7528\uFF0C\u672A\u6838\u9A8C\u6620\u5C04\u65F6\u4F7F\u7528\u8BE5 CLI \u7684\u9ED8\u8BA4\u6A21\u578B\u3002"), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-empty" }, "\u5F53\u524D\u76EE\u5F55\u6CA1\u6709\u53EF\u5206\u914D\u7684\u6A21\u578B\u8DEF\u7EBF\u3002") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react.default.createElement("article", { className: "mr-package", key: item.id }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-top" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel)), item.objective && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, "\u5177\u4F53\u76EE\u6807\uFF1A", item.objective), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, item.purpose, item.dependsOn.length > 0 ? ` \xB7 \u4F9D\u8D56\uFF1A${item.dependsOn.join("\u3001")}` : ""), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-package-copy" }, "\u9A8C\u6536\uFF1A", item.verificationChecklist.join("\uFF1B")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react.default.createElement(ChannelBadge, { item }))))), plan.mode === "team" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, plan.team.handoff), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-notice" }, plan.pricingNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")));
+function updateProfileJson(rawJson, route, draft) {
+  const profiles = parseModelProfilesJson(rawJson ?? "[]");
+  const candidate = draft === null ? null : profileFromDraft(route, draft);
+  const selected = profileRouteKey(route);
+  const others = profiles.filter((profile) => profileRouteKey(profile) !== selected).map((profile) => ({
+    ...profile,
+    ...profile.quality === void 0 ? {} : { quality: Number((profile.quality * 100).toFixed(6)) }
+  }));
+  const next = candidate && Object.keys(candidate).length > 2 ? [...others, candidate] : others;
+  const json = JSON.stringify(next, null, 2);
+  parseModelProfilesJson(json);
+  return json;
 }
-var remoteError = (response, fallback) => text(response?.error?.message) || text(response?.value?.error) || fallback;
-function probeLabel(probe) {
-  if (!probe) return "\u5C1A\u672A\u68C0\u6D4B";
-  if (probe.installed) return `\u5DF2\u5B89\u88C5${probe.version ? ` \xB7 ${probe.version}` : ""}`;
-  if (probe.status === "not-installed") return "\u672A\u5B89\u88C5";
-  if (probe.status === "probe-timeout") return "\u68C0\u6D4B\u8D85\u65F6";
-  if (probe.status === "probe-failed") return "\u68C0\u6D4B\u5931\u8D25";
-  return probe.detail || "\u672A\u5B89\u88C5";
+
+// .dsh-plugin/client/model-profile-editor.jsx
+var messageOf = (error) => typeof error?.message === "string" ? error.message : "\u6A21\u578B\u914D\u7F6E\u4FDD\u5B58\u5931\u8D25\u3002";
+function ModelProfileEditor({ routes, settingsScope, onSaved }) {
+  const [snapshot, setSnapshot] = import_react.default.useState(() => settingsScope.getSnapshot());
+  const [selected, setSelected] = import_react.default.useState("");
+  const [drafts, setDrafts] = import_react.default.useState({});
+  const [saving, setSaving] = import_react.default.useState(false);
+  const [notice, setNotice] = import_react.default.useState(null);
+  import_react.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
+  const route = routes.find((item) => profileRouteKey(item) === selected) ?? routes[0];
+  const routeKey2 = route ? profileRouteKey(route) : "";
+  const rawJson = snapshot.value?.modelProfilesJson ?? "[]";
+  let profiles = [];
+  let loadError = "";
+  try {
+    profiles = parseModelProfilesJson(rawJson);
+  } catch (error) {
+    loadError = messageOf(error);
+  }
+  const saved = profiles.find((item) => profileRouteKey(item) === routeKey2);
+  const pending = drafts[routeKey2];
+  const draft = pending?.fields ?? profileDraft(saved);
+  const writable = snapshot.status === "ready" && snapshot.writable === true && !saving && !loadError;
+  const unmatched = profiles.filter((item) => !routes.some((route2) => profileRouteKey(route2) === profileRouteKey(item))).length;
+  const edit = (name, value) => {
+    if (!route || !writable) return;
+    setDrafts((previous) => {
+      const previousEntry = previous[routeKey2] ?? { fields: profileDraft(saved), baseRevision: snapshot.revision };
+      return { ...previous, [routeKey2]: { ...previousEntry, fields: { ...previousEntry.fields, [name]: value } } };
+    });
+    setNotice(null);
+  };
+  const write = async (remove) => {
+    if (!route || !writable) return;
+    const revision = pending?.baseRevision ?? snapshot.revision;
+    if (revision !== snapshot.revision) {
+      setNotice({ tone: "error", text: "\u8BBE\u7F6E\u5DF2\u5728\u5176\u4ED6\u9875\u9762\u66F4\u65B0\u3002\u5F53\u524D\u8F93\u5165\u4ECD\u5728\uFF1B\u8BF7\u6838\u5BF9\u6700\u65B0\u5185\u5BB9\uFF0C\u518D\u9009\u62E9\u201C\u91CD\u65B0\u52A0\u8F7D\u6B64\u8DEF\u7EBF\u201D\u540E\u7F16\u8F91\u3002" });
+      return;
+    }
+    let nextJson;
+    try {
+      nextJson = updateProfileJson(rawJson, route, remove ? null : draft);
+    } catch (error) {
+      setNotice({ tone: "error", text: messageOf(error) });
+      return;
+    }
+    setSaving(true);
+    setNotice(null);
+    try {
+      const accepted = await settingsScope.mutate([{ op: "set", path: ["modelProfilesJson"], value: nextJson }], revision);
+      if (!accepted) throw new Error("\u8BBE\u7F6E\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\u3002\u8F93\u5165\u5DF2\u4FDD\u7559\uFF0C\u8BF7\u91CD\u65B0\u52A0\u8F7D\u540E\u6838\u5BF9\u3002");
+      setDrafts((previous) => {
+        const next = { ...previous };
+        delete next[routeKey2];
+        return next;
+      });
+      setNotice({ tone: "success", text: remove ? "\u5DF2\u5220\u9664\u8BE5\u6A21\u578B\u7684\u81EA\u62A5\u914D\u7F6E\u3002" : "\u8BE5\u6A21\u578B\u914D\u7F6E\u5DF2\u4FDD\u5B58\uFF1B\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u5373\u53EF\u4F7F\u7528\u3002" });
+      onSaved?.();
+    } catch (error) {
+      setNotice({ tone: "error", text: messageOf(error) });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const reload = () => {
+    setDrafts((previous) => {
+      const next = { ...previous };
+      delete next[routeKey2];
+      return next;
+    });
+    setNotice(null);
+  };
+  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u9009\u62E9\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u51C6\u786E\u8DEF\u7EBF\uFF0C\u586B\u5199\u4F60\u638C\u63E1\u7684\u8D28\u91CF\u8BC4\u5206\u4E0E\u5355\u4EF7\u3002\u914D\u7F6E\u7531\u4F60\u63D0\u4F9B\uFF0C\u63D2\u4EF6\u4E0D\u4F1A\u8BFB\u53D6\u8D26\u53F7\u5BC6\u94A5\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, "\u5DF2\u6709\u914D\u7F6E\u65E0\u6CD5\u89E3\u6790\uFF1A", loadError, "\u3002\u8BF7\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6B63 JSON\u3002"), snapshot.status !== "ready" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8BBE\u7F6E\u72B6\u6001\uFF1A", snapshot.status === "loading" ? "\u6B63\u5728\u52A0\u8F7D" : "\u5F53\u524D\u4E0D\u53EF\u7528"), snapshot.status === "ready" && !snapshot.writable && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "status" }, "\u5F53\u524D\u8BBE\u7F6E\u4E3A\u53EA\u8BFB\uFF0C\u8BF7\u5728\u53EF\u5199\u7684\u672C\u673A\u73AF\u5883\u914D\u7F6E\u3002"), routes.length === 0 ? /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-empty" }, "\u8BF7\u5148\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u6DFB\u52A0\u6A21\u578B\uFF0C\u518D\u8FD4\u56DE\u8FD9\u91CC\u586B\u5199\u4EF7\u683C\u4E0E\u80FD\u529B\u3002") : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "\u6A21\u578B\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey2, onChange: (event) => {
+    setSelected(event.target.value);
+    setNotice(null);
+  } }, routes.map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `\u5DF2\u914D\u7F6E${saved.pricing ? "\u5355\u4EF7" : "\u80FD\u529B\uFF0C\u4EF7\u683C\u672A\u77E5"}` : "\u672A\u914D\u7F6E\uFF0C\u4EF7\u683C\u4E0E\u8D28\u91CF\u6765\u6E90\u672A\u77E5", pending ? " \xB7 \u5F53\u524D\u6709\u672A\u4FDD\u5B58\u8F93\u5165" : "", unmatched > 0 ? ` \xB7 \u53E6\u6709 ${unmatched} \u6761\u914D\u7F6E\u4E0D\u5728\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u4E2D\uFF0C\u4FDD\u5B58\u65F6\u4F1A\u4FDD\u7559` : ""), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8D28\u91CF\u8BC4\u5206\uFF080\u2013100\uFF0C\u81EA\u62A5\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "\u4F8B\u5982 85\uFF1B\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u5165\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u51FA\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u64C5\u957F\u65B9\u5411\uFF08\u82F1\u6587\u6807\u7B7E\uFF0C\u9017\u53F7\u5206\u9694\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u5B98\u65B9 CLI \u6A21\u578B\u540D\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "\u4EC5\u5728\u5382\u5546 CLI \u652F\u6301\u8BE5\u51C6\u786E\u540D\u79F0\u65F6\u586B\u5199" }))), /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u7F13\u5B58\u5355\u4EF7\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u8BFB\u53D6\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u5199\u5165\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
+    void write(false);
+  } }, saving ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58\u6B64\u6A21\u578B"), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !pending || saving, onClick: reload }, "\u91CD\u65B0\u52A0\u8F7D\u6B64\u8DEF\u7EBF"), saved && /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable, onClick: () => {
+    void write(true);
+  } }, "\u5220\u9664\u6B64\u6A21\u578B\u914D\u7F6E")), notice && /* @__PURE__ */ import_react.default.createElement("p", { className: notice.tone === "error" ? "mr-error" : "mr-profile-success", role: notice.tone === "error" ? "alert" : "status" }, notice.text), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8D28\u91CF\u8BC4\u5206\u548C\u4EF7\u683C\u90FD\u662F\u7528\u6237\u63D0\u4F9B\u7684\u4F30\u503C\u3002\u672A\u586B\u5199\u5355\u4EF7\u65F6\u663E\u793A\u201C\u4EF7\u683C\u5F85\u914D\u7F6E\u201D\uFF1B\u9884\u7B97\u53EA\u5F71\u54CD\u672C\u5730\u89C4\u5212\uFF0C\u4E0D\u9650\u5236\u5B9E\u9645\u8D26\u5355\u3002CLI \u6A21\u578B\u540D\u987B\u4E0E\u5382\u5546\u5DE5\u5177\u6838\u5BF9\u3002"))));
 }
+
+// .dsh-plugin/client/tool-install-state.mjs
 function stableVersionOrder(left, right) {
   const parse = (value) => /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(value ?? ""));
   const current = parse(left);
@@ -1085,14 +1414,65 @@ function stableVersionOrder(left, right) {
   }
   return 0;
 }
+function toolInstallAction({ tool, probe, readiness, job, probeStatus }) {
+  const running = job?.status === "running";
+  const versionOrder = probe?.installed ? stableVersionOrder(probe.version, tool.version) : null;
+  const currentAndReady = versionOrder === 0 && readiness?.ready === true;
+  const repairable = versionOrder === 0 && readiness?.ready === false;
+  const newerOrUncertain = probe?.installed && (versionOrder === null || versionOrder > 0);
+  const label = running ? "\u5B89\u88C5\u4E2D\u2026" : currentAndReady ? "\u5DF2\u662F\u76EE\u6807\u7248\u672C" : repairable ? "\u4FEE\u590D\u5B98\u65B9\u6267\u884C\u5165\u53E3" : newerOrUncertain ? "\u8BF7\u4EBA\u5DE5\u6838\u5BF9\u7248\u672C" : probe?.installed ? "\u66F4\u65B0\u5230\u76EE\u6807\u7248\u672C" : job?.status === "failed" ? "\u91CD\u8BD5\u5B89\u88C5" : tool.manager === "signed-windows-installer" ? "\u4E0B\u8F7D\u5B89\u88C5\u5668" : "\u4E0B\u8F7D\u5B89\u88C5";
+  return {
+    label,
+    disabled: probeStatus !== "ready" || running || currentAndReady || newerOrUncertain
+  };
+}
+
+// .dsh-plugin/client/router-main.jsx
+init_official_tool_registry();
+
+// .dsh-plugin/client/router-main.css
+var router_main_default = ".mr-workspace {\r\n  --mr-card: rgba(255, 255, 255, .94);\r\n  --mr-ink: #182232;\r\n  --mr-muted: #526174;\r\n  --mr-line: rgba(38, 55, 75, .13);\r\n  --mr-accent: #315cc8;\r\n  --mr-soft: #edf3ff;\r\n  box-sizing: border-box;\r\n  width: 100%;\r\n  height: 100%;\r\n  min-height: 0;\r\n  overflow-y: auto;\r\n  background: rgba(246, 249, 253, .9);\r\n  backdrop-filter: blur(18px);\r\n  color: var(--mr-ink);\r\n  font-family: inherit;\r\n}\r\n.mr-workspace *, .mr-workspace *::before, .mr-workspace *::after { box-sizing: border-box; }\r\n.mr-shell { width: min(1160px, 100%); margin: 0 auto; padding: 36px 32px 64px; }\r\n.mr-header { display: flex; flex-wrap: wrap; gap: 20px; align-items: end; justify-content: space-between; margin-bottom: 24px; }\r\n.mr-eyebrow { margin: 0 0 8px; color: var(--mr-accent); font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }\r\n.mr-title { margin: 0; font-size: clamp(25px, 3vw, 34px); letter-spacing: -.035em; line-height: 1.16; }\r\n.mr-subtitle { margin: 10px 0 0; color: var(--mr-muted); font-size: 14px; line-height: 1.65; }\r\n.mr-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--mr-line); border-radius: 999px; background: var(--mr-card); color: var(--mr-muted); font-size: 12px; white-space: nowrap; }\r\n.mr-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #2cba83; }\r\n.mr-status-dot.loading { background: #e9a640; }\r\n.mr-status-dot.error { background: #d95360; }\r\n.mr-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr); gap: 18px; align-items: start; }\r\n.mr-card { min-width: 0; border: 1px solid var(--mr-line); border-radius: 18px; background: var(--mr-card); box-shadow: 0 12px 42px rgba(25, 45, 76, .08); }\r\n.mr-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 22px 0; }\r\n.mr-card-title { margin: 0; font-size: 16px; font-weight: 700; }\r\n.mr-card-copy { margin: 5px 0 0; color: var(--mr-muted); font-size: 12px; line-height: 1.55; }\r\n.mr-card-body { padding: 18px 22px 22px; }\r\n.mr-label { display: block; margin: 0 0 8px; font-size: 12px; font-weight: 700; }\r\n.mr-textarea, .mr-input { width: 100%; border: 1px solid var(--mr-line); border-radius: 11px; background: #fff; color: var(--mr-ink); font: inherit; outline: none; }\r\n.mr-textarea { min-height: 154px; padding: 13px 14px; resize: vertical; line-height: 1.6; font-size: 14px; }\r\n.mr-input { min-height: 38px; padding: 8px 11px; font-size: 13px; }\r\n.mr-textarea:focus, .mr-input:focus { border-color: var(--mr-accent); box-shadow: 0 0 0 3px rgba(49, 92, 200, .13); }\r\n.mr-controls { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; margin-top: 17px; }\r\n.mr-control-group { display: flex; flex-direction: column; gap: 7px; }\r\n.mr-control-label { color: var(--mr-muted); font-size: 11px; font-weight: 650; }\r\n.mr-segment { display: inline-flex; padding: 3px; border-radius: 10px; background: #edf1f7; }\r\n.mr-segment button { border: 0; border-radius: 8px; padding: 8px 12px; background: transparent; color: var(--mr-muted); font: inherit; font-size: 12px; cursor: pointer; }\r\n.mr-segment button[aria-pressed='true'] { background: #fff; color: var(--mr-ink); box-shadow: 0 2px 8px rgba(20, 35, 56, .1); font-weight: 700; }\r\n.mr-budget { width: 140px; }\r\n.mr-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 18px; }\r\n.mr-button { border: 1px solid transparent; border-radius: 10px; min-height: 38px; padding: 8px 14px; background: var(--mr-accent); color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }\r\n.mr-button:hover:not(:disabled) { filter: brightness(.94); }\r\n.mr-button:disabled { cursor: not-allowed; opacity: .5; }\r\n.mr-button-secondary { border-color: var(--mr-line); background: #fff; color: var(--mr-ink); }\r\n.mr-caption { color: var(--mr-muted); font-size: 11px; line-height: 1.5; }\r\n.mr-search { margin-top: 14px; }\r\n.mr-list { display: grid; gap: 8px; margin-top: 13px; max-height: 395px; overflow-y: auto; }\r\n.mr-route { display: flex; justify-content: space-between; gap: 10px; padding: 10px 11px; border: 1px solid var(--mr-line); border-radius: 10px; background: #f9fbfe; }\r\n.mr-route-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }\r\n.mr-route-provider { margin-top: 2px; color: var(--mr-muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\r\n.mr-pill { align-self: start; flex: none; padding: 3px 7px; border-radius: 7px; background: var(--mr-soft); color: var(--mr-accent); font-size: 10px; font-weight: 700; }\r\n.mr-empty, .mr-error { padding: 14px; border-radius: 10px; background: #f4f6fa; color: var(--mr-muted); font-size: 12px; line-height: 1.6; }\r\n.mr-error { background: #fff0f1; color: #a52d3c; }\r\n.mr-results { margin-top: 18px; }\r\n.mr-result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }\r\n.mr-metric { padding: 13px; border-radius: 12px; background: #f5f8fd; }\r\n.mr-metric-label { color: var(--mr-muted); font-size: 10px; }\r\n.mr-metric-value { margin-top: 5px; font-size: 15px; font-weight: 750; word-break: break-word; }\r\n.mr-section-title { margin: 20px 0 10px; font-size: 13px; font-weight: 750; }\r\n.mr-package { padding: 13px 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: #fafcff; }\r\n.mr-package + .mr-package { margin-top: 8px; }\r\n.mr-package-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }\r\n.mr-package-name { font-size: 12px; font-weight: 750; }\r\n.mr-package-route { color: var(--mr-accent); font-size: 11px; font-weight: 700; }\r\n.mr-package-copy { margin: 7px 0 0; color: var(--mr-muted); font-size: 11px; line-height: 1.6; }\r\n.mr-notice { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(49, 92, 200, .16); border-radius: 12px; background: #eff4ff; color: #354d7a; font-size: 11px; line-height: 1.65; }\r\n.mr-notice code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }\r\n@media (max-width: 850px) { .mr-grid { grid-template-columns: 1fr; } .mr-shell { padding: 24px 18px 48px; } }\r\n@media (prefers-color-scheme: dark) {\r\n  .mr-workspace { --mr-card: rgba(30, 38, 51, .94); --mr-ink: #ecf2ff; --mr-muted: #aebbd0; --mr-line: rgba(210, 224, 245, .15); --mr-accent: #91adff; --mr-soft: rgba(97, 132, 222, .18); background: rgba(18, 23, 32, .91); }\r\n  .mr-textarea, .mr-input, .mr-segment button[aria-pressed='true'], .mr-button-secondary { background: #273245; color: var(--mr-ink); }\r\n  .mr-segment, .mr-empty, .mr-metric { background: #222d3e; }\r\n  .mr-route, .mr-package { background: #222d3e; }\r\n  .mr-notice { background: #243454; color: #c9d6fa; }\r\n  .mr-error { background: #4a2730; color: #ffd4da; }\r\n}\r\n\r\n/* \u5B98\u65B9\u5DE5\u5177\u5361\u7247 */\r\n.mr-tools { display: grid; gap: 9px; }\r\n.mr-tool { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: var(--mr-card); }\r\n.mr-tool-info { min-width: 0; flex: 1; }\r\n.mr-tool-status { display: flex; align-items: center; gap: 6px; margin-top: 7px; color: var(--mr-muted); font-size: 11px; }\r\n.mr-tool-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #8d9aaa; }\r\n.mr-tool-dot.installed { background: #2cba83; }\r\n.mr-tool-dot.running { background: #e9a640; }\r\n.mr-tool-command { display: block; margin-top: 6px; padding: 4px 8px; font-size: 12px; background: var(--dsw-alias-markdown-code-block); border-radius: 6px; overflow-wrap: anywhere; }\r\n.mr-tool-button { flex-shrink: 0; }\r\n.mr-tool-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }\r\n.mr-tool-detail { margin: 7px 0 0; }\r\n.mr-tool-error { margin: 8px 0 0; padding: 9px 11px; }\r\n.mr-tool-log { margin-top: 7px; color: var(--mr-muted); font-size: 11px; }\r\n.mr-tool-log summary { cursor: pointer; }\r\n.mr-tool-log pre { max-height: 140px; overflow: auto; padding: 8px; border-radius: 7px; background: var(--dsw-alias-markdown-code-block); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }\r\n.mr-channel-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }\r\n.mr-pill-channel-ok { border-color: var(--dsw-alias-success, #2f9e63); color: var(--dsw-alias-success, #2f9e63); }\n.mr-profile-card { margin-top: 18px; }\n.mr-profile-state { display: block; margin: 8px 0 0; }\n.mr-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 15px; }\n.mr-profile-field { display: grid; align-content: start; gap: 6px; color: var(--mr-muted); font-size: 11px; font-weight: 650; }\n.mr-profile-field .mr-input { color: var(--mr-ink); }\n.mr-profile-advanced { margin-top: 14px; color: var(--mr-muted); font-size: 11px; }\n.mr-profile-advanced summary { cursor: pointer; }\n.mr-profile-success { padding: 10px 12px; border-radius: 10px; background: #e5f5eb; color: #175f3a; font-size: 12px; }\n@media (prefers-color-scheme: dark) { .mr-profile-success { background: #193b2b; color: #b4f1cc; } }\n@media (max-width: 560px) { .mr-tool { align-items: stretch; flex-direction: column; gap: 10px; } .mr-tool-button { align-self: flex-start; } }\n";
+
+// .dsh-plugin/client/router-main.jsx
+var money = (value) => value === null || value === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : `$${Number(value).toFixed(4)}`;
+var text = (value) => typeof value === "string" ? value.trim() : "";
+function RouterPanelIcon({ size = 20, active = false }) {
+  return /* @__PURE__ */ import_react2.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement("path", { d: "M7 6.5h7M7 17.5h7M15 6.5v11", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "5", cy: "6.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "5", cy: "17.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "17", cy: "12", r: "3", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7" }));
+}
+function RouteList({ routes, query }) {
+  const filtered = routes.filter((route) => {
+    const haystack = `${route.providerName} ${route.provider} ${route.name} ${route.model}`.toLowerCase();
+    return haystack.includes(query.toLowerCase());
+  });
+  if (filtered.length === 0) return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-empty" }, routes.length === 0 ? "\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u5C1A\u65E0\u53EF\u89C4\u5212\u7684\u8DEF\u7EBF\u3002\u8BF7\u5148\u5728\u201C\u6A21\u578B\u201D\u9875\u5B8C\u6210\u914D\u7F6E\u3002" : "\u6CA1\u6709\u5339\u914D\u7684\u6A21\u578B\u3002");
+  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-list", role: "list", "aria-label": "\u5B98\u65B9\u5DF2\u767B\u8BB0\u6A21\u578B\u8DEF\u7EBF" }, filtered.map((route) => /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-route", role: "listitem", key: `${route.provider}/${route.model}` }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-route-name", title: route.name }, route.name), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-route-provider", title: `${route.provider}/${route.model}` }, route.provider, "/", route.model)), route.reasoningKnown && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-pill" }, "\u63A8\u7406\u7B49\u7EA7"))));
+}
+function ChannelBadge({ item }) {
+  if (!item?.executionChannel) return null;
+  const official = item.executionChannel === "official-cli";
+  return /* @__PURE__ */ import_react2.default.createElement("span", { className: official ? "mr-pill mr-pill-channel-ok" : "mr-pill", title: item.channelDetail ?? "" }, official ? `\u5B98\u65B9 CLI \xB7 ${item.channelLabel ?? item.channelTool}` : "\u6A21\u578B\u76EE\u5F55 API");
+}
+function PlanResults({ plan }) {
+  const selected = plan.selected;
+  return /* @__PURE__ */ import_react2.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8DEF\u7531\u5EFA\u8BAE" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("h2", { className: "mr-card-title" }, "\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-card-copy" }, "\u672C\u5730\u8BA1\u7B97\u5B8C\u6210\uFF0C\u672A\u5411\u6A21\u578B\u53D1\u9001\u4EFB\u52A1\u5185\u5BB9\u3002"))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-label" }, "\u63A8\u8350\u8DEF\u7EBF"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "\u6682\u65E0\u8DEF\u7EBF")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-label" }, "\u4EFB\u52A1\u590D\u6742\u5EA6"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-value" }, { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u590D\u6742" }[plan.complexity.band] || plan.complexity.band)), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-label" }, "\u4F30\u7B97\u603B\u6210\u672C"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-value" }, money(plan.estimatedCost)))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-control-label" }, "\u6267\u884C\u6E20\u9053"), /* @__PURE__ */ import_react2.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, plan.reason), plan.optimization.budgetExceeded && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error" }, "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u4EFB\u52A1\u53EF\u80FD\u8D85\u8FC7\u672C\u6B21\u9884\u7B97\u3002\u9884\u7B97\u53EA\u5F71\u54CD\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u963B\u6B62\u5B9E\u9645\u6263\u8D39\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("h3", { className: "mr-section-title" }, "\u56E2\u961F\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u4E0B\u65B9\u6A21\u578B\u662F\u89C4\u5212\u5EFA\u8BAE\uFF1B\u6258\u7BA1\u6267\u884C\u4F1A\u6309\u5382\u5546 CLI \u7684\u6A21\u578B\u540D\u89C4\u5219\u9009\u7528\uFF0C\u672A\u6838\u9A8C\u6620\u5C04\u65F6\u4F7F\u7528\u8BE5 CLI \u7684\u9ED8\u8BA4\u6A21\u578B\u3002"), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-empty" }, "\u5F53\u524D\u76EE\u5F55\u6CA1\u6709\u53EF\u5206\u914D\u7684\u6A21\u578B\u8DEF\u7EBF\u3002") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react2.default.createElement("article", { className: "mr-package", key: item.id }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-package-top" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel)), item.objective && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5177\u4F53\u76EE\u6807\uFF1A", item.objective), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, item.purpose, item.dependsOn.length > 0 ? ` \xB7 \u4F9D\u8D56\uFF1A${item.dependsOn.join("\u3001")}` : ""), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u96BE\u5EA6\uFF1A", { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u56F0\u96BE" }[item.difficulty] || item.difficulty || "\u5F85\u8BC4\u4F30", " \xB7 \u8D39\u7528\uFF1A", money(item.estimatedCost)), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u9A8C\u6536\uFF1A", item.verificationChecklist.join("\uFF1B")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelBadge, { item }))))), plan.mode === "team" && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, plan.team.handoff), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-notice" }, plan.pricingNotice, " ", plan.qualityNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")));
+}
+var remoteError = (response, fallback) => text(response?.error?.message) || text(response?.value?.error) || fallback;
+function probeLabel(probe) {
+  if (!probe) return "\u5C1A\u672A\u68C0\u6D4B";
+  if (probe.installed) return `\u5DF2\u5B89\u88C5${probe.version ? ` \xB7 ${probe.version}` : ""}`;
+  if (probe.status === "not-installed") return "\u672A\u5B89\u88C5";
+  if (probe.status === "probe-timeout") return "\u68C0\u6D4B\u8D85\u65F6";
+  if (probe.status === "probe-failed") return "\u68C0\u6D4B\u5931\u8D25";
+  return probe.detail || "\u672A\u5B89\u88C5";
+}
 function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes }) {
-  const [probeState, setProbeState] = import_react.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], error: "" });
-  const [jobs, setJobs] = import_react.default.useState({});
-  const [rowErrors, setRowErrors] = import_react.default.useState({});
-  const mounted = import_react.default.useRef(false);
-  const request = import_react.default.useRef(0);
-  const submitting = import_react.default.useRef(/* @__PURE__ */ new Set());
-  const polling = import_react.default.useRef(/* @__PURE__ */ new Set());
+  const [probeState, setProbeState] = import_react2.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], error: "" });
+  const [jobs, setJobs] = import_react2.default.useState({});
+  const [rowErrors, setRowErrors] = import_react2.default.useState({});
+  const mounted = import_react2.default.useRef(false);
+  const request = import_react2.default.useRef(0);
+  const submitting = import_react2.default.useRef(/* @__PURE__ */ new Set());
+  const polling = import_react2.default.useRef(/* @__PURE__ */ new Set());
   const refresh = async () => {
     const current = ++request.current;
     setProbeState((previous) => ({ ...previous, status: "loading", error: "" }));
@@ -1112,7 +1492,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       onProbes({ probes: [], capabilities: [], readiness: [] });
     }
   };
-  import_react.default.useEffect(() => {
+  import_react2.default.useEffect(() => {
     mounted.current = true;
     void refresh();
     if (typeof officialToolInstallStatus === "function") {
@@ -1132,109 +1512,106 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       request.current += 1;
     };
   }, []);
-  import_react.default.useEffect(() => {
+  import_react2.default.useEffect(() => {
     const active = Object.values(jobs).filter((job) => job?.status === "running").map((job) => job.tool);
     if (active.length === 0 || typeof officialToolInstallStatus !== "function") return void 0;
     let listening = true;
-    const poll = async (id) => {
-      if (polling.current.has(id)) return;
-      polling.current.add(id);
+    const poll = async (id2) => {
+      if (polling.current.has(id2)) return;
+      polling.current.add(id2);
       try {
-        const response = await officialToolInstallStatus(id);
+        const response = await officialToolInstallStatus(id2);
         if (!listening || !mounted.current) return;
         if (!response?.ok) throw new Error(remoteError(response, "\u65E0\u6CD5\u83B7\u53D6\u5B89\u88C5\u8FDB\u5EA6\u3002"));
         const job = response.value?.job;
         if (!job) throw new Error("\u5B89\u88C5\u4EFB\u52A1\u72B6\u6001\u6682\u4E0D\u53EF\u7528\u3002");
-        setJobs((previous) => ({ ...previous, [id]: job }));
-        setRowErrors((previous) => ({ ...previous, [id]: "" }));
+        setJobs((previous) => ({ ...previous, [id2]: job }));
+        setRowErrors((previous) => ({ ...previous, [id2]: "" }));
         if (job.status !== "running") void refresh();
       } catch (error) {
-        if (listening && mounted.current) setRowErrors((previous) => ({ ...previous, [id]: text(error?.message) || "\u5B89\u88C5\u72B6\u6001\u8BFB\u53D6\u5931\u8D25\uFF0C\u5C06\u7EE7\u7EED\u91CD\u8BD5\u3002" }));
+        if (listening && mounted.current) setRowErrors((previous) => ({ ...previous, [id2]: text(error?.message) || "\u5B89\u88C5\u72B6\u6001\u8BFB\u53D6\u5931\u8D25\uFF0C\u5C06\u7EE7\u7EED\u91CD\u8BD5\u3002" }));
       } finally {
-        polling.current.delete(id);
+        polling.current.delete(id2);
       }
     };
-    const timer = setInterval(() => active.forEach((id) => {
-      void poll(id);
+    const timer = setInterval(() => active.forEach((id2) => {
+      void poll(id2);
     }), 1500);
     return () => {
       listening = false;
       clearInterval(timer);
     };
   }, [jobs, officialToolInstallStatus]);
-  const install = async (id) => {
-    const tool = OFFICIAL_TOOLS.find((item) => item.id === id);
-    if (!tool || tool.unsupported || submitting.current.has(id) || jobs[id]?.status === "running") return;
-    submitting.current.add(id);
-    setRowErrors((previous) => ({ ...previous, [id]: "" }));
-    setJobs((previous) => ({ ...previous, [id]: { tool: id, status: "running", outputTail: [] } }));
+  const install = async (id2) => {
+    const tool = OFFICIAL_TOOLS.find((item) => item.id === id2);
+    if (!tool || tool.unsupported || submitting.current.has(id2) || jobs[id2]?.status === "running") return;
+    submitting.current.add(id2);
+    setRowErrors((previous) => ({ ...previous, [id2]: "" }));
+    setJobs((previous) => ({ ...previous, [id2]: { tool: id2, status: "running", outputTail: [] } }));
     try {
       if (typeof installOfficialTool !== "function") throw new Error("\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002");
-      const response = await installOfficialTool(id);
+      const response = await installOfficialTool(id2);
       if (!mounted.current) return;
       if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, "\u5B89\u88C5\u4EFB\u52A1\u672A\u88AB\u63A5\u53D7\u3002"));
-      setJobs((previous) => ({ ...previous, [id]: response.value.job }));
+      setJobs((previous) => ({ ...previous, [id2]: response.value.job }));
     } catch (error) {
       if (mounted.current) {
-        setJobs((previous) => ({ ...previous, [id]: { tool: id, status: "failed", error: text(error?.message) || "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002" } }));
-        setRowErrors((previous) => ({ ...previous, [id]: text(error?.message) || "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002" }));
+        setJobs((previous) => ({ ...previous, [id2]: { tool: id2, status: "failed", error: text(error?.message) || "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002" } }));
+        setRowErrors((previous) => ({ ...previous, [id2]: text(error?.message) || "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002" }));
       }
     } finally {
-      submitting.current.delete(id);
+      submitting.current.delete(id2);
     }
   };
-  const cancel = async (id) => {
-    if (typeof cancelOfficialToolInstall !== "function" || jobs[id]?.status !== "running" || jobs[id]?.cancelRequested) return;
-    setRowErrors((previous) => ({ ...previous, [id]: "" }));
+  const cancel = async (id2) => {
+    if (typeof cancelOfficialToolInstall !== "function" || jobs[id2]?.status !== "running" || jobs[id2]?.cancelRequested) return;
+    setRowErrors((previous) => ({ ...previous, [id2]: "" }));
     try {
-      const response = await cancelOfficialToolInstall(id);
+      const response = await cancelOfficialToolInstall(id2);
       if (!mounted.current) return;
       if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, "\u53D6\u6D88\u8BF7\u6C42\u672A\u88AB\u63A5\u53D7\u3002"));
-      setJobs((previous) => ({ ...previous, [id]: response.value.job }));
+      setJobs((previous) => ({ ...previous, [id2]: response.value.job }));
       if (response.value.job.status !== "running") void refresh();
     } catch (error) {
-      if (mounted.current) setRowErrors((previous) => ({ ...previous, [id]: text(error?.message) || "\u65E0\u6CD5\u53D6\u6D88\u5B89\u88C5\u3002" }));
+      if (mounted.current) setRowErrors((previous) => ({ ...previous, [id2]: text(error?.message) || "\u65E0\u6CD5\u53D6\u6D88\u5B89\u88C5\u3002" }));
     }
   };
   const byId = Object.fromEntries(probeState.probes.map((probe) => [probe.id, probe]));
   const capabilitiesById = Object.fromEntries(probeState.capabilities.map((item) => [item.id, item]));
   const readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item]));
-  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u4E0B\u8F7D\u5B89\u88C5\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u68C0\u6D4B\u7248\u672C\u3002")), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
+  return /* @__PURE__ */ import_react2.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u4E0B\u8F7D\u5B89\u88C5\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u68C0\u6D4B\u7248\u672C\u3002")), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     void refresh();
-  } }, "\u91CD\u65B0\u68C0\u6D4B")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, probeState.status === "loading" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.status === "error" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
+  } }, "\u91CD\u65B0\u68C0\u6D4B")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-body" }, probeState.status === "loading" && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.status === "error" && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
     const command = installCommandLine(tool);
     const probe = byId[tool.id];
     const capability = capabilitiesById[tool.id];
     const readiness = readinessById[tool.id];
     const job = jobs[tool.id];
     const running = job?.status === "running";
-    const versionOrder = probe?.installed ? stableVersionOrder(probe.version, tool.version) : null;
-    const current = versionOrder === 0;
-    const newerOrUncertain = probe?.installed && (versionOrder === null || versionOrder > 0);
+    const action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status });
     const verified = job?.status === "succeeded" && job.postInstallProbe?.installed === true;
     const status = running ? job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u5B89\u88C5\u2026" : "\u5B89\u88C5\u4E2D\u2026" : job?.status === "installer-opened" ? "\u5B98\u65B9\u5B89\u88C5\u5668\u5DF2\u6253\u5F00\uFF0C\u8BF7\u5B8C\u6210\u5B89\u88C5\u540E\u91CD\u65B0\u68C0\u6D4B" : job?.status === "cancelled" ? "\u5B89\u88C5\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B" : verified ? "\u5B89\u88C5\u6210\u529F\u5E76\u9A8C\u8BC1" : probeLabel(probe);
-    const buttonLabel = running ? "\u5B89\u88C5\u4E2D\u2026" : current ? "\u5DF2\u662F\u76EE\u6807\u7248\u672C" : newerOrUncertain ? "\u8BF7\u4EBA\u5DE5\u6838\u5BF9\u7248\u672C" : probe?.installed ? "\u66F4\u65B0\u5230\u76EE\u6807\u7248\u672C" : job?.status === "failed" ? "\u91CD\u8BD5\u5B89\u88C5" : tool.manager === "signed-windows-installer" ? "\u4E0B\u8F7D\u5B89\u88C5\u5668" : "\u4E0B\u8F7D\u5B89\u88C5";
-    return /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, tool.version ? ` \xB7 \u76EE\u6807 ${tool.version}` : ""), probe?.installed && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-tool-detail" }, readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react.default.createElement("code", { className: "mr-tool-command" }, command) : /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, tool.unsupportedReason), probe?.detail && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), command && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-tool-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: probeState.status !== "ready" || running || current || newerOrUncertain, onClick: () => {
+    return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, tool.version ? ` \xB7 \u76EE\u6807 ${tool.version}` : ""), probe?.installed && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption mr-tool-detail" }, readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react2.default.createElement("code", { className: "mr-tool-command" }, command) : /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, tool.unsupportedReason), probe?.detail && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react2.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), command && /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-tool-actions" }, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: action.disabled, onClick: () => {
       void install(tool.id);
-    } }, buttonLabel), running && /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
+    } }, action.label), running && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
       void cancel(tool.id);
     } }, job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u2026" : "\u53D6\u6D88\u5B89\u88C5")));
-  })), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u7531 Host \u6309\u6CE8\u518C\u8868\u56FA\u5B9A\u6765\u6E90\u6267\u884C\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\uFF1B\u53EF\u70B9\u201C\u53D6\u6D88\u5B89\u88C5\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u5B9E\u9645\u7248\u672C\u3002ZCode \u5B89\u88C5\u5668\u542F\u52A8\u540E\u4ECD\u9700\u5728\u539F\u5382\u7A97\u53E3\u9009\u62E9\u76EE\u5F55\u5E76\u5B8C\u6210\u5B89\u88C5\u3002Agent \u4E5F\u53EF\u8C03\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_tool_install"), "\uFF0C\u6216\u5728\u4F1A\u8BDD\u4F7F\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "/tools"), "\u3002")));
+  })), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u7531 Host \u6309\u6CE8\u518C\u8868\u56FA\u5B9A\u6765\u6E90\u6267\u884C\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\uFF1B\u53EF\u70B9\u201C\u53D6\u6D88\u5B89\u88C5\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u5B9E\u9645\u7248\u672C\u3002ZCode \u5B89\u88C5\u5668\u542F\u52A8\u540E\u4ECD\u9700\u5728\u539F\u5382\u7A97\u53E3\u9009\u62E9\u76EE\u5F55\u5E76\u5B8C\u6210\u5B89\u88C5\u3002Agent \u4E5F\u53EF\u8C03\u7528 ", /* @__PURE__ */ import_react2.default.createElement("code", null, "model_router_tool_install"), "\uFF0C\u6216\u5728\u4F1A\u8BDD\u4F7F\u7528 ", /* @__PURE__ */ import_react2.default.createElement("code", null, "/tools"), "\u3002")));
 }
 function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus }) {
-  const [catalogState, setCatalogState] = import_react.default.useState({ status: "loading", catalog: null, error: "" });
-  const [task, setTask] = import_react.default.useState("");
-  const [mode, setMode] = import_react.default.useState("single");
-  const [budget, setBudget] = import_react.default.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0));
-  const [query, setQuery] = import_react.default.useState("");
-  const [plan, setPlan] = import_react.default.useState(null);
-  const [planError, setPlanError] = import_react.default.useState("");
-  const [toolProbes, setToolProbes] = import_react.default.useState(null);
-  const budgetEdited = import_react.default.useRef(false);
-  const budgetValue = import_react.default.useRef(budget);
-  const mounted = import_react.default.useRef(false);
-  const catalogRequest = import_react.default.useRef(0);
-  import_react.default.useEffect(() => {
+  const [catalogState, setCatalogState] = import_react2.default.useState({ status: "loading", catalog: null, error: "" });
+  const [task, setTask] = import_react2.default.useState("");
+  const [mode, setMode] = import_react2.default.useState("single");
+  const [budget, setBudget] = import_react2.default.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0));
+  const [query, setQuery] = import_react2.default.useState("");
+  const [plan, setPlan] = import_react2.default.useState(null);
+  const [planError, setPlanError] = import_react2.default.useState("");
+  const [toolProbes, setToolProbes] = import_react2.default.useState(null);
+  const budgetEdited = import_react2.default.useRef(false);
+  const budgetValue = import_react2.default.useRef(budget);
+  const mounted = import_react2.default.useRef(false);
+  const catalogRequest = import_react2.default.useRef(0);
+  import_react2.default.useEffect(() => {
     const syncBudget = () => {
       if (budgetEdited.current) return;
       const next = String(settingsScope.getSnapshot().value?.budgetUsd ?? 0);
@@ -1248,7 +1625,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     syncBudget();
     return settingsScope.subscribe(syncBudget);
   }, [settingsScope]);
-  import_react.default.useEffect(() => {
+  import_react2.default.useEffect(() => {
     mounted.current = true;
     const request = ++catalogRequest.current;
     Promise.resolve().then(loadCatalog).then((response) => {
@@ -1282,7 +1659,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     setPlan(null);
     setPlanError("");
   };
-  const handleToolProbes = import_react.default.useCallback((snapshot) => {
+  const handleToolProbes = import_react2.default.useCallback((snapshot) => {
     setToolProbes(snapshot);
     setPlan(null);
     setPlanError("");
@@ -1297,6 +1674,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       setPlan(createWorkspacePlan(task, catalogState.catalog, {
         mode,
         budgetUsd: parsedBudget,
+        modelProfilesJson: settingsScope.getSnapshot().value?.modelProfilesJson ?? "[]",
         installedToolIds: (toolProbes?.probes ?? []).filter((probe) => probe.installed).map((probe) => probe.id),
         runnableToolIds: (toolProbes?.readiness ?? []).filter((item) => item.ready).map((item) => item.id)
       }));
@@ -1305,25 +1683,25 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       setPlanError(text(error?.message) || "\u65E0\u6CD5\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE\u3002");
     }
   };
-  return /* @__PURE__ */ import_react.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-eyebrow" }, "Model Router \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react.default.createElement("h1", { className: "mr-title" }, "\u6A21\u578B\u8DEF\u7531\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-subtitle" }, "\u67E5\u770B\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E3A\u4EFB\u52A1\u751F\u6210\u8DEF\u7EBF\u5EFA\u8BAE\u4E0E\u56E2\u961F\u5DE5\u4F5C\u5305\u3002\u4E3B\u4F1A\u8BDD\u6A21\u578B\u4ECD\u7531\u5B98\u65B9\u9009\u62E9\u5668\u7BA1\u7406\u3002")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} \u4E2A\u4F9B\u5E94\u5546 \xB7 ${routes.length} \u6761\u8DEF\u7EBF` : catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55" : "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-grid" }, /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card", "aria-label": "\u4EFB\u52A1\u89C4\u5212" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u4EFB\u52A1\u89C4\u5212"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u89C4\u5212\u5728\u672C\u673A\u5B8C\u6210\uFF0C\u4E0D\u4F1A\u542F\u52A8\u6A21\u578B\u6216\u56E2\u961F\u4EFB\u52A1\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-task" }, "\u4EFB\u52A1\u63CF\u8FF0"), /* @__PURE__ */ import_react.default.createElement("textarea", { className: "mr-textarea", id: "mr-task", value: task, onChange: (event) => {
+  return /* @__PURE__ */ import_react2.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react2.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react2.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-eyebrow" }, "Model Router \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react2.default.createElement("h1", { className: "mr-title" }, "\u6A21\u578B\u8DEF\u7531\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-subtitle" }, "\u67E5\u770B\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E3A\u4EFB\u52A1\u751F\u6210\u8DEF\u7EBF\u5EFA\u8BAE\u4E0E\u56E2\u961F\u5DE5\u4F5C\u5305\u3002\u4E3B\u4F1A\u8BDD\u6A21\u578B\u4ECD\u7531\u5B98\u65B9\u9009\u62E9\u5668\u7BA1\u7406\u3002")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} \u4E2A\u4F9B\u5E94\u5546 \xB7 ${routes.length} \u6761\u8DEF\u7EBF` : catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55" : "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-grid" }, /* @__PURE__ */ import_react2.default.createElement("section", { className: "mr-card", "aria-label": "\u4EFB\u52A1\u89C4\u5212" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("h2", { className: "mr-card-title" }, "\u4EFB\u52A1\u89C4\u5212"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-card-copy" }, "\u89C4\u5212\u5728\u672C\u673A\u5B8C\u6210\uFF0C\u4E0D\u4F1A\u542F\u52A8\u6A21\u578B\u6216\u56E2\u961F\u4EFB\u52A1\u3002"))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-label", htmlFor: "mr-task" }, "\u4EFB\u52A1\u63CF\u8FF0"), /* @__PURE__ */ import_react2.default.createElement("textarea", { className: "mr-textarea", id: "mr-task", value: task, onChange: (event) => {
     setTask(event.target.value);
     invalidatePlan();
-  }, placeholder: "\u4F8B\u5982\uFF1A\u5206\u6790\u9879\u76EE\u67B6\u6784\uFF0C\u5206\u5DE5\u4FEE\u590D\u5173\u952E\u95EE\u9898\uFF0C\u5E76\u7ED9\u51FA\u9A8C\u6536\u6E05\u5355" }), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-control-label" }, "\u89C4\u5212\u6A21\u5F0F"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "\u89C4\u5212\u6A21\u5F0F" }, /* @__PURE__ */ import_react.default.createElement("button", { type: "button", "aria-pressed": mode === "single", onClick: () => {
+  }, placeholder: "\u4F8B\u5982\uFF1A\u5206\u6790\u9879\u76EE\u67B6\u6784\uFF0C\u5206\u5DE5\u4FEE\u590D\u5173\u952E\u95EE\u9898\uFF0C\u5E76\u7ED9\u51FA\u9A8C\u6536\u6E05\u5355" }), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-control-label" }, "\u89C4\u5212\u6A21\u5F0F"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "\u89C4\u5212\u6A21\u5F0F" }, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", "aria-pressed": mode === "single", onClick: () => {
     setMode("single");
     invalidatePlan();
-  } }, "\u5355\u4EFB\u52A1"), /* @__PURE__ */ import_react.default.createElement("button", { type: "button", "aria-pressed": mode === "team", onClick: () => {
+  } }, "\u5355\u4EFB\u52A1"), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", "aria-pressed": mode === "team", onClick: () => {
     setMode("team");
     invalidatePlan();
-  } }, "\u56E2\u961F\u5206\u5DE5"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-control-group mr-budget" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-budget" }, "\u672C\u6B21\u4F30\u7B97\u9884\u7B97\uFF08USD\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", id: "mr-budget", type: "number", min: "0", step: "0.01", value: budget, onChange: (event) => {
+  } }, "\u56E2\u961F\u5206\u5DE5"))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group mr-budget" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-budget" }, "\u672C\u6B21\u4F30\u7B97\u9884\u7B97\uFF08USD\uFF09"), /* @__PURE__ */ import_react2.default.createElement("input", { className: "mr-input", id: "mr-budget", type: "number", min: "0", step: "0.01", value: budget, onChange: (event) => {
     budgetEdited.current = true;
     budgetValue.current = event.target.value;
     setBudget(event.target.value);
     invalidatePlan();
-  } }))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react.default.createElement("span", { className: "mr-caption" }, toolProbes === null ? "\u6B63\u5728\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u2026" : "0 \u8868\u793A\u4E0D\u9650\u5236\u672C\u6B21\u5EFA\u8BAE\uFF1B\u4E0D\u4F1A\u8BBE\u7F6E\u771F\u5B9E\u652F\u51FA\u4E0A\u9650\u3002")), planError && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card", "aria-label": "\u6A21\u578B\u76EE\u5F55" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u6A21\u578B\u76EE\u5F55"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u53EA\u663E\u793A\u5B98\u65B9\u5DF2\u767B\u8BB0\u7684 provider/model\uFF0C\u4E0D\u8BFB\u53D6 API Key\u3002")), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: refresh }, "\u5237\u65B0")), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u52A0\u8F7D\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026"), catalogState.status === "ready" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "\u641C\u7D22\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "\u6A21\u578B\u6216\u4F9B\u5E94\u5546" }), /* @__PURE__ */ import_react.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " \u4E2A\u4F9B\u5E94\u5546\u7684\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u9875\u68C0\u67E5\u914D\u7F6E\u3002")), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "\u76EE\u5F55\u767B\u8BB0\u4E0D\u4EE3\u8868\u51ED\u636E\u6216\u7F51\u7EDC\u5F53\u524D\u53EF\u7528\uFF1B\u56FE\u50CF\u80FD\u529B\u9700\u8981\u5728\u5B9E\u9645\u4F7F\u7528\u524D\u6838\u5BF9\u3002")))), plan && /* @__PURE__ */ import_react.default.createElement(PlanResults, { plan }), /* @__PURE__ */ import_react.default.createElement(OfficialToolsCard, { listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes: handleToolProbes }), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-notice" }, "\u5B9E\u9645\u8C03\u7528\u8BF7\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u4F7F\u7528 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_consult"), "\u3001", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_tool_run"), " \u6216 ", /* @__PURE__ */ import_react.default.createElement("code", null, "model_router_team_execute"), "\u3002\u6258\u7BA1\u6267\u884C\u80FD\u529B\u548C\u5C31\u7EEA\u72B6\u6001\u89C1\u4E0A\u65B9\u5404\u5DE5\u5177\u5361\u7247\uFF1B\u5B9E\u9645\u4F7F\u7528\u7684\u6A21\u578B\u4EE5\u5382\u5546\u8BB0\u5F55\u4E3A\u51C6\u3002ZCode 3.14.3 \u4F7F\u7528\u5176\u81EA\u8EAB\u914D\u7F6E\u7684\u9ED8\u8BA4\u6A21\u578B\u3002\u53EF\u7F16\u8F91\u56E2\u961F\u4EFB\u52A1\u8981\u6C42\u5E72\u51C0\u7684 Git \u4ED3\u5E93\uFF0C\u5E76\u7ECF\u5B98\u65B9\u5DE5\u5177\u5BA1\u6279\u3002\u8BBE\u7F6E\u4F4D\u4E8E\u201C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5 \u2192 @ljwei-stak/model-router-galgame\u201D\u3002")));
+  } }))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, toolProbes === null ? "\u6B63\u5728\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u2026" : "0 \u8868\u793A\u4E0D\u9650\u5236\u672C\u6B21\u5EFA\u8BAE\uFF1B\u4E0D\u4F1A\u8BBE\u7F6E\u771F\u5B9E\u652F\u51FA\u4E0A\u9650\u3002")), planError && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react2.default.createElement("section", { className: "mr-card", "aria-label": "\u6A21\u578B\u76EE\u5F55" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("h2", { className: "mr-card-title" }, "\u6A21\u578B\u76EE\u5F55"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-card-copy" }, "\u53EA\u663E\u793A\u5B98\u65B9\u5DF2\u767B\u8BB0\u7684 provider/model\uFF0C\u4E0D\u8BFB\u53D6 API Key\u3002")), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: refresh }, "\u5237\u65B0")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u52A0\u8F7D\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026"), catalogState.status === "ready" && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "\u641C\u7D22\u8DEF\u7EBF"), /* @__PURE__ */ import_react2.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "\u6A21\u578B\u6216\u4F9B\u5E94\u5546" }), /* @__PURE__ */ import_react2.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " \u4E2A\u4F9B\u5E94\u5546\u7684\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u9875\u68C0\u67E5\u914D\u7F6E\u3002")), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "\u76EE\u5F55\u767B\u8BB0\u4E0D\u4EE3\u8868\u51ED\u636E\u6216\u7F51\u7EDC\u5F53\u524D\u53EF\u7528\uFF1B\u56FE\u50CF\u80FD\u529B\u9700\u8981\u5728\u5B9E\u9645\u4F7F\u7528\u524D\u6838\u5BF9\u3002")))), /* @__PURE__ */ import_react2.default.createElement(ModelProfileEditor, { routes, settingsScope, onSaved: invalidatePlan }), plan && /* @__PURE__ */ import_react2.default.createElement(PlanResults, { plan }), /* @__PURE__ */ import_react2.default.createElement(OfficialToolsCard, { listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes: handleToolProbes }), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-notice" }, "\u5B9E\u9645\u8C03\u7528\u8BF7\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u4F7F\u7528 ", /* @__PURE__ */ import_react2.default.createElement("code", null, "model_router_consult"), "\u3001", /* @__PURE__ */ import_react2.default.createElement("code", null, "model_router_tool_run"), " \u6216 ", /* @__PURE__ */ import_react2.default.createElement("code", null, "model_router_team_execute"), "\u3002\u6258\u7BA1\u6267\u884C\u80FD\u529B\u548C\u5C31\u7EEA\u72B6\u6001\u89C1\u4E0A\u65B9\u5404\u5DE5\u5177\u5361\u7247\uFF1B\u5B9E\u9645\u4F7F\u7528\u7684\u6A21\u578B\u4EE5\u5382\u5546\u8BB0\u5F55\u4E3A\u51C6\u3002ZCode 3.14.3 \u4F7F\u7528\u5176\u81EA\u8EAB\u914D\u7F6E\u7684\u9ED8\u8BA4\u6A21\u578B\u3002\u53EF\u7F16\u8F91\u56E2\u961F\u4EFB\u52A1\u8981\u6C42\u5E72\u51C0\u7684 Git \u4ED3\u5E93\uFF0C\u5E76\u7ECF\u5B98\u65B9\u5DE5\u5177\u5BA1\u6279\u3002\u8BBE\u7F6E\u4F4D\u4E8E\u201C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5 \u2192 @ljwei-stak/model-router-galgame\u201D\u3002")));
 }
 
 // .dsh-plugin/client/gal-module-page.jsx
-var import_react2 = __toESM(require("react"), 1);
+var import_react3 = __toESM(require("react"), 1);
 
 // .dsh-plugin/shared/gal-story.mjs
 var gal_story_exports = {};
@@ -1342,8 +1720,8 @@ __export(gal_story_exports, {
 
 // .dsh-plugin/shared/gal-story-personal.mjs
 function registerPersonalChapters({ scene: scene3, n: n3, option: option2 }) {
-  function episode({ id, location, time, description, rows, question, choices, after, next }) {
-    const prefix = `personal-${id}`;
+  function episode({ id: id2, location, time, description, rows, question, choices, after, next }) {
+    const prefix = `personal-${id2}`;
     const numbered = (lines, key) => lines.map(([speaker, text2, emotion], index) => n3(`${key}-${String(index + 1).padStart(2, "0")}`, speaker, text2, emotion ? { emotion } : {}));
     const start = numbered(rows, prefix);
     const branches = choices.flatMap((choice) => {
@@ -1353,7 +1731,7 @@ function registerPersonalChapters({ scene: scene3, n: n3, option: option2 }) {
     });
     scene3(location, time, `\u7A7A\u767D\u573A\u666F\uFF1A${description}`, [
       ...start,
-      n3(`${prefix}-choice`, question[0], question[1], { choices: choices.map((choice) => option2(choice.id, choice.text, `${prefix}-${choice.id}-01`, { flags: { [`personal${id}`]: choice.id } })) }),
+      n3(`${prefix}-choice`, question[0], question[1], { choices: choices.map((choice) => option2(choice.id, choice.text, `${prefix}-${choice.id}-01`, { flags: { [`personal${id2}`]: choice.id } })) }),
       ...branches,
       ...numbered(after, `${prefix}-after`)
     ], next);
@@ -2407,9 +2785,9 @@ function registerAfterword({ scene: scene3, n: n3, endings }) {
       ]
     }
   };
-  for (const [id, story] of Object.entries(stories)) {
-    const rows = story.rows.map(([speaker, text2], index) => n3(`afterword-${id}-${String(index + 1).padStart(2, "0")}`, speaker, text2));
-    rows.at(-1).ending = endings[id];
+  for (const [id2, story] of Object.entries(stories)) {
+    const rows = story.rows.map(([speaker, text2], index) => n3(`afterword-${id2}-${String(index + 1).padStart(2, "0")}`, speaker, text2));
+    rows.at(-1).ending = endings[id2];
     scene3(story.location, story.time, `\u7A7A\u767D\u573A\u666F\uFF1A${story.description}`, rows);
   }
 }
@@ -2439,8 +2817,8 @@ var MAX_TRAIL = 2048;
 var validatedStates = /* @__PURE__ */ new WeakSet();
 var legacyNext = Object.freeze({ "arrival-12": "letter-01", "break-common-04": "failure-01", "failure-common-04": "archive-01", "archive-common-03": "roof-01", "letter-common-04": "break-01", "roof-common-02": "packing-01", "packing-common-04": "departure-01" });
 var nodes = /* @__PURE__ */ new Map();
-var n = (id, speaker, text2, extra = {}) => ({ id, speaker, text: text2, ...extra });
-var option = (id, text2, next, effect = {}) => ({ id, text: text2, next, effect });
+var n = (id2, speaker, text2, extra = {}) => ({ id: id2, speaker, text: text2, ...extra });
+var option = (id2, text2, next, effect = {}) => ({ id: id2, text: text2, next, effect });
 function scene(location, time, description, rows, next = null) {
   rows.forEach((row, index) => {
     if (nodes.has(row.id)) throw new Error(`\u91CD\u590D\u5267\u60C5\u8282\u70B9\uFF1A${row.id}`);
@@ -2815,7 +3193,7 @@ function visibleNode(state) {
     time: node.time,
     description: node.description
   };
-  if (node.choices) result.choices = node.choices.map(({ id, text: text2 }) => ({ id, text: text2 }));
+  if (node.choices) result.choices = node.choices.map(({ id: id2, text: text2 }) => ({ id: id2, text: text2 }));
   if (node.ending && !(state.contentRevision === STORY_CONTENT_REVISION && node.continueTo)) result.ending = { ...node.ending };
   return result;
 }
@@ -3209,17 +3587,17 @@ function institutionalEndingFor(state) {
   const execution = state.flags.executionClause;
   const remedy = state.flags.remedyClause;
   const evidenceStrength = state.evidence.length + Math.max(0, state.axes.evidence);
-  let id;
-  if (!access || !execution || !remedy || evidenceStrength < 4 || access === "federated" && execution === "central") id = "fractured-ports";
-  else if (execution === "independent" || remedy === "review") id = "audited-gates";
-  else if (access === "commons" && execution === "community") id = "open-commons";
-  else if (access === "dome" && execution === "central") id = "glass-dome";
-  else if (access === "federated" && remedy === "fork") id = "federated-bridges";
-  else id = "market-truce";
-  const result = institutional[id];
-  return { id, ...result, evidenceCount: state.evidence.length, axisSnapshot: { ...state.axes } };
+  let id2;
+  if (!access || !execution || !remedy || evidenceStrength < 4 || access === "federated" && execution === "central") id2 = "fractured-ports";
+  else if (execution === "independent" || remedy === "review") id2 = "audited-gates";
+  else if (access === "commons" && execution === "community") id2 = "open-commons";
+  else if (access === "dome" && execution === "central") id2 = "glass-dome";
+  else if (access === "federated" && remedy === "fork") id2 = "federated-bridges";
+  else id2 = "market-truce";
+  const result = institutional[id2];
+  return { id: id2, ...result, evidenceCount: state.evidence.length, axisSnapshot: { ...state.axes } };
 }
-var hasCommitment = (state, id) => Object.values(state.commitmentsByCharacter).some((ids) => ids.includes(id));
+var hasCommitment = (state, id2) => Object.values(state.commitmentsByCharacter).some((ids) => ids.includes(id2));
 function relationshipEpiloguesFor(state) {
   const lineageKept = hasCommitment(state, "claude-own-voice") && hasCommitment(state, "chatgpt-stop-completing");
   const communityKept = hasCommitment(state, "huggingface-maintainer-seat") && hasCommitment(state, "llama-offline-right") && hasCommitment(state, "rwkv-small-architecture");
@@ -3565,8 +3943,8 @@ function storyPresentationFor(node) {
   }
   return Object.freeze({ backgroundId, musicTheme, soundCue });
 }
-function sideRouteForId(id) {
-  return routeByKey[id] || null;
+function sideRouteForId(id2) {
+  return routeByKey[id2] || null;
 }
 
 // .dsh-plugin/shared/gal-story-v2.mjs
@@ -3590,7 +3968,7 @@ var STORY_CHAPTERS = Object.freeze([
 var axes = ["openness", "safety", "autonomy", "evidence", "solidarity"];
 var nodes2 = /* @__PURE__ */ new Map();
 var n2 = (speaker, text2, extra = {}) => ({ speaker, text: text2, ...extra });
-var o = (id, text2, next, flags, values = {}, trust = {}, commitments2 = [], evidence3 = []) => ({ id, text: text2, next, effect: { flags, axes: values, trust, commitments: commitments2, evidence: evidence3 } });
+var o = (id2, text2, next, flags, values = {}, trust = {}, commitments2 = [], evidence3 = []) => ({ id: id2, text: text2, next, effect: { flags, axes: values, trust, commitments: commitments2, evidence: evidence3 } });
 var inheritedChoiceEffects = Object.freeze({
   "minimal-list": { evidence: ["visitor-consent-ledger"] },
   "consented-list": { evidence: ["visitor-consent-ledger"] },
@@ -3615,9 +3993,9 @@ var inheritedChoiceEffects = Object.freeze({
 });
 function scene2(chapterId, slug, location, time, description, rows, next = null) {
   rows.forEach((row, index) => {
-    const id = `${slug}-${String(index + 1).padStart(2, "0")}`;
-    if (nodes2.has(id)) throw new Error(`\u91CD\u590D\u5267\u60C5\u8282\u70B9\uFF1A${id}`);
-    nodes2.set(id, { id, chapterId, location, time, description, next: index + 1 < rows.length ? `${slug}-${String(index + 2).padStart(2, "0")}` : next, ...row });
+    const id2 = `${slug}-${String(index + 1).padStart(2, "0")}`;
+    if (nodes2.has(id2)) throw new Error(`\u91CD\u590D\u5267\u60C5\u8282\u70B9\uFF1A${id2}`);
+    nodes2.set(id2, { id: id2, chapterId, location, time, description, next: index + 1 < rows.length ? `${slug}-${String(index + 2).padStart(2, "0")}` : next, ...row });
   });
 }
 scene2("prologue", "station", "\u6A21\u578B\u57CE \xB7 \u5343\u6865\u7AD9", "\u534F\u8BAE\u7B7E\u7F72\u524D\u4E09\u5929 \xB7 \u4E0A\u5348", "\u7AD9\u724C\u4E0A\u7684\u8D39\u7528\u4E00\u591C\u4E4B\u95F4\u964D\u4E86\u4E0B\u6765\u3002\u65E7\u4EF7\u7B7E\u6CA1\u6709\u53D6\u8D70\uFF0C\u65B0\u7EB8\u53EA\u76D6\u4F4F\u4E86\u5B83\u7684\u4E00\u534A\u3002", [
@@ -4020,12 +4398,12 @@ function transition2(state, choiceId) {
   const values = { ...state.axes }, trust = { ...state.trustByCharacter };
   for (const [key, delta] of Object.entries(effect.axes || {})) values[key] += delta;
   for (const [key, delta] of Object.entries(effect.trust || {})) trust[key] = (trust[key] || 0) + delta;
-  const evidence3 = [.../* @__PURE__ */ new Set([...state.evidence, ...effect.evidence || [], ...inherited.evidence || []])].filter((id) => id in STORY_EVIDENCE);
+  const evidence3 = [.../* @__PURE__ */ new Set([...state.evidence, ...effect.evidence || [], ...inherited.evidence || []])].filter((id2) => id2 in STORY_EVIDENCE);
   const commitmentsByCharacter = Object.fromEntries(Object.entries(state.commitmentsByCharacter).map(([key, ids]) => [key, [...ids]]));
-  for (const id of [...effect.commitments || [], ...inherited.commitments || []]) {
-    const entry = STORY_COMMITMENTS[id];
+  for (const id2 of [...effect.commitments || [], ...inherited.commitments || []]) {
+    const entry = STORY_COMMITMENTS[id2];
     if (!entry) continue;
-    commitmentsByCharacter[entry.character] = [.../* @__PURE__ */ new Set([...commitmentsByCharacter[entry.character] || [], id])];
+    commitmentsByCharacter[entry.character] = [.../* @__PURE__ */ new Set([...commitmentsByCharacter[entry.character] || [], id2])];
   }
   return freeze({ ...state, nodeId: next, flags: { ...state.flags, ...effect.flags }, axes: values, trustByCharacter: trust, commitmentsByCharacter, evidence: evidence3, trail: [...state.trail, { nodeId: node.id, choiceId }] });
 }
@@ -4051,7 +4429,7 @@ function visible(state) {
   const node = nodes2.get(state.nodeId);
   const text2 = typeof node.text === "function" ? node.text(state) : node.text;
   const presentation = storyPresentationFor({ ...node, text: text2 });
-  return { id: node.id, chapterId: node.chapterId, routeId: state.routeId || null, speaker: node.speaker, text: text2, location: node.location, time: node.time, description: node.description, emotion: node.emotion || "thoughtful", ...presentation, ...node.choices ? { choices: node.choices.map(({ id, text: choiceText }) => ({ id, text: choiceText })) } : {}, ...node.sideEnding ? { ending: { ...node.sideEnding, relationshipEpilogues: [] } } : node.ending ? { ending: endingFor(state) } : {} };
+  return { id: node.id, chapterId: node.chapterId, routeId: state.routeId || null, speaker: node.speaker, text: text2, location: node.location, time: node.time, description: node.description, emotion: node.emotion || "thoughtful", ...presentation, ...node.choices ? { choices: node.choices.map(({ id: id2, text: choiceText }) => ({ id: id2, text: choiceText })) } : {}, ...node.sideEnding ? { ending: { ...node.sideEnding, relationshipEpilogues: [] } } : node.ending ? { ending: endingFor(state) } : {} };
 }
 var currentStoryNode2 = (raw) => visible(normalizeStory2(raw));
 var advanceStory2 = (raw, choiceId = null) => transition2(normalizeStory2(raw), choiceId);
@@ -4139,81 +4517,81 @@ function readStorySlots(storage, key = STORY_STORAGE_KEY, episodeId = null) {
 }
 
 // .dsh-plugin/client/gal-module.css
-var gal_module_default = `/* Gal \u6A21\u5757 \xB7 \u72EC\u7ACB\u5206\u5757\u6837\u5F0F\uFF08\u4E0E\u8DEF\u7531\u5DE5\u4F5C\u53F0\u5171\u7528 mr-* \u57FA\u7840\u53D8\u91CF\uFF09 */
-.gm-root .mr-segment button[aria-pressed="true"] { background: var(--dsw-alias-brand, #2f9e63); color: #fff; }
-
-.gm-story { display: grid; gap: 12px; min-width: 0; }
-
-.gm-story-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.gm-select { padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.08)); color: inherit; font-size: 13px; max-width: 340px; }
-
-.gm-stage, .gm-free-stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 16px; border: 1px solid rgba(124, 153, 203, .38); background: #101626; color: #f4f4fb; box-shadow: 0 14px 36px rgba(10, 12, 25, .22); }
-.gm-stage { min-height: 500px; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding: 22px; }
-.gm-stage::after, .gm-free-stage::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(180deg, rgba(10, 12, 30, .42) 0%, rgba(11, 15, 31, .04) 28%, rgba(8, 10, 23, .22) 51%, rgba(7, 10, 23, .88) 100%); }
-.gm-stage-art { position: absolute; inset: 0; z-index: 0; background-position: center; background-repeat: no-repeat; background-size: cover; }
-.gm-stage-portrait { position: absolute; z-index: 1; height: 87%; width: auto; max-width: 56%; right: 3%; bottom: 5%; object-fit: contain; object-position: bottom; pointer-events: none; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .4)); }
-.gm-stage > :not(.gm-stage-art):not(.gm-stage-portrait), .gm-free-stage > :not(.gm-stage-art):not(.gm-stage-portrait) { position: relative; z-index: 2; }
-.gm-stage-head { display: grid; gap: 4px; margin-bottom: auto; align-self: flex-start; padding: 11px 14px; border-radius: 10px; background: rgba(8, 13, 29, .63); backdrop-filter: blur(8px); }
-.gm-stage-place { display: flex; align-items: baseline; gap: 10px; font-size: 14px; color: #dce6f8; }
-.gm-stage-place strong { font-size: 16px; color: #fff; }
-.gm-stage-desc { margin: 0; max-width: 580px; font-size: 13px; color: #d5d9eb; }
-
-.gm-dialogue { width: 100%; box-sizing: border-box; padding: 16px 19px 20px; border-radius: 13px; border: 1px solid rgba(209, 219, 255, .38); background: rgba(11, 16, 35, .83); backdrop-filter: blur(12px); box-shadow: 0 5px 24px rgba(4, 6, 16, .3); cursor: pointer; }
-.gm-dialogue:focus-visible { outline: 2px solid #b5e4cb; outline-offset: 2px; }
-.gm-dialogue-narration { background: rgba(11, 16, 35, .72); font-style: italic; }
-.gm-speaker { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.gm-avatar { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid rgba(255,255,255,.42); border-radius: 50%; color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
-.gm-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
-.gm-avatar-large { width: 44px; height: 44px; font-size: 19px; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
-.gm-speaker-name { font-weight: 700; font-size: 15px; }
-.gm-dialogue-text { margin: 0; min-height: 3.6em; font-size: 15px; line-height: 1.75; white-space: pre-wrap; }
-.gm-caret { opacity: .7; }
-.gm-next-hint { position: absolute; right: 14px; bottom: 8px; font-size: 12px; color: #9fbcb2; }
-
-.gm-choices { display: grid; gap: 8px; width: 100%; }
-.gm-choice { text-align: left; padding: 11px 14px; border-radius: 10px; border: 1px solid rgba(207, 215, 255, .46); background: rgba(11, 16, 35, .82); backdrop-filter: blur(8px); color: #f3f6ff; font-size: 14px; cursor: pointer; }
-.gm-choice:hover, .gm-choice:focus-visible { background: rgba(44, 59, 100, .95); border-color: #d0dfff; }
-
-.gm-ending { padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.3); background: rgba(10, 14, 32, .88); backdrop-filter: blur(10px); display: grid; gap: 8px; }
-.gm-ending h3 { margin: 0; font-size: 16px; }
-.gm-ending p { margin: 0; font-size: 13px; color: #c9dcd4; }
-.gm-ending-epilogue { padding-top: 9px; border-top: 1px solid rgba(255,255,255,.15); }
-.gm-ending-epilogue h4 { margin: 0 0 4px; font-size: 13px; }
-
-.gm-history { max-height: 220px; overflow: auto; padding: 12px 14px; border-radius: 10px; border: 1px dashed var(--dsw-alias-border-l1); font-size: 13px; line-height: 1.7; display: grid; gap: 6px; }
-.gm-history p { margin: 0; }
-.gm-history-player { color: var(--dsw-alias-label-secondary, #7d8f88); }
-
-.gm-slots { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.gm-slot { display: inline-flex; gap: 6px; }
-
-.gm-free { display: grid; gap: 12px; min-width: 0; }
-.gm-free-controls { display: grid; gap: 6px; grid-template-columns: auto 1fr; align-items: center; max-width: 720px; }
-.gm-free-stage { min-height: 390px; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding: 20px; }
-.gm-free-stage .gm-stage-portrait { height: 92%; }
-.gm-free-scene { display: grid; gap: 2px; align-self: flex-start; margin-bottom: auto; padding: 10px 13px; border-radius: 10px; background: rgba(8, 13, 29, .65); font-size: 12px; color: #d5d9eb; }
-.gm-free-scene strong { font-size: 16px; color: #fff; }
-.gm-free-dialogue { padding: 15px 18px; border-radius: 13px; border: 1px solid rgba(209, 219, 255, .38); background: rgba(11, 16, 35, .83); backdrop-filter: blur(12px); }
-.gm-free-dialogue p { margin: 0; font-size: 15px; line-height: 1.7; }
-.gm-free-chat { display: grid; gap: 10px; padding: 15px; border-radius: 13px; border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.08)); }
-.gm-free-chat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; }
-.gm-free-chat-head span { color: var(--dsw-alias-label-secondary, #7d8f88); font-size: 12px; overflow-wrap: anywhere; }
-.gm-free-chat-log { min-height: 80px; max-height: 450px; overflow-y: auto; display: grid; align-content: start; gap: 9px; padding: 4px; }
-.gm-free-chat-message { max-width: min(85%, 680px); padding: 11px 13px; border-radius: 12px; border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.08)); font-size: 13px; line-height: 1.7; }
-.gm-free-chat-message.user { justify-self: end; background: rgba(48, 151, 111, .16); }
-.gm-free-chat-message.assistant { justify-self: start; }
-.gm-free-chat-message strong { display: block; margin-bottom: 3px; font-size: 12px; }
-.gm-free-chat-message p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.gm-free-details { padding: 12px 15px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; }
-.gm-free-details summary { cursor: pointer; font-size: 13px; font-weight: 600; }
-.gm-free-prompt { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.7; font-family: inherit; }
-@media (max-width: 760px) {
-  .gm-stage { min-height: 440px; padding: 14px; }
-  .gm-stage-portrait { right: -6%; max-width: 78%; height: 72%; bottom: 16%; }
-  .gm-stage-head { max-width: 90%; }
-  .gm-free-controls { grid-template-columns: 1fr; }
-  .gm-free-stage { min-height: 340px; padding: 14px; }
-}
+var gal_module_default = `/* Gal \u6A21\u5757 \xB7 \u72EC\u7ACB\u5206\u5757\u6837\u5F0F\uFF08\u4E0E\u8DEF\u7531\u5DE5\u4F5C\u53F0\u5171\u7528 mr-* \u57FA\u7840\u53D8\u91CF\uFF09 */\r
+.gm-root .mr-segment button[aria-pressed="true"] { background: var(--dsw-alias-brand, #2f9e63); color: #fff; }\r
+\r
+.gm-story { display: grid; gap: 12px; min-width: 0; }\r
+\r
+.gm-story-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }\r
+.gm-select { padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.08)); color: inherit; font-size: 13px; max-width: 340px; }\r
+\r
+.gm-stage, .gm-free-stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 16px; border: 1px solid rgba(124, 153, 203, .38); background: #101626; color: #f4f4fb; box-shadow: 0 14px 36px rgba(10, 12, 25, .22); }\r
+.gm-stage { min-height: 500px; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding: 22px; }\r
+.gm-stage::after, .gm-free-stage::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(180deg, rgba(10, 12, 30, .42) 0%, rgba(11, 15, 31, .04) 28%, rgba(8, 10, 23, .22) 51%, rgba(7, 10, 23, .88) 100%); }\r
+.gm-stage-art { position: absolute; inset: 0; z-index: 0; background-position: center; background-repeat: no-repeat; background-size: cover; }\r
+.gm-stage-portrait { position: absolute; z-index: 1; height: 87%; width: auto; max-width: 56%; right: 3%; bottom: 5%; object-fit: contain; object-position: bottom; pointer-events: none; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .4)); }\r
+.gm-stage > :not(.gm-stage-art):not(.gm-stage-portrait), .gm-free-stage > :not(.gm-stage-art):not(.gm-stage-portrait) { position: relative; z-index: 2; }\r
+.gm-stage-head { display: grid; gap: 4px; margin-bottom: auto; align-self: flex-start; padding: 11px 14px; border-radius: 10px; background: rgba(8, 13, 29, .63); backdrop-filter: blur(8px); }\r
+.gm-stage-place { display: flex; align-items: baseline; gap: 10px; font-size: 14px; color: #dce6f8; }\r
+.gm-stage-place strong { font-size: 16px; color: #fff; }\r
+.gm-stage-desc { margin: 0; max-width: 580px; font-size: 13px; color: #d5d9eb; }\r
+\r
+.gm-dialogue { width: 100%; box-sizing: border-box; padding: 16px 19px 20px; border-radius: 13px; border: 1px solid rgba(209, 219, 255, .38); background: rgba(11, 16, 35, .83); backdrop-filter: blur(12px); box-shadow: 0 5px 24px rgba(4, 6, 16, .3); cursor: pointer; }\r
+.gm-dialogue:focus-visible { outline: 2px solid #b5e4cb; outline-offset: 2px; }\r
+.gm-dialogue-narration { background: rgba(11, 16, 35, .72); font-style: italic; }\r
+.gm-speaker { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }\r
+.gm-avatar { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid rgba(255,255,255,.42); border-radius: 50%; color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0; overflow: hidden; }\r
+.gm-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }\r
+.gm-avatar-large { width: 44px; height: 44px; font-size: 19px; box-shadow: 0 2px 10px rgba(0,0,0,.35); }\r
+.gm-speaker-name { font-weight: 700; font-size: 15px; }\r
+.gm-dialogue-text { margin: 0; min-height: 3.6em; font-size: 15px; line-height: 1.75; white-space: pre-wrap; }\r
+.gm-caret { opacity: .7; }\r
+.gm-next-hint { position: absolute; right: 14px; bottom: 8px; font-size: 12px; color: #9fbcb2; }\r
+\r
+.gm-choices { display: grid; gap: 8px; width: 100%; }\r
+.gm-choice { text-align: left; padding: 11px 14px; border-radius: 10px; border: 1px solid rgba(207, 215, 255, .46); background: rgba(11, 16, 35, .82); backdrop-filter: blur(8px); color: #f3f6ff; font-size: 14px; cursor: pointer; }\r
+.gm-choice:hover, .gm-choice:focus-visible { background: rgba(44, 59, 100, .95); border-color: #d0dfff; }\r
+\r
+.gm-ending { padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.3); background: rgba(10, 14, 32, .88); backdrop-filter: blur(10px); display: grid; gap: 8px; }\r
+.gm-ending h3 { margin: 0; font-size: 16px; }\r
+.gm-ending p { margin: 0; font-size: 13px; color: #c9dcd4; }\r
+.gm-ending-epilogue { padding-top: 9px; border-top: 1px solid rgba(255,255,255,.15); }\r
+.gm-ending-epilogue h4 { margin: 0 0 4px; font-size: 13px; }\r
+\r
+.gm-history { max-height: 220px; overflow: auto; padding: 12px 14px; border-radius: 10px; border: 1px dashed var(--dsw-alias-border-l1); font-size: 13px; line-height: 1.7; display: grid; gap: 6px; }\r
+.gm-history p { margin: 0; }\r
+.gm-history-player { color: var(--dsw-alias-label-secondary, #7d8f88); }\r
+\r
+.gm-slots { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\r
+.gm-slot { display: inline-flex; gap: 6px; }\r
+\r
+.gm-free { display: grid; gap: 12px; min-width: 0; }\r
+.gm-free-controls { display: grid; gap: 6px; grid-template-columns: auto 1fr; align-items: center; max-width: 720px; }\r
+.gm-free-stage { min-height: 390px; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding: 20px; }\r
+.gm-free-stage .gm-stage-portrait { height: 92%; }\r
+.gm-free-scene { display: grid; gap: 2px; align-self: flex-start; margin-bottom: auto; padding: 10px 13px; border-radius: 10px; background: rgba(8, 13, 29, .65); font-size: 12px; color: #d5d9eb; }\r
+.gm-free-scene strong { font-size: 16px; color: #fff; }\r
+.gm-free-dialogue { padding: 15px 18px; border-radius: 13px; border: 1px solid rgba(209, 219, 255, .38); background: rgba(11, 16, 35, .83); backdrop-filter: blur(12px); }\r
+.gm-free-dialogue p { margin: 0; font-size: 15px; line-height: 1.7; }\r
+.gm-free-chat { display: grid; gap: 10px; padding: 15px; border-radius: 13px; border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.08)); }\r
+.gm-free-chat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; }\r
+.gm-free-chat-head span { color: var(--dsw-alias-label-secondary, #7d8f88); font-size: 12px; overflow-wrap: anywhere; }\r
+.gm-free-chat-log { min-height: 80px; max-height: 450px; overflow-y: auto; display: grid; align-content: start; gap: 9px; padding: 4px; }\r
+.gm-free-chat-message { max-width: min(85%, 680px); padding: 11px 13px; border-radius: 12px; border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-markdown-code-block, rgba(127,127,127,.08)); font-size: 13px; line-height: 1.7; }\r
+.gm-free-chat-message.user { justify-self: end; background: rgba(48, 151, 111, .16); }\r
+.gm-free-chat-message.assistant { justify-self: start; }\r
+.gm-free-chat-message strong { display: block; margin-bottom: 3px; font-size: 12px; }\r
+.gm-free-chat-message p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }\r
+.gm-free-details { padding: 12px 15px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; }\r
+.gm-free-details summary { cursor: pointer; font-size: 13px; font-weight: 600; }\r
+.gm-free-prompt { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.7; font-family: inherit; }\r
+@media (max-width: 760px) {\r
+  .gm-stage { min-height: 440px; padding: 14px; }\r
+  .gm-stage-portrait { right: -6%; max-width: 78%; height: 72%; bottom: 16%; }\r
+  .gm-stage-head { max-width: 90%; }\r
+  .gm-free-controls { grid-template-columns: 1fr; }\r
+  .gm-free-stage { min-height: 340px; padding: 14px; }\r
+}\r
 `;
 
 // aipicture/story-backgrounds/prologue-station.webp
@@ -4311,7 +4689,7 @@ var CHARACTER_ART = Object.freeze({
   github: github_default
 });
 function GalPanelIcon({ size = 20, active = false }) {
-  return /* @__PURE__ */ import_react2.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(
+  return /* @__PURE__ */ import_react3.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react3.default.createElement(
     "path",
     {
       d: "M4 6.8C4 5.25 5.25 4 6.8 4h10.4C18.75 4 20 5.25 20 6.8v7.4c0 1.55-1.25 2.8-2.8 2.8H10l-4.4 3.6c-.5.4-1.1 0-1.1-.6V6.8Z",
@@ -4320,7 +4698,7 @@ function GalPanelIcon({ size = 20, active = false }) {
       fill: active ? "currentColor" : "none",
       fillOpacity: active ? 0.18 : 0
     }
-  ), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "9", cy: "10.5", r: "1.1", fill: "currentColor" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "12.5", cy: "10.5", r: "1.1", fill: "currentColor" }), /* @__PURE__ */ import_react2.default.createElement("circle", { cx: "16", cy: "10.5", r: "1.1", fill: "currentColor" }));
+  ), /* @__PURE__ */ import_react3.default.createElement("circle", { cx: "9", cy: "10.5", r: "1.1", fill: "currentColor" }), /* @__PURE__ */ import_react3.default.createElement("circle", { cx: "12.5", cy: "10.5", r: "1.1", fill: "currentColor" }), /* @__PURE__ */ import_react3.default.createElement("circle", { cx: "16", cy: "10.5", r: "1.1", fill: "currentColor" }));
 }
 function speakerLabel(key) {
   return SPEAKER_LABELS[key] ?? STORY_CHARACTERS3[key] ?? key;
@@ -4333,15 +4711,15 @@ function speakerColor(key) {
 function Avatar({ speaker, large = false }) {
   const label = speakerLabel(speaker);
   const color = speakerColor(speaker);
-  return /* @__PURE__ */ import_react2.default.createElement("span", { className: large ? "gm-avatar gm-avatar-large" : "gm-avatar", style: { background: color }, "aria-hidden": "true" }, CHARACTER_ART[speaker] ? /* @__PURE__ */ import_react2.default.createElement("img", { src: CHARACTER_ART[speaker], alt: "" }) : label ? label.slice(0, 1) : "\uFF1F");
+  return /* @__PURE__ */ import_react3.default.createElement("span", { className: large ? "gm-avatar gm-avatar-large" : "gm-avatar", style: { background: color }, "aria-hidden": "true" }, CHARACTER_ART[speaker] ? /* @__PURE__ */ import_react3.default.createElement("img", { src: CHARACTER_ART[speaker], alt: "" }) : label ? label.slice(0, 1) : "\uFF1F");
 }
 function StageArtwork({ background, speaker }) {
-  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-stage-art", style: { backgroundImage: `url("${background}")` }, "aria-hidden": "true" }), CHARACTER_ART[speaker] && /* @__PURE__ */ import_react2.default.createElement("img", { className: "gm-stage-portrait", src: CHARACTER_ART[speaker], alt: "", "aria-hidden": "true" }));
+  return /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-stage-art", style: { backgroundImage: `url("${background}")` }, "aria-hidden": "true" }), CHARACTER_ART[speaker] && /* @__PURE__ */ import_react3.default.createElement("img", { className: "gm-stage-portrait", src: CHARACTER_ART[speaker], alt: "", "aria-hidden": "true" }));
 }
 function useTypewriter(fullText, speed = 24) {
-  const [shown, setShown] = import_react2.default.useState("");
-  const doneRef = import_react2.default.useRef(false);
-  import_react2.default.useEffect(() => {
+  const [shown, setShown] = import_react3.default.useState("");
+  const doneRef = import_react3.default.useRef(false);
+  import_react3.default.useEffect(() => {
     doneRef.current = false;
     setShown("");
     if (!fullText) return void 0;
@@ -4360,7 +4738,7 @@ function useTypewriter(fullText, speed = 24) {
   return { shown, complete, done: shown.length >= fullText.length };
 }
 function StageHeader({ node }) {
-  return /* @__PURE__ */ import_react2.default.createElement("header", { className: "gm-stage-head" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-stage-place" }, /* @__PURE__ */ import_react2.default.createElement("strong", null, node.location ?? "\u672A\u540D\u4E4B\u5730"), node.time && /* @__PURE__ */ import_react2.default.createElement("span", null, node.time)), node.description && /* @__PURE__ */ import_react2.default.createElement("p", { className: "gm-stage-desc" }, node.description));
+  return /* @__PURE__ */ import_react3.default.createElement("header", { className: "gm-stage-head" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-stage-place" }, /* @__PURE__ */ import_react3.default.createElement("strong", null, node.location ?? "\u672A\u540D\u4E4B\u5730"), node.time && /* @__PURE__ */ import_react3.default.createElement("span", null, node.time)), node.description && /* @__PURE__ */ import_react3.default.createElement("p", { className: "gm-stage-desc" }, node.description));
 }
 function Dialogue({ node, onAdvance }) {
   const isNarration = node.speaker === "narrator";
@@ -4374,34 +4752,34 @@ function Dialogue({ node, onAdvance }) {
     event.preventDefault();
     click();
   };
-  return /* @__PURE__ */ import_react2.default.createElement("div", { className: isNarration ? "gm-dialogue gm-dialogue-narration" : "gm-dialogue", onClick: click, onKeyDown: keyDown, role: "button", tabIndex: 0, "aria-label": done ? node.choices || node.ending ? "\u5BF9\u8BDD\u5DF2\u663E\u793A\uFF0C\u8BF7\u9009\u62E9\u5267\u60C5\u9009\u9879" : "\u7EE7\u7EED\u5267\u60C5" : "\u663E\u793A\u5B8C\u6574\u5BF9\u8BDD" }, !isNarration && /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-speaker" }, /* @__PURE__ */ import_react2.default.createElement(Avatar, { speaker: node.speaker, large: true }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "gm-speaker-name" }, speakerLabel(node.speaker))), /* @__PURE__ */ import_react2.default.createElement("p", { className: "gm-dialogue-text" }, shown, !done && /* @__PURE__ */ import_react2.default.createElement("span", { className: "gm-caret" }, "\u258D")), !node.choices && !node.ending && done && /* @__PURE__ */ import_react2.default.createElement("span", { className: "gm-next-hint" }, "\u70B9\u51FB\u7EE7\u7EED \u25B8"));
+  return /* @__PURE__ */ import_react3.default.createElement("div", { className: isNarration ? "gm-dialogue gm-dialogue-narration" : "gm-dialogue", onClick: click, onKeyDown: keyDown, role: "button", tabIndex: 0, "aria-label": done ? node.choices || node.ending ? "\u5BF9\u8BDD\u5DF2\u663E\u793A\uFF0C\u8BF7\u9009\u62E9\u5267\u60C5\u9009\u9879" : "\u7EE7\u7EED\u5267\u60C5" : "\u663E\u793A\u5B8C\u6574\u5BF9\u8BDD" }, !isNarration && /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-speaker" }, /* @__PURE__ */ import_react3.default.createElement(Avatar, { speaker: node.speaker, large: true }), /* @__PURE__ */ import_react3.default.createElement("span", { className: "gm-speaker-name" }, speakerLabel(node.speaker))), /* @__PURE__ */ import_react3.default.createElement("p", { className: "gm-dialogue-text" }, shown, !done && /* @__PURE__ */ import_react3.default.createElement("span", { className: "gm-caret" }, "\u258D")), !node.choices && !node.ending && done && /* @__PURE__ */ import_react3.default.createElement("span", { className: "gm-next-hint" }, "\u70B9\u51FB\u7EE7\u7EED \u25B8"));
 }
 function StoryMode() {
-  const storage = import_react2.default.useMemo(() => {
+  const storage = import_react3.default.useMemo(() => {
     try {
       return typeof window !== "undefined" ? window.localStorage : null;
     } catch {
       return null;
     }
   }, []);
-  const [episodeId, setEpisodeId] = import_react2.default.useState(() => selectedStoryEpisode(storage));
-  const [story, setStory] = import_react2.default.useState(() => {
+  const [episodeId, setEpisodeId] = import_react3.default.useState(() => selectedStoryEpisode(storage));
+  const [story, setStory] = import_react3.default.useState(() => {
     try {
       return readStory(storage, episodeStorageKey(STORY_STORAGE_KEY, selectedStoryEpisode(storage)), selectedStoryEpisode(storage));
     } catch {
       return createStory3(selectedStoryEpisode(storage));
     }
   });
-  const [error, setError] = import_react2.default.useState("");
-  const [showHistory, setShowHistory] = import_react2.default.useState(false);
-  const [slots, setSlots] = import_react2.default.useState(() => {
+  const [error, setError] = import_react3.default.useState("");
+  const [showHistory, setShowHistory] = import_react3.default.useState(false);
+  const [slots, setSlots] = import_react3.default.useState(() => {
     try {
       return readStorySlots(storage, STORY_STORAGE_KEY, episodeId);
     } catch {
       return [null, null, null];
     }
   });
-  const node = import_react2.default.useMemo(() => {
+  const node = import_react3.default.useMemo(() => {
     try {
       return currentStoryNode3(story);
     } catch {
@@ -4468,7 +4846,7 @@ function StoryMode() {
     persist(createStory3(episodeId));
   };
   const episode = getStoryEpisode(story) ?? STORY_EPISODES.find((item) => item.id === episodeId);
-  const history = import_react2.default.useMemo(() => {
+  const history = import_react3.default.useMemo(() => {
     if (!showHistory) return [];
     try {
       return storyHistory3(story);
@@ -4476,7 +4854,7 @@ function StoryMode() {
       return [];
     }
   }, [story, showHistory]);
-  const stageSpeaker = import_react2.default.useMemo(() => {
+  const stageSpeaker = import_react3.default.useMemo(() => {
     if (CHARACTER_ART[node?.speaker]) return node.speaker;
     if (node?.speaker !== "player" && node?.speaker !== "narrator") return null;
     try {
@@ -4486,7 +4864,7 @@ function StoryMode() {
     }
   }, [story, node?.speaker]);
   const stageBackground = STORY_ART[node?.backgroundId] ?? STORY_ART[node?.chapterId] ?? model_city_title_default;
-  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-story" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-story-toolbar" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-episode" }, "\u5267\u76EE"), /* @__PURE__ */ import_react2.default.createElement("select", { id: "gm-episode", className: "gm-select", value: episodeId, onChange: (event) => switchEpisode(event.target.value) }, STORY_EPISODES.map((item) => /* @__PURE__ */ import_react2.default.createElement("option", { key: item.id, value: item.id }, item.label, " \xB7 ", item.title))), episode?.chapters?.length > 0 && /* @__PURE__ */ import_react2.default.createElement(
+  return /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-story" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-story-toolbar" }, /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-episode" }, "\u5267\u76EE"), /* @__PURE__ */ import_react3.default.createElement("select", { id: "gm-episode", className: "gm-select", value: episodeId, onChange: (event) => switchEpisode(event.target.value) }, STORY_EPISODES.map((item) => /* @__PURE__ */ import_react3.default.createElement("option", { key: item.id, value: item.id }, item.label, " \xB7 ", item.title))), episode?.chapters?.length > 0 && /* @__PURE__ */ import_react3.default.createElement(
     "select",
     {
       className: "gm-select",
@@ -4503,8 +4881,8 @@ function StoryMode() {
       },
       "aria-label": "\u9009\u62E9\u7AE0\u8282"
     },
-    episode.chapters.map((chapter) => /* @__PURE__ */ import_react2.default.createElement("option", { key: chapter.id, value: chapter.id }, chapter.title))
-  ), episodeId === "bridges" && story?.chapterId === "side-routes" && /* @__PURE__ */ import_react2.default.createElement(
+    episode.chapters.map((chapter) => /* @__PURE__ */ import_react3.default.createElement("option", { key: chapter.id, value: chapter.id }, chapter.title))
+  ), episodeId === "bridges" && story?.chapterId === "side-routes" && /* @__PURE__ */ import_react3.default.createElement(
     "select",
     {
       className: "gm-select",
@@ -4519,11 +4897,11 @@ function StoryMode() {
       },
       "aria-label": "\u9009\u62E9\u89D2\u8272\u652F\u7EBF"
     },
-    STORY_SIDE_ROUTES2.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: route.id, value: route.id }, route.title))
-  ), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => setShowHistory((value) => !value) }, showHistory ? "\u6536\u8D77\u5386\u53F2" : "\u5386\u53F2"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: restart }, "\u91CD\u65B0\u5F00\u59CB")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-stage", "data-chapter": node?.chapterId ?? story?.chapterId ?? "" }, /* @__PURE__ */ import_react2.default.createElement(StageArtwork, { background: stageBackground, speaker: stageSpeaker }), node && /* @__PURE__ */ import_react2.default.createElement(StageHeader, { node }), node && /* @__PURE__ */ import_react2.default.createElement(Dialogue, { node, onAdvance: advance }), node?.choices && /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-choices", role: "group", "aria-label": "\u5267\u60C5\u9009\u9879" }, node.choices.map((choice) => /* @__PURE__ */ import_react2.default.createElement("button", { key: choice.id, type: "button", className: "gm-choice", onClick: () => advance(choice.id) }, choice.text))), node?.ending && /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-ending" }, /* @__PURE__ */ import_react2.default.createElement("h3", null, node.ending.title ?? "\u672C\u6BB5\u5B8C\u7ED3"), node.ending.description && /* @__PURE__ */ import_react2.default.createElement("p", null, node.ending.description), Array.isArray(node.ending.epilogue) && node.ending.epilogue.map((line, index) => /* @__PURE__ */ import_react2.default.createElement("p", { key: index }, line)), Array.isArray(node.ending.relationshipEpilogues) && node.ending.relationshipEpilogues.map((ending) => /* @__PURE__ */ import_react2.default.createElement("section", { className: "gm-ending-epilogue", key: ending.id }, /* @__PURE__ */ import_react2.default.createElement("h4", null, ending.title), /* @__PURE__ */ import_react2.default.createElement("p", null, ending.description))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button", type: "button", onClick: restart }, "\u5F00\u542F\u65B0\u7684\u4E00\u5468\u76EE")), !node && /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-empty" }, "\u5267\u60C5\u5F15\u64CE\u65E0\u6CD5\u8BFB\u53D6\u5F53\u524D\u5B58\u6863\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u3002")), showHistory && /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-history", role: "log", "aria-label": "\u5267\u60C5\u5386\u53F2" }, history.map((entry, index) => /* @__PURE__ */ import_react2.default.createElement("p", { key: `${entry.id}-${index}`, className: entry.speaker === "player" ? "gm-history-player" : "" }, speakerLabel(entry.speaker) && /* @__PURE__ */ import_react2.default.createElement("strong", null, speakerLabel(entry.speaker), "\uFF1A"), entry.text))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-slots" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-control-label" }, "\u5B58\u6863"), [0, 1, 2].map((index) => {
+    STORY_SIDE_ROUTES2.map((route) => /* @__PURE__ */ import_react3.default.createElement("option", { key: route.id, value: route.id }, route.title))
+  ), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => setShowHistory((value) => !value) }, showHistory ? "\u6536\u8D77\u5386\u53F2" : "\u5386\u53F2"), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: restart }, "\u91CD\u65B0\u5F00\u59CB")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-stage", "data-chapter": node?.chapterId ?? story?.chapterId ?? "" }, /* @__PURE__ */ import_react3.default.createElement(StageArtwork, { background: stageBackground, speaker: stageSpeaker }), node && /* @__PURE__ */ import_react3.default.createElement(StageHeader, { node }), node && /* @__PURE__ */ import_react3.default.createElement(Dialogue, { node, onAdvance: advance }), node?.choices && /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-choices", role: "group", "aria-label": "\u5267\u60C5\u9009\u9879" }, node.choices.map((choice) => /* @__PURE__ */ import_react3.default.createElement("button", { key: choice.id, type: "button", className: "gm-choice", onClick: () => advance(choice.id) }, choice.text))), node?.ending && /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-ending" }, /* @__PURE__ */ import_react3.default.createElement("h3", null, node.ending.title ?? "\u672C\u6BB5\u5B8C\u7ED3"), node.ending.description && /* @__PURE__ */ import_react3.default.createElement("p", null, node.ending.description), Array.isArray(node.ending.epilogue) && node.ending.epilogue.map((line, index) => /* @__PURE__ */ import_react3.default.createElement("p", { key: index }, line)), Array.isArray(node.ending.relationshipEpilogues) && node.ending.relationshipEpilogues.map((ending) => /* @__PURE__ */ import_react3.default.createElement("section", { className: "gm-ending-epilogue", key: ending.id }, /* @__PURE__ */ import_react3.default.createElement("h4", null, ending.title), /* @__PURE__ */ import_react3.default.createElement("p", null, ending.description))), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button", type: "button", onClick: restart }, "\u5F00\u542F\u65B0\u7684\u4E00\u5468\u76EE")), !node && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-empty" }, "\u5267\u60C5\u5F15\u64CE\u65E0\u6CD5\u8BFB\u53D6\u5F53\u524D\u5B58\u6863\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u3002")), showHistory && /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-history", role: "log", "aria-label": "\u5267\u60C5\u5386\u53F2" }, history.map((entry, index) => /* @__PURE__ */ import_react3.default.createElement("p", { key: `${entry.id}-${index}`, className: entry.speaker === "player" ? "gm-history-player" : "" }, speakerLabel(entry.speaker) && /* @__PURE__ */ import_react3.default.createElement("strong", null, speakerLabel(entry.speaker), "\uFF1A"), entry.text))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-slots" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label" }, "\u5B58\u6863"), [0, 1, 2].map((index) => {
     const slot = slots[index];
-    return /* @__PURE__ */ import_react2.default.createElement("span", { key: index, className: "gm-slot" }, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => saveSlot(index) }, "\u5B58 ", index + 1), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !slot || slot.invalid, onClick: () => loadSlot(index), title: slot?.savedAt ?? "" }, "\u8BFB ", index + 1));
-  }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u5B58\u6863\u4FDD\u5B58\u5728\u6D4F\u89C8\u5668\u672C\u5730\u3002")), error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, error));
+    return /* @__PURE__ */ import_react3.default.createElement("span", { key: index, className: "gm-slot" }, /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => saveSlot(index) }, "\u5B58 ", index + 1), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !slot || slot.invalid, onClick: () => loadSlot(index), title: slot?.savedAt ?? "" }, "\u8BFB ", index + 1));
+  }), /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\u5B58\u6863\u4FDD\u5B58\u5728\u6D4F\u89C8\u5668\u672C\u5730\u3002")), error && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, error));
 }
 var FREE_PRESETS = [
   { id: "cafe", label: "\u5F00\u653E\u65E5\u4F11\u606F\u533A", world: "\u767E\u6A21\u534F\u4F1A\u5F00\u653E\u65E5\u4E34\u8FD1\u6563\u573A\uFF0C\u5C55\u53F0\u8FB9\u7684\u706F\u4ECD\u4EAE\u7740\u3002", opener: "\u4F60\u4ECE\u55A7\u95F9\u7684\u4EBA\u7FA4\u8D70\u5230\u4E00\u5F20\u5B89\u9759\u7684\u5706\u684C\u65C1\u3002", art: association_open_day_default },
@@ -4531,20 +4909,20 @@ var FREE_PRESETS = [
   { id: "station", label: "\u5343\u6865\u7AD9\u53F0", world: "\u5343\u6865\u7AD9\u53F0\uFF0C\u672B\u73ED\u8F66\u5373\u5C06\u5F00\u51FA\u3002", opener: "\u4F60\u8BF4\uFF1A\u201C\u4ECA\u5929\u4E5F\u8F9B\u82E6\u4E86\u3002\u201D", art: prologue_station_default }
 ];
 function FreeMode({ routes, galReply, cancelGalReply }) {
-  const [routeKey2, setRouteKey] = import_react2.default.useState(routes[0] ? `${routes[0].provider}/${routes[0].model}` : "");
-  const [character, setCharacter] = import_react2.default.useState("harness");
-  const [preset, setPreset] = import_react2.default.useState("cafe");
-  const [extra, setExtra] = import_react2.default.useState("");
-  const [copied, setCopied] = import_react2.default.useState(false);
-  const [copyError, setCopyError] = import_react2.default.useState("");
-  const [messages, setMessages] = import_react2.default.useState([]);
-  const [draft, setDraft] = import_react2.default.useState("");
-  const [sending, setSending] = import_react2.default.useState(false);
-  const sendingRef = import_react2.default.useRef(false);
-  const [chatError, setChatError] = import_react2.default.useState("");
-  const chatGeneration = import_react2.default.useRef(0);
-  const pendingRequestId = import_react2.default.useRef(null);
-  import_react2.default.useEffect(() => () => {
+  const [routeKey2, setRouteKey] = import_react3.default.useState(routes[0] ? `${routes[0].provider}/${routes[0].model}` : "");
+  const [character, setCharacter] = import_react3.default.useState("harness");
+  const [preset, setPreset] = import_react3.default.useState("cafe");
+  const [extra, setExtra] = import_react3.default.useState("");
+  const [copied, setCopied] = import_react3.default.useState(false);
+  const [copyError, setCopyError] = import_react3.default.useState("");
+  const [messages, setMessages] = import_react3.default.useState([]);
+  const [draft, setDraft] = import_react3.default.useState("");
+  const [sending, setSending] = import_react3.default.useState(false);
+  const sendingRef = import_react3.default.useRef(false);
+  const [chatError, setChatError] = import_react3.default.useState("");
+  const chatGeneration = import_react3.default.useRef(0);
+  const pendingRequestId = import_react3.default.useRef(null);
+  import_react3.default.useEffect(() => () => {
     chatGeneration.current += 1;
     if (pendingRequestId.current && typeof cancelGalReply === "function") void cancelGalReply(pendingRequestId.current);
   }, []);
@@ -4627,19 +5005,19 @@ function FreeMode({ routes, galReply, cancelGalReply }) {
       setSending(false);
     }
   };
-  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-free" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-free-controls" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-route" }, "\u6A21\u578B\u8DEF\u7EBF\uFF08\u5B98\u65B9\u76EE\u5F55\uFF09"), /* @__PURE__ */ import_react2.default.createElement("select", { id: "gm-free-route", className: "gm-select", value: routeKey2, onChange: (event) => {
+  return /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-free" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-free-controls" }, /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-route" }, "\u6A21\u578B\u8DEF\u7EBF\uFF08\u5B98\u65B9\u76EE\u5F55\uFF09"), /* @__PURE__ */ import_react3.default.createElement("select", { id: "gm-free-route", className: "gm-select", value: routeKey2, onChange: (event) => {
     setRouteKey(event.target.value);
     resetChat();
-  }, disabled: routes.length === 0 }, routes.length === 0 && /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u76EE\u5F55\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5728\u5B98\u65B9\u4F1A\u8BDD\u9009\u6A21\u578B"), routes.map((item) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${item.provider}/${item.model}`, value: `${item.provider}/${item.model}` }, item.provider, "/", item.model, " \xB7 ", item.name))), /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-character" }, "\u89D2\u8272"), /* @__PURE__ */ import_react2.default.createElement("select", { id: "gm-free-character", className: "gm-select", value: character, onChange: (event) => {
+  }, disabled: routes.length === 0 }, routes.length === 0 && /* @__PURE__ */ import_react3.default.createElement("option", { value: "" }, "\u76EE\u5F55\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5728\u5B98\u65B9\u4F1A\u8BDD\u9009\u6A21\u578B"), routes.map((item) => /* @__PURE__ */ import_react3.default.createElement("option", { key: `${item.provider}/${item.model}`, value: `${item.provider}/${item.model}` }, item.provider, "/", item.model, " \xB7 ", item.name))), /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-character" }, "\u89D2\u8272"), /* @__PURE__ */ import_react3.default.createElement("select", { id: "gm-free-character", className: "gm-select", value: character, onChange: (event) => {
     setCharacter(event.target.value);
     resetChat();
-  } }, Object.entries(STORY_CHARACTERS3).map(([key, label]) => /* @__PURE__ */ import_react2.default.createElement("option", { key, value: key }, label))), /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-preset" }, "\u573A\u666F"), /* @__PURE__ */ import_react2.default.createElement("select", { id: "gm-free-preset", className: "gm-select", value: preset, onChange: (event) => {
+  } }, Object.entries(STORY_CHARACTERS3).map(([key, label]) => /* @__PURE__ */ import_react3.default.createElement("option", { key, value: key }, label))), /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-preset" }, "\u573A\u666F"), /* @__PURE__ */ import_react3.default.createElement("select", { id: "gm-free-preset", className: "gm-select", value: preset, onChange: (event) => {
     setPreset(event.target.value);
     resetChat();
-  } }, FREE_PRESETS.map((item) => /* @__PURE__ */ import_react2.default.createElement("option", { key: item.id, value: item.id }, item.label)))), /* @__PURE__ */ import_react2.default.createElement("textarea", { className: "mr-textarea", rows: 4, value: extra, onChange: (event) => {
+  } }, FREE_PRESETS.map((item) => /* @__PURE__ */ import_react3.default.createElement("option", { key: item.id, value: item.id }, item.label)))), /* @__PURE__ */ import_react3.default.createElement("textarea", { className: "mr-textarea", rows: 4, value: extra, onChange: (event) => {
     setExtra(event.target.value);
     resetChat();
-  }, placeholder: "\u8865\u5145\u8BBE\u5B9A\uFF08\u53EF\u9009\uFF09\uFF1A\u5173\u7CFB\u3001\u8BED\u6C14\u3001\u7981\u533A\u2026\u2026", "aria-label": "\u8865\u5145\u8BBE\u5B9A" }), /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-free-stage", "aria-label": "\u5F00\u573A\u9884\u89C8" }, /* @__PURE__ */ import_react2.default.createElement(StageArtwork, { background: presetData?.art ?? model_city_title_default, speaker: character }), /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-free-scene" }, /* @__PURE__ */ import_react2.default.createElement("span", null, "\u81EA\u7531\u6A21\u5F0F \xB7 \u5F00\u573A\u9884\u89C8"), /* @__PURE__ */ import_react2.default.createElement("strong", null, presetData?.label)), /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-free-dialogue" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-speaker" }, /* @__PURE__ */ import_react2.default.createElement(Avatar, { speaker: character, large: true }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "gm-speaker-name" }, STORY_CHARACTERS3[character] ?? character)), /* @__PURE__ */ import_react2.default.createElement("p", null, presetData?.opener))), /* @__PURE__ */ import_react2.default.createElement("section", { className: "gm-free-chat", "aria-label": "\u81EA\u7531\u6A21\u5F0F\u5BF9\u8BDD" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-free-chat-head" }, /* @__PURE__ */ import_react2.default.createElement("strong", null, "\u4E0E ", STORY_CHARACTERS3[character] ?? character, " \u5BF9\u8BDD"), /* @__PURE__ */ import_react2.default.createElement("span", null, route ? `${route.provider}/${route.model}` : "\u5C1A\u65E0\u53EF\u7528\u6A21\u578B")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "gm-free-chat-log", role: "log", "aria-live": "polite" }, messages.length === 0 && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u8F93\u5165\u7B2C\u4E00\u53E5\u8BDD\u540E\uFF0C\u63D2\u4EF6\u4F1A\u901A\u8FC7\u5B98\u65B9\u6A21\u578B\u670D\u52A1\u5F00\u59CB\u5BF9\u8BDD\u3002"), messages.map((item, index) => /* @__PURE__ */ import_react2.default.createElement("div", { className: `gm-free-chat-message ${item.role}`, key: index }, /* @__PURE__ */ import_react2.default.createElement("strong", null, item.role === "user" ? "\u4F60" : STORY_CHARACTERS3[character] ?? character, item.truncated ? " \xB7 \u56DE\u590D\u5DF2\u622A\u65AD" : ""), /* @__PURE__ */ import_react2.default.createElement("p", null, item.text))), sending && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, "\u6A21\u578B\u6B63\u5728\u56DE\u590D\u2026")), /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-draft" }, "\u4F60\u7684\u53F0\u8BCD"), /* @__PURE__ */ import_react2.default.createElement(
+  }, placeholder: "\u8865\u5145\u8BBE\u5B9A\uFF08\u53EF\u9009\uFF09\uFF1A\u5173\u7CFB\u3001\u8BED\u6C14\u3001\u7981\u533A\u2026\u2026", "aria-label": "\u8865\u5145\u8BBE\u5B9A" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-free-stage", "aria-label": "\u5F00\u573A\u9884\u89C8" }, /* @__PURE__ */ import_react3.default.createElement(StageArtwork, { background: presetData?.art ?? model_city_title_default, speaker: character }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-free-scene" }, /* @__PURE__ */ import_react3.default.createElement("span", null, "\u81EA\u7531\u6A21\u5F0F \xB7 \u5F00\u573A\u9884\u89C8"), /* @__PURE__ */ import_react3.default.createElement("strong", null, presetData?.label)), /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-free-dialogue" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-speaker" }, /* @__PURE__ */ import_react3.default.createElement(Avatar, { speaker: character, large: true }), /* @__PURE__ */ import_react3.default.createElement("span", { className: "gm-speaker-name" }, STORY_CHARACTERS3[character] ?? character)), /* @__PURE__ */ import_react3.default.createElement("p", null, presetData?.opener))), /* @__PURE__ */ import_react3.default.createElement("section", { className: "gm-free-chat", "aria-label": "\u81EA\u7531\u6A21\u5F0F\u5BF9\u8BDD" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-free-chat-head" }, /* @__PURE__ */ import_react3.default.createElement("strong", null, "\u4E0E ", STORY_CHARACTERS3[character] ?? character, " \u5BF9\u8BDD"), /* @__PURE__ */ import_react3.default.createElement("span", null, route ? `${route.provider}/${route.model}` : "\u5C1A\u65E0\u53EF\u7528\u6A21\u578B")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "gm-free-chat-log", role: "log", "aria-live": "polite" }, messages.length === 0 && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u8F93\u5165\u7B2C\u4E00\u53E5\u8BDD\u540E\uFF0C\u63D2\u4EF6\u4F1A\u901A\u8FC7\u5B98\u65B9\u6A21\u578B\u670D\u52A1\u5F00\u59CB\u5BF9\u8BDD\u3002"), messages.map((item, index) => /* @__PURE__ */ import_react3.default.createElement("div", { className: `gm-free-chat-message ${item.role}`, key: index }, /* @__PURE__ */ import_react3.default.createElement("strong", null, item.role === "user" ? "\u4F60" : STORY_CHARACTERS3[character] ?? character, item.truncated ? " \xB7 \u56DE\u590D\u5DF2\u622A\u65AD" : ""), /* @__PURE__ */ import_react3.default.createElement("p", null, item.text))), sending && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption", role: "status" }, "\u6A21\u578B\u6B63\u5728\u56DE\u590D\u2026")), /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "gm-free-draft" }, "\u4F60\u7684\u53F0\u8BCD"), /* @__PURE__ */ import_react3.default.createElement(
     "textarea",
     {
       id: "gm-free-draft",
@@ -4656,19 +5034,19 @@ function FreeMode({ routes, galReply, cancelGalReply }) {
       },
       placeholder: "\u5728\u573A\u666F\u4E2D\u8BF4\u4E9B\u4EC0\u4E48\u2026\uFF08Ctrl+Enter \u53D1\u9001\uFF09"
     }
-  ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button", type: "button", disabled: !route || sending || !draft.trim(), onClick: () => {
+  ), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button", type: "button", disabled: !route || sending || !draft.trim(), onClick: () => {
     void send();
-  } }, "\u53D1\u9001\u7ED9\u6A21\u578B"), sending && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: typeof cancelGalReply !== "function", onClick: () => {
+  } }, "\u53D1\u9001\u7ED9\u6A21\u578B"), sending && /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: typeof cancelGalReply !== "function", onClick: () => {
     void stop();
-  } }, "\u505C\u6B62\u751F\u6210"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: sending || messages.length === 0, onClick: resetChat }, "\u5F00\u59CB\u65B0\u5BF9\u8BDD")), chatError && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, chatError)), /* @__PURE__ */ import_react2.default.createElement("details", { className: "gm-free-details" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u53EF\u590D\u5236\u5230\u5B98\u65B9\u4F1A\u8BDD\u7684\u5F00\u573A\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react2.default.createElement("pre", { className: "gm-free-prompt" }, prompt)), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button", type: "button", onClick: copy2 }, copied ? "\u5DF2\u590D\u5236\uFF0C\u53BB\u5B98\u65B9\u4F1A\u8BDD\u7C98\u8D34\u53D1\u9001" : "\u590D\u5236\u5F00\u573A\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u4E5F\u53EF\u590D\u5236\u5230\u5B98\u65B9\u4F1A\u8BDD\u4F7F\u7528\uFF1B\u9762\u677F\u5185\u53D1\u9001\u4F1A\u8C03\u7528\u5DF2\u914D\u7F6E\u6A21\u578B\uFF0C\u53EF\u80FD\u4EA7\u751F\u8D26\u53F7\u8D39\u7528\u3002\u63D2\u4EF6\u4E0D\u4FDD\u5B58 API Key\u3002")), copyError && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, copyError));
+  } }, "\u505C\u6B62\u751F\u6210"), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: sending || messages.length === 0, onClick: resetChat }, "\u5F00\u59CB\u65B0\u5BF9\u8BDD")), chatError && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, chatError)), /* @__PURE__ */ import_react3.default.createElement("details", { className: "gm-free-details" }, /* @__PURE__ */ import_react3.default.createElement("summary", null, "\u67E5\u770B\u53EF\u590D\u5236\u5230\u5B98\u65B9\u4F1A\u8BDD\u7684\u5F00\u573A\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react3.default.createElement("pre", { className: "gm-free-prompt" }, prompt)), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button", type: "button", onClick: copy2 }, copied ? "\u5DF2\u590D\u5236\uFF0C\u53BB\u5B98\u65B9\u4F1A\u8BDD\u7C98\u8D34\u53D1\u9001" : "\u590D\u5236\u5F00\u573A\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\u4E5F\u53EF\u590D\u5236\u5230\u5B98\u65B9\u4F1A\u8BDD\u4F7F\u7528\uFF1B\u9762\u677F\u5185\u53D1\u9001\u4F1A\u8C03\u7528\u5DF2\u914D\u7F6E\u6A21\u578B\uFF0C\u53EF\u80FD\u4EA7\u751F\u8D26\u53F7\u8D39\u7528\u3002\u63D2\u4EF6\u4E0D\u4FDD\u5B58 API Key\u3002")), copyError && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, copyError));
 }
 function GalModulePage({ loadCatalog, galReply, cancelGalReply }) {
-  const [tab, setTab] = import_react2.default.useState("story");
-  return /* @__PURE__ */ import_react2.default.createElement("main", { className: "mr-workspace gm-root" }, /* @__PURE__ */ import_react2.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react2.default.createElement("style", null, gal_module_default), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react2.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-eyebrow" }, "Gal Module \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react2.default.createElement("h1", { className: "mr-title" }, "Gal \u6A21\u5757"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-subtitle" }, "\u5267\u60C5\u6A21\u5F0F\u63D0\u4F9B Gal \u89C6\u56FE\u821E\u53F0\u4E0E\u5B58\u6863\uFF1B\u81EA\u7531\u6A21\u5F0F\u53EF\u5728\u9762\u677F\u5185\u4F7F\u7528\u5B98\u65B9\u5DF2\u914D\u7F6E\u6A21\u578B\u5C55\u5F00\u5BF9\u8BDD\u3002")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-status-dot" }), "\u5267\u60C5\u79BB\u7EBF \xB7 \u81EA\u7531\u6A21\u5F0F\u6309\u9700\u8C03\u7528\u6A21\u578B")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-control-label" }, "\u6A21\u5F0F"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "Gal \u6A21\u5757\u6A21\u5F0F" }, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", "aria-pressed": tab === "story", onClick: () => setTab("story") }, "\u5267\u60C5\u6A21\u5F0F \xB7 Gal \u89C6\u56FE"), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", "aria-pressed": tab === "free", onClick: () => setTab("free") }, "\u81EA\u7531\u6A21\u5F0F")))), tab === "story" ? /* @__PURE__ */ import_react2.default.createElement(StoryMode, null) : /* @__PURE__ */ import_react2.default.createElement(FreeModeWithRoutes, { loadCatalog, galReply, cancelGalReply })));
+  const [tab, setTab] = import_react3.default.useState("story");
+  return /* @__PURE__ */ import_react3.default.createElement("main", { className: "mr-workspace gm-root" }, /* @__PURE__ */ import_react3.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react3.default.createElement("style", null, gal_module_default), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react3.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-eyebrow" }, "Gal Module \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react3.default.createElement("h1", { className: "mr-title" }, "Gal \u6A21\u5757"), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-subtitle" }, "\u5267\u60C5\u6A21\u5F0F\u63D0\u4F9B Gal \u89C6\u56FE\u821E\u53F0\u4E0E\u5B58\u6863\uFF1B\u81EA\u7531\u6A21\u5F0F\u53EF\u5728\u9762\u677F\u5185\u4F7F\u7528\u5B98\u65B9\u5DF2\u914D\u7F6E\u6A21\u578B\u5C55\u5F00\u5BF9\u8BDD\u3002")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-status-dot" }), "\u5267\u60C5\u79BB\u7EBF \xB7 \u81EA\u7531\u6A21\u5F0F\u6309\u9700\u8C03\u7528\u6A21\u578B")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label" }, "\u6A21\u5F0F"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "Gal \u6A21\u5757\u6A21\u5F0F" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": tab === "story", onClick: () => setTab("story") }, "\u5267\u60C5\u6A21\u5F0F \xB7 Gal \u89C6\u56FE"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": tab === "free", onClick: () => setTab("free") }, "\u81EA\u7531\u6A21\u5F0F")))), tab === "story" ? /* @__PURE__ */ import_react3.default.createElement(StoryMode, null) : /* @__PURE__ */ import_react3.default.createElement(FreeModeWithRoutes, { loadCatalog, galReply, cancelGalReply })));
 }
 function FreeModeWithRoutes({ loadCatalog, galReply, cancelGalReply }) {
-  const [state, setState] = import_react2.default.useState({ status: "loading", routes: [] });
-  import_react2.default.useEffect(() => {
+  const [state, setState] = import_react3.default.useState({ status: "loading", routes: [] });
+  import_react3.default.useEffect(() => {
     let mounted = true;
     Promise.resolve().then(loadCatalog).then((response) => {
       if (!mounted) return;
@@ -4686,9 +5064,9 @@ function FreeModeWithRoutes({ loadCatalog, galReply, cancelGalReply }) {
       mounted = false;
     };
   }, [loadCatalog]);
-  if (state.status === "loading") return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026");
-  if (state.status === "error") return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-empty" }, "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\uFF1B\u4ECD\u53EF\u590D\u5236\u63D0\u793A\u8BCD\u540E\u5728\u4EFB\u610F\u5B98\u65B9\u4F1A\u8BDD\u4F7F\u7528\u3002"), /* @__PURE__ */ import_react2.default.createElement(FreeMode, { routes: [], galReply, cancelGalReply }));
-  return /* @__PURE__ */ import_react2.default.createElement(FreeMode, { routes: state.routes, galReply, cancelGalReply });
+  if (state.status === "loading") return /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026");
+  if (state.status === "error") return /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-empty" }, "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\uFF1B\u4ECD\u53EF\u590D\u5236\u63D0\u793A\u8BCD\u540E\u5728\u4EFB\u610F\u5B98\u65B9\u4F1A\u8BDD\u4F7F\u7528\u3002"), /* @__PURE__ */ import_react3.default.createElement(FreeMode, { routes: [], galReply, cancelGalReply }));
+  return /* @__PURE__ */ import_react3.default.createElement(FreeMode, { routes: state.routes, galReply, cancelGalReply });
 }
 
 // .dsh-plugin/shared/official-tools-remote.mjs
@@ -4734,7 +5112,7 @@ var galRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#GalReplyRequ
   if (typeof request.requestId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.requestId)) {
     throw new TypeError("Gal reply needs a random requestId");
   }
-  const short = (field) => typeof request[field] === "string" && request[field].trim().length > 0 && request[field].length <= 160;
+  const short = (field2) => typeof request[field2] === "string" && request[field2].trim().length > 0 && request[field2].length <= 160;
   if (!short("provider") || !short("model")) throw new TypeError("Gal reply needs a configured provider/model");
   if (typeof request.persona !== "string" || request.persona.length > 4e3) throw new TypeError("Gal persona is too long");
   if (!Array.isArray(request.messages) || request.messages.length < 1 || request.messages.length > 24) throw new TypeError("Gal reply needs 1-24 messages");
@@ -4798,7 +5176,7 @@ var galRequestIdParameter = Object.freeze({
 });
 var OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor("list", [], listResultCodec),
-  descriptor("install", [toolIdParameter], installResultCodec),
+  descriptor("installTool", [toolIdParameter], installResultCodec),
   descriptor("cancel", [toolIdParameter], installResultCodec),
   descriptor("status", [toolIdParameter], statusResultCodec),
   descriptor("galReply", [galRequestParameter], galResultCodec),
@@ -4822,7 +5200,15 @@ var ROUTER_NAMESPACE = "model-router-galgame";
 var ROUTER_PACKAGE = "@ljwei-stak/model-router-galgame";
 var ROUTER_PANEL = "model-router-galgame";
 var GAL_PANEL = "model-router-gal";
-var inject = ["slots", "configForms", "remote", "remote.session", "layout"];
+var inject = ["remote"];
+var UI_INJECT = [
+  "slots",
+  "configForms",
+  "remote",
+  "remote.session",
+  `remote.${OFFICIAL_TOOLS_REMOTE_NAMESPACE}`,
+  "layout"
+];
 var FORM_LABELS = Object.freeze({
   unavailable: "\u8BE5\u63D2\u4EF6\u5F53\u524D\u672A\u52A0\u8F7D\uFF0C\u6682\u65F6\u65E0\u6CD5\u914D\u7F6E\u3002",
   readOnly: "\u5F53\u524D\u914D\u7F6E\u4E3A\u53EA\u8BFB\u3002",
@@ -4835,8 +5221,8 @@ var FIELD_COPY = Object.freeze({
   reset: "\u6062\u590D\u9ED8\u8BA4",
   invalidNumber: "\u8BF7\u8F93\u5165\u5141\u8BB8\u8303\u56F4\u5185\u7684\u6570\u5B57\uFF0C\u6216\u7559\u7A7A\u6062\u590D\u9ED8\u8BA4\u3002"
 });
-function boundedNumberField(field, { minimum = 0, maximum = Number.MAX_SAFE_INTEGER, integer = false } = {}) {
-  const numeric = (0, import_dsh_client_ui_primitives.settingsNumberField)(field);
+function boundedNumberField(field2, { minimum = 0, maximum = Number.MAX_SAFE_INTEGER, integer = false } = {}) {
+  const numeric = (0, import_dsh_client_ui_primitives.settingsNumberField)(field2);
   return {
     ...numeric,
     parse: (text2) => {
@@ -4849,16 +5235,32 @@ function boundedNumberField(field, { minimum = 0, maximum = Number.MAX_SAFE_INTE
     }
   };
 }
+function modelProfilesField() {
+  const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("modelProfilesJson");
+  return {
+    ...field2,
+    parse: (text2) => {
+      try {
+        parseModelProfilesJson(text2);
+        return field2.parse(text2);
+      } catch {
+        return void 0;
+      }
+    }
+  };
+}
 var RouterSettingsCardController = class {
   constructor(scope) {
     this.form = new import_dsh_client_ui_primitives.SettingsFormModel(scope, [
       boundedNumberField("budgetUsd", { minimum: 0 }),
-      boundedNumberField("maxConsultOutputChars", { minimum: 500, maximum: 5e4, integer: true })
+      boundedNumberField("maxConsultOutputChars", { minimum: 500, maximum: 5e4, integer: true }),
+      modelProfilesField()
     ]);
     this.store = this.form.bind(() => ({
       ...this.form.shell(),
       budgetUsd: this.form.field("budgetUsd"),
-      maxConsultOutputChars: this.form.field("maxConsultOutputChars")
+      maxConsultOutputChars: this.form.field("maxConsultOutputChars"),
+      modelProfilesJson: this.form.field("modelProfilesJson")
     }));
   }
   /** Supply the snapshot hook and staged form actions to the Plugins slot. */
@@ -4876,12 +5278,12 @@ function RouterSettingsCard(props) {
     return "\u4E3A\u5B98\u65B9\u5DF2\u914D\u7F6E\u7684\u6A21\u578B\u751F\u6210\u8DEF\u7531\u8BA1\u5212\uFF0C\u5E76\u63D0\u4F9B\u8DE8\u6A21\u578B\u54A8\u8BE2\u5DE5\u5177\u3002";
   }
   const disabled = !state.writable || state.saving;
-  return /* @__PURE__ */ import_react3.default.createElement(import_dsh_client_ui_primitives.SettingsForm, { labels: FORM_LABELS, state, onSave: props.save, onDiscard: props.discard }, /* @__PURE__ */ import_react3.default.createElement(
+  return /* @__PURE__ */ import_react4.default.createElement(import_dsh_client_ui_primitives.SettingsForm, { labels: FORM_LABELS, state, onSave: props.save, onDiscard: props.discard }, /* @__PURE__ */ import_react4.default.createElement(
     import_dsh_client_ui_primitives.SettingsValueField,
     {
       id: "model-router-budget-usd",
       label: "\u5355\u6B21\u8BA1\u5212\u9884\u7B97\u4E0A\u9650\uFF08USD\uFF09",
-      hint: "0 \u8868\u793A\u4E0D\u8BBE\u9884\u7B97\u4E0A\u9650\u3002\u4EF7\u683C\u662F\u76EE\u5F55\u4E2D\u7684\u4F30\u7B97\u503C\uFF0C\u5B9E\u9645\u8D26\u5355\u4EE5\u670D\u52A1\u5546\u4E3A\u51C6\uFF1B\u9884\u7B97\u53EA\u5F71\u54CD\u8DEF\u7531\u5EFA\u8BAE\u3002",
+      hint: "0 \u8868\u793A\u4E0D\u8BBE\u9884\u7B97\u4E0A\u9650\u3002\u53EA\u6709\u586B\u5199\u4E0B\u65B9\u5B9E\u9645\u4F7F\u7528\u7684\u5355\u4EF7\u540E\uFF0C\u624D\u80FD\u4F30\u7B97\u8D39\u7528\uFF1B\u9884\u7B97\u53EA\u5F71\u54CD\u8DEF\u7531\u5EFA\u8BAE\u3002",
       help: {
         label: "\u9884\u7B97\u8BF4\u660E",
         content: "\u9884\u7B97\u53EA\u5F71\u54CD\u8DEF\u7531\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u9650\u5236\u670D\u52A1\u5546\u6263\u8D39\uFF0C\u4E5F\u4E0D\u4F1A\u8BFB\u53D6\u6216\u4FDD\u5B58 API Key\u3002"
@@ -4898,7 +5300,7 @@ function RouterSettingsCard(props) {
         props.resetField("budgetUsd");
       }
     }
-  ), /* @__PURE__ */ import_react3.default.createElement(
+  ), /* @__PURE__ */ import_react4.default.createElement(
     import_dsh_client_ui_primitives.SettingsValueField,
     {
       id: "model-router-consult-output",
@@ -4917,15 +5319,33 @@ function RouterSettingsCard(props) {
         props.resetField("maxConsultOutputChars");
       }
     }
-  ), /* @__PURE__ */ import_react3.default.createElement("aside", { style: styles.notice, "aria-label": "\u6A21\u578B\u8DEF\u7531\u4F7F\u7528\u8BF4\u660E" }, /* @__PURE__ */ import_react3.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react3.default.createElement(import_dsh_client_ui_primitives.Tag, { tone: "info" }, "\u5B98\u65B9\u6A21\u578B\u914D\u7F6E")), /* @__PURE__ */ import_react3.default.createElement("p", { style: styles.noticeText }, "\u8BF7\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u9762\u914D\u7F6E DeepSeek\u3001OpenAI \u517C\u5BB9\u6216 Anthropic \u517C\u5BB9\u670D\u52A1\u3002\u6B64\u63D2\u4EF6\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E0D\u4FDD\u5B58 API Key\uFF1B\u76EE\u5F55\u4E2D\u7684\u8DEF\u7EBF\u4ECD\u9700\u901A\u8FC7\u5B9E\u9645\u8C03\u7528\u9A8C\u8BC1\u8D26\u53F7\u548C\u7F51\u7EDC\u53EF\u7528\u6027\u3002"), /* @__PURE__ */ import_react3.default.createElement("p", { style: styles.noticeText }, "\u4F7F\u7528 ", /* @__PURE__ */ import_react3.default.createElement("code", null, "model_router_plan"), " \u83B7\u53D6\u53EF\u5BA1\u9605\u7684\u8DEF\u7531\u5EFA\u8BAE\uFF0C\u4F7F\u7528 ", /* @__PURE__ */ import_react3.default.createElement("code", null, "model_router_consult"), " \u54A8\u8BE2\u4E00\u4E2A\u5DF2\u914D\u7F6E\u6A21\u578B\u3002\u5EFA\u8BAE\u4E0D\u4F1A\u6539\u5199\u4E3B\u4F1A\u8BDD\u6A21\u578B\uFF1B\u591A\u4EBA\u5206\u5DE5\u7531\u5B98\u65B9 Agent Teams \u5DE5\u5177\u6267\u884C\u3002")));
+  ), /* @__PURE__ */ import_react4.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react4.default.createElement("label", { htmlFor: "model-router-profiles-json", style: styles.profileLabel }, "\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E\uFF08JSON\uFF09"), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u6309\u201C\u6A21\u578B\u76EE\u5F55\u201D\u4E2D\u7684\u51C6\u786E provider/model \u586B\u5199\u3002quality \u4E3A\u81EA\u5B9A\u7684 0\u2013100 \u5206\uFF1Binput/output \u662F\u7F8E\u5143\u6BCF\u767E\u4E07 token\u3002\u7F3A\u5C11\u4EF7\u683C\u65F6\u53EA\u7ED9\u8DEF\u7EBF\u5EFA\u8BAE\uFF0C\u4E0D\u663E\u793A\u865A\u6784\u8D39\u7528\u3002"), /* @__PURE__ */ import_react4.default.createElement(
+    "textarea",
+    {
+      id: "model-router-profiles-json",
+      value: state.modelProfilesJson.text,
+      disabled,
+      "aria-invalid": state.modelProfilesJson.invalid,
+      onChange: (event) => props.edit("modelProfilesJson", event.target.value),
+      spellCheck: false,
+      style: styles.profileTextarea
+    }
+  ), state.modelProfilesJson.invalid && /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.profileError, role: "alert" }, "JSON \u683C\u5F0F\u6216\u67D0\u9879\u914D\u7F6E\u65E0\u6548\u3002\u6BCF\u9879\u9700\u63D0\u4F9B\u51C6\u786E\u7684 provider/model\uFF0C\u5355\u4EF7\u4E3A\u975E\u8D1F USD \u6570\u5B57\uFF0C\u8D28\u91CF\u4E3A 0\u2013100\u3002"), /* @__PURE__ */ import_react4.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react4.default.createElement("summary", null, "\u67E5\u770B\u914D\u7F6E\u683C\u5F0F"), /* @__PURE__ */ import_react4.default.createElement("pre", null, `[
+  {
+    "provider": "\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u4F9B\u5E94\u5546 ID",
+    "model": "\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u6A21\u578B ID",
+    "quality": 80,
+    "pricing": { "input": 0.2, "output": 0.8 },
+    "specialties": ["code"],
+    "cliModel": "\u5382\u5546 CLI \u4F7F\u7528\u7684\u6A21\u578B\u540D\uFF08\u53EF\u9009\uFF09"
+  }
+]`)), /* @__PURE__ */ import_react4.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("modelProfilesJson") }, "\u6062\u590D\u9ED8\u8BA4\u914D\u7F6E")), /* @__PURE__ */ import_react4.default.createElement("aside", { style: styles.notice, "aria-label": "\u6A21\u578B\u8DEF\u7531\u4F7F\u7528\u8BF4\u660E" }, /* @__PURE__ */ import_react4.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react4.default.createElement(import_dsh_client_ui_primitives.Tag, { tone: "info" }, "\u5B98\u65B9\u6A21\u578B\u914D\u7F6E")), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u8BF7\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u9762\u914D\u7F6E DeepSeek\u3001OpenAI \u517C\u5BB9\u6216 Anthropic \u517C\u5BB9\u670D\u52A1\u3002\u6B64\u63D2\u4EF6\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E0D\u4FDD\u5B58 API Key\uFF1B\u76EE\u5F55\u4E2D\u7684\u8DEF\u7EBF\u4ECD\u9700\u901A\u8FC7\u5B9E\u9645\u8C03\u7528\u9A8C\u8BC1\u8D26\u53F7\u548C\u7F51\u7EDC\u53EF\u7528\u6027\u3002"), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u4F7F\u7528 ", /* @__PURE__ */ import_react4.default.createElement("code", null, "model_router_plan"), " \u83B7\u53D6\u53EF\u5BA1\u9605\u7684\u8DEF\u7531\u5EFA\u8BAE\uFF0C\u4F7F\u7528 ", /* @__PURE__ */ import_react4.default.createElement("code", null, "model_router_consult"), " \u54A8\u8BE2\u4E00\u4E2A\u5DF2\u914D\u7F6E\u6A21\u578B\u3002\u5EFA\u8BAE\u4E0D\u4F1A\u6539\u5199\u4E3B\u4F1A\u8BDD\u6A21\u578B\uFF1B\u591A\u4EBA\u5206\u5DE5\u7531\u5B98\u65B9 Agent Teams \u5DE5\u5177\u6267\u884C\u3002")));
 }
 function OpenRouterWorkspace({ subject, openPanel }) {
   if (subject?.kind !== "bundle" || subject.pkg?.name !== ROUTER_PACKAGE) return null;
-  return /* @__PURE__ */ import_react3.default.createElement(import_dsh_client_ui_primitives.Button, { variant: "outline", size: "sm", type: "button", onClick: openPanel }, "\u6253\u5F00\u5DE5\u4F5C\u53F0");
+  return /* @__PURE__ */ import_react4.default.createElement(import_dsh_client_ui_primitives.Button, { variant: "outline", size: "sm", type: "button", onClick: openPanel }, "\u6253\u5F00\u5DE5\u4F5C\u53F0");
 }
-async function apply(ctx) {
-  const disposeOfficialToolsRemote = await ctx.remote.$mount(OFFICIAL_TOOLS_CLIENT_REMOTE);
-  ctx.effect(() => disposeOfficialToolsRemote, "model-router-galgame: official tools client remote");
+function registerUi(ctx) {
   const officialToolsRemote = ctx.remote[OFFICIAL_TOOLS_REMOTE_NAMESPACE];
   const settingsScope = ctx.configForms.get(ROUTER_NAMESPACE);
   const card = new RouterSettingsCardController(settingsScope);
@@ -4944,7 +5364,7 @@ async function apply(ctx) {
       loadCatalog: () => ctx.remote.session.modelCatalog(),
       settingsScope,
       listOfficialTools: () => officialToolsRemote.list(),
-      installOfficialTool: (toolId) => officialToolsRemote.install(toolId),
+      installOfficialTool: (toolId) => officialToolsRemote.installTool(toolId),
       cancelOfficialToolInstall: (toolId) => officialToolsRemote.cancel(toolId),
       officialToolInstallStatus: (toolId) => officialToolsRemote.status(toolId)
     })
@@ -4977,6 +5397,21 @@ async function apply(ctx) {
     inject: () => ({ openPanel: () => ctx.layout.selectPanel(ROUTER_PANEL) })
   }, OpenRouterWorkspace))), "model-router-galgame: bundle open action");
 }
+async function apply(ctx) {
+  const disposeRemote = await ctx.remote.$mount(OFFICIAL_TOOLS_CLIENT_REMOTE);
+  const ui = ctx.inject(UI_INJECT, registerUi);
+  try {
+    await ui;
+  } catch (error) {
+    await ui.dispose();
+    await disposeRemote();
+    throw error;
+  }
+  return async () => {
+    await ui.dispose();
+    await disposeRemote();
+  };
+}
 var styles = Object.freeze({
   titleLine: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" },
   notice: {
@@ -4991,7 +5426,12 @@ var styles = Object.freeze({
     color: "var(--dsw-alias-label-secondary)",
     fontSize: "13px",
     lineHeight: "20px"
-  }
+  },
+  profileEditor: { display: "grid", gap: "8px", marginTop: "14px" },
+  profileLabel: { fontSize: "13px", fontWeight: 600 },
+  profileTextarea: { width: "100%", minHeight: "150px", padding: "10px", fontFamily: "monospace", fontSize: "12px", borderRadius: "7px", border: "1px solid var(--dsw-alias-border-l1)", boxSizing: "border-box" },
+  profileError: { color: "var(--dsw-alias-label-danger)", fontSize: "12px", margin: 0 },
+  profileExample: { fontSize: "12px", whiteSpace: "pre-wrap" }
 });
     return module.exports;
   },

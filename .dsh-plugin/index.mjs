@@ -2,6 +2,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_ROUTER_SETTINGS } from './shared/router.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
+import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
 import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
 import {
   getOfficialTool,
@@ -26,6 +27,7 @@ export const inject = ['commands', 'llm', 'tools', 'typert', 'sandboxPolicy', 's
 export const Config = z.object({
   budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
   maxConsultOutputChars: z.number().step(1).min(500).max(50_000).default(12_000).volatile(),
+  modelProfilesJson: z.string().max(32_000).default('[]').volatile(),
 })
 
 const JSON_OUTPUT = {
@@ -65,6 +67,11 @@ function throwIfAborted(signal) {
 
 function routeKey(route) {
   return `${route.provider}\u0000${route.model}`
+}
+
+function configuredRoutesWithProfiles(routes, config) {
+  const profiles = parseModelProfilesJson(valueOf(config, 'modelProfilesJson', '[]'))
+  return applyModelProfiles(routes, profiles)
 }
 
 function uniqueStrings(values) {
@@ -118,12 +125,13 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
   const mode = options.mode === 'team' ? 'team' : 'single'
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const budgetUsd = Math.max(0, finiteNumber(options.budgetUsd, finiteNumber(configuredBudget, 0)))
-  const [availableRoutes, installed] = await Promise.all([
+  const [discoveredRoutes, installed] = await Promise.all([
     discoverConfiguredRoutes(ctx, options.signal),
     options.skipToolProbe === true
       ? Promise.resolve(Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
       : installedToolIds(),
   ])
+  const availableRoutes = configuredRoutesWithProfiles(discoveredRoutes, config)
   const readiness = options.skipToolProbe === true ? []
     : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
   const executable = new Set(Array.isArray(options.runnableToolIds)
@@ -228,6 +236,25 @@ function chooseConsultRoute(plan, routes, agent) {
   return routes.find(differs) ?? preferred ?? routes[0]
 }
 
+/** Manual package > manual tool > saved route mapping > CLI default. */
+export function resolveTeamCliModelBindings(plan, routes, requested = {}) {
+  if (!requested || typeof requested !== 'object' || Array.isArray(requested)) {
+    throw new Error('cliModelsJson 必须是以工作包或官方工具 ID 为键的 JSON 对象')
+  }
+  const byRoute = new Map(routes.map(route => [routeKey(route), route]))
+  const bindings = Object.create(null)
+  for (const item of plan.team.workPackages) {
+    const toolId = toolForProvider(item.recommendedProvider)?.id
+    const profile = byRoute.get(`${item.recommendedProvider}\u0000${item.recommendedModel}`)
+    if (profile?.cliModel && toolId !== 'zcode') bindings[item.id] = profile.cliModel
+    if (Object.hasOwn(requested, toolId)) bindings[item.id] = requested[toolId]
+    if (Object.hasOwn(requested, item.id)) bindings[item.id] = requested[item.id]
+  }
+  // Keep the supplied keys so the runtime can reject unknown tool/package IDs.
+  return { ...bindings, ...Object.fromEntries(Object.entries(requested)
+    .filter(([key]) => !Object.hasOwn(bindings, key))) }
+}
+
 function commandText(plan) {
   const selected = plan.selected ? `${plan.selected.provider}/${plan.selected.model}` : '没有可用路线'
   const channel = plan.executionChannel === 'official-cli'
@@ -236,7 +263,7 @@ function commandText(plan) {
   return [
     `推荐路线：${selected}`,
     `复杂度：${plan.complexity.band}；任务类型：${plan.taskType}`,
-    `执行渠道：${channel}；估算成本：$${plan.estimatedCost.toFixed(6)}（仅估算）`,
+    `执行渠道：${channel}；估算成本：${plan.estimatedCost === null ? '价格资料不足' : `$${plan.estimatedCost.toFixed(6)}（仅估算）`}`,
     `工作包：${plan.subtasks.map(item => `${item.name} → ${item.recommendedProvider}/${item.recommended}`).join('；')}`,
     plan.team.handoff,
   ].join('\n')
@@ -295,7 +322,7 @@ export function apply(ctx, config = {}) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_plan',
-    description: 'Recommend configured Harness model routes for a task and optionally produce work packages for official Agent Teams. Costs are local estimates.',
+    description: 'Analyze task difficulty, recommend only configured Harness model routes, and optionally split compound work into dependent packages. Cost estimates require user-supplied USD prices for the exact routes.',
     parameters: {
       task: { type: 'string', required: true, description: 'Task to analyze.' },
       mode: { type: 'string', enum: ['single', 'team'], description: 'Use team to produce Agent Teams work packages.' },
@@ -469,9 +496,12 @@ function registerOfficialToolModels(ctx, config) {
         if (!text(args.provider) || !text(args.model)) throw new Error('provider 和 model 必须同时提供')
         const tool = toolForProvider(args.provider)
         if (tool?.id !== args.tool) throw new Error('所选模型供应商与官方 CLI 工具不匹配')
-        const routes = await discoverConfiguredRoutes(ctx, exec.signal)
-        if (!routes.some(route => route.provider === args.provider && route.model === args.model)) throw new Error('所选 provider/model 不在官方模型目录中')
-        modelId = args.tool === 'claude-code' || args.tool === 'codex' ? args.model : null
+        const routes = configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, exec.signal), config)
+        const route = routes.find(item => item.provider === args.provider && item.model === args.model)
+        if (!route) throw new Error('所选 provider/model 不在官方模型目录中')
+        modelId = route.cliModel && args.tool !== 'zcode'
+          ? route.cliModel
+          : args.tool === 'claude-code' || args.tool === 'codex' ? args.model : null
       }
       if (text(args.cliModel)) {
         if (!text(args.provider) || !text(args.model)) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
@@ -499,7 +529,8 @@ function registerOfficialToolModels(ctx, config) {
       const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
       const mode = args.mode === 'workspace-write' ? 'workspace-write' : 'read-only'
       if (mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑团队执行')
-      const [routes, installed] = await Promise.all([discoverConfiguredRoutes(ctx, exec.signal), installedToolIds()])
+      const [discoveredRoutes, installed] = await Promise.all([discoverConfiguredRoutes(ctx, exec.signal), installedToolIds()])
+      const routes = configuredRoutesWithProfiles(discoveredRoutes, config)
       const readiness = await Promise.all(installed.map(id => officialToolReadiness(id, cwd)))
       const supported = new Set(readiness.filter(item => item.ready).map(item => item.id))
       const capabilities = new Map(officialToolExecutionCapabilities().map(item => [item.id, item]))
@@ -524,10 +555,11 @@ function registerOfficialToolModels(ctx, config) {
         try { cliModels = JSON.parse(bindingsText) }
         catch { throw new Error('cliModelsJson 不是有效的 JSON 对象') }
       }
+      cliModels = resolveTeamCliModelBindings(plan, executableRoutes, cliModels ?? {})
       const execution = await runOfficialTeam({ plan, task: args.task, workspace: cwd,
         allowedRoot: root, mode, installedIds: installed, cliModels, signal: exec.signal, sandbox: ctx.sandbox })
       return jsonValue({ plan, execution,
-        modelNotice: '团队向 Claude/Codex 请求 Harness 推荐模型 ID；其他厂商默认使用 CLI 已配置模型。cliModelsJson 可按工具或工作包指定准确 CLI 模型名。实际模型须以各厂商记录核对。',
+        modelNotice: '已配置 cliModel 的路线按工作包传给官方 CLI；Claude/Codex 在未配置映射时请求 Harness 模型 ID。其他厂商无映射时使用 CLI 默认模型。多数 CLI 尚不返回可核验的实际模型 ID，须以厂商运行记录核对。',
         billingNotice: 'budgetUsd 仅影响估算与路由，无法限制官方 CLI 账号实际费用。' })
     },
   }))

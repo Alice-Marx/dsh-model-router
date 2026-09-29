@@ -99,4 +99,13 @@
 .mr-tool-log pre { max-height: 140px; overflow: auto; padding: 8px; border-radius: 7px; background: var(--dsw-alias-markdown-code-block); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .mr-channel-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
 .mr-pill-channel-ok { border-color: var(--dsw-alias-success, #2f9e63); color: var(--dsw-alias-success, #2f9e63); }
+.mr-profile-card { margin-top: 18px; }
+.mr-profile-state { display: block; margin: 8px 0 0; }
+.mr-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 15px; }
+.mr-profile-field { display: grid; align-content: start; gap: 6px; color: var(--mr-muted); font-size: 11px; font-weight: 650; }
+.mr-profile-field .mr-input { color: var(--mr-ink); }
+.mr-profile-advanced { margin-top: 14px; color: var(--mr-muted); font-size: 11px; }
+.mr-profile-advanced summary { cursor: pointer; }
+.mr-profile-success { padding: 10px 12px; border-radius: 10px; background: #e5f5eb; color: #175f3a; font-size: 12px; }
+@media (prefers-color-scheme: dark) { .mr-profile-success { background: #193b2b; color: #b4f1cc; } }
 @media (max-width: 560px) { .mr-tool { align-items: stretch; flex-direction: column; gap: 10px; } .mr-tool-button { align-self: flex-start; } }

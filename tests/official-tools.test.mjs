@@ -1,5 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve, sep } from 'node:path'
 import {
   OFFICIAL_TOOLS,
   getOfficialTool,
@@ -12,8 +16,48 @@ import {
   startInstall,
   installStatus,
   resetForTests,
+  pinnedMiniMaxInstaller,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
+import { findManagedMiniMaxEntry } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+
+test('MiniMax official Windows installer entry requires the pinned version and CLI digest',
+  { skip: process.platform !== 'win32' }, async t => {
+    const root = await mkdtemp(join(tmpdir(), 'model-router-minimax-'))
+    t.after(async () => {
+      if (resolve(root).startsWith(`${resolve(tmpdir())}${sep}`)) await rm(root, { recursive: true, force: true })
+    })
+    const packageRoot = join(root, 'releases', '0.5.5', 'node_modules', '@minimax-ai', 'code')
+    const nativeRoot = join(packageRoot, 'node_modules', 'better-sqlite3', 'build', 'Release')
+    await mkdir(nativeRoot, { recursive: true })
+    await writeFile(join(root, 'mcode.cmd'), '@ECHO off\r\n')
+    await writeFile(join(root, 'current'), '0.5.5\n')
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+      name: '@minimax-ai/code', version: '0.5.5', bin: { mcode: './cli.js' },
+    }))
+    const cli = Buffer.from('official CLI fixture')
+    await writeFile(join(packageRoot, 'cli.js'), cli)
+    await writeFile(join(nativeRoot, 'better_sqlite3.node'), 'native fixture')
+    const digest = createHash('sha256').update(cli).digest('hex')
+    const found = await findManagedMiniMaxEntry(process.cwd(), [root], digest)
+    assert.equal(found?.source, 'verified-official-windows-installer-bundle')
+    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], '0'.repeat(64)), null)
+    await writeFile(join(root, 'current'), '0.5.4\n')
+    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], digest), null)
+    await writeFile(join(root, 'current'), '0.5.5\n')
+    await writeFile(join(packageRoot, 'cli.js'), 'tampered')
+    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], digest), null)
+  })
+
+test('MiniMax installer fallback verifies source bytes and pins the npm version selector', () => {
+  const source = Buffer.from('& $Npm view "$PackageName@latest" version --json\n')
+  const digest = createHash('sha256').update(source).digest('hex')
+  assert.match(pinnedMiniMaxInstaller(source, digest), /\$PackageName@0\.5\.5/)
+  assert.throws(() => pinnedMiniMaxInstaller(Buffer.from('tampered'), digest), /哈希/)
+  const noSelector = Buffer.from('Write-Step "latest"\n')
+  const otherHash = createHash('sha256').update(noSelector).digest('hex')
+  assert.throws(() => pinnedMiniMaxInstaller(noSelector, otherHash), /结构/)
+})
 
 test('registry stays fail-closed and internally consistent', () => {
   const ids = OFFICIAL_TOOLS.map(tool => tool.id)
@@ -22,6 +66,10 @@ test('registry stays fail-closed and internally consistent', () => {
     if (tool.unsupported) {
       assert.ok(tool.unsupportedReason.length > 10, `${tool.id} needs an actionable reason`)
       assert.equal(installCommandLine(tool), null, `${tool.id} must not expose an install command`)
+    } else if (tool.manager === 'signed-windows-installer') {
+      assert.match(tool.version, /^\d+\.\d+\.\d+$/)
+      assert.deepEqual(tool.installArgs, [], `${tool.id} must not expose npm arguments`)
+      assert.match(installCommandLine(tool), /官方签名安装器/)
     } else {
       assert.ok(tool.package && tool.installArgs.length > 0, `${tool.id} needs a fixed install`)
       assert.ok(Array.isArray(tool.probeExecutables) && tool.probeExecutables.length > 0, `${tool.id} needs probe executables`)

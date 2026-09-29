@@ -101,7 +101,7 @@ async function findMiMoExecutable(workspace, platform) {
   const wrapperInfo = WRAPPERS['mimo-code']
   for (const modules of moduleRoots()) {
     const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name, VERSIONS['mimo-code'])
-    if (!wrapper || wrapper.manifest.bin?.[wrapperInfo.command] !== wrapperInfo.bin) continue
+    if (!wrapper || String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//, '') !== wrapperInfo.bin) continue
     const optional = await optionalPackage(wrapper, 'mimo-code', platform, modules, workspace)
     if (!optional) continue
     const file = await realFileWithin(optional.root, join(optional.root, 'bin', 'mimo.exe'), workspace)
@@ -123,7 +123,7 @@ async function findGrokExecutable(workspace, platform) {
   const wrapperInfo = WRAPPERS['grok-build']
   for (const modules of moduleRoots()) {
     const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name, VERSIONS['grok-build'])
-    if (!wrapper || wrapper.manifest.bin?.[wrapperInfo.command] !== wrapperInfo.bin) continue
+    if (!wrapper || String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//, '') !== wrapperInfo.bin) continue
     const optional = await optionalPackage(wrapper, 'grok-build', platform, modules, workspace)
     if (!optional) continue
     const compressed = await realFileWithin(optional.root, join(optional.root, 'bin', 'grok.exe.br'), workspace)

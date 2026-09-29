@@ -14,6 +14,7 @@
  * https://moonshotai.github.io/kimi-code/en/reference/kimi-command.html
  */
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { access, readFile, realpath, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { StringDecoder } from 'node:string_decoder'
@@ -34,6 +35,9 @@ const STOP_GRACE_MS = 5_000
 const CLAUDE_MIN_RESTRICTED_VERSION = [2, 1, 259]
 const CLAUDE_SIGNER = 'Anthropic, PBC'
 const CODEX_SIGNER = 'OpenAI OpCo, LLC'
+// SHA-256 of package/cli.js in the official @minimax-ai/code@0.5.5 npm tarball.
+// The Windows installer-managed release carries the exact same entry file.
+const MINIMAX_055_CLI_SHA256 = '8d36dec74e93beddf392459557a7afd8655bcdc874121981608d2c82658814ab'
 const WINDOWS_SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 const ENVIRONMENT_KEYS = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec',
@@ -187,6 +191,39 @@ async function findGlobalPackageEntries(packageName, binName, expectedBin, works
   return found
 }
 
+/** The official MiniMax Windows installer uses a versioned releases tree rather than npm -g. */
+export async function findManagedMiniMaxEntry(workspace,
+  directories = pathDirectories().flatMap(directory => [directory, join(directory, '.minimax-code')]),
+  trustedCliSha256 = MINIMAX_055_CLI_SHA256) {
+  if (!IS_WINDOWS) return null
+  const version = getOfficialTool('minimax-code').version
+  for (const directory of directories) {
+    try {
+      const root = await realpath(directory)
+      if (root === workspace || inside(workspace, root)) continue
+      if (!(await stat(join(root, 'mcode.cmd'))).isFile()) continue
+      const current = (await readFile(join(root, 'current'), 'utf8')).trim()
+      if (current !== version) continue
+      const releaseRoot = await realpath(join(root, 'releases', version))
+      if (!inside(root, releaseRoot)) continue
+      const packageRoot = await realpath(join(releaseRoot, 'node_modules', '@minimax-ai', 'code'))
+      if (!inside(releaseRoot, packageRoot)) continue
+      const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
+      if (manifest.name !== '@minimax-ai/code' || manifest.version !== version
+        || String(manifest.bin?.mcode).replace(/^\.\//, '') !== 'cli.js') continue
+      const entry = await realpath(join(packageRoot, 'cli.js'))
+      if (!inside(packageRoot, entry) || !(await stat(entry)).isFile()) continue
+      const digest = createHash('sha256').update(await readFile(entry)).digest('hex')
+      if (digest !== trustedCliSha256) continue
+      const native = await realpath(join(packageRoot, 'node_modules', 'better-sqlite3',
+        'build', 'Release', 'better_sqlite3.node'))
+      if (!inside(packageRoot, native) || !(await stat(native)).isFile()) continue
+      return { entry, packageRoot, version, source: 'verified-official-windows-installer-bundle' }
+    } catch { /* inspect the next PATH directory */ }
+  }
+  return null
+}
+
 async function findCodexExecutable(workspace) {
   await ensureNpmPrefixOnPath()
   const filename = IS_WINDOWS ? 'codex.exe' : 'codex'
@@ -259,7 +296,14 @@ async function findSignedPackagedCodex(packageRoot, workspace) {
 
 /** PATH or package metadata alone is insufficient: verify the Windows EXE publisher. */
 function hasOfficialWindowsSignature(entry, expectedSigner) {
-  const script = '$s=Get-AuthenticodeSignature -LiteralPath $env:MODEL_ROUTER_VERIFY_PATH; '
+  // Some launch environments inherit a PowerShell module path where the
+  // built-in Security module does not autoload. Import its fixed system path
+  // explicitly, and fail closed if that import or the signature check fails.
+  const modulePath = join(WINDOWS_SYSTEM32, 'WindowsPowerShell', 'v1.0', 'Modules',
+    'Microsoft.PowerShell.Security', 'Microsoft.PowerShell.Security.psd1')
+  const script = '$ErrorActionPreference="Stop"; '
+    + 'Import-Module -Name $env:MODEL_ROUTER_SECURITY_MODULE -ErrorAction Stop; '
+    + '$s=Get-AuthenticodeSignature -LiteralPath $env:MODEL_ROUTER_VERIFY_PATH; '
     + '@{status=[string]$s.Status;subject=[string]$s.SignerCertificate.Subject} | ConvertTo-Json -Compress'
   const powershell = join(WINDOWS_SYSTEM32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
   return new Promise(resolveSignature => {
@@ -269,7 +313,8 @@ function hasOfficialWindowsSignature(entry, expectedSigner) {
         shell: false,
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'ignore'],
-        env: { ...process.env, MODEL_ROUTER_VERIFY_PATH: entry },
+        env: { ...process.env, MODEL_ROUTER_VERIFY_PATH: entry,
+          MODEL_ROUTER_SECURITY_MODULE: modulePath },
       })
     } catch { resolveSignature(false); return }
     let output = ''
@@ -369,6 +414,7 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     const tool = getOfficialTool(toolId)
     const entries = await findGlobalPackageEntries(tool.package, 'mcode', 'cli.js', workspace)
     const found = entries.find(entry => entry.version === tool.version)
+      ?? await findManagedMiniMaxEntry(workspace)
     if (!found) return { unsupported: `未找到固定版本 ${tool.package}@${tool.version} 的官方入口。` }
     const nodeExecutable = await findNodeExecutable(workspace, [22, 19, 0], version => {
       const major = Number(String(version).split('.')[0])
@@ -378,10 +424,10 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     if (modelId && !modelId.includes('/')) {
       return { unsupported: 'MiniMax CLI 要求 provider/model；当前模型目录 ID 不能直接传入，请在 MiniMax 中配置别名。' }
     }
-    return buildMiniMaxInvocation({
+    return { ...buildMiniMaxInvocation({
       nodeExecutable, cliEntry: found.entry, workspace, mode,
       modelReference: modelId, permission: mode === 'workspace-write' ? 'full' : 'smart',
-    })
+    }), source: found.source }
   }
   if (toolId === 'mimo-code' || toolId === 'grok-build') {
     try {
