@@ -2,7 +2,7 @@
 
 ## 本轮目标与交付状态
 
-本项目继续把原 Rustagent/Wonderland 的“按难度选模型、控制估计费用、拆解复合任务、跨模型交付”构想融入 `model-router-galgame`，作为官方 DeepSeek Harness Desktop 插件运行。本轮针对用户实际安装 **0.8.0** 时出现的 **DSH 0.2.0-rc.1 不兼容**，准备 **0.9.0** 修复版，并核验模型规划、官方工具安装和独立 Gal 模块。真实账号下的付费模型调用仍须账号持有人测试；本地规划结果不等于实际模型完成质量或真实账单。
+本项目继续把原 Rustagent/Wonderland 的“按难度选模型、控制估计费用、拆解复合任务、跨模型交付”构想融入 `model-router-galgame`，作为官方 DeepSeek Harness Desktop 插件运行。本轮针对用户实际安装 **0.8.0** 时出现的 **DSH 0.2.0-rc.1 不兼容**，完成并发布 **0.9.0** 修复版，核验模型规划、官方工具安装和独立 Gal 模块。真实账号下的付费模型调用仍须账号持有人测试；本地规划结果不等于实际模型完成质量或真实账单。
 
 ## 已完成的工作
 
@@ -62,4 +62,6 @@
 
 ## 发布记录
 
-0.9.0 计划作为 npm `next` 与 GitHub 预发布，保留 0.8.0 历史。本地安装包 `dist/ljwei-stak-model-router-galgame-0.9.0.tgz`，SHA-256 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`。包内 24 个文件已与 Git 提交逐文件比较，字节全部相同。最终提交、npm tarball 和 GitHub Release 的核对结果在发布后补记。
+0.9.0 已发布到 [npm 0.9.0](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.9.0)，`next` 指向 0.9.0；`latest` 保持 0.4.32，不自动替换旧稳定版。其公开 registry 版本元数据为 0.9.0，`dist.shasum` 为 `117d189c31c03bb2195f2f429c5057fe6a25c460`，共 24 个文件。重新从 npm 下载 tarball 后，SHA-256 与本地安装包一致：`FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`。
+
+[GitHub v0.9.0 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0) 已创建并附上同名 `.tgz` 安装包；从 Release 重新下载的附件 SHA-256 同样一致。验证过的源码提交为 `f47355e2a242e0eead08060d13a9902cad023f67`，`v0.9.0` 指向该提交，`main` 已推送。包内 24 个文件已与该 Git 提交逐文件比较，字节全部相同。后续仅追加本发布记录，不改变 `v0.9.0` 的已发布源码和安装包。
