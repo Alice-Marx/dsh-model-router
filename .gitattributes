@@ -1,5 +1,6 @@
 # Keep published files byte-for-byte identical to the npm tarball on all OSes.
 /.dsh-plugin/client.js -text
+/.dsh-plugin/official-tools-remote-service.mjs -text
 /.dsh-plugin/index.mjs -text
 /.dsh-plugin/shared/*.mjs -text
 /package.json -text
@@ -8,6 +9,7 @@
 /README.zh.md -text
 /README.i18n.yaml -text
 /INSTALLATION_GUIDE.zh.md -text
+/MIGRATION.md -text
 /GAL_GAME_CONCEPT.zh.md -text
 /GAL_STORY_V2_OUTLINE.zh.md -text
 /大模型娘人物设定.md -text
