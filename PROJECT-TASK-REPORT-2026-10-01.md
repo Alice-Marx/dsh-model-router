@@ -1,5 +1,7 @@
 # Model Router 总项目任务报告（2026-10-01）
 
+> **同日发布补记**：用户随后明确要求上传，0.10.1 已发布至 npm `next` 与 [GitHub v0.10.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1)。重新打包后的 SHA-256 为 `92F43B3CF8EC46A0E0DBC3CD9E746F1CEEBB4369819AFC34D9208574FACE545B`；远端下载与源码核对通过。下文保留开发完成时的历史状态和旧候选包哈希；最新发布、安装和验收信息以[发布任务报告](PROJECT-TASK-REPORT-2026-10-01-RELEASE.md)为准。
+
 ## 本轮范围与交付状态
 
 继续 0.10.0 的 Gal 长篇、美术与存档完善工作，按用户指定的 `F:\everyAI\all\galgame\EchoCity\game\images\chars\aipersona` 逐张核查原稿，并固定 Claude 为用户指定的持书形象。本轮候选版本为 **0.10.1**，声明适配 **DeepSeek Harness Desktop 0.2.0-rc.1**。已完成源码修改、本地实际组件预览、自动测试、构建和本地打包；npm 与 GitHub 发布仍等待桌面验证。

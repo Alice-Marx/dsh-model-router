@@ -28,6 +28,7 @@
 | --- | --- |
 | `pnpm install --frozen-lockfile` | 通过，锁文件未改变。 |
 | `npm test` | **81 / 81 通过，0 失败，0 跳过**；初次外部目录枚举失败已按上述版本清单方式修复。 |
+| `node --test tests/gal-story*.test.mjs tests/gal-game*.test.mjs` | **67 / 67 通过，0 失败，0 跳过**；额外覆盖旧剧目、分支、关系、存档、取消与回复原子提交。两组共 148 项。 |
 | `npm run build:client` | 通过，生成客户端 57,141,394 字节。 |
 | `npm run check:client` | 通过，已提交客户端与生成结果一致。 |
 | `pnpm peers check` | 通过。 |
@@ -38,7 +39,22 @@
 
 最终安装包为 **42,849,344 字节**，解包为 58,120,155 字节、37 文件。SHA-256：`92F43B3CF8EC46A0E0DBC3CD9E746F1CEEBB4369819AFC34D9208574FACE545B`。安装文档改变后已重新打包，因此此哈希取代开发报告中旧的未发布候选包哈希。
 
-发布进行中；最终源码提交、GitHub Release 与 npm 重新下载的一致性将在完成后补记于此。固定 `v0.10.1` 标签保留在经验证的源码提交，不移动历史标签、不强推。
+**已完成 GitHub 与 npm 发布，并重新下载复核。**
+
+| 项目 | 最终结果 |
+| --- | --- |
+| 发布源码 | `29f6a9b999844ceb1f79d444b7533b481e30a3c4`；完整开发历史、原稿、派生图、客户端源码与加工脚本已快进推送 main。 |
+| 固定标签 | `v0.10.1` 为上述提交的 annotated tag，已上传。后续报告提交只更新 main，不移动标签。 |
+| GitHub Release | [v0.10.1](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1)，非草稿、预发布；公开页面可访问，安装包和 `.sha256` 两附件均 uploaded。 |
+| npm | [@ljwei-stak/model-router-galgame 0.10.1](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.10.1)，公开 registry 已可下载，`next=0.10.1`、`latest=0.4.32`。 |
+| npm 内容标识 | SHA-1 `a873ff693ea55b4866d3b29cbd6b9b0268e06c92`，37 文件、58,120,155 解包字节，registry 返回 SHA-512 integrity。 |
+| 安装包哈希 | 本地包、`npm pack` 取回的 registry 包、带 no-cache 请求的 registry 直接下载、GitHub Release 重新下载，四份均为上述 SHA-256，大小均为 42,849,344 字节。GitHub 校验附件也与本地相同。 |
+| 源码字节 | 从 GitHub fetch 的 main／固定标签生成完整源码目录；npm 与 GitHub Release 的 37 个文件均分别与远端源码目录和 Git blobs 逐字节一致。 |
+| 运行依赖 | 包内 35 个相对 ES import 可解析；生产 JS 不依赖开发者盘符／外部原画目录，美术已内嵌。 |
+
+npm 网页抓取器返回 403，但已通过官方 registry metadata、实际 tarball 下载和内容哈希验证公开包，不把网页抓取失败当成包发布失败。GitHub 首次直连两次超时，使用本机既有代理的单命令参数完成连接，未改变系统代理或 Git 全局配置。Windows 自带 tar 对源归档的中文文件名报错，改用 Python UTF-8 tar 解包后完成完整源目录核对；发布包 37 项本身可正常解包。
+
+发布过程中仅依照 npm 要求完成了网页登录和本次发布的二次验证，没有读取或写入报告中的账号令牌。固定标签及历史 npm / GitHub 版本均保留。
 
 ## 需要用户进行的测试
 
