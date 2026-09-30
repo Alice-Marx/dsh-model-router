@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
@@ -112,23 +112,26 @@ test('every authored actor and scene cast resolves to bundled artwork', async ()
   assert.deepEqual(missing, [], `missing portraits among ${nodes.length} authored nodes`)
 })
 
-test('the original portrait folders map to real client images when source checkout is present', async t => {
-  if (!existsSync(sourcePortraits)) return t.skip('sibling galgame source checkout is not installed')
+test('the versioned original portrait inventory maps to verified client images', async () => {
   const { characters, identity } = await browserModules
-  const folders = await readdir(sourcePortraits, { withFileTypes: true })
-  const missing = []
-  let imageCount = 0
-  for (const folder of folders.filter(item => item.isDirectory())) {
-    const files = (await readdir(path.join(sourcePortraits, folder.name))).filter(name => /\.png$/i.test(name))
-    for (const name of files) {
-      imageCount += 1
-      const original = await readFile(path.join(sourcePortraits, folder.name, name))
-      assert.ok(original.length > 0, `${folder.name}/${name} source image is nonempty`)
-      if (!characters.characterImageFor(identity.normalizeCharacterKey(folder.name))) missing.push(`${folder.name}/${name}`)
+  const inventory = JSON.parse(await readFile(path.join(root, 'docs/assets/gal-portrait-sources.json'), 'utf8'))
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex')
+  assert.equal(inventory.schemaVersion, 1)
+  assert.equal(inventory.portraits.length, 28, 'release inventory includes every registered original portrait')
+  assert.equal(new Set(inventory.portraits.map(item => item.characterKey)).size, 28, 'registered character keys are unique')
+  // The committed inventory defines this release. Later additions to the
+  // optional sibling source checkout must not change the release's test set.
+  for (const portrait of inventory.portraits) {
+    const key = identity.normalizeCharacterKey(portrait.characterKey)
+    assert.equal(characters.characterImageFor(key), `art:${portrait.pluginBasePath}`, `${key}: exact registered base image`)
+    const bundled = await readFile(path.join(root, portrait.pluginBasePath))
+    assert.ok(bundled.length > 0, `${key}: bundled portrait is nonempty`)
+    assert.equal(digest(bundled), portrait.pluginBaseSha256, `${key}: bundled image matches its committed hash`)
+    const sourceFile = path.join(sourcePortraits, portrait.sourceRelativePath)
+    if (existsSync(sourceFile)) {
+      assert.equal(digest(await readFile(sourceFile)), portrait.sourceSha256, `${key}: original source matches its recorded hash`)
     }
   }
-  assert.ok(imageCount > 0, 'source portrait inventory was read')
-  assert.deepEqual(missing, [], 'each source character has a bundled client portrait')
 })
 
 test('chronicle background mappings resolve to scene art rather than the title fallback', async () => {

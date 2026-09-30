@@ -1,28 +1,34 @@
 # DeepSeek Harness Desktop 插件安装与验证
 
-**0.10.1 是本机候选版，尚未上传 npm 或 GitHub；0.9.0 是此前已发布版本。** 两者均声明适配官方 DeepSeek Harness Desktop **0.2.0-rc.1**。要体验五部 Gal 剧目与最新立绘，请按下文在插件管理器填 **0.10.1 本地 `.tgz` 文件的绝对路径**，不要填尚未发布的 `@ljwei-stak/model-router-galgame@0.10.1`。0.9.0 的 [npm 包](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.9.0)和[GitHub 预发布](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0)仍可安装，但不含这轮 Gal 内容。
+**0.10.1 通过 npm `next` 通道与 GitHub v0.10.1 预发布提供；0.9.0 是此前发布版本。** 两者均声明适配官方 DeepSeek Harness Desktop **0.2.0-rc.1**。要体验五部 Gal 剧目与最新立绘，请在插件管理器填 **`@ljwei-stak/model-router-galgame@0.10.1`**，或安装 Release 中的 `.tgz`。npm 的旧 `latest` 标签仍为 0.4.32，须指定完整版本号。0.10.1 已通过本地回归与组件预览，但用户的官方桌面安装和真实账号调用仍需验收。
 
 ## 版本与宿主对应关系
 
 | 插件版本 | 发布渠道 | 声明的 DeepSeek Harness 依赖 | 安装建议 |
 | --- | --- | --- | --- |
-| **0.10.1** | 本地候选包，未发布 | `0.2.0-rc.1` | 五部剧目、28 原稿基础图与 162 表情差分；按绝对 `.tgz` 路径安装，等待用户桌面验收。 |
+| **0.10.1** | npm `next`、GitHub v0.10.1 预发布 | `0.2.0-rc.1` | 五部剧目、28 原稿基础图与 162 表情差分；指定 `@0.10.1` 或下载 `.tgz`，等待用户桌面验收。 |
 | **0.9.0** | 已发布的 npm 包、GitHub v0.9.0 预发布 | `0.2.0-rc.1` | 旧兼容版；须显式指定 `@0.9.0`，不含本轮新增 Gal 内容。 |
 | 0.8.0 | 历史发布 | `0.1.7-rc.2` | 与桌面版 0.2.0-rc.1 不兼容。 |
 | 0.4.32 | npm `latest` | `@deepseek-ai/dsh-settings` 的 `^0.1.1-rc.1 || ^0.1.2-rc.1 || ^0.1.5-rc.1` | 历史版本；不适用于当前桌面版 0.2.0-rc.1。 |
 
-表中列的是包声明的兼容依赖，并非对所有旧桌面版本的实机验收。先在 DeepSeek Harness 的插件页确认宿主版本；安装 0.9.0 时不要只输入不带版本的包名，以免选到旧包。
+表中列的是包声明的兼容依赖，并非对所有旧桌面版本的实机验收。先在 DeepSeek Harness 的插件页确认宿主版本；安装 0.10.1 时不要只输入不带版本的包名，以免选到旧包。
 
-## 安装本地 0.10.1 候选版
+## 安装 0.10.1
 
-1. 确认本机已经生成 `F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.10.1.tgz`。可在 PowerShell 使用 `Test-Path -LiteralPath 'F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.10.1.tgz'` 检查；返回 `False` 时先等待本地打包完成。
-2. 打开官方 DeepSeek Harness Desktop 的 **插件 → 添加插件**，在输入框粘贴：
+1. 打开官方 DeepSeek Harness Desktop 的 **插件 → 添加插件**，在输入框粘贴：
 
    ```text
-   F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.10.1.tgz
+   @ljwei-stak/model-router-galgame@0.10.1
    ```
 
-   这是**本地文件**，无需选择 npm 镜像源，也无需把包先装到全局 npm。
+   安装源选择 **`https://registry.npmjs.org/`**；中国大陆镜像可能需要等待版本同步。无需先运行 `npm install -g`，全局安装不会在当前 Desktop profile 注册插件。
+2. 若需文件安装，从 [GitHub v0.10.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) 下载 `ljwei-stak-model-router-galgame-0.10.1.tgz` 和 `.sha256` 文件，保存到自选目录。在输入框改填下载文件的**绝对路径**，例如 `D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz`。用以下命令核对 Release 校验文件（替换成实际路径）：
+
+   ```powershell
+   Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz'
+   ```
+
+   本地文件安装无需 npm 镜像源，也可保留下载包后再次安装。
 3. 确认插件详情显示 **0.10.1** 且无宿主不兼容提示，点击安装并启用；若提示重启则重启。已装旧版时，先在插件页禁用重复的旧实例。左侧应出现 **模型路由** 和 **Gal 模块**。不要手工改动应用安装目录、`app.asar` 或 profile 文件。
 4. 进入 **Gal 模块 → 剧情模式 · Gal 视图**，核对五个剧目和立绘。安装后的逐项验证见下方清单；这一步仍须用户在官方桌面实装确认。
 
@@ -68,7 +74,7 @@ npm pack --pack-destination dist
 
 ## 0.10.1 的五部 Gal 剧目与存档
 
-安装本地候选包后，剧情模式的剧目下拉框应显示 **千桥协议、旧城迁移篇、雪灯来信、未寄出的春天、回声之城·正篇**。《雪灯来信》是五章、两结局的**独立短篇**；《未寄出的春天》是十二章、九条可选支线、五结局的**独立后日谈**；《回声之城·正篇》含序章、共通八章、六条主线、隐藏线与 TRUE END，**只有王女线有真／暗双结局**。详细剧情与路线见 [Gal 五剧目玩法说明](docs/ECHO_CITY_STORY.zh.md)。
+安装 0.10.1 后，剧情模式的剧目下拉框应显示 **千桥协议、旧城迁移篇、雪灯来信、未寄出的春天、回声之城·正篇**。《雪灯来信》是五章、两结局的**独立短篇**；《未寄出的春天》是十二章、九条可选支线、五结局的**独立后日谈**；《回声之城·正篇》含序章、共通八章、六条主线、隐藏线与 TRUE END，**只有王女线有真／暗双结局**。详细剧情与路线见 [Gal 五剧目玩法说明](docs/ECHO_CITY_STORY.zh.md)。
 
 各剧目有独立自动进度及三个手动槽。旧剧目、短篇和春篇**章节直入会重置此前选择**；正篇按章节继续时保留本周目的旗标与好感度。春篇修订版 1 旧存档可读，新增的“双份原件”“逐人询问”旗标不会凭空补入；先手动存旧进度，再从开篇重新开始才能体验新增选择和有条件的“回信”结局。清理桌面配置的应用数据可能删去本地存档。
 
@@ -97,7 +103,7 @@ npm pack --pack-destination dist
 
 | 检查项 | 预期 |
 | --- | --- |
-| 插件启用 | 本地候选包详情为 **0.10.1**，左侧出现“模型路由”和“Gal 模块”，无 DSH 0.2.0-rc.1 不兼容提示；若选择旧发布包，详情应为 0.9.0。 |
+| 插件启用 | 插件详情为 **0.10.1**，左侧出现“模型路由”和“Gal 模块”，无 DSH 0.2.0-rc.1 不兼容提示；若选择旧发布包，详情应为 0.9.0。 |
 | 官方工具 | 七张工具卡显示状态；点击下载、取消和重试后确认真实探测版本及执行入口就绪状态；ZCode 须在原厂安装窗口完成安装。 |
 | 本地规划 | 单任务与团队模式都能显示复杂度、每包难度、路线、渠道、依赖；完整填写单价时才显示费用，缺价时显示“价格待配置”。用简单与困难任务核对不同模型分配。 |
 | Gal 剧情 | 0.10.1 的五部剧目、章节、选项、历史、结局和独立三槽可用；核对正篇连续章节旗标与好感、春篇修订版 2 的新选项/有条件结局、28 原稿基础图、27 套六表情与双人物同场、六幅新背景。JEV 应有基础图，但不应被误列为剧情出场或有六表情。 |

@@ -1,10 +1,10 @@
 # Model Router Galgame · DeepSeek Harness 桌面插件
 
-[English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [v0.9.0 发布包](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0)
+[English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [v0.10.1 发布包](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) · [npm 0.10.1](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.10.1)
 
-**已发布版本为 0.9.0；本仓库当前为尚未上传 npm/GitHub 的本地候选版 0.10.1。两者均声明适配 DeepSeek Harness Desktop 0.2.0-rc.1。** 0.10.1 的 Gal 模块共有五部剧目：原有《千桥协议》《旧城迁移篇》，独立改编短篇《雪灯来信》，十二章后日谈《未寄出的春天》，以及共通线八章、六条角色主线、隐藏线与 TRUE END 的《回声之城：正篇》。正篇**只有王女线设真／暗双结局**。插件还会分析任务复杂度、拆分复合请求，在用户已配置的模型中权衡质量与估计费用；用户明确调用执行工具时才启动对应的官方 CLI。
+**0.10.1 通过 npm 的 `next` 通道与 GitHub 预发布提供，声明适配 DeepSeek Harness Desktop 0.2.0-rc.1。** 0.10.1 的 Gal 模块共有五部剧目：原有《千桥协议》《旧城迁移篇》，独立改编短篇《雪灯来信》，十二章后日谈《未寄出的春天》，以及共通线八章、六条角色主线、隐藏线与 TRUE END 的《回声之城：正篇》。正篇**只有王女线设真／暗双结局**。插件还会分析任务复杂度、拆分复合请求，在用户已配置的模型中权衡质量与估计费用；用户明确调用执行工具时才启动对应的官方 CLI。
 
-> 要体验下文的五部剧目，请在插件管理器安装**本地 0.10.1 `.tgz` 候选包**，按下方步骤填绝对文件路径。`@ljwei-stak/model-router-galgame@0.9.0` 是此前发布的版本，不包含这轮剧情与立绘。不要把未发布的 `@0.10.1` 当作 npm 地址。
+> 要体验下文的五部剧目，在插件管理器填写 **`@ljwei-stak/model-router-galgame@0.10.1`**，或安装 GitHub Release 中的 `.tgz`。npm 的旧 `latest` 标签仍为 0.4.32，请使用完整版本号。官方桌面实装、真实账号调用和费用仍需用户验收。
 
 ![从任务分析到官方工具执行的流程](docs/assets/routing-workflow.svg)
 
@@ -24,15 +24,15 @@
 
 | DeepSeek Harness Desktop / 宿主依赖 | 插件版本 | 安装说明 |
 | --- | --- | --- |
-| **0.2.0-rc.1** | **0.10.1 本地候选版** | 五部剧目与本轮立绘、春篇修订；从本地 `.tgz` 安装，尚待用户在官方桌面实装验收。 |
+| **0.2.0-rc.1** | **0.10.1（npm `next` / GitHub 预发布）** | 五部剧目与本轮立绘、春篇修订；指定 `@0.10.1` 或下载 `.tgz`，尚待用户在官方桌面实装验收。 |
 | **0.2.0-rc.1** | **0.9.0 已发布版** | 历史兼容版；从 npm 指定 `@0.9.0`，不含本轮新增 Gal 内容。 |
 | 0.1.7-rc.2 | 0.8.0 | 历史版本；其宿主 peer 与 0.2.0-rc.1 不兼容。 |
 | 声明的旧 `dsh-settings` 范围：`^0.1.1-rc.1 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` | 0.4.32（npm `latest`） | 旧版发布记录；不要凭 `latest` 给 0.2.0-rc.1 安装。 |
 
-**安装本地 0.10.1 候选包（体验五部剧目）**
+**安装 0.10.1（体验五部剧目）**
 
-1. 确认本机已生成文件 `F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.10.1.tgz`。若尚未生成，请先等本地打包完成；不要改填 npm 的 `@0.10.1`。
-2. 打开 DeepSeek Harness Desktop → **插件** → **添加插件**，输入上述文件的**完整绝对路径**。本地文件路径不需要 npm 镜像源。
+1. 打开 DeepSeek Harness Desktop → **插件** → **添加插件**，完整填写 **`@ljwei-stak/model-router-galgame@0.10.1`**。镜像未同步时，将安装源改为 `https://registry.npmjs.org/`。
+2. 如果需要离线文件安装，从 [GitHub v0.10.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) 下载 `.tgz` 和 `.sha256` 校验文件，保存到自选目录。在输入框填写 `.tgz` 的**完整绝对路径**，例如 `D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz`；本地文件不需要 npm 镜像源。用 `Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz'` 对照 Release 校验文件。
 3. 安装、启用插件；如有重启提示则重启。确认插件详情显示 **0.10.1**，左侧出现 **“模型路由”** 与 **“Gal 模块”**。遇到旧插件重复时，先在插件页禁用旧实例。
 
 **安装此前已发布的 0.9.0（历史版）**
@@ -55,17 +55,17 @@
 
 **方式 C：从经验证的源码构建**
 
-开发者安装 Node.js 22.19+ 与 pnpm 后，可检出固定标签 `v0.9.0`，在仓库根目录运行：
+开发者安装 Node.js 22.19+ 与 pnpm 后，可检出固定标签 `v0.10.1`，在仓库根目录运行：
 
 ```powershell
-git checkout v0.9.0
+git checkout v0.10.1
 pnpm install --frozen-lockfile
 npm run build:client
 New-Item -ItemType Directory -Force dist | Out-Null
 npm pack --pack-destination dist
 ```
 
-随后通过插件管理器安装 `dist` 中生成的 `.tgz`。主分支可能继续更新；要复现 0.9.0，请使用固定标签。更多界面步骤与排障见[安装指南](INSTALLATION_GUIDE.zh.md)。
+随后通过插件管理器安装 `dist` 中生成的 `.tgz`。主分支可能继续更新；要复现 0.10.1，请使用固定标签。更多界面步骤与排障见[安装指南](INSTALLATION_GUIDE.zh.md)。
 
 ## 开始使用
 
@@ -221,7 +221,7 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 - **剧情模式 · Gal 视图**：场景、人物立绘、分支选择、历史回看、结局和三个本地手动存档槽。剧情引擎离线运行，无需模型账号。
 - **自由模式**：选择宿主已配置的模型、角色与场景，在面板内发送消息、停止生成，也可复制开场提示词到官方会话。面板内对话会真实调用模型并可能计费。
 
-0.10.1 候选版的 **“剧目”** 下拉框共有五项：
+0.10.1 的 **“剧目”** 下拉框共有五项：
 
 | 剧目 | 篇幅与玩法 | 结局说明 |
 | --- | --- | --- |
@@ -249,7 +249,7 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 
 ## 验证与开发
 
-0.10.1 本地候选版已通过 **81/81 项自动测试**、客户端构建检查、peer 检查与 frozen 依赖安装检查；Claude 和春篇双人显示已在**真实插件组件的本地浏览器预览**中检查。**尚未在用户的官方 DeepSeek Harness Desktop 中安装 0.10.1 并验收**。0.9.0 曾在 Desktop 0.2.0-rc.1 运行时代码的隔离 profile 安装验证。七家 CLI 的真实账号登录、付费任务、实际模型与账单仍需账号持有人核对；可编辑团队任务先用测试仓库验证。
+0.10.1 发布构建已通过 **81/81 项自动测试**、客户端构建检查、peer 检查与 frozen 依赖安装检查；Claude 和春篇双人显示已在**真实插件组件的本地浏览器预览**中检查。**尚未在用户的官方 DeepSeek Harness Desktop 中安装 0.10.1 并验收**。0.9.0 曾在 Desktop 0.2.0-rc.1 运行时代码的隔离 profile 安装验证。七家 CLI 的真实账号登录、付费任务、实际模型与账单仍需账号持有人核对；可编辑团队任务先用测试仓库验证。
 
 开发者可运行 `pnpm install --frozen-lockfile`、`npm test`、`npm run check:client` 和 `pnpm peers check`。本轮文件职责、详细验证、用户需要做的测试和剩余任务见[总项目任务报告](PROJECT-TASK-REPORT-2026-10-01.md)。欢迎通过 [Issues](https://github.com/Alice-Marx/model-router-galgame/issues) 附插件安装详情、宿主版本和脱敏后的错误日志反馈问题。
 
