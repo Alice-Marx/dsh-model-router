@@ -16,3 +16,7 @@
 /GAL_GAME_PREVIEW.md -text
 /MODLENS_DEPLOYMENT.md -text
 /LICENSE -text
+/docs/ECHO_CITY_STORY.zh.md -text
+/docs/GAL_ART_SOURCES.zh.md -text
+/docs/GAL_ART_PROMPTS.zh.md -text
+/docs/assets/gal-portrait-sources.json -text

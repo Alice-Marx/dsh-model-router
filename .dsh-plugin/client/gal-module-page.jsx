@@ -33,7 +33,9 @@ import {
 import galStylesheet from './gal-module.css'
 import workspaceStylesheet from './router-main.css'
 import { STORY_BACKGROUNDS, backgroundForStoryNode, sceneDescription } from './gal-story-backgrounds.mjs'
-import { CHARACTER_IMAGES } from './characters.mjs'
+import { characterImageFor } from './characters.mjs'
+import { CHARACTER_LABELS } from './character-identity.mjs'
+import { stageCharactersFor } from './gal-stage-state.mjs'
 import { expressionFor } from './gal-game-expressions.mjs'
 
 const SPEAKER_LABELS = { player: '你', narrator: '' }
@@ -67,7 +69,7 @@ function speakerColor(key) {
 function Avatar({ speaker, large = false, emotion = 'neutral' }) {
   const label = speakerLabel(speaker)
   const color = speakerColor(speaker)
-  const source = CHARACTER_IMAGES[speaker] ? expressionFor(speaker, emotion) : null
+  const source = characterImageFor(speaker) ? expressionFor(speaker, emotion) : null
   const [failedSource, setFailedSource] = React.useState(null)
   return (
     <span className={large ? 'gm-avatar gm-avatar-large' : 'gm-avatar'} style={{ background: color }} aria-hidden="true">
@@ -78,8 +80,9 @@ function Avatar({ speaker, large = false, emotion = 'neutral' }) {
   )
 }
 
-function StagePortrait({ speaker, emotion = 'neutral', companion = false }) {
-  const source = CHARACTER_IMAGES[speaker] ? expressionFor(speaker, emotion) : null
+function StagePortrait({ actor, companion = false }) {
+  const { speaker, emotion = 'neutral' } = actor
+  const source = characterImageFor(speaker) ? expressionFor(speaker, emotion) : null
   const [failedSource, setFailedSource] = React.useState(null)
   if (!source) return null
   const className = companion ? 'gm-stage-portrait gm-stage-portrait-companion' : 'gm-stage-portrait'
@@ -88,12 +91,16 @@ function StagePortrait({ speaker, emotion = 'neutral', companion = false }) {
     : <img className={className} src={source} alt="" aria-hidden="true" onError={() => setFailedSource(source)} />
 }
 
-function StageArtwork({ background, speaker, companion = null, emotion = 'neutral' }) {
+function StageArtwork({ background, actors, speaker, companion = null, emotion = 'neutral' }) {
+  const visibleActors = actors ?? [
+    speaker && { speaker, emotion },
+    companion && { speaker: companion, emotion: 'neutral' },
+  ].filter(Boolean)
   return (
     <>
       <div className="gm-stage-art" style={{ backgroundImage: `url("${background}")` }} aria-hidden="true" />
-      {companion && companion !== speaker && <StagePortrait speaker={companion} companion />}
-      {speaker && <StagePortrait speaker={speaker} emotion={emotion} />}
+      {visibleActors[1] && <StagePortrait actor={visibleActors[1]} companion />}
+      {visibleActors[0] && <StagePortrait actor={visibleActors[0]} />}
     </>
   )
 }
@@ -242,18 +249,12 @@ function StoryMode() {
     if (!showHistory) return []
     try { return storyHistory(story) } catch { return [] }
   }, [story, showHistory])
-  const sceneSpeakers = React.useMemo(() => {
+  const sceneActors = React.useMemo(() => {
     if (!node) return []
-    const visible = CHARACTER_IMAGES[node.speaker] ? [node.speaker] : []
     try {
-      const lines = storyHistory(story)
-      for (let index = lines.length - 1; index >= 0 && visible.length < 2; index -= 1) {
-        const line = lines[index]
-        if (line.location !== node.location || line.time !== node.time) break
-        if (CHARACTER_IMAGES[line.speaker] && !visible.includes(line.speaker)) visible.push(line.speaker)
-      }
+      return stageCharactersFor(node, storyHistory(story)).filter(actor => characterImageFor(actor.speaker))
     } catch { /* 剧情状态异常时仍可展示当前角色。 */ }
-    return visible
+    return stageCharactersFor(node).filter(actor => characterImageFor(actor.speaker))
   }, [story, node])
   const stageBackground = backgroundForStoryNode(node)
   const affinity = React.useMemo(() => {
@@ -324,7 +325,7 @@ function StoryMode() {
       <p className="gm-episode-description"><strong>{episode?.title}</strong> · {episode?.description}</p>
 
       <div className="gm-stage" data-chapter={node?.chapterId ?? story?.chapterId ?? ''}>
-        <StageArtwork background={stageBackground} speaker={sceneSpeakers[0]} companion={sceneSpeakers[1]} emotion={node?.speaker === sceneSpeakers[0] ? node.emotion : 'neutral'} />
+        <StageArtwork background={stageBackground} actors={sceneActors} />
         {node && <StageHeader node={node} />}
         {node && <Dialogue node={node} onAdvance={advance} />}
         {node?.input && (
@@ -453,7 +454,7 @@ function FreeMode({ routes, galReply, cancelGalReply }) {
   const presetData = FREE_PRESETS.find(item => item.id === preset)
   const prompt = [
     `请以视觉小说角色的方式与我对话。`,
-    `你扮演：${STORY_CHARACTERS[character] ?? character}。`,
+    `你扮演：${CHARACTER_LABELS[character] ?? character}。`,
     `场景：${presetData?.world.trim() ?? ''}`,
     presetData?.opener ? `开场动作提示：${presetData.opener}` : '',
     extra.trim() ? `补充设定：${extra.trim()}` : '',
@@ -511,7 +512,7 @@ function FreeMode({ routes, galReply, cancelGalReply }) {
         </select>
         <label className="mr-control-label" htmlFor="gm-free-character">角色</label>
         <select id="gm-free-character" className="gm-select" value={character} onChange={event => { setCharacter(event.target.value); resetChat() }}>
-          {Object.entries(STORY_CHARACTERS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          {Object.entries(CHARACTER_LABELS).filter(([key]) => characterImageFor(key)).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
         <label className="mr-control-label" htmlFor="gm-free-preset">场景</label>
         <select id="gm-free-preset" className="gm-select" value={preset} onChange={event => { setPreset(event.target.value); resetChat() }}>
@@ -523,16 +524,16 @@ function FreeMode({ routes, galReply, cancelGalReply }) {
         <StageArtwork background={presetData?.art ?? STORY_BACKGROUNDS.title} speaker={character} />
         <div className="gm-free-scene"><span>自由模式 · 开场预览</span><strong>{presetData?.label}</strong></div>
         <div className="gm-free-dialogue">
-          <div className="gm-speaker"><Avatar speaker={character} large /><span className="gm-speaker-name">{STORY_CHARACTERS[character] ?? character}</span></div>
+          <div className="gm-speaker"><Avatar speaker={character} large /><span className="gm-speaker-name">{CHARACTER_LABELS[character] ?? character}</span></div>
           <p>{presetData?.opener}</p>
         </div>
       </div>
       <section className="gm-free-chat" aria-label="自由模式对话">
-        <div className="gm-free-chat-head"><strong>与 {STORY_CHARACTERS[character] ?? character} 对话</strong><span>{route ? `${route.provider}/${route.model}` : '尚无可用模型'}</span></div>
+        <div className="gm-free-chat-head"><strong>与 {CHARACTER_LABELS[character] ?? character} 对话</strong><span>{route ? `${route.provider}/${route.model}` : '尚无可用模型'}</span></div>
         <div className="gm-free-chat-log" role="log" aria-live="polite">
           {messages.length === 0 && <p className="mr-caption">输入第一句话后，插件会通过官方模型服务开始对话。</p>}
           {messages.map((item, index) => <div className={`gm-free-chat-message ${item.role}`} key={index}>
-            <strong>{item.role === 'user' ? '你' : STORY_CHARACTERS[character] ?? character}{item.truncated ? ' · 回复已截断' : ''}</strong><p>{item.text}</p>
+            <strong>{item.role === 'user' ? '你' : CHARACTER_LABELS[character] ?? character}{item.truncated ? ' · 回复已截断' : ''}</strong><p>{item.text}</p>
           </div>)}
           {sending && <p className="mr-caption" role="status">模型正在回复…</p>}
         </div>

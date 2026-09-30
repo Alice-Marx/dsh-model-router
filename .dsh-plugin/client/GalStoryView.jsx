@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Accessibility, ArrowRight, BookOpen, Bug, Check, Download, History, House, MapPin, Music2, Palette, Pause, Play, RotateCcw, Save, Settings2, Upload, Volume2, VolumeX, X } from 'lucide-react'
 import { STORY_EPISODES, STORY_CHARACTERS, STORY_SIDE_ROUTES, STORY_MUSIC_THEMES, getStoryEpisode, createStory, normalizeStory, currentStoryNode, advanceStory, storyHistory } from '../shared/gal-story-catalog.mjs'
 import { readStory, readStorySlots, writeStory, STORY_STORAGE_KEY, episodeStorageKey, selectedStoryEpisode } from './gal-story-storage.mjs'
-import { CHARACTER_IMAGES } from './characters.mjs'
+import { characterImageFor } from './characters.mjs'
+import { stageCharactersFor } from './gal-stage-state.mjs'
 import { STORY_BACKGROUNDS, backgroundForStoryNode, sceneDescription } from './gal-story-backgrounds.mjs'
 import { expressionClassFor, expressionFor, expressionLabelFor } from './gal-game-expressions.mjs'
 import { playStoryScore } from './gal-story-audio.mjs'
@@ -79,10 +80,10 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
   const scoreRef = useRef(null)
   const node = useMemo(() => currentStoryNode(state), [state])
   const history = useMemo(() => storyHistory(state), [state])
-  const portraitLine = [...history].reverse().find(line => line.location === node.location && line.time === node.time && CHARACTER_IMAGES[line.speaker])
-  const character = CHARACTER_IMAGES[node.speaker] ? node.speaker : portraitLine?.speaker
+  const stageActors = useMemo(() => {
+    return stageCharactersFor(node, history).filter(actor => characterImageFor(actor.speaker))
+  }, [node, history])
   const background = backgroundForStoryNode(node)
-  const emotion = node.speaker === character ? node.emotion || 'neutral' : 'neutral'
   const complete = !animate || shown >= node.text.length
   const hasChoices = Boolean(node.choices?.length)
   const hasInstitutionalEnding = Boolean(node.ending?.relationshipEpilogues?.length)
@@ -280,8 +281,8 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
     <style>{GAL_GAME_CSS}</style>
     {home && <section className="gg-title-screen" aria-labelledby="gg-title-heading" style={{ backgroundImage: `url(${STORY_BACKGROUNDS.title})` }}>
       <div className="gg-title-shade" />
-      <img className="gg-title-character gg-title-character-kimi" src={CHARACTER_IMAGES.kimi} alt="" aria-hidden="true" />
-      <img className="gg-title-character gg-title-character-claude" src={CHARACTER_IMAGES.claude} alt="" aria-hidden="true" />
+      <img className="gg-title-character gg-title-character-kimi" src={characterImageFor('kimi')} alt="" aria-hidden="true" />
+      <img className="gg-title-character gg-title-character-claude" src={characterImageFor('claude')} alt="" aria-hidden="true" />
       <div className="gg-title-copy">
         <p className="gg-title-kicker">MODEL CITY VISUAL NOVEL</p>
         <h1 id="gg-title-heading">{episode.title}</h1>
@@ -315,7 +316,19 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
         <div className="gg-scene-meta"><span><MapPin size={13} />{node.location}</span><time>{node.time}</time></div>
         {preferences.cueCaptions && node.soundCue && <div className={`gg-sound-cue is-${node.soundCue.id}`} role="status"><Music2 size={14} aria-hidden="true" /><span><strong>{node.soundCue.label}</strong>{node.soundCue.description}</span></div>}
         {!background && <div className="gg-scene-placeholder"><h2>{node.location}</h2><span className="gg-placeholder-rule" /><p>{sceneDescription(node.description)}</p></div>}
-        {character && <><img className={`gg-character ${expressionClassFor(emotion)}`} key={`${character}:${emotion}`} src={expressionFor(character, emotion)} alt={`${speakerName(character)}，表情：${expressionLabelFor(emotion)}`} draggable="false" /><span className={`gg-expression-badge ${expressionClassFor(emotion)}`} aria-hidden="true">{expressionLabelFor(emotion)}</span></>}
+        {stageActors.map((actor, index) => (
+          <img
+            className={`gg-character ${expressionClassFor(actor.emotion)}`}
+            key={`${actor.speaker}:${actor.emotion}`}
+            src={expressionFor(actor.speaker, actor.emotion)}
+            alt={`${speakerName(actor.speaker)}，表情：${expressionLabelFor(actor.emotion)}`}
+            draggable="false"
+            style={stageActors.length > 1 ? index === 0
+              ? { right: '0%', width: '57%', zIndex: 3 }
+              : { right: '42%', width: '53%', height: '100%', zIndex: 2, opacity: .86 } : undefined}
+          />
+        ))}
+        {stageActors[0] && <span className={`gg-expression-badge ${expressionClassFor(stageActors[0].emotion)}`} aria-hidden="true">{expressionLabelFor(stageActors[0].emotion)}</span>}
       </section>
       <p className="gg-sr-only" aria-live="polite">{speakerName(node.speaker)}：{node.text}</p>
       <GalDialogue ref={dialogueRef} character={node.speaker} speaker={speakerName(node.speaker)} text={node.text} shown={animate ? node.text.slice(0, shown) : node.text} onAdvance={() => progress()} canAdvance={!hasChoices && !node.ending} scene={dialogueScene} assetsMap={assetsMap} />
@@ -329,7 +342,7 @@ function StoryReader({ storageKey, episodeId, onChooseEpisode, scene: dialogueSc
     {panel === 'routes' && episodeId === 'bridges' && <Panel title="二十二条角色支线" wide onClose={() => setPanel(null)}>
       <p className="gg-route-intro">每条支线从独立状态开始，保留一项角色承诺和一份可核验证据。结局不会覆盖主线的制度结局。</p>
       <div className="gg-route-grid">{STORY_SIDE_ROUTES.map(route => <button type="button" className="gg-route-card" data-route-id={route.id} key={route.id} onClick={() => startRoute(route)}>
-        <img src={CHARACTER_IMAGES[route.character]} alt="" aria-hidden="true" />
+        <img src={characterImageFor(route.character)} alt="" aria-hidden="true" />
         <span><strong>{speakerName(route.character)} · {route.title}</strong><small>{route.subtitle}</small><em>{route.summary}</em></span><ArrowRight size={16} />
       </button>)}</div>
     </Panel>}

@@ -147,3 +147,73 @@ test('spring compiles with bridged acts and reaches the finale choice', async ()
   }
   assert.ok(hops > 0, 'spring plays from s01')
 })
+
+function walkSpring(spring, initial, choose, stopAt = node => Boolean(node.ending)) {
+  let state = initial
+  for (let hops = 0; hops < spring.STORY_STATS.nodes + 10; hops += 1) {
+    const node = spring.currentStoryNode(state)
+    if (stopAt(node)) return state
+    state = spring.advanceStory(state, node.choices ? choose(node) : null)
+  }
+  throw new Error('Spring path did not reach its requested node.')
+}
+
+test('spring true ending requires authored evidence, consent and two completed side routes', async () => {
+  const spring = await import('../.dsh-plugin/shared/gal-story-spring.mjs')
+  const choose = node => {
+    if (node.id === 's01a-008') return 's01-evidence-dual'
+    if (node.id === 's04a-004') return 's04-consent-ask'
+    if (node.id === 'r01-visit' || node.id === 'r02-visit') return 'visit'
+    if (/^r\d+-visit$/.test(node.id)) return 'skip'
+    return node.choices[0].id
+  }
+  const atFinale = walkSpring(spring, spring.createStory(), choose, node => node.id === 'spring-final-choice')
+  assert.equal(atFinale.flags.evidence, 'dual')
+  assert.equal(atFinale.flags.consent, 'ask')
+  assert.equal(atFinale.flags.relay, 'distributed')
+  assert.equal(atFinale.flags.anchor, 'shared')
+  assert.equal(atFinale.flags.side_r01, true)
+  assert.equal(atFinale.flags.side_r02, true)
+  assert.equal(spring.trueEndingReady(atFinale.flags), true)
+  const completed = walkSpring(spring, spring.advanceStory(atFinale, 'coauthor'), choose)
+  assert.equal(spring.currentStoryNode(completed).ending.id, 'letters')
+  const loaded = spring.normalizeStory(JSON.parse(JSON.stringify(completed)))
+  assert.equal(loaded.nodeId, completed.nodeId)
+})
+
+test('spring coauthor choice keeps a reachable ordinary ending when a prerequisite is missing', async () => {
+  const spring = await import('../.dsh-plugin/shared/gal-story-spring.mjs')
+  const choose = node => {
+    if (node.id === 's01a-008') return 's01-evidence-summary'
+    if (node.id === 's04a-004') return 's04-consent-ask'
+    if (node.id === 'r01-visit' || node.id === 'r02-visit') return 'visit'
+    if (/^r\d+-visit$/.test(node.id)) return 'skip'
+    return node.choices[0].id
+  }
+  const atFinale = walkSpring(spring, spring.createStory(), choose, node => node.id === 'spring-final-choice')
+  assert.equal(atFinale.flags.evidence, 'summary')
+  assert.equal(spring.trueEndingReady(atFinale.flags), false)
+  const completed = walkSpring(spring, spring.advanceStory(atFinale, 'coauthor'), choose)
+  assert.equal(spring.currentStoryNode(completed).ending.id, 'lamps')
+  assert.throws(() => spring.normalizeStory({ ...JSON.parse(JSON.stringify(completed)), flags: { ...completed.flags, evidence: 'dual' } }), /存档条件与重放轨迹不一致/)
+})
+
+test('spring revision 1 saves replay through former dialogue nodes without inventing new flags', async () => {
+  const spring = await import('../.dsh-plugin/shared/gal-story-spring.mjs')
+  let state = walkSpring(spring, spring.createStory(), node => node.choices[0].id, node => node.id === 's01a-008')
+  state = spring.normalizeStory({ ...JSON.parse(JSON.stringify(state)), contentRevision: 1 })
+  state = spring.advanceStory(state, null)
+  assert.equal(state.nodeId, 's01a-009')
+  assert.equal(state.flags.evidence, undefined)
+  state = walkSpring(spring, state, node => /^r\d+-visit$/.test(node.id) ? 'skip' : node.choices[0].id, node => node.id === 's04a-004')
+  state = spring.advanceStory(state, null)
+  assert.equal(state.nodeId, 's04a-005')
+  assert.equal(state.flags.consent, undefined)
+  const restored = spring.normalizeStory(JSON.parse(JSON.stringify(state)))
+  assert.equal(restored.nodeId, state.nodeId)
+  assert.equal(restored.contentRevision, 1)
+  assert.equal(spring.trueEndingReady(restored.flags), false)
+  assert.throws(() => spring.advanceStory(spring.createStory(), 's01-evidence-dual'))
+  const freshChoice = walkSpring(spring, spring.createStory(), node => node.choices[0].id, node => node.id === 's01a-008')
+  assert.throws(() => spring.advanceStory(freshChoice, null), /请从当前选项中选择/)
+})

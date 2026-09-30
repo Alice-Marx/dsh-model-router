@@ -4,7 +4,7 @@
 
 [简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [v0.9.0 release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0) · [npm package](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.9.0)
 
-> **Published compatibility:** plugin **0.9.0** targets DeepSeek Harness Desktop **0.2.0-rc.1**. The plugin was installed and its two panels opened in an isolated profile using that Desktop version's runtime. This source branch is an unpublished **0.9.1-dev.1** development build with a new Gal story and restored character art and scene backgrounds. Vendor account sign-in, paid model calls, actual model selection inside each CLI, and billing still need user verification.
+> **Version status:** **0.9.0** is the previously published release. This source tree is an **unpublished local 0.10.1 candidate**. Both declare peers for DeepSeek Harness Desktop **0.2.0-rc.1**. The 0.10.1 candidate adds five Gal stories, original portraits and expression variants; it has not yet been installed in the user's official Desktop profile. Vendor sign-in, paid calls, actual CLI model selection, and billing still need account-holder verification.
 
 ![Diagram of the local routing plan and the separate official-tool execution step](docs/assets/routing-workflow.svg)
 
@@ -28,11 +28,16 @@
 
 | Plugin version | Intended host | Install status |
 | --- | --- | --- |
-| **0.9.0** | **DeepSeek Harness Desktop 0.2.0-rc.1** | Current compatibility candidate, published as the npm `next` tag and a GitHub prerelease. Use the explicit version below. |
+| **0.10.1** | **DeepSeek Harness Desktop 0.2.0-rc.1** | Unpublished local candidate with five Gal stories. Install the local `.tgz` by absolute path. |
+| **0.9.0** | **DeepSeek Harness Desktop 0.2.0-rc.1** | Previously published on npm and GitHub. This older build lacks the new Gal content. |
 | **0.8.0** | DSH 0.1.7-rc.2 dependencies | Incompatible with Desktop 0.2.0-rc.1; the Desktop plugin manager rejects it. |
 | **0.4.32** | Legacy `@deepseek-ai/dsh-settings` peer range `^0.1.1-rc.1 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` | Still carries npm's `latest` tag as of 2026-09-29. Installing without an explicit version can select this older package; this row does not claim every older Desktop build was tested. |
 
-### Option A: install by package name
+### Install the local 0.10.1 candidate
+
+Once the archive exists at `F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.10.1.tgz`, open **Plugins → Add plugin** in DeepSeek Harness Desktop and paste that **full absolute file path** into the input. Install, enable, and restart if prompted. Confirm that plugin details show **0.10.1** and the sidebar shows **Model Router** and **Gal Module**. A local file path does not require an npm mirror. **Do not enter `@ljwei-stak/model-router-galgame@0.10.1` as an npm package:** this candidate has not been published.
+
+### Previously published 0.9.0: install by package name
 
 1. In DeepSeek Harness Desktop, open **Plugins → Add plugin**.
 2. Enter this exact package name, including the version:
@@ -44,7 +49,7 @@
 3. If the selected mirror cannot reach the package, choose an available **HTTPS** npm source, for example `https://registry.npmjs.org/`.
 4. Install and enable the plugin. The sidebar should show **Model Router** and **Gal Module**.
 
-### Option B: install the release archive
+### Previously published 0.9.0: install the release archive
 
 Download [`ljwei-stak-model-router-galgame-0.9.0.tgz`](https://github.com/Alice-Marx/model-router-galgame/releases/download/v0.9.0/ljwei-stak-model-router-galgame-0.9.0.tgz) from the [v0.9.0 GitHub release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0), then enter its absolute path in the Desktop **Add plugin** input (for example, `D:\Downloads\ljwei-stak-model-router-galgame-0.9.0.tgz`). On Windows, you can check the downloaded file:
 
@@ -54,7 +59,7 @@ Get-FileHash 'D:\Downloads\ljwei-stak-model-router-galgame-0.9.0.tgz' -Algorithm
 
 The published 0.9.0 archive has SHA-256 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`. Replace the example path with your download path. The npm and GitHub release archives were downloaded and compared byte for byte during publication.
 
-### Build a local archive from source
+### Rebuild the older 0.9.0 release from source
 
 With Node.js 22.19+ and pnpm installed, run these commands from this repository's root. Check out the verified release tag before building:
 
@@ -247,16 +252,34 @@ The planned Harness model ID is not necessarily the vendor CLI's model name. A s
 
 *Story artwork from the plugin's Gal assets; it is not a capture of the running interface.*
 
-The **Story** tab runs locally: stage backgrounds, characters, dialogue, choices, history, endings, autosave, and three manual local save slots. It needs no model account. The source tree now includes **Echo City: Letter by Snowlight** (`回声之城：雪灯来信`), a standalone five-chapter adaptation with nine choice points and two reachable endings. To play it in a build that contains the new story, open **Gal Module → Story mode**, choose **雪灯来信** from the episode dropdown, and click through dialogue and choices. The adjacent chapter selector starts that chapter with fresh state; it does **not** inherit choices from earlier chapters. Autosave resumes the selected episode; the new story has three manual slots separate from the older episodes.
+The **Story** tab runs locally: backgrounds, portraits, dialogue, choices, history, endings, autosave, and three manual save slots per story. No model account is needed. The 0.10.1 candidate offers five episodes:
 
-This adaptation draws on the locally authored *Echo City* materials, especially scenes S0/S4 of the expanded common story and *Shadow and Self* (`影与身`). It does not port the original eight chapters, six character routes, or original TRUE END. Company and model characters are fictional personifications. See the [Chinese story and play guide](docs/ECHO_CITY_STORY.zh.md) for the chapter map, choice effects, save behavior, and manual checks. **This source-development feature is in a local 0.9.1-dev.1 package; the published npm 0.9.0 package does not contain this episode.**
+| Episode in the selector | Scope | Ending distinction |
+| --- | --- | --- |
+| **千桥协议** (Thousand Bridges) | Eight main chapters and character side stories. | Six institutional endings. |
+| **旧城迁移篇** (Old City Migration) | The earlier complete migration story. | Its own existing branches. |
+| **雪灯来信** (Letter by Snowlight) | A **standalone five-chapter adaptation**, nine choices. | Two short-story endings, “各自点灯” and “如常”; neither is the full saga's TRUE END. |
+| **未寄出的春天** (The Unsent Spring) | An **independent twelve-chapter sequel** with nine optional character routes. | Five endings. The conditional “letters” ending requires two preserved originals, asking each person for consent, distributed relay, a shared anchor, and at least two completed side routes. |
+| **回声之城·正篇** (Echo City: Main Saga) | Prologue, eight common chapters, six character routes, hidden *Shadow and Self* with the naming night, and a TRUE END. | **Only the ChatGPT/princess route has separate true and dark endings**; completing all six routes and the hidden route unlocks the ensemble TRUE END. |
 
-The **Free** tab uses an official configured model route for in-panel chat, can stop a pending response, or copies the opening prompt into a Harness session. Free-mode replies are real model calls and may incur charges. The plugin does not store provider credentials.
+Open **Gal Module → Story mode**, choose an episode, advance the dialogue and select choices. **History** revisits prior lines; **Save 1–3 / Load 1–3** handles the current episode's manual slots. For the short story, Spring, and older episodes, directly entering a chapter starts it with fresh state rather than inheriting earlier choices; play from the beginning to see consequences carry through. The **Main Saga** preserves flags and 14 character-affinity values across sequential chapter changes. Its hidden route requires the DeepSeek/snow route's true ending, a complete transcription of the chapter-four note, and two observations of the steward's daily life. All six character routes and the hidden route are required for the TRUE END. The naming night lets you name the steward; the default is 衔雪.
 
-The local `0.9.1-dev.1` build restores portraits for all 23 authored speakers across the three stories and Free mode. The older migration story now selects bundled backgrounds by location; a scene change no longer carries a character portrait over from the previous location. Free mode also offers old-city library, Laurel theatre, Echo City tower, and three-harbor scene presets.
+Spring content revision 1 saves remain readable in revision 2; loading them does not invent flags for newly added choices. To experience the new **preserve two originals** and **ask each person** choices, manually save old progress in a slot and restart Spring from its opening. Story saves are local to the current Desktop profile and are not cloud backups. The stories use fictional personifications; their dialogue does not establish real product capabilities or prices. See the [Chinese five-story play guide](docs/ECHO_CITY_STORY.zh.md) for chapter and ending details.
+
+The **Free** tab uses an officially configured model route for in-panel chat, can stop a pending response, or copies the opening prompt into a Harness session. Free-mode replies are real model calls and may incur charges. The plugin does not store provider credentials.
+
+The 0.10.1 candidate connects **28 original PNG portraits** to base-image display and Free-mode character selection, with alias/player duplicates removed. **27 story characters × six generated expressions = 162** expression sprites, including 12 sets added this round; six Echo City backgrounds were added too. JEV has an original base portrait and is selectable in Free mode, but has no story appearance or expression set. Two-person scenes now render both `cast` and `stageCharacters` correctly. The [portrait provenance guide](docs/GAL_ART_SOURCES.zh.md) separates originals from generated variants.
+
+![Claude in the real plugin component, previewed locally in a browser](docs/assets/gal-claude-0.10.1-preview.png)
+
+*Actual 0.10.1 plugin component in a local browser preview: Claude's original portrait is visible. This is **not** an official Desktop installation screenshot.*
+
+![Two characters in the Spring story component, previewed locally in a browser](docs/assets/gal-spring-0.10.1-preview.png)
+
+*Actual 0.10.1 plugin component in a local browser preview: both scene characters are visible. Official Desktop installation still needs user validation.*
 
 ## Verification status and further reading
 
-Version 0.9.0 passed 70 automated tests, a frozen dependency install, client build check, peer dependency check, and an isolated install against the actual Desktop 0.2.0-rc.1 runtime. The isolated UI opened the Model Router and Gal panels, planned demo tasks, and showed local official-tool status. Some CLI installations and trusted-entry checks were exercised without vendor accounts. **These checks do not validate live sign-in, model identity, billable output, or production task quality.** Test those with your own accounts and a disposable Git repository before relying on editable team runs.
+The local **0.10.1 candidate passed 81/81 automated tests**, the client build check, peer check, and frozen dependency installation check. Claude and a two-character Spring scene were viewed in a **local browser preview of the actual plugin components**. **0.10.1 has not yet been installed and accepted in the user's official DeepSeek Harness Desktop profile.** The older 0.9.0 was installed in an isolated profile using the Desktop 0.2.0-rc.1 runtime. These checks do not validate live vendor sign-in, actual model identity, billable output, or production task quality; use your own accounts and a disposable Git repository for those checks.
 
-The [project task report](PROJECT-TASK-REPORT-2026-09-29.md) records the file roles, completed checks, account tests still needed, and remaining work. See the [migration notes](MIGRATION.md) if you previously used an older desktop integration.
+The [2026-10-01 project task report](PROJECT-TASK-REPORT-2026-10-01.md) records file roles, completed checks, account tests still needed, and remaining work. See the [migration notes](MIGRATION.md) if you previously used an older desktop integration.

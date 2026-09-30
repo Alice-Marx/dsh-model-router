@@ -4,7 +4,6 @@
  */
 import chatgpt from '../../aipicture/ChatGPT1.png'
 import claude from '../../aipicture/Claude1.png'
-import claudeSpecial from '../../aipicture/Claude.png'
 import harness from '../../aipicture/DeepSeek_Harness1.png'
 import deepseek from '../../aipicture/DeepSeek1.png'
 import doubao from '../../aipicture/Doubao1.png'
@@ -26,8 +25,12 @@ import gitlab from '../../aipicture/gitlab.webp'
 import gitee from '../../aipicture/gitee.webp'
 import cloudflare from '../../aipicture/cloudflare.webp'
 import zcode from '../../aipicture/Zcode.png'
+import hy from './source-portraits/hy.webp'
+import novelai from './source-portraits/novelai.webp'
+import comfyui from './source-portraits/comfyui.webp'
+import gptimage from './source-portraits/gptimage.webp'
+import jev from './source-portraits/jev.webp'
 import { CHARACTER_LABELS, characterKeyForModel, normalizeCharacterKey } from './character-identity.mjs'
-import { SPRING_ORIGINALS } from './gal-spring-portraits.mjs'
 
 export { CHARACTER_LABELS, characterKeyForModel } from './character-identity.mjs'
 
@@ -47,15 +50,16 @@ export const CHARACTER_IMAGES = Object.freeze({
   opencode,
   qwen,
   huggingface, llama, rwkv, perplexity, github, gitlab, gitee, cloudflare, zcode,
-  hy: SPRING_ORIGINALS.hy, comfyui: SPRING_ORIGINALS.comfyui,
-  novelai: SPRING_ORIGINALS.novelai, gptimage: SPRING_ORIGINALS.gptimage,
+  hy, comfyui, novelai, gptimage, jev,
 })
 
 export const hasCharacterImage = key => Boolean(CHARACTER_IMAGES[normalizeCharacterKey(key)])
 export const characterImageFor = key => CHARACTER_IMAGES[normalizeCharacterKey(key)] || null
 
 export const CHARACTER_VARIANTS = Object.freeze({
-  claude: Object.freeze({ default: claude, special: claudeSpecial }),
+  // Claude1.png is byte-for-byte identical to the user's EchoCity/Claude/Claude.png.
+  // Keep both fallback moods on that costume when an expression sprite is unavailable.
+  claude: Object.freeze({ default: claude, special: claude }),
 })
 
 export function characterForModel(model, provider = '') {

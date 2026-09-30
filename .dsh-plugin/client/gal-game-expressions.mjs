@@ -7,6 +7,7 @@ import thoughtful from '../../output/imagegen/deepseek-thoughtful.webp'
 import { CHARACTER_IMAGES, CHARACTER_VARIANTS } from './characters.mjs'
 import { normalizeCharacterKey } from './character-identity.mjs'
 import { SPRING_PORTRAITS } from './gal-spring-portraits.mjs'
+import { ECHO_PORTRAITS } from './gal-echo-art.mjs'
 
 export const DEEPSEEK_EXPRESSIONS = Object.freeze({ neutral, happy, shy, sad, angry, thoughtful })
 export const STORY_EMOTIONS = Object.freeze(['neutral', 'happy', 'shy', 'sad', 'angry', 'thoughtful', 'worried', 'determined', 'surprised', 'calm'])
@@ -21,18 +22,18 @@ export function normalizeEmotion(emotion) {
 }
 
 /**
- * Six genuine expression sprites now exist for all 27 characters. Existing
- * DeepSeek extra moods remain available; additional mood synonyms resolve to
- * the closest authored expression, never a color filter.
+ * Authored six-state sprite sets take priority over the original static art.
+ * Extra DeepSeek moods remain available for older one-argument callers.
  */
 export function expressionFor(characterOrEmotion, requestedEmotion) {
   const legacyCall = requestedEmotion === undefined
   const character = legacyCall ? 'deepseek' : normalizeCharacterKey(characterOrEmotion)
   const emotion = normalizeEmotion(legacyCall ? characterOrEmotion : requestedEmotion)
   // Preserve the old one-argument contract for existing free-mode callers.
-  if (!legacyCall && SPRING_PORTRAITS[character]) {
+  const sprites = ECHO_PORTRAITS[character] || SPRING_PORTRAITS[character]
+  if (!legacyCall && sprites) {
     const rasterMood = { angry: 'determined', thoughtful: 'neutral', worried: 'sad', calm: 'neutral' }[emotion] || emotion
-    return SPRING_PORTRAITS[character][rasterMood] || SPRING_PORTRAITS[character].neutral
+    return sprites[rasterMood] || sprites.neutral
   }
   if (character === 'deepseek') return DEEPSEEK_EXPRESSIONS[emotion] || DEEPSEEK_EXPRESSIONS.neutral
   if (character === 'claude') return ['determined', 'angry', 'surprised'].includes(emotion)

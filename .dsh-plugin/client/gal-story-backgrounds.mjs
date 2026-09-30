@@ -15,9 +15,11 @@ import evidenceLighthouse from '../../aipicture/story-backgrounds/evidence-light
 import operationsBridge from '../../aipicture/story-backgrounds/operations-bridge.webp'
 
 import { SPRING_BACKGROUNDS } from './gal-spring-backgrounds.mjs'
+import { ECHO_SCENE_ART } from './gal-echo-art.mjs'
 
 export const STORY_BACKGROUNDS = Object.freeze({
   ...SPRING_BACKGROUNDS,
+  ...ECHO_SCENE_ART,
   title: modelCityTitle,
   prologue: prologueStation,
   'open-day': associationOpenDay,
@@ -33,6 +35,21 @@ export const STORY_BACKGROUNDS = Object.freeze({
   'offline-workshop': offlineWorkshop,
   'evidence-lighthouse': evidenceLighthouse,
   'operations-bridge': operationsBridge,
+  'echo-tower-night': ECHO_SCENE_ART['echo-gate-snow'],
+  'echo-city': sixEndings,
+  'echo-city-dawn': sixEndings,
+  'echo-city-dusk': bridgesNight,
+  'echo-city-night': bridgesNight,
+  'echo-gate': ECHO_SCENE_ART['echo-gate-snow'],
+  'echo-archive': communityArchive,
+  'echo-theatre': laurelTheatre,
+  'echo-observatory': laurelObservatory,
+  'echo-workshop': offlineWorkshop,
+  'echo-harbor': threeHarbors,
+  'echo-open-day': associationOpenDay,
+  'echo-lighthouse': evidenceLighthouse,
+  'echo-bridge': operationsBridge,
+  'echo-protocol': protocolComposition,
 })
 
 // The first story predates chapter/background IDs. Its 41 authored locations

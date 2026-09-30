@@ -5,7 +5,7 @@ import { SIDE_ROUTES } from './gal-spring-sides.mjs'
 
 export const STORY_TITLE = '回声之城：未寄出的春天'
 export const STORY_VERSION = 4
-export const STORY_CONTENT_REVISION = 1
+export const STORY_CONTENT_REVISION = 2
 export const STORY_DESCRIPTION = '十二章长篇 · 九条可选角色支线 · 五个结局。承接“各自点灯”的独立后日谈，不改写其他剧目与结局。'
 export const STORY_CHARACTERS = Object.freeze({
   harness: '衔雪', chatgpt: 'ChatGPT', claude: 'Claude', deepseek: 'DeepSeek',
@@ -20,6 +20,9 @@ const nodes = new Map()
 const trusted = new WeakSet()
 const histories = new WeakMap()
 const KIND = 'model-router-gal-story'
+// Revision 1 had uninterrupted dialogue at these exact node IDs. Keep its
+// recorded null transitions readable without granting either new choice flag.
+const LEGACY_LINEAR_CHOICE_NODES = new Set(['s01a-008', 's04a-004'])
 const EMOTIONS = new Set(['neutral', 'happy', 'sad', 'determined', 'surprised', 'shy'])
 const known = new Set(['narrator', 'player', ...Object.keys(STORY_CHARACTERS)])
 const textFor = (text, flags) => typeof text === 'string' ? text : flags[text.flag] === text.equals ? text.yes : text.no
@@ -256,10 +259,13 @@ function seal(state) {
   trusted.add(state)
   return state
 }
-export function createStory({ chapterId = 's01' } = {}) {
+function createAtRevision(chapterId, contentRevision) {
   if (!chapterStarts[chapterId]) throw new Error('未知的长篇章节。')
-  return seal({ kind: KIND, version: STORY_VERSION, contentRevision: STORY_CONTENT_REVISION, chapterId,
+  return seal({ kind: KIND, version: STORY_VERSION, contentRevision, chapterId,
     nodeId: chapterStarts[chapterId], flags: {}, trail: [] })
+}
+export function createStory({ chapterId = 's01' } = {}) {
+  return createAtRevision(chapterId, STORY_CONTENT_REVISION)
 }
 function transition(state, choiceId = null) {
   const node = nodes.get(state.nodeId)
@@ -268,10 +274,15 @@ function transition(state, choiceId = null) {
   let target = node.next
   let flags = { ...state.flags }
   if (node.choices) {
-    const selected = node.choices.find(option => option.id === choiceId)
-    if (!selected) throw new Error('请从当前选项中选择。')
-    Object.assign(flags, selected.flags)
-    target = typeof selected.next === 'function' ? selected.next(flags) : selected.next
+    if (choiceId === null && state.contentRevision === 1 && LEGACY_LINEAR_CHOICE_NODES.has(node.id)) {
+      // A previously saved run passed straight through this dialogue line.
+      // It resumes on the same successor and gains no evidence/consent flag.
+    } else {
+      const selected = node.choices.find(option => option.id === choiceId)
+      if (!selected) throw new Error('请从当前选项中选择。')
+      Object.assign(flags, selected.flags)
+      target = typeof selected.next === 'function' ? selected.next(flags) : selected.next
+    }
   } else if (choiceId !== null) throw new Error('当前段落没有选项。')
   if (!nodes.has(target)) throw new Error('剧情目标不存在。')
   Object.assign(flags, nodes.get(target).enterFlags || {})
@@ -280,9 +291,9 @@ function transition(state, choiceId = null) {
 const canonical = object => JSON.stringify(Object.keys(object).sort().map(key => [key, object[key]]))
 export function normalizeStory(raw) {
   if (raw && trusted.has(raw)) return raw
-  if (!raw || raw.kind !== KIND || raw.version !== STORY_VERSION || raw.contentRevision !== STORY_CONTENT_REVISION) throw new Error('不支持的长篇存档版本。')
+  if (!raw || raw.kind !== KIND || raw.version !== STORY_VERSION || ![1, STORY_CONTENT_REVISION].includes(raw.contentRevision)) throw new Error('不支持的长篇存档版本。')
   if (!Array.isArray(raw.trail) || raw.trail.length > MAX_TRAIL || !raw.flags || typeof raw.flags !== 'object' || Array.isArray(raw.flags)) throw new Error('长篇存档结构不正确。')
-  let state = createStory({ chapterId: raw.chapterId })
+  let state = createAtRevision(raw.chapterId, raw.contentRevision)
   for (const entry of raw.trail) {
     if (!entry || entry.nodeId !== state.nodeId || !(entry.choiceId === null || typeof entry.choiceId === 'string')) throw new Error('剧情轨迹不连续。')
     state = transition(state, entry.choiceId)
@@ -307,7 +318,7 @@ export const advanceStory = (raw, choiceId = null) => transition(normalizeStory(
 export function storyHistory(raw) {
   const final = normalizeStory(raw)
   if (histories.has(final)) return histories.get(final)
-  let state = createStory({ chapterId: final.chapterId })
+  let state = createAtRevision(final.chapterId, final.contentRevision)
   const result = []
   for (const entry of final.trail) {
     const node = visible(state)

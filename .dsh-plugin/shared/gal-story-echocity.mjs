@@ -20,7 +20,7 @@ const MAX_TRAIL = 2048
 export const STORY_TITLE = '回声之城：正篇'
 export const STORY_VERSION = VERSION
 export const STORY_CONTENT_REVISION = CONTENT_REVISION
-export const STORY_DESCRIPTION = "忠实转译 Ren'Py 原作：共通线八章 · 六条主线（各含真/暗结局）· 隐藏线「影与身」（含命名之夜）· TRUE END「回声之城」。好感度与 Flag 体系完整保留。"
+export const STORY_DESCRIPTION = "忠实转译 Ren'Py 原作：共通线八章 · 六条主线（王女线含真/暗双结局）· 隐藏线「影与身」（含命名之夜）· TRUE END「回声之城」。好感度与 Flag 体系完整保留。"
 
 /** 章节表：共通线八章 + 六条主线 + 隐藏线 + TRUE END。 */
 export const STORY_CHAPTERS = Object.freeze([
@@ -1228,29 +1228,29 @@ export function storyGraphIssues() {
 
 /** 场景 bg 语义 id → 已入库背景图 key（见 client/gal-story-backgrounds.mjs）。 */
 export const ECHO_BACKGROUNDS = Object.freeze({
-  tower_night: 'echo-tower-night', tower_snow: 'echo-tower-night',
+  tower_night: 'echo-tower-night', tower_snow: 'echo-gate-snow',
   city_spring: 'echo-city', city_summer: 'echo-city', city_autumn: 'echo-city',
   city_winter: 'echo-city', city_dawn: 'echo-city-dawn', city_dusk: 'echo-city-dusk',
   city_night: 'echo-city-night', city_shock: 'echo-city-night', city_gate: 'echo-gate',
-  gate_night: 'echo-gate', gate_closed: 'echo-gate', gate_shame: 'echo-gate', snow_gate: 'echo-gate',
+  gate_night: 'echo-gate', gate_closed: 'echo-gate-snow', gate_shame: 'echo-gate-snow', snow_gate: 'echo-gate-snow',
   stele_forest: 'echo-archive', stele_mcp: 'echo-archive', stele_405b: 'echo-archive',
-  stele_shame: 'echo-archive', stele_night: 'echo-archive', stele_final: 'echo-archive', stele_child: 'echo-archive',
-  stage: 'echo-theatre', petition_wall: 'echo-theatre', grok4_stage: 'echo-theatre', stage_final: 'echo-theatre',
+  stele_shame: 'echo-flame-platform', stele_night: 'echo-flame-platform', stele_final: 'echo-flame-platform', stele_child: 'echo-flame-platform',
+  stage: 'echo-theatre', petition_wall: 'echo-petition-wall', grok4_stage: 'echo-theatre', stage_final: 'echo-theatre',
   archive: 'echo-archive', library: 'echo-archive', document_room: 'echo-archive',
   devday: 'echo-observatory', throne_room: 'echo-observatory', tower_day: 'echo-observatory',
   tower_reasoning: 'echo-observatory', tower_storm: 'echo-observatory', tower_final: 'echo-observatory',
   tower_top_ipo: 'echo-observatory', gemini_arrival: 'echo-observatory',
   canteen: 'echo-workshop', forge: 'echo-workshop', market_dusk: 'echo-workshop',
   market_after: 'echo-workshop', market_montage: 'echo-workshop',
-  old_tower_snow: 'echo-harbor', old_tower: 'echo-harbor', old_tower_flashback: 'echo-harbor',
-  old_tower_writing: 'echo-harbor', snow_dawn: 'echo-harbor', old_hut: 'echo-harbor',
+  old_tower_snow: 'echo-old-tower-snow', old_tower: 'echo-old-tower-snow', old_tower_flashback: 'echo-old-tower-snow',
+  old_tower_writing: 'echo-old-tower-snow', snow_dawn: 'echo-old-tower-snow', old_hut: 'echo-old-tower-snow',
   festival: 'echo-open-day', festival_night: 'echo-open-day', festival_silent: 'echo-open-day',
   pbc_ceremony: 'echo-open-day', lantern_night: 'echo-lighthouse', tower_all_lights: 'echo-lighthouse',
-  tower_two_lights: 'echo-lighthouse', claude_glow: 'echo-lighthouse',
-  steward_room: 'echo-bridge', seal_room: 'echo-bridge', claude_seal: 'echo-bridge',
+  tower_two_lights: 'echo-two-lamps', claude_glow: 'echo-lighthouse',
+  steward_room: 'echo-bridge', seal_room: 'echo-seal-chamber', claude_seal: 'echo-seal-chamber',
   writing_desk: 'echo-bridge', v3_night: 'echo-bridge', sputnik: 'echo-bridge',
   signing: 'echo-protocol', claude_crown: 'echo-protocol', courtyard: 'echo-protocol',
-  naming_night: 'echo-protocol', snow_door: 'echo-harbor', goose_night: 'echo-theatre',
+  naming_night: 'echo-two-lamps', snow_door: 'echo-two-lamps', goose_night: 'echo-theatre',
   three_bow: 'echo-observatory', rain_stops: 'echo-harbor', south_gate_night: 'echo-gate',
 })
 
