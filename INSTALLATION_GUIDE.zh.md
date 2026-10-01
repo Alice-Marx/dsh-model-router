@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop 插件安装与验证
 
-> **当前版本为 0.11.0 本地候选包，尚未上传 npm 或 GitHub。** 本轮新增 Gal 播放器设置与操作功能，保留五部剧情和既有美术。当前安装使用本地 `.tgz`，不要从 npm 尝试安装 `@0.11.0` 或未发布的 `@0.10.2`。
+> **当前版本为 0.11.1。** 从 [GitHub Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) 下载 `.tgz` 并安装。npm `latest` 仍是旧版 0.4.32，因此不要省略版本号；npm 的 0.11.1 发布状态与最终安装源见[本轮总项目报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)。
 
 [README](README.zh.md) · [Gal 设置与播放器详细教程](docs/GAL_SETTINGS.zh.md) · [五剧目玩法](docs/ECHO_CITY_STORY.zh.md)
 
@@ -8,49 +8,50 @@
 
 | 插件版本 | 状态 | 声明的 DSH 依赖 | 如何使用 |
 | --- | --- | --- | --- |
-| **0.11.0** | 当前本地候选版，未发布 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 安装本地包，新增 Gal 设置与播放器功能。 |
-| **0.10.2** | 历史本地兼容修复，未发布 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 官方 rc.2 运行时隔离安装已验证；兼容修复由 0.11.0 保留。 |
+| **0.11.1** | 当前 GitHub 版；npm 上传待完成 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 0.11.0 运行时与 Gal 功能；修复 README 与发布说明。 |
+| **0.11.0** | 前一 npm / GitHub 发布版 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 运行时相同，但 npm README 元数据缺失、包内说明过时；建议安装 0.11.1。 |
+| **0.10.2** | 历史本地兼容修复，未发布 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 官方 rc.2 运行时隔离安装已验证；兼容修复由 0.11.1 保留。 |
 | **0.10.1** | 已发布 npm / GitHub 预发布 | `0.2.0-rc.1` | 只适配 rc.1；rc.2 管理器拒绝安装。 |
 | **0.9.0** | 已发布历史版本 | `0.2.0-rc.1` | 历史兼容版，缺少后续 Gal 更新。 |
 | 0.8.0 | 已发布历史版本 | `0.1.7-rc.2` | 与当前 0.2.0 系列桌面版不兼容。 |
-| 0.4.32 | 旧版 npm `latest` 标签记录 | 旧 `dsh-settings` 依赖范围 | 裸包名可能选中旧版；当前候选安装使用文件路径。 |
+| 0.4.32 | 旧版 npm `latest` 标签记录 | 旧 `dsh-settings` 依赖范围 | 裸包名可能选中旧版；当前安装必须指定 `@0.11.1`。 |
 
-在官方桌面插件页核对宿主的完整版本，包括 `rc` 后缀。0.10.1 在 rc.2 的错误来自依赖范围，换 npm 镜像不能修复。使用匹配的候选包即可；保留桌面程序与 profile，不必改 `app.asar` 或绕过版本检查。
+在官方桌面插件页核对宿主的完整版本，包括 `rc` 后缀。0.10.1 在 rc.2 的错误来自依赖范围，换 npm 镜像不能修复。0.11.1 支持 rc.1 与 rc.2；保留桌面程序与 profile，不必改 `app.asar` 或绕过版本检查。
 
-## 2. 安装当前 0.11.0 候选包
+## 2. 安装 0.11.1
 
 1. 打开 **DeepSeek Harness Desktop → 插件 → 添加插件**。
-2. 在“包名、GitHub 仓库地址或本地目录路径”输入框粘贴安装包的**完整绝对路径**：
+2. 从 [v0.11.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/download/v0.11.1/ljwei-stak-model-router-galgame-0.11.1.tgz) 下载 `.tgz`。在“包名、GitHub 仓库地址或本地目录路径”输入框填写该文件的绝对路径；若 npm 注册表已列出该版，也可以输入完整包名：
 
    ```text
-   F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.11.0.tgz
+   @ljwei-stak/model-router-galgame@0.11.1
    ```
 
-3. 可以把文件复制到 D 盘等自选目录，再填写对应路径，例如 `D:\Plugins\ljwei-stak-model-router-galgame-0.11.0.tgz`。本地文件安装不需要 npm 镜像同步；路径必须指向实际文件。
-4. 确认安装预览显示 **0.11.0**，没有宿主不兼容提示，安装并启用。出现重启提示时再重启桌面程序。
+3. 本地安装包可放在 D 盘等自选位置；若精确 npm 版本不可用，先使用 GitHub Release 文件，不要改选裸包名。
+4. 确认安装预览显示 **0.11.1**，没有宿主不兼容提示，安装并启用。出现重启提示时再重启桌面程序。
 5. 核对侧边栏出现 **模型路由** 和 **Gal 模块**。进入 Gal 先显示 **标题画面**，可选择剧目、开始新故事或继续；另有 **剧情模式 · Gal 视图、自由模式、素材鉴赏**，上方有 **Gal 设置** 与 **开启音乐**。
 
 若交付附带 `.sha256` 文件，用 PowerShell 计算安装包摘要并与交付校验文件比较：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.11.0.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.11.1.tgz'
 ```
 
 普通使用无需 `npm install -g`：全局 npm 安装不会注册到当前 Harness profile。也可解压 `.tgz`，再填写内层含 `package.json` 和 `.dsh-plugin` 的 `package` 目录绝对路径。安装文件可放在自选盘；运行时的数据目录仍由宿主 profile 决定。
 
 ### 已有同名旧版时
 
-先在旧版导出当前剧情，或保留手动存档并备份 profile 数据。依插件管理器升级指引移除旧实例，再添加候选包；仅禁用旧实例可能仍被判“已安装”。保留 profile 和应用数据，旧手动槽沿用原键读取。若前次安装失败且“已安装”没有同名条目，可直接添加候选包。无需移除其他插件。
+先在旧版导出当前剧情，或保留手动存档并备份 profile 数据。依插件管理器升级指引更新到 0.11.1；若同名插件被管理器判为已安装，按其升级指引替换旧实例。保留 profile 和应用数据，旧手动槽沿用原键读取。无需移除其他插件。
 
-### 后续发布的 npm 方式
+### 版本选择与旧包说明
 
-仅在发布完成并核对注册表后，才可使用完整包名，例如：
+始终使用完整包名：
 
 ```text
-@ljwei-stak/model-router-galgame@0.11.0
+@ljwei-stak/model-router-galgame@0.11.1
 ```
 
-**这是未来发布示例，当前不能用于安装。** 届时镜像未同步可选 HTTPS 官方源 `https://registry.npmjs.org/`。目前已发布的历史包见 [0.10.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) 与 [npm 0.10.1](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.10.1)，只适配 rc.1，不能用于 rc.2。
+**不要省略版本号。** npm `latest` 标签当前仍指向 0.4.32。只有在注册表列出 0.11.1 后才从 npm 安装；0.11.0 缺少 npm README 元数据，0.11.1 修正了包内文档。历史 0.10.1 只适配 rc.1，不能用于 rc.2。
 
 ## 3. 初次使用 Gal：先调立绘，再开音乐
 
@@ -62,7 +63,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'F:\everyAI\all\model-router-galgame
 6. **文字与阅读**调逐字间隔、字号、自动阅读等待和不透明度。工具栏 **自动阅读**和 **已读快进**遇选项、命名和结局停止，由用户决定。
 7. 跨设备或升级前点击 **导出存档**下载 JSON。手动三槽、快捷存档和自动保存各有用途，详见[完整教程](docs/GAL_SETTINGS.zh.md)。
 
-本轮使用既有资源。下图为 **0.11.0 实际组件本地浏览器预览**，展示完整 Claude 原稿的布局预览与音乐设置：
+本轮使用既有资源。下图为 **0.11.0 运行时代码的组件本地浏览器预览**，展示完整 Claude 原稿的布局预览与音乐设置；0.11.1 保留相同 Gal 界面：
 
 ![0.11.0 Claude 全身布局与音频设置](docs/assets/gal-settings-0.11.0-preview.jpg)
 
@@ -92,7 +93,7 @@ Claude、Codex、MiMo、Grok 支持只读或可编辑；Kimi、MiniMax、ZCode �
 
 | 检查 | 预期 |
 | --- | --- |
-| 版本与入口 | 详情为 0.11.0，rc.1 / rc.2 通过 peer 检查，两侧边栏入口可见。 |
+| 版本与入口 | 详情为 0.11.1，rc.1 / rc.2 通过 peer 检查，两侧边栏入口可见。 |
 | 标题菜单 | 选择剧目后开始或继续该剧目；新故事替换自动进度前确认；手动槽和快捷档保留。 |
 | 立绘 | 默认完整全身，头、裙摆与脚部可见；全屏与窄窗口重新计算；主角、同伴和单独角色各自调节，刷新保留。 |
 | 音频 | 首次点击播放；七首可切换；音量 0、全部静音有效；本地文件不上传，重开需重选。 |
@@ -102,18 +103,17 @@ Claude、Codex、MiMo、Grok 支持只读或可编辑；Kimi、MiniMax、ZCode �
 | 素材鉴赏 | 人物与场景可浏览，全部开放；缺表情回退基础图，可能含剧透。 |
 | 自由与执行 | 用户真实账号核对回复、取消、CLI 实际模型与计费，独立于离线播放器测试。 |
 
-本轮 **153 项主测试与 75 项额外剧情／游戏测试（共 228 项）**及 0.11.0 包的官方 rc.2 隔离加载检查见 [Gal 播放器报告](PROJECT-TASK-REPORT-2026-10-01-GAL-PLAYER.md)。已验证两个入口、新标题、完整原画和全屏历史；用户当前桌面 profile 尚未升级。0.10.2 的历史兼容检查见 [rc.2 修复报告](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md)。
+0.11.1 沿用通过 **153 项主测试与 75 项额外剧情／游戏测试（共 228 项）**的 0.11.0 运行时。本轮重新核对 README 在包内的内容、npm 页面元数据、扫描状态及 npm / GitHub 安装包校验值。Gal 播放器隔离运行检查见 [Gal 播放器报告](PROJECT-TASK-REPORT-2026-10-01-GAL-PLAYER.md)，完整发布记录见 [0.11.1 项目报告](PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)。用户当前桌面 profile、真实登录、模型身份与费用仍需账号持有人验收。
 
-## 7. 从候选源码打包（开发者）
+## 7. 从 0.11.1 发布源码打包（开发者）
 
-使用 `package.json` 为 0.11.0 的完整本地源码，Node.js 22.19+ 与 pnpm：
+检出 `v0.11.1` 标签，使用 Node.js 22.19+ 与 pnpm：
 
 ```powershell
 Set-Location 'F:\everyAI\all\model-router-galgame'
 pnpm install --frozen-lockfile
 npm run build:client
-New-Item -ItemType Directory -Force dist | Out-Null
 npm pack --pack-destination dist
 ```
 
-开发验证另运行 `npm test`、`npm run check:client` 和 `pnpm peers check`。当前没有已发布的 `v0.11.0` 或 `v0.10.2` 标签；历史已发布版可用对应真实标签。把生成包的绝对路径填入官方插件管理器。
+开发验证另运行 `npm test`、`npm run check:client` 和 `pnpm peers check`。用 `git checkout v0.11.1` 获取当前完整源码。把生成包的绝对路径填入官方插件管理器。

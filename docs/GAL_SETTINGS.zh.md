@@ -1,8 +1,8 @@
 # Gal 设置与播放器操作指南
 
-适用于 **0.11.0 本地候选版**。该版本尚未发布到 npm/GitHub，安装请使用 [本地包安装步骤](../INSTALLATION_GUIDE.zh.md)。本轮完善播放器，继续使用既有五部剧情、美术和七首内置循环配乐。
+适用于 **0.11.1**；播放器运行时与 0.11.0 相同。安装请按[0.11.1 安装步骤](../INSTALLATION_GUIDE.zh.md)操作。本轮修正文档和包内图片清单，播放器继续使用既有五部剧情、美术和七首内置循环配乐；npm 发布状态见[本轮总项目报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)。
 
-[README](../README.zh.md) · [五剧目路线与结局](ECHO_CITY_STORY.zh.md) · [立绘来源](GAL_ART_SOURCES.zh.md) · [本轮项目报告](../PROJECT-TASK-REPORT-2026-10-01-GAL-PLAYER.md)
+[README](../README.zh.md) · [五剧目路线与结局](ECHO_CITY_STORY.zh.md) · [立绘来源](GAL_ART_SOURCES.zh.md) · [播放器实现报告](../PROJECT-TASK-REPORT-2026-10-01-GAL-PLAYER.md) · [0.11.1 发布报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)
 
 ## 标题菜单与游戏画面
 
