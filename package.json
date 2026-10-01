@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/model-router-galgame",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "type": "module",
   "description": "Official DeepSeek Harness desktop plugin: complexity-based model routing with official CLI tool probe/install, Agent Teams work packages, and a standalone Gal module (story & free modes)",
   "repository": {
@@ -65,11 +65,17 @@
     "README.md",
     "README.zh.md",
     "docs/ECHO_CITY_STORY.zh.md",
+    "docs/GAL_SETTINGS.zh.md",
     "docs/GAL_ART_SOURCES.zh.md",
     "docs/GAL_ART_PROMPTS.zh.md",
     "docs/assets/gal-portrait-sources.json",
     "docs/assets/gal-claude-0.10.1-preview.png",
     "docs/assets/gal-spring-0.10.1-preview.png",
+    "docs/assets/gal-title-0.11.0-preview.jpg",
+    "docs/assets/gal-settings-0.11.0-preview.jpg",
+    "docs/assets/gal-fullbody-0.11.0-preview.jpg",
+    "docs/assets/gal-official-rc2-0.11.0.jpg",
+    "docs/assets/gal-official-fullbody-0.11.0.jpg",
     "INSTALLATION_GUIDE.zh.md",
     "MIGRATION.md",
     "LICENSE"
@@ -77,7 +83,7 @@
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs --check",
-    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/gal-module.test.mjs tests/gal-art.test.mjs",
+    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/gal-module.test.mjs tests/gal-art.test.mjs tests/gal-preferences.test.mjs tests/gal-reading.test.mjs tests/gal-save-transfer.test.mjs tests/gal-audio-controller.test.mjs tests/gal-fullbody.test.mjs",
     "prepack": "node scripts/prepack.mjs",
     "pack:local": "npm pack --pack-destination dist"
   },

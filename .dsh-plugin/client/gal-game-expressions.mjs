@@ -42,6 +42,16 @@ export function expressionFor(characterOrEmotion, requestedEmotion) {
   return CHARACTER_IMAGES[character] || CHARACTER_IMAGES.harness
 }
 
+/** Full-length stage art always uses the registered original illustration.
+ * The emotion argument keeps this compatible with stage emotion calls, but
+ * cropped expression sprites belong to avatars/close-ups, not the full stage.
+ * Unknown story speakers deliberately remain unknown instead of borrowing art.
+ */
+export function fullBodyPortraitFor(character, emotion = 'neutral') {
+  const key = normalizeCharacterKey(character)
+  return typeof key === 'string' && Object.hasOwn(CHARACTER_IMAGES, key) ? CHARACTER_IMAGES[key] : null
+}
+
 export function expressionClassFor(emotion) {
   return `gg-expression-${normalizeEmotion(emotion)}`
 }
