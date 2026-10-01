@@ -106,6 +106,8 @@ CLI 安装时 pnpm 对仅有插件依赖的测试 profile 提示 peer 未由该 
 
 可以复制到自选盘再填写新路径；升级前导出故事备份，保留 profile。确认为 0.11.0 并启用。现在不能在 npm 直接安装未发布的 `@0.11.0`，详见安装指南。
 
+**最终源码／安装包校验**：功能源码提交为 `1204789`。提交后运行 `node scripts/verify-release.mjs dist/ljwei-stak-model-router-galgame-0.11.0.tgz HEAD`，包内 **43 个文件全部与 Git 源码逐字节一致**。结果保存在 `build/gal-player-release-verify.json`。本报告的校验回执不在 npm 载荷中，不改变安装包内容或 SHA-256。
+
 ## 六、用户需要做的测试
 
 1. 当前官方桌面 profile 安装 0.11.0，确认入口、五剧目、旧存档和当前主题正常。
