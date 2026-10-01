@@ -1,10 +1,12 @@
 # Model Router Galgame
 
+> **Current delivery:** 0.10.2 is a locally verified candidate, not yet published to npm/GitHub. Install the local archive at `F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.10.2.tgz`. The npm/Release instructions below are for the planned publication. Windows UI automation was stopped by the user before installation into the current Desktop profile.
+
 **A model routing and Galgame plugin for DeepSeek Harness Desktop.** It plans which of your configured models should handle a task, gives simpler work to an affordable capable route, and reserves stronger routes for difficult work. Compound requests become dependent work packages that can be run through supported official vendor tools.
 
-[简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [v0.10.1 release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) · [npm package](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.10.1)
+[简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [v0.10.2 release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.2) · [npm package](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.10.2)
 
-> **Version status:** **0.10.1** is distributed through npm's **`next`** channel and a GitHub **prerelease**, with peers for DeepSeek Harness Desktop **0.2.0-rc.1**. It includes five Gal stories, original portraits and expression variants. Install the explicit version below: npm's legacy `latest` tag remains 0.4.32. The 0.10.1 build has not yet been accepted in the user's official Desktop profile. Vendor sign-in, paid calls, actual CLI model selection, and billing still need account-holder verification.
+> **Version status:** **0.10.2** is planned for distribution through npm's **`next`** channel and a GitHub **prerelease**, with peers for DeepSeek Harness Desktop **0.2.0-rc.1 and 0.2.0-rc.2**. It includes five Gal stories, original portraits and expression variants. Install the explicit version below: npm's legacy `latest` tag remains 0.4.32. **0.10.1 only accepts rc.1; an rc.2 peer rejection is a version mismatch, not a network error.** The 0.10.2 build has not yet been accepted in the user's official Desktop profile. Vendor sign-in, paid calls, actual CLI model selection, and billing still need account-holder verification.
 
 ![Diagram of the local routing plan and the separate official-tool execution step](docs/assets/routing-workflow.svg)
 
@@ -28,24 +30,27 @@
 
 | Plugin version | Intended host | Install status |
 | --- | --- | --- |
-| **0.10.1** | **DeepSeek Harness Desktop 0.2.0-rc.1** | npm `next` and GitHub prerelease. Five Gal stories; official Desktop acceptance still needs user verification. |
+| **0.10.2** | **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2** | Local candidate; planned npm `next` and GitHub prerelease. Five Gal stories; official Desktop acceptance still needs user verification. |
+| **0.10.1** | **DeepSeek Harness Desktop 0.2.0-rc.1 only** | Historical prerelease; the Desktop plugin manager rejects it on rc.2. |
 | **0.9.0** | **DeepSeek Harness Desktop 0.2.0-rc.1** | Previously published on npm and GitHub. This older build lacks the new Gal content. |
 | **0.8.0** | DSH 0.1.7-rc.2 dependencies | Incompatible with Desktop 0.2.0-rc.1; the Desktop plugin manager rejects it. |
 | **0.4.32** | Legacy `@deepseek-ai/dsh-settings` peer range `^0.1.1-rc.1 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` | Still carries npm's `latest` tag as of 2026-09-29. Installing without an explicit version can select this older package; this row does not claim every older Desktop build was tested. |
 
-### Install 0.10.1 from npm
+### Install 0.10.2 from npm
 
 Open **Plugins → Add plugin** in DeepSeek Harness Desktop and enter:
 
 ```text
-@ljwei-stak/model-router-galgame@0.10.1
+@ljwei-stak/model-router-galgame@0.10.2
 ```
 
-Choose the official HTTPS source `https://registry.npmjs.org/` if a mirror has not synchronized the version. Install, enable, and restart if prompted. Confirm plugin details show **0.10.1**, the host is **0.2.0-rc.1**, and the sidebar shows **Model Router** and **Gal Module**. Global `npm install -g` does not register the plugin in your Desktop profile.
+Choose the official HTTPS source `https://registry.npmjs.org/` if a mirror has not synchronized the version. Install, enable, and restart if prompted. Confirm plugin details show **0.10.2**, the host is **0.2.0-rc.1 or 0.2.0-rc.2**, and the sidebar shows **Model Router** and **Gal Module**. Global `npm install -g` does not register the plugin in your Desktop profile.
 
-### Install the 0.10.1 release archive
+### Install the 0.10.2 release archive
 
-Download `ljwei-stak-model-router-galgame-0.10.1.tgz` and its `.sha256` file from the [v0.10.1 GitHub release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1). Save them in a directory you choose, then enter the archive's **absolute path** in **Add plugin**, for example `D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz`. Compare `Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz'` with the release's checksum file. Local archives do not need an npm mirror. Keep your existing Desktop profile and save slots when upgrading.
+Download `ljwei-stak-model-router-galgame-0.10.2.tgz` and its `.sha256` file from the [v0.10.2 GitHub release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.2). Save them in a directory you choose, then enter the archive's **absolute path** in **Add plugin**, for example `D:\Plugins\ljwei-stak-model-router-galgame-0.10.2.tgz`. Alternatively, extract the archive and enter the absolute path of its inner `package` directory, which contains `package.json` and `.dsh-plugin`. Compare `Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.10.2.tgz'` with the release's checksum file. Local archives and directories do not need an npm mirror.
+
+If the failed install left **no** matching entry under Installed, retry 0.10.2 directly. If an older copy of the same plugin is installed, preserve its manual save slots and back up its current profile data, then follow the plugin manager's upgrade instructions to remove the old instance before installing 0.10.2. Do not clear the Desktop profile or application data. Do not work around the 0.10.1 peer error with `allow-version`, a Desktop downgrade, or edits to `app.asar`.
 
 ### Previously published 0.9.0: install by package name
 
@@ -69,12 +74,12 @@ Get-FileHash 'D:\Downloads\ljwei-stak-model-router-galgame-0.9.0.tgz' -Algorithm
 
 The published 0.9.0 archive has SHA-256 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`. Replace the example path with your download path. The npm and GitHub release archives were downloaded and compared byte for byte during publication.
 
-### Rebuild 0.10.1 from source
+### Rebuild 0.10.2 from source
 
 With Node.js 22.19+ and pnpm installed, run these commands from this repository's root. Check out the verified release tag before building:
 
 ```powershell
-git checkout v0.10.1
+git checkout v0.10.2
 pnpm install --frozen-lockfile
 npm run build:client
 New-Item -ItemType Directory -Force dist | Out-Null
@@ -262,7 +267,7 @@ The planned Harness model ID is not necessarily the vendor CLI's model name. A s
 
 *Story artwork from the plugin's Gal assets; it is not a capture of the running interface.*
 
-The **Story** tab runs locally: backgrounds, portraits, dialogue, choices, history, endings, autosave, and three manual save slots per story. No model account is needed. Version 0.10.1 offers five episodes:
+The **Story** tab runs locally: backgrounds, portraits, dialogue, choices, history, endings, autosave, and three manual save slots per story. No model account is needed. Version 0.10.2 offers five episodes:
 
 | Episode in the selector | Scope | Ending distinction |
 | --- | --- | --- |
@@ -278,7 +283,7 @@ Spring content revision 1 saves remain readable in revision 2; loading them does
 
 The **Free** tab uses an officially configured model route for in-panel chat, can stop a pending response, or copies the opening prompt into a Harness session. Free-mode replies are real model calls and may incur charges. The plugin does not store provider credentials.
 
-Version 0.10.1 connects **28 original PNG portraits** to base-image display and Free-mode character selection, with alias/player duplicates removed. **27 story characters × six generated expressions = 162** expression sprites, including 12 sets added this round; six Echo City backgrounds were added too. JEV has an original base portrait and is selectable in Free mode, but has no story appearance or expression set. Two-person scenes now render both `cast` and `stageCharacters` correctly. The [portrait provenance guide](docs/GAL_ART_SOURCES.zh.md) separates originals from generated variants.
+Version 0.10.2 includes **28 original PNG portraits** for base-image display and Free-mode character selection, with alias/player duplicates removed. **27 story characters × six generated expressions = 162** expression sprites, including 12 sets added in the previous Gal update; six Echo City backgrounds were added too. JEV has an original base portrait and is selectable in Free mode, but has no story appearance or expression set. Two-person scenes render both `cast` and `stageCharacters` correctly. The [portrait provenance guide](docs/GAL_ART_SOURCES.zh.md) separates originals from generated variants.
 
 ![Claude in the real plugin component, previewed locally in a browser](docs/assets/gal-claude-0.10.1-preview.png)
 
@@ -290,6 +295,6 @@ Version 0.10.1 connects **28 original PNG portraits** to base-image display and 
 
 ## Verification status and further reading
 
-The **0.10.1 release build passed 81/81 automated tests**, the client build check, peer check, and frozen dependency installation check. Claude and a two-character Spring scene were viewed in a **local browser preview of the actual plugin components**. **0.10.1 has not yet been installed and accepted in the user's official DeepSeek Harness Desktop profile.** The older 0.9.0 was installed in an isolated profile using the Desktop 0.2.0-rc.1 runtime. These checks do not validate live vendor sign-in, actual model identity, billable output, or production task quality; use your own accounts and a disposable Git repository for those checks.
+Version **0.10.2 passed 84/84 main tests and 67/67 additional Gal checks (151 total)**, plus the client build and check, frozen dependency installation, and peer check. Claude and a two-character Spring scene were viewed in a **local browser preview of the actual 0.10.1 plugin components**. **0.10.2 has not yet been installed and accepted in the user's official DeepSeek Harness Desktop profile.** The older 0.9.0 was installed in an isolated profile using the Desktop 0.2.0-rc.1 runtime. These checks do not validate live vendor sign-in, actual model identity, billable output, or production task quality; use your own accounts and a disposable Git repository for those checks.
 
-The [2026-10-01 project task report](PROJECT-TASK-REPORT-2026-10-01.md) records file roles, completed checks, account tests still needed, and remaining work. See the [migration notes](MIGRATION.md) if you previously used an older desktop integration.
+The [rc.2 compatibility report](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md) records file roles, completed checks, account tests still needed, and remaining work. See the [migration notes](MIGRATION.md) if you previously used an older desktop integration.

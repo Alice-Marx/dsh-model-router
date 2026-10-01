@@ -1,10 +1,12 @@
 # Model Router Galgame · DeepSeek Harness 桌面插件
 
-[English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [v0.10.1 发布包](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) · [npm 0.10.1](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.10.1)
+> **当前交付状态**：0.10.2 已完成本地打包、151 项检查与官方 rc.2 运行时隔离安装，**尚未上传 npm/GitHub**。当前请在插件管理器填本地文件 `F:\everyAI\all\model-router-galgame\dist\ljwei-stak-model-router-galgame-0.10.2.tgz`。下文 npm/Release 地址为后续发布方式，现在不能用 `@0.10.2` 从 npm 安装；桌面自动操作已由用户按 Esc 停止，未安装到当前桌面 profile。
 
-**0.10.1 通过 npm 的 `next` 通道与 GitHub 预发布提供，声明适配 DeepSeek Harness Desktop 0.2.0-rc.1。** 0.10.1 的 Gal 模块共有五部剧目：原有《千桥协议》《旧城迁移篇》，独立改编短篇《雪灯来信》，十二章后日谈《未寄出的春天》，以及共通线八章、六条角色主线、隐藏线与 TRUE END 的《回声之城：正篇》。正篇**只有王女线设真／暗双结局**。插件还会分析任务复杂度、拆分复合请求，在用户已配置的模型中权衡质量与估计费用；用户明确调用执行工具时才启动对应的官方 CLI。
+[English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [v0.10.2 发布包](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.2) · [npm 0.10.2](https://www.npmjs.com/package/@ljwei-stak/model-router-galgame/v/0.10.2)
 
-> 要体验下文的五部剧目，在插件管理器填写 **`@ljwei-stak/model-router-galgame@0.10.1`**，或安装 GitHub Release 中的 `.tgz`。npm 的旧 `latest` 标签仍为 0.4.32，请使用完整版本号。官方桌面实装、真实账号调用和费用仍需用户验收。
+**0.10.2 计划通过 npm 的 `next` 通道与 GitHub 预发布提供，声明适配 DeepSeek Harness Desktop 0.2.0-rc.1 和 0.2.0-rc.2。** 0.10.2 的 Gal 模块共有五部剧目：原有《千桥协议》《旧城迁移篇》，独立改编短篇《雪灯来信》，十二章后日谈《未寄出的春天》，以及共通线八章、六条角色主线、隐藏线与 TRUE END 的《回声之城：正篇》。正篇**只有王女线设真／暗双结局**。插件还会分析任务复杂度、拆分复合请求，在用户已配置的模型中权衡质量与估计费用；用户明确调用执行工具时才启动对应的官方 CLI。
+
+> 要体验下文的五部剧目，在插件管理器填写 **`@ljwei-stak/model-router-galgame@0.10.2`**，或安装 GitHub Release 中的 `.tgz`。npm 的旧 `latest` 标签仍为 0.4.32，请使用完整版本号。**0.10.1 只声明支持 rc.1，在 rc.2 被拒绝是版本依赖不兼容，不是网络故障。** 0.10.2 的官方桌面实装、真实账号调用和费用仍需用户验收。
 
 ![从任务分析到官方工具执行的流程](docs/assets/routing-workflow.svg)
 
@@ -24,16 +26,19 @@
 
 | DeepSeek Harness Desktop / 宿主依赖 | 插件版本 | 安装说明 |
 | --- | --- | --- |
-| **0.2.0-rc.1** | **0.10.1（npm `next` / GitHub 预发布）** | 五部剧目与本轮立绘、春篇修订；指定 `@0.10.1` 或下载 `.tgz`，尚待用户在官方桌面实装验收。 |
+| **0.2.0-rc.1 / 0.2.0-rc.2** | **0.10.2 本地候选版（待发布）** | 当前安装版本；指定 `@0.10.2` 或下载 `.tgz`，官方桌面实装仍待用户验证。 |
+| 0.2.0-rc.1 | 0.10.1（历史预发布） | 仅声明 rc.1 peer；**rc.2 会拒绝安装**，请升级到 0.10.2。 |
 | **0.2.0-rc.1** | **0.9.0 已发布版** | 历史兼容版；从 npm 指定 `@0.9.0`，不含本轮新增 Gal 内容。 |
 | 0.1.7-rc.2 | 0.8.0 | 历史版本；其宿主 peer 与 0.2.0-rc.1 不兼容。 |
 | 声明的旧 `dsh-settings` 范围：`^0.1.1-rc.1 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` | 0.4.32（npm `latest`） | 旧版发布记录；不要凭 `latest` 给 0.2.0-rc.1 安装。 |
 
-**安装 0.10.1（体验五部剧目）**
+**安装 0.10.2（体验五部剧目）**
 
-1. 打开 DeepSeek Harness Desktop → **插件** → **添加插件**，完整填写 **`@ljwei-stak/model-router-galgame@0.10.1`**。镜像未同步时，将安装源改为 `https://registry.npmjs.org/`。
-2. 如果需要离线文件安装，从 [GitHub v0.10.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) 下载 `.tgz` 和 `.sha256` 校验文件，保存到自选目录。在输入框填写 `.tgz` 的**完整绝对路径**，例如 `D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz`；本地文件不需要 npm 镜像源。用 `Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.10.1.tgz'` 对照 Release 校验文件。
-3. 安装、启用插件；如有重启提示则重启。确认插件详情显示 **0.10.1**，左侧出现 **“模型路由”** 与 **“Gal 模块”**。遇到旧插件重复时，先在插件页禁用旧实例。
+1. 打开 DeepSeek Harness Desktop → **插件** → **添加插件**，完整填写 **`@ljwei-stak/model-router-galgame@0.10.2`**。镜像未同步时，将安装源改为 `https://registry.npmjs.org/`。
+2. 如果需要文件安装，从 [GitHub v0.10.2 Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.2) 下载 `.tgz` 和 `.sha256` 校验文件，保存到自选目录。在输入框填写 `.tgz` 的**完整绝对路径**，例如 `D:\Plugins\ljwei-stak-model-router-galgame-0.10.2.tgz`；也可解压后填内层含 `package.json` 与 `.dsh-plugin` 的 `package` 目录绝对路径。本地文件不需要 npm 镜像源。用 `Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.10.2.tgz'` 对照 Release 校验文件。
+3. 安装、启用插件；如有重启提示则重启。确认插件详情显示 **0.10.2**，左侧出现 **“模型路由”** 与 **“Gal 模块”**。若之前安装失败且“已安装”列表没有同名插件，直接重试 0.10.2；若已有同名旧版，先保留手动存档并备份当前配置数据，依插件管理器升级指引卸载旧实例，再装 0.10.2。**不要清理 profile 或应用数据**。
+
+截图中的 0.10.1 peer 错误应通过安装 0.10.2 解决；不要尝试 `allow-version`、降级桌面版或修改 `app.asar`。
 
 **安装此前已发布的 0.9.0（历史版）**
 
@@ -53,19 +58,19 @@
 
 0.9.0 包的 SHA-256 为 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`；npm 与 GitHub 重新下载的包已核对为相同字节。旧版不被覆盖或删除。`npm install -g` 只安装 npm 包，**不会**在当前 Harness profile 注册和启用插件；正常使用请走插件管理器。不要修改桌面安装目录或 `app.asar`。
 
-**方式 C：从经验证的源码构建**
+**0.10.2 从源码重建（开发者）**
 
-开发者安装 Node.js 22.19+ 与 pnpm 后，可检出固定标签 `v0.10.1`，在仓库根目录运行：
+开发者安装 Node.js 22.19+ 与 pnpm 后，可检出固定标签 `v0.10.2`，在仓库根目录运行：
 
 ```powershell
-git checkout v0.10.1
+git checkout v0.10.2
 pnpm install --frozen-lockfile
 npm run build:client
 New-Item -ItemType Directory -Force dist | Out-Null
 npm pack --pack-destination dist
 ```
 
-随后通过插件管理器安装 `dist` 中生成的 `.tgz`。主分支可能继续更新；要复现 0.10.1，请使用固定标签。更多界面步骤与排障见[安装指南](INSTALLATION_GUIDE.zh.md)。
+随后通过插件管理器安装 `dist` 中生成的 `.tgz`。主分支可能继续更新；要复现 0.10.2，请使用固定标签。更多界面步骤与排障见[安装指南](INSTALLATION_GUIDE.zh.md)。
 
 ## 开始使用
 
@@ -221,7 +226,7 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 - **剧情模式 · Gal 视图**：场景、人物立绘、分支选择、历史回看、结局和三个本地手动存档槽。剧情引擎离线运行，无需模型账号。
 - **自由模式**：选择宿主已配置的模型、角色与场景，在面板内发送消息、停止生成，也可复制开场提示词到官方会话。面板内对话会真实调用模型并可能计费。
 
-0.10.1 的 **“剧目”** 下拉框共有五项：
+0.10.2 的 **“剧目”** 下拉框共有五项：
 
 | 剧目 | 篇幅与玩法 | 结局说明 |
 | --- | --- | --- |
@@ -249,8 +254,8 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 
 ## 验证与开发
 
-0.10.1 发布构建已通过 **81/81 项自动测试**、客户端构建检查、peer 检查与 frozen 依赖安装检查；Claude 和春篇双人显示已在**真实插件组件的本地浏览器预览**中检查。**尚未在用户的官方 DeepSeek Harness Desktop 中安装 0.10.1 并验收**。0.9.0 曾在 Desktop 0.2.0-rc.1 运行时代码的隔离 profile 安装验证。七家 CLI 的真实账号登录、付费任务、实际模型与账单仍需账号持有人核对；可编辑团队任务先用测试仓库验证。
+0.10.2 已通过 **84/84 项主测试与 67/67 项额外 Gal 检查（共 151 项）**，以及客户端构建、客户端检查、frozen 依赖安装和 peer 检查。Claude 和春篇双人显示已在 **0.10.1 实际插件组件的本地浏览器预览**中检查。**尚未在用户的官方 DeepSeek Harness Desktop 中安装 0.10.2 并验收**。0.9.0 曾在 Desktop 0.2.0-rc.1 运行时代码的隔离 profile 安装验证。七家 CLI 的真实账号登录、付费任务、实际模型与账单仍需账号持有人核对；可编辑团队任务先用测试仓库验证。
 
-开发者可运行 `pnpm install --frozen-lockfile`、`npm test`、`npm run check:client` 和 `pnpm peers check`。本轮文件职责、详细验证、用户需要做的测试和剩余任务见[总项目任务报告](PROJECT-TASK-REPORT-2026-10-01.md)。欢迎通过 [Issues](https://github.com/Alice-Marx/model-router-galgame/issues) 附插件安装详情、宿主版本和脱敏后的错误日志反馈问题。
+开发者可运行 `pnpm install --frozen-lockfile`、`npm test`、`npm run check:client` 和 `pnpm peers check`。本轮文件职责、详细验证、用户需要做的测试和剩余任务见[rc.2 兼容修复报告](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md)。欢迎通过 [Issues](https://github.com/Alice-Marx/model-router-galgame/issues) 附插件安装详情、宿主版本和脱敏后的错误日志反馈问题。
 
 许可证：[MIT](LICENSE)。
