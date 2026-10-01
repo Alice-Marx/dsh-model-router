@@ -1,6 +1,6 @@
 # Model Router Galgame · DeepSeek Harness 桌面插件
 
-> **当前版本：0.11.1。** 可从 [v0.11.1 GitHub Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) 下载版本化安装包；若 npm 注册表已同步该版本，也可在插件管理器输入完整包名 `@ljwei-stak/model-router-galgame@0.11.1`。npm 的 `latest` 标签仍是 0.4.32，因此必须填写完整版本号。0.11.1 保留 0.11.0 运行时并修正发布说明；旧 0.11.0 的 npm 页面缺少 README 元数据。真实模型登录与费用仍由账号持有人验收。
+> **当前版本：0.11.1。** 可从 [v0.11.1 GitHub Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) 下载版本化安装包，也可在插件管理器输入完整包名 `@ljwei-stak/model-router-galgame@0.11.1`，或使用 npm `next` 标签。npm 的 `latest` 仍是 0.4.32，因此必须填写完整版本号或 `@next`。0.11.1 保留 0.11.0 运行时并修正发布说明；旧 0.11.0 的 npm 页面缺少 README 元数据。真实模型登录与费用仍由账号持有人验收。
 
 [English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [Gal 设置详细教程](docs/GAL_SETTINGS.zh.md) · [历史已发布 v0.10.1](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1)
 
@@ -47,7 +47,7 @@
 
 旧 0.10.1 的 peer 错误已在 0.10.2 修复，并由 0.11.0 / 0.11.1 保留。不要尝试 `allow-version` 或修改 `app.asar` 绕过版本检查。
 
-**版本选择提示**：只有在注册表列出精确版本后，才输入 `@ljwei-stak/model-router-galgame@0.11.1`；不要只填裸包名，因为 npm `latest` 仍指向 0.4.32。若 npm 尚未同步，请使用 v0.11.1 GitHub Release 安装包。
+**版本选择提示**：0.11.1 已发布到 npm `next` 标签。输入 `@ljwei-stak/model-router-galgame@0.11.1` 或 `@ljwei-stak/model-router-galgame@next`；不要只填裸包名，因为 npm `latest` 仍指向 0.4.32。若所选镜像暂未同步，请改用官方 npm 源或 v0.11.1 GitHub Release 安装包。
 
 **安装此前已发布的 0.9.0（历史版）**
 

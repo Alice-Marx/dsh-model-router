@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop 插件安装与验证
 
-> **当前版本为 0.11.1。** 从 [GitHub Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) 下载 `.tgz` 并安装。npm `latest` 仍是旧版 0.4.32，因此不要省略版本号；npm 的 0.11.1 发布状态与最终安装源见[本轮总项目报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)。
+> **当前版本为 0.11.1。** 可从 [GitHub Release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) 下载 `.tgz` 安装，也可在 DeepSeek Harness 插件管理器输入完整 npm 包名。npm `next` 标签指向 0.11.1，`latest` 仍是旧版 0.4.32，因此不要省略版本号。发布状态见[本轮总项目报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)。
 
 [README](README.zh.md) · [Gal 设置与播放器详细教程](docs/GAL_SETTINGS.zh.md) · [五剧目玩法](docs/ECHO_CITY_STORY.zh.md)
 
@@ -8,7 +8,7 @@
 
 | 插件版本 | 状态 | 声明的 DSH 依赖 | 如何使用 |
 | --- | --- | --- | --- |
-| **0.11.1** | 当前 GitHub 版；npm 上传待完成 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 0.11.0 运行时与 Gal 功能；修复 README 与发布说明。 |
+| **0.11.1** | 当前 npm `next` / GitHub 发布版 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 0.11.0 运行时与 Gal 功能；修复 README 与发布说明。 |
 | **0.11.0** | 前一 npm / GitHub 发布版 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 运行时相同，但 npm README 元数据缺失、包内说明过时；建议安装 0.11.1。 |
 | **0.10.2** | 历史本地兼容修复，未发布 | `0.2.0-rc.1 \|\| 0.2.0-rc.2` | 官方 rc.2 运行时隔离安装已验证；兼容修复由 0.11.1 保留。 |
 | **0.10.1** | 已发布 npm / GitHub 预发布 | `0.2.0-rc.1` | 只适配 rc.1；rc.2 管理器拒绝安装。 |
@@ -21,13 +21,13 @@
 ## 2. 安装 0.11.1
 
 1. 打开 **DeepSeek Harness Desktop → 插件 → 添加插件**。
-2. 从 [v0.11.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/download/v0.11.1/ljwei-stak-model-router-galgame-0.11.1.tgz) 下载 `.tgz`。在“包名、GitHub 仓库地址或本地目录路径”输入框填写该文件的绝对路径；若 npm 注册表已列出该版，也可以输入完整包名：
+2. 从 [v0.11.1 Release](https://github.com/Alice-Marx/model-router-galgame/releases/download/v0.11.1/ljwei-stak-model-router-galgame-0.11.1.tgz) 下载 `.tgz`。在“包名、GitHub 仓库地址或本地目录路径”输入框填写该文件的绝对路径；也可以从 npm 安装完整包名：
 
    ```text
    @ljwei-stak/model-router-galgame@0.11.1
    ```
 
-3. 本地安装包可放在 D 盘等自选位置；若精确 npm 版本不可用，先使用 GitHub Release 文件，不要改选裸包名。
+3. 本地安装包可放在 D 盘等自选位置；若 npm 镜像暂未同步，先使用 GitHub Release 文件，不要改选裸包名。
 4. 确认安装预览显示 **0.11.1**，没有宿主不兼容提示，安装并启用。出现重启提示时再重启桌面程序。
 5. 核对侧边栏出现 **模型路由** 和 **Gal 模块**。进入 Gal 先显示 **标题画面**，可选择剧目、开始新故事或继续；另有 **剧情模式 · Gal 视图、自由模式、素材鉴赏**，上方有 **Gal 设置** 与 **开启音乐**。
 
@@ -51,7 +51,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 @ljwei-stak/model-router-galgame@0.11.1
 ```
 
-**不要省略版本号。** npm `latest` 标签当前仍指向 0.4.32。只有在注册表列出 0.11.1 后才从 npm 安装；0.11.0 缺少 npm README 元数据，0.11.1 修正了包内文档。历史 0.10.1 只适配 rc.1，不能用于 rc.2。
+**不要省略版本号。** npm 的 `next` 标签指向 0.11.1，`latest` 仍指向 0.4.32。输入 `@ljwei-stak/model-router-galgame@0.11.1` 或 `@ljwei-stak/model-router-galgame@next`；0.11.0 缺少 npm README 元数据，0.11.1 修正了包内文档。历史 0.10.1 只适配 rc.1，不能用于 rc.2。
 
 ## 3. 初次使用 Gal：先调立绘，再开音乐
 
