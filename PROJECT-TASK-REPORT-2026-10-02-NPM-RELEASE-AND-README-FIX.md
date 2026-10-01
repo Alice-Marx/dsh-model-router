@@ -6,7 +6,7 @@ Correct the stale release instructions and missing npm page README in v0.11.0. P
 
 ## Current publication status
 
-The local 0.11.1 archive is ready, but **npm publication has not succeeded**. Public registry lookup for `0.11.1` returns 404. Multiple publish attempts reached the registry and then failed during the large PUT upload (`ECONNRESET` / `ETIMEDOUT`); do not treat the npm package name as installable yet. The versioned GitHub release is the fallback install source and is being prepared separately. npm's existing `latest` tag remains 0.4.32.
+GitHub **v0.11.1 is published** with the `.tgz` and `.sha256` assets. I downloaded both assets from the release and confirmed the archive hash matches the local file and sidecar. npm publication has **not** succeeded: public registry lookup for `0.11.1` returns 404, and multiple publish attempts failed during the large PUT upload (`ECONNRESET` / `ETIMEDOUT`). Do not treat the npm package name as installable yet. npm's existing `latest` tag remains 0.4.32.
 
 ## Work completed
 
@@ -15,7 +15,8 @@ The local 0.11.1 archive is ready, but **npm publication has not succeeded**. Pu
 - Explained the old compatibility failure: 0.10.1 only declared the rc.1 peer range; the 0.11.x manifest accepts rc.1 and rc.2. The installer should use the official registry HTTPS source if a selected mirror has not synchronized the release.
 - Updated Gal story, artwork, and settings documents to remove obsolete “unpublished candidate” wording and link to the current release report.
 - Added all local images referenced by the READMEs to the npm `files` allowlist. The packed archive contains 49 entries and every relative image reference in `README.md`, `README.zh.md`, and `INSTALLATION_GUIDE.zh.md` resolves inside the archive.
-- Repacked the archive and generated a SHA-256 sidecar. Current local archive SHA-256: `5abe474da7b63da18b7d27a4d3d41451274c7dc2ea9df0100a74d85d818f41ea`.
+- Repacked the archive and generated a SHA-256 sidecar. Current release archive size: **43,963,934 bytes**. SHA-256: `5abe474da7b63da18b7d27a4d3d41451274c7dc2ea9df0100a74d85d818f41ea`.
+- Pushed source and documentation to GitHub `main`; created the `v0.11.1` release with both archive assets. A fresh GitHub download matches the local tarball and sidecar byte-for-byte by SHA-256.
 - Updated the Desktop compatibility test's expected package version to 0.11.1.
 
 ## Changed files
@@ -23,9 +24,9 @@ The local 0.11.1 archive is ready, but **npm publication has not succeeded**. Pu
 | File | Purpose |
 | --- | --- |
 | `package.json` | Bumps to 0.11.1 and includes README diagrams, screenshots, and the story title art in the package. |
-| `README.md` | Replaces stale candidate instructions with the exact release version, compatibility notes, installation steps, and algorithm/use documentation. |
+| `README.md` | Replaces stale candidate instructions with the release version, compatibility notes, installation steps, and algorithm/use documentation. |
 | `README.zh.md` | Chinese release, compatibility, installation, routing algorithm, Gal usage, and verification instructions. |
-| `INSTALLATION_GUIDE.zh.md` | Chinese step-by-step installation and first-run checks. |
+| `INSTALLATION_GUIDE.zh.md` | Chinese step-by-step installation and first-run checks, including the npm publication limitation and GitHub archive fallback. |
 | `docs/ECHO_CITY_STORY.zh.md` | Updates release references and usage notes for the Gal story collection. |
 | `docs/GAL_ART_SOURCES.zh.md` | Refreshes the art source guide's release links. |
 | `docs/GAL_SETTINGS.zh.md` | Refreshes settings guide version links and labels. |
@@ -39,19 +40,19 @@ The local 0.11.1 archive is ready, but **npm publication has not succeeded**. Pu
 - `pnpm peers check`: passed with no peer dependency issues.
 - `npm pack --pack-destination dist`: succeeded; package version 0.11.1, 49 files, 44.0 MB compressed.
 - Archive README assets: **0 missing references** across the three published Markdown guides.
-- `git diff --check`: passed; Git emitted only a Windows line-ending notice for the edited compatibility test.
+- `git diff --check`: passed; Git emitted only Windows line-ending notices for two edited text files.
+- GitHub `v0.11.1` release API lists two assets. The archive downloaded from GitHub is 43,963,934 bytes; its SHA-256 equals both the local archive and sidecar.
+- npm `GET /@ljwei-stak%2fmodel-router-galgame/0.11.1`: **404**. The publish lifecycle endpoint also returned 404 after the upload attempts timed out.
 
 These checks validate the source and the local archive. They do not by themselves establish that npm's security scan has finished, that GitHub assets match the final archive, or that the current Desktop profile accepts the newly installed 0.11.1 package.
 
 ## Still to finish
 
-1. Retry npm 0.11.1 when the registry accepts package uploads. Complete the browser verification for that attempt, wait for npm's lifecycle status to become `published`, then verify the public version document, README metadata, tarball and SHA-256. Keep the `next` dist-tag and do not move `latest` from 0.4.32.
-2. Commit and push the source, create the `v0.11.1` GitHub release, attach the exact `.tgz` and `.sha256` files, then download the GitHub asset and compare its hash with the local archive.
-3. In the user's DeepSeek Harness Desktop profile, install the versioned GitHub release archive (or the exact npm package after registry confirmation), enable it, and confirm plugin details show 0.11.1 and both **模型路由** and **Gal 模块** entries render. Preserve the existing profile and saves.
-4. After the UI acceptance check, separately verify a configured provider route and any official CLI that the user has credentials for. Check observed provider/model identity and billing in the user's own account; these are live-account checks and are not simulated by unit tests.
+1. Retry npm 0.11.1 when the registry accepts large package uploads. Complete the fresh browser verification, wait for lifecycle status `published`, then verify the public version document, README metadata, tarball and SHA-256. Keep the `next` dist-tag and do not move `latest` from 0.4.32.
+2. In the user's DeepSeek Harness Desktop profile, install the versioned GitHub release archive, enable it, and confirm plugin details show 0.11.1 and both **模型路由** and **Gal 模块** entries render. Preserve the existing profile and saves.
+3. After the UI acceptance check, separately verify a configured provider route and any official CLI that the user has credentials for. Check observed provider/model identity and billing in the user's own account; these are live-account checks and are not simulated by unit tests.
 
 ## How to finish the remaining checks
 
-- For npm, retry `npm publish --tag next --access public` when registry uploads are healthy. Complete its fresh browser verification promptly, then verify the published lifecycle and compare the registry tarball byte-for-byte. Never move `latest` from 0.4.32 as part of this patch.
-- For GitHub, push the source and annotated `v0.11.1` tag to `origin`, attach the prepared tarball and checksum sidecar to a release, then verify a fresh download.
-- In the Desktop plugin manager, choose **插件 → 添加插件** and install from the versioned GitHub release archive. If npm later confirms the exact version is published, `@ljwei-stak/model-router-galgame@0.11.1` is also valid. If installation fails, expand **查看安装详情** and capture the host version and full peer-dependency error before changing compatibility metadata.
+- For npm, retry `npm publish --tag next --access public` when registry uploads are healthy. Complete its fresh browser verification promptly, then verify the published lifecycle, rendered README metadata, and registry tarball hash. Never move `latest` from 0.4.32 as part of this patch.
+- In the Desktop plugin manager, choose **插件 → 添加插件** and install from the v0.11.1 GitHub archive. The exact npm package name is valid only after npm's registry lists version 0.11.1. If installation fails, expand **查看安装详情** and capture the host version and full peer-dependency error before changing compatibility metadata.
