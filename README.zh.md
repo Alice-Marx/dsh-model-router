@@ -2,7 +2,7 @@
 
 **0.13.0 新增开箱体检、成本控制、订阅优先计费与执行记录；自 0.12.0 起模型路由与 GAL 是两个独立插件。** 路由器分析问题、判断难度，在用户已配置的模型中选择合适路线：简单工作更重视费用，困难工作更重视质量，复合任务拆成有依赖的工作包，再由支持的官方模型工具执行。
 
-**自 0.13.0 起 npm 包名改为 `@ljwei-stak/dsh-model-router`**，旧名 `@ljwei-stak/model-router-galgame`（至 0.12.0）不再更新，升级时需卸载旧插件再添加新包（见[从旧包名升级](#从旧包名-ljwei-stakmodel-router-galgame-升级)）；**自 0.12.0 起只提供“模型路由”入口**。要玩剧情、调整立绘、听音乐或自由对话，请另装 [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame)。两个插件互不依赖，可单独安装，也可同时安装。
+**自 0.13.0 起 npm 包名改为 `@ljwei-stak/dsh-model-router`**，旧名 `@ljwei-stak/model-router-galgame` 最后版本为 0.13.0（与新包 0.13.0 内容相同），之后不再更新，升级时需卸载旧插件再添加新包（见[从旧包名升级](#从旧包名-ljwei-stakmodel-router-galgame-升级)）；**自 0.12.0 起只提供“模型路由”入口**。要玩剧情、调整立绘、听音乐或自由对话，请另装 [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame)。两个插件互不依赖，可单独安装，也可同时安装。
 
 [English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [迁移说明](MIGRATION.md) · [独立 GAL 仓库](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
@@ -46,7 +46,7 @@
 
 ### 从旧包名 @ljwei-stak/model-router-galgame 升级
 
-0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`，插件管理器无法原地更新旧条目：
+0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`。旧包名的最后版本同样是 0.13.0，内容相同，之后的更新只发布到新包名。插件管理器无法原地更新旧条目：
 
 1. 在插件管理器卸载 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据）。
 2. 添加 `@ljwei-stak/dsh-model-router@0.13.0`，按提示重启。

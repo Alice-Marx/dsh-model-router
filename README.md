@@ -2,7 +2,7 @@
 
 **Version 0.13.0 adds health checks, cost control, subscription-first billing and run history; since 0.12.0 model routing and GAL are separate plugins.** This plugin analyzes a request, gives simpler work to affordable capable models, and reserves stronger routes for difficult work. Compound requests become dependent work packages that supported official vendor tools can execute.
 
-**Since 0.13.0 the npm package is `@ljwei-stak/dsh-model-router`.** The old name `@ljwei-stak/model-router-galgame` (up to 0.12.0) is no longer updated; to upgrade, remove the old plugin and add the new one ([details](#upgrade-from-ljwei-stakmodel-router-galgame)). **Since 0.12.0 the router package has only the Model Router sidebar entry.** Install the independent [GAL plugin](https://github.com/Alice-Marx/deepseek-harness-galgame) if you also want stories, portraits, music, saves, or free roleplay.
+**Since 0.13.0 the npm package is `@ljwei-stak/dsh-model-router`.** The old name `@ljwei-stak/model-router-galgame` ends at 0.13.0 (same content as the new package's 0.13.0) and will get no further updates; to upgrade, remove the old plugin and add the new one ([details](#upgrade-from-ljwei-stakmodel-router-galgame)). **Since 0.12.0 the router package has only the Model Router sidebar entry.** Install the independent [GAL plugin](https://github.com/Alice-Marx/deepseek-harness-galgame) if you also want stories, portraits, music, saves, or free roleplay.
 
 [简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Migration guide](MIGRATION.md) · [GAL repository](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
@@ -42,7 +42,7 @@ For npm installation, select the official **HTTPS** source `https://registry.npm
 
 ### Upgrade from `@ljwei-stak/model-router-galgame`
 
-The package was renamed in 0.13.0, so the plugin manager cannot update the old entry in place:
+The package was renamed in 0.13.0. The old name's last version is also 0.13.0, with identical content, so future updates only come under the new name. The plugin manager cannot update the old entry in place:
 
 1. Remove `@ljwei-stak/model-router-galgame` in the plugin manager (keep profile and application data).
 2. Add `@ljwei-stak/dsh-model-router@0.13.0` and restart when prompted.

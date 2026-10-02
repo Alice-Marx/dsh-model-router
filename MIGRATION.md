@@ -4,14 +4,14 @@
 
 | 插件 | 安装输入 | 所属项目 |
 | --- | --- | --- |
-| 模型路由 | `@ljwei-stak/dsh-model-router@0.13.0`（0.12.0 起独立；0.13.0 起改名） | [路由仓库](https://github.com/Alice-Marx/dsh-model-router)；旧包名 `@ljwei-stak/model-router-galgame` 停在 0.12.0，不再更新。 |
+| 模型路由 | `@ljwei-stak/dsh-model-router@0.13.0`（0.12.0 起独立；0.13.0 起改名） | [路由仓库](https://github.com/Alice-Marx/dsh-model-router)；旧包名 `@ljwei-stak/model-router-galgame` 最后版本为 0.13.0（与新包 0.13.0 内容相同），之后不再更新。 |
 | GAL | `@ljwei-stak/dsh-galgame@0.1.0` | [新 GAL 仓库](https://github.com/Alice-Marx/deepseek-harness-galgame)；独立安装与更新。 |
 
 路由 0.12.0 只注册**模型路由**侧边栏入口。剧情引擎、角色美术、音乐、存档与自由模式全部归独立 GAL；两个插件互不依赖。
 
 ## 0.13.0 包名变更
 
-0.13.0 起 npm 包名由 `@ljwei-stak/model-router-galgame` 改为 **`@ljwei-stak/dsh-model-router`**。旧包名停在 0.12.0（`next`）与 0.4.32（`latest`），不再更新，也不会被弃用或删除。
+0.13.0 起 npm 包名由 `@ljwei-stak/model-router-galgame` 改为 **`@ljwei-stak/dsh-model-router`**。旧包名的最后版本是 0.13.0（`next`；`latest` 仍为 0.4.32），内容与新包 `@ljwei-stak/dsh-model-router@0.13.0` 相同；旧包名之后不再更新，但不会被弃用或删除。已装旧包 0.13.0 的用户功能不缺，但应按下面步骤换到新包名以获得后续更新。
 
 - 插件管理器把两者视为不同的包，不能原地“更新”：先卸载旧包（保留 profile 与应用数据），再添加新包。
 - 不要同时安装：二者使用同一个 profile 条目 id `model-router-galgame` 和相同的 `model_router_*` 工具名。

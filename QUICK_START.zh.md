@@ -14,7 +14,7 @@
 
 ### 2. 安装插件
 
-正式 npm 包（0.13.0 起包名为 `@ljwei-stak/dsh-model-router`；旧名 `@ljwei-stak/model-router-galgame` 不再更新）：
+正式 npm 包（0.13.0 起包名为 `@ljwei-stak/dsh-model-router`；旧名 `@ljwei-stak/model-router-galgame` 最后版本为 0.13.0，与新包 0.13.0 内容相同，之后不再更新）：
 
 ```bash
 pnpm config set registry https://registry.npmjs.org/

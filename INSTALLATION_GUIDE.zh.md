@@ -72,7 +72,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-galgame-0
 
 1. 在旧合并插件的 GAL 播放器导出需要保留的剧情进度，并备份整个 Harness profile。每份 JSON 仅保存**当前剧情状态**，不含所有手动槽、设置、已读记录或本地音乐；重要槽位可依次读档再导出。
 2. 在**同一个 profile**安装独立 `@ljwei-stak/dsh-galgame@0.1.0`。
-3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.13.0`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
+3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`（旧包名最后版本为 0.13.0，内容相同，之后不再更新）：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.13.0`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
 4. 现在路由与 GAL 各有一个入口。独立 GAL 沿用旧存档 localStorage 键，核对当前进度和三槽；更换 profile 或进度未恢复时，先切换到匹配剧目，再导入 JSON 备份。
 5. 后续分别更新需要的插件；只用路由可以不启用或不安装 GAL。保留 profile 与应用数据，卸载插件时不要清理故事数据。
 
