@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.2 — 2026-10-03
+
+Bug-fix release for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under the npm `next` and `latest` tags.
+
+### Fixed
+- Codex runs through the signed Windows runner failed in any workspace that is not a Git repository (for example a plain project folder chosen in the workbench). The step paused with "Codex 未返回完整成功终态和回答" and no model call was made. Codex 0.157.1 refuses such directories unless `--skip-git-repo-check` is passed (`Not inside a trusted directory and --skip-git-repo-check was not specified.`). The flag was only in the portable adapter; the signed runner now passes it too. Read-only runs stay confined by `--sandbox read-only` and the Harness process sandbox.
+- When Codex exits without a successful turn, the error now names the cause: an untrusted directory, or no JSON events at all (with the last CLI output line). The pause detail no longer comes out empty when stderr is empty but stdout has output.
+
 ## 0.13.1 — 2026-10-03
 
 Bug-fix release for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under the npm `next` and `latest` tags.

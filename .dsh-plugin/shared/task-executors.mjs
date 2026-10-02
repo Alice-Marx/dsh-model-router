@@ -254,6 +254,14 @@ function parseClaude(stdout) {
   return { ok: true, answer: result.result }
 }
 
+/** First non-empty diagnostic from a signed-runner result (an empty stderr must not hide stdout). */
+export function verifiedDiagnostic(verified) {
+  for (const value of [verified?.detail, verified?.stderrTail, verified?.stdoutTail]) {
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return ''
+}
+
 function parseCodex(stdout) {
   let answer = ''
   let completed = false
@@ -695,7 +703,7 @@ export async function executeAssignedTask({
         route, task: prompt, signal, adapter, preference, exitCode: verified.exitCode ?? null,
         timedOut: verified.status === 'timed-out', attempted: true,
         reason: verified.error || verified.reason || '官方 CLI 执行失败，已回退模型目录 API。',
-        detail: redactDiagnostic(verified.detail ?? verified.stderrTail ?? verified.stdoutTail ?? '', childEnvironment(adapter, credentials, credentialMode).secret),
+        detail: redactDiagnostic(verifiedDiagnostic(verified), childEnvironment(adapter, credentials, credentialMode).secret),
         raw: [verified.error, verified.reason, verified.detail, verified.stderrTail, verified.stdoutTail].filter(item => typeof item === 'string').join('\n'),
       })
     }

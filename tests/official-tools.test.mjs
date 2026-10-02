@@ -19,7 +19,8 @@ import {
   pinnedMiniMaxInstaller,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
-import { findManagedMiniMaxEntry } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+import { usageFromOutput, verifiedDiagnostic } from '../.dsh-plugin/shared/task-executors.mjs'
 
 test('MiniMax official Windows installer entry requires the pinned version and CLI digest',
   { skip: process.platform !== 'win32' }, async t => {
@@ -218,4 +219,46 @@ test('version banners are parsed leniently but bounded', () => {
   assert.equal(versionFromBanner('1.2.3-beta.1 ready'), '1.2.3-beta.1')
   assert.equal(versionFromBanner('no version here'), null)
   assert.equal(versionFromBanner(''), null)
+})
+
+
+// 0.13.2 regression: on Windows the signed Codex runner omitted --skip-git-repo-check,
+// so Codex 0.157.1 refused any workspace that is not a Git repository
+// ("Not inside a trusted directory and --skip-git-repo-check was not specified.").
+test('signed Codex runner passes --skip-git-repo-check so non-Git workspaces run', () => {
+  assert.deepEqual(codexExecArgs('read-only', 'gpt-5.6-sol'), [
+    '--ask-for-approval', 'never', 'exec', '--skip-git-repo-check',
+    '--model', 'gpt-5.6-sol', '--sandbox', 'read-only', '--json', '-',
+  ])
+  const write = codexExecArgs('workspace-write', null)
+  assert.deepEqual(write, ['--ask-for-approval', 'never', 'exec', '--skip-git-repo-check', '--sandbox', 'workspace-write', '--json', '-'])
+  // exec options must follow the `exec` subcommand; the global approval flag precedes it.
+  assert.ok(write.indexOf('--skip-git-repo-check') > write.indexOf('exec'))
+  assert.ok(write.indexOf('--ask-for-approval') < write.indexOf('exec'))
+})
+
+test('Codex failures name the cause: untrusted directory, no events, or incomplete turn', () => {
+  assert.match(codexIncompleteError(0, 'Not inside a trusted directory and --skip-git-repo-check was not specified.\n'), /非 Git 仓库\/未信任目录/)
+  assert.match(codexIncompleteError(0, ''), /未输出任何 JSON 事件.*未收到 CLI 输出/)
+  assert.match(codexIncompleteError(0, 'line one\r\nfatal: boom\r\n'), /CLI 输出：fatal: boom/)
+  assert.equal(codexIncompleteError(3, 'ERROR rmcp::transport::worker: HTTP 502'), 'Codex 未返回完整成功终态和回答。')
+})
+
+test('signed-runner failure detail skips empty strings (an empty stderr no longer hides stdout)', () => {
+  assert.equal(verifiedDiagnostic({ detail: undefined, stderrTail: '', stdoutTail: 'runner said no' }), 'runner said no')
+  assert.equal(verifiedDiagnostic({ detail: '  ', stderrTail: 'stderr text', stdoutTail: 'x' }), 'stderr text')
+  assert.equal(verifiedDiagnostic({}), '')
+  assert.equal(verifiedDiagnostic(null), '')
+})
+
+test('Codex 0.157.1 turn.completed usage from a real ChatGPT-login run is parsed', () => {
+  const stream = [
+    '{"type":"thread.started","thread_id":"t"}',
+    '{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Codex is ignoring 1 unrecognized configuration setting."}}',
+    '{"type":"turn.started"}',
+    '{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"OK"}}',
+    '{"type":"turn.completed","usage":{"input_tokens":14919,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0}}',
+  ].join('\n')
+  const usage = usageFromOutput('codex-jsonl', stream.split('\n').at(-1))
+  assert.equal(usage?.usage?.outputTokens ?? usage?.usage?.output_tokens ?? usage?.outputTokens, 5)
 })

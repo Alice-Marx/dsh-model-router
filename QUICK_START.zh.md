@@ -18,8 +18,8 @@
 
 ```bash
 pnpm config set registry https://registry.npmjs.org/
-pnpm dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.13.1
-pnpm dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.13.1
+pnpm dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.13.2
+pnpm dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.13.2
 ```
 
 官方 `@liustack/modlens@3.25.4` 会随插件自动安装。

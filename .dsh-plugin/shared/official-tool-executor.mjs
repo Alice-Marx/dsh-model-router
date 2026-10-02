@@ -394,11 +394,7 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     if (!found) return { unsupported: '未找到具有 OpenAI 有效签名的 codex.exe。' }
     return {
       file: found.entry,
-      args: [
-        '--ask-for-approval', 'never', 'exec',
-        ...(modelId ? ['--model', modelId] : []),
-        '--sandbox', mode, '--json', '-',
-      ],
+      args: codexExecArgs(mode, modelId),
       format: 'codex-jsonl',
       source: found.source,
     }
@@ -467,6 +463,36 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     }
   }
   return { unsupported: CAPABILITIES[toolId]?.reason ?? '此官方工具尚无已核验的安全执行适配器。' }
+}
+
+/**
+ * Codex `exec` argv for the signed runner. `--skip-git-repo-check` is required:
+ * without it Codex refuses any workspace that is not a Git repository or a
+ * directory trusted in the user's config ("Not inside a trusted directory and
+ * --skip-git-repo-check was not specified.", exit 1). The workbench lets the user
+ * pick any absolute directory, and read-only runs are still confined by
+ * `--sandbox read-only` and the Harness process sandbox; write runs use an
+ * isolated Git worktree, so the flag changes nothing there.
+ */
+export function codexExecArgs(mode, modelId = null) {
+  return [
+    '--ask-for-approval', 'never', 'exec', '--skip-git-repo-check',
+    ...(modelId ? ['--model', modelId] : []),
+    '--sandbox', mode, '--json', '-',
+  ]
+}
+
+/** Failure text when Codex exits without a successful turn; names the cause when it is known. */
+export function codexIncompleteError(eventCount, stderr = '') {
+  const text = String(stderr ?? '')
+  if (/not inside a trusted directory/i.test(text)) {
+    return 'Codex 拒绝在非 Git 仓库/未信任目录中运行（Not inside a trusted directory）。'
+  }
+  if (!eventCount) {
+    const last = text.split(/\r?\n/u).map(line => line.trim()).filter(Boolean).at(-1)
+    return `Codex 未输出任何 JSON 事件就退出了（未开始回合，没有调用模型）。${last ? `CLI 输出：${last.slice(0, 300)}` : '未收到 CLI 输出。'}`
+  }
+  return 'Codex 未返回完整成功终态和回答。'
 }
 
 /** Check the actual trusted launch entry without starting an account call. */
@@ -538,6 +564,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
     let outputBytes = 0
     let jsonlBuffer = ''
     let codexUsageLine = ''
+    let codexEvents = 0
     let reportedUsage = null
     let terminal = null
     let failedEvent = false
@@ -601,6 +628,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
           }
           return
         }
+        codexEvents += 1
         if (event.type === 'turn.completed' && event.usage) codexUsageLine = line
         if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
         // Top-level `error` events include transient reconnect notices; only turn.failed is terminal.
@@ -725,7 +753,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         }
         terminal = 'completed'
       } else if (protocolError || terminal !== 'completed' || !finalText.trim()) {
-        settle({ status: 'failed', exitCode: code, error: protocolError ?? 'Codex 未返回完整成功终态和回答。' })
+        settle({ status: 'failed', exitCode: code, error: protocolError ?? codexIncompleteError(codexEvents, stderrTail) })
         return
       }
       if (!reportedUsage && codexUsageLine) reportedUsage = usageFromOutput('codex-jsonl', codexUsageLine)

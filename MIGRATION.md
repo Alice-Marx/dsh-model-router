@@ -4,14 +4,14 @@
 
 | 插件 | 安装输入 | 所属项目 |
 | --- | --- | --- |
-| 模型路由 | `@ljwei-stak/dsh-model-router@0.13.1`（0.12.0 起独立；0.13.0 起改名） | [路由仓库](https://github.com/Alice-Marx/dsh-model-router)；旧包名 `@ljwei-stak/model-router-galgame` 最后版本为 0.13.0（与新包 0.13.0 内容相同），之后不再更新。 |
+| 模型路由 | `@ljwei-stak/dsh-model-router@0.13.2`（0.12.0 起独立；0.13.0 起改名） | [路由仓库](https://github.com/Alice-Marx/dsh-model-router)；旧包名 `@ljwei-stak/model-router-galgame` 最后版本为 0.13.0（与新包 0.13.0 内容相同），之后不再更新。 |
 | GAL | `@ljwei-stak/dsh-galgame@0.1.0` | [新 GAL 仓库](https://github.com/Alice-Marx/deepseek-harness-galgame)；独立安装与更新。 |
 
 路由 0.12.0 只注册**模型路由**侧边栏入口。剧情引擎、角色美术、音乐、存档与自由模式全部归独立 GAL；两个插件互不依赖。
 
 ## 0.13.0 包名变更
 
-0.13.0 起 npm 包名由 `@ljwei-stak/model-router-galgame` 改为 **`@ljwei-stak/dsh-model-router`**。旧包名的最后版本是 0.13.0（`next`；`latest` 仍为 0.4.32），内容与新包 `@ljwei-stak/dsh-model-router@0.13.1` 相同；旧包名之后不再更新，但不会被弃用或删除。已装旧包 0.13.0 的用户功能不缺，但应按下面步骤换到新包名以获得后续更新。
+0.13.0 起 npm 包名由 `@ljwei-stak/model-router-galgame` 改为 **`@ljwei-stak/dsh-model-router`**。旧包名的最后版本是 0.13.0（`next`；`latest` 仍为 0.4.32），内容与新包 `@ljwei-stak/dsh-model-router@0.13.2` 相同；旧包名之后不再更新，但不会被弃用或删除。已装旧包 0.13.0 的用户功能不缺，但应按下面步骤换到新包名以获得后续更新。
 
 - 插件管理器把两者视为不同的包，不能原地“更新”：先卸载旧包（保留 profile 与应用数据），再添加新包。
 - 不要同时安装：二者使用同一个 profile 条目 id `model-router-galgame` 和相同的 `model_router_*` 工具名。
@@ -22,7 +22,7 @@
 
 1. **升级前备份**：旧 GAL 播放器导出需要保留的进度 JSON，并备份 Harness profile。JSON 保存当前剧情状态，不包含全部槽位、设置、已读记录或音乐；重要手动槽可依次读取后导出。
 2. 在**同一个 Harness profile**安装 `@ljwei-stak/dsh-galgame@0.1.0`。
-3. 在官方插件管理器卸载原包 `@ljwei-stak/model-router-galgame`，再添加 `@ljwei-stak/dsh-model-router@0.13.1`。完成两项安装后再打开剧情，避免并行使用旧合并 GAL 与新 GAL 入口。
+3. 在官方插件管理器卸载原包 `@ljwei-stak/model-router-galgame`，再添加 `@ljwei-stak/dsh-model-router@0.13.2`。完成两项安装后再打开剧情，避免并行使用旧合并 GAL 与新 GAL 入口。
 4. 核对只有一个**模型路由**和一个**Gal 模块**入口。打开独立 GAL 检查当前进度、三槽及设置；同 profile 继续使用原 localStorage 键。
 5. 若使用不同 profile 或没有读到进度，在 GAL 选择匹配剧目，再导入保存的 JSON。导入上限 **2 MB**，确认后替换当前剧情进度。
 
