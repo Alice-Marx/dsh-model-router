@@ -296,9 +296,16 @@ export function createNpmUpdateHandler({
 }
 
 export function registerNpmUpdateRoute(ctx, moduleUrl) {
-  const connection = ctx.connection ?? ctx.get?.('connection')
-  const profiles = ctx.desktopProfiles ?? ctx.get?.('desktopProfiles')
-  const pnpm = ctx.desktopPnpm ?? ctx.get?.('desktopPnpm')
+  // None of these services is in the plugin's inject list. Under Cordis a direct
+  // `ctx.<name>` read then throws "without inject", so a caller-bound property
+  // is used when present and ctx.get() otherwise; neither may throw here.
+  const service = name => {
+    try { const bound = ctx[name]; if (bound !== undefined && bound !== null) return bound } catch { /* not injected */ }
+    try { return ctx.get?.(name) } catch { return undefined }
+  }
+  const connection = service('connection')
+  const profiles = service('desktopProfiles')
+  const pnpm = service('desktopPnpm')
   const register = typeof connection?.register === 'function'
     ? (channel, handler) => connection.register(ctx, channel, handler)
     : typeof connection?.rpc?.handle === 'function'

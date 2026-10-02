@@ -6,7 +6,7 @@
 
 [简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Migration guide](MIGRATION.md) · [GAL repository](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
-> **Host compatibility:** both the router 0.13.0 and GAL 0.1.0 target DeepSeek Harness Desktop **0.2.0-rc.1 and 0.2.0-rc.2**. Use the exact installation versions below. Releases use npm's `next` tag while this host is a prerelease; a bare package name or a moving tag is not a version pin.
+> **Host compatibility:** both the router 0.13.1 and GAL 0.1.0 target DeepSeek Harness Desktop **0.2.0-rc.1 and 0.2.0-rc.2**. Use the exact installation versions below. Releases use npm's `next` tag while this host is a prerelease; a bare package name or a moving tag is not a version pin.
 
 ![Diagram of the local routing plan and official-tool execution](docs/assets/routing-workflow.svg)
 
@@ -35,7 +35,7 @@ In **DeepSeek Harness Desktop → Plugins → Add plugin**, enter one exact pack
 
 | What you want | Installation input | Repository |
 | --- | --- | --- |
-| Model routing and official tools | `@ljwei-stak/dsh-model-router@0.13.0` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
+| Model routing and official tools | `@ljwei-stak/dsh-model-router@0.13.1` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
 | GAL only, or GAL alongside the router | `@ljwei-stak/dsh-galgame@0.1.0` | [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) |
 
 For npm installation, select the official **HTTPS** source `https://registry.npmjs.org/` if a mirror has not synchronized the exact version. Install, enable, and restart when prompted. Router details should show **0.13.0** and its sidebar **Model Router**; the separate GAL package adds **Gal Module**. Either package can be installed without the other. Global `npm install -g` does not register a plugin in your Desktop profile.
@@ -45,30 +45,30 @@ For npm installation, select the official **HTTPS** source `https://registry.npm
 The package was renamed in 0.13.0. The old name's last version is also 0.13.0, with identical content, so future updates only come under the new name. The plugin manager cannot update the old entry in place:
 
 1. Remove `@ljwei-stak/model-router-galgame` in the plugin manager (keep profile and application data).
-2. Add `@ljwei-stak/dsh-model-router@0.13.0` and restart when prompted.
+2. Add `@ljwei-stak/dsh-model-router@0.13.1` and restart when prompted.
 3. Do not keep both installed: they share the profile entry id `model-router-galgame` and the `model_router_*` tool names. Because the entry id is unchanged, router settings saved in the profile and the run history in `~/.dsh/model-router/state.json` carry over.
 
 ### Upgrade from the combined 0.11.x plugin
 
 1. Before upgrading, use the old GAL player's **Export save** for each story progress you want to keep, and back up the Harness profile. A JSON export contains the current story state, not all slots, settings, read history, or local audio.
 2. Install `@ljwei-stak/dsh-galgame@0.1.0` in the **same profile**.
-3. Remove the old `@ljwei-stak/model-router-galgame` plugin and add `@ljwei-stak/dsh-model-router@0.13.0` (see above). Finish both installations before continuing play; this removes the old combined GAL entry and leaves one entry from the independent GAL plugin.
+3. Remove the old `@ljwei-stak/model-router-galgame` plugin and add `@ljwei-stak/dsh-model-router@0.13.1` (see above). Finish both installations before continuing play; this removes the old combined GAL entry and leaves one entry from the independent GAL plugin.
 4. Open the new GAL entry and verify your progress. The standalone plugin retains the old localStorage keys in the same profile. For a different profile or a missing state, select the matching story and import the JSON backup.
 
 The standalone GAL core contains **Echo City: Main Saga** and **Old City Migration: The Unfinished Promise**. Previously separated stories remain in their source archive and are not shipped with either core plugin. See [migration notes](MIGRATION.md) for save limitations and older desktop integrations.
 
 ### Install a versioned release archive
 
-Download the `.tgz` attachment from the [router v0.13.0 release](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.0) or [GAL v0.1.0 release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0). Enter the downloaded file's absolute path, for example:
+Download the `.tgz` attachment from the [router v0.13.0 release](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.1) or [GAL v0.1.0 release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0). Enter the downloaded file's absolute path, for example:
 
 ```text
-D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.13.1.tgz
 ```
 
 Where a checksum sidecar is supplied, compare it with:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.1.tgz'
 ```
 
 You can also extract the archive and enter its inner `package` directory, which contains `package.json` and `.dsh-plugin`. The download may be stored on your preferred drive; runtime data location is controlled by the Harness profile. Upgrade through the plugin manager without modifying `app.asar` or bypassing dependency checks.
@@ -77,7 +77,8 @@ You can also extract the archive and enter its inner `package` directory, which 
 
 | Version | Intended host | Scope |
 | --- | --- | --- |
-| **Router 0.13.0** | **0.2.0-rc.1 / 0.2.0-rc.2** | Health check, cost control, subscription-first billing, run history; GAL installs separately. Exact npm version or `@next`. |
+| **Router 0.13.1** | **0.2.0-rc.1 / 0.2.0-rc.2** | Fixes workbench and `model_router_execute` runs failing with `cannot get property "credentials" without inject`. Exact npm version, `@next` or `@latest`. |
+| [Router 0.13.0](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.0) | 0.2.0-rc.1 / 0.2.0-rc.2 | Health check, cost control, subscription-first billing, run history; runs fail in the Harness (fixed in 0.13.1). |
 | **GAL 0.1.0** | **0.2.0-rc.1 / 0.2.0-rc.2** | First standalone GAL package, two core stories. Exact npm version or `@next`. |
 | [Router 0.12.0](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.12.0) | 0.2.0-rc.1 / 0.2.0-rc.2 | First independent router release (GAL split out). |
 | [Combined 0.11.1](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) | 0.2.0-rc.1 / 0.2.0-rc.2 | Historical combined router and GAL package; corrected 0.11.0 release documentation. |

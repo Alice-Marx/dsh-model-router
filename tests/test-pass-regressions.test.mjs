@@ -8,6 +8,7 @@ import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-regressions-'))
 const host = await import('../.dsh-plugin/index.mjs')
@@ -30,7 +31,7 @@ async function workspace(t) {
 
 function llmCtx({ providers = { deepseek: ['deepseek-chat'] }, answer = () => 'API 回答', onStream = null } = {}) {
   const calls = []
-  return {
+  return strictCtx({
     calls,
     llm: {
       listProviders: () => Object.keys(providers).map(id => ({ id })),
@@ -46,7 +47,7 @@ function llmCtx({ providers = { deepseek: ['deepseek-chat'] }, answer = () => 'A
         })()
       },
     },
-  }
+  }, { testOnly: ['calls'] })
 }
 const profiles = list => ({ modelProfilesJson: JSON.stringify(list) })
 const LONG_TEAM_TASK = steps => `目标：完成一个大型重构。\n1. 分析现有模块结构并列出问题。\n2. 设计新的模块接口，依赖第 1 步。\n3. 实现新接口并编写测试，依赖第 2 步。\n背景资料：\n${CJK(steps)}`

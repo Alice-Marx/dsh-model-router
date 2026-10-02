@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.1 — 2026-10-03
+
+Bug-fix release for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under the npm `next` and `latest` tags.
+
+### Fixed
+- Workbench runs ("在工作台执行": preview, then confirm), `model_router_execute` and step reruns failed in the Harness with `cannot get property "credentials" without inject`. The executor read `ctx?.credentials`, which is not in the plugin's `inject` list; Cordis throws for every non-injected `ctx.<service>` read, and optional chaining does not help. Optional services are now read through `ctx.get(name)`, as the Harness itself does, so nothing new is required at load time. The run never started, so no model was called and nothing was billed. The failed run stays in history with that error.
+- The source-only npm update helper (not shipped in the package) reads `connection`, `desktopProfiles` and `desktopPnpm` the same safe way.
+
+### Tests
+- Test mocks for Host code paths now enforce `inject` like Cordis (`tests/helpers/strict-ctx.mjs`).
+- New `tests/cordis-inject.test.mjs` runs the workbench preview and run, `executeConfiguredAssignment` and a step rerun in a real Cordis plugin context with the Host `inject` list and sibling-provided services, with and without a `credentials` service. It also scans Host sources for `ctx.<name>` reads of non-injected services.
+
 ## 0.13.0 — 2026-10-03
 
 Prerelease for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under the npm `next` tag. Merges PR #1 and PR #2.

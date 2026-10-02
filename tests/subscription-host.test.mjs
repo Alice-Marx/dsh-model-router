@@ -4,6 +4,7 @@ import { mkdtempSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-subscription-'))
 
@@ -22,7 +23,7 @@ async function workspace(t) {
 
 function planCtx() {
   const calls = []
-  return {
+  return strictCtx({
     calls,
     llm: {
       listProviders: () => [{ id: 'glm-coding-plan' }, { id: 'zhipu' }],
@@ -40,7 +41,7 @@ function planCtx() {
         })()
       },
     },
-  }
+  }, { testOnly: ['calls'] })
 }
 
 const CONFIG = {
@@ -110,7 +111,7 @@ test('team runs record a CLI quota hit without switching to an API key', async t
 function flakyPlanCtx({ planFails = true } = {}) {
   const calls = []
   const state = { planFails }
-  return {
+  return strictCtx({
     calls, state,
     llm: {
       listProviders: () => [{ id: 'kimi-code' }, { id: 'moonshot' }],
@@ -125,7 +126,7 @@ function flakyPlanCtx({ planFails = true } = {}) {
         })()
       },
     },
-  }
+  }, { testOnly: ['calls', 'state'] })
 }
 
 const KIMI_CONFIG = {

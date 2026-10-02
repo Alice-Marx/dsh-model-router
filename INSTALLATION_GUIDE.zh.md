@@ -8,7 +8,7 @@
 
 | 需求 | 添加插件输入框 | 安装后的入口 |
 | --- | --- | --- |
-| 分析复杂度、按质量和费用选模型、调用官方工具 | `@ljwei-stak/dsh-model-router@0.13.0` | 模型路由 |
+| 分析复杂度、按质量和费用选模型、调用官方工具 | `@ljwei-stak/dsh-model-router@0.13.1` | 模型路由 |
 | 剧情、立绘、音乐、存档、自由对话 | `@ljwei-stak/dsh-galgame@0.1.0` | Gal 模块 |
 | 两者都要 | 分别安装上面两个包 | 模型路由 + Gal 模块 |
 
@@ -22,7 +22,7 @@
 2. 在“包名、GitHub 仓库地址或本地目录路径”输入框填一个完整包名，例如：
 
    ```text
-   @ljwei-stak/dsh-model-router@0.13.0
+   @ljwei-stak/dsh-model-router@0.13.1
    ```
 
    只想安装 GAL 时填写：
@@ -38,7 +38,7 @@
    ```
 
 4. 核对预览的包名、版本和宿主兼容信息，安装并启用。有重启提示时重启桌面程序。
-5. 检查插件详情与侧边栏：路由应为 **0.13.0 / 模型路由**；GAL 应为 **0.1.0 / Gal 模块**。仅装路由时没有 GAL 入口是预期行为。
+5. 检查插件详情与侧边栏：路由应为 **0.13.1 / 模型路由**；GAL 应为 **0.1.0 / Gal 模块**。仅装路由时没有 GAL 入口是预期行为。
 
 普通用户无需 `npm install -g`，该命令不会把插件注册到当前 Harness profile。
 
@@ -46,13 +46,13 @@
 
 进入对应 Release 下载 `.tgz`：
 
-- [模型路由 v0.13.0](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.0)
+- [模型路由 v0.13.1](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.1)
 - [独立 GAL v0.1.0](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0)
 
 在“添加插件”填写下载文件的**绝对路径**，例如：
 
 ```text
-D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.13.1.tgz
 ```
 
 ```text
@@ -62,7 +62,7 @@ D:\Plugins\ljwei-stak-dsh-galgame-0.1.0.tgz
 如附有 `.sha256` 文件，用 PowerShell 计算并比较摘要：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.1.tgz'
 Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-galgame-0.1.0.tgz'
 ```
 
@@ -72,7 +72,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-galgame-0
 
 1. 在旧合并插件的 GAL 播放器导出需要保留的剧情进度，并备份整个 Harness profile。每份 JSON 仅保存**当前剧情状态**，不含所有手动槽、设置、已读记录或本地音乐；重要槽位可依次读档再导出。
 2. 在**同一个 profile**安装独立 `@ljwei-stak/dsh-galgame@0.1.0`。
-3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`（旧包名最后版本为 0.13.0，内容相同，之后不再更新）：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.13.0`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
+3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`（旧包名最后版本为 0.13.0，内容相同，之后不再更新）：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.13.1`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
 4. 现在路由与 GAL 各有一个入口。独立 GAL 沿用旧存档 localStorage 键，核对当前进度和三槽；更换 profile 或进度未恢复时，先切换到匹配剧目，再导入 JSON 备份。
 5. 后续分别更新需要的插件；只用路由可以不启用或不安装 GAL。保留 profile 与应用数据，卸载插件时不要清理故事数据。
 
@@ -104,7 +104,7 @@ Claude、Codex、MiMo、Grok 支持只读或可编辑；Kimi、MiniMax、ZCode �
 | 检查 | 预期 |
 | --- | --- |
 | 宿主版本 | 0.2.0-rc.1 或 0.2.0-rc.2；包括 `rc` 后缀。 |
-| 路由独立安装 | 0.13.0 详情、模型路由入口、目录和模型档案可用；不出现旧合并 GAL 入口。 |
+| 路由独立安装 | 0.13.1 详情、模型路由入口、目录和模型档案可用；不出现旧合并 GAL 入口。 |
 | GAL 独立安装 | 0.1.0 详情、Gal 模块入口、标题与两部核心剧情可用；不要求安装路由。 |
 | 共同安装 | 两个入口各一份，路由工具和 GAL 播放器均能使用。 |
 | 存档迁移 | 同 profile 可读旧键；跨 profile 用匹配剧目 JSON 导入；旧篇目的数据不覆盖。 |
@@ -116,7 +116,7 @@ Claude、Codex、MiMo、Grok 支持只读或可编辑；Kimi、MiniMax、ZCode �
 
 ## 8. 开发者从完整源码构建
 
-路由仓库检出 `v0.13.0`；GAL 仓库检出 `v0.1.0`。使用 Node.js **22.19+** 与 pnpm，各自在根目录运行：
+路由仓库检出 `v0.13.1`；GAL 仓库检出 `v0.1.0`。使用 Node.js **22.19+** 与 pnpm，各自在根目录运行：
 
 ```powershell
 pnpm install --frozen-lockfile

@@ -4,6 +4,7 @@ import { mkdtempSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-billing-'))
 for (const name of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY']) delete process.env[name]
@@ -126,14 +127,14 @@ test('tool runs are recorded as one step; a failed one can be re-run, editable t
 })
 
 function teamCtx() {
-  return {
+  return strictCtx({
     sandbox: { confine() { throw new Error('the injected runner never spawns') } },
     llm: {
       listProviders: () => [{ id: 'anthropic' }, { id: 'openai' }],
       listModels: async provider => provider === 'anthropic' ? [{ id: 'claude-x' }] : [{ id: 'gpt-x' }],
       resolveModelInfo: async (provider, model) => ({ provider, id: model }),
     },
-  }
+  })
 }
 
 test('read-only team runs are recorded and one failed step re-runs with its downstream only', async t => {

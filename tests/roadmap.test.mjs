@@ -5,6 +5,7 @@ import { mkdtempSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-roadmap-'))
 
@@ -308,7 +309,7 @@ test('workbench RPC codecs accept only ids and paired routes', () => {
 
 function mockCtx({ answers = {} } = {}) {
   const streamCalls = []
-  return {
+  return strictCtx({
     streamCalls,
     llm: {
       listProviders: () => [{ id: 'cheap' }, { id: 'strong' }],
@@ -324,7 +325,7 @@ function mockCtx({ answers = {} } = {}) {
         })()
       },
     },
-  }
+  }, { testOnly: ['streamCalls'] })
 }
 
 const PROFILES = JSON.stringify([

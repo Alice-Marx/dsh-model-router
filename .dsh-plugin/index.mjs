@@ -451,10 +451,26 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   }
 }
 
+/**
+ * A host service this plugin may use but does not require. Cordis throws
+ * `cannot get property "<name>" without inject` for any `ctx.<name>` read of a
+ * service missing from `inject` (optional chaining does not help), and every
+ * `inject` entry is required, so optional services are read with `ctx.get()`,
+ * the same seam the Harness itself uses (for example `ctx.get("credentials")`).
+ */
+export function optionalService(ctx, name) {
+  try { return typeof ctx?.get === 'function' ? ctx.get(name) : undefined } catch { return undefined }
+}
+
 async function credentialsForRoute(ctx, route) {
   const provider = text(route?.provider)
   if (!provider) return null
-  const readers = [ctx?.credentials?.getApiKey, ctx?.llm?.getProviderApiKey]
+  const credentials = optionalService(ctx, 'credentials')
+  const llm = ctx?.llm
+  const readers = [
+    typeof credentials?.getApiKey === 'function' ? key => credentials.getApiKey(key) : null,
+    typeof llm?.getProviderApiKey === 'function' ? key => llm.getProviderApiKey(key) : null,
+  ]
   for (const read of readers) {
     if (typeof read !== 'function') continue
     try {

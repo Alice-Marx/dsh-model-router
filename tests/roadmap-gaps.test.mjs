@@ -5,6 +5,7 @@ import { mkdtempSync } from 'node:fs'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-gaps-'))
 for (const name of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY', 'KIMI_API_KEY', 'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY']) delete process.env[name]
@@ -202,7 +203,7 @@ test('model_router_tool_run estimates cost and pauses on an exhausted budget', a
 })
 
 // ---------------------------------------------------------------- item 1
-const routeCtx = () => ({
+const routeCtx = () => strictCtx({
   llm: {
     listProviders: () => ['openai'],
     listModels: async () => [{ id: 'gpt-x' }],
