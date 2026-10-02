@@ -8,7 +8,7 @@ import {
   billingOverview, billingPlan, createQuotaTracker, detectQuotaExhaustion, exhaustedUntil, parseQuotaPatterns,
   parseResetAt, vendorKey,
 } from '../.dsh-plugin/shared/subscription-billing.mjs'
-import { executeRouteWithBilling } from '../.dsh-plugin/shared/task-executors.mjs'
+import { assignmentPackages, executeAssignmentPlan, executeRouteWithBilling, rerunAssignmentPackage } from '../.dsh-plugin/shared/task-executors.mjs'
 import { parseModelProfilesJson, applyModelProfiles } from '../.dsh-plugin/shared/model-profiles.mjs'
 import { billingOf, buildRunRecord, spending } from '../.dsh-plugin/shared/run-ledger.mjs'
 import { checkLogin, subscriptionLoginOf } from '../.dsh-plugin/shared/tool-health.mjs'
@@ -261,15 +261,100 @@ test('CLI quota exhaustion switches the same step to the API key and records why
   }
 })
 
-test('non-quota CLI failures keep the existing CLI-to-API fallback without marking quota', async t => {
+test('non-quota CLI failures pause for the user by default; api / fail settings are honoured', async t => {
   const cwd = await workspace(t)
-  const billing = billingContext({ routes: [claudeRoute] })
-  const { spawnImpl } = fakeSpawn((file, args) => args[0] === '--version' ? { code: 0, stdout: '1.0.0\n' } : { code: 2, stderr: 'segfault' })
-  const result = await executeRouteWithBilling({ route: claudeRoute, task: 'x', workspace: cwd, spawnImpl, billing, apiFallback: () => ({ ok: true, answer: 'api' }) })
-  assert.equal(result.ok, true)
-  assert.equal(result.billingSwitch, undefined)
-  assert.equal(billing.quota.status('cli:claude-code'), null)
-  assert.equal(billingOf(result), 'api')
+  const failures = [
+    ['non-zero exit', { code: 2, stderr: 'segfault' }],
+    ['parse failure', { code: 0, stdout: 'not json at all' }],
+    ['auth error', { code: 1, stderr: 'Error: Invalid API key · Please run /login' }],
+  ]
+  for (const [label, script] of failures) {
+    const billing = billingContext({ routes: [claudeRoute] })
+    const { spawnImpl } = fakeSpawn((file, args) => args[0] === '--version' ? { code: 0, stdout: '1.0.0\n' } : script)
+    const result = await executeRouteWithBilling({ route: claudeRoute, task: 'x', workspace: cwd, spawnImpl, billing,
+      apiFallback: () => { throw new Error(`${label}: api must not run`) } })
+    assert.equal(result.ok, false, label)
+    assert.equal(result.paused, true, label)
+    assert.equal(result.pause.kind, 'subscription-failure')
+    assert.deepEqual(result.pause.choices, ['api', 'subscription', 'cancel'])
+    assert.match(result.pause.reason, /不是额度用尽或限流，已暂停/)
+    assert.equal(result.fallback, null)
+    assert.equal(billing.quota.status('cli:claude-code'), null, `${label}: not marked exhausted`)
+    if (label === 'auth error') assert.equal(result.pause.loginRequired, true)
+  }
+
+  const crash = fakeSpawn((file, args) => args[0] === '--version' ? { code: 0, stdout: '1.0.0\n' } : { code: 2, stderr: 'segfault' })
+  const viaApi = await executeRouteWithBilling({ route: claudeRoute, task: 'x', workspace: cwd, spawnImpl: crash.spawnImpl,
+    billing: billingContext({ routes: [claudeRoute], onFailure: 'api' }), apiFallback: () => ({ ok: true, answer: 'api' }) })
+  assert.equal(viaApi.ok, true)
+  assert.equal(viaApi.paused, undefined)
+  assert.equal(billingOf(viaApi), 'api')
+  const failed = await executeRouteWithBilling({ route: claudeRoute, task: 'x', workspace: cwd, spawnImpl: crash.spawnImpl,
+    billing: billingContext({ routes: [claudeRoute], onFailure: 'fail' }), apiFallback: () => { throw new Error('no') } })
+  assert.equal(failed.ok, false)
+  assert.equal(failed.paused, undefined)
+  assert.match(failed.error, /按设置不自动改用 API Key/)
+
+  // A CLI that is not installed was never attempted: the API is used as before.
+  const missing = fakeSpawn(() => ({ code: 127 }))
+  const notInstalled = await executeRouteWithBilling({ route: claudeRoute, task: 'x', workspace: cwd, spawnImpl: missing.spawnImpl,
+    billing: billingContext({ routes: [claudeRoute] }), apiFallback: () => ({ ok: true, answer: 'api' }) })
+  assert.equal(notInstalled.ok, true)
+  assert.equal(notInstalled.channel, 'harness-llm')
+
+  // The user's "改用 API 重试" goes straight to the API key and says why.
+  const confirmed = await executeRouteWithBilling({ route: claudeRoute, task: 'x', workspace: cwd, spawnImpl: fakeSpawn(() => { throw new Error('CLI skipped') }).spawnImpl,
+    billing: billingContext({ routes: [claudeRoute], choice: 'api' }), apiFallback: () => ({ ok: true, answer: 'api ok' }) })
+  assert.equal(confirmed.ok, true)
+  assert.equal(confirmed.billing, 'api')
+  assert.equal(confirmed.billingSwitch.kind, 'user-confirmed')
+  assert.match(confirmed.billingSwitch.reason, /按你的确认改用 API Key/)
+})
+
+test('a paused step makes downstream steps wait and the run status paused', async t => {
+  const cwd = await workspace(t)
+  const plan = { mode: 'team', team: { workPackages: [
+    { id: 'a', name: 'A', recommendedProvider: 'anthropic', recommendedModel: 'claude-sonnet' },
+    { id: 'b', name: 'B', dependsOn: ['a'], recommendedProvider: 'deepseek', recommendedModel: 'chat' },
+  ] } }
+  const routes = [{ ...claudeRoute }, { provider: 'deepseek', model: 'chat' }]
+  const { spawnImpl } = fakeSpawn((file, args) => args[0] === '--version' ? { code: 0, stdout: '1.0.0\n' } : { code: 0, stdout: '' })
+  const execution = await executeAssignmentPlan({ plan, task: '任务', routes, workspace: cwd, spawnImpl,
+    billing: billingContext({ routes }), apiFallback: () => { throw new Error('api must not run') } })
+  assert.equal(execution.status, 'paused')
+  const [a, b] = execution.packages
+  assert.equal(a.paused, true)
+  assert.equal(b.waiting, true)
+  assert.match(b.error, /等待上游步骤确认：a/)
+  const record = buildRunRecord({ id: 'p', createdAt: NOW, finishedAt: NOW, task: '任务', plan, execution })
+  assert.deepEqual(record.packages.map(item => item.status), ['paused', 'waiting'])
+  assert.equal(record.status, 'paused')
+  assert.match(record.packages[0].pause.reason, /已暂停/)
+
+  // Choosing the API for the paused step re-runs it and the waiting step.
+  const resumed = await rerunAssignmentPackage({ task: '任务', packages: assignmentPackages(plan, '任务'), previous: execution.packages,
+    packageId: 'a', routes, workspace: cwd, spawnImpl, subscriptionChoice: 'api',
+    billing: billingContext({ routes }), apiFallback: ({ route }) => ({ ok: true, answer: `${route.provider} 完成` }) })
+  assert.equal(resumed.status, 'completed')
+  assert.deepEqual(resumed.ranIds, ['a', 'b'])
+  assert.equal(resumed.packages[0].billingSwitch.kind, 'user-confirmed')
+})
+
+test('a coding-plan route pauses on a non-quota failure instead of spending the API key', async () => {
+  const routes = [
+    { provider: 'glm-coding-plan', model: 'glm-4.6', subscription: 'plan-key', apiRoute: { provider: 'zhipu', model: 'glm-4.6' } },
+    { provider: 'zhipu', model: 'glm-4.6' },
+  ]
+  const calls = []
+  const result = await executeRouteWithBilling({ route: routes[0], task: 'x', billing: billingContext({ routes }),
+    apiFallback: request => { calls.push(request.route.provider); throw new Error('500 Internal Server Error') } })
+  assert.equal(result.paused, true)
+  assert.match(result.pause.detail, /500/)
+  assert.deepEqual(calls, ['glm-coding-plan'])
+  const api = await executeRouteWithBilling({ route: routes[0], task: 'x', billing: billingContext({ routes, onFailure: 'api' }),
+    apiFallback: request => { if (request.subscription) throw new Error('500'); return { ok: true, answer: 'api' } } })
+  assert.equal(api.ok, true)
+  assert.equal(api.provider, 'zhipu')
 })
 
 test('subscription-only never uses an API key; api-only never uses the subscription', async t => {

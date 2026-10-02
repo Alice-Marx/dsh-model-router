@@ -440,7 +440,7 @@ function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, sig
   })
 }
 
-async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false, detail = '', raw = '', skipped = false }) {
+async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false, detail = '', raw = '', skipped = false, attempted = false }) {
   const provider = String(route?.provider ?? '')
   const model = String(route?.model ?? '')
   const fallback = {
@@ -456,14 +456,23 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
     }
   }
   try {
-    const api = await apiFallback({ route, task, signal, reason, detail, raw: String(raw ?? '').slice(-40_000), toolId: adapter?.id ?? null })
+    const api = await apiFallback({ route, task, signal, reason, detail, raw: String(raw ?? '').slice(-40_000), toolId: adapter?.id ?? null, attempted, timedOut, exitCode })
+    // A billing-aware fallback can pause the step for the user's decision.
+    if (api?.paused) {
+      return {
+        ok: false, provider, model, preference, channel: 'official-cli', toolId: adapter?.id ?? null, answer: '',
+        fallback: null, timedOut, exitCode, paused: true,
+        pause: { ...api.pause, ...(detail ? { detail } : {}), ...(fallback.loginRequired ? { loginRequired: true } : {}) },
+        error: api.error,
+      }
+    }
     const answer = String(api?.answer ?? '').slice(0, MAX_ANSWER_CHARS)
     // A billing-aware fallback can refuse (subscription-only) or explain a switch.
     const note = api?.billingNote ?? null
     return {
       ok: api?.ok === true && answer.trim().length > 0,
       provider, model, preference, channel: api?.refused ? 'official-cli' : 'harness-llm', toolId: adapter?.id ?? null,
-      answer, fallback: note?.reason ? { ...fallback, reason: note.reason } : fallback, timedOut, exitCode,
+      answer, fallback: note?.reason ? { ...fallback, reason: note.reason } : api?.refused ? { ...fallback, reason: api.error } : fallback, timedOut, exitCode,
       ...(api?.usage ? { usage: api.usage } : {}),
       ...(note ? { billingSwitch: note } : {}),
       ...(api?.billing ? { billing: api.billing } : {}),
@@ -552,7 +561,7 @@ export async function executeAssignedTask({
     if (verified && verified.status !== 'unsupported') {
       return useApi(apiFallback, {
         route, task: prompt, signal, adapter, preference, exitCode: verified.exitCode ?? null,
-        timedOut: verified.status === 'timed-out',
+        timedOut: verified.status === 'timed-out', attempted: true,
         reason: verified.error || verified.reason || '官方 CLI 执行失败，已回退模型目录 API。',
         detail: redactDiagnostic(verified.detail ?? verified.stderrTail ?? verified.stdoutTail ?? '', childEnvironment(adapter, credentials, credentialMode).secret),
         raw: [verified.error, verified.reason, verified.detail, verified.stderrTail, verified.stdoutTail].filter(item => typeof item === 'string').join('\n'),
@@ -589,7 +598,7 @@ export async function executeAssignedTask({
   }
   if (!run.ok) {
     return useApi(apiFallback, {
-      route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, timedOut: run.timedOut,
+      route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, timedOut: run.timedOut, attempted: true,
       reason: run.timedOut ? `${adapter.label} 执行超时，已回退模型目录 API。`
         : run.outputLimit ? `${adapter.label} 输出超过上限，已回退模型目录 API。`
           : `${adapter.label} 执行失败，已回退模型目录 API。`,
@@ -600,7 +609,7 @@ export async function executeAssignedTask({
   const parsed = parseAdapterOutput(adapter.format, run.stdout)
   if (!parsed.ok) {
     return useApi(apiFallback, {
-      route, task: prompt, signal, adapter, preference, exitCode: run.exitCode,
+      route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, attempted: true,
       reason: `${parsed.error} 已回退模型目录 API。`,
       detail: failureDetail(adapter.format, run.stdout, run.stderr, secret),
       raw: `${run.stdout.slice(-20_000)}\n${run.stderr.slice(-20_000)}`,
@@ -608,7 +617,7 @@ export async function executeAssignedTask({
   }
   const answer = redact(parsed.answer, secret)
   if (!answer.trim()) {
-    return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, reason: '官方 CLI 没有返回文本，已回退模型目录 API。' })
+    return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, attempted: true, reason: '官方 CLI 没有返回文本，已回退模型目录 API。' })
   }
   return officialSuccess({
     route, adapter, preference, answer, exitCode: run.exitCode,
@@ -630,6 +639,25 @@ function switchReason(info, until) {
   return info?.kind === 'rate-limit' ? `订阅通道触发限流${reset}，已切换 API Key。` : `订阅额度已用尽${reset}，已切换 API Key。`
 }
 
+/** What a subscription-first step does after a failure that is not quota / rate-limit exhaustion. */
+export const SUBSCRIPTION_FAILURE_ACTIONS = Object.freeze(['ask', 'api', 'fail'])
+export const DEFAULT_SUBSCRIPTION_FAILURE_ACTION = 'ask'
+export const SUBSCRIPTION_CHOICES = Object.freeze(['api', 'subscription', 'cancel'])
+
+const failureAction = billing => SUBSCRIPTION_FAILURE_ACTIONS.includes(billing?.onFailure) ? billing.onFailure : DEFAULT_SUBSCRIPTION_FAILURE_ACTION
+
+function pauseFor(summary, detail, extra = {}) {
+  return {
+    kind: 'subscription-failure',
+    reason: `${summary} 这不是额度用尽或限流，已暂停此步骤等待你决定：改用 API 重试、重试订阅或取消。`,
+    detail: String(detail ?? '').slice(0, 2_000),
+    choices: [...SUBSCRIPTION_CHOICES],
+    ...extra,
+  }
+}
+
+const failureSummary = text => `${String(text ?? '').replace(/，?已(?:回退模型目录 API|改用 API Key)。?$/u, '').replace(/[。.]$/u, '') || '订阅调用失败'}。`
+
 /**
  * Subscription-first execution of one route. `billing` supplies:
  * `quota` (tracker), `cooldownMinutes`, `extraPatterns`, `routes`,
@@ -639,6 +667,10 @@ function switchReason(info, until) {
  * - subscription-first: use the subscription (CLI account login without any
  *   API key, or a coding-plan key route). On quota / rate limit, mark it
  *   exhausted and retry the same step on the API-key route at once.
+ * - A failure that is not exhaustion (timeout, crash, parse error, non-zero
+ *   exit, auth error) follows `billing.onFailure`: 'ask' (default) pauses the
+ *   step for the user, 'api' falls back to the API key, 'fail' stops.
+ *   `billing.choice` 'api' is the user's confirmation to use the API key.
  * - subscription-only: never fall back to an API key.
  * - api-only: never use the subscription.
  */
@@ -675,6 +707,11 @@ export async function executeRouteWithBilling({ route, billing = null, apiFallba
     if (plan.mode === 'subscription-only') return refuse(`${label}：该路线没有可用的订阅（CLI 账号登录或编程套餐路线）。`)
     return executeAssignedTask({ ...options, route, apiFallback })
   }
+  if (billing.choice === 'api') {
+    const reason = '已按你的确认改用 API Key 重试此步骤。'
+    if (plan.mode === 'subscription-only') return refuse('按设置只用订阅，不能改用 API Key。')
+    return viaApi(reason, { from: 'subscription', reason, kind: 'user-confirmed', until: null, detail: '' }, true)
+  }
   if (plan.mode === 'api-only') {
     if (sub.kind === 'plan-key') return viaApi('按设置只用 API Key，未使用编程套餐。', null, true)
     return executeAssignedTask({ ...options, route, apiFallback, credentialMode: 'api-only' })
@@ -710,6 +747,12 @@ export async function executeRouteWithBilling({ route, billing = null, apiFallba
       return viaApi(reason, note)
     }
     if (plan.mode === 'subscription-only') return refuse(`编程套餐路线调用失败：${detail || '未知错误'}`, { subscriptionRoute: { ...sub.route } })
+    const action = failureAction(billing)
+    if (action === 'fail') return refuse(`编程套餐路线调用失败：${detail || '未知错误'}。按设置不自动改用 API Key。`, { subscriptionRoute: { ...sub.route } })
+    if (action === 'ask') {
+      const pause = pauseFor(`编程套餐路线调用失败：${detail || '未知错误'}。`, detail)
+      return refuse(pause.reason, { paused: true, pause, subscriptionRoute: { ...sub.route } })
+    }
     return viaApi('编程套餐路线调用失败，已改用 API Key。', { from: 'subscription', reason: '编程套餐路线调用失败，已改用 API Key。', kind: 'error', until: null, detail })
   }
 
@@ -737,6 +780,14 @@ ${args?.raw ?? ''}`, vendor)
       return { ...api, billing: 'api', billingNote: { ...note, to: 'api' } }
     }
     if (plan.mode === 'subscription-only') return { ok: false, refused: true, error: `${args?.reason ?? '官方 CLI 执行失败。'}（按设置只用订阅，未回退 API）` }
+    // The subscription really ran and failed for another reason: do not spend API money silently.
+    const action = failureAction(billing)
+    if (args?.attempted === true && action !== 'api') {
+      const summary = failureSummary(args?.reason)
+      if (action === 'fail') return { ok: false, refused: true, error: `${summary}按设置不自动改用 API Key。` }
+      const pause = pauseFor(summary, args?.detail ?? '', { timedOut: args?.timedOut === true, exitCode: args?.exitCode ?? null })
+      return { ok: false, paused: true, pause, error: pause.reason }
+    }
     return apiFallback(args)
   }
   const result = await executeAssignedTask({ ...options, route, apiFallback: guarded, credentialMode: 'session-only' })
@@ -797,7 +848,8 @@ function aggregateOf(results) {
     item.answer || item.error || '',
   ].join('\n')).join('\n\n')
   const status = results.length > 0 && results.every(item => item.ok) ? 'completed'
-    : results.some(item => item.ok) ? 'partial' : 'failed'
+    : results.some(item => item.paused) ? 'paused'
+      : results.some(item => item.ok) ? 'partial' : 'failed'
   return { status, packages: results, aggregate }
 }
 
@@ -806,7 +858,7 @@ function aggregateOf(results) {
  * target set keep their previous results, so a single failed step can be
  * retried without re-running finished work.
  */
-async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, options }) {
+async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, choices = {}, options }) {
   const routeList = Array.isArray(routes) ? routes : []
   const { credentialsFor, onPackage, billing, ...runOptions } = options
   const results = []
@@ -822,9 +874,13 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     const model = override?.model ?? item.recommendedModel
     const unmet = (item.dependsOn ?? []).filter(id => results.find(result => result.id === id)?.ok !== true)
     if (unmet.length > 0) {
+      // Waiting behind a paused step (the user decides), or blocked by a failure.
+      const waitingOn = unmet.filter(id => { const dep = results.find(result => result.id === id); return dep?.paused || dep?.waiting })
       const blocked = {
         id: item.id, name: item.name, ok: false, provider, model,
-        channel: 'harness-llm', answer: '', fallback: null, blocked: true, error: `依赖未完成：${unmet.join('、')}`,
+        channel: 'harness-llm', answer: '', fallback: null, blocked: true,
+        ...(waitingOn.length ? { waiting: true } : {}),
+        error: waitingOn.length ? `等待上游步骤确认：${waitingOn.join('、')}` : `依赖未完成：${unmet.join('、')}`,
       }
       results.push(blocked)
       ranIds.push(item.id)
@@ -836,7 +892,7 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     const credentials = typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null
     const result = await executeRouteWithBilling({
       ...runOptions,
-      billing: billing ? { ...billing, routes: billing.routes ?? routeList } : null,
+      billing: billing ? { ...billing, routes: billing.routes ?? routeList, ...(choices[item.id] ? { choice: choices[item.id] } : {}) } : null,
       credentials,
       route,
       task: routingBypassed ? checkedTask(task) : packagePrompt(task, item, results),
@@ -876,7 +932,7 @@ export function downstreamPackageIds(packages, packageId) {
  * stored answers, which also feed the retried package's dependency context.
  */
 export async function rerunAssignmentPackage({
-  task, packages, previous, packageId, routingBypassed = false, routes, override = null, cascade = true, ...options
+  task, packages, previous, packageId, routingBypassed = false, routes, override = null, cascade = true, subscriptionChoice = null, ...options
 }) {
   const list = Array.isArray(packages) ? packages : []
   if (!list.some(item => item.id === packageId)) throw new TypeError(`unknown work package ${packageId}`)
@@ -888,5 +944,6 @@ export async function rerunAssignmentPackage({
     }
   }
   const overrides = override?.provider && override?.model ? { [packageId]: { provider: override.provider, model: override.model } } : {}
-  return runPackages({ packages: list, task, routingBypassed, routes, previous: prior, targets, overrides, options })
+  const choices = subscriptionChoice === 'api' || subscriptionChoice === 'subscription' ? { [packageId]: subscriptionChoice } : {}
+  return runPackages({ packages: list, task, routingBypassed, routes, previous: prior, targets, overrides, choices, options })
 }

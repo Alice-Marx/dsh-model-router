@@ -11,6 +11,8 @@ export const PACKAGE_STATUS = Object.freeze({
   failed: Object.freeze({ label: '失败', tone: 'error' }),
   blocked: Object.freeze({ label: '依赖未完成', tone: 'blocked' }),
   cancelled: Object.freeze({ label: '已取消', tone: 'blocked' }),
+  paused: Object.freeze({ label: '等待确认', tone: 'warn' }),
+  waiting: Object.freeze({ label: '等待上游确认', tone: 'blocked' }),
 })
 
 export function packageStatus(item) {
@@ -96,7 +98,7 @@ export function unwrapRemote(response, fallback) {
 export const RUN_KIND_LABEL = Object.freeze({ assign: '路由执行', team: '团队执行', tool: '单工具调用' })
 export const RUN_STATUS_LABEL = Object.freeze({
   completed: '完成', partial: '部分完成', failed: '失败', 'cli-completed': '完成',
-  incomplete: '未完成', 'integration-pending': '待整合', blocked: '被阻止', cancelled: '已取消', pending: '待执行',
+  incomplete: '未完成', paused: '等待确认', 'integration-pending': '待整合', blocked: '被阻止', cancelled: '已取消', pending: '待执行',
 })
 
 /**

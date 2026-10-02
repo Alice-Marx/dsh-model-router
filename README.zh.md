@@ -218,7 +218,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 
 识别到后，该订阅**标记为额度已用尽，直到厂商给出的恢复时间**（`resets_at`、`resets_in_seconds`、`retry in Xs`、GLM 的重置时间、Claude 的“resets 3:45pm”）；没给时间时按 `subscriptionCooldownMinutes`（默认 60 分钟）暂停，无时间的限流只暂停 1 分钟。**同一步骤立即改用 API Key 重试**，后续步骤在恢复前直接跳过这份订阅。执行记录会写明计费渠道（`billing: subscription | api`）和原因，例如 **“订阅额度已用尽（预计 10-2 18:30 恢复），已切换 API Key。”** 状态保存在 `state.json` 的 `quota` 中，重启后仍有效。
 
-不是额度或限流的订阅失败沿用原有行为：官方 CLI 失败后回退模型目录 API，并显示真实错误。
+**其他原因的订阅失败不会悄悄改用 API Key。** 订阅确实调用了、但因其他原因失败（超时、崩溃、输出无法解析、非零退出、登录错误、套餐端点返回 5xx 等）时，默认（`onSubscriptionFailure: "ask"`）**暂停该步骤**：执行记录标为“**等待确认**”并显示真实错误，下游步骤显示“**等待上游确认**”。在执行记录中选择 **改用 API 重试**、**重试订阅**（例如重新登录后）或 **取消**（取消该步骤及等待它的步骤）。在会话中，`model_router_execute` 返回 `status: "paused-subscription-failure"` 和 `awaitingConfirmation`，模型应询问你后调用 `model_router_rerun_step`，`subscriptionChoice` 为 `api`、`subscription` 或 `cancel`；选 `api` 会弹出宿主审批。在成本卡片“订阅调用失败（非额度用尽）时”中可改为 `api`（恢复以前的自动回退）或 `fail`（不询问，直接失败）。CLI 未安装或没有无界面适配器时并没有尝试订阅，仍按原方式走模型目录 API。
 
 厂商改了报错文案时，可在 `quotaPatternsJson` 中按工具 ID、供应商 ID 或 `*` 追加正则：
 

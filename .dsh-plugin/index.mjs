@@ -53,6 +53,7 @@ export const Config = z.object({
   confirmUnsandboxedCli: z.boolean().default(true).volatile(),
   subscriptionCooldownMinutes: z.number().step(1).min(1).max(10_080).default(DEFAULT_COOLDOWN_MINUTES).volatile(),
   quotaPatternsJson: z.string().max(8_000).default('{}').volatile(),
+  onSubscriptionFailure: z.union(['ask', 'api', 'fail']).default('ask').volatile(),
 })
 
 const JSON_OUTPUT = {
@@ -186,6 +187,21 @@ function quotaPatterns(config) {
   return parseQuotaPatterns(valueOf(config, 'quotaPatternsJson', '{}'))
 }
 
+function subscriptionFailureAction(config) {
+  const value = valueOf(config, 'onSubscriptionFailure', 'ask')
+  return value === 'api' || value === 'fail' ? value : 'ask'
+}
+
+/** Steps paused after a non-quota subscription failure, for the session model and the workbench. */
+function pausedSteps(execution) {
+  return (execution?.packages ?? []).filter(item => item?.paused).map(item => ({
+    packageId: item.id, name: item.name, provider: item.provider, model: item.model,
+    reason: item.pause?.reason ?? item.error ?? '', detail: item.pause?.detail ?? '', choices: item.pause?.choices ?? ['api', 'subscription', 'cancel'],
+  }))
+}
+
+const SUBSCRIPTION_PAUSE_NOTICE = '有步骤在订阅调用失败（非额度用尽或限流）后已暂停，下游步骤在等待，未自动改用 API Key。请把 awaitingConfirmation 中的原因和错误告诉用户，按用户选择调用 model_router_rerun_step，subscriptionChoice 为 api（改用 API 重试，会触发审批）、subscription（重试订阅）或 cancel（取消）。'
+
 function cooldownMinutes(config) {
   return boundedInteger(valueOf(config, 'subscriptionCooldownMinutes', DEFAULT_COOLDOWN_MINUTES), DEFAULT_COOLDOWN_MINUTES, 1, 10_080)
 }
@@ -199,6 +215,7 @@ async function billingContext(config, options = {}) {
     quota,
     cooldownMinutes: cooldownMinutes(config),
     extraPatterns: quotaPatterns(config).patterns,
+    onFailure: subscriptionFailureAction(config),
     loginBillingFor: toolId => subscriptionLoginOf(healthCache.loginState(toolId)),
     now: Date.now,
     ...(options.billing && typeof options.billing === 'object' ? options.billing : {}),
@@ -499,6 +516,7 @@ function executionHooks(ctx, options) {
     onPackage: result => {
       // A CLI that reports "not logged in" is skipped for the cache lifetime.
       if (result?.fallback?.loginRequired && result.toolId) healthCache.markLoggedOut(result.toolId, result.fallback.error)
+      if (result?.pause?.loginRequired && result.toolId) healthCache.markLoggedOut(result.toolId, result.pause.detail)
     },
     credentialsFor: route => credentialsForRoute(ctx, route),
     runVerified: options.runVerified ?? (request => runOfficialTool({
@@ -577,7 +595,8 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
   const reviews = await reviewRunPackages(ctx, run, routes, config, { signal: options.signal, random: options.random })
   let stored = true
   try { await routerStateStore().appendRun(run) } catch { stored = false }
-  return { plan, execution, budget, runId: run.id, run, reviews, stored }
+  const awaiting = pausedSteps(execution)
+  return { plan, execution, budget, runId: run.id, run, reviews, stored, ...(awaiting.length ? { awaitingConfirmation: awaiting } : {}) }
 }
 
 async function storedRun(runId) {
@@ -588,10 +607,14 @@ async function storedRun(runId) {
 }
 
 /** Re-run one failed (or, with a new route, any) step and its unfinished downstream steps. */
-export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, workspace, signal, ...options } = {}) {
+export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, subscriptionChoice = null, workspace, signal, ...options } = {}) {
   const { run, saved } = await storedRun(runId)
   const target = run.packages.find(item => item.id === text(packageId))
   if (!target) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
+  const choice = text(subscriptionChoice) || null
+  if (choice && !['api', 'subscription', 'cancel'].includes(choice)) throw new Error('subscriptionChoice 只能是 api、subscription 或 cancel')
+  if (choice && !target.paused) throw new Error('该步骤没有在等待订阅失败的确认；直接重跑即可。')
+  if (choice === 'cancel') return { run: await cancelPausedStep(run.id, target.id), execution: null, budget: null, cancelled: true }
   const routes = await routesWithLearning(ctx, config, signal, saved.runs)
   let override = null
   if (text(provider) || text(model)) {
@@ -604,6 +627,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   } else if (target.ok) {
     throw new Error('该步骤已成功；如需换模型重做，请指定改派的 provider/model。')
   }
+  if (choice && run.kind !== 'assign' && run.kind !== undefined) throw new Error('只有路由执行的步骤会因订阅失败暂停。')
   if (run.kind === 'tool') throw new Error('model_router_tool_run 的单次调用没有可单独重跑的步骤；请直接再次调用 model_router_tool_run。')
   if (run.kind === 'team' && run.executionMode !== 'read-only') {
     throw new Error('可编辑（workspace-write）团队运行不支持单步重跑：之前的改动在独立 Git 工作树中，已整合或保留待人工核对。请重新调用 model_router_team_execute。')
@@ -630,6 +654,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     override,
     workspace: cwd,
     signal,
+    ...(choice ? { subscriptionChoice: choice } : {}),
     ...executionHooks(ctx, options),
     billing: await billingContext(config, options),
     apiFallback: async ({ route, task: packageTask, signal: callSignal }) => consultConfiguredModel(ctx, route, packageTask, limit, callSignal),
@@ -637,7 +662,27 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   const updated = await routerStateStore().updateRun(run.id, current => {
     mergeRerun(current, execution, { rerunIds: execution.ranIds, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
   })
-  return { run: updated, execution, budget }
+  const awaiting = pausedSteps(execution)
+  return { run: updated, execution, budget, ...(awaiting.length ? { awaitingConfirmation: awaiting } : {}) }
+}
+
+/** The user cancelled a paused step: it and the steps waiting on it stop. */
+async function cancelPausedStep(runId, packageId) {
+  return routerStateStore().updateRun(runId, current => {
+    const waiting = new Set(downstreamPackageIds(current.packages, packageId))
+    for (const item of current.packages) {
+      if (item.id === packageId) {
+        Object.assign(item, { status: 'cancelled', cancelled: true, paused: false, ok: false,
+          error: `已取消：${item.pause?.reason ?? item.error ?? ''}`.slice(0, 2_000) })
+        delete item.pause
+      } else if (waiting.has(item.id) && !item.ok) {
+        Object.assign(item, { status: 'blocked', waiting: false, blocked: true, error: `上游步骤 ${packageId} 已取消。` })
+      }
+    }
+    current.status = current.packages.some(item => item.paused) ? 'paused'
+      : current.packages.some(item => item.ok) ? 'partial' : 'cancelled'
+    current.finishedAt = Date.now()
+  })
 }
 
 /** Stored team packages in plan shape; `override` reassigns the retried package. */
@@ -886,6 +931,7 @@ export function routerRemoteServices(ctx, config) {
     rerun: request => rerunRecordedStep(ctx, config, {
       runId: request?.runId, packageId: request?.packageId, provider: request?.provider, model: request?.model,
       confirmOverBudget: request?.confirmOverBudget === true,
+      ...(request?.subscriptionChoice ? { subscriptionChoice: request.subscriptionChoice } : {}),
     }),
     boundaries: () => securityBoundaries(ctx, config),
   }
@@ -929,6 +975,16 @@ export function apply(ctx, config = {}) {
         displayReason: {
           en: `Allow the official CLI model to use shell, skills, configured MCP and other normal tools in an isolated Git worktree, then apply its patch to this workspace? ${sandboxNote.en}`,
           zh: `允许官方 CLI 模型在独立 Git 工作区使用终端、技能、已配置 MCP 等工具，并将改动补丁应用回当前工作区？可写范围：独立 Git 工作树及补丁涉及的源文件。${sandboxNote.zh}`,
+        },
+      }
+    }
+    if (exec.name === 'model_router_rerun_step' && exec.arguments?.subscriptionChoice === 'api') {
+      return {
+        kind: 'ask',
+        reason: 'Retry a paused step on the API key after its subscription attempt failed (not a quota limit)',
+        displayReason: {
+          en: 'The subscription attempt for this step failed for a reason other than quota. Retry it on the API key (billed to the API account)?',
+          zh: '该步骤的订阅调用失败（不是额度用尽或限流）。改用 API Key 重试吗？会按 API 计费并计入预算。',
         },
       }
     }
@@ -1199,12 +1255,13 @@ function registerOfficialToolModels(ctx, config) {
         selected: result.plan.selected,
         decision: decisionSummary(result.plan),
         budget: result.budget,
-        ...(result.paused ? { status: 'paused-budget' } : {}),
+        ...(result.paused ? { status: 'paused-budget' } : result.awaitingConfirmation ? { status: 'paused-subscription-failure', awaitingConfirmation: result.awaitingConfirmation } : {}),
         execution: result.execution,
         runId: result.runId ?? null,
         reviews: result.reviews ?? [],
         notice: result.paused
           ? '已因预算暂停，未启动任何模型。请向用户说明预估费用，用户同意后再以 confirmOverBudget: true 调用。'
+          : result.awaitingConfirmation ? SUBSCRIPTION_PAUSE_NOTICE
           : '官方 CLI 以只读无界面方式运行。可编辑改动仍使用 model_router_tool_run 或 model_router_team_execute。未安装、未登录、失败或配置为 api 的模型走模型目录 API；回退原因与 CLI 原始错误见 fallback。可用 model_router_rerun_step 重跑失败步骤，model_router_rate 记录评价。',
       })
     },
@@ -1231,6 +1288,7 @@ function registerOfficialToolModels(ctx, config) {
       provider: { type: 'string', description: 'Optional configured provider to reassign to; pair with model.' },
       model: { type: 'string', description: 'Optional configured model to reassign to; pair with provider.' },
       confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the budget. Triggers an approval prompt.' },
+      subscriptionChoice: { type: 'string', enum: ['api', 'subscription', 'cancel'], description: 'Only for a step paused after a non-quota subscription failure, and only with the user\'s decision: api = retry on the API key (approval prompt), subscription = retry the subscription, cancel = stop the step and its waiting downstream steps.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
@@ -1238,8 +1296,12 @@ function registerOfficialToolModels(ctx, config) {
       const result = await rerunRecordedStep(ctx, config, {
         runId: args.runId, packageId: args.packageId, provider: args.provider, model: args.model,
         confirmOverBudget: args.confirmOverBudget === true, workspace: cwd, signal: exec.signal,
+        ...(text(args.subscriptionChoice) ? { subscriptionChoice: text(args.subscriptionChoice) } : {}),
       })
-      return jsonValue({ ...(result.paused ? { status: 'paused-budget' } : {}), budget: result.budget, execution: result.execution ?? null, runId: result.run?.id ?? args.runId })
+      return jsonValue({
+        ...(result.paused ? { status: 'paused-budget' } : result.cancelled ? { status: 'cancelled' } : result.awaitingConfirmation ? { status: 'paused-subscription-failure', awaitingConfirmation: result.awaitingConfirmation, notice: SUBSCRIPTION_PAUSE_NOTICE } : {}),
+        budget: result.budget, execution: result.execution ?? null, runId: result.run?.id ?? args.runId,
+      })
     },
   }))
   ctx.tools.register(defineTool({

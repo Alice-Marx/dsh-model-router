@@ -83,6 +83,7 @@ const rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunReq
     runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'),
     ...(provider ? { provider, model } : {}),
     confirmOverBudget: request.confirmOverBudget === true,
+    ...(['api', 'subscription', 'cancel'].includes(request.subscriptionChoice) ? { subscriptionChoice: request.subscriptionChoice } : {}),
   }
 })
 

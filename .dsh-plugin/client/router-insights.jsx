@@ -8,6 +8,8 @@ import {
 
 const text = value => typeof value === 'string' ? value.trim() : ''
 const BAND = { simple: '简单', balanced: '中等', complex: '困难' }
+const SUBSCRIPTION_FAILURE_OPTIONS = [['ask', '暂停并询问'], ['api', '自动改用 API'], ['fail', '直接失败']]
+const SUBSCRIPTION_CHOICE_BUTTONS = [['api', '改用 API 重试', false], ['subscription', '重试订阅', true], ['cancel', '取消', true]]
 
 /** First-open banner: one line per problem, with the way out. */
 export function OnboardingBanner({ health, onDone, onRefresh, refreshing, error }) {
@@ -148,6 +150,12 @@ export function CostControlCard({ ledger, settingsScope, onChanged, error }) {
               <button type="button" aria-pressed={value.overBudgetAction === 'pause'} disabled={!settings.writable} onClick={() => { void set('overBudgetAction', 'pause') }}>暂停并询问</button>
             </div>
           </div>
+          <div className="mr-control-group"><span className="mr-control-label">订阅调用失败（非额度用尽）时</span>
+            <div className="mr-segment" role="group" aria-label="订阅调用失败时">
+              {SUBSCRIPTION_FAILURE_OPTIONS.map(([id, label]) => <button key={id} type="button" aria-pressed={(value.onSubscriptionFailure ?? 'ask') === id} disabled={!settings.writable} onClick={() => { void set('onSubscriptionFailure', id) }}>{label}</button>)}
+            </div>
+            <span className="mr-caption">超时、崩溃、解析失败、非零退出、登录错误等。额度用尽或限流仍会自动切换 API Key。</span>
+          </div>
         </div>
         <h3 className="mr-section-title">质量回路</h3>
         <div className="mr-controls">
@@ -198,6 +206,7 @@ function ChannelText({ item }) {
 }
 
 function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
+  if (item.status === 'paused') return <PausedNode run={run} item={item} busy={busy} onRerun={onRerun} />
   const [target, setTarget] = React.useState('')
   const cost = packageCost(item)
   const rerun = rerunSupport(run)
@@ -232,6 +241,26 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
             <button className="mr-button mr-button-secondary mr-mini" type="button" disabled={!target} onClick={() => { const [provider, model] = target.split('\u0000'); onRerun(run.id, item.id, { provider, model }) }}>改派并重跑</button>
           </span>
         )}
+      </div>
+    </>
+  )
+}
+
+/** A step paused after a non-quota subscription failure: the user picks how to continue. */
+function PausedNode({ run, item, busy, onRerun }) {
+  const pause = item.pause ?? {}
+  return (
+    <>
+      <p className="mr-package-route">{item.provider}/{item.model}</p>
+      <div className="mr-channel-line"><span className="mr-pill mr-pill-warn">等待确认</span><span className="mr-caption">订阅调用失败，未自动改用 API Key</span></div>
+      <p className="mr-package-copy mr-warn-text">{pause.reason ?? item.error}</p>
+      {pause.detail && <p className="mr-package-copy mr-fallback-error">真实错误：<code>{pause.detail}</code></p>}
+      {pause.loginRequired && <p className="mr-package-copy">看起来是登录问题：请先在终端重新登录该 CLI，再点“重试订阅”。</p>}
+      <div className="mr-node-actions">
+        {SUBSCRIPTION_CHOICE_BUTTONS.map(([choice, label, secondary]) => (
+          <button key={choice} className={`mr-button mr-mini${secondary ? ' mr-button-secondary' : ''}`} type="button" disabled={busy}
+            onClick={() => onRerun(run.id, item.id, null, choice)}>{label}</button>
+        ))}
       </div>
     </>
   )

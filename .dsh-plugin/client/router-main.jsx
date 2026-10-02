@@ -351,18 +351,18 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     catch (error) { if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '评价保存失败。' })) }
     finally { if (mounted.current) setBusy(false) }
   }
-  const rerun = async (runId, packageId, override) => {
+  const rerun = async (runId, packageId, override, choice = null) => {
     const run = ledger.value?.runs?.find(item => item.id === runId)
     const item = run?.packages?.find(entry => entry.id === packageId)
     const provider = override?.provider ?? item?.provider
     const tool = toolForProvider(provider)
     const healthEntry = health.report?.tools?.find(entry => entry.id === tool?.id)
     // Team retries go through the signed runner inside the Harness sandbox.
-    if (run?.kind !== 'team' && ledger.value?.settings?.confirmUnsandboxedCli !== false && tool && HEADLESS_TOOLS.has(tool.id) && healthEntry?.installed && healthEntry.login?.state !== 'logged-out'
+    if (choice !== 'api' && choice !== 'cancel' && run?.kind !== 'team' && ledger.value?.settings?.confirmUnsandboxedCli !== false && tool && HEADLESS_TOOLS.has(tool.id) && healthEntry?.installed && healthEntry.login?.state !== 'logged-out'
       && !window.confirm(`重跑会直接启动 ${tool.label} 的无界面 CLI，不经过 Harness 进程沙箱，只读仅由 CLI 参数保证。继续吗？`)) return
     setBusy(true)
     try {
-      const request = { runId, packageId, ...(override ? { provider: override.provider, model: override.model } : {}) }
+      const request = { runId, packageId, ...(override ? { provider: override.provider, model: override.model } : {}), ...(choice ? { subscriptionChoice: choice } : {}) }
       let result = await call(() => rerunStep(request), '重跑失败。')
       if (result?.paused) {
         if (!window.confirm(`${result.budget?.message ?? '本次重跑会超出预算。'}\n仍要继续吗？`)) return
@@ -528,7 +528,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} />}
         <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.value ? workbench.ledger.error : ''}
           onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating) => { void workbench.rate(runId, packageId, rating) }}
-          onRerun={(runId, packageId, override) => { void workbench.rerun(runId, packageId, override) }} />
+          onRerun={(runId, packageId, override, choice) => { void workbench.rerun(runId, packageId, override, choice) }} />
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes}
           health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
         <BillingCard billing={workbench.health.report?.billing ?? null} error={workbench.health.report ? '' : workbench.health.error}

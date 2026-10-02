@@ -171,10 +171,13 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     plannedChannel: planned.executionChannel ?? null,
     provider: result?.provider ?? planned.recommendedProvider,
     model: result?.model ?? planned.recommendedModel,
-    status: !result ? 'pending' : result.ok ? (result.fallback ? 'fallback' : 'succeeded') : result.blocked ? 'blocked' : result.cancelled ? 'cancelled' : 'failed',
+    status: !result ? 'pending' : result.ok ? (result.fallback ? 'fallback' : 'succeeded') : result.paused ? 'paused'
+      : result.waiting ? 'waiting' : result.blocked ? 'blocked' : result.cancelled ? 'cancelled' : 'failed',
     ok: result?.ok === true,
     ran: Boolean(result) && !result.blocked,
     blocked: result?.blocked === true,
+    ...(result?.paused ? { paused: true, pause: { ...result.pause } } : {}),
+    ...(result?.waiting ? { waiting: true } : {}),
     reassigned: result?.reassigned === true,
     channel: result?.channel ?? null,
     toolId: result?.toolId ?? null,
@@ -256,6 +259,7 @@ export function storedResults(run) {
     id: item.id, name: item.name, ok: item.ok, provider: item.provider, model: item.model,
     channel: item.channel, answer: item.answer, error: item.error, fallback: item.fallback,
     blocked: item.blocked, finishedAt: item.finishedAt,
+    ...(item.paused ? { paused: true } : {}), ...(item.waiting ? { waiting: true } : {}),
   }))
 }
 
