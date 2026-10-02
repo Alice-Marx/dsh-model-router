@@ -8,6 +8,7 @@
 
 import React from 'react'
 import { parseModelProfilesJson } from '../shared/model-profiles.mjs'
+import { parseQuotaPatterns } from '../shared/subscription-billing.mjs'
 import { toolBoundary } from '../shared/security-boundaries.mjs'
 import { RouterMainPage, RouterPanelIcon } from './router-main.jsx'
 import {
@@ -81,6 +82,21 @@ function modelProfilesField() {
   }
 }
 
+function quotaPatternsField() {
+  const field = settingsTextField('quotaPatternsJson')
+  return {
+    ...field,
+    parse: text => {
+      const raw = String(text ?? '').trim() || '{}'
+      try {
+        const value = JSON.parse(raw)
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+      } catch { return undefined }
+      return parseQuotaPatterns(raw).errors.length ? undefined : field.parse(text)
+    },
+  }
+}
+
 /**
  * Bridges the Host config form onto a slot-friendly snapshot store.
  *
@@ -95,7 +111,9 @@ export class RouterSettingsCardController {
       boundedNumberField('dailyBudgetUsd', { minimum: 0, maximum: 1_000_000 }),
       boundedNumberField('monthlyBudgetUsd', { minimum: 0, maximum: 1_000_000 }),
       boundedNumberField('reviewSampleRate', { minimum: 0, maximum: 1 }),
+      boundedNumberField('subscriptionCooldownMinutes', { minimum: 1, maximum: 10_080, integer: true }),
       modelProfilesField(),
+      quotaPatternsField(),
     ])
     this.store = this.form.bind(() => ({
       ...this.form.shell(),
@@ -104,7 +122,9 @@ export class RouterSettingsCardController {
       dailyBudgetUsd: this.form.field('dailyBudgetUsd'),
       monthlyBudgetUsd: this.form.field('monthlyBudgetUsd'),
       reviewSampleRate: this.form.field('reviewSampleRate'),
+      subscriptionCooldownMinutes: this.form.field('subscriptionCooldownMinutes'),
       modelProfilesJson: this.form.field('modelProfilesJson'),
+      quotaPatternsJson: this.form.field('quotaPatternsJson'),
     }))
   }
 
@@ -167,6 +187,7 @@ export function RouterSettingsCard(props) {
         ['dailyBudgetUsd', 'model-router-daily-budget', '每日执行预算（USD）', '0 表示不限。按本机执行记录的实际费用累计，超出后按工作台设置自动降级或暂停询问。'],
         ['monthlyBudgetUsd', 'model-router-monthly-budget', '每月执行预算（USD）', '0 表示不限。按本地时区的自然月累计。'],
         ['reviewSampleRate', 'model-router-review-rate', '强模型抽检比例（0–1）', '质量回路设为“抽检”时，按此比例让更强的模型复核便宜模型的结果。'],
+        ['subscriptionCooldownMinutes', 'model-router-subscription-cooldown', '订阅额度冷却时间（分钟）', '订阅额度用尽或限流、但厂商没有给出恢复时间时，暂停使用该订阅的时长；期间同一路线直接使用 API Key。'],
       ].map(([key, id, label, hint]) => (
         <SettingsValueField
           key={key}
@@ -210,8 +231,28 @@ export function RouterSettingsCard(props) {
           style={styles.profileTextarea}
         />
         {state.modelProfilesJson.invalid && <p style={styles.profileError} role="alert">JSON 格式或某项配置无效。每项需提供准确的 provider/model，单价为非负 USD 数字，质量为 0–100。</p>}
-        <details style={styles.profileExample}><summary>查看配置格式</summary><pre>{`[\n  {\n    "provider": "模型目录中的供应商 ID",\n    "model": "模型目录中的模型 ID",\n    "quality": 80,\n    "pricing": { "input": 0.2, "output": 0.8 },\n    "specialties": ["code"],\n    "cliModel": "厂商 CLI 使用的模型名（可选）",\n    "execution": "auto"\n  }\n]`}</pre><p style={styles.noticeText}>execution 可省略。auto 或 official 表示优先官方无界面工具，失败后回退 API；api 表示始终走模型目录。</p></details>
+        <details style={styles.profileExample}><summary>查看配置格式</summary><pre>{`[\n  {\n    "provider": "模型目录中的供应商 ID",\n    "model": "模型目录中的模型 ID",\n    "quality": 80,\n    "pricing": { "input": 0.2, "output": 0.8 },\n    "specialties": ["code"],\n    "cliModel": "厂商 CLI 使用的模型名（可选）",\n    "execution": "auto",\n    "billing": "subscription-first",\n    "subscription": "plan-key",\n    "apiRoute": { "provider": "按量付费供应商 ID", "model": "模型 ID" }\n  }\n]`}</pre><p style={styles.noticeText}>execution 可省略。auto 或 official 表示优先官方无界面工具，失败后回退 API；api 表示始终走模型目录。billing 默认 subscription-first（订阅优先，额度用尽或限流时切换 API Key），也可设为 api-only 或 subscription-only。subscription 为 plan-key 表示该路线本身是编程套餐端点（如 GLM Coding Plan、Kimi Code、MiniMax Token Plan），apiRoute 指定额度用尽时回退的按量付费路线。</p></details>
         <button type="button" disabled={disabled} onClick={() => props.resetField('modelProfilesJson')}>恢复默认配置</button>
+      </div>
+
+      <div style={styles.profileEditor}>
+        <label htmlFor="model-router-quota-patterns" style={styles.profileLabel}>订阅额度识别规则（JSON，可选）</label>
+        <p style={styles.noticeText}>内置规则已覆盖 Claude、Codex、Gemini、Kimi、MiniMax、GLM 的文档化报错。厂商改了报错文案时，可按工具 ID、供应商 ID 或 * 追加正则：quota 表示额度用尽，rateLimit 表示限流。</p>
+        <textarea
+          id="model-router-quota-patterns"
+          value={state.quotaPatternsJson.text}
+          disabled={disabled}
+          aria-invalid={state.quotaPatternsJson.invalid}
+          onChange={event => props.edit('quotaPatternsJson', event.target.value)}
+          spellCheck={false}
+          style={styles.profileTextarea}
+        />
+        {state.quotaPatternsJson.invalid && <p style={styles.profileError} role="alert">需要 JSON 对象，且每条规则都是有效的正则表达式。</p>}
+        <details style={styles.profileExample}><summary>查看规则格式</summary><pre>{`{
+  "kimi-code": { "quota": ["额度已用完"], "rateLimit": ["请求过于频繁"] },
+  "my-glm-plan": { "quota": ["Usage limit reached for", "1308"] }
+}`}</pre></details>
+        <button type="button" disabled={disabled} onClick={() => props.resetField('quotaPatternsJson')}>恢复默认规则</button>
       </div>
 
       <aside style={styles.notice} aria-label="模型路由使用说明">

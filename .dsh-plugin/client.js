@@ -146,7 +146,7 @@ var OFFICIAL_TOOLS = Object.freeze([
     installArgs: [],
     probeExecutables: [],
     probeNote: "\u68C0\u6D4B\u7ECF\u8FC7\u6709\u6548\u7B7E\u540D\u7684 ZCode.exe \u548C\u540C\u76EE\u5F55 GLM \u8D44\u6E90\uFF1B\u684C\u9762\u5B89\u88C5\u5668\u9700\u4EBA\u5DE5\u9009\u62E9\u5B89\u88C5\u4F4D\u7F6E\u3002",
-    providerHints: ["zai", "z.ai", "zcode", "glm", "zhipu"]
+    providerHints: ["zai", "z.ai", "zcode", "glm", "zhipu", "bigmodel"]
   })
 ]);
 var TOOL_BY_ID = new Map(OFFICIAL_TOOLS.map((tool) => [tool.id, tool]));
@@ -171,6 +171,8 @@ function installCommandLine(tool) {
 var MAX_TEXT = 32e3;
 var MAX_PROFILES = 200;
 var id = (value) => typeof value === "string" ? value.trim() : "";
+var BILLING_VALUES = /* @__PURE__ */ new Set(["subscription-first", "api-only", "subscription-only"]);
+var SUBSCRIPTION_VALUES = /* @__PURE__ */ new Set(["plan-key", "cli-login", "none"]);
 function nonnegative(value, label) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1e6) {
     throw new Error(`${label} \u5FC5\u987B\u662F 0 \u5230 1000000 \u4E4B\u95F4\u7684\u6709\u9650\u6570\u5B57`);
@@ -180,7 +182,7 @@ function nonnegative(value, label) {
 function normalizeProfile(entry, index) {
   const label = `\u7B2C ${index + 1} \u4E2A\u6A21\u578B`;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error(`${label} \u5FC5\u987B\u662F\u5BF9\u8C61`);
-  const allowed = /* @__PURE__ */ new Set(["provider", "model", "quality", "pricing", "specialties", "cliModel", "execution"]);
+  const allowed = /* @__PURE__ */ new Set(["provider", "model", "quality", "pricing", "specialties", "cliModel", "execution", "billing", "subscription", "apiRoute"]);
   const unknown = Object.keys(entry).find((key) => !allowed.has(key));
   if (unknown) throw new Error(`${label} \u542B\u4E0D\u652F\u6301\u7684\u5B57\u6BB5 ${unknown}\uFF1B\u4E0D\u8981\u5728\u8FD9\u91CC\u586B\u5199\u5BC6\u94A5\u6216\u547D\u4EE4`);
   const provider = id(entry.provider);
@@ -227,7 +229,27 @@ function normalizeProfile(entry, index) {
     }
     if (entry.execution !== "auto") profile.execution = entry.execution;
   }
-  if (Object.keys(profile).length === 2) throw new Error(`${label} \u81F3\u5C11\u63D0\u4F9B quality\u3001pricing\u3001specialties\u3001cliModel \u6216 execution \u4E4B\u4E00`);
+  if (entry.billing !== void 0) {
+    if (!BILLING_VALUES.has(entry.billing)) throw new Error(`${label} \u7684 billing \u53EA\u80FD\u662F subscription-first\u3001api-only \u6216 subscription-only`);
+    profile.billing = entry.billing;
+  }
+  if (entry.subscription !== void 0) {
+    if (!SUBSCRIPTION_VALUES.has(entry.subscription)) throw new Error(`${label} \u7684 subscription \u53EA\u80FD\u662F plan-key\u3001cli-login \u6216 none`);
+    profile.subscription = entry.subscription;
+  }
+  if (entry.apiRoute !== void 0) {
+    const target = entry.apiRoute;
+    if (!target || typeof target !== "object" || Array.isArray(target) || Object.keys(target).some((key) => key !== "provider" && key !== "model")) {
+      throw new Error(`${label} \u7684 apiRoute \u5FC5\u987B\u662F { provider, model }`);
+    }
+    const apiProvider = id(target.provider);
+    const apiModel = id(target.model);
+    if (!apiProvider || !apiModel || apiProvider.length > 160 || apiModel.length > 240) throw new Error(`${label} \u7684 apiRoute \u9700\u8981\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u51C6\u786E provider \u548C model`);
+    if (profile.subscription !== "plan-key") throw new Error(`${label} \u53EA\u6709 subscription \u4E3A plan-key \u65F6\u624D\u80FD\u8BBE\u7F6E apiRoute`);
+    if (apiProvider === provider && apiModel === model) throw new Error(`${label} \u7684 apiRoute \u4E0D\u80FD\u6307\u5411\u81EA\u5DF1`);
+    profile.apiRoute = { provider: apiProvider, model: apiModel };
+  }
+  if (Object.keys(profile).length === 2) throw new Error(`${label} \u81F3\u5C11\u63D0\u4F9B quality\u3001pricing\u3001specialties\u3001cliModel\u3001execution\u3001billing \u6216 subscription \u4E4B\u4E00`);
   return profile;
 }
 function normalizeExecutionPreference(value) {
@@ -268,10 +290,102 @@ function applyModelProfiles(routes, profiles) {
       ...profile.pricing === void 0 ? {} : { pricing: { ...profile.pricing }, pricingSource: "user" },
       ...profile.specialties === void 0 ? {} : { specialties: [...profile.specialties] },
       ...profile.cliModel === void 0 ? {} : { cliModel: profile.cliModel },
-      ...profile.execution === void 0 ? {} : { execution: profile.execution }
+      ...profile.execution === void 0 ? {} : { execution: profile.execution },
+      ...profile.billing === void 0 ? {} : { billing: profile.billing },
+      ...profile.subscription === void 0 ? {} : { subscription: profile.subscription },
+      ...profile.apiRoute === void 0 ? {} : { apiRoute: { ...profile.apiRoute } }
     };
   });
 }
+
+// .dsh-plugin/shared/subscription-billing.mjs
+var BILLING_MODES = Object.freeze(["subscription-first", "api-only", "subscription-only"]);
+var DEFAULT_BILLING_MODE = "subscription-first";
+var MAX_COOLDOWN_MS = 31 * 24 * 60 * 6e4;
+var BILLING_MODE_LABEL = Object.freeze({
+  "subscription-first": "\u8BA2\u9605\u4F18\u5148",
+  "api-only": "\u53EA\u7528 API Key",
+  "subscription-only": "\u53EA\u7528\u8BA2\u9605"
+});
+var VENDOR_QUOTA_PATTERNS = Object.freeze({
+  "claude-code": Object.freeze([
+    { kind: "quota", source: "code.claude.com/docs/en/errors", re: /you['’]?ve hit your [a-z0-9 -]{0,24}limit/i },
+    { kind: "quota", source: "\u65E7\u7248 CLI \u6587\u672C\uFF08\u672A\u6838\u9A8C\uFF09", re: /claude ai usage limit reached|usage limit reached\|\d{10}/i },
+    { kind: "rate-limit", source: "code.claude.com/docs/en/errors", re: /server is temporarily limiting requests|request rejected \(429\)/i }
+  ]),
+  codex: Object.freeze([
+    { kind: "quota", source: "Codex usage_limit_reached\uFF08\u793E\u533A\u8BB0\u5F55\u7684 API \u8FD4\u56DE\uFF09", re: /usage_limit_reached|you['’]?ve hit your usage limit|usage limit has been reached/i },
+    { kind: "rate-limit", source: "OpenAI 429\uFF08\u901A\u7528\uFF09", re: /rate_limit_exceeded|rate limit reached for/i }
+  ]),
+  gemini: Object.freeze([
+    { kind: "quota", source: "Google API RESOURCE_EXHAUSTED", re: /RESOURCE_EXHAUSTED|quota exceeded|exhausted your (?:daily )?quota|usage limit reached for all/i }
+  ]),
+  "kimi-code": Object.freeze([
+    { kind: "quota", source: "kimi.com/code/docs \u9519\u8BEF\u53C2\u8003", re: /you['’]?ve reached your (?:5-hour|weekly \(7-day\)|monthly) usage limit/i },
+    { kind: "rate-limit", source: "kimi.com/code/docs \u9519\u8BEF\u53C2\u8003", re: /you['’]?ve reached your concurrent request limit|we['’]?re receiving too many requests|engine is currently overloaded/i }
+  ]),
+  "minimax-code": Object.freeze([
+    { kind: "quota", source: "platform.minimax.io \u9519\u8BEF\u7801 2056", re: /(?:\bcode\b["'\s:=]*|\[)2056\b|usage limit exceeded|token plan usage limit reached/i },
+    { kind: "rate-limit", source: "platform.minimax.io \u9519\u8BEF\u7801 2045", re: /(?:\bcode\b["'\s:=]*|\[)2045\b|rate growth limit/i }
+  ]),
+  zcode: Object.freeze([
+    { kind: "quota", source: "docs.z.ai / docs.bigmodel.cn \u9519\u8BEF\u7801 1308\u20131321", re: /(?:\bcode\b["'\s:=]*|\[)13(?:08|09|10|1[6-9]|2[01])\b|usage limit reached for|weekly\/monthly limit exhausted|已达到.{0,20}使用上限|套餐已到期|每周\/每月使用上限/i },
+    { kind: "rate-limit", source: "docs.z.ai \u9519\u8BEF\u7801 1302/1305", re: /(?:\bcode\b["'\s:=]*|\[)130[25]\b|rate limit reached for requests|速率限制|访问量过大/i }
+  ]),
+  "*": Object.freeze([
+    { kind: "rate-limit", source: "HTTP 429\uFF08\u901A\u7528\uFF09", re: /\b429\b|too many requests|rate[_ ]limit/i }
+  ])
+});
+var clean = (value) => typeof value === "string" ? value.trim() : "";
+function parseQuotaPatterns(value) {
+  const patterns = {};
+  const errors = [];
+  if (value === void 0 || value === null || clean(value) === "") return { patterns, errors };
+  let input;
+  try {
+    input = JSON.parse(value);
+  } catch {
+    return { patterns, errors: ["quotaPatternsJson \u4E0D\u662F\u6709\u6548\u7684 JSON"] };
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { patterns, errors: ["quotaPatternsJson \u5FC5\u987B\u662F\u5BF9\u8C61"] };
+  for (const [key, entry] of Object.entries(input).slice(0, 40)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      errors.push(`${key}: \u5FC5\u987B\u662F\u5BF9\u8C61`);
+      continue;
+    }
+    const list = [];
+    for (const [field2, kind] of [["quota", "quota"], ["rateLimit", "rate-limit"]]) {
+      const values = entry[field2];
+      if (values === void 0) continue;
+      if (!Array.isArray(values)) {
+        errors.push(`${key}.${field2}: \u5FC5\u987B\u662F\u6570\u7EC4`);
+        continue;
+      }
+      for (const source of values.slice(0, 20)) {
+        if (typeof source !== "string" || !source || source.length > 200) {
+          errors.push(`${key}.${field2}: \u6BCF\u9879\u5FC5\u987B\u662F 1\u2013200 \u5B57\u7B26\u7684\u6B63\u5219`);
+          continue;
+        }
+        try {
+          list.push({ kind, source: "\u7528\u6237\u914D\u7F6E", re: new RegExp(source, "i") });
+        } catch {
+          errors.push(`${key}.${field2}: \u65E0\u6548\u6B63\u5219 ${source.slice(0, 40)}`);
+        }
+      }
+    }
+    if (list.length) patterns[key] = list;
+  }
+  return { patterns, errors };
+}
+var SUBSCRIPTION_STATE_LABEL = Object.freeze({
+  "logged-in": "\u5DF2\u767B\u5F55\u8BA2\u9605\u8D26\u53F7",
+  "plan-key": "\u7F16\u7A0B\u5957\u9910 Key \u8DEF\u7EBF",
+  "api-key-only": "\u4EC5 API Key \u767B\u5F55",
+  "logged-out": "\u672A\u767B\u5F55",
+  exhausted: "\u989D\u5EA6\u5DF2\u7528\u5C3D",
+  unknown: "\u767B\u5F55\u72B6\u6001\u672A\u77E5",
+  none: "\u65E0\u8BA2\u9605"
+});
 
 // .dsh-plugin/shared/security-boundaries.mjs
 var READ_ONLY_SCOPE = Object.freeze({
@@ -1167,7 +1281,7 @@ function buildPlan({ text: text3 = "", available = [], mode = "collective", pric
 }
 
 // .dsh-plugin/shared/harness-plan.mjs
-var clean = (value) => typeof value === "string" ? value.trim() : "";
+var clean2 = (value) => typeof value === "string" ? value.trim() : "";
 var HEADLESS_TOOL_IDS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]);
 function channelForProvider(provider, installedToolIds = [], runnableToolIds = [], route = null, loggedOutToolIds = []) {
   const preference = normalizeExecutionPreference(route?.execution);
@@ -1237,15 +1351,15 @@ function createPlanFromRoutes(task, availableRoutes, {
   preset = "balanced",
   loggedOutToolIds = []
 } = {}) {
-  const taskText = clean(task);
+  const taskText = clean2(task);
   if (!taskText) throw new Error("task must contain text");
-  const requestedDirect = mode === "direct" || clean(directProvider) !== "" || clean(directModel) !== "";
+  const requestedDirect = mode === "direct" || clean2(directProvider) !== "" || clean2(directModel) !== "";
   const selectedMode = mode === "team" ? "team" : "single";
   let routes = Array.isArray(availableRoutes) ? availableRoutes : [];
   let directRoute = null;
   if (requestedDirect) {
-    const provider = clean(directProvider);
-    const model = clean(directModel);
+    const provider = clean2(directProvider);
+    const model = clean2(directModel);
     if (!provider || !model) throw new Error("\u6307\u5B9A\u5355\u4E00\u6A21\u578B\u9700\u8981\u540C\u65F6\u63D0\u4F9B provider \u548C model");
     const match = routes.filter((route) => route.provider === provider && route.model === model);
     if (match.length !== 1) throw new Error(`\u6307\u5B9A\u6A21\u578B ${provider}/${model} \u4E0D\u5728\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u4E2D`);
@@ -1340,31 +1454,31 @@ function applyQualityBiases(routes, biases) {
 }
 
 // .dsh-plugin/client/catalog.mjs
-var clean2 = (value) => typeof value === "string" ? value.trim() : "";
+var clean3 = (value) => typeof value === "string" ? value.trim() : "";
 function routesFromModelCatalog(catalog) {
   const groups = Array.isArray(catalog?.groups) ? catalog.groups : [];
   const routable = new Set(Array.isArray(catalog?.routableProviders) ? catalog.routableProviders : []);
   const routes = [];
   const seen = /* @__PURE__ */ new Set();
   for (const group of groups) {
-    const provider = clean2(group?.id);
+    const provider = clean3(group?.id);
     if (!provider || !routable.has(provider)) continue;
     for (const entry of Array.isArray(group.models) ? group.models : []) {
-      const model = clean2(entry?.id);
+      const model = clean3(entry?.id);
       if (!model) continue;
       const key = `${provider}\0${model}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const reasoning = entry?.reasoning;
-      const efforts = Array.isArray(reasoning?.efforts) ? [...new Set(reasoning.efforts.map((item) => clean2(item?.id ?? item)).filter(Boolean))] : [];
+      const efforts = Array.isArray(reasoning?.efforts) ? [...new Set(reasoning.efforts.map((item) => clean3(item?.id ?? item)).filter(Boolean))] : [];
       routes.push({
         provider,
-        providerName: clean2(group.name) || provider,
+        providerName: clean3(group.name) || provider,
         model,
-        name: clean2(entry.name) || model,
+        name: clean3(entry.name) || model,
         reasoningKnown: reasoning !== void 0 && reasoning !== null,
         reasoningEfforts: efforts,
-        ...clean2(reasoning?.defaultEffort) ? { defaultReasoningEffort: clean2(reasoning.defaultEffort) } : {},
+        ...clean3(reasoning?.defaultEffort) ? { defaultReasoningEffort: clean3(reasoning.defaultEffort) } : {},
         // modelCatalog deliberately omits modalities; unknown means the Host
         // must still validate image capability before a real request.
         inputModalities: []
@@ -1405,7 +1519,10 @@ function profileDraft(profile) {
     cacheWrite: profile?.pricing?.cacheWrite === void 0 ? "" : String(profile.pricing.cacheWrite),
     specialties: Array.isArray(profile?.specialties) ? profile.specialties.join(", ") : "",
     cliModel: profile?.cliModel ?? "",
-    execution: profile?.execution === "official" || profile?.execution === "api" ? profile.execution : "auto"
+    execution: profile?.execution === "official" || profile?.execution === "api" ? profile.execution : "auto",
+    billing: BILLING_MODES.includes(profile?.billing) ? profile.billing : DEFAULT_BILLING_MODE,
+    subscription: ["plan-key", "cli-login", "none"].includes(profile?.subscription) ? profile.subscription : "auto",
+    apiRoute: profile?.apiRoute ? profileRouteKey(profile.apiRoute) : ""
   };
 }
 function profileFromDraft(route, draft) {
@@ -1442,6 +1559,20 @@ function profileFromDraft(route, draft) {
   const execution = field(draft?.execution) || "auto";
   if (!["auto", "official", "api"].includes(execution)) throw new Error("\u6267\u884C\u65B9\u5F0F\u53EA\u80FD\u662F\u81EA\u52A8\u3001\u5B98\u65B9\u5DE5\u5177\u6216\u6A21\u578B\u76EE\u5F55 API\u3002");
   if (execution !== "auto") profile.execution = execution;
+  const billing = field(draft?.billing) || DEFAULT_BILLING_MODE;
+  if (!BILLING_MODES.includes(billing)) throw new Error("\u8BA1\u8D39\u65B9\u5F0F\u53EA\u80FD\u662F\u8BA2\u9605\u4F18\u5148\u3001\u53EA\u7528 API Key \u6216\u53EA\u7528\u8BA2\u9605\u3002");
+  if (billing !== DEFAULT_BILLING_MODE) profile.billing = billing;
+  const subscription = field(draft?.subscription) || "auto";
+  if (!["auto", "plan-key", "cli-login", "none"].includes(subscription)) throw new Error("\u8BA2\u9605\u6765\u6E90\u53EA\u80FD\u662F\u81EA\u52A8\u3001\u7F16\u7A0B\u5957\u9910 Key\u3001CLI \u8D26\u53F7\u767B\u5F55\u6216\u65E0\u8BA2\u9605\u3002");
+  if (subscription !== "auto") profile.subscription = subscription;
+  const apiKey = String(draft?.apiRoute ?? "");
+  if (apiKey) {
+    if (subscription !== "plan-key") throw new Error("\u53EA\u6709\u201C\u7F16\u7A0B\u5957\u9910 Key\u201D\u8DEF\u7EBF\u9700\u8981\u9009\u62E9\u56DE\u9000\u7684 API \u8DEF\u7EBF\u3002");
+    const [apiProvider, apiModel] = apiKey.split("\0");
+    if (!field(apiProvider) || !field(apiModel)) throw new Error("\u56DE\u9000 API \u8DEF\u7EBF\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002");
+    if (field(apiProvider) === provider && field(apiModel) === model) throw new Error("\u56DE\u9000 API \u8DEF\u7EBF\u4E0D\u80FD\u662F\u5957\u9910\u8DEF\u7EBF\u672C\u8EAB\u3002");
+    profile.apiRoute = { provider: field(apiProvider), model: field(apiModel) };
+  }
   return profile;
 }
 function updateProfileJson(rawJson, route, draft) {
@@ -1533,11 +1664,11 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
   return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u9009\u62E9\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u51C6\u786E\u8DEF\u7EBF\uFF0C\u586B\u5199\u4F60\u638C\u63E1\u7684\u8D28\u91CF\u8BC4\u5206\u4E0E\u5355\u4EF7\u3002\u914D\u7F6E\u7531\u4F60\u63D0\u4F9B\uFF0C\u63D2\u4EF6\u4E0D\u4F1A\u8BFB\u53D6\u8D26\u53F7\u5BC6\u94A5\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, "\u5DF2\u6709\u914D\u7F6E\u65E0\u6CD5\u89E3\u6790\uFF1A", loadError, "\u3002\u8BF7\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6B63 JSON\u3002"), snapshot.status !== "ready" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8BBE\u7F6E\u72B6\u6001\uFF1A", snapshot.status === "loading" ? "\u6B63\u5728\u52A0\u8F7D" : "\u5F53\u524D\u4E0D\u53EF\u7528"), snapshot.status === "ready" && !snapshot.writable && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "status" }, "\u5F53\u524D\u8BBE\u7F6E\u4E3A\u53EA\u8BFB\uFF0C\u8BF7\u5728\u53EF\u5199\u7684\u672C\u673A\u73AF\u5883\u914D\u7F6E\u3002"), routes.length === 0 ? /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-empty" }, "\u8BF7\u5148\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u6DFB\u52A0\u6A21\u578B\uFF0C\u518D\u8FD4\u56DE\u8FD9\u91CC\u586B\u5199\u4EF7\u683C\u4E0E\u80FD\u529B\u3002") : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "\u6A21\u578B\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey3, onChange: (event) => {
     setSelected(event.target.value);
     setNotice(null);
-  } }, routes.map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `\u5DF2\u914D\u7F6E${saved.pricing ? "\u5355\u4EF7" : "\u80FD\u529B\uFF0C\u4EF7\u683C\u672A\u77E5"}` : "\u672A\u914D\u7F6E\uFF0C\u4EF7\u683C\u4E0E\u8D28\u91CF\u6765\u6E90\u672A\u77E5", pending ? " \xB7 \u5F53\u524D\u6709\u672A\u4FDD\u5B58\u8F93\u5165" : "", unmatched > 0 ? ` \xB7 \u53E6\u6709 ${unmatched} \u6761\u914D\u7F6E\u4E0D\u5728\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u4E2D\uFF0C\u4FDD\u5B58\u65F6\u4F1A\u4FDD\u7559` : ""), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8D28\u91CF\u8BC4\u5206\uFF080\u2013100\uFF0C\u81EA\u62A5\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "\u4F8B\u5982 85\uFF1B\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u5165\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u51FA\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u64C5\u957F\u65B9\u5411\uFF08\u82F1\u6587\u6807\u7B7E\uFF0C\u9017\u53F7\u5206\u9694\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u5B98\u65B9 CLI \u6A21\u578B\u540D\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "\u4EC5\u5728\u5382\u5546 CLI \u652F\u6301\u8BE5\u51C6\u786E\u540D\u79F0\u65F6\u586B\u5199" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u6267\u884C\u65B9\u5F0F"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.execution || "auto", disabled: !writable, onChange: (event) => edit("execution", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "auto" }, "\u81EA\u52A8\uFF1A\u5DF2\u5B89\u88C5\u5219\u7528\u5B98\u65B9\u5DE5\u5177\uFF0C\u5931\u8D25\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "official" }, "\u5B98\u65B9\u5DE5\u5177\uFF1A\u5931\u8D25\u6216\u672A\u5B89\u88C5\u65F6\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "api" }, "\u4EC5\u6A21\u578B\u76EE\u5F55 API")))), /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u7F13\u5B58\u5355\u4EF7\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u8BFB\u53D6\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u5199\u5165\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
+  } }, routes.map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `\u5DF2\u914D\u7F6E${saved.pricing ? "\u5355\u4EF7" : "\u80FD\u529B\uFF0C\u4EF7\u683C\u672A\u77E5"}` : "\u672A\u914D\u7F6E\uFF0C\u4EF7\u683C\u4E0E\u8D28\u91CF\u6765\u6E90\u672A\u77E5", pending ? " \xB7 \u5F53\u524D\u6709\u672A\u4FDD\u5B58\u8F93\u5165" : "", unmatched > 0 ? ` \xB7 \u53E6\u6709 ${unmatched} \u6761\u914D\u7F6E\u4E0D\u5728\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u4E2D\uFF0C\u4FDD\u5B58\u65F6\u4F1A\u4FDD\u7559` : ""), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8D28\u91CF\u8BC4\u5206\uFF080\u2013100\uFF0C\u81EA\u62A5\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "\u4F8B\u5982 85\uFF1B\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u5165\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u51FA\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u64C5\u957F\u65B9\u5411\uFF08\u82F1\u6587\u6807\u7B7E\uFF0C\u9017\u53F7\u5206\u9694\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u5B98\u65B9 CLI \u6A21\u578B\u540D\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "\u4EC5\u5728\u5382\u5546 CLI \u652F\u6301\u8BE5\u51C6\u786E\u540D\u79F0\u65F6\u586B\u5199" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u6267\u884C\u65B9\u5F0F"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.execution || "auto", disabled: !writable, onChange: (event) => edit("execution", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "auto" }, "\u81EA\u52A8\uFF1A\u5DF2\u5B89\u88C5\u5219\u7528\u5B98\u65B9\u5DE5\u5177\uFF0C\u5931\u8D25\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "official" }, "\u5B98\u65B9\u5DE5\u5177\uFF1A\u5931\u8D25\u6216\u672A\u5B89\u88C5\u65F6\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "api" }, "\u4EC5\u6A21\u578B\u76EE\u5F55 API"))), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8BA1\u8D39\u65B9\u5F0F"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.billing, disabled: !writable, onChange: (event) => edit("billing", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "subscription-first" }, "\u8BA2\u9605\u4F18\u5148\uFF1A\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u65F6\u5207\u6362 API Key"), /* @__PURE__ */ import_react.default.createElement("option", { value: "api-only" }, "\u53EA\u7528 API Key"), /* @__PURE__ */ import_react.default.createElement("option", { value: "subscription-only" }, "\u53EA\u7528\u8BA2\u9605\uFF1A\u989D\u5EA6\u7528\u5C3D\u65F6\u4E0D\u5207\u6362"))), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8BA2\u9605\u6765\u6E90"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.subscription, disabled: !writable, onChange: (event) => edit("subscription", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "auto" }, "\u81EA\u52A8\uFF1A\u6709\u5B98\u65B9 CLI \u65F6\u7528 CLI \u8D26\u53F7\u767B\u5F55"), /* @__PURE__ */ import_react.default.createElement("option", { value: "plan-key" }, "\u7F16\u7A0B\u5957\u9910 Key\uFF1A\u8BE5\u8DEF\u7EBF\u672C\u8EAB\u662F\u5957\u9910\u7AEF\u70B9"), /* @__PURE__ */ import_react.default.createElement("option", { value: "cli-login" }, "\u5B98\u65B9 CLI \u8D26\u53F7\u767B\u5F55"), /* @__PURE__ */ import_react.default.createElement("option", { value: "none" }, "\u65E0\u8BA2\u9605\uFF1A\u59CB\u7EC8\u6309 API \u8BA1\u8D39"))), draft.subscription === "plan-key" && /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u989D\u5EA6\u7528\u5C3D\u65F6\u56DE\u9000\u7684 API \u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.apiRoute, disabled: !writable, onChange: (event) => edit("apiRoute", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "\u4E0D\u56DE\u9000\uFF08\u672A\u914D\u7F6E API \u8DEF\u7EBF\uFF09"), routes.filter((item) => profileRouteKey(item) !== routeKey3).map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))))), /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u7F13\u5B58\u5355\u4EF7\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u8BFB\u53D6\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u5199\u5165\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
     void write(false);
   } }, saving ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58\u6B64\u6A21\u578B"), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !pending || saving, onClick: reload }, "\u91CD\u65B0\u52A0\u8F7D\u6B64\u8DEF\u7EBF"), saved && /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable, onClick: () => {
     void write(true);
-  } }, "\u5220\u9664\u6B64\u6A21\u578B\u914D\u7F6E")), notice && /* @__PURE__ */ import_react.default.createElement("p", { className: notice.tone === "error" ? "mr-error" : "mr-profile-success", role: notice.tone === "error" ? "alert" : "status" }, notice.text), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8D28\u91CF\u8BC4\u5206\u548C\u4EF7\u683C\u90FD\u662F\u7528\u6237\u63D0\u4F9B\u7684\u4F30\u503C\u3002\u672A\u586B\u5199\u5355\u4EF7\u65F6\u663E\u793A\u201C\u4EF7\u683C\u5F85\u914D\u7F6E\u201D\uFF1B\u9884\u7B97\u53EA\u5F71\u54CD\u672C\u5730\u89C4\u5212\uFF0C\u4E0D\u9650\u5236\u5B9E\u9645\u8D26\u5355\u3002CLI \u6A21\u578B\u540D\u987B\u4E0E\u5382\u5546\u5DE5\u5177\u6838\u5BF9\u3002\u6267\u884C\u65B9\u5F0F\u51B3\u5B9A\u8BE5\u6A21\u578B\u6536\u5230\u4EFB\u52A1\u65F6\u8D70\u5B98\u65B9\u65E0\u754C\u9762\u5DE5\u5177\u8FD8\u662F\u6A21\u578B\u76EE\u5F55 API\uFF1B\u5B98\u65B9\u5DE5\u5177\u5931\u8D25\u65F6\u4ECD\u4F1A\u56DE\u9000 API\u3002"))));
+  } }, "\u5220\u9664\u6B64\u6A21\u578B\u914D\u7F6E")), notice && /* @__PURE__ */ import_react.default.createElement("p", { className: notice.tone === "error" ? "mr-error" : "mr-profile-success", role: notice.tone === "error" ? "alert" : "status" }, notice.text), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8D28\u91CF\u8BC4\u5206\u548C\u4EF7\u683C\u90FD\u662F\u7528\u6237\u63D0\u4F9B\u7684\u4F30\u503C\u3002\u672A\u586B\u5199\u5355\u4EF7\u65F6\u663E\u793A\u201C\u4EF7\u683C\u5F85\u914D\u7F6E\u201D\uFF1B\u9884\u7B97\u53EA\u5F71\u54CD\u672C\u5730\u89C4\u5212\uFF0C\u4E0D\u9650\u5236\u5B9E\u9645\u8D26\u5355\u3002CLI \u6A21\u578B\u540D\u987B\u4E0E\u5382\u5546\u5DE5\u5177\u6838\u5BF9\u3002\u6267\u884C\u65B9\u5F0F\u51B3\u5B9A\u8BE5\u6A21\u578B\u6536\u5230\u4EFB\u52A1\u65F6\u8D70\u5B98\u65B9\u65E0\u754C\u9762\u5DE5\u5177\u8FD8\u662F\u6A21\u578B\u76EE\u5F55 API\uFF1B\u5B98\u65B9\u5DE5\u5177\u5931\u8D25\u65F6\u4ECD\u4F1A\u56DE\u9000 API\u3002\u8BA1\u8D39\u65B9\u5F0F\u9ED8\u8BA4\u8BA2\u9605\u4F18\u5148\uFF1A\u5148\u7528 CLI \u8D26\u53F7\u767B\u5F55\u6216\u7F16\u7A0B\u5957\u9910 Key \u8DEF\u7EBF\uFF0C\u8BA2\u9605\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u65F6\u540C\u4E00\u6B65\u9AA4\u81EA\u52A8\u6539\u7528 API Key\uFF0C\u5E76\u8BB0\u5165\u8FD0\u884C\u5386\u53F2\u3002"))));
 }
 
 // .dsh-plugin/client/tool-install-state.mjs
@@ -1679,6 +1810,37 @@ function rerunSupport(run) {
   if (run?.kind === "team" && run.executionMode !== "read-only") return { supported: false, reason: "\u53EF\u7F16\u8F91\u56E2\u961F\u8FD0\u884C\u4E0D\u652F\u6301\u5355\u6B65\u91CD\u8DD1\uFF1A\u6539\u52A8\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u3002\u8BF7\u5728\u4F1A\u8BDD\u4E2D\u91CD\u65B0\u8C03\u7528 model_router_team_execute\u3002" };
   return { supported: true, reason: "" };
 }
+var pad2 = (value) => String(value).padStart(2, "0");
+function formatResetTime(at) {
+  if (!Number.isFinite(at)) return "";
+  const date = new Date(at);
+  return `${date.getMonth() + 1}-${date.getDate()} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+var BILLING_CHANNEL_LABEL = Object.freeze({ subscription: "\u8BA2\u9605", api: "API Key" });
+function billingRows(billing) {
+  return (billing?.providers ?? []).map((row) => {
+    const sub = row.subscription ?? {};
+    const subscription = sub.kind === "plan-key" ? `\u7F16\u7A0B\u5957\u9910 Key${sub.planRoute ? `\uFF08${sub.planRoute.provider}/${sub.planRoute.model}\uFF09` : ""}` : sub.kind === "cli-login" ? `\u5B98\u65B9 CLI \u8D26\u53F7\u767B\u5F55 \xB7 ${sub.toolId}` : "\u65E0\u8BA2\u9605";
+    const state = sub.state === "exhausted" ? `${sub.exhaustedKind === "rate-limit" ? "\u9650\u6D41\u4E2D" : "\u989D\u5EA6\u5DF2\u7528\u5C3D"}\uFF0C\u9884\u8BA1 ${formatResetTime(sub.exhaustedUntil)} \u6062\u590D${sub.resetReported ? "" : "\uFF08\u5382\u5546\u672A\u7ED9\u51FA\u65F6\u95F4\uFF0C\u6309\u51B7\u5374\u65F6\u95F4\u4F30\u7B97\uFF09"}` : sub.stateLabel ?? "\u2014";
+    const api = row.mode === "subscription-only" ? "\u4E0D\u56DE\u9000\uFF08\u53EA\u7528\u8BA2\u9605\uFF09" : row.api?.available ? `\u53EF\u7528${row.api.route ? `\uFF1A${row.api.route.provider}/${row.api.route.model}` : ""}${row.api.cliKeyEnv ? " \xB7 CLI \u73AF\u5883\u53D8\u91CF\u4E5F\u6709 Key" : ""}` : "\u672A\u914D\u7F6E\u56DE\u9000\u7684 API \u8DEF\u7EBF";
+    return {
+      key: `${row.provider}\0${sub.key ?? "none"}\0${row.mode}`,
+      provider: row.provider,
+      models: (row.models ?? []).join("\u3001"),
+      mode: row.modeLabel ?? row.mode,
+      subscription,
+      state,
+      exhausted: sub.state === "exhausted",
+      api,
+      apiAvailable: row.api?.available === true
+    };
+  });
+}
+function billingSwitchText(item) {
+  const note = item?.billingSwitch;
+  if (!note?.reason) return null;
+  return note.reason;
+}
 
 // .dsh-plugin/client/router-insights.jsx
 var text = (value) => typeof value === "string" ? value.trim() : "";
@@ -1784,7 +1946,7 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
   const rerun = rerunSupport(run);
   const canRerun = rerun.supported && !item.ok && !busy;
   const others = routes.filter((route) => `${route.provider}/${route.model}` !== `${item.provider}/${item.model}`);
-  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), item.fallback?.reason && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(run.id, item.id, item.rating === 1 ? "clear" : "up") }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(run.id, item.id, item.rating === -1 ? "clear" : "down") }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", onClick: () => onRerun(run.id, item.id, null) }, "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
+  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u8BA1\u8D39\uFF1A", BILLING_CHANNEL_LABEL[item.billing] ?? "\u2014", item.subscriptionRoute ? ` \xB7 \u5957\u9910\u8DEF\u7EBF ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` \xB7 ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "\u8BA1\u8D39\u5207\u6362\uFF1A", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(run.id, item.id, item.rating === 1 ? "clear" : "up") }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(run.id, item.id, item.rating === -1 ? "clear" : "down") }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", onClick: () => onRerun(run.id, item.id, null) }, "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
     const [provider, model] = target.split("\0");
     onRerun(run.id, item.id, { provider, model });
   } }, "\u6539\u6D3E\u5E76\u91CD\u8DD1"))));
@@ -1794,6 +1956,10 @@ function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, busy, erro
   const [openId, setOpenId] = import_react2.default.useState(null);
   const current = runs.find((run) => run.id === openId) ?? runs[0];
   return /* @__PURE__ */ import_react2.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u6267\u884C\u8BB0\u5F55" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("h2", { className: "mr-card-title" }, "\u6267\u884C\u8BB0\u5F55\u4E0E\u5B50\u4EFB\u52A1"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-card-copy" }, "\u6765\u81EA\u4F1A\u8BDD\u4E2D\u7684 model_router_execute\u3001model_router_team_execute \u548C model_router_tool_run\u3002\u6BCF\u4E2A\u5DE5\u4F5C\u5305\u663E\u793A\u5206\u914D\u7684\u6A21\u578B\u3001\u539F\u56E0\u3001\u6E20\u9053\u3001\u8D39\u7528\uFF1B\u56DE\u9000\u65F6\u663E\u793A CLI \u539F\u59CB\u9519\u8BEF\u3002\u8DEF\u7531\u6267\u884C\u548C\u53EA\u8BFB\u56E2\u961F\u6267\u884C\u4E2D\u5931\u8D25\u7684\u6B65\u9AA4\u53EF\u5355\u72EC\u91CD\u8DD1\uFF0C\u4E0D\u4F1A\u91CD\u505A\u5DF2\u5B8C\u6210\u7684\u6B65\u9AA4\u3002")), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: busy, onClick: onRefresh }, "\u5237\u65B0")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, error), runs.length === 0 && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-empty" }, "\u8FD8\u6CA1\u6709\u6267\u884C\u8BB0\u5F55\u3002\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_execute\u3001model_router_team_execute \u6216 model_router_tool_run \u540E\uFF0C\u8FD9\u91CC\u4F1A\u663E\u793A\u51B3\u7B56\u548C\u7ED3\u679C\u3002"), runs.length > 0 && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-label", htmlFor: "mr-run-select" }, "\u9009\u62E9\u8BB0\u5F55"), /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input", id: "mr-run-select", value: current?.id ?? "", onChange: (event) => setOpenId(event.target.value) }, runs.map((run) => /* @__PURE__ */ import_react2.default.createElement("option", { key: run.id, value: run.id }, new Date(run.createdAt).toLocaleString(), " \xB7 ", RUN_KIND_LABEL[run.kind ?? "assign"] ?? run.kind, " \xB7 ", RUN_STATUS_LABEL[run.status] ?? run.status, " \xB7 ", run.task.slice(0, 40)))), current && /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-run" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-label" }, "\u65B9\u6848"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[current.preset]?.label ?? current.preset, current.budget?.downgraded ? "\uFF08\u8D85\u9884\u7B97\u81EA\u52A8\u964D\u7EA7\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-label" }, "\u96BE\u5EA6"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-value" }, BAND[current.decision?.complexity?.band] ?? "\u2014", current.decision?.complexity?.value !== null && current.decision?.complexity?.value !== void 0 ? ` \xB7 ${current.decision.complexity.value}` : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-label" }, "\u9884\u4F30 / \u5B9E\u9645\uFF08\u8BA1\u5165\u9884\u7B97\uFF09"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-value" }, money(current.decision?.estimatedCost), " / ", money(runTotals(current).budgetUsd))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-label" }, "\u7C7B\u578B"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-metric-value" }, RUN_KIND_LABEL[current.kind ?? "assign"] ?? current.kind, current.kind === "team" || current.kind === "tool" ? ` \xB7 ${current.executionMode === "workspace-write" ? "\u53EF\u7F16\u8F91" : "\u53EA\u8BFB"}` : ""))), runTotals(current).subscription && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u8BA2\u9605\u53C2\u8003\u8D39\u7528\uFF08\u6309 API \u4EF7\u6298\u7B97\uFF0C\u4E0D\u8BA1\u5165\u9884\u7B97\uFF09\uFF1A", money(runTotals(current).referenceUsd)), current.isolatedWorkspace && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u72EC\u7ACB\u5DE5\u4F5C\u533A\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, current.isolatedWorkspace)), current.decision?.reason && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u8DEF\u7531\u539F\u56E0\uFF1A", current.decision.reason), /* @__PURE__ */ import_react2.default.createElement(DagView, { packages: current.packages, renderNode: (item) => /* @__PURE__ */ import_react2.default.createElement(RunNode, { run: current, item, routes, allowReassign: ledger?.settings?.allowManualReassign !== false, busy, onRate, onRerun }) })))));
+}
+function BillingCard({ billing, error, onRefresh, refreshing }) {
+  const rows = billingRows(billing);
+  return /* @__PURE__ */ import_react2.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8BA2\u9605\u4E0E API Key" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("h2", { className: "mr-card-title" }, "\u8BA2\u9605\u4E0E API Key"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-card-copy" }, "\u9ED8\u8BA4\u8BA2\u9605\u4F18\u5148\uFF1A\u6709\u8BA2\u9605\uFF08\u5B98\u65B9 CLI \u8D26\u53F7\u767B\u5F55\u6216\u7F16\u7A0B\u5957\u9910 Key \u8DEF\u7EBF\uFF09\u5C31\u5148\u7528\u8BA2\u9605\uFF1B\u8BA2\u9605\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u65F6\uFF0C\u540C\u4E00\u6B65\u9AA4\u81EA\u52A8\u6539\u7528 API Key\uFF0C\u5E76\u5728\u6267\u884C\u8BB0\u5F55\u4E2D\u5199\u660E\u539F\u56E0\u3002\u8BA2\u9605\u8FD0\u884C\u53EA\u663E\u793A\u53C2\u8003\u8D39\u7528\uFF0C\u4E0D\u8BA1\u5165\u9884\u7B97\u3002")), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: refreshing, onClick: onRefresh }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, error), billing?.quotaPatternErrors?.length > 0 && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, "\u989D\u5EA6\u8BC6\u522B\u89C4\u5219\u6709\u8BEF\uFF0C\u5DF2\u5FFD\u7565\uFF1A", billing.quotaPatternErrors.join("\uFF1B")), rows.length === 0 && !error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-empty" }, billing ? "\u6A21\u578B\u76EE\u5F55\u4E2D\u6CA1\u6709\u8DEF\u7EBF\u3002" : "\u6B63\u5728\u8BFB\u53D6\u2026"), rows.length > 0 && /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react2.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react2.default.createElement("thead", null, /* @__PURE__ */ import_react2.default.createElement("tr", null, /* @__PURE__ */ import_react2.default.createElement("th", null, "\u4F9B\u5E94\u5546"), /* @__PURE__ */ import_react2.default.createElement("th", null, "\u8BA1\u8D39\u65B9\u5F0F"), /* @__PURE__ */ import_react2.default.createElement("th", null, "\u8BA2\u9605"), /* @__PURE__ */ import_react2.default.createElement("th", null, "\u8BA2\u9605\u72B6\u6001 / \u6062\u590D\u65F6\u95F4"), /* @__PURE__ */ import_react2.default.createElement("th", null, "API Key \u56DE\u9000"))), /* @__PURE__ */ import_react2.default.createElement("tbody", null, rows.map((row) => /* @__PURE__ */ import_react2.default.createElement("tr", { key: row.key }, /* @__PURE__ */ import_react2.default.createElement("td", null, /* @__PURE__ */ import_react2.default.createElement("strong", null, row.provider), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-caption" }, row.models)), /* @__PURE__ */ import_react2.default.createElement("td", null, row.mode), /* @__PURE__ */ import_react2.default.createElement("td", null, row.subscription), /* @__PURE__ */ import_react2.default.createElement("td", { className: row.exhausted ? "mr-warn-text" : "" }, row.state), /* @__PURE__ */ import_react2.default.createElement("td", { className: row.apiAvailable ? "" : "mr-warn-text" }, row.api)))))), billing && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u5382\u5546\u6CA1\u6709\u7ED9\u51FA\u6062\u590D\u65F6\u95F4\u65F6\uFF0C\u6309\u8BBE\u7F6E\u4E2D\u7684\u51B7\u5374\u65F6\u95F4\uFF08", billing.cooldownMinutes ?? 60, " \u5206\u949F\uFF09\u6682\u505C\u4F7F\u7528\u8BE5\u8BA2\u9605\u3002\u56E2\u961F\u6267\u884C\u548C\u5355\u5DE5\u5177\u8C03\u7528\u53EA\u80FD\u901A\u8FC7\u5B98\u65B9 CLI \u4FEE\u6539\u6587\u4EF6\uFF0C\u989D\u5EA6\u7528\u5C3D\u65F6\u4F1A\u8BB0\u5F55\u5E76\u63D0\u793A\uFF0C\u4F46\u4E0D\u4F1A\u81EA\u52A8\u6539\u7528 API Key\u3002")));
 }
 function SecurityCard({ data, error, onRefresh }) {
   const rows = data?.boundaries ?? [];
@@ -2226,6 +2392,16 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
         void workbench.refreshHealth(true);
       }
     }
+  ), /* @__PURE__ */ import_react3.default.createElement(
+    BillingCard,
+    {
+      billing: workbench.health.report?.billing ?? null,
+      error: workbench.health.report ? "" : workbench.health.error,
+      refreshing: workbench.health.refreshing,
+      onRefresh: () => {
+        void workbench.refreshHealth(true);
+      }
+    }
   ), /* @__PURE__ */ import_react3.default.createElement(SecurityCard, { data: workbench.boundaries.value, error: workbench.boundaries.error, onRefresh: () => {
     void workbench.refreshBoundaries();
   } }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-notice" }, "\u5B9E\u9645\u8C03\u7528\u8BF7\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u4F7F\u7528 ", /* @__PURE__ */ import_react3.default.createElement("code", null, "model_router_execute"), "\uFF08\u6309\u8DEF\u7531\u6216\u6307\u5B9A\u6A21\u578B\u6267\u884C\uFF0C\u5B98\u65B9 CLI \u5931\u8D25\u5219\u56DE\u9000 API\uFF09\u3001", /* @__PURE__ */ import_react3.default.createElement("code", null, "model_router_consult"), "\u3001", /* @__PURE__ */ import_react3.default.createElement("code", null, "model_router_tool_run"), " \u6216 ", /* @__PURE__ */ import_react3.default.createElement("code", null, "model_router_team_execute"), "\u3002\u6307\u5B9A\u6A21\u578B\u4F1A\u8DF3\u8FC7\u8DEF\u7EBF\u6BD4\u8F83\u3002\u6258\u7BA1\u6267\u884C\u80FD\u529B\u548C\u5C31\u7EEA\u72B6\u6001\u89C1\u4E0A\u65B9\u5404\u5DE5\u5177\u5361\u7247\uFF1B\u5B9E\u9645\u4F7F\u7528\u7684\u6A21\u578B\u4EE5\u5382\u5546\u8BB0\u5F55\u4E3A\u51C6\u3002ZCode 3.14.3 \u4F7F\u7528\u5176\u81EA\u8EAB\u914D\u7F6E\u7684\u9ED8\u8BA4\u6A21\u578B\u3002\u53EF\u7F16\u8F91\u56E2\u961F\u4EFB\u52A1\u8981\u6C42\u5E72\u51C0\u7684 Git \u4ED3\u5E93\uFF0C\u5E76\u7ECF\u5B98\u65B9\u5DE5\u5177\u5BA1\u6279\u3002\u8BBE\u7F6E\u4F4D\u4E8E\u201C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5 \u2192 @ljwei-stak/model-router-galgame\u201D\u3002")));
@@ -2396,6 +2572,22 @@ function modelProfilesField() {
     }
   };
 }
+function quotaPatternsField() {
+  const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("quotaPatternsJson");
+  return {
+    ...field2,
+    parse: (text3) => {
+      const raw = String(text3 ?? "").trim() || "{}";
+      try {
+        const value = JSON.parse(raw);
+        if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+      } catch {
+        return void 0;
+      }
+      return parseQuotaPatterns(raw).errors.length ? void 0 : field2.parse(text3);
+    }
+  };
+}
 var RouterSettingsCardController = class {
   constructor(scope) {
     this.form = new import_dsh_client_ui_primitives.SettingsFormModel(scope, [
@@ -2404,7 +2596,9 @@ var RouterSettingsCardController = class {
       boundedNumberField("dailyBudgetUsd", { minimum: 0, maximum: 1e6 }),
       boundedNumberField("monthlyBudgetUsd", { minimum: 0, maximum: 1e6 }),
       boundedNumberField("reviewSampleRate", { minimum: 0, maximum: 1 }),
-      modelProfilesField()
+      boundedNumberField("subscriptionCooldownMinutes", { minimum: 1, maximum: 10080, integer: true }),
+      modelProfilesField(),
+      quotaPatternsField()
     ]);
     this.store = this.form.bind(() => ({
       ...this.form.shell(),
@@ -2413,7 +2607,9 @@ var RouterSettingsCardController = class {
       dailyBudgetUsd: this.form.field("dailyBudgetUsd"),
       monthlyBudgetUsd: this.form.field("monthlyBudgetUsd"),
       reviewSampleRate: this.form.field("reviewSampleRate"),
-      modelProfilesJson: this.form.field("modelProfilesJson")
+      subscriptionCooldownMinutes: this.form.field("subscriptionCooldownMinutes"),
+      modelProfilesJson: this.form.field("modelProfilesJson"),
+      quotaPatternsJson: this.form.field("quotaPatternsJson")
     }));
   }
   /** Supply the snapshot hook and staged form actions to the Plugins slot. */
@@ -2475,7 +2671,8 @@ function RouterSettingsCard(props) {
   ), [
     ["dailyBudgetUsd", "model-router-daily-budget", "\u6BCF\u65E5\u6267\u884C\u9884\u7B97\uFF08USD\uFF09", "0 \u8868\u793A\u4E0D\u9650\u3002\u6309\u672C\u673A\u6267\u884C\u8BB0\u5F55\u7684\u5B9E\u9645\u8D39\u7528\u7D2F\u8BA1\uFF0C\u8D85\u51FA\u540E\u6309\u5DE5\u4F5C\u53F0\u8BBE\u7F6E\u81EA\u52A8\u964D\u7EA7\u6216\u6682\u505C\u8BE2\u95EE\u3002"],
     ["monthlyBudgetUsd", "model-router-monthly-budget", "\u6BCF\u6708\u6267\u884C\u9884\u7B97\uFF08USD\uFF09", "0 \u8868\u793A\u4E0D\u9650\u3002\u6309\u672C\u5730\u65F6\u533A\u7684\u81EA\u7136\u6708\u7D2F\u8BA1\u3002"],
-    ["reviewSampleRate", "model-router-review-rate", "\u5F3A\u6A21\u578B\u62BD\u68C0\u6BD4\u4F8B\uFF080\u20131\uFF09", "\u8D28\u91CF\u56DE\u8DEF\u8BBE\u4E3A\u201C\u62BD\u68C0\u201D\u65F6\uFF0C\u6309\u6B64\u6BD4\u4F8B\u8BA9\u66F4\u5F3A\u7684\u6A21\u578B\u590D\u6838\u4FBF\u5B9C\u6A21\u578B\u7684\u7ED3\u679C\u3002"]
+    ["reviewSampleRate", "model-router-review-rate", "\u5F3A\u6A21\u578B\u62BD\u68C0\u6BD4\u4F8B\uFF080\u20131\uFF09", "\u8D28\u91CF\u56DE\u8DEF\u8BBE\u4E3A\u201C\u62BD\u68C0\u201D\u65F6\uFF0C\u6309\u6B64\u6BD4\u4F8B\u8BA9\u66F4\u5F3A\u7684\u6A21\u578B\u590D\u6838\u4FBF\u5B9C\u6A21\u578B\u7684\u7ED3\u679C\u3002"],
+    ["subscriptionCooldownMinutes", "model-router-subscription-cooldown", "\u8BA2\u9605\u989D\u5EA6\u51B7\u5374\u65F6\u95F4\uFF08\u5206\u949F\uFF09", "\u8BA2\u9605\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u3001\u4F46\u5382\u5546\u6CA1\u6709\u7ED9\u51FA\u6062\u590D\u65F6\u95F4\u65F6\uFF0C\u6682\u505C\u4F7F\u7528\u8BE5\u8BA2\u9605\u7684\u65F6\u957F\uFF1B\u671F\u95F4\u540C\u4E00\u8DEF\u7EBF\u76F4\u63A5\u4F7F\u7528 API Key\u3002"]
   ].map(([key, id2, label, hint]) => /* @__PURE__ */ import_react4.default.createElement(
     import_dsh_client_ui_primitives.SettingsValueField,
     {
@@ -2517,9 +2714,26 @@ function RouterSettingsCard(props) {
     "pricing": { "input": 0.2, "output": 0.8 },
     "specialties": ["code"],
     "cliModel": "\u5382\u5546 CLI \u4F7F\u7528\u7684\u6A21\u578B\u540D\uFF08\u53EF\u9009\uFF09",
-    "execution": "auto"
+    "execution": "auto",
+    "billing": "subscription-first",
+    "subscription": "plan-key",
+    "apiRoute": { "provider": "\u6309\u91CF\u4ED8\u8D39\u4F9B\u5E94\u5546 ID", "model": "\u6A21\u578B ID" }
   }
-]`), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "execution \u53EF\u7701\u7565\u3002auto \u6216 official \u8868\u793A\u4F18\u5148\u5B98\u65B9\u65E0\u754C\u9762\u5DE5\u5177\uFF0C\u5931\u8D25\u540E\u56DE\u9000 API\uFF1Bapi \u8868\u793A\u59CB\u7EC8\u8D70\u6A21\u578B\u76EE\u5F55\u3002")), /* @__PURE__ */ import_react4.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("modelProfilesJson") }, "\u6062\u590D\u9ED8\u8BA4\u914D\u7F6E")), /* @__PURE__ */ import_react4.default.createElement("aside", { style: styles.notice, "aria-label": "\u6A21\u578B\u8DEF\u7531\u4F7F\u7528\u8BF4\u660E" }, /* @__PURE__ */ import_react4.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react4.default.createElement(import_dsh_client_ui_primitives.Tag, { tone: "info" }, "\u5B98\u65B9\u6A21\u578B\u914D\u7F6E")), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u8BF7\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u9762\u914D\u7F6E DeepSeek\u3001OpenAI \u517C\u5BB9\u6216 Anthropic \u517C\u5BB9\u670D\u52A1\u3002\u6B64\u63D2\u4EF6\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E0D\u4FDD\u5B58 API Key\uFF1B\u76EE\u5F55\u4E2D\u7684\u8DEF\u7EBF\u4ECD\u9700\u901A\u8FC7\u5B9E\u9645\u8C03\u7528\u9A8C\u8BC1\u8D26\u53F7\u548C\u7F51\u7EDC\u53EF\u7528\u6027\u3002"), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u4F7F\u7528 ", /* @__PURE__ */ import_react4.default.createElement("code", null, "model_router_plan"), " \u83B7\u53D6\u53EF\u5BA1\u9605\u7684\u8DEF\u7531\u5EFA\u8BAE\uFF0C\u4F7F\u7528 ", /* @__PURE__ */ import_react4.default.createElement("code", null, "model_router_consult"), " \u54A8\u8BE2\u4E00\u4E2A\u5DF2\u914D\u7F6E\u6A21\u578B\u3002\u5EFA\u8BAE\u4E0D\u4F1A\u6539\u5199\u4E3B\u4F1A\u8BDD\u6A21\u578B\uFF1B\u591A\u4EBA\u5206\u5DE5\u7531\u5B98\u65B9 Agent Teams \u5DE5\u5177\u6267\u884C\u3002")));
+]`), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "execution \u53EF\u7701\u7565\u3002auto \u6216 official \u8868\u793A\u4F18\u5148\u5B98\u65B9\u65E0\u754C\u9762\u5DE5\u5177\uFF0C\u5931\u8D25\u540E\u56DE\u9000 API\uFF1Bapi \u8868\u793A\u59CB\u7EC8\u8D70\u6A21\u578B\u76EE\u5F55\u3002billing \u9ED8\u8BA4 subscription-first\uFF08\u8BA2\u9605\u4F18\u5148\uFF0C\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u65F6\u5207\u6362 API Key\uFF09\uFF0C\u4E5F\u53EF\u8BBE\u4E3A api-only \u6216 subscription-only\u3002subscription \u4E3A plan-key \u8868\u793A\u8BE5\u8DEF\u7EBF\u672C\u8EAB\u662F\u7F16\u7A0B\u5957\u9910\u7AEF\u70B9\uFF08\u5982 GLM Coding Plan\u3001Kimi Code\u3001MiniMax Token Plan\uFF09\uFF0CapiRoute \u6307\u5B9A\u989D\u5EA6\u7528\u5C3D\u65F6\u56DE\u9000\u7684\u6309\u91CF\u4ED8\u8D39\u8DEF\u7EBF\u3002")), /* @__PURE__ */ import_react4.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("modelProfilesJson") }, "\u6062\u590D\u9ED8\u8BA4\u914D\u7F6E")), /* @__PURE__ */ import_react4.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react4.default.createElement("label", { htmlFor: "model-router-quota-patterns", style: styles.profileLabel }, "\u8BA2\u9605\u989D\u5EA6\u8BC6\u522B\u89C4\u5219\uFF08JSON\uFF0C\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u5185\u7F6E\u89C4\u5219\u5DF2\u8986\u76D6 Claude\u3001Codex\u3001Gemini\u3001Kimi\u3001MiniMax\u3001GLM \u7684\u6587\u6863\u5316\u62A5\u9519\u3002\u5382\u5546\u6539\u4E86\u62A5\u9519\u6587\u6848\u65F6\uFF0C\u53EF\u6309\u5DE5\u5177 ID\u3001\u4F9B\u5E94\u5546 ID \u6216 * \u8FFD\u52A0\u6B63\u5219\uFF1Aquota \u8868\u793A\u989D\u5EA6\u7528\u5C3D\uFF0CrateLimit \u8868\u793A\u9650\u6D41\u3002"), /* @__PURE__ */ import_react4.default.createElement(
+    "textarea",
+    {
+      id: "model-router-quota-patterns",
+      value: state.quotaPatternsJson.text,
+      disabled,
+      "aria-invalid": state.quotaPatternsJson.invalid,
+      onChange: (event) => props.edit("quotaPatternsJson", event.target.value),
+      spellCheck: false,
+      style: styles.profileTextarea
+    }
+  ), state.quotaPatternsJson.invalid && /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.profileError, role: "alert" }, "\u9700\u8981 JSON \u5BF9\u8C61\uFF0C\u4E14\u6BCF\u6761\u89C4\u5219\u90FD\u662F\u6709\u6548\u7684\u6B63\u5219\u8868\u8FBE\u5F0F\u3002"), /* @__PURE__ */ import_react4.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react4.default.createElement("summary", null, "\u67E5\u770B\u89C4\u5219\u683C\u5F0F"), /* @__PURE__ */ import_react4.default.createElement("pre", null, `{
+  "kimi-code": { "quota": ["\u989D\u5EA6\u5DF2\u7528\u5B8C"], "rateLimit": ["\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41"] },
+  "my-glm-plan": { "quota": ["Usage limit reached for", "1308"] }
+}`)), /* @__PURE__ */ import_react4.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("quotaPatternsJson") }, "\u6062\u590D\u9ED8\u8BA4\u89C4\u5219")), /* @__PURE__ */ import_react4.default.createElement("aside", { style: styles.notice, "aria-label": "\u6A21\u578B\u8DEF\u7531\u4F7F\u7528\u8BF4\u660E" }, /* @__PURE__ */ import_react4.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react4.default.createElement(import_dsh_client_ui_primitives.Tag, { tone: "info" }, "\u5B98\u65B9\u6A21\u578B\u914D\u7F6E")), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u8BF7\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u9762\u914D\u7F6E DeepSeek\u3001OpenAI \u517C\u5BB9\u6216 Anthropic \u517C\u5BB9\u670D\u52A1\u3002\u6B64\u63D2\u4EF6\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E0D\u4FDD\u5B58 API Key\uFF1B\u76EE\u5F55\u4E2D\u7684\u8DEF\u7EBF\u4ECD\u9700\u901A\u8FC7\u5B9E\u9645\u8C03\u7528\u9A8C\u8BC1\u8D26\u53F7\u548C\u7F51\u7EDC\u53EF\u7528\u6027\u3002"), /* @__PURE__ */ import_react4.default.createElement("p", { style: styles.noticeText }, "\u4F7F\u7528 ", /* @__PURE__ */ import_react4.default.createElement("code", null, "model_router_plan"), " \u83B7\u53D6\u53EF\u5BA1\u9605\u7684\u8DEF\u7531\u5EFA\u8BAE\uFF0C\u4F7F\u7528 ", /* @__PURE__ */ import_react4.default.createElement("code", null, "model_router_consult"), " \u54A8\u8BE2\u4E00\u4E2A\u5DF2\u914D\u7F6E\u6A21\u578B\u3002\u5EFA\u8BAE\u4E0D\u4F1A\u6539\u5199\u4E3B\u4F1A\u8BDD\u6A21\u578B\uFF1B\u591A\u4EBA\u5206\u5DE5\u7531\u5B98\u65B9 Agent Teams \u5DE5\u5177\u6267\u884C\u3002")));
 }
 function OpenRouterWorkspace({ subject, openPanel }) {
   if (subject?.kind !== "bundle" || subject.pkg?.name !== ROUTER_PACKAGE) return null;

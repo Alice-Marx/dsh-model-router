@@ -138,3 +138,47 @@ export function rerunSupport(run) {
   if (run?.kind === 'team' && run.executionMode !== 'read-only') return { supported: false, reason: '可编辑团队运行不支持单步重跑：改动在独立 Git 工作树中。请在会话中重新调用 model_router_team_execute。' }
   return { supported: true, reason: '' }
 }
+
+const pad2 = value => String(value).padStart(2, '0')
+/** Local "M-D HH:MM" for reset times (the Host and the UI share the user's machine). */
+export function formatResetTime(at) {
+  if (!Number.isFinite(at)) return ''
+  const date = new Date(at)
+  return `${date.getMonth() + 1}-${date.getDate()} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
+export const BILLING_CHANNEL_LABEL = Object.freeze({ subscription: '订阅', api: 'API Key' })
+
+/** Health-check billing rows in display form. */
+export function billingRows(billing) {
+  return (billing?.providers ?? []).map(row => {
+    const sub = row.subscription ?? {}
+    const subscription = sub.kind === 'plan-key'
+      ? `编程套餐 Key${sub.planRoute ? `（${sub.planRoute.provider}/${sub.planRoute.model}）` : ''}`
+      : sub.kind === 'cli-login' ? `官方 CLI 账号登录 · ${sub.toolId}` : '无订阅'
+    const state = sub.state === 'exhausted'
+      ? `${sub.exhaustedKind === 'rate-limit' ? '限流中' : '额度已用尽'}，预计 ${formatResetTime(sub.exhaustedUntil)} 恢复${sub.resetReported ? '' : '（厂商未给出时间，按冷却时间估算）'}`
+      : sub.stateLabel ?? '—'
+    const api = row.mode === 'subscription-only' ? '不回退（只用订阅）'
+      : row.api?.available ? `可用${row.api.route ? `：${row.api.route.provider}/${row.api.route.model}` : ''}${row.api.cliKeyEnv ? ' · CLI 环境变量也有 Key' : ''}`
+        : '未配置回退的 API 路线'
+    return {
+      key: `${row.provider}\u0000${sub.key ?? 'none'}\u0000${row.mode}`,
+      provider: row.provider,
+      models: (row.models ?? []).join('、'),
+      mode: row.modeLabel ?? row.mode,
+      subscription,
+      state,
+      exhausted: sub.state === 'exhausted',
+      api,
+      apiAvailable: row.api?.available === true,
+    }
+  })
+}
+
+/** One line for a step that switched channel, or null. */
+export function billingSwitchText(item) {
+  const note = item?.billingSwitch
+  if (!note?.reason) return null
+  return note.reason
+}

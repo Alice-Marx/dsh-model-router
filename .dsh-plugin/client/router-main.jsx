@@ -4,7 +4,7 @@ import { ModelProfileEditor } from './model-profile-editor.jsx'
 import { toolInstallAction } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
-import { CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
+import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
 import { planBudget, unwrapRemote } from './insights-state.mjs'
 import stylesheet from './router-main.css'
 
@@ -531,6 +531,8 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           onRerun={(runId, packageId, override) => { void workbench.rerun(runId, packageId, override) }} />
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes}
           health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
+        <BillingCard billing={workbench.health.report?.billing ?? null} error={workbench.health.report ? '' : workbench.health.error}
+          refreshing={workbench.health.refreshing} onRefresh={() => { void workbench.refreshHealth(true) }} />
         <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />
         <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
       </div>

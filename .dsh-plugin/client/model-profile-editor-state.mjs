@@ -1,4 +1,5 @@
 import { parseModelProfilesJson } from '../shared/model-profiles.mjs'
+import { BILLING_MODES, DEFAULT_BILLING_MODE } from '../shared/subscription-billing.mjs'
 
 export const PROFILE_SPECIALTY_HINT = 'code, math, research, summarization, writing, vision, reasoning'
 
@@ -25,6 +26,9 @@ export function profileDraft(profile) {
     specialties: Array.isArray(profile?.specialties) ? profile.specialties.join(', ') : '',
     cliModel: profile?.cliModel ?? '',
     execution: profile?.execution === 'official' || profile?.execution === 'api' ? profile.execution : 'auto',
+    billing: BILLING_MODES.includes(profile?.billing) ? profile.billing : DEFAULT_BILLING_MODE,
+    subscription: ['plan-key', 'cli-login', 'none'].includes(profile?.subscription) ? profile.subscription : 'auto',
+    apiRoute: profile?.apiRoute ? profileRouteKey(profile.apiRoute) : '',
   }
 }
 
@@ -63,6 +67,20 @@ export function profileFromDraft(route, draft) {
   const execution = field(draft?.execution) || 'auto'
   if (!['auto', 'official', 'api'].includes(execution)) throw new Error('执行方式只能是自动、官方工具或模型目录 API。')
   if (execution !== 'auto') profile.execution = execution
+  const billing = field(draft?.billing) || DEFAULT_BILLING_MODE
+  if (!BILLING_MODES.includes(billing)) throw new Error('计费方式只能是订阅优先、只用 API Key 或只用订阅。')
+  if (billing !== DEFAULT_BILLING_MODE) profile.billing = billing
+  const subscription = field(draft?.subscription) || 'auto'
+  if (!['auto', 'plan-key', 'cli-login', 'none'].includes(subscription)) throw new Error('订阅来源只能是自动、编程套餐 Key、CLI 账号登录或无订阅。')
+  if (subscription !== 'auto') profile.subscription = subscription
+  const apiKey = String(draft?.apiRoute ?? '')
+  if (apiKey) {
+    if (subscription !== 'plan-key') throw new Error('只有“编程套餐 Key”路线需要选择回退的 API 路线。')
+    const [apiProvider, apiModel] = apiKey.split('\0')
+    if (!field(apiProvider) || !field(apiModel)) throw new Error('回退 API 路线无效，请重新选择。')
+    if (field(apiProvider) === provider && field(apiModel) === model) throw new Error('回退 API 路线不能是套餐路线本身。')
+    profile.apiRoute = { provider: field(apiProvider), model: field(apiModel) }
+  }
   return profile
 }
 

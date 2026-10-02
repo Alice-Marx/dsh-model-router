@@ -17,6 +17,7 @@ import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute } from 'node:path'
 import { toolForProvider } from './official-tool-registry.mjs'
 import { normalizeExecutionPreference } from './model-profiles.mjs'
+import { BILLING_MODE_LABEL, billingPlan, detectQuotaExhaustion, vendorKey } from './subscription-billing.mjs'
 
 const MAX_TASK_BYTES = 64_000
 const MAX_ANSWER_CHARS = 48_000
@@ -155,14 +156,29 @@ function cliModelFor(route, adapter) {
   return null
 }
 
-function childEnvironment(adapter, credentials) {
+/** Variables that switch a CLI from its account login to API-key billing. */
+const API_KEY_VARIABLES = Object.freeze({
+  'claude-code': ['ANTHROPIC_API_KEY'],
+  codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
+  gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+})
+
+/**
+ * `credentialMode`: `default` injects a configured or inherited key;
+ * `session-only` strips every API-key variable so the CLI uses its own
+ * subscription login; `api-only` is `default` (the caller checks a key exists).
+ */
+function childEnvironment(adapter, credentials, credentialMode = 'default') {
   const env = {}
+  const sessionOnly = credentialMode === 'session-only'
+  const stripped = new Set(sessionOnly ? [...(API_KEY_VARIABLES[adapter?.id] ?? []), adapter?.apiKeyEnv].filter(Boolean) : [])
   for (const key of BASE_ENV_KEYS) {
     if (process.env[key] !== undefined) env[key] = process.env[key]
   }
   for (const key of adapter?.sessionEnv ?? []) {
-    if (process.env[key] !== undefined) env[key] = process.env[key]
+    if (process.env[key] !== undefined && !stripped.has(key)) env[key] = process.env[key]
   }
+  if (sessionOnly) return { env, secret: '', credentialSource: 'cli-session' }
   const supplied = typeof credentials?.apiKey === 'string' ? credentials.apiKey : ''
   if (supplied && (supplied.includes('\0') || supplied.length > 4_096)) {
     throw new TypeError('apiKey is not a usable credential')
@@ -424,7 +440,7 @@ function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, sig
   })
 }
 
-async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false, detail = '', skipped = false }) {
+async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false, detail = '', raw = '', skipped = false }) {
   const provider = String(route?.provider ?? '')
   const model = String(route?.model ?? '')
   const fallback = {
@@ -440,13 +456,17 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
     }
   }
   try {
-    const api = await apiFallback({ route, task, signal, reason })
+    const api = await apiFallback({ route, task, signal, reason, detail, raw: String(raw ?? '').slice(-40_000), toolId: adapter?.id ?? null })
     const answer = String(api?.answer ?? '').slice(0, MAX_ANSWER_CHARS)
+    // A billing-aware fallback can refuse (subscription-only) or explain a switch.
+    const note = api?.billingNote ?? null
     return {
       ok: api?.ok === true && answer.trim().length > 0,
-      provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
-      answer, fallback, timedOut, exitCode,
+      provider, model, preference, channel: api?.refused ? 'official-cli' : 'harness-llm', toolId: adapter?.id ?? null,
+      answer, fallback: note?.reason ? { ...fallback, reason: note.reason } : fallback, timedOut, exitCode,
       ...(api?.usage ? { usage: api.usage } : {}),
+      ...(note ? { billingSwitch: note } : {}),
+      ...(api?.billing ? { billing: api.billing } : {}),
       error: api?.ok === true && answer.trim() ? undefined : (api?.error || reason),
     }
   } catch (error) {
@@ -484,7 +504,7 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
  */
 export async function executeAssignedTask({
   route, task, workspace, timeoutMs, signal, credentials = null, spawnImpl = spawn,
-  apiFallback, runVerified = null, onChunk = null, skipOfficial = null, stopGraceMs,
+  apiFallback, runVerified = null, onChunk = null, skipOfficial = null, stopGraceMs, credentialMode = 'default',
 } = {}) {
   const prompt = checkedTask(task)
   const preference = executionPreference(route)
@@ -501,9 +521,15 @@ export async function executeAssignedTask({
       reason: '该供应商没有官方代理工具，已使用模型目录 API。',
     })
   }
+  if (credentialMode === 'api-only' && !childEnvironment(adapter, credentials).secret) {
+    return useApi(apiFallback, {
+      route, task: prompt, signal, adapter, preference, skipped: true,
+      reason: `按设置只用 API Key：${adapter.label} 没有可注入的 API Key，已使用模型目录 API，未使用订阅登录。`,
+    })
+  }
   // A cached health check (for example "not logged in") skips the CLI at once.
   const skipReason = typeof skipOfficial === 'function'
-    ? skipOfficial({ toolId: adapter.id, hasApiKey: Boolean(childEnvironment(adapter, credentials).secret) })
+    ? skipOfficial({ toolId: adapter.id, hasApiKey: Boolean(childEnvironment(adapter, credentials, credentialMode).secret) })
     : null
   if (typeof skipReason === 'string' && skipReason) {
     return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, reason: skipReason, skipped: true })
@@ -514,9 +540,10 @@ export async function executeAssignedTask({
   if (typeof runVerified === 'function' && adapter.portableOnly !== true) {
     const verified = await runVerified({
       toolId: adapter.id, task: prompt, workspace: cwd, modelId, mode: 'read-only', signal, timeoutMs: timeout,
+      ...(credentialMode === 'session-only' ? { sessionOnly: true } : {}),
     })
     if (verified?.status === 'succeeded' && typeof verified.finalText === 'string' && verified.finalText.trim()) {
-      const { secret, credentialSource } = childEnvironment(adapter, credentials)
+      const { secret, credentialSource } = childEnvironment(adapter, credentials, credentialMode)
       return officialSuccess({
         route, adapter, preference, answer: redact(verified.finalText, secret),
         exitCode: verified.exitCode ?? 0, version: null, credentialSource,
@@ -527,7 +554,8 @@ export async function executeAssignedTask({
         route, task: prompt, signal, adapter, preference, exitCode: verified.exitCode ?? null,
         timedOut: verified.status === 'timed-out',
         reason: verified.error || verified.reason || '官方 CLI 执行失败，已回退模型目录 API。',
-        detail: redactDiagnostic(verified.detail ?? '', childEnvironment(adapter, credentials).secret),
+        detail: redactDiagnostic(verified.detail ?? verified.stderrTail ?? verified.stdoutTail ?? '', childEnvironment(adapter, credentials, credentialMode).secret),
+        raw: [verified.error, verified.reason, verified.detail, verified.stderrTail, verified.stdoutTail].filter(item => typeof item === 'string').join('\n'),
       })
     }
   }
@@ -537,7 +565,7 @@ export async function executeAssignedTask({
       reason: `${adapter.label} 没有可用的无界面适配器，已使用模型目录 API。`,
     })
   }
-  const { env, secret, credentialSource } = childEnvironment(adapter, credentials)
+  const { env, secret, credentialSource } = childEnvironment(adapter, credentials, credentialMode)
   const probe = await captureProcess(spawnImpl, adapter.executable, ['--version'], {
     cwd, env, stdin: '', timeoutMs: Math.min(PROBE_TIMEOUT_MS, timeout), signal, secret,
   })
@@ -566,6 +594,7 @@ export async function executeAssignedTask({
         : run.outputLimit ? `${adapter.label} 输出超过上限，已回退模型目录 API。`
           : `${adapter.label} 执行失败，已回退模型目录 API。`,
       detail: run.timedOut ? '' : failureDetail(adapter.format, run.stdout, run.stderr, secret),
+      raw: `${run.stdout.slice(-20_000)}\n${run.stderr.slice(-20_000)}`,
     })
   }
   const parsed = parseAdapterOutput(adapter.format, run.stdout)
@@ -574,6 +603,7 @@ export async function executeAssignedTask({
       route, task: prompt, signal, adapter, preference, exitCode: run.exitCode,
       reason: `${parsed.error} 已回退模型目录 API。`,
       detail: failureDetail(adapter.format, run.stdout, run.stderr, secret),
+      raw: `${run.stdout.slice(-20_000)}\n${run.stderr.slice(-20_000)}`,
     })
   }
   const answer = redact(parsed.answer, secret)
@@ -586,6 +616,140 @@ export async function executeAssignedTask({
     credentialSource,
     usage: usageFromOutput(adapter.format, run.stdout),
   })
+}
+
+const formatReset = at => {
+  if (!Number.isFinite(at)) return ''
+  const date = new Date(at)
+  const pad = value => String(value).padStart(2, '0')
+  return `${date.getMonth() + 1}-${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function switchReason(info, until) {
+  const reset = until ? `（预计 ${formatReset(until)} 恢复）` : ''
+  return info?.kind === 'rate-limit' ? `订阅通道触发限流${reset}，已切换 API Key。` : `订阅额度已用尽${reset}，已切换 API Key。`
+}
+
+/**
+ * Subscription-first execution of one route. `billing` supplies:
+ * `quota` (tracker), `cooldownMinutes`, `extraPatterns`, `routes`,
+ * `loginBillingFor(toolId)` ('subscription' | 'api-key' | 'logged-out' |
+ * 'unknown'), and `now`. Without `billing` this is `executeAssignedTask`.
+ *
+ * - subscription-first: use the subscription (CLI account login without any
+ *   API key, or a coding-plan key route). On quota / rate limit, mark it
+ *   exhausted and retry the same step on the API-key route at once.
+ * - subscription-only: never fall back to an API key.
+ * - api-only: never use the subscription.
+ */
+export async function executeRouteWithBilling({ route, billing = null, apiFallback, ...options } = {}) {
+  if (!billing) return executeAssignedTask({ ...options, route, apiFallback })
+  const plan = billingPlan(route, billing.routes ?? [])
+  const now = typeof billing.now === 'function' ? billing.now : Date.now
+  const sub = plan.subscription
+  const apiRoute = plan.apiRoute
+  const label = BILLING_MODE_LABEL[plan.mode]
+  const provider = String(route?.provider ?? '')
+  const model = String(route?.model ?? '')
+  const base = { provider, model, billingMode: plan.mode }
+  const refuse = (error, extra = {}) => ({
+    ok: false, ...base, preference: executionPreference(route), channel: sub?.kind === 'plan-key' ? 'harness-llm' : 'official-cli',
+    toolId: sub?.toolId ?? null, answer: '', fallback: null, error, ...extra,
+  })
+  const viaApi = async (reason, note, skipped = false) => {
+    if (!apiRoute || (sub?.kind === 'plan-key' && apiRoute.provider === sub.route.provider && apiRoute.model === sub.route.model)) {
+      return refuse(`${reason.replace(/，?已切换 API Key。$/u, '。')}没有配置可回退的 API 路线（apiRoute）。`, note ? { billingSwitch: { ...note, to: null } } : {})
+    }
+    const result = await useApiRoute(apiFallback, { route: apiRoute, task: options.task, signal: options.signal, reason, skipped })
+    // Keep the API route that actually ran (pricing); the plan route is recorded separately.
+    return {
+      ...base, ...result, billingMode: plan.mode, billing: 'api',
+      ...(note ? { billingSwitch: { ...note, to: 'api' } } : {}),
+      ...(sub?.kind === 'plan-key' ? { subscriptionRoute: { ...sub.route } } : {}),
+    }
+  }
+  const classify = (text, vendor) => detectQuotaExhaustion(text, { vendor, provider: sub?.kind === 'plan-key' ? sub.route.provider : provider, extraPatterns: billing.extraPatterns ?? {}, now: now() })
+  const markExhausted = (info, detail) => billing.quota?.mark?.(sub.key, { ...info, detail }, { cooldownMinutes: billing.cooldownMinutes }) ?? null
+
+  if (!sub) {
+    if (plan.mode === 'subscription-only') return refuse(`${label}：该路线没有可用的订阅（CLI 账号登录或编程套餐路线）。`)
+    return executeAssignedTask({ ...options, route, apiFallback })
+  }
+  if (plan.mode === 'api-only') {
+    if (sub.kind === 'plan-key') return viaApi('按设置只用 API Key，未使用编程套餐。', null, true)
+    return executeAssignedTask({ ...options, route, apiFallback, credentialMode: 'api-only' })
+  }
+  const exhausted = billing.quota?.status?.(sub.key) ?? null
+  if (exhausted) {
+    const reason = `订阅额度已用尽（预计 ${formatReset(exhausted.until)} 恢复），已直接使用 API Key。`
+    const note = { from: 'subscription', reason, kind: exhausted.kind, until: exhausted.until, detail: exhausted.detail ?? '', skippedSubscription: true }
+    if (plan.mode === 'subscription-only') return refuse(`订阅额度已用尽（预计 ${formatReset(exhausted.until)} 恢复）；按设置只用订阅，未使用 API Key。`, { billingSwitch: { ...note, to: null } })
+    return viaApi(reason, note, true)
+  }
+
+  if (sub.kind === 'plan-key') {
+    let attempt
+    try { attempt = await apiFallback({ route: sub.route, task: options.task, signal: options.signal, reason: '编程套餐（订阅）', subscription: true }) }
+    catch (error) { attempt = { ok: false, error: String(error?.message ?? error) } }
+    if (attempt?.ok === true && String(attempt.answer ?? '').trim()) {
+      return {
+        ok: true, ...base, preference: executionPreference(route), channel: 'harness-llm', toolId: null,
+        answer: String(attempt.answer).slice(0, MAX_ANSWER_CHARS), fallback: null,
+        billing: 'subscription', subscriptionRoute: { ...sub.route },
+        ...(attempt.usage ? { usage: attempt.usage } : {}),
+      }
+    }
+    const detail = redactDiagnostic(attempt?.error ?? '')
+    const info = classify(String(attempt?.error ?? ''), vendorKey({ provider: sub.route.provider }))
+    if (options.signal?.aborted) return refuse('执行已取消。', { cancelled: true })
+    if (info) {
+      const entry = markExhausted(info, detail)
+      const reason = switchReason(info, entry?.until)
+      const note = { from: 'subscription', reason, kind: info.kind, until: entry?.until ?? null, detail, source: info.source }
+      if (plan.mode === 'subscription-only') return refuse(reason.replace('已切换 API Key。', '按设置只用订阅，未使用 API Key。'), { billingSwitch: { ...note, to: null }, subscriptionRoute: { ...sub.route } })
+      return viaApi(reason, note)
+    }
+    if (plan.mode === 'subscription-only') return refuse(`编程套餐路线调用失败：${detail || '未知错误'}`, { subscriptionRoute: { ...sub.route } })
+    return viaApi('编程套餐路线调用失败，已改用 API Key。', { from: 'subscription', reason: '编程套餐路线调用失败，已改用 API Key。', kind: 'error', until: null, detail })
+  }
+
+  // CLI account login.
+  const login = typeof billing.loginBillingFor === 'function' ? billing.loginBillingFor(sub.toolId) : 'unknown'
+  if (login === 'api-key' || login === 'logged-out') {
+    if (plan.mode === 'subscription-only') {
+      return refuse(login === 'logged-out' ? `${label}：官方 CLI 未登录订阅账号。` : `${label}：官方 CLI 当前以 API Key 计费，没有订阅登录。`)
+    }
+    // No subscription login: the existing CLI-with-key / catalog API behaviour.
+    return executeAssignedTask({ ...options, route, apiFallback })
+  }
+  const guarded = async args => {
+    const vendor = vendorKey({ toolId: args?.toolId ?? sub.toolId })
+    const info = classify(`${args?.detail ?? ''}
+${args?.raw ?? ''}`, vendor)
+    if (info) {
+      const entry = markExhausted(info, args?.detail ?? '')
+      const reason = switchReason(info, entry?.until)
+      const note = { from: 'subscription', reason, kind: info.kind, until: entry?.until ?? null, detail: args?.detail ?? '', source: info.source }
+      if (plan.mode === 'subscription-only') {
+        return { ok: false, refused: true, error: reason.replace('已切换 API Key。', '按设置只用订阅，未使用 API Key。'), billingNote: { ...note, to: null } }
+      }
+      const api = await apiFallback({ ...args, route: apiRoute ?? args.route })
+      return { ...api, billing: 'api', billingNote: { ...note, to: 'api' } }
+    }
+    if (plan.mode === 'subscription-only') return { ok: false, refused: true, error: `${args?.reason ?? '官方 CLI 执行失败。'}（按设置只用订阅，未回退 API）` }
+    return apiFallback(args)
+  }
+  const result = await executeAssignedTask({ ...options, route, apiFallback: guarded, credentialMode: 'session-only' })
+  return {
+    ...result,
+    billingMode: plan.mode,
+    ...(result.ok && result.channel === 'official-cli' ? { billing: 'subscription' } : {}),
+  }
+}
+
+/** API-key run of `route` on the catalog API, in executor result shape. */
+function useApiRoute(apiFallback, { route, task, signal: abort, reason, skipped }) {
+  return useApi(apiFallback, { route, task, signal: abort, reason, skipped, preference: executionPreference(route) })
 }
 
 function packagePrompt(task, item, completed) {
@@ -644,7 +808,7 @@ function aggregateOf(results) {
  */
 async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, options }) {
   const routeList = Array.isArray(routes) ? routes : []
-  const { credentialsFor, onPackage, ...runOptions } = options
+  const { credentialsFor, onPackage, billing, ...runOptions } = options
   const results = []
   const ranIds = []
   for (const item of packages) {
@@ -670,8 +834,9 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     const route = routeList.find(candidate => candidate.provider === provider && candidate.model === model)
       ?? { provider, model }
     const credentials = typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null
-    const result = await executeAssignedTask({
+    const result = await executeRouteWithBilling({
       ...runOptions,
+      billing: billing ? { ...billing, routes: billing.routes ?? routeList } : null,
       credentials,
       route,
       task: routingBypassed ? checkedTask(task) : packagePrompt(task, item, results),

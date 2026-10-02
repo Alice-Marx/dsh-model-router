@@ -106,6 +106,27 @@ export function ModelProfileEditor({ routes, settingsScope, onSaved }) {
                   <option value="api">仅模型目录 API</option>
                 </select>
               </label>
+              <label className="mr-profile-field"><span>计费方式</span>
+                <select className="mr-input" value={draft.billing} disabled={!writable} onChange={event => edit('billing', event.target.value)}>
+                  <option value="subscription-first">订阅优先：额度用尽或限流时切换 API Key</option>
+                  <option value="api-only">只用 API Key</option>
+                  <option value="subscription-only">只用订阅：额度用尽时不切换</option>
+                </select>
+              </label>
+              <label className="mr-profile-field"><span>订阅来源</span>
+                <select className="mr-input" value={draft.subscription} disabled={!writable} onChange={event => edit('subscription', event.target.value)}>
+                  <option value="auto">自动：有官方 CLI 时用 CLI 账号登录</option>
+                  <option value="plan-key">编程套餐 Key：该路线本身是套餐端点</option>
+                  <option value="cli-login">官方 CLI 账号登录</option>
+                  <option value="none">无订阅：始终按 API 计费</option>
+                </select>
+              </label>
+              {draft.subscription === 'plan-key' && <label className="mr-profile-field"><span>额度用尽时回退的 API 路线</span>
+                <select className="mr-input" value={draft.apiRoute} disabled={!writable} onChange={event => edit('apiRoute', event.target.value)}>
+                  <option value="">不回退（未配置 API 路线）</option>
+                  {routes.filter(item => profileRouteKey(item) !== routeKey).map(item => <option key={profileRouteKey(item)} value={profileRouteKey(item)}>{item.provider}/{item.model}</option>)}
+                </select>
+              </label>}
             </div>
             <details className="mr-profile-advanced"><summary>缓存单价（可选）</summary><div className="mr-profile-grid">
               <label className="mr-profile-field"><span>缓存读取（USD / 百万 token）</span><input className="mr-input" type="number" min="0" step="any" value={draft.cacheRead} disabled={!writable} onChange={event => edit('cacheRead', event.target.value)} placeholder="留空按普通输入价格估算" /></label>
@@ -117,7 +138,7 @@ export function ModelProfileEditor({ routes, settingsScope, onSaved }) {
               {saved && <button className="mr-button mr-button-secondary" type="button" disabled={!writable} onClick={() => { void write(true) }}>删除此模型配置</button>}
             </div>
             {notice && <p className={notice.tone === 'error' ? 'mr-error' : 'mr-profile-success'} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
-            <p className="mr-caption">质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算只影响本地规划，不限制实际账单。CLI 模型名须与厂商工具核对。执行方式决定该模型收到任务时走官方无界面工具还是模型目录 API；官方工具失败时仍会回退 API。</p>
+            <p className="mr-caption">质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算只影响本地规划，不限制实际账单。CLI 模型名须与厂商工具核对。执行方式决定该模型收到任务时走官方无界面工具还是模型目录 API；官方工具失败时仍会回退 API。计费方式默认订阅优先：先用 CLI 账号登录或编程套餐 Key 路线，订阅额度用尽或限流时同一步骤自动改用 API Key，并记入运行历史。</p>
           </>}
       </div>
     </section>

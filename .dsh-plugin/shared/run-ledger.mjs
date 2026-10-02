@@ -43,6 +43,8 @@ export function actualCost(result, pricing) {
  */
 export function billingOf(result, { loginBilling = null, apiKeyPresent = false } = {}) {
   if (!result || result.blocked) return null
+  // The subscription-first executor states the channel it billed explicitly.
+  if (result.billing === 'api' || result.billing === 'subscription') return result.billing
   if (result.channel !== 'official-cli') return 'api'
   if (result.credentialSource === 'configured-api-key' || result.credentialSource === 'process-environment') return 'api'
   if (!result.credentialSource && apiKeyPresent) return 'api'
@@ -179,6 +181,9 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     credentialSource: result?.credentialSource ?? null,
     ...(result?.actualModel ? { actualModel: String(result.actualModel) } : {}),
     fallback: result?.fallback ?? null,
+    ...(result?.billingMode ? { billingMode: String(result.billingMode) } : {}),
+    ...(result?.billingSwitch ? { billingSwitch: { ...result.billingSwitch } } : {}),
+    ...(result?.subscriptionRoute ? { subscriptionRoute: { provider: String(result.subscriptionRoute.provider ?? ''), model: String(result.subscriptionRoute.model ?? '') } } : {}),
     error: result?.ok ? null : (result?.error ?? null),
     answer: String(result?.answer ?? '').slice(0, MAX_STORED_ANSWER),
     answerTruncated: String(result?.answer ?? '').length > MAX_STORED_ANSWER,

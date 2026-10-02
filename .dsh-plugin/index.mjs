@@ -5,7 +5,10 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_ROUTER_SETTINGS, modelMetadata } from './shared/router.mjs'
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
-import { HEALTH_CACHE_MS, apiKeyEnvPresent, healthCache, runHealthCheck } from './shared/tool-health.mjs'
+import { HEALTH_CACHE_MS, apiKeyEnvPresent, healthCache, runHealthCheck, subscriptionLoginOf } from './shared/tool-health.mjs'
+import {
+  DEFAULT_COOLDOWN_MINUTES, billingOverview, createQuotaTracker, detectQuotaExhaustion, parseQuotaPatterns, vendorKey,
+} from './shared/subscription-billing.mjs'
 import { createRouterState } from './shared/router-state.mjs'
 import {
   applyQualityBiases, budgetCheck, buildRunRecord, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
@@ -48,6 +51,8 @@ export const Config = z.object({
   reviewSampleRate: z.number().min(0).max(1).default(0.2).volatile(),
   allowManualReassign: z.boolean().default(true).volatile(),
   confirmUnsandboxedCli: z.boolean().default(true).volatile(),
+  subscriptionCooldownMinutes: z.number().step(1).min(1).max(10_080).default(DEFAULT_COOLDOWN_MINUTES).volatile(),
+  quotaPatternsJson: z.string().max(8_000).default('{}').volatile(),
 })
 
 const JSON_OUTPUT = {
@@ -160,6 +165,78 @@ async function hydrateHealth() {
   healthHydrated = true
   const saved = await savedState()
   if (saved.health && !healthCache.report()) healthCache.remember(saved.health)
+}
+
+// Subscription quota: which subscriptions hit their limit, and until when.
+let quotaTracker = null
+let quotaHydrated = false
+function quotaStore() {
+  quotaTracker ??= createQuotaTracker({ persist: snapshot => routerStateStore().saveQuota(snapshot) })
+  return quotaTracker
+}
+async function hydrateQuota() {
+  if (quotaHydrated) return quotaStore()
+  quotaHydrated = true
+  const saved = await savedState()
+  quotaStore().load(saved.quota)
+  return quotaStore()
+}
+
+function quotaPatterns(config) {
+  return parseQuotaPatterns(valueOf(config, 'quotaPatternsJson', '{}'))
+}
+
+function cooldownMinutes(config) {
+  return boundedInteger(valueOf(config, 'subscriptionCooldownMinutes', DEFAULT_COOLDOWN_MINUTES), DEFAULT_COOLDOWN_MINUTES, 1, 10_080)
+}
+
+/** Subscription-first billing context for the executor; `options.billing === false` disables it. */
+async function billingContext(config, options = {}) {
+  if (options.billing === false) return null
+  const quota = await hydrateQuota()
+  await hydrateHealth()
+  return {
+    quota,
+    cooldownMinutes: cooldownMinutes(config),
+    extraPatterns: quotaPatterns(config).patterns,
+    loginBillingFor: toolId => subscriptionLoginOf(healthCache.loginState(toolId)),
+    now: Date.now,
+    ...(options.billing && typeof options.billing === 'object' ? options.billing : {}),
+  }
+}
+
+/** Health-check billing table: subscription state and API availability per provider. */
+export async function billingHealth(ctx, config, { signal } = {}) {
+  const quota = await hydrateQuota()
+  await hydrateHealth()
+  let routes = []
+  try { routes = configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, signal), config) } catch { routes = [] }
+  const overview = billingOverview(routes, {
+    quota,
+    loginFor: toolId => subscriptionLoginOf(healthCache.loginState(toolId)),
+    apiKeyEnvFor: toolId => apiKeyEnvPresent(toolId),
+  })
+  return { ...overview, cooldownMinutes: cooldownMinutes(config), quotaPatternErrors: quotaPatterns(config).errors }
+}
+
+/**
+ * Team and direct CLI runs edit through the official CLI only, so a quota hit
+ * there is recorded (and later steps skip that subscription) but not retried
+ * on an API key automatically.
+ */
+async function noteCliQuota(config, toolId, textValue) {
+  if (!toolId || !text(textValue)) return null
+  const info = detectQuotaExhaustion(String(textValue), { vendor: vendorKey({ toolId }), extraPatterns: quotaPatterns(config).patterns })
+  if (!info) return null
+  const quota = await hydrateQuota()
+  const entry = quota.mark(`cli:${toolId}`, { ...info, detail: String(textValue).slice(0, 300) }, { cooldownMinutes: cooldownMinutes(config) })
+  const until = new Date(entry.until)
+  const pad = value => String(value).padStart(2, '0')
+  const at = `${until.getMonth() + 1}-${until.getDate()} ${pad(until.getHours())}:${pad(until.getMinutes())}`
+  return {
+    from: 'subscription', to: null, kind: info.kind, until: entry.until, source: info.source, detail: entry.detail,
+    reason: `${info.kind === 'rate-limit' ? '订阅通道触发限流' : '订阅额度已用尽'}（预计 ${at} 恢复）；该运行只能通过官方 CLI 修改文件，未自动切换 API Key。`,
+  }
 }
 
 const fileExists = async path => {
@@ -477,6 +554,7 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
     }
   }
   const hooks = executionHooks(ctx, options)
+  const billing = await billingContext(config, options)
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const startedAt = Date.now()
   const execution = await executeAssignmentPlan({
@@ -486,6 +564,7 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
     workspace: options.workspace,
     signal: options.signal,
     ...hooks,
+    billing,
     apiFallback: async ({ route, task: packageTask, signal }) => consultConfiguredModel(ctx, route, packageTask, limit, signal),
   })
   const run = buildRunRecord({
@@ -536,7 +615,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   }
   const cwd = text(workspace) || run.workspace
   if (!cwd || !(await fileExists(cwd))) throw new Error('原运行的工作区不可用，无法重跑该步骤。')
-  if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options })
+  if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options, config })
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const execution = await rerunAssignmentPackage({
     task: run.task,
@@ -552,6 +631,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     workspace: cwd,
     signal,
     ...executionHooks(ctx, options),
+    billing: await billingContext(config, options),
     apiFallback: async ({ route, task: packageTask, signal: callSignal }) => consultConfiguredModel(ctx, route, packageTask, limit, callSignal),
   })
   const updated = await routerStateStore().updateRun(run.id, current => {
@@ -577,7 +657,7 @@ function teamPlanFromRun(run, ids, override, targetId) {
  * Read-only team retry: the failed step plus downstream steps that had not
  * succeeded run through the same signed runner; earlier answers are context.
  */
-async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options }) {
+async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options, config = {} }) {
   const downstream = downstreamPackageIds(run.packages, target.id)
     .filter(id => !run.packages.find(item => item.id === id)?.ok)
   const ids = [target.id, ...downstream]
@@ -594,8 +674,18 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, 
     const entry = converted.packages.find(item => item.id === target.id)
     if (entry) entry.reassigned = true
   }
+  const quotaNotes = []
+  for (const result of Array.isArray(execution?.results) ? execution.results : []) {
+    if (result?.status === 'succeeded' || !result?.toolId) continue
+    const note = await noteCliQuota(config, result.toolId, `${result.error ?? ''}\n${result.outputTail ?? ''}`)
+    if (note) quotaNotes.push([result.id, note])
+  }
   const updated = await routerStateStore().updateRun(run.id, current => {
     mergeRerun(current, converted, { rerunIds: ids, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
+    for (const [id, note] of quotaNotes) {
+      const stored = current.packages.find(item => item.id === id)
+      if (stored) stored.billingSwitch = note
+    }
     current.status = execution?.status ?? current.status
     if (override) {
       const stored = current.packages.find(item => item.id === target.id)
@@ -606,7 +696,16 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, 
 }
 
 /** Ledger record for model_router_team_execute; storage failures never fail the run. */
-export async function recordTeamRun({ task, plan, execution, mode, workspace, routes, cliModels, budget, startedAt, preset }) {
+/** Attach a recorded quota hit to the stored package of a CLI-only run. */
+async function annotateCliQuota(run, config, failures) {
+  for (const failure of failures) {
+    const note = await noteCliQuota(config, failure.toolId, failure.text)
+    const stored = note ? run.packages.find(item => item.id === failure.id) : null
+    if (stored) stored.billingSwitch = note
+  }
+}
+
+export async function recordTeamRun({ task, plan, execution, mode, workspace, routes, cliModels, budget, startedAt, preset, config = {} }) {
   const run = buildTeamRunRecord({
     id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task, plan, execution, mode, workspace,
     preset: plan?.preset ?? preset ?? DEFAULT_ROUTING_PRESET,
@@ -615,16 +714,22 @@ export async function recordTeamRun({ task, plan, execution, mode, workspace, ro
   })
   const bindings = Object.fromEntries(Object.entries(cliModels ?? {}).filter(([, value]) => typeof value === 'string' && value))
   if (Object.keys(bindings).length) run.cliModels = bindings
+  await annotateCliQuota(run, config, (Array.isArray(execution?.results) ? execution.results : [])
+    .filter(result => result?.status !== 'succeeded' && result?.toolId)
+    .map(result => ({ id: result.id, toolId: result.toolId, text: `${result.error ?? ''}\n${result.outputTail ?? ''}` })))
   try { await routerStateStore().appendRun(run); return run } catch { return null }
 }
 
 /** Ledger record for model_router_tool_run. */
-export async function recordToolRun({ toolId, task, provider, model, mode, workspace, result, routes = [], startedAt }) {
+export async function recordToolRun({ toolId, task, provider, model, mode, workspace, result, routes = [], startedAt, config = {} }) {
   const run = buildToolRunRecord({
     id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task, workspace,
     toolId, toolLabel: getOfficialTool(toolId)?.label ?? toolId, provider, model, mode, result,
     pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
   })
+  if (result && result.status !== 'succeeded') {
+    await annotateCliQuota(run, config, [{ id: 'direct', toolId, text: `${result.error ?? result.reason ?? ''}\n${result.outputTail ?? ''}` }])
+  }
   try { await routerStateStore().appendRun(run); return run } catch { return null }
 }
 
@@ -773,7 +878,7 @@ export function routerRemoteServices(ctx, config) {
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })
       const saved = await savedState()
-      return { ...report, onboarding: saved.onboarding }
+      return { ...report, onboarding: saved.onboarding, billing: await billingHealth(ctx, config) }
     },
     completeOnboarding: async () => routerStateStore().completeOnboarding(Date.now()),
     ledger: () => ledgerSummary(config),
@@ -1055,6 +1160,7 @@ function registerOfficialToolModels(ctx, config) {
       const recorded = result.status === 'unsupported' ? null : await recordToolRun({
         toolId: args.tool, task: args.task, provider: text(args.provider), model: text(args.model), mode, workspace: cwd, result, startedAt,
         routes: text(args.provider) ? configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, exec.signal), config) : [],
+        config,
       })
       return jsonValue({ ...result, runId: recorded?.id ?? null,
         ...(!modelId && text(args.model) ? { modelNotice: result.modelNotice
@@ -1105,14 +1211,15 @@ function registerOfficialToolModels(ctx, config) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_health',
-    description: 'Onboarding health check: for each official CLI in the fixed registry, report installed, version vs pinned version, and login state (cheap status commands only; never starts a login). Logged-out tools are skipped by routing until re-checked.',
+    description: 'Onboarding health check: for each official CLI in the fixed registry, report installed, version vs pinned version, and login state (cheap status commands only; never starts a login), plus a per-provider billing table: billing mode (subscription-first by default), subscription state (logged in / coding-plan key route / exhausted until a time) and whether an API-key route is available for fallback. Logged-out tools are skipped by routing until re-checked.',
     parameters: {
       fresh: { type: 'boolean', description: 'Re-probe instead of using the 60s probe cache.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
       throwIfAborted(exec.signal)
-      return jsonValue(await toolHealthReport({ fresh: args.fresh === true }))
+      const report = await toolHealthReport({ fresh: args.fresh === true })
+      return jsonValue({ ...report, billing: await billingHealth(ctx, config, { signal: exec.signal }) })
     },
   }))
   ctx.tools.register(defineTool({
@@ -1201,7 +1308,7 @@ function registerOfficialToolModels(ctx, config) {
       const execution = await runOfficialTeam({ plan, task: args.task, workspace: cwd,
         allowedRoot: root, mode, installedIds: installed, cliModels, signal: exec.signal, sandbox: ctx.sandbox })
       const recorded = await recordTeamRun({ task: args.task, plan, execution, mode, workspace: cwd,
-        routes: executableRoutes, cliModels, budget, startedAt })
+        routes: executableRoutes, cliModels, budget, startedAt, config })
       return jsonValue({ plan, execution, runId: recorded?.id ?? null,
         rerunNotice: mode === 'read-only'
           ? '失败的工作包可用 model_router_rerun_step 单步重跑（只重跑该步及其未完成的下游）。'

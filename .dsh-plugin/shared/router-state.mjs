@@ -1,6 +1,6 @@
 /**
  * Small persistent Host state for the router: onboarding flag, last health
- * check, and the bounded run ledger (routing decisions, channels, fallback
+ * check, subscription quota exhaustion, and the bounded run ledger (routing decisions, channels, fallback
  * errors, cost, review and user ratings). One JSON file under the DSH home;
  * writes are serialized and atomic (temp file + rename). Never stores keys.
  */
@@ -25,7 +25,7 @@ export function defaultStatePath(env = process.env) {
 }
 
 function emptyState() {
-  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, runs: [] }
+  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, quota: {}, runs: [] }
 }
 
 function sanitize(value) {
@@ -34,6 +34,7 @@ function sanitize(value) {
     version: STATE_VERSION,
     onboarding: { completedAt: Number.isFinite(value.onboarding?.completedAt) ? value.onboarding.completedAt : null },
     health: value.health && Array.isArray(value.health.tools) ? value.health : null,
+    quota: value.quota && typeof value.quota === 'object' && !Array.isArray(value.quota) ? value.quota : {},
     runs: Array.isArray(value.runs) ? value.runs.filter(run => run && typeof run.id === 'string').slice(-MAX_RUNS) : [],
   }
 }
@@ -71,6 +72,8 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
     update,
     completeOnboarding: at => update(current => { current.onboarding.completedAt = at; return current.onboarding }),
     saveHealth: report => update(current => { current.health = report; return report }),
+    /** Subscription exhaustion snapshot (`createQuotaTracker().snapshot()`). */
+    saveQuota: snapshot => update(current => { current.quota = snapshot && typeof snapshot === 'object' ? snapshot : {}; return current.quota }),
     appendRun: run => update(current => { current.runs.push(run); return run }),
     updateRun: (id, change) => update(current => {
       const run = current.runs.find(item => item.id === id)

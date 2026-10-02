@@ -1,7 +1,8 @@
 import React from 'react'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
+import { BILLING_MODE_LABEL } from '../shared/subscription-billing.mjs'
 import {
-  LOGIN_LABEL, RUN_KIND_LABEL, RUN_STATUS_LABEL, VERSION_LABEL, budgetMeter, dagLayers, formatUsd, healthSummary,
+  BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, VERSION_LABEL, budgetMeter, dagLayers, formatUsd, healthSummary,
   packageCost, packageStatus, rerunSupport, runTotals,
 } from './insights-state.mjs'
 
@@ -208,7 +209,9 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
       <div className="mr-channel-line"><ChannelText item={item} /><span className="mr-caption">预估 {formatUsd(item.estimatedCost)} · 实际 {cost.budget}{item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : ''}</span></div>
       {cost.reference && <p className="mr-package-copy">{cost.reference}</p>}
       {item.actualModel && <p className="mr-package-copy">CLI 回报模型：{item.actualModel}</p>}
-      {item.fallback?.reason && <p className="mr-package-copy">回退原因：{item.fallback.reason}</p>}
+      {(item.billing || item.billingMode) && <p className="mr-package-copy">计费：{BILLING_CHANNEL_LABEL[item.billing] ?? '—'}{item.subscriptionRoute ? ` · 套餐路线 ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : ''}{item.billingMode && item.billingMode !== 'subscription-first' ? ` · ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ''}</p>}
+      {billingSwitchText(item) && <p className="mr-package-copy mr-warn-text">计费切换：{billingSwitchText(item)}</p>}
+      {item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && <p className="mr-package-copy">回退原因：{item.fallback.reason}</p>}
       {item.fallback?.error && <p className="mr-package-copy mr-fallback-error">CLI 原始错误：<code>{item.fallback.error}</code></p>}
       {!item.ok && item.error && <p className="mr-package-copy mr-fallback-error">{item.error}</p>}
       {item.review && <p className="mr-package-copy">强模型抽查（{item.review.provider}/{item.review.model}）：{item.review.score ? `${item.review.score}/5` : '未评分'} {item.review.summary}</p>}
@@ -270,6 +273,39 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
             )}
           </>
         )}
+      </div>
+    </section>
+  )
+}
+
+/** 订阅与 API Key: per-provider billing mode, subscription state and fallback availability. */
+export function BillingCard({ billing, error, onRefresh, refreshing }) {
+  const rows = billingRows(billing)
+  return (
+    <section className="mr-card mr-results" aria-label="订阅与 API Key">
+      <div className="mr-card-head"><div>
+        <h2 className="mr-card-title">订阅与 API Key</h2>
+        <p className="mr-card-copy">默认订阅优先：有订阅（官方 CLI 账号登录或编程套餐 Key 路线）就先用订阅；订阅额度用尽或限流时，同一步骤自动改用 API Key，并在执行记录中写明原因。订阅运行只显示参考费用，不计入预算。</p>
+      </div><button className="mr-button mr-button-secondary" type="button" disabled={refreshing} onClick={onRefresh}>重新体检</button></div>
+      <div className="mr-card-body">
+        {error && <p className="mr-error" role="alert">{error}</p>}
+        {billing?.quotaPatternErrors?.length > 0 && <p className="mr-error" role="alert">额度识别规则有误，已忽略：{billing.quotaPatternErrors.join('；')}</p>}
+        {rows.length === 0 && !error && <p className="mr-empty">{billing ? '模型目录中没有路线。' : '正在读取…'}</p>}
+        {rows.length > 0 && (
+          <div className="mr-table-wrap"><table className="mr-table">
+            <thead><tr><th>供应商</th><th>计费方式</th><th>订阅</th><th>订阅状态 / 恢复时间</th><th>API Key 回退</th></tr></thead>
+            <tbody>{rows.map(row => (
+              <tr key={row.key}>
+                <td><strong>{row.provider}</strong><div className="mr-caption">{row.models}</div></td>
+                <td>{row.mode}</td>
+                <td>{row.subscription}</td>
+                <td className={row.exhausted ? 'mr-warn-text' : ''}>{row.state}</td>
+                <td className={row.apiAvailable ? '' : 'mr-warn-text'}>{row.api}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        {billing && <p className="mr-caption">厂商没有给出恢复时间时，按设置中的冷却时间（{billing.cooldownMinutes ?? 60} 分钟）暂停使用该订阅。团队执行和单工具调用只能通过官方 CLI 修改文件，额度用尽时会记录并提示，但不会自动改用 API Key。</p>}
       </div>
     </section>
   )

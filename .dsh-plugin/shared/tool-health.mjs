@@ -44,6 +44,13 @@ const API_KEY_ENV = Object.freeze({
   zcode: ['ZAI_API_KEY'],
 })
 
+/** Copy of `env` without this CLI's API-key variables, so a status probe reports the account login itself. */
+function sessionEnvironment(toolId, env) {
+  const names = API_KEY_ENV[toolId] ?? []
+  if (!env || names.length === 0) return undefined
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !names.includes(name)))
+}
+
 /** True when an API-key variable for this CLI is set in `env` (names only, values are never read out). */
 export function apiKeyEnvPresent(toolId, env = process.env) {
   return (API_KEY_ENV[toolId] ?? []).some(name => typeof env?.[name] === 'string' && env[name].trim() !== '')
@@ -76,35 +83,53 @@ function guide(toolId) {
 export async function checkLogin(toolId, { runner, env = process.env, exists = async () => false, home = '' } = {}) {
   const keyNames = (KEY_ENV[toolId] ?? []).filter(name => typeof env?.[name] === 'string' && env[name].trim())
   const viaKey = keyNames.length > 0 ? { state: 'logged-in', detail: `检测到环境变量 ${keyNames.join('、')}（未验证有效性）。`, source: 'environment',
-    billing: apiKeyEnvPresent(toolId, env) ? 'api-key' : 'subscription' } : null
+    billing: apiKeyEnvPresent(toolId, env) ? 'api-key' : 'subscription',
+    accountLogin: keyNames.some(name => !(API_KEY_ENV[toolId] ?? []).includes(name)) } : null
   const keyBilling = apiKeyEnvPresent(toolId, env) ? 'api-key' : null
   if (toolId === 'claude-code' && typeof runner === 'function') {
-    const outcome = await runner('claude', ['auth', 'status', '--json'], { timeoutMs: LOGIN_CHECK_TIMEOUT_MS })
+    const outcome = await runner('claude', ['auth', 'status', '--json'], { timeoutMs: LOGIN_CHECK_TIMEOUT_MS, env: sessionEnvironment(toolId, env) })
     if (outcome.timedOut) return viaKey ?? { state: 'unknown', detail: '登录状态检测超时。' }
     try {
       const status = JSON.parse(outcome.stdout)
       if (status?.loggedIn === true) return { state: 'logged-in', detail: `已登录（${String(status.authMethod ?? 'account')}）。`, source: 'cli',
-        billing: keyBilling ?? (/api[_-]?key/i.test(String(status.authMethod ?? '')) ? 'api-key' : 'subscription') }
+        billing: keyBilling ?? (/api[_-]?key/i.test(String(status.authMethod ?? '')) ? 'api-key' : 'subscription'),
+        accountLogin: !/api[_-]?key/i.test(String(status.authMethod ?? '')) }
       if (status?.loggedIn === false) return viaKey ?? { state: 'logged-out', detail: 'claude auth status 报告未登录。', source: 'cli' }
     } catch { /* older CLI without JSON status */ }
     return viaKey ?? { state: 'unknown', detail: '无法解析 claude auth status 输出。' }
   }
   if (toolId === 'codex' && typeof runner === 'function') {
-    const outcome = await runner('codex', ['login', 'status'], { timeoutMs: LOGIN_CHECK_TIMEOUT_MS })
+    const outcome = await runner('codex', ['login', 'status'], { timeoutMs: LOGIN_CHECK_TIMEOUT_MS, env: sessionEnvironment(toolId, env) })
     if (outcome.timedOut) return viaKey ?? { state: 'unknown', detail: '登录状态检测超时。' }
     const output = `${outcome.stdout}\n${outcome.stderr}`
     if (/not logged in/i.test(output)) return viaKey ?? { state: 'logged-out', detail: 'codex login status 报告未登录。', source: 'cli' }
     if (outcome.ok) return { state: 'logged-in', detail: output.split(/\r?\n/u).map(line => line.trim()).find(Boolean)?.slice(0, 120) || '已登录。', source: 'cli',
-      billing: keyBilling ?? (/api key/i.test(output) ? 'api-key' : /chatgpt/i.test(output) ? 'subscription' : 'unknown') }
+      billing: keyBilling ?? (/api key/i.test(output) ? 'api-key' : /chatgpt/i.test(output) ? 'subscription' : 'unknown'),
+      accountLogin: /chatgpt/i.test(output) ? true : /api key/i.test(output) ? false : null }
     return viaKey ?? { state: 'unknown', detail: 'codex login status 未给出明确结果。' }
   }
   if (toolId === 'gemini') {
-    if (viaKey) return viaKey
     const credentialFile = home ? `${home}/.gemini/oauth_creds.json` : ''
-    if (credentialFile && await exists(credentialFile)) return { state: 'logged-in', detail: '检测到 Gemini CLI 登录凭据文件（未验证是否过期）。', source: 'file', billing: 'subscription' }
+    const hasFile = Boolean(credentialFile) && await exists(credentialFile)
+    if (viaKey) return { ...viaKey, accountLogin: hasFile }
+    if (hasFile) return { state: 'logged-in', detail: '检测到 Gemini CLI 登录凭据文件（未验证是否过期）。', source: 'file', billing: 'subscription', accountLogin: true }
     return { state: 'unknown', detail: 'Gemini CLI 没有登录状态命令；首次运行时会提示登录。' }
   }
   return viaKey ?? { state: 'unknown', detail: '该 CLI 没有可安全调用的登录状态命令；首次运行时以实际结果为准。' }
+}
+
+/**
+ * Whether a CLI can run on its subscription login (with API-key variables
+ * removed): 'subscription', 'api-key' (only an API key authenticates it),
+ * 'logged-out', or 'unknown'.
+ */
+export function subscriptionLoginOf(login) {
+  if (!login) return 'unknown'
+  if (login.state === 'logged-out') return 'logged-out'
+  if (login.accountLogin === true) return 'subscription'
+  if (login.accountLogin === false) return 'api-key'
+  if (login.billing === 'subscription') return 'subscription'
+  return 'unknown'
 }
 
 /** Combine one probe with its login state. */
@@ -165,7 +190,8 @@ export function createHealthCache({ ttlMs = HEALTH_CACHE_MS, now = Date.now } = 
       if (override && now() - override.at < ttlMs) return override
       if (!report || now() - report.checkedAt >= ttlMs) return null
       const entry = report.tools.find(item => item.id === toolId)
-      return entry?.installed ? { state: entry.login?.state ?? 'unknown', detail: entry.login?.detail ?? '', billing: entry.login?.billing ?? null } : null
+      return entry?.installed ? { state: entry.login?.state ?? 'unknown', detail: entry.login?.detail ?? '', billing: entry.login?.billing ?? null,
+        accountLogin: typeof entry.login?.accountLogin === 'boolean' ? entry.login.accountLogin : null } : null
     },
     /** Reason to skip the CLI, or null. A configured API key still lets the CLI authenticate. */
     skipReason({ toolId, hasApiKey = false }) {
