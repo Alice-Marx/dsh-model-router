@@ -98,6 +98,36 @@ For example, enter: “**Plan a complex, three-minute science-fiction short film
 
 The [full Chinese workbench guide](docs/WORKBENCH_USER_GUIDE.zh.md) walks through the controls, result location, model-profile setup, and session handoff.
 
+## Health check, cost control and quality loop
+
+The workbench shows these at the top. The matching session tools are in parentheses.
+
+1. **Onboarding health check** (`model_router_health`). When you first open the workbench, it checks every official tool in the registry: is it installed, does its version match the pinned version, and is it logged in. Login checks only run cheap status commands with short timeouts: `claude auth status --json` for Claude and `codex login status` for Codex. Gemini's login is inferred from `GEMINI_API_KEY`/`GOOGLE_API_KEY` or `~/.gemini/oauth_creds.json`. Other tools show "unknown". The check never starts a login.
+   - **一键安装** (one-click install) reuses the fixed registry installer.
+   - **去登录** (log in) shows the login command so you can copy it.
+   - Results are cached for 10 minutes. Routing **skips logged-out CLIs immediately** and goes straight to the model-catalog API; before this, Codex took about 14 s to fail and fall back. A tool is not skipped when its API key is configured. If a CLI reports a login error at run time, it is also marked as logged out.
+2. **Visible routing decisions**. Plans show the selected model, preset, difficulty score, estimated cost, and channel (official CLI or API, with a "CLI 未登录" badge when the CLI is logged out). The run history shows each step's actual channel. On fallback it shows the real redacted error: Claude JSON `result`, Codex `turn.failed.error.message`, or a stderr snippet. When `allowManualReassign` is on (the default), you can reassign a step to another configured route and rerun it.
+3. **Cost control**. Set daily and monthly budgets (USD, `0` = unlimited) and see meters for today's and this month's spend.
+   - Before a run, the estimate is checked against the budget.
+   - After a run, the actual cost is recorded. CLI-reported cost (Claude `total_cost_usd`) is used first; otherwise token usage × your configured prices. Without prices, only token counts are kept.
+   - `overBudgetAction` decides what happens over budget. `downgrade` (the default) re-plans with the economy preset and pauses if it still doesn't fit. `pause` asks you right away. Continuing from a session requires `confirmOverBudget=true`, which triggers a host approval.
+   - Note: Claude's `total_cost_usd` is the API-equivalent price, even when you use a subscription.
+4. **Presets** (`routingPreset`): 省钱优先 (economy) / 均衡 (balanced, the default) / 效果优先 (quality). Presets tilt the quality/cost/latency weights and move the quality floor a cheaper substitute must clear by ±0.04. Balanced is identical to the previous planner.
+5. **Subtask DAG** (`model_router_rerun_step`). Team packages are shown in dependency columns. Recorded runs show each step's status (done, fallback, failed, blocked). **重跑此步** (rerun this step) reruns only the failed step and its unfinished downstream steps. Finished steps keep their results.
+6. **Security boundaries**. The workbench card and the plugin settings list each route's readable and writable scope and its sandbox status:
+   - Read-only runs write nothing.
+   - File-modifying runs use an isolated Git worktree and need host approval.
+   - On Linux/macOS, a headless CLI launched directly has no Harness process sandbox. With `confirmUnsandboxedCli` on (the default), you are asked first.
+7. **Quality loop** (`model_router_rate`). `reviewMode` can be `off`, `sample` (uses `reviewSampleRate`), or `always`. When on, a stronger configured model reviews cheap-model output, and the verdict is stored with the run. You can rate each result 👍/👎. Ratings add a small shrunk bias (at most ±0.04) to that exact `provider/model`'s quality score for future routing.
+
+**Local data**: state is kept in `~/.dsh/model-router/state.json` (or `$DSH_HOME/model-router/state.json`). It holds the health report and the last 200 runs, including **task text and answer excerpts**, costs, and ratings. It never leaves your machine. Delete the file to clear it.
+
+**Known gaps**:
+- Only `model_router_execute` runs are recorded and shown in the DAG. `team_execute`/`tool_run` are budget-gated but not recorded.
+- The workbench cannot start new runs; start tasks from a session. Rerun and rating work from the workbench.
+- Kimi, MiniMax, MiMo, Grok and ZCode have no reliable login status command, and the login commands shown for them are best-effort.
+- The UI has passed build checks and unit tests only. It has not been verified in a real Harness desktop.
+
 ## How the routing decision is derived
 
 The router is a **deterministic, local heuristic**. It exposes its inputs and decision record. Its quality scores are user estimates, available benchmark data, or catalog hints—not measured success probabilities for your particular task. It does not guarantee a globally optimal assignment.
@@ -251,7 +281,9 @@ From a Harness session, these plugin tools are available:
 | --- | --- |
 | `model_router_routes` / `model_router_plan` | Show configured routes or generate a local plan. `/router` is the session command for a plan. |
 | `model_router_consult` | Ask another configured Harness model for a live second opinion through the model API. This can incur provider charges. |
-| `model_router_execute` | Run a routed plan, or one explicit model, through each vendor's headless CLI when enabled. Missing or failed CLIs fall back to the model API. Read-only. |
+| `model_router_execute` | Run a routed plan, or one explicit model, through each vendor's headless CLI when enabled. Missing, logged-out, or failed CLIs fall back to the model API (a hung CLI gets SIGTERM, then SIGKILL after 5 s). Records cost and supports per-step rerun and rating. Read-only. |
+| `model_router_health` | Onboarding health check: installed, version, login state per official tool. Logged-out tools are skipped by routing. |
+| `model_router_rerun_step` / `model_router_rate` | Rerun (optionally reassign) one failed step of a recorded run; rate a result 👍/👎 to nudge future routing. |
 | `model_router_tools` / `model_router_tool_install` | Probe or install a fixed official tool. `/tools` exposes the human command. |
 | `model_router_tool_run` | Run one ready vendor CLI in the approved session workspace. |
 | `model_router_team_execute` | Run dependent work packages through ready vendor CLIs in order; stop on failure or a reported model mismatch. |
@@ -268,7 +300,7 @@ The planned Harness model ID is not necessarily the vendor CLI's model name. A s
 
 ## Development and verification
 
-Use Node.js **22.19+** and pnpm. From a complete source checkout, run:
+Use Node.js **22.19+** and pnpm 10 (pinned through `packageManager`; `corepack enable` picks it up). From a complete source checkout, run:
 
 ```powershell
 pnpm install --frozen-lockfile

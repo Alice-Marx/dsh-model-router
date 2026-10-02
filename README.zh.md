@@ -21,6 +21,7 @@ npm 包名仍为 `@ljwei-stak/model-router-galgame`，便于原用户直接升�
 - [安装与版本选择](#安装与版本选择)
 - [开始使用](#开始使用)
 - [工作台页面怎么用](#工作台页面怎么用)
+- [体检、成本与质量回路](#体检成本与质量回路)
 - [路由算法：从输入到分配](#路由算法从输入到分配)
 - [官方工具与执行边界](#官方工具与执行边界)
 - [可选安装 GAL](#可选安装-gal)
@@ -89,7 +90,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 3. 输入任务，先查看单任务、团队计划，或在**指定模型**里直接选一条已配置路线。结果会给出复杂度、工作包目标与依赖、质量门槛、推荐路线、预计费用及 `official-cli` / `harness-llm` 渠道。规划本身**不会调用付费模型**。
 4. 在**逐模型价格与能力**里可以为每条路线选择执行方式：`auto` / `official` 优先该厂商官方工具，缺失或失败时回退模型目录 API；`api` 始终走模型目录。不填写时按 `auto`。
 5. 在**官方工具**卡片上检测、一键下载安装或修复执行入口。工具就绪只说明安装与可信入口通过核验；首次登录、模型权限和真实费用仍要在对应厂商账号中验证。
-6. 在官方会话里使用 `model_router_execute` 按计划或指定模型执行并汇总结果。`model_router_consult` 仍是一次模型目录咨询；`model_router_tool_run` 跑一个已核验的官方 CLI；`model_router_team_execute` 按依赖顺序执行可编辑工作包。可编辑任务需要干净的测试 Git 仓库，并经过宿主的工具审批。
+6. 在官方会话里使用 `model_router_execute` 按计划或指定模型执行并汇总结果。`model_router_consult` 仍是一次模型目录咨询；`model_router_tool_run` 跑一个已核验的官方 CLI；`model_router_team_execute` 按依赖顺序执行可编辑工作包。可编辑任务需要干净的测试 Git 仓库，并经过宿主的工具审批。 体检、重跑和评价另有 `model_router_health`、`model_router_rerun_step`、`model_router_rate`，见下文。
 
 ![0.9.0 隔离安装后的桌面官方工具面板](docs/assets/desktop-official-tools-0.9.0.png)
 
@@ -122,6 +123,36 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 先选**团队分工**、预算填 `0`、点**生成路由建议**并向下看结果；补齐价格后再用 `10` 等估价目标比较方案。如果只想在会话里再得到一次计划，可发送“请调用 `model_router_plan`，按 `team` 模式规划以下任务，`budgetUsd=10`，先不要执行”。若确认要调用已安装 CLI，可在**测试仓库**中请求“请调用 `model_router_team_execute`，对同一任务先以 `read-only` 模式执行可完成的文字/代码检查，并报告每包的实际状态”。想让 CLI 写文件时改为 `workspace-write`，需要干净 Git 仓库及宿主审批。真实执行可能计费。
 
 当前插件能规划短片任务，并通过已适配的官方**模型编程 CLI**处理它们有能力完成的文本或代码工作。**“生成路由建议”不会操作 Blender、ComfyUI、剪辑软件或导出视频。** 要交付成片，还需为相应创作软件提供可调用的工作流、素材、权限和人工验收。详见[工作台使用指南](docs/WORKBENCH_USER_GUIDE.zh.md)的单工具、团队和常见问题章节。
+
+## 体检、成本与质量回路
+
+工作台顶部按下面顺序展示这些能力。会话内对应的工具在括号里。
+
+1. **开箱体检**（`model_router_health`）。第一次打开工作台时，会对注册表里的每个官方工具检查三件事：是否安装、版本是否等于本版固定版本、是否已登录。登录检查只跑很便宜的状态命令，每条超时都很短：Claude 用 `claude auth status --json`，Codex 用 `codex login status`。Gemini 根据 `GEMINI_API_KEY`/`GOOGLE_API_KEY` 或 `~/.gemini/oauth_creds.json` 推断。其他工具暂时显示“登录状态未知”。体检不会发起登录。
+   - 未安装的工具点**一键安装**，复用原有的固定注册表安装器。
+   - 未登录的工具点**去登录**，查看并复制登录命令。
+   - 体检结果缓存 10 分钟。路由会**立刻跳过未登录的 CLI**，直接走模型目录 API；以前 Codex 要等约 14 秒才失败回退。配置了对应 API Key 时不跳过。如果执行中 CLI 报出登录错误，也会把该工具标为未登录。点“重新体检”可以刷新。
+2. **路由决策看得见**。路由建议会显示推荐模型、路由方案、难度分和估算成本，以及执行渠道（官方 CLI 还是模型目录 API；未登录时标“CLI 未登录”）。执行记录里每一步都写明实际渠道。如果回退到 API，会显示脱敏后的真实错误：Claude JSON 的 `result`、Codex 的 `turn.failed.error.message`，或 stderr 片段。设置允许时可以**改派并重跑**到另一条已配置路线（`allowManualReassign`，默认开启）。
+3. **成本控制**。“成本控制”卡片显示今日和本月已花费金额及进度条，并可设置**每日/每月预算**（USD，`0` 表示不限）。
+   - 执行前，用本次预估金额检查预算。
+   - 执行后，记录实际费用：优先用 CLI 回报的费用（Claude 的 `total_cost_usd`），否则用 token 用量乘以“模型价格与能力配置”里的单价。没有单价时只记录 token 数。
+   - 超出预算时的处理由 `overBudgetAction` 决定：`downgrade`（默认）先改用“省钱优先”重新规划，仍超出就暂停；`pause` 直接暂停，询问你是否继续。会话里继续需要传 `confirmOverBudget=true`，宿主会再弹出一次审批。
+   - 注意：Claude 的 `total_cost_usd` 是按 API 价格换算的金额，使用订阅时不等于实际扣费。
+4. **预设方案**（`routingPreset`）。可选**省钱优先 / 均衡 / 效果优先**，默认是均衡。方案会调整质量、成本和速度三者的权重，并把替代模型必须达到的质量门槛下调或上调 0.04。均衡和以前的算法完全相同。
+5. **子任务可视化**（`model_router_rerun_step`）。团队分工的工作包按依赖关系分列，显示成依赖图（DAG）。执行记录里每一步都标有状态：完成、已回退、失败或依赖未完成。点**重跑此步**只重跑失败的那一步，以及依赖它的未完成步骤，已完成的步骤保留原结果。
+6. **安全边界**。“安全边界”卡片和插件设置页会逐条列出每条路线可读、可写的范围，以及是否经过 Harness 沙箱：
+   - 只读执行不写文件；
+   - 修改文件的执行在独立 Git 工作树里进行，需要宿主审批；
+   - 在 Linux/macOS 上直接启动无界面 CLI 时没有 Harness 进程沙箱，`confirmUnsandboxedCli`（默认开启）会在启动前先询问你。
+7. **质量回路**（`model_router_rate`）。`reviewMode` 可以设为 `off`、`sample` 或 `always`；`sample` 按 `reviewSampleRate` 的比例抽检。开启后，会让更强的已配置模型复核便宜模型的输出，并把结论写进执行记录。你可以对每个结果点 👍/👎。评价会以收缩平均的方式，给对应 `provider/model` 的质量分加一个微调，范围最多 ±0.04，作用于以后的路由。
+
+**本地数据**：上面的状态保存在 `~/.dsh/model-router/state.json`（若设置了 `DSH_HOME`，则在 `$DSH_HOME/model-router/state.json`），包括体检结果、最近 200 次执行的**任务文本、答案摘要**、费用和评价。只保存在本机，不上传。需要清除时直接删除这个文件。
+
+**当前限制**：
+- 只有 `model_router_execute` 的执行会写入记录和 DAG。`model_router_team_execute` 与 `model_router_tool_run` 只受预算检查约束，不记录费用和评价。
+- 工作台还不能直接发起新的执行，任务仍要在会话中开始；重跑和评价可以在工作台里完成。
+- Kimi、MiniMax、MiMo、Grok、ZCode 还没有可靠的登录状态命令，显示的登录命令仅供参考。
+- 这些界面只通过了构建检查和单元测试，还没有在真实 Harness 桌面里验证。
 
 ## 路由算法：从输入到分配
 
@@ -229,7 +260,7 @@ U = wq·质量 + wc·成本得分 + wl·(1 - 延迟估值)
 
 | 供应商 | 官方工具 | 无界面调用 | 凭据 |
 | --- | --- | --- | --- |
-| Anthropic / Claude | Claude Code | `claude -p --output-format json`，任务从标准输入读取 | 已配置的 `ANTHROPIC_API_KEY`，否则使用 `claude` 自己的登录会话 |
+| Anthropic / Claude | Claude Code | `claude -p --output-format json`，任务作为位置参数传入 | 已配置的 `ANTHROPIC_API_KEY`，否则使用 `claude` 自己的登录会话 |
 | OpenAI | Codex CLI | `codex exec --json --sandbox read-only` | 已配置的 `OPENAI_API_KEY`，否则使用 `codex` 登录会话 |
 | Google / Gemini | Gemini CLI | `gemini -p --output-format json`，标准输入作为补充上下文 | 已配置的 `GEMINI_API_KEY`，否则使用 Gemini CLI 已缓存的登录 |
 | DeepSeek 及其他没有适配器的供应商 | 无 | 直接使用 Harness 模型目录 API | 使用宿主里已经配置的供应商凭据，插件不另存密钥 |
@@ -242,7 +273,7 @@ npm install -g @openai/codex@0.157.1 --registry=https://registry.npmjs.org/
 npm install -g @google/gemini-cli@0.62.0 --registry=https://registry.npmjs.org/
 ```
 
-Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙箱执行器；入口不可用时才用上面的无界面命令。每次调用都在当前会话工作目录中进行，限制输出体积和超时（默认 10 分钟，上限 45 分钟）。官方命令缺失、超时、非零退出或输出无法解析时，自动改走模型目录 API，并在结果里写明回退原因。密钥只放进该子进程的环境变量，不会写入模型档案或返回文本。
+Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙箱执行器；入口不可用时才用上面的无界面命令。每次调用都在当前会话工作目录中进行，限制输出体积和超时（默认 10 分钟，上限 45 分钟）；超时或取消时先发 SIGTERM，5 秒后仍未退出则 SIGKILL。官方命令缺失、超时、非零退出或输出无法解析时，自动改走模型目录 API，并在结果里写明回退原因。密钥只放进该子进程的环境变量，不会写入模型档案或返回文本。
 
 每条路线的 `execution` 可以是 `auto`（默认）、`official` 或 `api`。前两者都会先尝试官方工具；`api` 不启动 CLI。可编辑写文件仍使用 `model_router_tool_run` 或 `model_router_team_execute`，不由这次只读汇总改仓库。
 
@@ -256,7 +287,7 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 
 ## 验证与开发
 
-开发环境为 Node.js **22.19+** 与 pnpm。在完整源码根目录运行：
+开发环境为 Node.js **22.19+** 与 pnpm 10（已通过 `packageManager` 固定，`corepack enable` 后自动使用）。在完整源码根目录运行：
 
 ```powershell
 pnpm install --frozen-lockfile
