@@ -86,9 +86,10 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 
 1. 在宿主的**模型**页配置要用的供应商、模型和凭据。插件只从官方目录读取准确的 `provider/model` 路线，不替用户创建模型账号，也不另存 API Key。
 2. 打开**模型路由 → 逐模型价格与能力**。为准备比较的每条路线填写自己认可的质量评分（0–100）、输入/输出单价（USD / 百万 token）、擅长方向；有缓存价格时可另外填写。未知项可以留空，界面会说明估价缺失。
-3. 输入任务，先查看单任务或团队计划：复杂度、工作包目标与依赖、质量门槛、推荐路线、预计费用及 `official-cli` / `harness-llm` 渠道。规划本身**不会调用付费模型**。
-4. 在**官方工具**卡片上检测、一键下载安装或修复执行入口。工具就绪只说明安装与可信入口通过核验；首次登录、模型权限和真实费用仍要在对应厂商账号中验证。
-5. 在官方会话里明确使用 `model_router_consult` 获取另一模型意见，使用 `model_router_tool_run` 跑一个官方 CLI，或用 `model_router_team_execute` 按依赖顺序执行多个工作包。可编辑任务需要干净的测试 Git 仓库，并经过宿主的工具审批。
+3. 输入任务，先查看单任务、团队计划，或在**指定模型**里直接选一条已配置路线。结果会给出复杂度、工作包目标与依赖、质量门槛、推荐路线、预计费用及 `official-cli` / `harness-llm` 渠道。规划本身**不会调用付费模型**。
+4. 在**逐模型价格与能力**里可以为每条路线选择执行方式：`auto` / `official` 优先该厂商官方工具，缺失或失败时回退模型目录 API；`api` 始终走模型目录。不填写时按 `auto`。
+5. 在**官方工具**卡片上检测、一键下载安装或修复执行入口。工具就绪只说明安装与可信入口通过核验；首次登录、模型权限和真实费用仍要在对应厂商账号中验证。
+6. 在官方会话里使用 `model_router_execute` 按计划或指定模型执行并汇总结果。`model_router_consult` 仍是一次模型目录咨询；`model_router_tool_run` 跑一个已核验的官方 CLI；`model_router_team_execute` 按依赖顺序执行可编辑工作包。可编辑任务需要干净的测试 Git 仓库，并经过宿主的工具审批。
 
 ![0.9.0 隔离安装后的桌面官方工具面板](docs/assets/desktop-official-tools-0.9.0.png)
 
@@ -102,10 +103,10 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 
 1. **先看右侧“模型目录”**：顶部“供应商数 · 路线数”表示 Harness 已登记的 `provider/model`；搜索框只过滤显示，“刷新”重新读取目录。卡片上的“推理等级”不是价格、质量分或登录状态。若列表为空，先去 Harness 官方“模型”页添加供应商与模型。
 2. **要比较费用，先向下配置档案**：在“逐模型价格与能力”里选择准备使用的准确路线，填写自报质量评分（0–100）和核对过的输入/输出价格（均为 USD / 百万 token），按**保存此模型**；每条待比较路线分别保存。擅长标签和厂商 CLI 模型名可选。没有价格就留空，不要把未知写成零。
-3. **写“任务描述”**：可以粘贴长提案，但最好把要交付的步骤写成编号条目，并写清验收标准。“单任务”只给单项路线建议；“团队分工”会把可执行需求拆成有依赖的工作包，最多六个显式执行包。
+3. **写“任务描述”**：可以粘贴长提案，但最好把要交付的步骤写成编号条目，并写清验收标准。“单任务”只给单项路线建议；“团队分工”会把可执行需求拆成有依赖的工作包，最多六个显式执行包。“指定模型”不比较其他路线，整项任务都交给下拉框里选中的那一条。
 4. **设置预算并生成**：“本次估算预算（USD）”中的 `10` 只是本地估价目标，`0` 表示规划不设预算；两者都**不会限制真实账号扣费**。点**生成路由建议**后，继续向下滚过“逐模型价格与能力”，找到新增的**路由建议**卡片。按钮不会启动模型。
 5. **读结果**：先核对推荐 `provider/model`、复杂度、估算总成本、执行渠道与警告；团队模式再逐包核对目标、难度、依赖、建议模型、估价和验收项。`官方 CLI` 说明本机相应入口可托管；`模型目录 API` 说明可通过 Harness 模型目录调用，但不等于这个包能由插件的 CLI 团队执行器运行。修改任务、预算或档案后重新生成。
-6. **需要实际工作时另开官方会话**：在左侧点**新会话**并选好工作区，明确请求使用 `model_router_consult`、`model_router_tool_run` 或 `model_router_team_execute`。团队执行会按照**当前已就绪且支持所选模式的官方 CLI**重新规划，可能与页面上刚才的静态建议不同；它不会直接读取那张结果卡作为执行清单。
+6. **需要实际工作时另开官方会话**：在左侧点**新会话**并选好工作区。要按工作台结果执行，请求 `model_router_execute`；若只要某一个模型，同时给出该路线的 `provider` 和 `model`。`model_router_consult` 只做模型目录咨询。`model_router_tool_run` 与 `model_router_team_execute` 仍负责已核验 CLI 的可编辑任务。团队执行会按照**当前已就绪且支持所选模式的官方 CLI**重新规划，可能与页面上刚才的静态建议不同；它不会直接读取那张结果卡作为执行清单。
 
 例如，要先给一个三分钟科幻短片做**前期规划**，可以在任务描述中输入：
 
@@ -218,8 +219,32 @@ U = wq·质量 + wc·成本得分 + wl·(1 - 延迟估值)
 | MiMo Code | 0.1.15 | 固定官方 npm 包；支持只读及可编辑模式。 |
 | Grok Build | 1.0.41 | 固定官方 npm 包；支持只读及可编辑模式。 |
 | ZCode | 3.14.3 | 固定、校验哈希和签名的 Windows 安装器；用户在原厂窗口选目录；只允许经审批的独立 Git 工作区可编辑任务。 |
+| Gemini CLI | 0.62.0 | 固定官方 npm 包 `@google/gemini-cli`。无界面任务使用 `gemini -p`；签名沙箱入口不启动它。 |
 
 插件界面只能请求注册表内的工具 ID，不能传入任意 npm 包名或 shell 命令。下载后还会核验版本和可信执行入口；仅显示版本号但入口不可信时，卡片提供“修复官方执行入口”。MiniMax 已由官方 Windows 安装器管理的 0.5.5 版本也可识别。若 npm 全局前缀在 C 盘，CLI 安装可能占用 C 盘；请先按自己的空间规划调整此前缀。
+
+### 官方工具如何接到被分配的任务
+
+`model_router_execute` 在模型拿到任务或子任务后选择执行通道。适配器只认固定命令，不接受调用方传入的可执行文件或参数：
+
+| 供应商 | 官方工具 | 无界面调用 | 凭据 |
+| --- | --- | --- | --- |
+| Anthropic / Claude | Claude Code | `claude -p --output-format json`，任务从标准输入读取 | 已配置的 `ANTHROPIC_API_KEY`，否则使用 `claude` 自己的登录会话 |
+| OpenAI | Codex CLI | `codex exec --json --sandbox read-only` | 已配置的 `OPENAI_API_KEY`，否则使用 `codex` 登录会话 |
+| Google / Gemini | Gemini CLI | `gemini -p --output-format json`，标准输入作为补充上下文 | 已配置的 `GEMINI_API_KEY`，否则使用 Gemini CLI 已缓存的登录 |
+| DeepSeek 及其他没有适配器的供应商 | 无 | 直接使用 Harness 模型目录 API | 使用宿主里已经配置的供应商凭据，插件不另存密钥 |
+
+安装示例（版本与工作台一键安装相同）：
+
+```text
+npm install -g @anthropic-ai/claude-code@2.1.283 --registry=https://registry.npmjs.org/
+npm install -g @openai/codex@0.157.1 --registry=https://registry.npmjs.org/
+npm install -g @google/gemini-cli@0.62.0 --registry=https://registry.npmjs.org/
+```
+
+Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙箱执行器；入口不可用时才用上面的无界面命令。每次调用都在当前会话工作目录中进行，限制输出体积和超时（默认 10 分钟，上限 45 分钟）。官方命令缺失、超时、非零退出或输出无法解析时，自动改走模型目录 API，并在结果里写明回退原因。密钥只放进该子进程的环境变量，不会写入模型档案或返回文本。
+
+每条路线的 `execution` 可以是 `auto`（默认）、`official` 或 `api`。前两者都会先尝试官方工具；`api` 不启动 CLI。可编辑写文件仍使用 `model_router_tool_run` 或 `model_router_team_execute`，不由这次只读汇总改仓库。
 
 `model_router_tool_run` 用于单工具调用；`model_router_team_execute` 为**插件自有的顺序 CLI 团队执行器**：按依赖运行，失败或回报模型不匹配即停。可编辑工作先在独立 Git worktree 执行，并在原仓库保持干净时整合；被 Git 忽略的输出需单独检查。官方 Harness Agent Teams 的成员生命周期与成员模型仍由宿主管理。
 

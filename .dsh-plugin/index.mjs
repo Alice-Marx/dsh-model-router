@@ -9,8 +9,9 @@ import {
   installCommandLine,
   toolForProvider,
 } from './shared/official-tool-registry.mjs'
-import { officialToolExecutionCapabilities, officialToolReadiness } from './shared/official-tool-executor.mjs'
+import { officialToolExecutionCapabilities, officialToolReadiness, runOfficialTool } from './shared/official-tool-executor.mjs'
 import { runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
+import { executeAssignmentPlan } from './shared/task-executors.mjs'
 import {
   probeAllTools,
   probeToolWith,
@@ -208,6 +209,65 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
         ? { truncationReason: 'output-character-limit', notice: '回答达到字符上限，后续内容已截断。' }
         : {}),
   }
+}
+
+async function credentialsForRoute(ctx, route) {
+  const provider = text(route?.provider)
+  if (!provider) return null
+  const readers = [ctx?.credentials?.getApiKey, ctx?.llm?.getProviderApiKey]
+  for (const read of readers) {
+    if (typeof read !== 'function') continue
+    try {
+      const value = await read(provider)
+      const apiKey = typeof value === 'string' ? value : value?.apiKey ?? value?.key
+      if (typeof apiKey === 'string' && apiKey.trim() && !apiKey.includes('\0') && apiKey.length <= 4_096) {
+        return { apiKey }
+      }
+    } catch { /* this host build does not expose provider keys; the CLI login session remains available */ }
+  }
+  return null
+}
+
+/** Route, or honor one explicit model, then run each package through its adapter. */
+export async function executeConfiguredAssignment(ctx, task, config = {}, options = {}) {
+  const taskText = text(task)
+  if (!taskText) throw new Error('task must contain text')
+  const direct = text(options.provider) || text(options.model)
+  const discovered = await discoverConfiguredRoutes(ctx, options.signal)
+  const routes = configuredRoutesWithProfiles(discovered, config)
+  const installed = options.skipToolProbe === true
+    ? (Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
+    : await installedToolIds()
+  const readiness = options.skipToolProbe === true ? []
+    : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
+  const runnableToolIds = Array.isArray(options.runnableToolIds)
+    ? options.runnableToolIds
+    : readiness.filter(item => item.ready).map(item => item.id)
+  const plan = direct
+    ? createPlanFromRoutes(taskText, routes, {
+      mode: 'direct', directProvider: options.provider, directModel: options.model,
+      installedToolIds: installed, runnableToolIds,
+    })
+    : createPlanFromRoutes(taskText, routes, {
+      mode: options.planMode === 'team' ? 'team' : 'single',
+      budgetUsd: options.budgetUsd,
+      installedToolIds: installed,
+      runnableToolIds,
+    })
+  const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
+  const execution = await executeAssignmentPlan({
+    plan,
+    task: taskText,
+    routes: plan.availableRoutes,
+    workspace: options.workspace,
+    signal: options.signal,
+    credentialsFor: route => credentialsForRoute(ctx, route),
+    apiFallback: async ({ route, task: packageTask, signal }) => consultConfiguredModel(ctx, route, packageTask, limit, signal),
+    runVerified: options.runVerified ?? (request => runOfficialTool({
+      ...request, sandbox: ctx.sandbox, mode: 'read-only',
+    })),
+  })
+  return { plan, execution }
 }
 
 function explicitRoute(args, routes) {
@@ -436,7 +496,7 @@ async function waitForInstall(toolId, signal) {
 function registerOfficialToolModels(ctx, config) {
   ctx.tools.register(defineTool({
     name: 'model_router_tools',
-    description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, ZCode) and report which are installed with their versions. Never reads credentials.',
+    description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, ZCode, Gemini CLI) and report which are installed with their versions. Never reads credentials.',
     parameters: {},
     output: JSON_OUTPUT,
     async execute(_args, exec) {
@@ -512,6 +572,36 @@ function registerOfficialToolModels(ctx, config) {
       return jsonValue({ ...result,
         ...(!modelId && text(args.model) ? { modelNotice: result.modelNotice
           ?? 'Harness 模型 ID 未经此厂商 CLI 验证；本次使用厂商 CLI 已配置的默认模型。' } : {}),
+      })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_execute',
+    description: 'Run a task on configured models and aggregate the results. Omit provider and model to route first. Supply both to use that one model and skip routing. auto/official profiles try the vendor headless CLI (claude -p, codex exec, gemini -p) and fall back to the Harness model API when the CLI is missing or fails. api profiles always use the model API. This call is read-only and does not apply file edits.',
+    parameters: {
+      task: { type: 'string', required: true, description: 'Task to execute.' },
+      provider: { type: 'string', description: 'Configured provider. Pair with model to bypass routing.' },
+      model: { type: 'string', description: 'Configured model. Pair with provider to bypass routing.' },
+      planMode: { type: 'string', enum: ['single', 'team'], description: 'Used only when provider and model are omitted.' },
+      budgetUsd: { type: 'number', description: 'Optional local estimate ceiling when routing. Not a vendor billing cap.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const { cwd } = await sessionWorkspace(ctx, exec)
+      const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
+      const result = await executeConfiguredAssignment(ctx, args.task, config, {
+        provider: args.provider,
+        model: args.model,
+        planMode: args.planMode,
+        budgetUsd: finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)),
+        workspace: cwd,
+        signal: exec.signal,
+      })
+      return jsonValue({
+        routingBypassed: result.plan.routingBypassed === true,
+        selected: result.plan.selected,
+        execution: result.execution,
+        notice: '官方 CLI 以只读无界面方式运行。可编辑改动仍使用 model_router_tool_run 或 model_router_team_execute。未安装、失败或配置为 api 的模型走模型目录 API。',
       })
     },
   }))

@@ -33,6 +33,16 @@ test('editing one route keeps another profile quality and price unchanged', () =
   assert.equal(profiles.find(item => item.model === 'strong').pricing.output, 18)
 })
 
+test('editor can save an official-tool or API execution preference', () => {
+  const json = updateProfileJson('[]', cheap, {
+    quality: '', input: '', output: '', cacheRead: '', cacheWrite: '',
+    specialties: '', cliModel: '', execution: 'api',
+  })
+  const [profile] = parseModelProfilesJson(json)
+  assert.equal(profile.execution, 'api')
+  assert.equal(profileDraft(profile).execution, 'api')
+})
+
 test('editor rejects partial prices and removes only the selected route', () => {
   assert.throws(() => updateProfileJson('[]', cheap,
     { quality: '', input: '0.1', output: '', specialties: '', cliModel: '' }), /同时填写/)

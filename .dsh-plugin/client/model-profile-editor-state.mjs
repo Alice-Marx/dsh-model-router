@@ -24,6 +24,7 @@ export function profileDraft(profile) {
     cacheWrite: profile?.pricing?.cacheWrite === undefined ? '' : String(profile.pricing.cacheWrite),
     specialties: Array.isArray(profile?.specialties) ? profile.specialties.join(', ') : '',
     cliModel: profile?.cliModel ?? '',
+    execution: profile?.execution === 'official' || profile?.execution === 'api' ? profile.execution : 'auto',
   }
 }
 
@@ -59,6 +60,9 @@ export function profileFromDraft(route, draft) {
     if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(cliModel)) throw new Error('CLI 模型名需由字母数字开头，且只包含字母、数字、点、下划线、冒号、斜杠或连字符。')
     profile.cliModel = cliModel
   }
+  const execution = field(draft?.execution) || 'auto'
+  if (!['auto', 'official', 'api'].includes(execution)) throw new Error('执行方式只能是自动、官方工具或模型目录 API。')
+  if (execution !== 'auto') profile.execution = execution
   return profile
 }
 

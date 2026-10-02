@@ -84,6 +84,21 @@ export const OFFICIAL_TOOLS = Object.freeze([
     providerHints: ['xai', 'grok'],
   }),
   Object.freeze({
+    id: 'gemini',
+    label: 'Gemini CLI',
+    vendor: 'Google',
+    purpose: 'Google 官方 Gemini CLI，无界面模式使用 gemini -p。',
+    package: '@google/gemini-cli',
+    version: '0.62.0',
+    manager: 'npm',
+    installArgs: ['install', '-g', '@google/gemini-cli@0.62.0', '--registry=https://registry.npmjs.org/'],
+    probeExecutables: ['gemini'],
+    providerHints: ['gemini', 'google'],
+    // Headless runs go through the task adapter. The signed sandbox runner does
+    // not launch this CLI; a missing or failed process falls back to the API.
+    headlessAdapter: true,
+  }),
+  Object.freeze({
     id: 'zcode',
     label: 'ZCode',
     vendor: 'Z.ai',

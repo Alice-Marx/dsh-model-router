@@ -227,12 +227,19 @@ Open **Model Router → Model pricing and capabilities**. Choose a route that ac
     "quality": 80,
     "pricing": { "input": 0.5, "output": 2.0, "currency": "USD" },
     "specialties": ["code", "summarization"],
-    "cliModel": "name-configured-in-that-vendor-cli"
+    "cliModel": "name-configured-in-that-vendor-cli",
+    "execution": "auto"
   }
 ]
 ```
 
 `quality` is a personal 0–100 comparison score. `pricing.input` and `.output` are nonnegative USD rates per million tokens; optional `cacheRead` and `cacheWrite` rates are supported. The optional `cliModel` must match the name accepted by that vendor's own CLI, which may differ from the Harness directory ID. MiniMax and MiMo expect `provider/model` for that field. ZCode 3.14.3 cannot switch models per call, so it does not accept `cliModel`.
+
+`execution` chooses how that route runs when it receives a task. `auto` (the default when omitted) and `official` try the vendor headless CLI first and fall back to the Harness model API if the tool is missing or fails. `api` always uses the model directory API.
+
+## Single-model mode
+
+In **Task planning**, choose **指定模型** and pick one configured `provider/model`. The plan assigns that route and does not compare the others. In a Harness session, call `model_router_execute` with the same `provider` and `model` to run the whole task on it, through its official CLI when that route's execution setting allows it.
 
 ## Official tools and actual execution
 
@@ -243,10 +250,13 @@ From a Harness session, these plugin tools are available:
 | Tool | Purpose |
 | --- | --- |
 | `model_router_routes` / `model_router_plan` | Show configured routes or generate a local plan. `/router` is the session command for a plan. |
-| `model_router_consult` | Ask another configured Harness model for a live second opinion. This can incur provider charges. |
+| `model_router_consult` | Ask another configured Harness model for a live second opinion through the model API. This can incur provider charges. |
+| `model_router_execute` | Run a routed plan, or one explicit model, through each vendor's headless CLI when enabled. Missing or failed CLIs fall back to the model API. Read-only. |
 | `model_router_tools` / `model_router_tool_install` | Probe or install a fixed official tool. `/tools` exposes the human command. |
 | `model_router_tool_run` | Run one ready vendor CLI in the approved session workspace. |
 | `model_router_team_execute` | Run dependent work packages through ready vendor CLIs in order; stop on failure or a reported model mismatch. |
+
+Headless assignment uses fixed adapters: Claude Code `claude -p`, Codex `codex exec`, and Gemini CLI `gemini -p` (`@google/gemini-cli@0.62.0`). DeepSeek and other providers without an adapter stay on the model directory API. A configured provider API key is passed only into that process; otherwise the CLI's own logged-in session is used. The plugin does not store keys in model profiles. Editable writes remain on `model_router_tool_run` and `model_router_team_execute`.
 
 Claude Code, Codex, MiMo Code, and Grok Build support read-only and approved editable runs. Kimi Code, MiniMax Code, and ZCode headless modes handle permissions automatically, so the plugin only permits approved editable runs for them in an isolated Git worktree. Editable execution requires a clean Git repository. A successful run applies source changes only after the original checkout remains clean; ignored outputs remain for manual review. The official Harness process sandbox wraps launches, while its Windows ACL backend reports only partial file-effect enforcement.
 

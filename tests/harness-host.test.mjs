@@ -159,6 +159,7 @@ test('registers router tools and manual command without intercepting the main ag
 
   assert.deepEqual(tools.map(tool => tool.name).sort(), [
     'model_router_consult',
+    'model_router_execute',
     'model_router_plan',
     'model_router_routes',
     'model_router_team_execute',
