@@ -2,7 +2,10 @@ import React from 'react'
 import { createWorkspacePlan, routesFromModelCatalog } from './catalog.mjs'
 import { ModelProfileEditor } from './model-profile-editor.jsx'
 import { toolInstallAction } from './tool-install-state.mjs'
-import { OFFICIAL_TOOLS, installCommandLine } from '../shared/official-tool-registry.mjs'
+import { OFFICIAL_TOOLS, installCommandLine, toolForProvider } from '../shared/official-tool-registry.mjs'
+import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
+import { CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
+import { planBudget, unwrapRemote } from './insights-state.mjs'
 import stylesheet from './router-main.css'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
@@ -51,8 +54,9 @@ function ChannelBadge({ item }) {
   )
 }
 
-function PlanResults({ plan }) {
+function PlanResults({ plan, ledger }) {
   const selected = plan.selected
+  const budget = planBudget(ledger, plan.estimatedCost)
   return (
     <section className="mr-card mr-results" aria-label="路由建议">
       <div className="mr-card-head">
@@ -64,9 +68,13 @@ function PlanResults({ plan }) {
       <div className="mr-card-body">
         <div className="mr-result-grid">
           <div className="mr-metric"><div className="mr-metric-label">推荐路线</div><div className="mr-metric-value">{selected ? `${selected.provider}/${selected.model}` : '暂无路线'}</div></div>
-          <div className="mr-metric"><div className="mr-metric-label">任务复杂度</div><div className="mr-metric-value">{{ simple: '简单', balanced: '中等', complex: '复杂' }[plan.complexity.band] || plan.complexity.band}</div></div>
+          <div className="mr-metric"><div className="mr-metric-label">任务复杂度 · 难度分</div><div className="mr-metric-value">{{ simple: '简单', balanced: '中等', complex: '复杂' }[plan.complexity.band] || plan.complexity.band} · {plan.complexity.value}</div></div>
           <div className="mr-metric"><div className="mr-metric-label">估算总成本</div><div className="mr-metric-value">{money(plan.estimatedCost)}</div></div>
+          <div className="mr-metric"><div className="mr-metric-label">路由方案</div><div className="mr-metric-value">{ROUTING_PRESETS[plan.preset]?.label ?? '均衡'}</div></div>
         </div>
+        {budget?.exceeded && <p className="mr-error" role="alert">执行前预算检查：{budget.message} 实际执行时将按设置自动降级或暂停询问。</p>}
+        {budget?.limited && !budget.exceeded && budget.estimateKnown && <p className="mr-caption">执行前预算检查：本次预估 {money(plan.estimatedCost)}，剩余额度 {money(budget.remainingUsd)}。</p>}
+        {plan.loginRequired && <p className="mr-caption">推荐模型的官方 CLI 未登录，执行时直接走模型目录 API；可在“官方工具”卡片点“去登录”。</p>}
         <div className="mr-channel-line">
           <span className="mr-control-label">执行渠道</span>
           <ChannelBadge item={plan} />
@@ -77,6 +85,7 @@ function PlanResults({ plan }) {
           <>
             <h3 className="mr-section-title">团队工作包</h3>
             <p className="mr-caption">下方模型是规划建议；托管执行会按厂商 CLI 的模型名规则选用，未核验映射时使用该 CLI 的默认模型。</p>
+            {plan.team.workPackages.length > 1 && <DagView packages={plan.team.workPackages} label="工作包依赖图" renderNode={item => <p className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</p>} />}
             {plan.team.workPackages.length === 0
               ? <div className="mr-empty">当前目录没有可分配的模型路线。</div>
               : plan.team.workPackages.map((item, index) => (
@@ -86,7 +95,8 @@ function PlanResults({ plan }) {
                   <p className="mr-package-copy">{item.purpose}{item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.join('、')}` : ''}</p>
                   <p className="mr-package-copy">难度：{{ simple: '简单', balanced: '中等', complex: '困难' }[item.difficulty] || item.difficulty || '待评估'} · 费用：{money(item.estimatedCost)}</p>
                   <p className="mr-package-copy">验收：{item.verificationChecklist.join('；')}</p>
-                  <div className="mr-channel-line"><ChannelBadge item={item} /></div>
+                  <div className="mr-channel-line"><ChannelBadge item={item} />{item.loginRequired && <span className="mr-pill">CLI 未登录</span>}</div>
+                  {item.channelDetail && <p className="mr-package-copy">渠道说明：{item.channelDetail}</p>}
                 </article>
               ))}
           </>
@@ -110,7 +120,8 @@ function probeLabel(probe) {
   return probe.detail || '未安装'
 }
 
-function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes }) {
+function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth }) {
+  const healthById = Object.fromEntries((health?.tools ?? []).map(item => [item.id, item]))
   const [probeState, setProbeState] = React.useState({ status: 'loading', probes: [], capabilities: [], readiness: [], error: '' })
   const [jobs, setJobs] = React.useState({})
   const [rowErrors, setRowErrors] = React.useState({})
@@ -120,6 +131,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   const polling = React.useRef(new Set())
 
   const refresh = async () => {
+    onRefreshHealth?.()
     const current = ++request.current
     setProbeState(previous => ({ ...previous, status: 'loading', error: '' }))
     try {
@@ -223,9 +235,9 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   return (
     <section className="mr-card" aria-label="官方工具">
       <div className="mr-card-head"><div>
-        <h2 className="mr-card-title">官方工具</h2>
-        <p className="mr-card-copy">检测本机官方工具，并从固定注册表一键下载安装。ZCode 会打开官方安装窗口供你选择目录；完成后重新检测版本。</p>
-      </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新检测</button></div>
+        <h2 className="mr-card-title">官方工具 · 体检</h2>
+        <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装。未登录的工具点“去登录”查看登录命令。ZCode 会打开官方安装窗口供你选择目录；完成后重新体检。</p>
+      </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新体检</button></div>
       <div className="mr-card-body">
         {probeState.status === 'loading' && <p className="mr-empty" role="status">正在检测本机官方工具…</p>}
         {probeState.status === 'error' && <p className="mr-error" role="alert">{probeState.error}</p>}
@@ -248,6 +260,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
                   <div className="mr-route-name" title={tool.purpose}>{tool.label}</div>
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
                   <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{tool.version ? ` · 目标 ${tool.version}` : ''}</div>
+                  <ToolLoginLine entry={healthById[tool.id]} />
                   {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.headlessAdapter
                     ? '已可由 model_router_execute 以无界面方式调用。命令缺失或失败时回退模型目录 API。签名沙箱入口不启动此 CLI。'
                     : readiness?.ready
@@ -285,7 +298,92 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
 }
 
 /** Root-scoped official Desktop panel. The plan is local; real calls remain in Host tools. */
-export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus }) {
+const HEADLESS_TOOLS = new Set(['claude-code', 'codex', 'gemini'])
+
+/** Workbench RPC state: health check, run ledger and security boundaries. */
+function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
+  const [health, setHealth] = React.useState({ report: null, error: '', refreshing: false })
+  const [ledger, setLedger] = React.useState({ value: null, error: '' })
+  const [boundaries, setBoundaries] = React.useState({ value: null, error: '' })
+  const [busy, setBusy] = React.useState(false)
+  const mounted = React.useRef(true)
+  React.useEffect(() => () => { mounted.current = false }, [])
+  const call = async (operation, fallback) => {
+    if (typeof operation !== 'function') throw new Error('工作台服务尚未加载，请更新插件后重试。')
+    return unwrapRemote(await operation(), fallback)
+  }
+  const refreshHealth = async fresh => {
+    setHealth(previous => ({ ...previous, refreshing: true, error: '' }))
+    try {
+      const report = await call(() => toolHealth(fresh === true), '体检失败。')
+      if (mounted.current) setHealth({ report, error: '', refreshing: false })
+    } catch (error) {
+      if (mounted.current) setHealth(previous => ({ ...previous, refreshing: false, error: text(error?.message) || '体检失败。' }))
+    }
+  }
+  const refreshLedger = async () => {
+    try {
+      const value = await call(loadLedger, '执行记录读取失败。')
+      if (mounted.current) setLedger({ value, error: '' })
+    } catch (error) {
+      if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '执行记录读取失败。' }))
+    }
+  }
+  const refreshBoundaries = async () => {
+    try {
+      const value = await call(loadBoundaries, '安全边界读取失败。')
+      if (mounted.current) setBoundaries({ value, error: '' })
+    } catch (error) {
+      if (mounted.current) setBoundaries({ value: null, error: text(error?.message) || '安全边界读取失败。' })
+    }
+  }
+  const finishOnboarding = async () => {
+    try {
+      const onboarding = await call(completeOnboarding, '无法保存体检状态。')
+      if (mounted.current) setHealth(previous => ({ ...previous, report: { ...previous.report, onboarding } }))
+    } catch (error) {
+      if (mounted.current) setHealth(previous => ({ ...previous, error: text(error?.message) || '无法保存体检状态。' }))
+    }
+  }
+  const rate = async (runId, packageId, rating) => {
+    setBusy(true)
+    try { await call(() => rateResult({ runId, packageId, rating }), '评价保存失败。'); await refreshLedger() }
+    catch (error) { if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '评价保存失败。' })) }
+    finally { if (mounted.current) setBusy(false) }
+  }
+  const rerun = async (runId, packageId, override) => {
+    const run = ledger.value?.runs?.find(item => item.id === runId)
+    const item = run?.packages?.find(entry => entry.id === packageId)
+    const provider = override?.provider ?? item?.provider
+    const tool = toolForProvider(provider)
+    const healthEntry = health.report?.tools?.find(entry => entry.id === tool?.id)
+    if (ledger.value?.settings?.confirmUnsandboxedCli !== false && tool && HEADLESS_TOOLS.has(tool.id) && healthEntry?.installed && healthEntry.login?.state !== 'logged-out'
+      && !window.confirm(`重跑会直接启动 ${tool.label} 的无界面 CLI，不经过 Harness 进程沙箱，只读仅由 CLI 参数保证。继续吗？`)) return
+    setBusy(true)
+    try {
+      const request = { runId, packageId, ...(override ? { provider: override.provider, model: override.model } : {}) }
+      let result = await call(() => rerunStep(request), '重跑失败。')
+      if (result?.paused) {
+        if (!window.confirm(`${result.budget?.message ?? '本次重跑会超出预算。'}\n仍要继续吗？`)) return
+        result = await call(() => rerunStep({ ...request, confirmOverBudget: true }), '重跑失败。')
+      }
+      await refreshLedger()
+    } catch (error) {
+      if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '重跑失败。' }))
+    } finally {
+      if (mounted.current) setBusy(false)
+    }
+  }
+  React.useEffect(() => {
+    void refreshHealth(false)
+    void refreshLedger()
+    void refreshBoundaries()
+  }, [])
+  return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun }
+}
+
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
+  const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')
   const [mode, setMode] = React.useState('single')
@@ -368,6 +466,9 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         modelProfilesJson: settingsScope.getSnapshot().value?.modelProfilesJson ?? '[]',
         installedToolIds: (toolProbes?.probes ?? []).filter(probe => probe.installed).map(probe => probe.id),
         runnableToolIds: (toolProbes?.readiness ?? []).filter(item => item.ready).map(item => item.id),
+        preset: settingsScope.getSnapshot().value?.routingPreset ?? 'balanced',
+        qualityBiases: workbench.ledger.value?.biases ?? null,
+        loggedOutToolIds: (workbench.health.report?.tools ?? []).filter(item => item.installed && item.login?.state === 'logged-out').map(item => item.id),
       }))
     } catch (error) {
       setPlan(null)
@@ -387,6 +488,13 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           </div>
           <div className="mr-status"><span className={`mr-status-dot ${catalogState.status === 'loading' ? 'loading' : catalogState.status === 'error' ? 'error' : ''}`} />{catalogState.status === 'ready' ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === 'loading' ? '正在读取模型目录' : '模型目录读取失败'}</div>
         </header>
+
+        {workbench.health.report && !workbench.health.report.onboarding?.completedAt && (
+          <OnboardingBanner health={workbench.health.report} error={workbench.health.error} refreshing={workbench.health.refreshing}
+            onRefresh={() => { void workbench.refreshHealth(true) }} onDone={() => { void workbench.finishOnboarding() }} />
+        )}
+        <CostControlCard ledger={workbench.ledger.value} error={workbench.ledger.error && !workbench.ledger.value ? workbench.ledger.error : ''} settingsScope={settingsScope}
+          onChanged={() => { invalidatePlan(); void workbench.refreshLedger() }} />
 
         <div className="mr-grid">
           <section className="mr-card" aria-label="任务规划">
@@ -416,8 +524,13 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         </div>
 
         <ModelProfileEditor routes={routes} settingsScope={settingsScope} onSaved={invalidatePlan} />
-        {plan && <PlanResults plan={plan} />}
-        <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} />
+        {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} />}
+        <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.value ? workbench.ledger.error : ''}
+          onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating) => { void workbench.rate(runId, packageId, rating) }}
+          onRerun={(runId, packageId, override) => { void workbench.rerun(runId, packageId, override) }} />
+        <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes}
+          health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
+        <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />
         <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
       </div>
     </main>

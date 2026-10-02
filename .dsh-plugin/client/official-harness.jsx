@@ -8,6 +8,7 @@
 
 import React from 'react'
 import { parseModelProfilesJson } from '../shared/model-profiles.mjs'
+import { toolBoundary } from '../shared/security-boundaries.mjs'
 import { RouterMainPage, RouterPanelIcon } from './router-main.jsx'
 import {
   OFFICIAL_TOOLS_CLIENT_REMOTE,
@@ -91,12 +92,18 @@ export class RouterSettingsCardController {
     this.form = new SettingsFormModel(scope, [
       boundedNumberField('budgetUsd', { minimum: 0 }),
       boundedNumberField('maxConsultOutputChars', { minimum: 500, maximum: 50_000, integer: true }),
+      boundedNumberField('dailyBudgetUsd', { minimum: 0, maximum: 1_000_000 }),
+      boundedNumberField('monthlyBudgetUsd', { minimum: 0, maximum: 1_000_000 }),
+      boundedNumberField('reviewSampleRate', { minimum: 0, maximum: 1 }),
       modelProfilesField(),
     ])
     this.store = this.form.bind(() => ({
       ...this.form.shell(),
       budgetUsd: this.form.field('budgetUsd'),
       maxConsultOutputChars: this.form.field('maxConsultOutputChars'),
+      dailyBudgetUsd: this.form.field('dailyBudgetUsd'),
+      monthlyBudgetUsd: this.form.field('monthlyBudgetUsd'),
+      reviewSampleRate: this.form.field('reviewSampleRate'),
       modelProfilesJson: this.form.field('modelProfilesJson'),
     }))
   }
@@ -155,6 +162,40 @@ export function RouterSettingsCard(props) {
         onEdit={(text) => { props.edit('maxConsultOutputChars', text) }}
         onReset={() => { props.resetField('maxConsultOutputChars') }}
       />
+
+      {[
+        ['dailyBudgetUsd', 'model-router-daily-budget', '每日执行预算（USD）', '0 表示不限。按本机执行记录的实际费用累计，超出后按工作台设置自动降级或暂停询问。'],
+        ['monthlyBudgetUsd', 'model-router-monthly-budget', '每月执行预算（USD）', '0 表示不限。按本地时区的自然月累计。'],
+        ['reviewSampleRate', 'model-router-review-rate', '强模型抽检比例（0–1）', '质量回路设为“抽检”时，按此比例让更强的模型复核便宜模型的结果。'],
+      ].map(([key, id, label, hint]) => (
+        <SettingsValueField
+          key={key}
+          id={id}
+          label={label}
+          hint={hint}
+          disabled={disabled}
+          {...state[key]}
+          overriddenLabel={FIELD_COPY.overridden}
+          resetLabel={FIELD_COPY.reset}
+          invalidLabel={FIELD_COPY.invalidNumber}
+          onEdit={(text) => { props.edit(key, text) }}
+          onReset={() => { props.resetField(key) }}
+        />
+      ))}
+
+      <div style={styles.profileEditor}>
+        <span style={styles.profileLabel}>官方 CLI 读写边界</span>
+        <p style={styles.noticeText}>只读执行不写任何文件；修改文件的执行在独立 Git 工作树中进行，需要你确认后才会把补丁应用回当前工作区。工作台“安全边界”卡片按已配置模型逐条列出。</p>
+        <table style={styles.boundaryTable}>
+          <thead><tr><th style={styles.boundaryCell}>工具</th><th style={styles.boundaryCell}>只读执行可读</th><th style={styles.boundaryCell}>修改执行可写</th></tr></thead>
+          <tbody>
+            {[['claude-code', 'Claude Code'], ['codex', 'Codex'], ['gemini', 'Gemini CLI']].map(([toolId, label]) => {
+              const boundary = toolBoundary(toolId)
+              return <tr key={toolId}><td style={styles.boundaryCell}>{label}</td><td style={styles.boundaryCell}>{boundary.readOnly.readable}</td><td style={styles.boundaryCell}>{boundary.write?.writable ?? '不支持修改执行'}</td></tr>
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <div style={styles.profileEditor}>
         <label htmlFor="model-router-profiles-json" style={styles.profileLabel}>模型价格与能力配置（JSON）</label>
@@ -216,6 +257,12 @@ function registerUi(ctx) {
       installOfficialTool: toolId => officialToolsRemote.installTool(toolId),
       cancelOfficialToolInstall: toolId => officialToolsRemote.cancel(toolId),
       officialToolInstallStatus: toolId => officialToolsRemote.status(toolId),
+      toolHealth: fresh => officialToolsRemote.health(fresh),
+      completeOnboarding: () => officialToolsRemote.completeOnboarding(),
+      loadLedger: () => officialToolsRemote.ledger(),
+      rateResult: request => officialToolsRemote.rateResult(request),
+      rerunStep: request => officialToolsRemote.rerunStep(request),
+      loadBoundaries: () => officialToolsRemote.boundaries(),
     }),
   }, RouterMainPage))), 'model-router-galgame: main workspace')
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
@@ -259,6 +306,8 @@ const styles = Object.freeze({
     borderRadius: '8px',
     background: 'var(--dsw-alias-markdown-code-block)',
   },
+  boundaryTable: { width: '100%', borderCollapse: 'collapse', fontSize: 12, lineHeight: 1.5 },
+  boundaryCell: { padding: '6px 8px', borderBottom: '1px solid rgba(127, 127, 127, .25)', textAlign: 'left', verticalAlign: 'top' },
   noticeText: {
     margin: '7px 0 0',
     color: 'var(--dsw-alias-label-secondary)',
