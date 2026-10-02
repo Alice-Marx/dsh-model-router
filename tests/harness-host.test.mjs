@@ -1,5 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+// Router state (run ledger, health cache) must not touch the real DSH home.
+process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-host-'))
 
 import {
   apply,
@@ -160,7 +166,10 @@ test('registers router tools and manual command without intercepting the main ag
   assert.deepEqual(tools.map(tool => tool.name).sort(), [
     'model_router_consult',
     'model_router_execute',
+    'model_router_health',
     'model_router_plan',
+    'model_router_rate',
+    'model_router_rerun_step',
     'model_router_routes',
     'model_router_team_execute',
     'model_router_tool_install',

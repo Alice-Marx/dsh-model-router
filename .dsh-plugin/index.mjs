@@ -1,6 +1,16 @@
+import { randomUUID } from 'node:crypto'
+import { stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { DEFAULT_ROUTER_SETTINGS } from './shared/router.mjs'
+import { DEFAULT_ROUTER_SETTINGS, modelMetadata } from './shared/router.mjs'
+import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
+import { HEALTH_CACHE_MS, healthCache, runHealthCheck } from './shared/tool-health.mjs'
+import { createRouterState } from './shared/router-state.mjs'
+import {
+  applyQualityBiases, budgetCheck, buildRunRecord, mergeRerun, routeQualityBiases, spending, storedResults, actualCost,
+} from './shared/run-ledger.mjs'
+import { routeBoundaries } from './shared/security-boundaries.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
 import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
@@ -11,7 +21,7 @@ import {
 } from './shared/official-tool-registry.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness, runOfficialTool } from './shared/official-tool-executor.mjs'
 import { runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
-import { executeAssignmentPlan } from './shared/task-executors.mjs'
+import { executeAssignmentPlan, rerunAssignmentPackage } from './shared/task-executors.mjs'
 import {
   probeAllTools,
   probeToolWith,
@@ -29,6 +39,14 @@ export const Config = z.object({
   budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
   maxConsultOutputChars: z.number().step(1).min(500).max(50_000).default(12_000).volatile(),
   modelProfilesJson: z.string().max(32_000).default('[]').volatile(),
+  routingPreset: z.union(['economy', 'balanced', 'quality']).default(DEFAULT_ROUTING_PRESET).volatile(),
+  dailyBudgetUsd: z.number().min(0).max(1_000_000).default(0).volatile(),
+  monthlyBudgetUsd: z.number().min(0).max(1_000_000).default(0).volatile(),
+  overBudgetAction: z.union(['downgrade', 'pause']).default('downgrade').volatile(),
+  reviewMode: z.union(['off', 'sample', 'always']).default('off').volatile(),
+  reviewSampleRate: z.number().min(0).max(1).default(0.2).volatile(),
+  allowManualReassign: z.boolean().default(true).volatile(),
+  confirmUnsandboxedCli: z.boolean().default(true).volatile(),
 })
 
 const JSON_OUTPUT = {
@@ -119,6 +137,83 @@ export async function discoverConfiguredRoutes(ctx, signal) {
   return [...routes.values()].sort((left, right) => routeKey(left).localeCompare(routeKey(right)))
 }
 
+// ---------------------------------------------------------------------------
+// Router runtime state: health cache, run ledger, budget and ratings.
+
+let routerState = null
+
+/** Persistent Host state (DSH home). Tests point DSH_HOME at a temp dir before the first call. */
+export function routerStateStore() {
+  routerState ??= createRouterState()
+  return routerState
+}
+
+async function savedState() {
+  try { return await routerStateStore().read() }
+  catch { return { onboarding: { completedAt: null }, health: null, runs: [] } }
+}
+
+let healthHydrated = false
+async function hydrateHealth() {
+  if (healthHydrated) return
+  healthHydrated = true
+  const saved = await savedState()
+  if (saved.health && !healthCache.report()) healthCache.remember(saved.health)
+}
+
+const fileExists = async path => {
+  try { await stat(path); return true } catch { return false }
+}
+
+/** 开箱体检: install, version and login state for every registry tool. */
+export async function toolHealthReport({ fresh = false, runner = defaultRunner } = {}) {
+  const probes = await probeAllTools({ fresh })
+  const report = await runHealthCheck(probes, { runner, home: homedir(), exists: fileExists })
+  healthCache.remember(report)
+  try { await routerStateStore().saveHealth(report) } catch { /* the cache still serves this process */ }
+  return report
+}
+
+/** A recent report, re-running the cheap checks only when the cache expired. */
+async function currentHealth() {
+  await hydrateHealth()
+  const report = healthCache.report()
+  if (report && Date.now() - report.checkedAt < HEALTH_CACHE_MS) return report
+  try { return await toolHealthReport() } catch { return report }
+}
+
+function loggedOutIds(report) {
+  return (report?.tools ?? []).filter(item => item.installed && healthCache.loginState(item.id)?.state === 'logged-out').map(item => item.id)
+}
+
+function routingPresetOf(config, requested) {
+  return normalizeRoutingPreset(text(requested) || valueOf(config, 'routingPreset', DEFAULT_ROUTING_PRESET))
+}
+
+function budgetSettings(config) {
+  return {
+    dailyLimitUsd: Math.max(0, finiteNumber(valueOf(config, 'dailyBudgetUsd', 0), 0)),
+    monthlyLimitUsd: Math.max(0, finiteNumber(valueOf(config, 'monthlyBudgetUsd', 0), 0)),
+    action: valueOf(config, 'overBudgetAction', 'downgrade') === 'pause' ? 'pause' : 'downgrade',
+  }
+}
+
+function budgetFor(config, runs, estimateUsd) {
+  const settings = budgetSettings(config)
+  const spent = spending(runs)
+  return { ...budgetCheck({ estimateUsd, spent, ...settings }), spent, ...settings }
+}
+
+function routePricing(routes, item) {
+  return routes.find(route => route.provider === item?.provider && route.model === item?.model)?.pricing ?? null
+}
+
+/** Routes with user profiles and the gentle quality bias learned from ratings and reviews. */
+async function routesWithLearning(ctx, config, signal, runs) {
+  const discovered = await discoverConfiguredRoutes(ctx, signal)
+  return applyQualityBiases(configuredRoutesWithProfiles(discovered, config), routeQualityBiases(runs))
+}
+
 /** Produce a route recommendation and work packages compatible with official Agent Teams. */
 export async function createRoutePlan(ctx, task, config = {}, options = {}) {
   const taskText = text(task)
@@ -126,21 +221,27 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
   const mode = options.mode === 'team' ? 'team' : 'single'
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const budgetUsd = Math.max(0, finiteNumber(options.budgetUsd, finiteNumber(configuredBudget, 0)))
-  const [discoveredRoutes, installed] = await Promise.all([
-    discoverConfiguredRoutes(ctx, options.signal),
+  const saved = await savedState()
+  const [availableRoutes, installed] = await Promise.all([
+    routesWithLearning(ctx, config, options.signal, saved.runs),
     options.skipToolProbe === true
       ? Promise.resolve(Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
       : installedToolIds(),
   ])
-  const availableRoutes = configuredRoutesWithProfiles(discoveredRoutes, config)
   const readiness = options.skipToolProbe === true ? []
     : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
   const executable = new Set(Array.isArray(options.runnableToolIds)
     ? options.runnableToolIds : readiness.filter(item => item.ready).map(item => item.id))
-  return createPlanFromRoutes(taskText, availableRoutes, {
+  const loggedOut = options.skipToolProbe === true
+    ? (Array.isArray(options.loggedOutToolIds) ? options.loggedOutToolIds : [])
+    : loggedOutIds(await currentHealth())
+  const plan = createPlanFromRoutes(taskText, availableRoutes, {
     mode, budgetUsd, installedToolIds: installed,
     runnableToolIds: installed.filter(id => executable.has(id)),
+    preset: routingPresetOf(config, options.preset),
+    loggedOutToolIds: loggedOut,
   })
+  return { ...plan, budgetStatus: budgetFor(config, saved.runs, plan.estimatedCost) }
 }
 
 /** One bounded, independent call through the same official LLM service. */
@@ -158,6 +259,7 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   let answer = ''
   let characterLimitReached = false
   let finish = { kind: 'unknown' }
+  let usage = null
   try {
     const stream = ctx.llm.stream({
       provider,
@@ -181,6 +283,13 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
           controller.abort(new Error('consultation output limit reached'))
           break
         }
+      } else if (chunk?.type === 'usage' && chunk.usage && typeof chunk.usage === 'object') {
+        usage = {
+          inputTokens: finiteNumber(chunk.usage.inputTokens, 0),
+          outputTokens: finiteNumber(chunk.usage.outputTokens, 0),
+          cacheReadTokens: finiteNumber(chunk.usage.cacheReadTokens, 0),
+          cacheWriteTokens: finiteNumber(chunk.usage.cacheWriteTokens, 0),
+        }
       } else if (chunk?.type === 'finish') {
         const reason = chunk.reason
         finish = { kind: text(reason?.kind) || 'unknown' }
@@ -203,6 +312,7 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   }
   return {
     ok: true, provider, model, answer, truncated, finish,
+    ...(usage ? { usage } : {}),
     ...(tokenLimitReached
       ? { truncationReason: 'model-token-limit', notice: '模型达到本次调用的输出 token 上限，回答可能不完整。' }
       : characterLimitReached
@@ -228,13 +338,92 @@ async function credentialsForRoute(ctx, route) {
   return null
 }
 
+function routeQuality(route) {
+  if (!route) return null
+  const base = Number.isFinite(route.quality) ? route.quality : modelMetadata(route.model)?.quality
+  return Number.isFinite(base) ? base : null
+}
+
+/** The strongest configured route by known quality, used as the reviewer. */
+export function reviewerRoute(routes) {
+  return routes
+    .map(route => ({ route, quality: routeQuality(route) }))
+    .filter(item => item.quality !== null)
+    .sort((left, right) => right.quality - left.quality || routeKey(left.route).localeCompare(routeKey(right.route)))[0]?.route ?? null
+}
+
+function reviewScore(answer) {
+  const match = /"score"\s*:\s*([1-5])/u.exec(answer) ?? /(?:评分|分数|score)\s*[:：]?\s*([1-5])\b/iu.exec(answer)
+  return match ? Number(match[1]) : null
+}
+
+/**
+ * 质量回路: a stronger configured model spot-checks answers from cheaper
+ * routes. `sample` reviews a random share; `always` reviews every cheaper answer.
+ */
+export async function reviewRunPackages(ctx, run, routes, config, { signal, random = Math.random } = {}) {
+  const mode = valueOf(config, 'reviewMode', 'off')
+  if (mode !== 'sample' && mode !== 'always') return []
+  const rate = Math.min(1, Math.max(0, finiteNumber(valueOf(config, 'reviewSampleRate', 0.2), 0.2)))
+  const reviewer = reviewerRoute(routes)
+  if (!reviewer) return []
+  const reviewerQuality = routeQuality(reviewer)
+  const reviews = []
+  for (const item of run.packages) {
+    if (!item.ok || !text(item.answer)) continue
+    if (item.provider === reviewer.provider && item.model === reviewer.model) continue
+    const own = routeQuality(routes.find(route => route.provider === item.provider && route.model === item.model))
+    if (own !== null && own >= reviewerQuality - 0.02) continue
+    if (mode === 'sample' && random() >= rate) continue
+    const prompt = [
+      '请作为更强的审阅模型，抽查下面这个由较经济模型完成的工作包结果。',
+      '只输出一行 JSON：{"score": 1-5 的整数, "summary": "不超过 80 字的主要问题或肯定"}。5 表示可直接采用，1 表示错误或不可用。',
+      `总任务：\n${run.task.slice(0, 6_000)}`,
+      `工作包：${item.name}\n${item.objective.slice(0, 1_500)}`,
+      `待审结果：\n${item.answer.slice(0, 3_500)}`,
+    ].join('\n\n')
+    try {
+      const result = await consultConfiguredModel(ctx, reviewer, prompt, 1_200, signal)
+      const score = result.ok ? reviewScore(result.answer) : null
+      let summary = ''
+      try { summary = text(JSON.parse(/\{[\s\S]*\}/u.exec(result.answer)?.[0] ?? '{}').summary) } catch { /* free-form review */ }
+      item.review = {
+        provider: reviewer.provider, model: reviewer.model, score,
+        summary: (summary || text(result.answer) || text(result.error)).slice(0, 300), at: Date.now(),
+      }
+      const cost = actualCost(result, reviewer.pricing ?? null)
+      const entry = { packageId: item.id, provider: reviewer.provider, model: reviewer.model, ran: true, finishedAt: Date.now(), usage: result.usage ?? null, ...cost }
+      run.reviews.push(entry)
+      reviews.push({ ...entry, score })
+    } catch (error) {
+      if (signal?.aborted) throw error
+      item.review = { provider: reviewer.provider, model: reviewer.model, score: null, summary: `审阅失败：${errorText(error).slice(0, 200)}`, at: Date.now() }
+    }
+  }
+  return reviews
+}
+
+function executionHooks(ctx, options) {
+  return {
+    skipOfficial: options.skipOfficial ?? (request => healthCache.skipReason(request)),
+    onPackage: result => {
+      // A CLI that reports "not logged in" is skipped for the cache lifetime.
+      if (result?.fallback?.loginRequired && result.toolId) healthCache.markLoggedOut(result.toolId, result.fallback.error)
+    },
+    credentialsFor: route => credentialsForRoute(ctx, route),
+    runVerified: options.runVerified ?? (request => runOfficialTool({
+      ...request, sandbox: ctx.sandbox, mode: 'read-only',
+    })),
+  }
+}
+
 /** Route, or honor one explicit model, then run each package through its adapter. */
 export async function executeConfiguredAssignment(ctx, task, config = {}, options = {}) {
   const taskText = text(task)
   if (!taskText) throw new Error('task must contain text')
   const direct = text(options.provider) || text(options.model)
-  const discovered = await discoverConfiguredRoutes(ctx, options.signal)
-  const routes = configuredRoutesWithProfiles(discovered, config)
+  const saved = await savedState()
+  const routes = await routesWithLearning(ctx, config, options.signal, saved.runs)
   const installed = options.skipToolProbe === true
     ? (Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
     : await installedToolIds()
@@ -243,31 +432,157 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
   const runnableToolIds = Array.isArray(options.runnableToolIds)
     ? options.runnableToolIds
     : readiness.filter(item => item.ready).map(item => item.id)
-  const plan = direct
+  const loggedOut = options.skipToolProbe === true
+    ? (Array.isArray(options.loggedOutToolIds) ? options.loggedOutToolIds : [])
+    : loggedOutIds(await currentHealth())
+  const preset = routingPresetOf(config, options.preset)
+  const planWith = (presetId, budgetUsd) => direct
     ? createPlanFromRoutes(taskText, routes, {
       mode: 'direct', directProvider: options.provider, directModel: options.model,
-      installedToolIds: installed, runnableToolIds,
+      installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
     : createPlanFromRoutes(taskText, routes, {
       mode: options.planMode === 'team' ? 'team' : 'single',
-      budgetUsd: options.budgetUsd,
-      installedToolIds: installed,
-      runnableToolIds,
+      budgetUsd, installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
+  let plan = planWith(preset, options.budgetUsd)
+  let budget = budgetFor(config, saved.runs, plan.estimatedCost)
+  if (budget.exceeded && budget.action === 'downgrade' && !direct) {
+    const cheaper = planWith('economy', budget.remainingUsd > 0 ? budget.remainingUsd : options.budgetUsd)
+    const recheck = budgetFor(config, saved.runs, cheaper.estimatedCost)
+    if (!recheck.exceeded) {
+      budget = { ...recheck, downgraded: true, downgradedFrom: preset,
+        message: `原方案${budget.message} 已自动降级为“省钱优先”方案（预估 ${cheaper.estimatedCost === null ? '价格待配置' : `$${cheaper.estimatedCost.toFixed(4)}`}）。` }
+      plan = cheaper
+    }
+  }
+  if (budget.exceeded && options.confirmOverBudget !== true) {
+    return {
+      plan, execution: null, paused: true,
+      budget: { ...budget, paused: true,
+        message: `${budget.message} 已暂停执行：${direct ? '指定模型无法自动降级。' : budget.action === 'pause' ? '设置为超预算时暂停。' : '降级后仍超出预算。'}请向用户确认后，以 confirmOverBudget: true 重新调用。` },
+    }
+  }
+  const hooks = executionHooks(ctx, options)
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
+  const startedAt = Date.now()
   const execution = await executeAssignmentPlan({
     plan,
     task: taskText,
     routes: plan.availableRoutes,
     workspace: options.workspace,
     signal: options.signal,
-    credentialsFor: route => credentialsForRoute(ctx, route),
+    ...hooks,
     apiFallback: async ({ route, task: packageTask, signal }) => consultConfiguredModel(ctx, route, packageTask, limit, signal),
-    runVerified: options.runVerified ?? (request => runOfficialTool({
-      ...request, sandbox: ctx.sandbox, mode: 'read-only',
-    })),
   })
-  return { plan, execution }
+  const run = buildRunRecord({
+    id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution,
+    preset: plan.preset ?? preset, workspace: options.workspace ?? '',
+    pricingFor: item => routePricing(routes, item),
+    budget: { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: budget.downgraded === true, confirmed: budget.exceeded ? true : undefined },
+  })
+  const reviews = await reviewRunPackages(ctx, run, routes, config, { signal: options.signal, random: options.random })
+  let stored = true
+  try { await routerStateStore().appendRun(run) } catch { stored = false }
+  return { plan, execution, budget, runId: run.id, run, reviews, stored }
+}
+
+async function storedRun(runId) {
+  const saved = await savedState()
+  const run = saved.runs.find(item => item.id === text(runId))
+  if (!run) throw new Error(`未找到运行记录 ${text(runId)}`)
+  return { run, saved }
+}
+
+/** Re-run one failed (or, with a new route, any) step and its unfinished downstream steps. */
+export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, workspace, signal, ...options } = {}) {
+  const { run, saved } = await storedRun(runId)
+  const target = run.packages.find(item => item.id === text(packageId))
+  if (!target) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
+  const routes = await routesWithLearning(ctx, config, signal, saved.runs)
+  let override = null
+  if (text(provider) || text(model)) {
+    if (!text(provider) || !text(model)) throw new Error('改派需要同时提供 provider 和 model')
+    if (valueOf(config, 'allowManualReassign', true) === false) throw new Error('设置中已关闭手动改派。')
+    if (!routes.some(route => route.provider === text(provider) && route.model === text(model))) {
+      throw new Error(`route ${text(provider)}/${text(model)} is not configured in DeepSeek Harness`)
+    }
+    override = { provider: text(provider), model: text(model) }
+  } else if (target.ok) {
+    throw new Error('该步骤已成功；如需换模型重做，请指定改派的 provider/model。')
+  }
+  const sameRoute = !override || (override.provider === target.recommendedProvider && override.model === target.recommendedModel)
+  const budget = budgetFor(config, saved.runs, sameRoute ? target.estimatedCost : null)
+  if (budget.exceeded && confirmOverBudget !== true) {
+    return { paused: true, budget: { ...budget, paused: true, message: `${budget.message} 已暂停重跑，请确认后再试。` }, run }
+  }
+  const cwd = text(workspace) || run.workspace
+  if (!cwd || !(await fileExists(cwd))) throw new Error('原运行的工作区不可用，无法重跑该步骤。')
+  const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
+  const execution = await rerunAssignmentPackage({
+    task: run.task,
+    packages: run.packages.map(item => ({
+      id: item.id, name: item.name, objective: item.objective, dependsOn: item.dependsOn,
+      recommendedProvider: item.provider ?? item.recommendedProvider, recommendedModel: item.model ?? item.recommendedModel,
+    })),
+    previous: storedResults(run),
+    packageId: target.id,
+    routingBypassed: run.routingBypassed,
+    routes,
+    override,
+    workspace: cwd,
+    signal,
+    ...executionHooks(ctx, options),
+    apiFallback: async ({ route, task: packageTask, signal: callSignal }) => consultConfiguredModel(ctx, route, packageTask, limit, callSignal),
+  })
+  const updated = await routerStateStore().updateRun(run.id, current => {
+    mergeRerun(current, execution, { rerunIds: execution.ranIds, pricingFor: item => routePricing(routes, item) })
+  })
+  return { run: updated, execution, budget }
+}
+
+/** Store a user rating (+1 useful, -1 not useful, 0 clears) for one result. */
+export async function rateRecordedResult({ runId, packageId, rating } = {}) {
+  const value = rating === 'up' || rating === 1 ? 1 : rating === 'down' || rating === -1 ? -1 : rating === 'clear' || rating === 0 ? null : undefined
+  if (value === undefined) throw new Error('rating 只能是 up、down 或 clear')
+  return routerStateStore().updateRun(text(runId), current => {
+    const item = current.packages.find(entry => entry.id === text(packageId))
+    if (!item) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
+    item.rating = value
+  })
+}
+
+/** Everything the workbench shows: recent runs, spending, budget, learned biases and settings. */
+export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
+  const saved = await savedState()
+  const spent = spending(saved.runs)
+  const settings = budgetSettings(config)
+  return {
+    runs: saved.runs.slice(-limit).reverse().map(run => ({
+      ...run,
+      task: run.task.slice(0, 2_000),
+      packages: run.packages.map(item => ({ ...item, answer: item.answer.slice(0, 1_500) })),
+    })),
+    spent,
+    budget: { ...settings, ...budgetCheck({ estimateUsd: null, spent, ...settings }) },
+    biases: routeQualityBiases(saved.runs),
+    onboarding: saved.onboarding,
+    settings: {
+      preset: routingPresetOf(config),
+      reviewMode: valueOf(config, 'reviewMode', 'off'),
+      allowManualReassign: valueOf(config, 'allowManualReassign', true) !== false,
+      confirmUnsandboxedCli: valueOf(config, 'confirmUnsandboxedCli', true) !== false,
+    },
+    storage: routerStateStore().file,
+  }
+}
+
+/** Per-route read/write boundaries for the security card. */
+export async function securityBoundaries(ctx, config = {}) {
+  const routes = configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx), config)
+  const readiness = await Promise.all(['claude-code', 'codex'].map(id => officialToolReadiness(id).catch(() => ({ id, ready: false }))))
+  const sandboxedToolIds = readiness.filter(item => item.ready && typeof ctx.sandbox?.confine === 'function').map(item => item.id)
+  return { platform: process.platform, sandboxAvailable: typeof ctx.sandbox?.confine === 'function', boundaries: routeBoundaries(routes, { sandboxedToolIds, platform: process.platform }) }
 }
 
 function explicitRoute(args, routes) {
@@ -315,6 +630,26 @@ export function resolveTeamCliModelBindings(plan, routes, requested = {}) {
     .filter(([key]) => !Object.hasOwn(bindings, key))) }
 }
 
+/** What was assigned and why, per package: route, difficulty, estimated cost, channel. */
+export function decisionSummary(plan) {
+  const packages = plan?.routingBypassed
+    ? [{ id: 'direct', name: '指定模型', recommendedProvider: plan.selected?.provider, recommendedModel: plan.selected?.model,
+      difficulty: plan.complexity?.band, estimatedCost: plan.estimatedCost, executionChannel: plan.executionChannel, channelDetail: plan.channelDetail }]
+    : plan?.team?.workPackages ?? []
+  return {
+    preset: plan?.preset ?? DEFAULT_ROUTING_PRESET,
+    complexity: plan?.complexity ?? null,
+    reason: plan?.reason ?? '',
+    estimatedCost: plan?.estimatedCost ?? null,
+    packages: packages.map(item => ({
+      id: item.id, name: item.name, route: `${item.recommendedProvider}/${item.recommendedModel}`,
+      difficulty: item.difficulty ?? null, estimatedCost: item.estimatedCost ?? null,
+      channel: item.executionChannel ?? null, channelDetail: item.channelDetail ?? '',
+      dependsOn: item.dependsOn ?? [],
+    })),
+  }
+}
+
 function commandText(plan) {
   const selected = plan.selected ? `${plan.selected.provider}/${plan.selected.model}` : '没有可用路线'
   const channel = plan.executionChannel === 'official-cli'
@@ -322,18 +657,53 @@ function commandText(plan) {
     : '官方模型目录 API'
   return [
     `推荐路线：${selected}`,
-    `复杂度：${plan.complexity.band}；任务类型：${plan.taskType}`,
+    `方案：${routingPreset(plan.preset).label}；复杂度：${plan.complexity.band}（难度分 ${plan.complexity.value}）；任务类型：${plan.taskType}`,
     `执行渠道：${channel}；估算成本：${plan.estimatedCost === null ? '价格资料不足' : `$${plan.estimatedCost.toFixed(6)}（仅估算）`}`,
     `工作包：${plan.subtasks.map(item => `${item.name} → ${item.recommendedProvider}/${item.recommended}`).join('；')}`,
     plan.team.handoff,
-  ].join('\n')
+    plan.budgetStatus?.exceeded ? `预算：${plan.budgetStatus.message}` : '',
+  ].filter(Boolean).join('\n')
+}
+
+const HEADLESS_CLI_IDS = new Set(['claude-code', 'codex', 'gemini'])
+
+/** Whether a read-only execution could start a headless CLI without the Harness sandbox. */
+function mayLaunchDirectCli(args = {}) {
+  const provider = text(args?.provider)
+  if (provider) {
+    const tool = toolForProvider(provider)
+    if (!tool || !HEADLESS_CLI_IDS.has(tool.id)) return false
+    return healthCache.loginState(tool.id)?.state !== 'logged-out'
+  }
+  const report = healthCache.report()
+  if (!report) return true
+  return report.tools.some(item => HEADLESS_CLI_IDS.has(item.id) && item.installed && healthCache.loginState(item.id)?.state !== 'logged-out')
+}
+
+/** Host operations behind the workbench RPC; the client never supplies commands or paths. */
+export function routerRemoteServices(ctx, config) {
+  return {
+    health: async fresh => {
+      const report = await toolHealthReport({ fresh: fresh === true })
+      const saved = await savedState()
+      return { ...report, onboarding: saved.onboarding }
+    },
+    completeOnboarding: async () => routerStateStore().completeOnboarding(Date.now()),
+    ledger: () => ledgerSummary(config),
+    rate: request => rateRecordedResult(request),
+    rerun: request => rerunRecordedStep(ctx, config, {
+      runId: request?.runId, packageId: request?.packageId, provider: request?.provider, model: request?.model,
+      confirmOverBudget: request?.confirmOverBudget === true,
+    }),
+    boundaries: () => securityBoundaries(ctx, config),
+  }
 }
 
 /** Register model-facing tools and the human /router command. */
 export function apply(ctx, config = {}) {
   // The official Host injects typert; direct lightweight uses of apply may
   // supply only the model/command services and do not expose the Desktop RPC.
-  if (ctx.typert) registerOfficialToolsRemote(ctx)
+  if (ctx.typert) registerOfficialToolsRemote(ctx, routerRemoteServices(ctx, config))
   ctx.on('tools/pre-execute', async (exec, next) => {
     const decision = await next()
     if (decision.kind !== 'allow') return decision
@@ -358,12 +728,37 @@ export function apply(ctx, config = {}) {
     }
     if ((exec.name === 'model_router_tool_run' || exec.name === 'model_router_team_execute')
       && exec.arguments?.mode === 'workspace-write') {
+      const sandboxNote = typeof ctx.sandbox?.confine === 'function'
+        ? { en: 'Launches are wrapped by the Harness process sandbox.', zh: '启动由 Harness 进程沙箱包装（Windows ACL 后端为部分强制）。' }
+        : { en: 'The Harness process sandbox is unavailable, so the launch will be refused.', zh: '当前没有 Harness 进程沙箱，启动会被拒绝。' }
       return {
         kind: 'ask',
         reason: 'Official CLI models will use their normal tools in an isolated Git worktree and integrate their patch into the current workspace',
         displayReason: {
-          en: 'Allow the official CLI model to use shell, skills, configured MCP and other normal tools in an isolated Git worktree, then apply its patch to this workspace?',
-          zh: '允许官方 CLI 模型在独立 Git 工作区使用终端、技能、已配置 MCP 等工具，并将改动补丁应用回当前工作区？',
+          en: `Allow the official CLI model to use shell, skills, configured MCP and other normal tools in an isolated Git worktree, then apply its patch to this workspace? ${sandboxNote.en}`,
+          zh: `允许官方 CLI 模型在独立 Git 工作区使用终端、技能、已配置 MCP 等工具，并将改动补丁应用回当前工作区？可写范围：独立 Git 工作树及补丁涉及的源文件。${sandboxNote.zh}`,
+        },
+      }
+    }
+    if ((exec.name === 'model_router_execute' || exec.name === 'model_router_rerun_step' || exec.name === 'model_router_team_execute')
+      && exec.arguments?.confirmOverBudget === true) {
+      return {
+        kind: 'ask',
+        reason: 'Run although the configured daily or monthly model budget would be exceeded',
+        displayReason: {
+          en: 'This run exceeds the configured daily or monthly budget. Continue anyway?',
+          zh: '本次执行会超出设置的每日或每月预算（按已配置单价估算）。仍要继续吗？',
+        },
+      }
+    }
+    if ((exec.name === 'model_router_execute' || exec.name === 'model_router_rerun_step')
+      && valueOf(config, 'confirmUnsandboxedCli', true) !== false && mayLaunchDirectCli(exec.arguments)) {
+      return {
+        kind: 'ask',
+        reason: 'An official CLI may be started directly, outside the Harness process sandbox, in read-only headless mode',
+        displayReason: {
+          en: 'The routed model may run its official CLI directly (claude -p / codex exec / gemini -p) without the Harness process sandbox. It is started read-only, enforced only by the CLI flags. Allow?',
+          zh: '分配的模型可能直接启动其官方 CLI（claude -p / codex exec / gemini -p），不经过 Harness 进程沙箱；只读仅由 CLI 自身参数保证（Codex 可读取当前用户可读的文件）。允许执行？可在设置中关闭此确认。',
         },
       }
     }
@@ -584,6 +979,8 @@ function registerOfficialToolModels(ctx, config) {
       model: { type: 'string', description: 'Configured model. Pair with provider to bypass routing.' },
       planMode: { type: 'string', enum: ['single', 'team'], description: 'Used only when provider and model are omitted.' },
       budgetUsd: { type: 'number', description: 'Optional local estimate ceiling when routing. Not a vendor billing cap.' },
+      preset: { type: 'string', enum: ['economy', 'balanced', 'quality'], description: 'Optional routing preset for this call; defaults to the saved setting.' },
+      confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
@@ -593,16 +990,71 @@ function registerOfficialToolModels(ctx, config) {
         provider: args.provider,
         model: args.model,
         planMode: args.planMode,
+        preset: args.preset,
         budgetUsd: finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)),
+        confirmOverBudget: args.confirmOverBudget === true,
         workspace: cwd,
         signal: exec.signal,
       })
       return jsonValue({
         routingBypassed: result.plan.routingBypassed === true,
         selected: result.plan.selected,
+        decision: decisionSummary(result.plan),
+        budget: result.budget,
+        ...(result.paused ? { status: 'paused-budget' } : {}),
         execution: result.execution,
-        notice: '官方 CLI 以只读无界面方式运行。可编辑改动仍使用 model_router_tool_run 或 model_router_team_execute。未安装、失败或配置为 api 的模型走模型目录 API。',
+        runId: result.runId ?? null,
+        reviews: result.reviews ?? [],
+        notice: result.paused
+          ? '已因预算暂停，未启动任何模型。请向用户说明预估费用，用户同意后再以 confirmOverBudget: true 调用。'
+          : '官方 CLI 以只读无界面方式运行。可编辑改动仍使用 model_router_tool_run 或 model_router_team_execute。未安装、未登录、失败或配置为 api 的模型走模型目录 API；回退原因与 CLI 原始错误见 fallback。可用 model_router_rerun_step 重跑失败步骤，model_router_rate 记录评价。',
       })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_health',
+    description: 'Onboarding health check: for each official CLI in the fixed registry, report installed, version vs pinned version, and login state (cheap status commands only; never starts a login). Logged-out tools are skipped by routing until re-checked.',
+    parameters: {
+      fresh: { type: 'boolean', description: 'Re-probe instead of using the 60s probe cache.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      throwIfAborted(exec.signal)
+      return jsonValue(await toolHealthReport({ fresh: args.fresh === true }))
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_rerun_step',
+    description: 'Re-run one failed work package of a recorded model_router_execute run without restarting finished packages; unfinished downstream packages follow. Supply provider and model to reassign the package to another configured route (if the user allows manual reassignment).',
+    parameters: {
+      runId: { type: 'string', required: true, description: 'runId returned by model_router_execute.' },
+      packageId: { type: 'string', required: true, description: 'Work package id to re-run.' },
+      provider: { type: 'string', description: 'Optional configured provider to reassign to; pair with model.' },
+      model: { type: 'string', description: 'Optional configured model to reassign to; pair with provider.' },
+      confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the budget. Triggers an approval prompt.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const { cwd } = await sessionWorkspace(ctx, exec)
+      const result = await rerunRecordedStep(ctx, config, {
+        runId: args.runId, packageId: args.packageId, provider: args.provider, model: args.model,
+        confirmOverBudget: args.confirmOverBudget === true, workspace: cwd, signal: exec.signal,
+      })
+      return jsonValue({ ...(result.paused ? { status: 'paused-budget' } : {}), budget: result.budget, execution: result.execution ?? null, runId: result.run?.id ?? args.runId })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_rate',
+    description: 'Record the user\'s rating of one recorded result (up = useful, down = not useful, clear). Ratings gently adjust future routing for that exact provider/model.',
+    parameters: {
+      runId: { type: 'string', required: true, description: 'runId returned by model_router_execute.' },
+      packageId: { type: 'string', required: true, description: 'Work package id.' },
+      rating: { type: 'string', required: true, enum: ['up', 'down', 'clear'], description: 'The user\'s rating.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args) {
+      const run = await rateRecordedResult(args)
+      return jsonValue({ ok: true, runId: run.id, packageId: args.packageId, rating: args.rating })
     },
   }))
   ctx.tools.register(defineTool({
@@ -613,6 +1065,7 @@ function registerOfficialToolModels(ctx, config) {
       mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default read-only; workspace-write needs a clean Git repository and approval.' },
       budgetUsd: { type: 'number', description: 'Estimated planning ceiling only, not a vendor billing limit.' },
       cliModelsJson: { type: 'string', description: 'Optional JSON object mapping official tool IDs or work package IDs to exact model names configured in those CLIs. MiniMax/MiMo require provider/model; ZCode 3.14.3 cannot switch per call.' },
+      confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
@@ -637,7 +1090,13 @@ function registerOfficialToolModels(ctx, config) {
       const plan = createPlanFromRoutes(args.task, executableRoutes, {
         mode: 'team', budgetUsd, installedToolIds: installed,
         runnableToolIds: installed.filter(id => supported.has(id)),
+        preset: routingPresetOf(config),
       })
+      const budget = budgetFor(config, (await savedState()).runs, plan.estimatedCost)
+      if (budget.exceeded && args.confirmOverBudget !== true) {
+        return jsonValue({ status: 'paused-budget', budget, plan,
+          notice: `${budget.message} 已暂停团队执行。请向用户确认后以 confirmOverBudget: true 重新调用。` })
+      }
       const bindingsText = text(args.cliModelsJson)
       if (bindingsText.length > 4_000) throw new Error('cliModelsJson 超过 4000 字符上限')
       let cliModels = null

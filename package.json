@@ -55,6 +55,11 @@
     ".dsh-plugin/shared/zcode-bundle.mjs",
     ".dsh-plugin/shared/zcode-installer.mjs",
     ".dsh-plugin/shared/official-team-runtime.mjs",
+    ".dsh-plugin/shared/tool-health.mjs",
+    ".dsh-plugin/shared/router-state.mjs",
+    ".dsh-plugin/shared/run-ledger.mjs",
+    ".dsh-plugin/shared/routing-presets.mjs",
+    ".dsh-plugin/shared/security-boundaries.mjs",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
@@ -70,7 +75,7 @@
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs --check",
-    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs tests/task-executors.test.mjs",
+    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs tests/task-executors.test.mjs tests/roadmap.test.mjs",
     "prepack": "node scripts/prepack.mjs",
     "pack:local": "npm pack --pack-destination dist"
   },
@@ -78,6 +83,7 @@
   "engines": {
     "node": ">=22.19"
   },
+  "packageManager": "pnpm@10.34.6",
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh-commands": "0.2.0-rc.1 || 0.2.0-rc.2",

@@ -6,6 +6,7 @@
  * process while retaining the same objective used in the thesis model.
  */
 
+import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, presetFloor, presetWeights } from './routing-presets.mjs'
 import { liveBenchRow } from './livebench.mjs'
 
 export const OBJECTIVE_WEIGHTS = Object.freeze({
@@ -193,7 +194,9 @@ function specialtyMatch(model, taskType, liveScores = {}) {
 }
 
 function qualityForTask(row, taskType) {
-  return asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0
+  const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0
+  // User ratings and reviews nudge a route by at most a few points.
+  return row?.qualityBias ? clamp(base + row.qualityBias) : base
 }
 
 function specialtyForTask(row, taskType) {
@@ -554,6 +557,7 @@ const ROUTING_BEAM_WIDTH = 256
 const ROUTING_CANDIDATE_LIMIT = 12
 
 function weightsForTask(weights, task) {
+  if (task.weights) return task.weights
   return task.purpose === 'synthesis' ? SYNTHESIS_WEIGHTS : (OBJECTIVE_WEIGHTS[task.difficulty] ?? weights)
 }
 
@@ -816,7 +820,8 @@ function solveAssignments({ rows, tasks, weights, maxCost, text, complexity, bud
   }
 }
 
-export function buildPlan({ text = '', available = [], mode = 'collective', pricing = {}, liveBench = null, liveBenchError = '', budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0 } = {}) {
+export function buildPlan({ text = '', available = [], mode = 'collective', pricing = {}, liveBench = null, liveBenchError = '', budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+  const presetId = normalizeRoutingPreset(preset)
   const firstLine = String(text ?? '').split(/\r?\n/u)[0].trim()
   const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine)
     && !/(?:执行|完成|实施|分配)/u.test(firstLine)
@@ -827,7 +832,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     ? { value: Math.max(0.66, assessed.value), band: 'complex' }
     : assessed
   const taskType = classifyTask(transformOnly ? firstLine : text)
-  const weights = OBJECTIVE_WEIGHTS[complexity.band]
+  const weights = presetWeights(OBJECTIVE_WEIGHTS[complexity.band], presetId)
   const discovered = Array.isArray(available)
     ? available.map(entry => {
         const rawEfforts = Array.isArray(entry.reasoningEfforts) ? entry.reasoningEfforts : []
@@ -840,6 +845,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
           reasoningKnown: entry.reasoningKnown === true
             || (entry.reasoningKnown === undefined && Array.isArray(entry.reasoningEfforts)),
           quality: asScore(entry.quality),
+          qualityBias: Number.isFinite(entry.qualityBias) ? clamp(entry.qualityBias, -0.05, 0.05) : 0,
           qualitySource: entry.qualitySource === 'user' ? 'user' : 'route',
           latency: asScore(entry.latency),
           risk: asScore(entry.risk),
@@ -865,7 +871,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     const live = liveBenchRow(liveBench, route.model)
     const liveScores = live?.scores ?? {}
     const liveOverall = asScore(live?.overall)
-    const quality = asScore(liveScores?.[taskType]) ?? liveOverall ?? asScore(metadata.quality) ?? 0
+    const quality = clamp((asScore(liveScores?.[taskType]) ?? liveOverall ?? asScore(metadata.quality) ?? 0) + route.qualityBias)
     const qualitySource = liveOverall !== undefined || asScore(liveScores?.[taskType]) !== undefined
       ? 'livebench' : route.quality !== undefined ? route.qualitySource : catalog ? 'catalog-heuristic' : 'unknown'
     const userPrice = normalizedPrices[normalize(`${route.provider}/${route.model}`)] ?? normalizedPrices[normalize(route.model)]
@@ -880,6 +886,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       model: route.model,
       metadata,
       quality,
+      qualityBias: route.qualityBias,
       qualitySource,
       pricingSource,
       liveScores,
@@ -903,7 +910,12 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     const effective = effectivePricing(row.pricing, cacheReadRatio, cacheWriteRatio)
     return effective.input + effective.output
   }))
-  const taskNodes = taskPackages(taskType, text, complexity.band)
+  // Presets tilt each package's weights and quality floor; balanced is a no-op.
+  const taskNodes = taskPackages(taskType, text, complexity.band).map(task => presetId === DEFAULT_ROUTING_PRESET ? task : {
+    ...task,
+    qualityFloor: presetFloor(task.qualityFloor, presetId),
+    weights: presetWeights(weightsForTask(weights, task), presetId),
+  })
   const unassignableTasks = taskNodes.filter(task => task.type === 'vision'
     && !rows.some(row => row.inputModalities.length === 0 || row.inputModalities.includes('image')))
     .map(task => task.id)
@@ -1024,6 +1036,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     : `${complexity.band === 'simple' ? '低复杂度优先成本、响应速度与较低推理开销' : complexity.band === 'balanced' ? '在质量、成本、推理等级、延迟与风险之间平衡' : '高复杂度执行包含推理等级的依赖感知全局约束分配'}；任务类型为 ${taskType}，已对 ${String(subtasks.length)} 个工作包进行 Pareto 剪枝和有界组合搜索。`
   return {
     mode,
+    preset: presetId,
     complexity: { value: Number(complexity.value.toFixed(3)), band: complexity.band },
     compound,
     unassignableTasks,

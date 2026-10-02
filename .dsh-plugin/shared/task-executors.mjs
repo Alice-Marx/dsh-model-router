@@ -233,7 +233,114 @@ function parseAdapterOutput(format, stdout) {
   return { ok: false, error: '该官方工具没有无界面输出解析器。' }
 }
 
-function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, signal, onChunk, secret }) {
+const DIAGNOSTIC_CHARS = 400
+
+/** Shorten and scrub a CLI diagnostic before it reaches the user or the run ledger. */
+export function redactDiagnostic(value, secret = '') {
+  const scrubbed = redact(String(value ?? ''), secret)
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-[redacted]')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1[redacted]')
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, '[redacted]')
+    .replace(/\b(api[_-]?key|token|secret|password)(["'\s:=]+)[^\s"',}]{6,}/gi, '$1$2[redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return scrubbed.length > DIAGNOSTIC_CHARS ? `${scrubbed.slice(0, DIAGNOSTIC_CHARS)}…` : scrubbed
+}
+
+function jsonLines(stdout) {
+  const events = []
+  for (const line of String(stdout ?? '').split(/\r?\n/u)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    try { events.push(JSON.parse(trimmed)) } catch { /* not a protocol line */ }
+  }
+  return events
+}
+
+/**
+ * The vendor's own failure text: Claude's JSON `result`, Codex's
+ * `turn.failed.error.message`, Gemini's `error.message`, else a stderr tail.
+ */
+export function failureDetail(format, stdout = '', stderr = '', secret = '') {
+  let detail = ''
+  try {
+    if (format === 'claude-json') {
+      const result = JSON.parse(stdout)
+      if (typeof result?.result === 'string' && result.result.trim()) detail = result.result
+      else if (typeof result?.error === 'string') detail = result.error
+    } else if (format === 'codex-jsonl') {
+      let failed = ''
+      let lastError = ''
+      for (const event of jsonLines(stdout)) {
+        if (event.type === 'turn.failed' && typeof event.error?.message === 'string') failed = event.error.message
+        if (event.type === 'error' && typeof event.message === 'string' && !/^Reconnecting\.\.\./u.test(event.message)) lastError = event.message
+      }
+      detail = failed || lastError
+    } else if (format === 'gemini-json') {
+      const result = JSON.parse(stdout)
+      detail = String(result?.error?.message ?? '')
+    }
+  } catch { /* fall through to stderr */ }
+  if (!detail.trim()) {
+    detail = String(stderr ?? '').split(/\r?\n/u).map(line => line.trim()).filter(Boolean).slice(-3).join(' | ')
+  }
+  return redactDiagnostic(detail, secret)
+}
+
+/** True when a diagnostic says the CLI has no usable account session or key. */
+export function looksLikeLoginFailure(detail) {
+  return /not logged in|please run \/login|log ?in required|unauthori[sz]ed|\b401\b|missing bearer|invalid api key|authentication (?:failed|required)/i.test(String(detail ?? ''))
+}
+
+const count = value => Number.isFinite(value) && value >= 0 ? Math.round(value) : 0
+
+/** Token usage reported by the CLI, in the Harness TokenUsage shape (disjoint cache counts). */
+export function usageFromOutput(format, stdout = '') {
+  try {
+    if (format === 'claude-json') {
+      const result = JSON.parse(stdout)
+      const usage = result?.usage
+      if (!usage || typeof usage !== 'object') return null
+      const reported = Number(result.total_cost_usd)
+      return {
+        usage: {
+          inputTokens: count(usage.input_tokens),
+          outputTokens: count(usage.output_tokens),
+          cacheReadTokens: count(usage.cache_read_input_tokens),
+          cacheWriteTokens: count(usage.cache_creation_input_tokens),
+        },
+        ...(Number.isFinite(reported) && reported > 0 ? { reportedCostUsd: reported } : {}),
+      }
+    }
+    if (format === 'codex-jsonl') {
+      const completed = jsonLines(stdout).filter(event => event.type === 'turn.completed' && event.usage).at(-1)
+      if (!completed) return null
+      const cached = count(completed.usage.cached_input_tokens)
+      return { usage: {
+        inputTokens: Math.max(0, count(completed.usage.input_tokens) - cached),
+        outputTokens: count(completed.usage.output_tokens),
+        cacheReadTokens: cached,
+        cacheWriteTokens: 0,
+      } }
+    }
+    if (format === 'gemini-json') {
+      const models = JSON.parse(stdout)?.stats?.models
+      if (!models || typeof models !== 'object') return null
+      let input = 0
+      let output = 0
+      let cached = 0
+      for (const entry of Object.values(models)) {
+        input += count(entry?.tokens?.prompt)
+        output += count(entry?.tokens?.candidates)
+        cached += count(entry?.tokens?.cached)
+      }
+      return { usage: { inputTokens: Math.max(0, input - cached), outputTokens: output, cacheReadTokens: cached, cacheWriteTokens: 0 } }
+    }
+  } catch { /* usage is optional */ }
+  return null
+}
+
+function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, signal, onChunk, secret, stopGraceMs = STOP_GRACE_MS }) {
   return new Promise(resolve => {
     let child
     try {
@@ -270,7 +377,11 @@ function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, sig
       if (finished || stopReason) return
       stopReason = reason
       try { child.kill('SIGTERM') } catch { /* already gone */ }
-      graceTimer = setTimeout(settle, STOP_GRACE_MS)
+      // A CLI that ignores SIGTERM is force-killed so it cannot linger after the fallback.
+      graceTimer = setTimeout(() => {
+        try { child.kill('SIGKILL') } catch { /* already gone */ }
+        settle()
+      }, stopGraceMs)
       graceTimer.unref?.()
     }
     const onAbort = () => stop('cancelled')
@@ -313,13 +424,19 @@ function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, sig
   })
 }
 
-async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false }) {
+async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false, detail = '', skipped = false }) {
   const provider = String(route?.provider ?? '')
   const model = String(route?.model ?? '')
+  const fallback = {
+    reason,
+    ...(detail ? { error: detail } : {}),
+    ...(detail && looksLikeLoginFailure(detail) ? { loginRequired: true } : {}),
+    ...(skipped ? { skipped: true } : {}),
+  }
   if (typeof apiFallback !== 'function') {
     return {
       ok: false, provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
-      answer: '', fallback: { reason }, timedOut, exitCode, error: reason,
+      answer: '', fallback, timedOut, exitCode, error: reason,
     }
   }
   try {
@@ -328,18 +445,19 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
     return {
       ok: api?.ok === true && answer.trim().length > 0,
       provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
-      answer, fallback: { reason }, timedOut, exitCode,
+      answer, fallback, timedOut, exitCode,
+      ...(api?.usage ? { usage: api.usage } : {}),
       error: api?.ok === true && answer.trim() ? undefined : (api?.error || reason),
     }
   } catch (error) {
     return {
       ok: false, provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
-      answer: '', fallback: { reason }, timedOut, exitCode, error: String(error?.message ?? error),
+      answer: '', fallback, timedOut, exitCode, error: String(error?.message ?? error),
     }
   }
 }
 
-function officialSuccess({ route, adapter, preference, answer, exitCode, version, credentialSource }) {
+function officialSuccess({ route, adapter, preference, answer, exitCode, version, credentialSource, usage = null }) {
   return {
     ok: true,
     provider: route.provider,
@@ -355,6 +473,8 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
     exitCode,
     version: version ?? null,
     credentialSource,
+    ...(usage?.usage ? { usage: usage.usage } : {}),
+    ...(usage?.reportedCostUsd ? { reportedCostUsd: usage.reportedCostUsd } : {}),
   }
 }
 
@@ -364,7 +484,7 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
  */
 export async function executeAssignedTask({
   route, task, workspace, timeoutMs, signal, credentials = null, spawnImpl = spawn,
-  apiFallback, runVerified = null, onChunk = null,
+  apiFallback, runVerified = null, onChunk = null, skipOfficial = null, stopGraceMs,
 } = {}) {
   const prompt = checkedTask(task)
   const preference = executionPreference(route)
@@ -380,6 +500,13 @@ export async function executeAssignedTask({
       route, task: prompt, signal, preference,
       reason: '该供应商没有官方代理工具，已使用模型目录 API。',
     })
+  }
+  // A cached health check (for example "not logged in") skips the CLI at once.
+  const skipReason = typeof skipOfficial === 'function'
+    ? skipOfficial({ toolId: adapter.id, hasApiKey: Boolean(childEnvironment(adapter, credentials).secret) })
+    : null
+  if (typeof skipReason === 'string' && skipReason) {
+    return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, reason: skipReason, skipped: true })
   }
   const cwd = await checkedWorkspace(workspace)
   const timeout = checkedTimeout(timeoutMs)
@@ -400,6 +527,7 @@ export async function executeAssignedTask({
         route, task: prompt, signal, adapter, preference, exitCode: verified.exitCode ?? null,
         timedOut: verified.status === 'timed-out',
         reason: verified.error || verified.reason || '官方 CLI 执行失败，已回退模型目录 API。',
+        detail: redactDiagnostic(verified.detail ?? '', childEnvironment(adapter, credentials).secret),
       })
     }
   }
@@ -426,6 +554,7 @@ export async function executeAssignedTask({
   const args = adapter.buildArgs(modelId)
   const run = await captureProcess(spawnImpl, adapter.executable, args, {
     cwd, env, stdin: prompt, timeoutMs: timeout, signal, onChunk, secret,
+    ...(Number.isSafeInteger(stopGraceMs) && stopGraceMs >= 10 && stopGraceMs <= STOP_GRACE_MS ? { stopGraceMs } : {}),
   })
   if (run.cancelled) {
     return { ok: false, provider, model, preference, channel: 'official-cli', toolId: adapter.id, answer: '', fallback: null, timedOut: false, exitCode: run.exitCode, error: '执行已取消。', cancelled: true }
@@ -436,6 +565,7 @@ export async function executeAssignedTask({
       reason: run.timedOut ? `${adapter.label} 执行超时，已回退模型目录 API。`
         : run.outputLimit ? `${adapter.label} 输出超过上限，已回退模型目录 API。`
           : `${adapter.label} 执行失败，已回退模型目录 API。`,
+      detail: run.timedOut ? '' : failureDetail(adapter.format, run.stdout, run.stderr, secret),
     })
   }
   const parsed = parseAdapterOutput(adapter.format, run.stdout)
@@ -443,6 +573,7 @@ export async function executeAssignedTask({
     return useApi(apiFallback, {
       route, task: prompt, signal, adapter, preference, exitCode: run.exitCode,
       reason: `${parsed.error} 已回退模型目录 API。`,
+      detail: failureDetail(adapter.format, run.stdout, run.stderr, secret),
     })
   }
   const answer = redact(parsed.answer, secret)
@@ -453,6 +584,7 @@ export async function executeAssignedTask({
     route, adapter, preference, answer, exitCode: run.exitCode,
     version: versionFromBanner(`${probe.stdout}\n${probe.stderr}`),
     credentialSource,
+    usage: usageFromOutput(adapter.format, run.stdout),
   })
 }
 
@@ -495,32 +627,7 @@ export function assignmentPackages(plan, task) {
   }))
 }
 
-/** Run packages in plan order and return one aggregate the router can keep. */
-export async function executeAssignmentPlan({ plan, task, routes, ...options }) {
-  const packages = assignmentPackages(plan, task)
-  const routeList = Array.isArray(routes) ? routes : []
-  const results = []
-  for (const item of packages) {
-    const unmet = (item.dependsOn ?? []).filter(id => results.find(result => result.id === id)?.ok !== true)
-    if (unmet.length > 0) {
-      results.push({
-        id: item.id, name: item.name, ok: false, provider: item.recommendedProvider, model: item.recommendedModel,
-        channel: 'harness-llm', answer: '', fallback: null, error: `依赖未完成：${unmet.join('、')}`,
-      })
-      continue
-    }
-    const route = routeList.find(candidate => candidate.provider === item.recommendedProvider && candidate.model === item.recommendedModel)
-      ?? { provider: item.recommendedProvider, model: item.recommendedModel }
-    const { credentialsFor, ...runOptions } = options
-    const credentials = typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null
-    const result = await executeAssignedTask({
-      ...runOptions,
-      credentials,
-      route,
-      task: plan?.routingBypassed ? checkedTask(task) : packagePrompt(task, item, results),
-    })
-    results.push({ id: item.id, name: item.name, ...result })
-  }
+function aggregateOf(results) {
   const aggregate = results.map(item => [
     `## ${item.name} (${item.provider}/${item.model}, ${item.channel === 'official-cli' ? '官方 CLI' : '模型目录 API'})`,
     item.answer || item.error || '',
@@ -528,4 +635,93 @@ export async function executeAssignmentPlan({ plan, task, routes, ...options }) 
   const status = results.length > 0 && results.every(item => item.ok) ? 'completed'
     : results.some(item => item.ok) ? 'partial' : 'failed'
   return { status, packages: results, aggregate }
+}
+
+/**
+ * Run `targets` (all packages when null) in plan order. Packages outside the
+ * target set keep their previous results, so a single failed step can be
+ * retried without re-running finished work.
+ */
+async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, options }) {
+  const routeList = Array.isArray(routes) ? routes : []
+  const { credentialsFor, onPackage, ...runOptions } = options
+  const results = []
+  const ranIds = []
+  for (const item of packages) {
+    const kept = previous.find(result => result.id === item.id)
+    if (targets && !targets.has(item.id) && kept) {
+      results.push(kept)
+      continue
+    }
+    const override = overrides[item.id]
+    const provider = override?.provider ?? item.recommendedProvider
+    const model = override?.model ?? item.recommendedModel
+    const unmet = (item.dependsOn ?? []).filter(id => results.find(result => result.id === id)?.ok !== true)
+    if (unmet.length > 0) {
+      const blocked = {
+        id: item.id, name: item.name, ok: false, provider, model,
+        channel: 'harness-llm', answer: '', fallback: null, blocked: true, error: `依赖未完成：${unmet.join('、')}`,
+      }
+      results.push(blocked)
+      ranIds.push(item.id)
+      if (typeof onPackage === 'function') await onPackage(blocked)
+      continue
+    }
+    const route = routeList.find(candidate => candidate.provider === provider && candidate.model === model)
+      ?? { provider, model }
+    const credentials = typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null
+    const result = await executeAssignedTask({
+      ...runOptions,
+      credentials,
+      route,
+      task: routingBypassed ? checkedTask(task) : packagePrompt(task, item, results),
+    })
+    const entry = { id: item.id, name: item.name, ...(override ? { reassigned: true } : {}), ...result }
+    results.push(entry)
+    ranIds.push(item.id)
+    if (typeof onPackage === 'function') await onPackage(entry)
+  }
+  return { ...aggregateOf(results), ranIds }
+}
+
+/** Run packages in plan order and return one aggregate the router can keep. */
+export async function executeAssignmentPlan({ plan, task, routes, ...options }) {
+  return runPackages({
+    packages: assignmentPackages(plan, task),
+    task,
+    routingBypassed: plan?.routingBypassed === true,
+    routes,
+    options,
+  })
+}
+
+/** Package ids downstream of `packageId`, in plan order. */
+export function downstreamPackageIds(packages, packageId) {
+  const found = new Set([packageId])
+  for (const item of packages) {
+    if ((item.dependsOn ?? []).some(id => found.has(id))) found.add(item.id)
+  }
+  found.delete(packageId)
+  return packages.map(item => item.id).filter(id => found.has(id))
+}
+
+/**
+ * Retry one stored package, optionally on a manually chosen route, and then
+ * any downstream package that had not succeeded. Finished packages keep their
+ * stored answers, which also feed the retried package's dependency context.
+ */
+export async function rerunAssignmentPackage({
+  task, packages, previous, packageId, routingBypassed = false, routes, override = null, cascade = true, ...options
+}) {
+  const list = Array.isArray(packages) ? packages : []
+  if (!list.some(item => item.id === packageId)) throw new TypeError(`unknown work package ${packageId}`)
+  const prior = Array.isArray(previous) ? previous : []
+  const targets = new Set([packageId])
+  if (cascade) {
+    for (const id of downstreamPackageIds(list, packageId)) {
+      if (prior.find(result => result.id === id)?.ok !== true) targets.add(id)
+    }
+  }
+  const overrides = override?.provider && override?.model ? { [packageId]: { provider: override.provider, model: override.model } } : {}
+  return runPackages({ packages: list, task, routingBypassed, routes, previous: prior, targets, overrides, options })
 }

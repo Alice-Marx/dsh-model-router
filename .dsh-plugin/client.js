@@ -276,6 +276,50 @@ function applyModelProfiles(routes, profiles) {
 // .dsh-plugin/client/router-main.jsx
 var import_react2 = __toESM(require("react"), 1);
 
+// .dsh-plugin/shared/routing-presets.mjs
+var DEFAULT_ROUTING_PRESET = "balanced";
+var ROUTING_PRESETS = Object.freeze({
+  economy: Object.freeze({
+    id: "economy",
+    label: "\u7701\u94B1\u4F18\u5148",
+    description: "\u66F4\u770B\u91CD\u5355\u4EF7\uFF0C\u5141\u8BB8\u8D28\u91CF\u7565\u4F4E\u7684\u6A21\u578B\u627F\u62C5\u7B80\u5355\u548C\u4E2D\u7B49\u4EFB\u52A1\u3002",
+    floorDelta: -0.04,
+    tilt: Object.freeze({ quality: 0.75, cost: 1.6, latency: 1.1 })
+  }),
+  balanced: Object.freeze({
+    id: "balanced",
+    label: "\u5747\u8861",
+    description: "\u9ED8\u8BA4\uFF1A\u6309\u4EFB\u52A1\u96BE\u5EA6\u5E73\u8861\u8D28\u91CF\u3001\u6210\u672C\u548C\u901F\u5EA6\u3002",
+    floorDelta: 0,
+    tilt: Object.freeze({})
+  }),
+  quality: Object.freeze({
+    id: "quality",
+    label: "\u6548\u679C\u4F18\u5148",
+    description: "\u66F4\u770B\u91CD\u8D28\u91CF\uFF0C\u63D0\u9AD8\u66FF\u4EE3\u6A21\u578B\u5FC5\u987B\u8FBE\u5230\u7684\u8D28\u91CF\u95E8\u69DB\u3002",
+    floorDelta: 0.04,
+    tilt: Object.freeze({ quality: 1.35, cost: 0.5, specialty: 1.2, reasoning: 1.2 })
+  })
+});
+function normalizeRoutingPreset(value) {
+  return Object.hasOwn(ROUTING_PRESETS, value) ? value : DEFAULT_ROUTING_PRESET;
+}
+function routingPreset(value) {
+  return ROUTING_PRESETS[normalizeRoutingPreset(value)];
+}
+function presetWeights(weights, preset) {
+  const { tilt } = routingPreset(preset);
+  if (!weights || Object.keys(tilt).length === 0) return weights;
+  const total = Object.values(weights).reduce((sum, value) => sum + value, 0);
+  const tilted = Object.fromEntries(Object.entries(weights).map(([key, value]) => [key, value * (tilt[key] ?? 1)]));
+  const tiltedTotal = Object.values(tilted).reduce((sum, value) => sum + value, 0);
+  return Object.freeze(Object.fromEntries(Object.entries(tilted).map(([key, value]) => [key, value * total / tiltedTotal])));
+}
+function presetFloor(floor, preset) {
+  const value = Number(floor) + routingPreset(preset).floorDelta;
+  return Math.max(0.5, Math.min(0.97, value));
+}
+
 // .dsh-plugin/shared/livebench.mjs
 var TASK_ALIASES = Object.freeze({
   reasoning: ["reasoning", "reasoning_score", "hard_reasoning"],
@@ -414,7 +458,8 @@ function specialtyMatch(model, taskType, liveScores = {}) {
   return 0.38;
 }
 function qualityForTask(row, taskType) {
-  return asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0;
+  const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0;
+  return row?.qualityBias ? clamp(base + row.qualityBias) : base;
 }
 function specialtyForTask(row, taskType) {
   return specialtyMatch(row.metadata, taskType, row.liveScores);
@@ -675,6 +720,7 @@ var SYNTHESIS_WEIGHTS = Object.freeze({ quality: 0.58, cost: 0.08, latency: 0.04
 var ROUTING_BEAM_WIDTH = 256;
 var ROUTING_CANDIDATE_LIMIT = 12;
 function weightsForTask(weights, task) {
+  if (task.weights) return task.weights;
   return task.purpose === "synthesis" ? SYNTHESIS_WEIGHTS : OBJECTIVE_WEIGHTS[task.difficulty] ?? weights;
 }
 function compareText(left, right) {
@@ -860,7 +906,8 @@ function solveAssignments({ rows, tasks, weights, maxCost, text: text2, complexi
     minimumFeasibleCost: suffixMinimum[0]
   };
 }
-function buildPlan({ text: text2 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0 } = {}) {
+function buildPlan({ text: text2 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+  const presetId = normalizeRoutingPreset(preset);
   const firstLine = String(text2 ?? "").split(/\r?\n/u)[0].trim();
   const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine) && !/(?:执行|完成|实施|分配)/u.test(firstLine);
   const assessed = assessComplexity(transformOnly ? firstLine : text2);
@@ -868,7 +915,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
   const compound = shouldSplitRequirements(requirements);
   const complexity = compound && assessed.band !== "complex" ? { value: Math.max(0.66, assessed.value), band: "complex" } : assessed;
   const taskType = classifyTask(transformOnly ? firstLine : text2);
-  const weights = OBJECTIVE_WEIGHTS[complexity.band];
+  const weights = presetWeights(OBJECTIVE_WEIGHTS[complexity.band], presetId);
   const discovered = Array.isArray(available) ? available.map((entry) => {
     const rawEfforts = Array.isArray(entry.reasoningEfforts) ? entry.reasoningEfforts : [];
     const reasoningEfforts = rawEfforts.map((effort) => String(effort?.id ?? effort ?? "")).filter(Boolean);
@@ -879,6 +926,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
       defaultReasoningEffort: entry.defaultReasoningEffort === void 0 ? void 0 : String(entry.defaultReasoningEffort),
       reasoningKnown: entry.reasoningKnown === true || entry.reasoningKnown === void 0 && Array.isArray(entry.reasoningEfforts),
       quality: asScore(entry.quality),
+      qualityBias: Number.isFinite(entry.qualityBias) ? clamp(entry.qualityBias, -0.05, 0.05) : 0,
       qualitySource: entry.qualitySource === "user" ? "user" : "route",
       latency: asScore(entry.latency),
       risk: asScore(entry.risk),
@@ -903,7 +951,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
     const live = liveBenchRow(liveBench, route.model);
     const liveScores = live?.scores ?? {};
     const liveOverall = asScore(live?.overall);
-    const quality = asScore(liveScores?.[taskType]) ?? liveOverall ?? asScore(metadata.quality) ?? 0;
+    const quality = clamp((asScore(liveScores?.[taskType]) ?? liveOverall ?? asScore(metadata.quality) ?? 0) + route.qualityBias);
     const qualitySource = liveOverall !== void 0 || asScore(liveScores?.[taskType]) !== void 0 ? "livebench" : route.quality !== void 0 ? route.qualitySource : catalog ? "catalog-heuristic" : "unknown";
     const userPrice = normalizedPrices[normalize(`${route.provider}/${route.model}`)] ?? normalizedPrices[normalize(route.model)];
     const pricingRow = userPrice ?? route.pricing ?? null;
@@ -914,6 +962,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
       model: route.model,
       metadata,
       quality,
+      qualityBias: route.qualityBias,
       qualitySource,
       pricingSource,
       liveScores,
@@ -940,7 +989,11 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
     const effective = effectivePricing(row.pricing, cacheReadRatio, cacheWriteRatio);
     return effective.input + effective.output;
   }));
-  const taskNodes = taskPackages(taskType, text2, complexity.band);
+  const taskNodes = taskPackages(taskType, text2, complexity.band).map((task) => presetId === DEFAULT_ROUTING_PRESET ? task : {
+    ...task,
+    qualityFloor: presetFloor(task.qualityFloor, presetId),
+    weights: presetWeights(weightsForTask(weights, task), presetId)
+  });
   const unassignableTasks = taskNodes.filter((task) => task.type === "vision" && !rows.some((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image"))).map((task) => task.id);
   const budget = Number(budgetUsd);
   const utilityPlan = solveAssignments({
@@ -1046,6 +1099,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
   const reason = selected === null ? unassignableTasks.length > 0 ? `\u56FE\u50CF\u5DE5\u4F5C\u5305 ${unassignableTasks.join("\u3001")} \u6CA1\u6709\u53EF\u7528\u7684\u56FE\u50CF\u6A21\u578B\uFF0C\u65E0\u6CD5\u5F62\u6210\u5B8C\u6574\u5206\u914D\u8BA1\u5212\u3002` : "\u5C1A\u672A\u53D1\u73B0\u53EF\u7528\u6A21\u578B\uFF0C\u4FDD\u7559 Harness \u539F\u59CB\u6A21\u578B\u9009\u62E9\u3002" : `${complexity.band === "simple" ? "\u4F4E\u590D\u6742\u5EA6\u4F18\u5148\u6210\u672C\u3001\u54CD\u5E94\u901F\u5EA6\u4E0E\u8F83\u4F4E\u63A8\u7406\u5F00\u9500" : complexity.band === "balanced" ? "\u5728\u8D28\u91CF\u3001\u6210\u672C\u3001\u63A8\u7406\u7B49\u7EA7\u3001\u5EF6\u8FDF\u4E0E\u98CE\u9669\u4E4B\u95F4\u5E73\u8861" : "\u9AD8\u590D\u6742\u5EA6\u6267\u884C\u5305\u542B\u63A8\u7406\u7B49\u7EA7\u7684\u4F9D\u8D56\u611F\u77E5\u5168\u5C40\u7EA6\u675F\u5206\u914D"}\uFF1B\u4EFB\u52A1\u7C7B\u578B\u4E3A ${taskType}\uFF0C\u5DF2\u5BF9 ${String(subtasks.length)} \u4E2A\u5DE5\u4F5C\u5305\u8FDB\u884C Pareto \u526A\u679D\u548C\u6709\u754C\u7EC4\u5408\u641C\u7D22\u3002`;
   return {
     mode,
+    preset: presetId,
     complexity: { value: Number(complexity.value.toFixed(3)), band: complexity.band },
     compound,
     unassignableTasks,
@@ -1089,7 +1143,7 @@ function buildPlan({ text: text2 = "", available = [], mode = "collective", pric
 // .dsh-plugin/shared/harness-plan.mjs
 var clean = (value) => typeof value === "string" ? value.trim() : "";
 var HEADLESS_TOOL_IDS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]);
-function channelForProvider(provider, installedToolIds = [], runnableToolIds = [], route = null) {
+function channelForProvider(provider, installedToolIds = [], runnableToolIds = [], route = null, loggedOutToolIds = []) {
   const preference = normalizeExecutionPreference(route?.execution);
   const tool = toolForProvider(provider);
   if (preference === "api") {
@@ -1104,6 +1158,16 @@ function channelForProvider(provider, installedToolIds = [], runnableToolIds = [
     return { kind: "harness-llm", preference, detail: "\u901A\u8FC7\u5B98\u65B9\u6A21\u578B\u76EE\u5F55 API \u8C03\u7528\u3002" };
   }
   const installed = Array.isArray(installedToolIds) && installedToolIds.includes(tool.id);
+  if (installed && Array.isArray(loggedOutToolIds) && loggedOutToolIds.includes(tool.id)) {
+    return {
+      kind: "harness-llm",
+      preference,
+      tool: tool.id,
+      label: tool.label,
+      loginRequired: true,
+      detail: `${tool.label} \u5DF2\u5B89\u88C5\u4F46\u672A\u767B\u5F55\uFF08\u5F00\u7BB1\u4F53\u68C0\u7ED3\u679C\uFF09\uFF1B\u5B9E\u9645\u8C03\u7528\u76F4\u63A5\u4F7F\u7528\u6A21\u578B\u76EE\u5F55 API\uFF0C\u4E0D\u7B49\u5F85 CLI \u5931\u8D25\u3002`
+    };
+  }
   const runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id);
   const headless = installed && HEADLESS_TOOL_IDS.has(tool.id);
   if (runnable || headless) {
@@ -1129,6 +1193,7 @@ function annotate(channel) {
     ...channel.tool ? { channelTool: channel.tool } : {},
     ...channel.label ? { channelLabel: channel.label } : {},
     ...channel.preference ? { executionPreference: channel.preference } : {},
+    ...channel.loginRequired ? { loginRequired: true } : {},
     channelDetail: channel.detail
   };
 }
@@ -1142,7 +1207,9 @@ function createPlanFromRoutes(task, availableRoutes, {
   cacheReadRatio = 0,
   cacheWriteRatio = 0,
   directProvider = "",
-  directModel = ""
+  directModel = "",
+  preset = "balanced",
+  loggedOutToolIds = []
 } = {}) {
   const taskText = clean(task);
   if (!taskText) throw new Error("task must contain text");
@@ -1164,7 +1231,7 @@ function createPlanFromRoutes(task, availableRoutes, {
   const channelOf = (provider, model) => {
     const route = routes.find((item) => item.provider === provider && item.model === model);
     const key = `${String(provider ?? "")}\0${String(model ?? "")}\0${route?.execution ?? ""}`;
-    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(provider, installedIds, runnableToolIds, route));
+    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(provider, installedIds, runnableToolIds, route, loggedOutToolIds));
     return channelCache.get(key);
   };
   const needsImage = detectTaskTypes(taskText).includes("vision");
@@ -1176,7 +1243,8 @@ function createPlanFromRoutes(task, availableRoutes, {
     pricing,
     liveBench,
     cacheReadRatio,
-    cacheWriteRatio
+    cacheWriteRatio,
+    preset
   });
   const selectedChannel = plan.selected ? channelOf(plan.selected.provider, plan.selected.model) : null;
   return {
@@ -1761,6 +1829,37 @@ var statusResultCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialTo
   }
   return result;
 });
+var anyObjectCodec = (name) => strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${name}`, (value) => plainObject(value, name));
+var freshCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#HealthFresh`, (value) => {
+  if (typeof value !== "boolean") throw new TypeError("fresh must be a boolean");
+  return value;
+});
+var idText = (value, subject) => {
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,80}$/.test(value)) throw new TypeError(`${subject} must be a short id`);
+  return value;
+};
+var optionalRouteText = (value, subject) => {
+  if (value === void 0 || value === null || value === "") return void 0;
+  if (typeof value !== "string" || value.length > 240 || value.includes("\0")) throw new TypeError(`${subject} is invalid`);
+  return value;
+};
+var rateRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RateRequest`, (value) => {
+  const request = plainObject(value, "rate request");
+  if (!["up", "down", "clear"].includes(request.rating)) throw new TypeError("rating must be up, down or clear");
+  return { runId: idText(request.runId, "runId"), packageId: idText(request.packageId, "packageId"), rating: request.rating };
+});
+var rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunRequest`, (value) => {
+  const request = plainObject(value, "rerun request");
+  const provider = optionalRouteText(request.provider, "provider");
+  const model = optionalRouteText(request.model, "model");
+  if (Boolean(provider) !== Boolean(model)) throw new TypeError("provider and model must be supplied together");
+  return {
+    runId: idText(request.runId, "runId"),
+    packageId: idText(request.packageId, "packageId"),
+    ...provider ? { provider, model } : {},
+    confirmOverBudget: request.confirmOverBudget === true
+  };
+});
 function descriptor(method, parameters, result) {
   return Object.freeze({
     id: `${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${OFFICIAL_TOOLS_REMOTE_NAMESPACE}/${method}`,
@@ -1778,11 +1877,19 @@ var toolIdParameter = Object.freeze({
   source: "json",
   codec: toolIdCodec
 });
+var jsonParameter = (name, codec) => Object.freeze({ name, wire: name, source: "json", codec });
 var OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor("list", [], listResultCodec),
   descriptor("installTool", [toolIdParameter], installResultCodec),
   descriptor("cancel", [toolIdParameter], installResultCodec),
-  descriptor("status", [toolIdParameter], statusResultCodec)
+  descriptor("status", [toolIdParameter], statusResultCodec),
+  // Workbench: onboarding health check, run ledger, ratings, step retry, security boundaries.
+  descriptor("health", [jsonParameter("fresh", freshCodec)], anyObjectCodec("HealthReport")),
+  descriptor("completeOnboarding", [], anyObjectCodec("OnboardingState")),
+  descriptor("ledger", [], anyObjectCodec("RunLedger")),
+  descriptor("rateResult", [jsonParameter("request", rateRequestCodec)], anyObjectCodec("RateResult")),
+  descriptor("rerunStep", [jsonParameter("request", rerunRequestCodec)], anyObjectCodec("RerunResult")),
+  descriptor("boundaries", [], anyObjectCodec("SecurityBoundaries"))
 ]);
 var OFFICIAL_TOOLS_CLIENT_REMOTE = Object.freeze({
   package: OFFICIAL_TOOLS_REMOTE_PACKAGE,

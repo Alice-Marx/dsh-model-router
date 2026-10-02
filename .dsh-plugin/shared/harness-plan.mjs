@@ -12,7 +12,7 @@ const HEADLESS_TOOL_IDS = new Set(['claude-code', 'codex', 'gemini'])
  * that the caller reports as installed, `harness-llm` otherwise. The probe
  * snapshot comes from the Host caller, which owns the real process boundary.
  */
-export function channelForProvider(provider, installedToolIds = [], runnableToolIds = [], route = null) {
+export function channelForProvider(provider, installedToolIds = [], runnableToolIds = [], route = null, loggedOutToolIds = []) {
   const preference = normalizeExecutionPreference(route?.execution)
   const tool = toolForProvider(provider)
   if (preference === 'api') {
@@ -26,6 +26,12 @@ export function channelForProvider(provider, installedToolIds = [], runnableTool
     return { kind: 'harness-llm', preference, detail: '通过官方模型目录 API 调用。' }
   }
   const installed = Array.isArray(installedToolIds) && installedToolIds.includes(tool.id)
+  if (installed && Array.isArray(loggedOutToolIds) && loggedOutToolIds.includes(tool.id)) {
+    return {
+      kind: 'harness-llm', preference, tool: tool.id, label: tool.label, loginRequired: true,
+      detail: `${tool.label} 已安装但未登录（开箱体检结果）；实际调用直接使用模型目录 API，不等待 CLI 失败。`,
+    }
+  }
   const runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id)
   const headless = installed && HEADLESS_TOOL_IDS.has(tool.id)
   if (runnable || headless) {
@@ -55,6 +61,7 @@ function annotate(channel) {
     ...channel.tool ? { channelTool: channel.tool } : {},
     ...channel.label ? { channelLabel: channel.label } : {},
     ...channel.preference ? { executionPreference: channel.preference } : {},
+    ...channel.loginRequired ? { loginRequired: true } : {},
     channelDetail: channel.detail,
   }
 }
@@ -67,7 +74,7 @@ function annotate(channel) {
 export function createPlanFromRoutes(task, availableRoutes, {
   mode = 'single', budgetUsd = 0, installedToolIds = [], runnableToolIds = [],
   pricing = {}, liveBench = null, cacheReadRatio = 0, cacheWriteRatio = 0,
-  directProvider = '', directModel = '',
+  directProvider = '', directModel = '', preset = 'balanced', loggedOutToolIds = [],
 } = {}) {
   const taskText = clean(task)
   if (!taskText) throw new Error('task must contain text')
@@ -89,7 +96,7 @@ export function createPlanFromRoutes(task, availableRoutes, {
   const channelOf = (provider, model) => {
     const route = routes.find(item => item.provider === provider && item.model === model)
     const key = `${String(provider ?? '')}\0${String(model ?? '')}\0${route?.execution ?? ''}`
-    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(provider, installedIds, runnableToolIds, route))
+    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(provider, installedIds, runnableToolIds, route, loggedOutToolIds))
     return channelCache.get(key)
   }
   const needsImage = detectTaskTypes(taskText).includes('vision')
@@ -102,6 +109,7 @@ export function createPlanFromRoutes(task, availableRoutes, {
     liveBench,
     cacheReadRatio,
     cacheWriteRatio,
+    preset,
   })
   const selectedChannel = plan.selected ? channelOf(plan.selected.provider, plan.selected.model) : null
   return {
