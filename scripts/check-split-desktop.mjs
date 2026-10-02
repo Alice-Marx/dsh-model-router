@@ -67,6 +67,7 @@ try {
       const save = await page.evaluate(() => localStorage.getItem('model-router:gal-story:v1:episode:echo-chronicle'))
       assert.ok(save, 'GAL retains the combined-plugin story key')
       await page.reload()
+      try { await later.waitFor({ timeout: 3000 }); await later.click() } catch { /* The official preview may repeat optional credential onboarding on reload. */ }
       await page.getByRole('button', { name: 'Gal 模块', exact: true }).click()
       await page.getByRole('button', { name: /继续阅读/ }).click()
       await page.locator('.gm-stage').waitFor()
