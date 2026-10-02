@@ -14,18 +14,20 @@
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute } from 'node:path'
+import { isAbsolute, win32 } from 'node:path'
 import { toolForProvider } from './official-tool-registry.mjs'
 import { normalizeExecutionPreference } from './model-profiles.mjs'
 import { BILLING_MODE_LABEL, billingPlan, detectQuotaExhaustion, vendorKey } from './subscription-billing.mjs'
 
-const MAX_TASK_BYTES = 64_000
+export const MAX_TASK_BYTES = 64_000
 const MAX_ANSWER_CHARS = 48_000
 const MAX_OUTPUT_BYTES = 2_000_000
 const DEFAULT_TIMEOUT_MS = 10 * 60_000
 const MAX_TIMEOUT_MS = 45 * 60_000
 const PROBE_TIMEOUT_MS = 8_000
 const STOP_GRACE_MS = 5_000
+const CANCEL_GRACE_MS = 1_500
+const IS_WINDOWS = process.platform === 'win32'
 
 const BASE_ENV_KEYS = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec',
@@ -117,11 +119,51 @@ export function adapterForToolId(toolId) {
   return ADAPTER_BY_ID.get(String(toolId ?? '').trim()) ?? null
 }
 
-function checkedTask(task) {
-  if (typeof task !== 'string' || !task.trim() || task.includes('\0') || Buffer.byteLength(task, 'utf8') > MAX_TASK_BYTES) {
-    throw new TypeError(`task must be nonempty text of at most ${MAX_TASK_BYTES} UTF-8 bytes`)
+/**
+ * Why a task text cannot be sent to a CLI or the catalog API, in Chinese, or
+ * null. The limit is in UTF-8 bytes (CLI standard input), so the message also
+ * gives the character count: about 21,000 Chinese or 64,000 ASCII characters.
+ */
+export function taskTextProblem(task) {
+  if (typeof task !== 'string' || !task.trim()) return '任务内容为空，请先描述任务。'
+  if (task.includes('\0')) return '任务内容包含不可见的空字符（\\0），请删除后重试。'
+  const bytes = Buffer.byteLength(task, 'utf8')
+  if (bytes > MAX_TASK_BYTES) {
+    return `任务内容过长：${[...task].length} 个字符（UTF-8 ${bytes} 字节），上限 ${MAX_TASK_BYTES} 字节（约 ${Math.floor(MAX_TASK_BYTES / 3)} 个中文字符或 ${MAX_TASK_BYTES} 个英文字符）。请精简任务，或把长资料放进工作区文件并在任务中引用路径。`
   }
+  return null
+}
+
+function checkedTask(task) {
+  const problem = taskTextProblem(task)
+  if (problem) throw new TypeError(problem)
   return task
+}
+
+/** Longest prefix of `value` within `maxBytes` UTF-8 bytes, never splitting a character. */
+export function sliceUtf8(value, maxBytes) {
+  const textValue = String(value ?? '')
+  if (maxBytes <= 0) return ''
+  if (Buffer.byteLength(textValue, 'utf8') <= maxBytes) return textValue
+  let low = 0
+  let high = textValue.length
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2)
+    if (Buffer.byteLength(textValue.slice(0, mid), 'utf8') <= maxBytes) low = mid
+    else high = mid - 1
+  }
+  let end = low
+  const code = textValue.charCodeAt(end - 1)
+  if (code >= 0xd800 && code <= 0xdbff) end -= 1
+  return textValue.slice(0, end)
+}
+
+const TRUNCATED = '…（已截断）'
+
+function truncatedTo(value, maxBytes) {
+  const textValue = String(value ?? '')
+  if (Buffer.byteLength(textValue, 'utf8') <= maxBytes) return textValue
+  return `${sliceUtf8(textValue, Math.max(0, maxBytes - Buffer.byteLength(TRUNCATED, 'utf8')))}${TRUNCATED}`
 }
 
 function checkedModel(modelId) {
@@ -356,12 +398,37 @@ export function usageFromOutput(format, stdout = '') {
   return null
 }
 
+/**
+ * Signal a CLI and every process it started. POSIX: the child leads its own
+ * process group (spawned detached), so the group is signalled. Windows:
+ * `taskkill /T /F` ends the process tree. Falls back to the child alone.
+ */
+export function killProcessTree(child, signal = 'SIGTERM', { tree = true, platform = process.platform, killImpl = process.kill.bind(process), spawnTaskkill = spawn } = {}) {
+  const pid = tree && Number.isSafeInteger(child?.pid) && child.pid > 0 ? child.pid : null
+  if (pid && platform === 'win32') {
+    try {
+      // Absolute System32 path, like the signed runner: a PATH entry cannot shadow taskkill.
+      const taskkill = win32.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe')
+      const killer = spawnTaskkill(taskkill, ['/PID', String(pid), '/T', '/F'], { windowsHide: true, shell: false, stdio: 'ignore' })
+      killer?.on?.('error', () => { try { child.kill(signal) } catch { /* already gone */ } })
+      return true
+    } catch { /* fall through */ }
+  } else if (pid) {
+    try { killImpl(-pid, signal); return true } catch { /* not a group leader, or already gone */ }
+  }
+  try { child?.kill?.(signal) } catch { /* already gone */ }
+  return false
+}
+
 function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, signal, onChunk, secret, stopGraceMs = STOP_GRACE_MS }) {
   return new Promise(resolve => {
     let child
+    // Only a real child process has a process group / tree to signal (tests inject fakes).
+    const tree = spawnImpl === spawn
     try {
+      // Own process group on POSIX so a stop also reaches the CLI's tool subprocesses.
       child = spawnImpl(file, args, {
-        cwd, env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'],
+        cwd, env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'], detached: tree && !IS_WINDOWS,
       })
     } catch (error) {
       resolve({ ok: false, exitCode: null, stdout: '', stderr: '', spawnError: error?.code ?? error?.message ?? 'spawn-failed', timedOut: false, cancelled: false })
@@ -392,12 +459,13 @@ function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, sig
     const stop = reason => {
       if (finished || stopReason) return
       stopReason = reason
-      try { child.kill('SIGTERM') } catch { /* already gone */ }
+      killProcessTree(child, 'SIGTERM', { tree })
       // A CLI that ignores SIGTERM is force-killed so it cannot linger after the fallback.
+      // A user cancel waits less than a timeout or output-limit stop.
       graceTimer = setTimeout(() => {
-        try { child.kill('SIGKILL') } catch { /* already gone */ }
+        killProcessTree(child, 'SIGKILL', { tree })
         settle()
-      }, stopGraceMs)
+      }, reason === 'cancelled' ? Math.min(stopGraceMs, CANCEL_GRACE_MS) : stopGraceMs)
       graceTimer.unref?.()
     }
     const onAbort = () => stop('cancelled')
@@ -422,6 +490,10 @@ function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, sig
     child.on('error', error => {
       spawnError = error?.code ?? error?.message ?? 'spawn-failed'
       settle()
+    })
+    child.on('exit', () => {
+      // The CLI is gone: stop whatever it left behind in its group after a stop.
+      if (stopReason) killProcessTree(child, 'SIGKILL', { tree })
     })
     child.on('close', code => {
       exitCode = code
@@ -467,6 +539,13 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
       }
     }
     const answer = String(api?.answer ?? '').slice(0, MAX_ANSWER_CHARS)
+    if (signal?.aborted && !(api?.ok === true && answer.trim())) {
+      return {
+        ok: false, provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
+        answer: '', fallback, timedOut, exitCode, error: '执行已取消。', cancelled: true,
+        ...(api?.usage ? { usage: api.usage } : {}),
+      }
+    }
     // A billing-aware fallback can refuse (subscription-only) or explain a switch.
     const note = api?.billingNote ?? null
     return {
@@ -479,6 +558,12 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
       error: api?.ok === true && answer.trim() ? undefined : (api?.error || reason),
     }
   } catch (error) {
+    if (signal?.aborted) {
+      return {
+        ok: false, provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
+        answer: '', fallback, timedOut, exitCode, error: '执行已取消。', cancelled: true,
+      }
+    }
     return {
       ok: false, provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
       answer: '', fallback, timedOut, exitCode, error: String(error?.message ?? error),
@@ -675,8 +760,14 @@ const failureSummary = text => `${String(text ?? '').replace(/，?已(?:回退�
  * - api-only: never use the subscription.
  */
 export async function executeRouteWithBilling({ route, billing = null, apiFallback, ...options } = {}) {
+  const plan = billingPlan(route, billing?.routes ?? [])
+  // Every result names the billing mode it ran under, whichever branch produced it.
+  const result = await routeWithBilling(plan, { route, billing, apiFallback, ...options })
+  return { ...result, billingMode: result?.billingMode ?? plan.mode }
+}
+
+async function routeWithBilling(plan, { route, billing = null, apiFallback, ...options } = {}) {
   if (!billing) return executeAssignedTask({ ...options, route, apiFallback })
-  const plan = billingPlan(route, billing.routes ?? [])
   const now = typeof billing.now === 'function' ? billing.now : Date.now
   const sub = plan.subscription
   const apiRoute = plan.apiRoute
@@ -756,15 +847,37 @@ export async function executeRouteWithBilling({ route, billing = null, apiFallba
     return viaApi('编程套餐路线调用失败，已改用 API Key。', { from: 'subscription', reason: '编程套餐路线调用失败，已改用 API Key。', kind: 'error', until: null, detail })
   }
 
-  // CLI account login.
-  const login = typeof billing.loginBillingFor === 'function' ? billing.loginBillingFor(sub.toolId) : 'unknown'
+  // CLI account login. "Retry subscription" means the user signed in again: ignore a cached logged-out state.
+  const retrySubscription = billing.choice === 'subscription'
+  const login = retrySubscription ? 'unknown'
+    : typeof billing.loginBillingFor === 'function' ? billing.loginBillingFor(sub.toolId) : 'unknown'
   if (login === 'api-key' || login === 'logged-out') {
     if (plan.mode === 'subscription-only') {
       return refuse(login === 'logged-out' ? `${label}：官方 CLI 未登录订阅账号。` : `${label}：官方 CLI 当前以 API Key 计费，没有订阅登录。`)
     }
+    // The user has this subscription (the CLI failed authentication while running on it, or
+    // the profile names a subscription billing mode): ask instead of silently paying by API key.
+    const loginInfo = typeof billing.loginDetailFor === 'function' ? billing.loginDetailFor(sub.toolId) : null
+    const action = failureAction(billing)
+    if (login === 'logged-out' && action !== 'api' && (loginInfo?.source === 'runtime-auth' || subscriptionDeclared(route, billing.routes))) {
+      const name = adapterForProvider(provider)?.label ?? sub.toolId
+      const why = loginInfo?.source === 'runtime-auth'
+        ? `${name} 的订阅登录已失效（上次运行报认证错误）`
+        : `${name} 未登录订阅账号（该路线配置为“${label}”）`
+      if (action === 'fail') return refuse(`${why}，按设置不自动改用 API Key。请在终端登录后点“重新体检”。`, { loginRequired: true })
+      const pause = {
+        kind: 'subscription-login',
+        reason: `${why}，未自动改用 API Key，已暂停此步骤：请先在终端登录再选“重试订阅”，或选“改用 API 重试”、“取消”。`,
+        detail: String(loginInfo?.detail ?? '').slice(0, 2_000),
+        choices: [...SUBSCRIPTION_CHOICES],
+        loginRequired: true,
+      }
+      return refuse(pause.reason, { paused: true, pause })
+    }
     // No subscription login: the existing CLI-with-key / catalog API behaviour.
     return executeAssignedTask({ ...options, route, apiFallback })
   }
+  if (retrySubscription) options = { ...options, skipOfficial: null }
   const guarded = async args => {
     const vendor = vendorKey({ toolId: args?.toolId ?? sub.toolId })
     const info = classify(`${args?.detail ?? ''}
@@ -798,22 +911,58 @@ ${args?.raw ?? ''}`, vendor)
   }
 }
 
+/** The profile names a subscription billing mode for this route (not just the default). */
+function subscriptionDeclared(route, routes = []) {
+  const key = `${route?.provider}\u0000${route?.model}`
+  const self = (Array.isArray(routes) ? routes : []).find(item => `${item.provider}\u0000${item.model}` === key) ?? route
+  return self?.billing === 'subscription-first' || self?.billing === 'subscription-only'
+}
+
 /** API-key run of `route` on the catalog API, in executor result shape. */
 function useApiRoute(apiFallback, { route, task, signal: abort, reason, skipped }) {
   return useApi(apiFallback, { route, task, signal: abort, reason, skipped, preference: executionPreference(route) })
 }
 
-function packagePrompt(task, item, completed) {
+const PROMPT_HEADROOM_BYTES = 512
+const MIN_TASK_SHARE_BYTES = 8_000
+const DEPENDENCY_ANSWER_BYTES = 7_500
+
+/**
+ * The prompt for one work package, always within MAX_TASK_BYTES: the objective
+ * is capped first, dependency answers share what the task leaves (each at most
+ * DEPENDENCY_ANSWER_BYTES, the remainder split evenly), and the total task is
+ * truncated last. Truncated parts end with “（已截断）”.
+ */
+export function packagePrompt(task, item, completed, maxBytes = MAX_TASK_BYTES) {
   const dependencies = (item.dependsOn ?? []).map(id => completed.find(result => result.id === id)).filter(Boolean)
-  return [
-    `总任务：\n${String(task).slice(0, 40_000)}`,
-    `当前工作包：${item.name}`,
-    item.objective ? `具体目标：\n${item.objective}` : '',
-    dependencies.length
-      ? `已完成的依赖结果：\n${dependencies.map(dep => `${dep.name}:\n${String(dep.answer ?? '').slice(0, 2_500)}`).join('\n\n')}`
-      : '当前工作包无前置依赖。',
-    '只完成当前工作包，并给出可汇总的结果。',
+  const name = truncatedTo(item.name, 300)
+  const closing = '只完成当前工作包，并给出可汇总的结果。'
+  const budget = maxBytes - PROMPT_HEADROOM_BYTES
+  const bytes = value => Buffer.byteLength(value, 'utf8')
+  const objective = item.objective ? truncatedTo(item.objective, Math.floor(budget / 4)) : ''
+  const fixed = bytes(`总任务：\n\n\n当前工作包：${name}\n\n${objective ? `具体目标：\n${objective}\n\n` : ''}已完成的依赖结果：\n\n\n${closing}`)
+    + dependencies.reduce((sum, dep) => sum + bytes(`${truncatedTo(dep.name, 200)}:\n\n\n`), 0)
+  const taskBytes = bytes(String(task))
+  const free = Math.max(0, budget - fixed)
+  // Dependencies get what they need up to their cap, but never squeeze the task below its share.
+  const wantDeps = dependencies.reduce((sum, dep) => sum + Math.min(bytes(String(dep.answer ?? '')), DEPENDENCY_ANSWER_BYTES), 0)
+  const depBudget = Math.max(0, Math.min(wantDeps, free - Math.min(taskBytes, MIN_TASK_SHARE_BYTES)))
+  let remaining = depBudget
+  const depTexts = dependencies.map((dep, index) => {
+    const share = Math.floor(remaining / (dependencies.length - index))
+    const answer = truncatedTo(String(dep.answer ?? ''), Math.min(DEPENDENCY_ANSWER_BYTES, share))
+    remaining -= bytes(answer)
+    return `${truncatedTo(dep.name, 200)}:\n${answer}`
+  })
+  const taskText = truncatedTo(String(task), Math.max(0, free - (depBudget - remaining)))
+  const prompt = [
+    `总任务：\n${taskText}`,
+    `当前工作包：${name}`,
+    objective ? `具体目标：\n${objective}` : '',
+    dependencies.length ? `已完成的依赖结果：\n${depTexts.join('\n\n')}` : '当前工作包无前置依赖。',
+    closing,
   ].filter(Boolean).join('\n\n')
+  return bytes(prompt) <= maxBytes ? prompt : sliceUtf8(prompt, maxBytes)
 }
 
 /** One forced model receives the whole task. Routed plans keep their packages. */
@@ -849,7 +998,8 @@ function aggregateOf(results) {
   ].join('\n')).join('\n\n')
   const status = results.length > 0 && results.every(item => item.ok) ? 'completed'
     : results.some(item => item.paused) ? 'paused'
-      : results.some(item => item.ok) ? 'partial' : 'failed'
+      : results.some(item => item.cancelled) ? 'cancelled'
+        : results.some(item => item.ok) ? 'partial' : 'failed'
   return { status, packages: results, aggregate }
 }
 
@@ -872,6 +1022,14 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     const override = overrides[item.id]
     const provider = override?.provider ?? item.recommendedProvider
     const model = override?.model ?? item.recommendedModel
+    if (runOptions.signal?.aborted) {
+      // Cancelled: later packages are not started (no CLI process, no API spend).
+      const cancelled = { id: item.id, name: item.name, ok: false, provider, model, channel: 'harness-llm', answer: '', fallback: null, cancelled: true, notStarted: true, error: '执行已取消，此步骤未开始。' }
+      results.push(cancelled)
+      ranIds.push(item.id)
+      if (typeof onPackage === 'function') await onPackage(cancelled)
+      continue
+    }
     const unmet = (item.dependsOn ?? []).filter(id => results.find(result => result.id === id)?.ok !== true)
     if (unmet.length > 0) {
       // Waiting behind a paused step (the user decides), or blocked by a failure.

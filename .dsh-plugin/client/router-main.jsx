@@ -490,6 +490,9 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           <div className="mr-status"><span className={`mr-status-dot ${catalogState.status === 'loading' ? 'loading' : catalogState.status === 'error' ? 'error' : ''}`} />{catalogState.status === 'ready' ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === 'loading' ? '正在读取模型目录' : '模型目录读取失败'}</div>
         </header>
 
+        {(workbench.health.report?.notices ?? []).map(notice => (
+          <div key={`${notice.kind}-${notice.at}`} className="mr-error" role="alert">{notice.message}</div>
+        ))}
         {workbench.health.report && !workbench.health.report.onboarding?.completedAt && (
           <OnboardingBanner health={workbench.health.report} error={workbench.health.error} refreshing={workbench.health.refreshing}
             onRefresh={() => { void workbench.refreshHealth(true) }} onDone={() => { void workbench.finishOnboarding() }} />

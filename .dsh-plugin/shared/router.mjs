@@ -471,6 +471,54 @@ function explicitRequirements(text) {
   return []
 }
 
+const CN_DIGITS = Object.freeze({ 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 })
+const stepNumber = token => {
+  const value = String(token ?? '').trim()
+  if (/^\d{1,2}$/u.test(value)) return Number(value)
+  if (/^十[一二三四五六七八九]?$/u.test(value)) return 10 + (CN_DIGITS[value[1]] ?? 0)
+  if (/^[一二两三四五六七八九]十?$/u.test(value)) return CN_DIGITS[value[0]] * (value.length === 2 ? 10 : 1)
+  return null
+}
+const STEP_TOKEN = '(?:\\d{1,2}|[一二两三四五六七八九十]{1,2})'
+const STEP_LIST = `${STEP_TOKEN}(?:\\s*(?:[、,，/]|和|与|及|以及|and|&|-|~|到|至)\\s*(?:第\\s*)?${STEP_TOKEN})*`
+const STEP_REFERENCE_PATTERNS = Object.freeze([
+  // 依赖第 1 步 / 基于第 2、3 步 / 根据步骤 1 / 在第 2 步完成后 / 第 1 步之后
+  new RegExp(`(?:依赖|依靠|取决于|基于|根据|承接|使用|利用|需要|等待|待)(?:于)?\\s*(?:第\\s*(${STEP_LIST})\\s*(?:步|项|个?步骤|条)|步骤\\s*(${STEP_LIST}))`, 'giu'),
+  new RegExp(`(?:在|等)?\\s*第\\s*(${STEP_LIST})\\s*(?:步|项|个?步骤|条)(?:完成|结束|做完)?(?:之后|以后|后)`, 'giu'),
+  new RegExp(`步骤\\s*(${STEP_LIST})\\s*(?:完成|结束)?(?:之后|以后|后)`, 'giu'),
+  // depends on step 1 / after steps 1 and 2 / based on step #2 / requires step 3
+  new RegExp(`(?:depends?\\s+on|depending\\s+on|after|based\\s+on|builds?\\s+on|requires?|using(?:\\s+the\\s+output\\s+of)?)\\s+(?:the\\s+(?:result|output)s?\\s+of\\s+)?(?:steps?|items?|#)\\s*#?(${STEP_LIST})`, 'giu'),
+])
+
+/**
+ * Step numbers (1-based, in list order) that a requirement explicitly names
+ * as its prerequisites: “依赖第 1 步”, “基于第 2、3 步”, “第 1 步完成后”,
+ * “depends on step 1”, “after steps 1 and 2”. Ranges (“第 1-3 步”) expand.
+ */
+export function explicitStepReferences(objective) {
+  const found = new Set()
+  const value = String(objective ?? '')
+  for (const pattern of STEP_REFERENCE_PATTERNS) {
+    pattern.lastIndex = 0
+    for (const match of value.matchAll(pattern)) {
+      const list = match.slice(1).find(Boolean) ?? ''
+      const parts = list.split(/\s*(?:[、,，/]|和|与|及|以及|and|&)\s*/iu)
+      for (const part of parts) {
+        const range = /^(.+?)\s*(?:-|~|到|至)\s*(?:第\s*)?(.+)$/u.exec(part)
+        if (range) {
+          const from = stepNumber(range[1])
+          const to = stepNumber(range[2])
+          if (from && to && to >= from && to - from < 20) for (let step = from; step <= to; step += 1) found.add(step)
+          continue
+        }
+        const step = stepNumber(part.replace(/^第\s*/u, ''))
+        if (step) found.add(step)
+      }
+    }
+  }
+  return [...found].sort((a, b) => a - b)
+}
+
 function taskPackages(taskType, text, band) {
   if (band !== 'complex') {
     const task = { id: 'execution', name: '直接回答与必要校验', type: taskType, purpose: 'execution', difficulty: band, criticality: 0.65, dependsOn: [], preferredReasoningEffort: band === 'simple' ? 'low' : 'medium' }
@@ -493,7 +541,12 @@ function taskPackages(taskType, text, band) {
       const type = detectTaskTypes(objective)[0] ?? 'general'
       const difficulty = group.length > 1 ? 'complex' : requirementDifficulty(objective, type)
       const previous = packages.at(-1)
-      const sequential = /^(?:最后|然后|接着|随后|再|基于|根据|测试|验证|部署|发布)|(?:完成|结束|实现)后/u.test(objective)
+      // Explicit references (“依赖第 1 步”) become DAG edges; only earlier steps count, so the plan stays acyclic.
+      const groupOf = step => requirements.length > MAX_EXPLICIT_EXECUTION_PACKAGES && step >= MAX_EXPLICIT_EXECUTION_PACKAGES
+        ? MAX_EXPLICIT_EXECUTION_PACKAGES - 1 : step - 1
+      const explicit = [...new Set(group.flatMap(item => explicitStepReferences(item)).map(groupOf))]
+        .filter(target => target >= 0 && target < index).map(target => `execution-${target + 1}`)
+      const sequential = explicit.length === 0 && /^(?:最后|然后|接着|随后|再|基于|根据|测试|验证|部署|发布)|(?:完成|结束|实现)后/u.test(objective)
       packages.push({
         id: `execution-${index + 1}`,
         name: group.length === 1
@@ -504,7 +557,8 @@ function taskPackages(taskType, text, band) {
         purpose: 'execution',
         difficulty,
         criticality: difficulty === 'simple' ? 0.55 : difficulty === 'balanced' ? 0.72 : 0.86,
-        dependsOn: sequential && previous?.purpose === 'execution' ? ['analysis', previous.id] : ['analysis'],
+        dependsOn: explicit.length ? ['analysis', ...explicit]
+          : sequential && previous?.purpose === 'execution' ? ['analysis', previous.id] : ['analysis'],
         preferredReasoningEffort: difficulty === 'simple' ? 'low' : difficulty === 'balanced' ? 'medium' : 'high',
       })
     })

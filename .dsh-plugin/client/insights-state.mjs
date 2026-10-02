@@ -2,7 +2,7 @@
  * Pure view helpers for the workbench insight cards (health check, budget,
  * run DAG). Kept free of React so the test suite can import them directly.
  */
-import { budgetCheck } from '../shared/run-ledger.mjs'
+import { budgetCheck, formatUsd as sharedFormatUsd } from '../shared/run-ledger.mjs'
 
 export const PACKAGE_STATUS = Object.freeze({
   pending: Object.freeze({ label: '待执行', tone: 'pending' }),
@@ -60,7 +60,8 @@ export function healthSummary(tools) {
   }
 }
 
-const money = value => typeof value === 'number' && Number.isFinite(value) ? `$${value.toFixed(value >= 1 ? 2 : 4)}` : '—'
+// Same four-decimal format as the Host budget messages.
+const money = sharedFormatUsd
 export { money as formatUsd }
 
 /** Budget bar for one period: share used (0–1) and text. */

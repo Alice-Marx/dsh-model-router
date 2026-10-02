@@ -176,18 +176,25 @@ export function createHealthCache({ ttlMs = HEALTH_CACHE_MS, now = Date.now } = 
     remember(next) {
       if (next && Array.isArray(next.tools)) {
         report = next
-        overrides.clear()
+        // A runtime authentication failure stays known while the new check still says
+        // logged out, so the router keeps asking instead of silently using the API key.
+        for (const [toolId, override] of [...overrides]) {
+          const entry = next.tools.find(item => item.id === toolId)
+          if (override.source !== 'runtime-auth' || entry?.login?.state !== 'logged-out') overrides.delete(toolId)
+        }
       }
       return report
     },
     report() { return report },
     /** Mark one tool logged out after its CLI reported an authentication failure. */
-    markLoggedOut(toolId, detail) {
-      overrides.set(toolId, { at: now(), state: 'logged-out', detail: String(detail ?? '').slice(0, 200) })
+    markLoggedOut(toolId, detail, at = now()) {
+      overrides.set(toolId, { at, state: 'logged-out', detail: String(detail ?? '').slice(0, 200), source: 'runtime-auth' })
     },
+    /** The CLI ran on its subscription again: forget the authentication failure. */
+    clearLoggedOut(toolId) { return overrides.delete(toolId) },
     loginState(toolId) {
       const override = overrides.get(toolId)
-      if (override && now() - override.at < ttlMs) return override
+      if (override && (now() - override.at < ttlMs || report?.tools?.find(item => item.id === toolId)?.login?.state === 'logged-out')) return override
       if (!report || now() - report.checkedAt >= ttlMs) return null
       const entry = report.tools.find(item => item.id === toolId)
       return entry?.installed ? { state: entry.login?.state ?? 'unknown', detail: entry.login?.detail ?? '', billing: entry.login?.billing ?? null,

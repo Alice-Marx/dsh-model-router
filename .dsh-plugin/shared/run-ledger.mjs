@@ -100,6 +100,11 @@ export function spending(runs, at = Date.now()) {
  * Decide whether a run fits the configured limits. A zero limit is off.
  * `estimateUsd` null means prices are missing; only already-exceeded limits block then.
  */
+/** USD amounts in budget messages and the workbench: always four decimals, so limits and spend line up. */
+export function formatUsd(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? `$${value.toFixed(4)}` : '—'
+}
+
 export function budgetCheck({ estimateUsd = null, spent = { today: 0, month: 0 }, dailyLimitUsd = 0, monthlyLimitUsd = 0 } = {}) {
   const limits = []
   if (finite(dailyLimitUsd) && dailyLimitUsd > 0) limits.push({ period: 'daily', label: '今日', limit: dailyLimitUsd, spent: spent.today ?? 0 })
@@ -114,7 +119,7 @@ export function budgetCheck({ estimateUsd = null, spent = { today: 0, month: 0 }
     remainingUsd: remaining,
     exceeded: exceeded ? exceeded.period : null,
     message: exceeded
-      ? `${exceeded.label}预算 $${exceeded.limit.toFixed(2)}，已用 $${exceeded.spent.toFixed(4)}${estimateKnown ? `，本次预估 $${estimateUsd.toFixed(4)}` : ''}，将超出上限。`
+      ? `${exceeded.label}预算 ${formatUsd(exceeded.limit)}，已用 ${formatUsd(exceeded.spent)}${estimateKnown ? `，本次预估 ${formatUsd(estimateUsd)}` : ''}，将超出上限。`
       : limits.length && !estimateKnown ? '部分路线缺少单价，无法预估本次费用；仅在已用金额达到上限时阻止。' : '',
   }
 }
@@ -153,7 +158,7 @@ export function applyQualityBiases(routes, biases) {
 }
 
 function storedPackage(planned, result, pricing, finishedAt, billingFor = billingOf) {
-  const cost = !result || result.blocked
+  const cost = !result || result.blocked || result.notStarted
     ? { costUsd: null, costSource: 'not-run', billing: null, referenceCostUsd: null }
     : billedCost(result, pricing, billingFor(result))
   return {
@@ -174,7 +179,7 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     status: !result ? 'pending' : result.ok ? (result.fallback ? 'fallback' : 'succeeded') : result.paused ? 'paused'
       : result.waiting ? 'waiting' : result.blocked ? 'blocked' : result.cancelled ? 'cancelled' : 'failed',
     ok: result?.ok === true,
-    ran: Boolean(result) && !result.blocked,
+    ran: Boolean(result) && !result.blocked && !result.notStarted,
     blocked: result?.blocked === true,
     ...(result?.paused ? { paused: true, pause: { ...result.pause } } : {}),
     ...(result?.waiting ? { waiting: true } : {}),

@@ -11,7 +11,7 @@ import {
 } from './shared/subscription-billing.mjs'
 import { createRouterState } from './shared/router-state.mjs'
 import {
-  applyQualityBiases, budgetCheck, buildRunRecord, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
+  applyQualityBiases, budgetCheck, buildRunRecord, formatUsd, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
   routeQualityBiases, spending, storedResults, actualCost, teamExecutionResults,
 } from './shared/run-ledger.mjs'
 import { routeBoundaries } from './shared/security-boundaries.mjs'
@@ -25,7 +25,7 @@ import {
 } from './shared/official-tool-registry.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness, runOfficialTool } from './shared/official-tool-executor.mjs'
 import { runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
-import { downstreamPackageIds, executeAssignmentPlan, rerunAssignmentPackage } from './shared/task-executors.mjs'
+import { downstreamPackageIds, executeAssignmentPlan, rerunAssignmentPackage, taskTextProblem } from './shared/task-executors.mjs'
 import {
   probeAllTools,
   probeToolWith,
@@ -160,19 +160,29 @@ async function savedState() {
   catch { return { onboarding: { completedAt: null }, health: null, runs: [] } }
 }
 
+const NOTICE_DAYS = 7
+/** Router notices (for example a corrupt state file that was backed up) from the last week. */
+function recentNotices(saved, now = Date.now()) {
+  return (saved?.notices ?? []).filter(item => Number.isFinite(item?.at) && now - item.at < NOTICE_DAYS * 86_400_000)
+}
+
 let healthHydrated = false
 async function hydrateHealth() {
   if (healthHydrated) return
   healthHydrated = true
   const saved = await savedState()
   if (saved.health && !healthCache.report()) healthCache.remember(saved.health)
+  // Authentication failures seen while running on a subscription survive a reload.
+  for (const [toolId, entry] of Object.entries(saved.authFailures ?? {})) {
+    if (!healthCache.loginState(toolId) || healthCache.loginState(toolId).source !== 'runtime-auth') healthCache.markLoggedOut(toolId, entry.detail, entry.at)
+  }
 }
 
 // Subscription quota: which subscriptions hit their limit, and until when.
 let quotaTracker = null
 let quotaHydrated = false
 function quotaStore() {
-  quotaTracker ??= createQuotaTracker({ persist: snapshot => routerStateStore().saveQuota(snapshot) })
+  quotaTracker ??= createQuotaTracker({ persist: (snapshot, change) => routerStateStore().saveQuota(snapshot, change) })
   return quotaTracker
 }
 async function hydrateQuota() {
@@ -217,6 +227,7 @@ async function billingContext(config, options = {}) {
     extraPatterns: quotaPatterns(config).patterns,
     onFailure: subscriptionFailureAction(config),
     loginBillingFor: toolId => subscriptionLoginOf(healthCache.loginState(toolId)),
+    loginDetailFor: toolId => healthCache.loginState(toolId),
     now: Date.now,
     ...(options.billing && typeof options.billing === 'object' ? options.billing : {}),
   }
@@ -324,7 +335,7 @@ async function routesWithLearning(ctx, config, signal, runs) {
 /** Produce a route recommendation and work packages compatible with official Agent Teams. */
 export async function createRoutePlan(ctx, task, config = {}, options = {}) {
   const taskText = text(task)
-  if (!taskText) throw new Error('task must contain text')
+  if (!taskText) throw new Error('任务内容为空，请先描述任务。')
   const mode = options.mode === 'team' ? 'team' : 'single'
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const budgetUsd = Math.max(0, finiteNumber(options.budgetUsd, finiteNumber(configuredBudget, 0)))
@@ -357,7 +368,7 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   const model = text(route?.model)
   const taskText = text(task)
   if (!provider || !model) throw new Error('a configured provider and model are required')
-  if (!taskText) throw new Error('task must contain text')
+  if (!taskText) throw new Error('任务内容为空，请先描述任务。')
   throwIfAborted(signal)
   const limit = boundedInteger(outputLimit, 12_000, 1, 50_000)
   const controller = new AbortController()
@@ -513,10 +524,18 @@ export async function reviewRunPackages(ctx, run, routes, config, { signal, rand
 function executionHooks(ctx, options) {
   return {
     skipOfficial: options.skipOfficial ?? (request => healthCache.skipReason(request)),
-    onPackage: result => {
-      // A CLI that reports "not logged in" is skipped for the cache lifetime.
-      if (result?.fallback?.loginRequired && result.toolId) healthCache.markLoggedOut(result.toolId, result.fallback.error)
-      if (result?.pause?.loginRequired && result.toolId) healthCache.markLoggedOut(result.toolId, result.pause.detail)
+    onPackage: async result => {
+      // A CLI that reports "not logged in" is marked; with a subscription the router then asks instead of using the API key.
+      const failed = result?.toolId && (result.fallback?.loginRequired ? result.fallback.error : result.pause?.loginRequired && result.pause.kind !== 'subscription-login' ? result.pause.detail : null)
+      if (failed) {
+        const at = Date.now()
+        healthCache.markLoggedOut(result.toolId, failed, at)
+        try { await routerStateStore().saveAuthFailure(result.toolId, { at, detail: failed }) } catch { /* the cache still serves this process */ }
+      } else if (result?.ok && result.channel === 'official-cli' && result.toolId && healthCache.loginState(result.toolId)?.source === 'runtime-auth') {
+        healthCache.clearLoggedOut(result.toolId)
+        try { await routerStateStore().saveAuthFailure(result.toolId, null) } catch { /* the cache still serves this process */ }
+      }
+      if (typeof options.onPackage === 'function') await options.onPackage(result)
     },
     credentialsFor: route => credentialsForRoute(ctx, route),
     runVerified: options.runVerified ?? (request => runOfficialTool({
@@ -528,7 +547,9 @@ function executionHooks(ctx, options) {
 /** Route, or honor one explicit model, then run each package through its adapter. */
 export async function executeConfiguredAssignment(ctx, task, config = {}, options = {}) {
   const taskText = text(task)
-  if (!taskText) throw new Error('task must contain text')
+  // Validate before planning or any paid call: the whole task must fit one CLI/API prompt.
+  const problem = taskTextProblem(taskText)
+  if (problem) throw new Error(problem)
   const direct = text(options.provider) || text(options.model)
   const saved = await savedState()
   const routes = await routesWithLearning(ctx, config, options.signal, saved.runs)
@@ -560,7 +581,7 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
     const recheck = budgetFor(config, saved.runs, cheaper.estimatedCost)
     if (!recheck.exceeded) {
       budget = { ...recheck, downgraded: true, downgradedFrom: preset,
-        message: `原方案${budget.message} 已自动降级为“省钱优先”方案（预估 ${cheaper.estimatedCost === null ? '价格待配置' : `$${cheaper.estimatedCost.toFixed(4)}`}）。` }
+        message: `原方案${budget.message} 已自动降级为“省钱优先”方案（预估 ${cheaper.estimatedCost === null ? '价格待配置' : formatUsd(cheaper.estimatedCost)}）。` }
       plan = cheaper
     }
   }
@@ -571,20 +592,41 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
         message: `${budget.message} 已暂停执行：${direct ? '指定模型无法自动降级。' : budget.action === 'pause' ? '设置为超预算时暂停。' : '降级后仍超出预算。'}请向用户确认后，以 confirmOverBudget: true 重新调用。` },
     }
   }
-  const hooks = executionHooks(ctx, options)
+  const finished = []
+  const hooks = executionHooks(ctx, { ...options, onPackage: result => { finished.push(result) } })
   const billing = await billingContext(config, options)
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const startedAt = Date.now()
-  const execution = await executeAssignmentPlan({
-    plan,
-    task: taskText,
-    routes: plan.availableRoutes,
-    workspace: options.workspace,
-    signal: options.signal,
-    ...hooks,
-    billing,
-    apiFallback: async ({ route, task: packageTask, signal }) => consultConfiguredModel(ctx, route, packageTask, limit, signal),
-  })
+  let execution
+  try {
+    execution = await executeAssignmentPlan({
+      plan,
+      task: taskText,
+      routes: plan.availableRoutes,
+      workspace: options.workspace,
+      signal: options.signal,
+      ...hooks,
+      billing,
+      apiFallback: async ({ route, task: packageTask, signal }) => consultConfiguredModel(ctx, route, packageTask, limit, signal),
+    })
+  } catch (error) {
+    // Steps that already ran (and may have been paid for) are always recorded with their spend.
+    const message = String(error?.message ?? error)
+    const partial = { status: options.signal?.aborted ? 'cancelled' : 'failed', packages: finished, aggregate: '', error: message }
+    const run = buildRunRecord({
+      id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution: partial,
+      preset: plan.preset ?? preset, workspace: options.workspace ?? '',
+      pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
+      budget: { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: budget.downgraded === true, confirmed: budget.exceeded ? true : undefined },
+    })
+    run.error = message.slice(0, 2_000)
+    let stored = true
+    try { await routerStateStore().appendRun(run) } catch { stored = false }
+    const wrapped = new Error(`${message}${finished.length ? `（已完成 ${finished.length} 个步骤，${stored ? `已记录到运行 ${run.id}，费用计入预算` : '但运行记录保存失败'}）` : ''}`)
+    wrapped.runId = stored ? run.id : null
+    wrapped.cause = error
+    throw wrapped
+  }
   const run = buildRunRecord({
     id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution,
     preset: plan.preset ?? preset, workspace: options.workspace ?? '',
@@ -923,7 +965,7 @@ export function routerRemoteServices(ctx, config) {
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })
       const saved = await savedState()
-      return { ...report, onboarding: saved.onboarding, billing: await billingHealth(ctx, config) }
+      return { ...report, onboarding: saved.onboarding, notices: recentNotices(saved), billing: await billingHealth(ctx, config) }
     },
     completeOnboarding: async () => routerStateStore().completeOnboarding(Date.now()),
     ledger: () => ledgerSummary(config),
@@ -1276,7 +1318,7 @@ function registerOfficialToolModels(ctx, config) {
     async execute(args, exec) {
       throwIfAborted(exec.signal)
       const report = await toolHealthReport({ fresh: args.fresh === true })
-      return jsonValue({ ...report, billing: await billingHealth(ctx, config, { signal: exec.signal }) })
+      return jsonValue({ ...report, notices: recentNotices(await savedState()), billing: await billingHealth(ctx, config, { signal: exec.signal }) })
     },
   }))
   ctx.tools.register(defineTool({

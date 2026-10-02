@@ -162,7 +162,8 @@ export function exhaustedUntil(info, { now = Date.now(), cooldownMinutes = DEFAU
 /** In-memory quota state with an optional persistence callback. Keys: `cli:<tool>` or `plan:<provider>`. */
 export function createQuotaTracker({ now = Date.now, persist = null } = {}) {
   const entries = new Map()
-  const save = () => { if (typeof persist === 'function') Promise.resolve(persist(Object.fromEntries(entries))).catch(() => {}) }
+  // `removed` lets a shared store merge this snapshot with other processes' entries.
+  const save = (removed = []) => { if (typeof persist === 'function') Promise.resolve(persist(Object.fromEntries(entries), { removed })).catch(() => {}) }
   return {
     load(saved) {
       for (const [key, entry] of Object.entries(saved ?? {})) {
@@ -186,10 +187,10 @@ export function createQuotaTracker({ now = Date.now, persist = null } = {}) {
     status(key) {
       const entry = entries.get(key)
       if (!entry) return null
-      if (entry.until <= now()) { entries.delete(key); save(); return null }
+      if (entry.until <= now()) { entries.delete(key); save([key]); return null }
       return { ...entry }
     },
-    clear(key) { if (entries.delete(key)) save() },
+    clear(key) { if (entries.delete(key)) save([key]) },
     snapshot() {
       const at = now()
       return Object.fromEntries([...entries].filter(([, entry]) => entry.until > at).map(([key, entry]) => [key, { ...entry }]))

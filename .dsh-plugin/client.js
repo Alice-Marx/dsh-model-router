@@ -781,6 +781,47 @@ function explicitRequirements(text3) {
   }
   return [];
 }
+var CN_DIGITS = Object.freeze({ \u4E00: 1, \u4E8C: 2, \u4E24: 2, \u4E09: 3, \u56DB: 4, \u4E94: 5, \u516D: 6, \u4E03: 7, \u516B: 8, \u4E5D: 9, \u5341: 10 });
+var stepNumber = (token) => {
+  const value = String(token ?? "").trim();
+  if (/^\d{1,2}$/u.test(value)) return Number(value);
+  if (/^十[一二三四五六七八九]?$/u.test(value)) return 10 + (CN_DIGITS[value[1]] ?? 0);
+  if (/^[一二两三四五六七八九]十?$/u.test(value)) return CN_DIGITS[value[0]] * (value.length === 2 ? 10 : 1);
+  return null;
+};
+var STEP_TOKEN = "(?:\\d{1,2}|[\u4E00\u4E8C\u4E24\u4E09\u56DB\u4E94\u516D\u4E03\u516B\u4E5D\u5341]{1,2})";
+var STEP_LIST = `${STEP_TOKEN}(?:\\s*(?:[\u3001,\uFF0C/]|\u548C|\u4E0E|\u53CA|\u4EE5\u53CA|and|&|-|~|\u5230|\u81F3)\\s*(?:\u7B2C\\s*)?${STEP_TOKEN})*`;
+var STEP_REFERENCE_PATTERNS = Object.freeze([
+  // 依赖第 1 步 / 基于第 2、3 步 / 根据步骤 1 / 在第 2 步完成后 / 第 1 步之后
+  new RegExp(`(?:\u4F9D\u8D56|\u4F9D\u9760|\u53D6\u51B3\u4E8E|\u57FA\u4E8E|\u6839\u636E|\u627F\u63A5|\u4F7F\u7528|\u5229\u7528|\u9700\u8981|\u7B49\u5F85|\u5F85)(?:\u4E8E)?\\s*(?:\u7B2C\\s*(${STEP_LIST})\\s*(?:\u6B65|\u9879|\u4E2A?\u6B65\u9AA4|\u6761)|\u6B65\u9AA4\\s*(${STEP_LIST}))`, "giu"),
+  new RegExp(`(?:\u5728|\u7B49)?\\s*\u7B2C\\s*(${STEP_LIST})\\s*(?:\u6B65|\u9879|\u4E2A?\u6B65\u9AA4|\u6761)(?:\u5B8C\u6210|\u7ED3\u675F|\u505A\u5B8C)?(?:\u4E4B\u540E|\u4EE5\u540E|\u540E)`, "giu"),
+  new RegExp(`\u6B65\u9AA4\\s*(${STEP_LIST})\\s*(?:\u5B8C\u6210|\u7ED3\u675F)?(?:\u4E4B\u540E|\u4EE5\u540E|\u540E)`, "giu"),
+  // depends on step 1 / after steps 1 and 2 / based on step #2 / requires step 3
+  new RegExp(`(?:depends?\\s+on|depending\\s+on|after|based\\s+on|builds?\\s+on|requires?|using(?:\\s+the\\s+output\\s+of)?)\\s+(?:the\\s+(?:result|output)s?\\s+of\\s+)?(?:steps?|items?|#)\\s*#?(${STEP_LIST})`, "giu")
+]);
+function explicitStepReferences(objective) {
+  const found = /* @__PURE__ */ new Set();
+  const value = String(objective ?? "");
+  for (const pattern of STEP_REFERENCE_PATTERNS) {
+    pattern.lastIndex = 0;
+    for (const match of value.matchAll(pattern)) {
+      const list = match.slice(1).find(Boolean) ?? "";
+      const parts = list.split(/\s*(?:[、,，/]|和|与|及|以及|and|&)\s*/iu);
+      for (const part of parts) {
+        const range = /^(.+?)\s*(?:-|~|到|至)\s*(?:第\s*)?(.+)$/u.exec(part);
+        if (range) {
+          const from = stepNumber(range[1]);
+          const to = stepNumber(range[2]);
+          if (from && to && to >= from && to - from < 20) for (let step2 = from; step2 <= to; step2 += 1) found.add(step2);
+          continue;
+        }
+        const step = stepNumber(part.replace(/^第\s*/u, ""));
+        if (step) found.add(step);
+      }
+    }
+  }
+  return [...found].sort((a, b) => a - b);
+}
 function taskPackages(taskType, text3, band) {
   if (band !== "complex") {
     const task = { id: "execution", name: "\u76F4\u63A5\u56DE\u7B54\u4E0E\u5FC5\u8981\u6821\u9A8C", type: taskType, purpose: "execution", difficulty: band, criticality: 0.65, dependsOn: [], preferredReasoningEffort: band === "simple" ? "low" : "medium" };
@@ -801,7 +842,9 @@ function taskPackages(taskType, text3, band) {
       const type = detectTaskTypes(objective)[0] ?? "general";
       const difficulty = group.length > 1 ? "complex" : requirementDifficulty(objective, type);
       const previous = packages.at(-1);
-      const sequential = /^(?:最后|然后|接着|随后|再|基于|根据|测试|验证|部署|发布)|(?:完成|结束|实现)后/u.test(objective);
+      const groupOf = (step) => requirements.length > MAX_EXPLICIT_EXECUTION_PACKAGES && step >= MAX_EXPLICIT_EXECUTION_PACKAGES ? MAX_EXPLICIT_EXECUTION_PACKAGES - 1 : step - 1;
+      const explicit = [...new Set(group.flatMap((item) => explicitStepReferences(item)).map(groupOf))].filter((target) => target >= 0 && target < index).map((target) => `execution-${target + 1}`);
+      const sequential = explicit.length === 0 && /^(?:最后|然后|接着|随后|再|基于|根据|测试|验证|部署|发布)|(?:完成|结束|实现)后/u.test(objective);
       packages.push({
         id: `execution-${index + 1}`,
         name: group.length === 1 ? `\u9700\u6C42 ${index + 1}\uFF1A${group[0].slice(0, 28)}` : `\u9700\u6C42 ${index + 1}\uFF1A\u5176\u4F59 ${group.length} \u9879`,
@@ -810,7 +853,7 @@ function taskPackages(taskType, text3, band) {
         purpose: "execution",
         difficulty,
         criticality: difficulty === "simple" ? 0.55 : difficulty === "balanced" ? 0.72 : 0.86,
-        dependsOn: sequential && previous?.purpose === "execution" ? ["analysis", previous.id] : ["analysis"],
+        dependsOn: explicit.length ? ["analysis", ...explicit] : sequential && previous?.purpose === "execution" ? ["analysis", previous.id] : ["analysis"],
         preferredReasoningEffort: difficulty === "simple" ? "low" : difficulty === "balanced" ? "medium" : "high"
       });
     });
@@ -1429,6 +1472,9 @@ function createPlanFromRoutes(task, availableRoutes, {
 // .dsh-plugin/shared/run-ledger.mjs
 var finite = (value) => typeof value === "number" && Number.isFinite(value);
 var routeKey2 = (provider, model) => `${String(provider ?? "")}\0${String(model ?? "")}`;
+function formatUsd(value) {
+  return typeof value === "number" && Number.isFinite(value) ? `$${value.toFixed(4)}` : "\u2014";
+}
 function budgetCheck({ estimateUsd = null, spent = { today: 0, month: 0 }, dailyLimitUsd = 0, monthlyLimitUsd = 0 } = {}) {
   const limits = [];
   if (finite(dailyLimitUsd) && dailyLimitUsd > 0) limits.push({ period: "daily", label: "\u4ECA\u65E5", limit: dailyLimitUsd, spent: spent.today ?? 0 });
@@ -1442,7 +1488,7 @@ function budgetCheck({ estimateUsd = null, spent = { today: 0, month: 0 }, daily
     estimateUsd: estimateKnown ? estimateUsd : null,
     remainingUsd: remaining,
     exceeded: exceeded ? exceeded.period : null,
-    message: exceeded ? `${exceeded.label}\u9884\u7B97 $${exceeded.limit.toFixed(2)}\uFF0C\u5DF2\u7528 $${exceeded.spent.toFixed(4)}${estimateKnown ? `\uFF0C\u672C\u6B21\u9884\u4F30 $${estimateUsd.toFixed(4)}` : ""}\uFF0C\u5C06\u8D85\u51FA\u4E0A\u9650\u3002` : limits.length && !estimateKnown ? "\u90E8\u5206\u8DEF\u7EBF\u7F3A\u5C11\u5355\u4EF7\uFF0C\u65E0\u6CD5\u9884\u4F30\u672C\u6B21\u8D39\u7528\uFF1B\u4EC5\u5728\u5DF2\u7528\u91D1\u989D\u8FBE\u5230\u4E0A\u9650\u65F6\u963B\u6B62\u3002" : ""
+    message: exceeded ? `${exceeded.label}\u9884\u7B97 ${formatUsd(exceeded.limit)}\uFF0C\u5DF2\u7528 ${formatUsd(exceeded.spent)}${estimateKnown ? `\uFF0C\u672C\u6B21\u9884\u4F30 ${formatUsd(estimateUsd)}` : ""}\uFF0C\u5C06\u8D85\u51FA\u4E0A\u9650\u3002` : limits.length && !estimateKnown ? "\u90E8\u5206\u8DEF\u7EBF\u7F3A\u5C11\u5355\u4EF7\uFF0C\u65E0\u6CD5\u9884\u4F30\u672C\u6B21\u8D39\u7528\uFF1B\u4EC5\u5728\u5DF2\u7528\u91D1\u989D\u8FBE\u5230\u4E0A\u9650\u65F6\u963B\u6B62\u3002" : ""
   };
 }
 function applyQualityBiases(routes, biases) {
@@ -1749,7 +1795,7 @@ function healthSummary(tools) {
     older: installed.filter((item) => item.versionStatus === "older").length
   };
 }
-var money = (value) => typeof value === "number" && Number.isFinite(value) ? `$${value.toFixed(value >= 1 ? 2 : 4)}` : "\u2014";
+var money = formatUsd;
 function budgetMeter(spent, limit) {
   if (!(limit > 0)) return { limited: false, share: 0, text: `${money(spent)}\uFF08\u672A\u8BBE\u4E0A\u9650\uFF09` };
   const share = Math.min(1, Math.max(0, spent / limit));
@@ -2340,7 +2386,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       setPlanError(text2(error?.message) || "\u65E0\u6CD5\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE\u3002");
     }
   };
-  return /* @__PURE__ */ import_react3.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react3.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react3.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-eyebrow" }, "Model Router \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react3.default.createElement("h1", { className: "mr-title" }, "\u6A21\u578B\u8DEF\u7531\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-subtitle" }, "\u67E5\u770B\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E3A\u4EFB\u52A1\u751F\u6210\u8DEF\u7EBF\u5EFA\u8BAE\u4E0E\u56E2\u961F\u5DE5\u4F5C\u5305\u3002\u4E3B\u4F1A\u8BDD\u6A21\u578B\u4ECD\u7531\u5B98\u65B9\u9009\u62E9\u5668\u7BA1\u7406\u3002")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} \u4E2A\u4F9B\u5E94\u5546 \xB7 ${routes.length} \u6761\u8DEF\u7EBF` : catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55" : "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25")), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react3.default.createElement(
+  return /* @__PURE__ */ import_react3.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react3.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react3.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-eyebrow" }, "Model Router \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react3.default.createElement("h1", { className: "mr-title" }, "\u6A21\u578B\u8DEF\u7531\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-subtitle" }, "\u67E5\u770B\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E3A\u4EFB\u52A1\u751F\u6210\u8DEF\u7EBF\u5EFA\u8BAE\u4E0E\u56E2\u961F\u5DE5\u4F5C\u5305\u3002\u4E3B\u4F1A\u8BDD\u6A21\u578B\u4ECD\u7531\u5B98\u65B9\u9009\u62E9\u5668\u7BA1\u7406\u3002")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} \u4E2A\u4F9B\u5E94\u5546 \xB7 ${routes.length} \u6761\u8DEF\u7EBF` : catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55" : "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25")), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react3.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react3.default.createElement(
     OnboardingBanner,
     {
       health: workbench.health.report,

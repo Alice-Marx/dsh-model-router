@@ -105,7 +105,7 @@ The workbench shows these at the top. The matching session tools are in parenthe
 1. **Onboarding health check** (`model_router_health`). When you first open the workbench, it checks every official tool in the registry: is it installed, does its version match the pinned version, and is it logged in. Login checks only run cheap status commands with short timeouts: `claude auth status --json` for Claude and `codex login status` for Codex. Gemini's login is inferred from `GEMINI_API_KEY`/`GOOGLE_API_KEY` or `~/.gemini/oauth_creds.json`. Other tools show "unknown". The check never starts a login.
    - **一键安装** (one-click install) reuses the fixed registry installer.
    - **去登录** (log in) shows the login command so you can copy it.
-   - Results are cached for 10 minutes. Routing **skips logged-out CLIs immediately** and goes straight to the model-catalog API; before this, Codex took about 14 s to fail and fall back. A tool is not skipped when its API key is configured. If a CLI reports a login error at run time, it is also marked as logged out.
+   - Results are cached for 10 minutes. Routing **skips logged-out CLIs immediately** and goes straight to the model-catalog API; before this, Codex took about 14 s to fail and fall back. A tool is not skipped when its API key is configured. If a CLI reports a login error at run time, it is also marked as logged out — but because you were running on its subscription, later steps on that route are **paused and ask** (“订阅登录已失效…未自动改用 API Key”) instead of silently using the API key, also after a restart (`authFailures` in `state.json`), until the CLI runs on its subscription again. The same applies when a profile explicitly sets `billing: "subscription-first"` or `"subscription-only"` and the CLI is logged out. Logged-out CLIs without either signal, and CLIs that are not installed, still go straight to the API.
 2. **Visible routing decisions**. Plans show the selected model, preset, difficulty score, estimated cost, and channel (official CLI or API, with a "CLI 未登录" badge when the CLI is logged out). The run history shows each step's actual channel. On fallback it shows the real redacted error: Claude JSON `result`, Codex `turn.failed.error.message`, or a stderr snippet. When `allowManualReassign` is on (the default), you can reassign a step to another configured route and rerun it.
 3. **Cost control**. Set daily and monthly budgets (USD, `0` = unlimited) and see meters for today's and this month's spend.
    - Before a run, the estimate is checked against the budget.
@@ -127,11 +127,13 @@ The workbench shows these at the top. The matching session tools are in parenthe
 7. **Quality loop** (`model_router_rate`). `reviewMode` can be `off`, `sample` (uses `reviewSampleRate`), or `always`. When on, a stronger configured model reviews cheap-model output, and the verdict is stored with the run. You can rate each result 👍/👎. Ratings add a small shrunk bias (at most ±0.04) to that exact `provider/model`'s quality score for future routing.
 
 **Local data (on by default)**: run history is **saved locally by default**; there is no switch. It is kept in `~/.dsh/model-router/state.json` (or `$DSH_HOME/model-router/state.json`) and contains:
-- the health report and subscription quota state (which subscriptions are exhausted until when);
+- the health report, subscription quota state (which subscriptions are exhausted until when) and CLIs whose subscription login failed at run time;
 - the last 200 runs (routed, team and tool runs), with the **full task text** (up to 20,000 characters) and **each step's answer excerpt** (up to 4,000 characters);
 - workspace paths, routing decisions, costs and ratings.
 
 The file never leaves your machine and holds no API keys. If your tasks contain sensitive content, keep this file in mind. Delete it, or its `runs` array, to clear the history.
+
+Several Host processes can share one DSH home: each write takes `state.json.lock`, re-reads the file, applies its change and replaces the file atomically, so concurrent runs are not lost. If the file cannot be parsed, it is kept as `state.json.corrupt-<time>` and the workbench and `model_router_health` (`notices`) show a warning for 7 days; recover history from that backup if needed.
 
 **Known gaps**:
 - For team and tool runs, token usage is read only from Claude/Codex output; other CLIs show "cost unknown" or "subscription login, no usage reported". `model_router_tool_run` has no pre-run estimate and no budget check; `model_router_team_execute` checks the budget before running.
@@ -227,7 +229,7 @@ The initial bands are `simple` for `C < 0.34`, `balanced` for `0.34 ≤ C < 0.66
 
 ### 2. Split compound work into a directed acyclic graph
 
-A complex request begins with **analysis** and ends with **synthesis**. Action-like lines, bullets, clauses, or sentences can become up to six explicit execution packages. A request for testing or verification adds a verification package. The `dependsOn` edges put analysis before execution, verification after the relevant execution packages, and synthesis after all required results. Sequential wording such as “then” adds an edge between execution packages.
+A complex request begins with **analysis** and ends with **synthesis**. Action-like lines, bullets, clauses, or sentences can become up to six explicit execution packages. A request for testing or verification adds a verification package. The `dependsOn` edges put analysis before execution, verification after the relevant execution packages, and synthesis after all required results. Sequential wording such as “then” adds an edge between execution packages. Explicit references become edges to exactly those steps: “依赖第 1 步”, “基于第 2、3 步”, “第 1 步完成后”, “依赖第 1-3 步”, “depends on step 2”, “after steps 1 and 3” (numbers count the listed requirements; forward references are ignored).
 
 ```text
 analysis ──┬── keyword extraction ────────────┐
@@ -360,7 +362,7 @@ From a Harness session, these plugin tools are available:
 | --- | --- |
 | `model_router_routes` / `model_router_plan` | Show configured routes or generate a local plan. `/router` is the session command for a plan. |
 | `model_router_consult` | Ask another configured Harness model for a live second opinion through the model API. This can incur provider charges. |
-| `model_router_execute` | Run a routed plan, or one explicit model, through each vendor's headless CLI when enabled. Missing, logged-out, or failed CLIs fall back to the model API (a hung CLI gets SIGTERM, then SIGKILL after 5 s). Records cost and supports per-step rerun and rating. Read-only. |
+| `model_router_execute` | Run a routed plan, or one explicit model, through each vendor's headless CLI when enabled. Missing, logged-out, or failed CLIs fall back to the model API (a hung CLI and the processes it started get SIGTERM, then SIGKILL after 5 s; a cancel waits at most 1.5 s; Windows uses `taskkill /T /F`). The task may be up to 64,000 UTF-8 bytes (about 21,000 Chinese or 64,000 English characters) and is checked before any paid call; long tasks and dependency answers are truncated per step so each step's prompt fits. A run that stops on an error after paid steps is still recorded with their cost. Records cost and supports per-step rerun and rating. Read-only. |
 | `model_router_health` | Onboarding health check: installed, version, login state per official tool. Logged-out tools are skipped by routing. |
 | `model_router_rerun_step` / `model_router_rate` | Rerun (optionally reassign) one failed step of a recorded run; rate a result 👍/👎 to nudge future routing. |
 | `model_router_tools` / `model_router_tool_install` | Probe or install a fixed official tool. `/tools` exposes the human command. |
