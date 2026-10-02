@@ -111,19 +111,29 @@ The workbench shows these at the top. The matching session tools are in parenthe
    - Before a run, the estimate is checked against the budget.
    - After a run, the actual cost is recorded. CLI-reported cost (Claude `total_cost_usd`) is used first; otherwise token usage × your configured prices. Without prices, only token counts are kept.
    - `overBudgetAction` decides what happens over budget. `downgrade` (the default) re-plans with the economy preset and pauses if it still doesn't fit. `pause` asks you right away. Continuing from a session requires `confirmOverBudget=true`, which triggers a host approval.
-   - Note: Claude's `total_cost_usd` is the API-equivalent price, even when you use a subscription.
+   - **Only API-billed spend counts against budgets**: model-catalog API calls, and official CLI calls that use an API key (injected by the plugin, inherited from the environment, or a CLI whose own login is an API key according to the health check).
+   - When an official CLI runs on a **subscription login** with no API key (for example Claude Pro/Max, or Codex signed in with ChatGPT), its reported or usage × price figure is shown separately as **订阅参考费用 (subscription reference cost, priced at API rates)** and is **not** counted toward the daily/monthly budget. The cost card and run history show both the budget-counted spend and the reference cost. Tool rows show whether each CLI is on a subscription login or bills an API key.
+   - When the login type cannot be detected (CLIs without a status command, CLIs launched by the team runner), it is treated as a subscription login unless a matching API-key environment variable is set.
 4. **Presets** (`routingPreset`): 省钱优先 (economy) / 均衡 (balanced, the default) / 效果优先 (quality). Presets tilt the quality/cost/latency weights and move the quality floor a cheaper substitute must clear by ±0.04. Balanced is identical to the previous planner.
-5. **Subtask DAG** (`model_router_rerun_step`). Team packages are shown in dependency columns. Recorded runs show each step's status (done, fallback, failed, blocked). **重跑此步** (rerun this step) reruns only the failed step and its unfinished downstream steps. Finished steps keep their results.
+5. **Subtask DAG** (`model_router_rerun_step`). Team packages are shown in dependency columns. Every `model_router_execute`, `model_router_team_execute` and `model_router_tool_run` call is recorded with its kind and each step's status (done, fallback, failed, blocked). A team run stops at the first failure, so later steps show as blocked. **重跑此步** (rerun this step) reruns only the failed step and its unfinished downstream steps. Finished steps keep their results and feed the rerun as dependency context.
+   - Routed runs: any failed step can be rerun or reassigned.
+   - Team runs: **read-only** team runs support single-step rerun through the same signed runner and Harness sandbox. **Editable** (`workspace-write`) team runs do not, because the earlier changes live in an isolated Git worktree that is already integrated or kept for manual review; call `model_router_team_execute` again. The signed runner currently supports Claude/Codex read-only runs only on Windows. On Linux/macOS, team runs can only use Kimi/MiniMax in editable mode, so team rerun is effectively unavailable there.
+   - Tool runs: a single step with no rerun; call `model_router_tool_run` again.
 6. **Security boundaries**. The workbench card and the plugin settings list each route's readable and writable scope and its sandbox status:
    - Read-only runs write nothing.
    - File-modifying runs use an isolated Git worktree and need host approval.
    - On Linux/macOS, a headless CLI launched directly has no Harness process sandbox. With `confirmUnsandboxedCli` on (the default), you are asked first.
 7. **Quality loop** (`model_router_rate`). `reviewMode` can be `off`, `sample` (uses `reviewSampleRate`), or `always`. When on, a stronger configured model reviews cheap-model output, and the verdict is stored with the run. You can rate each result 👍/👎. Ratings add a small shrunk bias (at most ±0.04) to that exact `provider/model`'s quality score for future routing.
 
-**Local data**: state is kept in `~/.dsh/model-router/state.json` (or `$DSH_HOME/model-router/state.json`). It holds the health report and the last 200 runs, including **task text and answer excerpts**, costs, and ratings. It never leaves your machine. Delete the file to clear it.
+**Local data (on by default)**: run history is **saved locally by default**; there is no switch. It is kept in `~/.dsh/model-router/state.json` (or `$DSH_HOME/model-router/state.json`) and contains:
+- the health report;
+- the last 200 runs (routed, team and tool runs), with the **full task text** (up to 20,000 characters) and **each step's answer excerpt** (up to 4,000 characters);
+- workspace paths, routing decisions, costs and ratings.
+
+The file never leaves your machine and holds no API keys. If your tasks contain sensitive content, keep this file in mind. Delete it, or its `runs` array, to clear the history.
 
 **Known gaps**:
-- Only `model_router_execute` runs are recorded and shown in the DAG. `team_execute`/`tool_run` are budget-gated but not recorded.
+- For team and tool runs, token usage is read only from Claude/Codex output; other CLIs show "cost unknown" or "subscription login, no usage reported". `model_router_tool_run` has no pre-run estimate and no budget check; `model_router_team_execute` checks the budget before running.
 - The workbench cannot start new runs; start tasks from a session. Rerun and rating work from the workbench.
 - Kimi, MiniMax, MiMo, Grok and ZCode have no reliable login status command, and the login commands shown for them are best-effort.
 - The UI has passed build checks and unit tests only. It has not been verified in a real Harness desktop.
@@ -303,15 +313,14 @@ The planned Harness model ID is not necessarily the vendor CLI's model name. A s
 Use Node.js **22.19+** and pnpm 10 (pinned through `packageManager`; `corepack enable` picks it up). From a complete source checkout, run:
 
 ```powershell
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --strict-peer-dependencies
 npm run build:client
 npm test
 npm run check:client
-pnpm peers check
 npm pack --pack-destination dist
 ```
 
-The client must be rebuilt when its source changes; a previously generated bundle does not verify new code. Install the resulting archive through the Desktop plugin manager in a separate test profile to check the router entry and official-tool panel. Test GAL alone and alongside the router using its own repository's instructions. Live sign-in, actual vendor model identity, response quality, and provider billing require the account holder's acceptance checks.
+pnpm 10 has no `pnpm peers check` command; `--strict-peer-dependencies` makes the install fail on unmet peer dependencies instead. The client must be rebuilt when its source changes; a previously generated bundle does not verify new code. Install the resulting archive through the Desktop plugin manager in a separate test profile to check the router entry and official-tool panel. Test GAL alone and alongside the router using its own repository's instructions. Live sign-in, actual vendor model identity, response quality, and provider billing require the account holder's acceptance checks.
 
 The [0.11.1 release report](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md) and [rc.2 compatibility report](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md) preserve the earlier release record. Current split-release results belong in the new project task report; historical test counts do not establish standalone-package compatibility.
 

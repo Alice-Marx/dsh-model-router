@@ -137,19 +137,29 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
    - 执行前，用本次预估金额检查预算。
    - 执行后，记录实际费用：优先用 CLI 回报的费用（Claude 的 `total_cost_usd`），否则用 token 用量乘以“模型价格与能力配置”里的单价。没有单价时只记录 token 数。
    - 超出预算时的处理由 `overBudgetAction` 决定：`downgrade`（默认）先改用“省钱优先”重新规划，仍超出就暂停；`pause` 直接暂停，询问你是否继续。会话里继续需要传 `confirmOverBudget=true`，宿主会再弹出一次审批。
-   - 注意：Claude 的 `total_cost_usd` 是按 API 价格换算的金额，使用订阅时不等于实际扣费。
+   - **只有走 API 计费的花费计入预算**：模型目录 API 调用，或官方 CLI 使用 API Key（插件注入的、环境变量里的，或体检发现 CLI 本身用 API Key 登录）的调用。
+   - 官方 CLI 用**订阅账号登录**、没有 API Key 时（例如 Claude Pro/Max、ChatGPT 登录的 Codex），CLI 回报的金额或按单价折算的金额只显示为“**订阅参考费用（按 API 价折算）**”，**不计入**每日/每月预算。成本卡片和执行记录会同时显示“计入预算”的金额和订阅参考费用。工具卡片会标出各 CLI 是“订阅账号登录”还是“API Key 计费”。
+   - 判断不了登录方式时（例如 Kimi 等没有状态命令的 CLI、团队执行器启动的 CLI），只要没有检测到对应的 API Key 环境变量，就按订阅登录处理。
 4. **预设方案**（`routingPreset`）。可选**省钱优先 / 均衡 / 效果优先**，默认是均衡。方案会调整质量、成本和速度三者的权重，并把替代模型必须达到的质量门槛下调或上调 0.04。均衡和以前的算法完全相同。
-5. **子任务可视化**（`model_router_rerun_step`）。团队分工的工作包按依赖关系分列，显示成依赖图（DAG）。执行记录里每一步都标有状态：完成、已回退、失败或依赖未完成。点**重跑此步**只重跑失败的那一步，以及依赖它的未完成步骤，已完成的步骤保留原结果。
+5. **子任务可视化**（`model_router_rerun_step`）。团队分工的工作包按依赖关系分列，显示成依赖图（DAG）。`model_router_execute`、`model_router_team_execute` 和 `model_router_tool_run` 的每次执行都会写入执行记录，并标明类型（路由执行 / 团队执行 / 单工具调用）。每一步都标有状态：完成、已回退、失败或依赖未完成；团队执行在某一步失败后停止，后面的步骤显示为“依赖未完成”。点**重跑此步**只重跑失败的那一步，以及依赖它的未完成步骤，已完成的步骤保留原结果，并作为重跑的依赖上下文。
+   - 路由执行：都可以单步重跑，也可以改派。
+   - 团队执行：**只读**团队运行可以单步重跑（同样经过签名执行器和 Harness 沙箱）。**可编辑**（`workspace-write`）团队运行不支持单步重跑，因为之前的改动在独立 Git 工作树中，已整合或保留待人工核对；请重新调用 `model_router_team_execute`。目前签名执行器只在 Windows 上支持 Claude/Codex 只读运行，Linux/macOS 上的团队执行只能用 Kimi/MiniMax 的可编辑模式，因此在这两个平台上实际上不能单步重跑团队执行。
+   - 单工具调用：只有一步，不提供单步重跑，直接再调用一次 `model_router_tool_run` 即可。
 6. **安全边界**。“安全边界”卡片和插件设置页会逐条列出每条路线可读、可写的范围，以及是否经过 Harness 沙箱：
    - 只读执行不写文件；
    - 修改文件的执行在独立 Git 工作树里进行，需要宿主审批；
    - 在 Linux/macOS 上直接启动无界面 CLI 时没有 Harness 进程沙箱，`confirmUnsandboxedCli`（默认开启）会在启动前先询问你。
 7. **质量回路**（`model_router_rate`）。`reviewMode` 可以设为 `off`、`sample` 或 `always`；`sample` 按 `reviewSampleRate` 的比例抽检。开启后，会让更强的已配置模型复核便宜模型的输出，并把结论写进执行记录。你可以对每个结果点 👍/👎。评价会以收缩平均的方式，给对应 `provider/model` 的质量分加一个微调，范围最多 ±0.04，作用于以后的路由。
 
-**本地数据**：上面的状态保存在 `~/.dsh/model-router/state.json`（若设置了 `DSH_HOME`，则在 `$DSH_HOME/model-router/state.json`），包括体检结果、最近 200 次执行的**任务文本、答案摘要**、费用和评价。只保存在本机，不上传。需要清除时直接删除这个文件。
+**本地数据（默认开启）**：执行记录**默认自动保存在本机**，没有开关。保存位置是 `~/.dsh/model-router/state.json`（若设置了 `DSH_HOME`，则在 `$DSH_HOME/model-router/state.json`）。内容包括：
+- 体检结果；
+- 最近 200 次执行（路由执行、团队执行、单工具调用）的**完整任务文本**（最多 2 万字）和**每步答案摘要**（每步最多 4000 字）；
+- 工作区路径、路由决策、费用和评价。
+
+这个文件只在本机，不会上传，也不包含 API Key。如果任务里有敏感内容，请留意这个文件；需要清除时直接删除它，或删掉其中的 `runs` 数组。
 
 **当前限制**：
-- 只有 `model_router_execute` 的执行会写入记录和 DAG。`model_router_team_execute` 与 `model_router_tool_run` 只受预算检查约束，不记录费用和评价。
+- 团队执行和单工具调用的 token 用量只来自 Claude/Codex 的输出；其他 CLI 显示“费用未知”或“订阅登录，未回报可折算的用量”。`model_router_tool_run` 没有执行前费用预估，也不检查预算；`model_router_team_execute` 在执行前检查预算。
 - 工作台还不能直接发起新的执行，任务仍要在会话中开始；重跑和评价可以在工作台里完成。
 - Kimi、MiniMax、MiMo、Grok、ZCode 还没有可靠的登录状态命令，显示的登录命令仅供参考。
 - 这些界面只通过了构建检查和单元测试，还没有在真实 Harness 桌面里验证。
@@ -290,15 +300,14 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 开发环境为 Node.js **22.19+** 与 pnpm 10（已通过 `packageManager` 固定，`corepack enable` 后自动使用）。在完整源码根目录运行：
 
 ```powershell
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --strict-peer-dependencies
 npm run build:client
 npm test
 npm run check:client
-pnpm peers check
 npm pack --pack-destination dist
 ```
 
-客户端源代码有变化时必须重建；旧生成文件不能验证新实现。将生成的安装包在独立测试 profile 安装，检查路由入口、目录、模型档案和官方工具卡。GAL 的单独安装及与路由共同安装按其仓库步骤验收。真实登录、厂商实际模型、任务质量与计费仍需账号持有人核对。
+pnpm 10 没有 `pnpm peers check` 命令；改用 `--strict-peer-dependencies`，peer 依赖不满足时安装直接失败。客户端源代码有变化时必须重建；旧生成文件不能验证新实现。将生成的安装包在独立测试 profile 安装，检查路由入口、目录、模型档案和官方工具卡。GAL 的单独安装及与路由共同安装按其仓库步骤验收。真实登录、厂商实际模型、任务质量与计费仍需账号持有人核对。
 
 历史记录保留在 [0.11.1 发布报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)和[rc.2 兼容报告](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md)。本次拆分的构建、测试与发布结果写入新的总项目报告；旧合并版的测试数量不代表独立包已经通过验证。
 
