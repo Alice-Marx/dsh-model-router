@@ -14,12 +14,12 @@
 
 ### 2. 安装插件
 
-正式 npm 包（当前版本 `0.4.20`）：
+正式 npm 包（0.13.0 起包名为 `@ljwei-stak/dsh-model-router`；旧名 `@ljwei-stak/model-router-galgame` 不再更新）：
 
 ```bash
 pnpm config set registry https://registry.npmjs.org/
-pnpm dsh plugin --profile web add @ljwei-stak/model-router-galgame@0.4.20
-pnpm dsh plugin --profile desktop add @ljwei-stak/model-router-galgame@0.4.20
+pnpm dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.13.0
+pnpm dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.13.0
 ```
 
 官方 `@liustack/modlens@3.25.4` 会随插件自动安装。
@@ -28,11 +28,11 @@ pnpm dsh plugin --profile desktop add @ljwei-stak/model-router-galgame@0.4.20
 
 ```bash
 # 方法1: 从插件目录安装
-cd /path/to/model-router-galgame
+cd /path/to/dsh-model-router
 dsh plugin --profile web add .
 
 # 方法2: 从任意位置安装
-dsh plugin --profile web add /path/to/model-router-galgame
+dsh plugin --profile web add /path/to/dsh-model-router
 
 # 重启 Harness
 dsh restart

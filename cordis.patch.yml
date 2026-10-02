@@ -1,6 +1,12 @@
 # Official DeepSeek Harness desktop bundle. It intentionally contributes only
 # the router assistant; provider credentials, model catalogs and Agent Teams
 # remain owned by the official desktop profile.
+#
+# The package was renamed to @ljwei-stak/dsh-model-router in 0.13.0. `name` is
+# the module the loader imports and must be the package name. The entry `id`
+# deliberately stays `model-router-galgame`: settings forms, profile patches and
+# saved panel state address the plugin by this id, so keeping it preserves the
+# configuration of existing installs.
 - insert:
     - id: model-router-galgame
-      name: '@ljwei-stak/model-router-galgame'
+      name: '@ljwei-stak/dsh-model-router'

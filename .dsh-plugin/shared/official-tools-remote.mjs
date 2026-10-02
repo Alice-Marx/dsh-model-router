@@ -7,7 +7,7 @@
  */
 import { getOfficialTool } from './official-tool-registry.mjs'
 
-export const OFFICIAL_TOOLS_REMOTE_PACKAGE = '@ljwei-stak/model-router-galgame'
+export const OFFICIAL_TOOLS_REMOTE_PACKAGE = '@ljwei-stak/dsh-model-router'
 export const OFFICIAL_TOOLS_REMOTE_NAMESPACE = 'modelRouterOfficialTools'
 
 function strictCodec(typeSymbol, parse) {

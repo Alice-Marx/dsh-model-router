@@ -2,7 +2,7 @@
 
 **0.13.0 新增开箱体检、成本控制、订阅优先计费与执行记录；自 0.12.0 起模型路由与 GAL 是两个独立插件。** 路由器分析问题、判断难度，在用户已配置的模型中选择合适路线：简单工作更重视费用，困难工作更重视质量，复合任务拆成有依赖的工作包，再由支持的官方模型工具执行。
 
-npm 包名仍为 `@ljwei-stak/model-router-galgame`，便于原用户直接升级；**自 0.12.0 起只提供“模型路由”入口**。要玩剧情、调整立绘、听音乐或自由对话，请另装 [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame)。两个插件互不依赖，可单独安装，也可同时安装。
+**自 0.13.0 起 npm 包名改为 `@ljwei-stak/dsh-model-router`**，旧名 `@ljwei-stak/model-router-galgame`（至 0.12.0）不再更新，升级时需卸载旧插件再添加新包（见[从旧包名升级](#从旧包名-ljwei-stakmodel-router-galgame-升级)）；**自 0.12.0 起只提供“模型路由”入口**。要玩剧情、调整立绘、听音乐或自由对话，请另装 [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame)。两个插件互不依赖，可单独安装，也可同时安装。
 
 [English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [迁移说明](MIGRATION.md) · [独立 GAL 仓库](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
@@ -34,7 +34,7 @@ npm 包名仍为 `@ljwei-stak/model-router-galgame`，便于原用户直接升�
 
 | 安装内容 | 输入框填写 | GitHub 仓库 |
 | --- | --- | --- |
-| 模型路由、模型档案与官方工具 | `@ljwei-stak/model-router-galgame@0.13.0` | [Model Router](https://github.com/Alice-Marx/model-router-galgame) |
+| 模型路由、模型档案与官方工具 | `@ljwei-stak/dsh-model-router@0.13.0` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
 | GAL 剧情、自由模式与播放器 | `@ljwei-stak/dsh-galgame@0.1.0` | [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) |
 
 1. npm 安装源选择官方 **HTTPS** 地址 `https://registry.npmjs.org/`；国内镜像尚未同步时可改用此源或版本化 GitHub 安装包。
@@ -43,11 +43,20 @@ npm 包名仍为 `@ljwei-stak/model-router-galgame`，便于原用户直接升�
 
 普通使用不需要 `npm install -g`：全局 npm 安装不会注册到当前 Harness profile。路由与 GAL 都可以不安装另一插件而运行。
 
+
+### 从旧包名 @ljwei-stak/model-router-galgame 升级
+
+0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`，插件管理器无法原地更新旧条目：
+
+1. 在插件管理器卸载 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据）。
+2. 添加 `@ljwei-stak/dsh-model-router@0.13.0`，按提示重启。
+3. 不要两个同时安装：二者使用相同的 profile 条目 id `model-router-galgame` 和相同的 `model_router_*` 工具名。条目 id 未变，所以 profile 中保存的路由设置以及 `~/.dsh/model-router/state.json` 里的执行记录会保留。
+
 ### 从合并版 0.11.x 升级
 
 1. **先备份**：旧版 GAL 中对需要保留的剧情进度使用“导出存档”，并备份 Harness profile。JSON 仅包含当前剧情状态，不包含全部手动槽、设置、已读记录与本地音乐。
 2. 在**同一个 profile**安装 `@ljwei-stak/dsh-galgame@0.1.0`。
-3. 用插件管理器把原 `@ljwei-stak/model-router-galgame` 更新到 **0.13.0**。完成两项更新后再游玩；旧合并插件的 GAL 入口随路由升级移除，只留下新 GAL 插件的入口。
+3. 在插件管理器卸载原 `@ljwei-stak/model-router-galgame`，再添加 `@ljwei-stak/dsh-model-router@0.13.0`（见上文“从旧包名升级”）。完成两项安装后再游玩；旧合并插件的 GAL 入口随路由升级移除，只留下新 GAL 插件的入口。
 4. 打开独立 GAL 检查进度。它保留原 localStorage 存档键；更换 profile 或没有读到旧进度时，先选择对应剧目，再导入备份 JSON。
 
 独立 GAL 核心只内置**《回声之城·正篇》**和**《旧城迁移篇：未写完的约定》**。此前分出的其他篇目保留在源代码归档，不随这两个核心插件发布。完整迁移步骤见[迁移说明](MIGRATION.md)。
@@ -57,13 +66,13 @@ npm 包名仍为 `@ljwei-stak/model-router-galgame`，便于原用户直接升�
 从[路由 v0.13.0 Release](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.0)或[GAL v0.1.0 Release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0)下载 `.tgz`，在添加插件输入框填写文件绝对路径，例如：
 
 ```text
-D:\Plugins\ljwei-stak-model-router-galgame-0.13.0.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz
 ```
 
 如附有 `.sha256` 校验文件，使用以下命令计算摘要并比较：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.13.0.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz'
 ```
 
 也可解压并填写内层含 `package.json` 和 `.dsh-plugin` 的 `package` 目录。安装包可放到自选磁盘；运行数据位置由宿主 profile 决定。不要改 `app.asar` 或绕过依赖检查。
@@ -397,8 +406,8 @@ npm pack --pack-destination dist
 
 pnpm 10 没有 `pnpm peers check` 命令；改用 `--strict-peer-dependencies`，peer 依赖不满足时安装直接失败。客户端源代码有变化时必须重建；旧生成文件不能验证新实现。将生成的安装包在独立测试 profile 安装，检查路由入口、目录、模型档案和官方工具卡。GAL 的单独安装及与路由共同安装按其仓库步骤验收。真实登录、厂商实际模型、任务质量与计费仍需账号持有人核对。
 
-历史记录保留在 [0.11.1 发布报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)和[rc.2 兼容报告](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md)。本次拆分的构建、测试与发布结果写入新的总项目报告；旧合并版的测试数量不代表独立包已经通过验证。
+历史记录保留在 [0.11.1 发布报告](https://github.com/Alice-Marx/dsh-model-router/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)和[rc.2 兼容报告](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md)。本次拆分的构建、测试与发布结果写入新的总项目报告；旧合并版的测试数量不代表独立包已经通过验证。
 
-安装或执行出错时，可到 [Issues](https://github.com/Alice-Marx/model-router-galgame/issues) 提供宿主版本、插件版本、安装详情和脱敏日志。
+安装或执行出错时，可到 [Issues](https://github.com/Alice-Marx/dsh-model-router/issues) 提供宿主版本、插件版本、安装详情和脱敏日志。
 
 许可证：[MIT](LICENSE)。

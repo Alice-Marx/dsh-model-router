@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: "@ljwei-stak/model-router-galgame",
+  id: "@ljwei-stak/dsh-model-router",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -2638,7 +2638,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
 }
 
 // .dsh-plugin/shared/official-tools-remote.mjs
-var OFFICIAL_TOOLS_REMOTE_PACKAGE = "@ljwei-stak/model-router-galgame";
+var OFFICIAL_TOOLS_REMOTE_PACKAGE = "@ljwei-stak/dsh-model-router";
 var OFFICIAL_TOOLS_REMOTE_NAMESPACE = "modelRouterOfficialTools";
 function strictCodec(typeSymbol, parse) {
   return Object.freeze({ mode: "strict", typeSymbol, create: () => ({ parse }) });
@@ -2786,7 +2786,7 @@ var OFFICIAL_TOOLS_HOST_TYPERT = Object.freeze({
 // .dsh-plugin/client/official-harness.jsx
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 var ROUTER_NAMESPACE = "model-router-galgame";
-var ROUTER_PACKAGE = "@ljwei-stak/model-router-galgame";
+var ROUTER_PACKAGE = "@ljwei-stak/dsh-model-router";
 var ROUTER_PANEL = "model-router-galgame";
 var inject = ["remote"];
 var UI_INJECT = [

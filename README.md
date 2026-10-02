@@ -2,7 +2,7 @@
 
 **Version 0.13.0 adds health checks, cost control, subscription-first billing and run history; since 0.12.0 model routing and GAL are separate plugins.** This plugin analyzes a request, gives simpler work to affordable capable models, and reserves stronger routes for difficult work. Compound requests become dependent work packages that supported official vendor tools can execute.
 
-The npm name remains `@ljwei-stak/model-router-galgame` so existing users can upgrade. **Since 0.12.0 the router package has only the Model Router sidebar entry.** Install the independent [GAL plugin](https://github.com/Alice-Marx/deepseek-harness-galgame) if you also want stories, portraits, music, saves, or free roleplay.
+**Since 0.13.0 the npm package is `@ljwei-stak/dsh-model-router`.** The old name `@ljwei-stak/model-router-galgame` (up to 0.12.0) is no longer updated; to upgrade, remove the old plugin and add the new one ([details](#upgrade-from-ljwei-stakmodel-router-galgame)). **Since 0.12.0 the router package has only the Model Router sidebar entry.** Install the independent [GAL plugin](https://github.com/Alice-Marx/deepseek-harness-galgame) if you also want stories, portraits, music, saves, or free roleplay.
 
 [简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Migration guide](MIGRATION.md) · [GAL repository](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
@@ -35,16 +35,24 @@ In **DeepSeek Harness Desktop → Plugins → Add plugin**, enter one exact pack
 
 | What you want | Installation input | Repository |
 | --- | --- | --- |
-| Model routing and official tools | `@ljwei-stak/model-router-galgame@0.13.0` | [Model Router](https://github.com/Alice-Marx/model-router-galgame) |
+| Model routing and official tools | `@ljwei-stak/dsh-model-router@0.13.0` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
 | GAL only, or GAL alongside the router | `@ljwei-stak/dsh-galgame@0.1.0` | [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) |
 
 For npm installation, select the official **HTTPS** source `https://registry.npmjs.org/` if a mirror has not synchronized the exact version. Install, enable, and restart when prompted. Router details should show **0.13.0** and its sidebar **Model Router**; the separate GAL package adds **Gal Module**. Either package can be installed without the other. Global `npm install -g` does not register a plugin in your Desktop profile.
+
+### Upgrade from `@ljwei-stak/model-router-galgame`
+
+The package was renamed in 0.13.0, so the plugin manager cannot update the old entry in place:
+
+1. Remove `@ljwei-stak/model-router-galgame` in the plugin manager (keep profile and application data).
+2. Add `@ljwei-stak/dsh-model-router@0.13.0` and restart when prompted.
+3. Do not keep both installed: they share the profile entry id `model-router-galgame` and the `model_router_*` tool names. Because the entry id is unchanged, router settings saved in the profile and the run history in `~/.dsh/model-router/state.json` carry over.
 
 ### Upgrade from the combined 0.11.x plugin
 
 1. Before upgrading, use the old GAL player's **Export save** for each story progress you want to keep, and back up the Harness profile. A JSON export contains the current story state, not all slots, settings, read history, or local audio.
 2. Install `@ljwei-stak/dsh-galgame@0.1.0` in the **same profile**.
-3. Update the existing `@ljwei-stak/model-router-galgame` plugin to **0.13.0** through the plugin manager. Finish both installations before continuing play; this removes the old combined GAL entry and leaves one entry from the independent GAL plugin.
+3. Remove the old `@ljwei-stak/model-router-galgame` plugin and add `@ljwei-stak/dsh-model-router@0.13.0` (see above). Finish both installations before continuing play; this removes the old combined GAL entry and leaves one entry from the independent GAL plugin.
 4. Open the new GAL entry and verify your progress. The standalone plugin retains the old localStorage keys in the same profile. For a different profile or a missing state, select the matching story and import the JSON backup.
 
 The standalone GAL core contains **Echo City: Main Saga** and **Old City Migration: The Unfinished Promise**. Previously separated stories remain in their source archive and are not shipped with either core plugin. See [migration notes](MIGRATION.md) for save limitations and older desktop integrations.
@@ -54,13 +62,13 @@ The standalone GAL core contains **Echo City: Main Saga** and **Old City Migrati
 Download the `.tgz` attachment from the [router v0.13.0 release](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.0) or [GAL v0.1.0 release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0). Enter the downloaded file's absolute path, for example:
 
 ```text
-D:\Plugins\ljwei-stak-model-router-galgame-0.13.0.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz
 ```
 
 Where a checksum sidecar is supplied, compare it with:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.13.0.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.0.tgz'
 ```
 
 You can also extract the archive and enter its inner `package` directory, which contains `package.json` and `.dsh-plugin`. The download may be stored on your preferred drive; runtime data location is controlled by the Harness profile. Upgrade through the plugin manager without modifying `app.asar` or bypassing dependency checks.
@@ -409,8 +417,8 @@ npm pack --pack-destination dist
 
 pnpm 10 has no `pnpm peers check` command; `--strict-peer-dependencies` makes the install fail on unmet peer dependencies instead. The client must be rebuilt when its source changes; a previously generated bundle does not verify new code. Install the resulting archive through the Desktop plugin manager in a separate test profile to check the router entry and official-tool panel. Test GAL alone and alongside the router using its own repository's instructions. Live sign-in, actual vendor model identity, response quality, and provider billing require the account holder's acceptance checks.
 
-The [0.11.1 release report](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md) and [rc.2 compatibility report](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md) preserve the earlier release record. Current split-release results belong in the new project task report; historical test counts do not establish standalone-package compatibility.
+The [0.11.1 release report](https://github.com/Alice-Marx/dsh-model-router/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md) and [rc.2 compatibility report](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md) preserve the earlier release record. Current split-release results belong in the new project task report; historical test counts do not establish standalone-package compatibility.
 
-For installation failures, include the host and plugin versions, plugin installation details, and redacted logs in a [GitHub issue](https://github.com/Alice-Marx/model-router-galgame/issues).
+For installation failures, include the host and plugin versions, plugin installation details, and redacted logs in a [GitHub issue](https://github.com/Alice-Marx/dsh-model-router/issues).
 
 License: [MIT](LICENSE).

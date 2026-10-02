@@ -1,5 +1,5 @@
 /**
- * Official DeepSeek Harness desktop client surface for model-router-galgame.
+ * Official DeepSeek Harness desktop client surface for @ljwei-stak/dsh-model-router.
  *
  * Adds a visible Desktop panel and a compact settings form within the
  * installed bundle's detail page. The official app still owns the conversation,
@@ -26,8 +26,10 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /** The Host plugin name is also the live configuration-form namespace. */
+// Profile entry id and panel id predate the 0.13.0 package rename; they stay
+// unchanged so existing settings and layout state keep applying.
 export const ROUTER_NAMESPACE = 'model-router-galgame'
-export const ROUTER_PACKAGE = '@ljwei-stak/model-router-galgame'
+export const ROUTER_PACKAGE = '@ljwei-stak/dsh-model-router'
 export const ROUTER_PANEL = 'model-router-galgame'
 
 /** Required Cordis services supplied by the official desktop client. */

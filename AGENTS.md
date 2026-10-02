@@ -3,7 +3,8 @@
 - Synchronize releases only when the user requests an update. Do not create
   scheduled synchronization jobs.
 - Compare this repository's package version with all stable npm versions of
-  `@ljwei-stak/model-router-galgame` using semantic version ordering. Never
+  `@ljwei-stak/dsh-model-router` (renamed in 0.13.0; the old
+  `@ljwei-stak/model-router-galgame` is frozen at 0.12.0) using semantic version ordering. Never
   downgrade either side or assume the `latest` tag is the highest version.
 - When npm is newer, recover the corresponding complete source checkout and
   verify its published files against the npm tarball before pushing GitHub.

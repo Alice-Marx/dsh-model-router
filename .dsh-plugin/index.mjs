@@ -37,6 +37,7 @@ import {
   defaultRunner,
 } from './shared/official-tools-runtime.mjs'
 
+// Cordis plugin name, matching the profile entry id; unchanged by the 0.13.0 package rename.
 export const name = 'model-router-galgame'
 export const inject = ['commands', 'llm', 'tools', 'typert', 'sandboxPolicy', 'sandbox']
 

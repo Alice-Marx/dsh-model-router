@@ -1,15 +1,15 @@
 {
-  "name": "@ljwei-stak/model-router-galgame",
+  "name": "@ljwei-stak/dsh-model-router",
   "version": "0.13.0",
   "type": "module",
   "description": "Model Router for official DeepSeek Harness Desktop: cost-aware task routing, dependent work packages and official vendor CLI discovery, installation and execution. GAL is available separately as @ljwei-stak/dsh-galgame.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Alice-Marx/model-router-galgame.git"
+    "url": "git+https://github.com/Alice-Marx/dsh-model-router.git"
   },
-  "homepage": "https://github.com/Alice-Marx/model-router-galgame#readme",
+  "homepage": "https://github.com/Alice-Marx/dsh-model-router#readme",
   "bugs": {
-    "url": "https://github.com/Alice-Marx/model-router-galgame/issues"
+    "url": "https://github.com/Alice-Marx/dsh-model-router/issues"
   },
   "publishConfig": {
     "access": "public"

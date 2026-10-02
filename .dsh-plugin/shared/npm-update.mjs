@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const ROUTER_PACKAGE_NAME = '@ljwei-stak/model-router-galgame'
+export const ROUTER_PACKAGE_NAME = '@ljwei-stak/dsh-model-router'
 export const ROUTER_NPM_REGISTRY = 'https://registry.npmjs.org/'
 export const ROUTER_UPDATE_CHANNEL = '/model-router-update'
 export const ROUTER_UPDATE_ENDPOINT = 'install-plugin'
@@ -108,7 +108,7 @@ async function npmLatest(fetchImpl, signal) {
     signal,
     headers: {
       accept: 'application/json',
-      'user-agent': 'model-router-galgame-updater',
+      'user-agent': 'dsh-model-router-updater',
     },
   })
   if (!response.ok) throw new Error(`npm registry returned HTTP ${response.status}`)
