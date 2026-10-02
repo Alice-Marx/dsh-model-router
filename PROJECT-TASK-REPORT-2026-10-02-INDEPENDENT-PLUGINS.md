@@ -64,7 +64,7 @@
 | 路由 0.12.0 | **npm 已成功发布，标签 `next`**；已从 npm 下载核验 | 333,507 字节 | `C3B2F354374B355DF1751DC64229BEEE2C09053B8CD7F9443BCA9FD36BAE0A06` | 下载包 29 个文件已与提交 `a15907f` 校验一致。 |
 | GAL 0.1.0 | **npm 已成功发布，`latest` 与 `next` 均为 0.1.0**；已从 npm 重新打包核验 | 40,188,069 字节 | `B8E4DB966991A772C23A14F02E3EAB08B008DD7941651A98809A3283038DFDE9` | 注册表包的 16 个文件已与推送后的 `origin/main` 逐字节一致。 |
 
-路由 GitHub Release **已发布并从公开下载验证**：[v0.12.0](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.12.0)。主分支和标签指向经校验的提交 `a15907f78abd2d611c2802f95167bb09deb3f815`，Release 附有 tarball 和 SHA-256 文件；独立 GAL 的 [GitHub v0.1.0 Release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0) 也已公开发布并完成附件下载核对。新仓库标签 `v0.1.0` 指向独立 GAL 源码提交 `2aef3e42b8d266f7a45222d3010751771e3fbd90`。
+路由 GitHub Release **已发布并从公开下载验证**：[v0.12.0](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.12.0)。GitHub 在本轮发布期间将原路由仓库重定向到规范地址 [Alice-Marx/dsh-model-router](https://github.com/Alice-Marx/dsh-model-router)；旧 `model-router-galgame` 地址会跳转。已更新本地 `origin`，保留原 npm 包身份以支持升级。主分支包含发布报告；标签 `v0.12.0` 仍固定在经核验的源码提交 `a15907f78abd2d611c2802f95167bb09deb3f815`，Release 附有已下载核验的 tarball 和 SHA-256 文件。独立 GAL 的 [GitHub v0.1.0 Release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0) 也已公开发布并完成附件下载核对；标签固定在源码提交 `2aef3e42b8d266f7a45222d3010751771e3fbd90`。
 
 GAL npm 的原始直连验证上传返回 `EOTP`；使用本机代理重新验证后，CLI 返回成功。为确认完整载荷，从官方 registry `npm pack` 得到的 tarball 与发布前包 SHA-1 / SHA-512 / SHA-256 一致，16 个文件也逐一与 GitHub `origin/main` 一致。安装命令需指定精确版本；路由包的 `latest` 仍是旧版 `0.4.32`，`next` 指向 `0.12.0`。
 
