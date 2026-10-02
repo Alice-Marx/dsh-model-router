@@ -114,6 +114,7 @@ The workbench shows these at the top. The matching session tools are in parenthe
    - **Only API-billed spend counts against budgets**: model-catalog API calls, and official CLI calls that use an API key (injected by the plugin, inherited from the environment, or a CLI whose own login is an API key according to the health check).
    - When an official CLI runs on a **subscription login** with no API key (for example Claude Pro/Max, or Codex signed in with ChatGPT), its reported or usage × price figure is shown separately as **订阅参考费用 (subscription reference cost, priced at API rates)** and is **not** counted toward the daily/monthly budget. The cost card and run history show both the budget-counted spend and the reference cost. Tool rows show whether each CLI is on a subscription login or bills an API key.
    - When the login type cannot be detected (CLIs without a status command, CLIs launched by the team runner), it is treated as a subscription login unless a matching API-key environment variable is set.
+   - Routed runs follow the [subscription-first rule](#subscription-first-api-key-only-when-the-quota-runs-out) for every provider: the subscription is used first and only quota/rate-limit exhaustion switches the step to an API key, which is then counted.
 4. **Presets** (`routingPreset`): 省钱优先 (economy) / 均衡 (balanced, the default) / 效果优先 (quality). Presets tilt the quality/cost/latency weights and move the quality floor a cheaper substitute must clear by ±0.04. Balanced is identical to the previous planner.
 5. **Subtask DAG** (`model_router_rerun_step`). Team packages are shown in dependency columns. Every `model_router_execute`, `model_router_team_execute` and `model_router_tool_run` call is recorded with its kind and each step's status (done, fallback, failed, blocked). A team run stops at the first failure, so later steps show as blocked. **重跑此步** (rerun this step) reruns only the failed step and its unfinished downstream steps. Finished steps keep their results and feed the rerun as dependency context.
    - Routed runs: any failed step can be rerun or reassigned.
@@ -126,7 +127,7 @@ The workbench shows these at the top. The matching session tools are in parenthe
 7. **Quality loop** (`model_router_rate`). `reviewMode` can be `off`, `sample` (uses `reviewSampleRate`), or `always`. When on, a stronger configured model reviews cheap-model output, and the verdict is stored with the run. You can rate each result 👍/👎. Ratings add a small shrunk bias (at most ±0.04) to that exact `provider/model`'s quality score for future routing.
 
 **Local data (on by default)**: run history is **saved locally by default**; there is no switch. It is kept in `~/.dsh/model-router/state.json` (or `$DSH_HOME/model-router/state.json`) and contains:
-- the health report;
+- the health report and subscription quota state (which subscriptions are exhausted until when);
 - the last 200 runs (routed, team and tool runs), with the **full task text** (up to 20,000 characters) and **each step's answer excerpt** (up to 4,000 characters);
 - workspace paths, routing decisions, costs and ratings.
 
@@ -137,6 +138,74 @@ The file never leaves your machine and holds no API keys. If your tasks contain 
 - The workbench cannot start new runs; start tasks from a session. Rerun and rating work from the workbench.
 - Kimi, MiniMax, MiMo, Grok and ZCode have no reliable login status command, and the login commands shown for them are best-effort.
 - The UI has passed build checks and unit tests only. It has not been verified in a real Harness desktop.
+
+## Subscription first, API key only when the quota runs out
+
+Many vendors sell coding subscriptions besides pay-as-you-go API keys: Claude Pro/Max, ChatGPT plans for Codex, Gemini, Kimi Code, the MiniMax Token Plan, the GLM Coding Plan (Zhipu / Z.ai) and others. The router's rule is:
+
+> **If a subscription is available, use it. Only when that subscription hits its quota or rate limit does the same step switch to the API key.**
+
+**Two kinds of subscription.**
+
+| Kind | How it is recognised | How it runs |
+| --- | --- | --- |
+| **CLI account login** (`cli-login`) | The route's provider maps to an official CLI (Claude Code, Codex, Gemini CLI, Kimi Code, MiniMax Code, ZCode for GLM…) and the health check finds an account login. | The CLI runs with **all API-key variables removed** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`/`CODEX_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`, `KIMI_API_KEY`/`MOONSHOT_API_KEY`, `MINIMAX_API_KEY`, `ZAI_API_KEY`, …) and no key is injected, so it can only bill the subscription. |
+| **Coding-plan key route** (`plan-key`) | A Harness provider whose base URL and key are a coding plan, marked with `subscription: "plan-key"` in its model profile. Provider ids such as `glm-coding-plan`, `kimi-code`, `minimax-token-plan` are recognised automatically; the profile setting always wins. | The plan route is called through the model catalog first. Its `apiRoute` names the pay-as-you-go route used when the plan is exhausted. |
+
+Configure a plan-key route in Harness's **Models** page like any Anthropic- or OpenAI-compatible provider, using the vendor's documented plan endpoint and plan key (the plugin never reads or stores keys):
+
+| Plan | Anthropic-compatible base URL (Claude Code style) | OpenAI-compatible base URL |
+| --- | --- | --- |
+| GLM Coding Plan | `https://open.bigmodel.cn/api/anthropic` (intl `https://api.z.ai/api/anthropic`) | `https://open.bigmodel.cn/api/coding/paas/v4` (intl `https://api.z.ai/api/coding/paas/v4`) — not the general `/api/paas/v4`, which bills account balance |
+| Kimi Code | `https://api.kimi.com/coding/` | `https://api.kimi.com/coding/v1`, model `kimi-for-coding` |
+| MiniMax Token Plan | `https://api.minimaxi.com/anthropic` (intl `https://api.minimax.io/anthropic`) | — |
+
+Check each plan's terms first: some vendors (the GLM Coding Plan FAQ, for example) say plan quota applies only inside their supported coding tools, and other API use needs the standard API service. Endpoints and model ids change; verify them in the vendor docs.
+
+**Profile fields** (in “逐模型价格与能力” or `modelProfilesJson`):
+
+```json
+[
+  { "provider": "glm-coding-plan", "model": "glm-4.6", "subscription": "plan-key",
+    "apiRoute": { "provider": "zhipu", "model": "glm-4.6" } },
+  { "provider": "anthropic", "model": "claude-sonnet-4-5", "billing": "subscription-first" },
+  { "provider": "deepseek", "model": "deepseek-chat", "billing": "api-only" }
+]
+```
+
+- `billing`: `subscription-first` (default; may be omitted), `api-only` (never use the subscription), or `subscription-only` (never fall back to an API key; the step fails with the reason instead).
+- `subscription`: `plan-key`, `cli-login`, or `none` (always API). Omitted means automatic.
+- `apiRoute`: only for `plan-key` routes; an exact catalog route. When the router picks that API route directly, it still uses the plan first while the plan has quota.
+
+**Exhaustion detection and switching.** When the subscription attempt fails, its error text is matched against documented vendor messages:
+
+| Vendor | Quota exhausted | Rate limited |
+| --- | --- | --- |
+| Claude Code | “You've hit your session/weekly/Opus limit · resets 3:45pm” | “Server is temporarily limiting requests”, “Request rejected (429)” |
+| Codex | `usage_limit_reached` (`resets_at` / `resets_in_seconds`), “You've hit your usage limit” | `rate_limit_exceeded` |
+| Gemini | `RESOURCE_EXHAUSTED`, “Quota exceeded”, “exhausted your daily quota” (`retry in Xs`) | — |
+| Kimi Code | 403 “You've reached your 5-hour / weekly (7-day) / monthly usage limit” | “concurrent request limit”, 429 “receiving too many requests”, “engine is currently overloaded” |
+| MiniMax | error `2056` “usage limit exceeded” / “Token Plan usage limit reached” | error `2045` |
+| GLM | errors `1308`–`1310`, `1316`–`1321` (“Usage limit reached for … will reset at YYYY-MM-DD HH:MM:SS”, “已达到…使用上限”) | errors `1302`, `1305` |
+| Any | — | HTTP `429`, “Too Many Requests”, “rate limit” |
+
+On a match the subscription is marked **exhausted until the reported reset time** (`resets_at`, `resets_in_seconds`, `retry in Xs`, GLM's reset timestamp, Claude's “resets 3:45pm”), otherwise for `subscriptionCooldownMinutes` (default 60; rate limits without a time are skipped for 1 minute). The **same step is retried on the API key at once**, and later steps skip the exhausted subscription until it recovers. The run history records the channel (`billing: subscription | api`) and the reason, for example **“订阅额度已用尽（预计 10-2 18:30 恢复），已切换 API Key。”** The state survives restarts (`quota` in `state.json`).
+
+Other subscription failures (not a quota or rate limit) keep the earlier behaviour: the official CLI falls back to the catalog API with the real error shown.
+
+If a vendor changes its wording, add patterns in `quotaPatternsJson`, keyed by tool id, provider id or `*`:
+
+```json
+{ "kimi-code": { "quota": ["额度已用完"], "rateLimit": ["请求过于频繁"] }, "my-glm-plan": { "quota": ["1308"] } }
+```
+
+Invalid regular expressions are ignored and listed in the health check.
+
+**Health check.** The “订阅与 API Key” card (and `model_router_health` → `billing`) lists each provider with its billing mode, subscription source, subscription state (logged in / coding-plan key route / API-key-only login / logged out / **exhausted until X**) and whether an API-key route is available for fallback. Login probes run with API-key variables removed, so a Claude or Codex account login is detected even when an API key is also set.
+
+**Budget.** Subscription runs (CLI login or plan-key route) are shown as subscription reference cost and are not counted; API-key fallback runs are counted against the daily/monthly budget, for every provider.
+
+**Limits.** `model_router_team_execute` and `model_router_tool_run` edit files through the official CLI only, so a quota hit there is recorded (the step shows the reason and later routed steps skip that subscription) but is **not** retried on an API key automatically. Kimi Code and MiniMax Code CLIs have no portable read-only adapter on Linux/macOS, so their subscriptions are used there through plan-key routes.
 
 ## How the routing decision is derived
 

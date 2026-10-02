@@ -22,6 +22,7 @@ npm 包名仍为 `@ljwei-stak/model-router-galgame`，便于原用户直接升�
 - [开始使用](#开始使用)
 - [工作台页面怎么用](#工作台页面怎么用)
 - [体检、成本与质量回路](#体检成本与质量回路)
+- [订阅优先：额度用尽才切换 API Key](#订阅优先额度用尽才切换-api-key)
 - [路由算法：从输入到分配](#路由算法从输入到分配)
 - [官方工具与执行边界](#官方工具与执行边界)
 - [可选安装 GAL](#可选安装-gal)
@@ -140,6 +141,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
    - **只有走 API 计费的花费计入预算**：模型目录 API 调用，或官方 CLI 使用 API Key（插件注入的、环境变量里的，或体检发现 CLI 本身用 API Key 登录）的调用。
    - 官方 CLI 用**订阅账号登录**、没有 API Key 时（例如 Claude Pro/Max、ChatGPT 登录的 Codex），CLI 回报的金额或按单价折算的金额只显示为“**订阅参考费用（按 API 价折算）**”，**不计入**每日/每月预算。成本卡片和执行记录会同时显示“计入预算”的金额和订阅参考费用。工具卡片会标出各 CLI 是“订阅账号登录”还是“API Key 计费”。
    - 判断不了登录方式时（例如 Kimi 等没有状态命令的 CLI、团队执行器启动的 CLI），只要没有检测到对应的 API Key 环境变量，就按订阅登录处理。
+   - 路由执行对所有厂商按[订阅优先规则](#订阅优先额度用尽才切换-api-key)：先用订阅，只有额度用尽或限流才把该步骤切换到 API Key，切换后的花费计入预算。
 4. **预设方案**（`routingPreset`）。可选**省钱优先 / 均衡 / 效果优先**，默认是均衡。方案会调整质量、成本和速度三者的权重，并把替代模型必须达到的质量门槛下调或上调 0.04。均衡和以前的算法完全相同。
 5. **子任务可视化**（`model_router_rerun_step`）。团队分工的工作包按依赖关系分列，显示成依赖图（DAG）。`model_router_execute`、`model_router_team_execute` 和 `model_router_tool_run` 的每次执行都会写入执行记录，并标明类型（路由执行 / 团队执行 / 单工具调用）。每一步都标有状态：完成、已回退、失败或依赖未完成；团队执行在某一步失败后停止，后面的步骤显示为“依赖未完成”。点**重跑此步**只重跑失败的那一步，以及依赖它的未完成步骤，已完成的步骤保留原结果，并作为重跑的依赖上下文。
    - 路由执行：都可以单步重跑，也可以改派。
@@ -152,7 +154,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 7. **质量回路**（`model_router_rate`）。`reviewMode` 可以设为 `off`、`sample` 或 `always`；`sample` 按 `reviewSampleRate` 的比例抽检。开启后，会让更强的已配置模型复核便宜模型的输出，并把结论写进执行记录。你可以对每个结果点 👍/👎。评价会以收缩平均的方式，给对应 `provider/model` 的质量分加一个微调，范围最多 ±0.04，作用于以后的路由。
 
 **本地数据（默认开启）**：执行记录**默认自动保存在本机**，没有开关。保存位置是 `~/.dsh/model-router/state.json`（若设置了 `DSH_HOME`，则在 `$DSH_HOME/model-router/state.json`）。内容包括：
-- 体检结果；
+- 体检结果和订阅额度状态（哪些订阅额度已用尽、预计何时恢复）；
 - 最近 200 次执行（路由执行、团队执行、单工具调用）的**完整任务文本**（最多 2 万字）和**每步答案摘要**（每步最多 4000 字）；
 - 工作区路径、路由决策、费用和评价。
 
@@ -163,6 +165,74 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 - 工作台还不能直接发起新的执行，任务仍要在会话中开始；重跑和评价可以在工作台里完成。
 - Kimi、MiniMax、MiMo、Grok、ZCode 还没有可靠的登录状态命令，显示的登录命令仅供参考。
 - 这些界面只通过了构建检查和单元测试，还没有在真实 Harness 桌面里验证。
+
+## 订阅优先：额度用尽才切换 API Key
+
+除按量付费的 API Key 外，很多厂商都有编程订阅：Claude Pro/Max、ChatGPT 套餐（Codex）、Gemini、Kimi Code、MiniMax Token Plan、GLM Coding Plan（智谱 / Z.ai）等。路由的规则是：
+
+> **有订阅就先用订阅；只有订阅额度用尽或触发限流时，同一步骤才改用 API Key。**
+
+**两种订阅方式：**
+
+| 方式 | 怎么识别 | 怎么运行 |
+| --- | --- | --- |
+| **官方 CLI 账号登录**（`cli-login`） | 路线的供应商对应一个官方 CLI（Claude Code、Codex、Gemini CLI、Kimi Code、MiniMax Code、GLM 的 ZCode 等），体检发现已登录订阅账号。 | 启动 CLI 时**去掉所有 API Key 环境变量**（`ANTHROPIC_API_KEY`、`OPENAI_API_KEY`/`CODEX_API_KEY`、`GEMINI_API_KEY`/`GOOGLE_API_KEY`、`KIMI_API_KEY`/`MOONSHOT_API_KEY`、`MINIMAX_API_KEY`、`ZAI_API_KEY` 等），也不注入 Key，只能按订阅计费。 |
+| **编程套餐 Key 路线**（`plan-key`） | Harness 里一个以套餐地址和套餐 Key 配置的供应商，在模型档案中设 `subscription: "plan-key"`。供应商 ID 形如 `glm-coding-plan`、`kimi-code`、`minimax-token-plan` 时会自动识别；档案设置优先。 | 先通过模型目录调用套餐路线；`apiRoute` 指定套餐额度用尽时使用的按量付费路线。 |
+
+套餐路线在 Harness 的**模型**页按普通 Anthropic 兼容或 OpenAI 兼容服务添加，填写厂商文档中的套餐地址和套餐 Key（插件不读取、不保存 Key）：
+
+| 套餐 | Anthropic 兼容地址（Claude Code 方式） | OpenAI 兼容地址 |
+| --- | --- | --- |
+| GLM Coding Plan | `https://open.bigmodel.cn/api/anthropic`（国际版 `https://api.z.ai/api/anthropic`） | `https://open.bigmodel.cn/api/coding/paas/v4`（国际版 `https://api.z.ai/api/coding/paas/v4`）；不要用通用的 `/api/paas/v4`，那个扣账户余额 |
+| Kimi Code | `https://api.kimi.com/coding/` | `https://api.kimi.com/coding/v1`，模型 `kimi-for-coding` |
+| MiniMax Token Plan | `https://api.minimaxi.com/anthropic`（国际版 `https://api.minimax.io/anthropic`） | — |
+
+请先核对各套餐条款：部分厂商（例如 GLM Coding Plan 常见问题）说明套餐额度只在其支持的编程工具中使用，其他 API 用途需开通标准 API 服务。地址和模型 ID 会变化，请以厂商文档为准。
+
+**档案字段**（“逐模型价格与能力”或 `modelProfilesJson`）：
+
+```json
+[
+  { "provider": "glm-coding-plan", "model": "glm-4.6", "subscription": "plan-key",
+    "apiRoute": { "provider": "zhipu", "model": "glm-4.6" } },
+  { "provider": "anthropic", "model": "claude-sonnet-4-5", "billing": "subscription-first" },
+  { "provider": "deepseek", "model": "deepseek-chat", "billing": "api-only" }
+]
+```
+
+- `billing`：`subscription-first`（订阅优先，默认，可省略）、`api-only`（只用 API Key，不用订阅）、`subscription-only`（只用订阅，额度用尽时不切换 API Key，该步骤失败并写明原因）。
+- `subscription`：`plan-key`、`cli-login` 或 `none`（始终按 API 计费）；省略表示自动判断。
+- `apiRoute`：只用于 `plan-key` 路线，填模型目录中的准确路线。路由直接选中这条 API 路线时，套餐还有额度也会先用套餐。
+
+**额度识别与切换。** 订阅调用失败时，把报错与各厂商文档中的文案比对：
+
+| 厂商 | 额度用尽 | 限流 |
+| --- | --- | --- |
+| Claude Code | “You've hit your session/weekly/Opus limit · resets 3:45pm” | “Server is temporarily limiting requests”、“Request rejected (429)” |
+| Codex | `usage_limit_reached`（含 `resets_at` / `resets_in_seconds`）、“You've hit your usage limit” | `rate_limit_exceeded` |
+| Gemini | `RESOURCE_EXHAUSTED`、“Quota exceeded”、“exhausted your daily quota”（`retry in Xs`） | — |
+| Kimi Code | 403 “You've reached your 5-hour / weekly (7-day) / monthly usage limit” | “concurrent request limit”、429 “receiving too many requests”、“engine is currently overloaded” |
+| MiniMax | 错误码 `2056`（“usage limit exceeded” / “Token Plan usage limit reached”） | 错误码 `2045` |
+| GLM | 错误码 `1308`–`1310`、`1316`–`1321`（“Usage limit reached for … will reset at YYYY-MM-DD HH:MM:SS”、“已达到…使用上限”） | 错误码 `1302`、`1305` |
+| 通用 | — | HTTP `429`、“Too Many Requests”、“rate limit” |
+
+识别到后，该订阅**标记为额度已用尽，直到厂商给出的恢复时间**（`resets_at`、`resets_in_seconds`、`retry in Xs`、GLM 的重置时间、Claude 的“resets 3:45pm”）；没给时间时按 `subscriptionCooldownMinutes`（默认 60 分钟）暂停，无时间的限流只暂停 1 分钟。**同一步骤立即改用 API Key 重试**，后续步骤在恢复前直接跳过这份订阅。执行记录会写明计费渠道（`billing: subscription | api`）和原因，例如 **“订阅额度已用尽（预计 10-2 18:30 恢复），已切换 API Key。”** 状态保存在 `state.json` 的 `quota` 中，重启后仍有效。
+
+不是额度或限流的订阅失败沿用原有行为：官方 CLI 失败后回退模型目录 API，并显示真实错误。
+
+厂商改了报错文案时，可在 `quotaPatternsJson` 中按工具 ID、供应商 ID 或 `*` 追加正则：
+
+```json
+{ "kimi-code": { "quota": ["额度已用完"], "rateLimit": ["请求过于频繁"] }, "my-glm-plan": { "quota": ["1308"] } }
+```
+
+无效的正则会被忽略，并在体检中列出。
+
+**体检。** “订阅与 API Key”卡片（以及 `model_router_health` 的 `billing`）按供应商列出：计费方式、订阅来源、订阅状态（已登录订阅账号 / 编程套餐 Key 路线 / 仅 API Key 登录 / 未登录 / **额度已用尽，预计 X 恢复**），以及是否有可回退的 API Key 路线。登录检测时会去掉 API Key 环境变量，所以同时设了 API Key 也能识别 Claude、Codex 的账号登录。
+
+**预算。** 所有厂商的订阅运行（CLI 账号登录或套餐 Key 路线）都只显示订阅参考费用、不计入预算；切换到 API Key 的运行计入每日/每月预算。
+
+**限制。** `model_router_team_execute` 和 `model_router_tool_run` 只通过官方 CLI 修改文件，额度用尽时会记录（该步骤写明原因，之后的路由执行会跳过这份订阅），但**不会自动改用 API Key 重试**。Kimi Code、MiniMax Code 在 Linux/macOS 上没有可移植的只读适配器，在这些平台上请通过套餐 Key 路线使用它们的订阅。
 
 ## 路由算法：从输入到分配
 
