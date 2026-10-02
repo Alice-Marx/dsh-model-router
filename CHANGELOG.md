@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.3 — 2026-10-03
+
+Bug-fix release for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under the npm `next` and `latest` tags.
+
+**After updating, quit Harness completely (including the tray icon) and start it again.** A live patch reload does not replace plugin code that the running Host has already imported.
+
+### Fixed
+- On Harness Desktop for Windows, every official CLI run that went through the Harness process sandbox exited 0 with no output, so the step paused with "Codex 未返回完整成功终态和回答" and no model was called. The sandbox runner is started as `DeepSeek Harness.exe …/runner.js`, which needs `ELECTRON_RUN_AS_NODE=1`; the plugin's minimal CLI environment dropped it, so the executable started the desktop app instead, lost the single-instance lock and quit. The runner now gets that variable whenever it is the Electron executable.
+- Codex cannot start inside the Harness Windows sandbox at all: it must write `CODEX_HOME` (`~/.codex`) and the sandbox denies those writes (`failed to initialize in-process app-server client: … (os error 5)`). On Windows, Codex now skips the Harness sandbox and starts directly with its own `--sandbox read-only`. This is the launch the "不经沙箱启动 CLI" confirmation already describes.
+- A CLI that exits without writing anything to stdout or stderr is now reported as such, for example "Codex 退出码 0，无任何输出（stdout 与 stderr 均为空）。", instead of a generic "incomplete answer" message.
+
 ## 0.13.2 — 2026-10-03
 
 Bug-fix release for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under the npm `next` and `latest` tags.

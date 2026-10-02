@@ -24,7 +24,7 @@ import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser } from './vendor-mimo-grok-adapter.mjs'
-import { usageFromEvents, usageFromOutput } from './task-executors.mjs'
+import { emptyOutputError, outputIsEmpty, usageFromEvents, usageFromOutput } from './task-executors.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -495,6 +495,41 @@ export function codexIncompleteError(eventCount, stderr = '') {
   return 'Codex 未返回完整成功终态和回答。'
 }
 
+/**
+ * Extra environment the Harness sandbox runner itself needs. On Desktop the
+ * runner prefix is `[process.execPath, …/runner.js]` and process.execPath is
+ * the Electron app (DeepSeek Harness.exe). Harness starts such Node-mode
+ * children with ELECTRON_RUN_AS_NODE=1; without it the executable boots the
+ * GUI, loses the single-instance lock and exits 0 with no output, so the
+ * wrapped CLI never runs. The minimal CLI environment must therefore carry it
+ * whenever the confined argv starts with this Electron executable.
+ */
+export function runnerEnvironment(argv0, { execPath = process.execPath, electron = process.versions?.electron, platform = process.platform } = {}) {
+  if (!electron || typeof argv0 !== 'string' || typeof execPath !== 'string') return {}
+  const normalize = value => {
+    const resolved = resolve(value)
+    return platform === 'win32' ? resolved.replace(/\//g, '\\').toLowerCase() : resolved
+  }
+  return normalize(argv0) === normalize(execPath) ? { ELECTRON_RUN_AS_NODE: '1' } : {}
+}
+
+/**
+ * CLIs that cannot start inside the Harness Windows ACL process sandbox.
+ * Codex 0.157 must write CODEX_HOME (~/.codex: app-server state, sessions,
+ * temp aliases) before its first turn; the ACL runner denies every write in
+ * read-only mode and every write outside the workspace in workspace-write, so
+ * Codex exits with "failed to initialize in-process app-server client: Access
+ * is denied (os error 5)". Returning "unsupported" lets a read-only step use
+ * the direct `codex exec --sandbox read-only` launch the user approves as
+ * "unsandboxed CLI", instead of failing every time.
+ */
+export function harnessSandboxBlocker(toolId, platform = process.platform) {
+  if (toolId === 'codex' && platform === 'win32') {
+    return 'Codex 启动时必须写入 CODEX_HOME（~/.codex），Harness 的 Windows 进程沙箱会拒绝这些写入（os error 5）；改用 Codex 自带的只读沙箱直接启动。'
+  }
+  return null
+}
+
 /** Check the actual trusted launch entry without starting an account call. */
 export async function officialToolReadiness(toolId, workspace = process.cwd()) {
   const tool = getOfficialTool(toolId)
@@ -539,7 +574,7 @@ function stopProcessTree(child) {
   }
 }
 
-function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessionOnly = false) {
+function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessionOnly = false, extraEnv = {}) {
   return new Promise(resolveResult => {
     let child
     try {
@@ -549,7 +584,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         windowsHide: true,
         detached: !IS_WINDOWS,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: executionEnvironment(toolId, { sessionOnly }),
+        env: { ...executionEnvironment(toolId, { sessionOnly }), ...extraEnv },
       })
     } catch (error) {
       resolveResult({ status: 'failed', error: String(error?.message ?? error), exitCode: null })
@@ -705,6 +740,11 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         settle({ status: stopReason, exitCode: code, exitSignal })
         return
       }
+      if (outputIsEmpty(stdoutTail, stderrTail)) {
+        settle({ status: 'failed', exitCode: code, exitSignal, emptyOutput: true,
+          error: emptyOutputError(getOfficialTool(toolId)?.label ?? toolId, code) })
+        return
+      }
       if (miniMaxParser) {
         const outcome = miniMaxParser.finish(code)
         const reported = usageFromEvents('minimax-result', outcome)
@@ -793,6 +833,8 @@ export async function runOfficialTool({
   if (executionMode === 'workspace-write') await checkedWriteWorkspace(cwd, isolatedRoot)
   const timeout = checkedTimeout(timeoutMs)
   if (signal?.aborted) return { toolId: tool.id, status: 'cancelled', workspace: cwd }
+  const blocker = harnessSandboxBlocker(tool.id)
+  if (blocker) return { toolId: tool.id, status: 'unsupported', reason: blocker }
   const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel, prompt)
   if (spec.unsupported) return { toolId: tool.id, status: 'unsupported', reason: spec.unsupported }
   if (typeof sandbox?.confine !== 'function') {
@@ -811,7 +853,7 @@ export async function runOfficialTool({
   }
   const startedAt = Date.now()
   const outcome = await captureProcess({ ...spec, file: confined.argv[0], args: confined.argv.slice(1) },
-    prompt, cwd, signal, timeout, tool.id, sessionOnly === true)
+    prompt, cwd, signal, timeout, tool.id, sessionOnly === true, runnerEnvironment(confined.argv[0]))
   return {
     toolId: tool.id,
     mode: executionMode,

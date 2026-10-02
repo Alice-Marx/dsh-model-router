@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.13.2",
+  "version": "0.13.3",
   "type": "module",
   "description": "Model Router for official DeepSeek Harness Desktop: cost-aware task routing, dependent work packages and official vendor CLI discovery, installation and execution. GAL is available separately as @ljwei-stak/dsh-galgame.",
   "repository": {

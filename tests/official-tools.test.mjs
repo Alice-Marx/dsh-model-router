@@ -19,8 +19,8 @@ import {
   pinnedMiniMaxInstaller,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
-import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry } from '../.dsh-plugin/shared/official-tool-executor.mjs'
-import { usageFromOutput, verifiedDiagnostic } from '../.dsh-plugin/shared/task-executors.mjs'
+import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+import { emptyOutputError, outputIsEmpty, usageFromOutput, verifiedDiagnostic } from '../.dsh-plugin/shared/task-executors.mjs'
 
 test('MiniMax official Windows installer entry requires the pinned version and CLI digest',
   { skip: process.platform !== 'win32' }, async t => {
@@ -261,4 +261,42 @@ test('Codex 0.157.1 turn.completed usage from a real ChatGPT-login run is parsed
   ].join('\n')
   const usage = usageFromOutput('codex-jsonl', stream.split('\n').at(-1))
   assert.equal(usage?.usage?.outputTokens ?? usage?.usage?.output_tokens ?? usage?.outputTokens, 5)
+})
+
+
+// 0.13.3 regression: Harness Desktop's sandbox runner is `[DeepSeek Harness.exe, runner.js, …]`.
+// Without ELECTRON_RUN_AS_NODE=1 that Electron executable boots the GUI, loses the
+// single-instance lock and exits 0 with no output, so the wrapped CLI never ran.
+test('the Harness runner prefix gets ELECTRON_RUN_AS_NODE when it is the Electron executable', () => {
+  const execPath = 'D:\\Programs\\DeepSeek Harness\\DeepSeek Harness.exe'
+  const win = { execPath, electron: '44.0.0', platform: 'win32' }
+  if (process.platform === 'win32') {
+    assert.deepEqual(runnerEnvironment('d:/programs/deepseek harness/DeepSeek Harness.exe', win), { ELECTRON_RUN_AS_NODE: '1' })
+  }
+  assert.deepEqual(runnerEnvironment(execPath, win), { ELECTRON_RUN_AS_NODE: '1' })
+  assert.deepEqual(runnerEnvironment('/usr/bin/bwrap', win), {}, 'other runners get nothing extra')
+  assert.deepEqual(runnerEnvironment(execPath, { ...win, electron: undefined }), {}, 'plain Node hosts need nothing')
+  assert.deepEqual(runnerEnvironment('/opt/harness/harness', { execPath: '/opt/harness/harness', electron: '44.0.0', platform: 'linux' }), { ELECTRON_RUN_AS_NODE: '1' })
+})
+
+test('Codex is not started inside the Harness Windows ACL sandbox (it must write CODEX_HOME)', async t => {
+  assert.match(harnessSandboxBlocker('codex', 'win32'), /CODEX_HOME.*os error 5/)
+  assert.equal(harnessSandboxBlocker('codex', 'linux'), null)
+  assert.equal(harnessSandboxBlocker('claude-code', 'win32'), null)
+  if (process.platform === 'win32') {
+    const cwd = await mkdtemp(join(tmpdir(), 'model-router-codex-blocker-'))
+    t.after(() => rm(cwd, { recursive: true, force: true }))
+    let confined = false
+    const result = await runOfficialTool({ toolId: 'codex', task: 'OK', workspace: cwd, sandbox: { confine: async () => { confined = true; return {} } } })
+    assert.equal(result.status, 'unsupported')
+    assert.equal(confined, false, 'the sandbox runner is never asked to wrap Codex')
+  }
+})
+
+test('empty CLI output is named explicitly with the exit code', () => {
+  assert.equal(emptyOutputError('Codex CLI', 0), 'Codex 退出码 0，无任何输出（stdout 与 stderr 均为空）。')
+  assert.equal(emptyOutputError('Claude Code', 3), 'Claude Code 退出码 3，无任何输出（stdout 与 stderr 均为空）。')
+  assert.equal(emptyOutputError('Codex CLI', null), 'Codex 退出码 未知，无任何输出（stdout 与 stderr 均为空）。')
+  assert.equal(outputIsEmpty('\r\n', ''), true, 'what the Electron GUI instance printed')
+  assert.equal(outputIsEmpty('', 'x'), false)
 })

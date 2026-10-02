@@ -261,3 +261,21 @@ test('official CLI timeout falls back and a dependency failure does not run late
   assert.equal(spawns, 0)
   assert.match(aggregate.aggregate, /分析/)
 })
+
+
+// 0.13.3 regression: a CLI that writes nothing must be reported as such, not as an incomplete answer.
+test('an official CLI that exits with no output at all reports the exit code and empty output', async t => {
+  const cwd = await workspace(t)
+  const run = (code, stdout, stderr = '') => {
+    const { spawnImpl } = fakeSpawn((file, args) => args[0] === '--version' ? { code: 0, stdout: 'codex-cli 0.157.1\n' } : { code, stdout, stderr })
+    return executeAssignedTask({
+      route: { provider: 'openai', model: 'gpt-5' }, task: '请回答 OK。', workspace: cwd, spawnImpl,
+      apiFallback: async () => ({ ok: true, answer: 'api answer' }),
+    })
+  }
+  const silent = await run(0, '\r\n')
+  assert.equal(silent.channel, 'harness-llm')
+  assert.match(silent.fallback.reason, /^Codex 退出码 0，无任何输出（stdout 与 stderr 均为空）。/)
+  const withStderr = await run(0, '', 'boom\n')
+  assert.doesNotMatch(withStderr.fallback.reason, /无任何输出/)
+})

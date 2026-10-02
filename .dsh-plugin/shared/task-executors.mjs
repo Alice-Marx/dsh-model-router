@@ -254,6 +254,25 @@ function parseClaude(stdout) {
   return { ok: true, answer: result.result }
 }
 
+/** Short CLI name for messages: "Codex CLI" -> "Codex". */
+function shortLabel(label) {
+  return String(label ?? '官方 CLI').replace(/\s+CLI$/u, '')
+}
+
+/**
+ * Explicit failure text when a CLI exited without writing anything to stdout
+ * or stderr (whitespace-only counts as nothing), instead of a generic
+ * "incomplete answer" message that hides that the CLI never produced output.
+ */
+export function emptyOutputError(label, exitCode) {
+  return `${shortLabel(label)} 退出码 ${exitCode ?? '未知'}，无任何输出（stdout 与 stderr 均为空）。`
+}
+
+/** True when neither stream carries anything but whitespace. */
+export function outputIsEmpty(stdout, stderr) {
+  return !String(stdout ?? '').trim() && !String(stderr ?? '').trim()
+}
+
 /** First non-empty diagnostic from a signed-runner result (an empty stderr must not hide stdout). */
 export function verifiedDiagnostic(verified) {
   for (const value of [verified?.detail, verified?.stderrTail, verified?.stdoutTail]) {
@@ -746,7 +765,9 @@ export async function executeAssignedTask({
       raw: `${run.stdout.slice(-20_000)}\n${run.stderr.slice(-20_000)}`,
     })
   }
-  const parsed = parseAdapterOutput(adapter.format, run.stdout)
+  const parsed = outputIsEmpty(run.stdout, run.stderr)
+    ? { ok: false, error: emptyOutputError(adapter.label, run.exitCode) }
+    : parseAdapterOutput(adapter.format, run.stdout)
   if (!parsed.ok) {
     return useApi(apiFallback, {
       route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, attempted: true,
