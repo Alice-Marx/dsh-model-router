@@ -92,11 +92,137 @@ Configure providers, models, and credentials on Harness's official **Models** pa
 3. The **Estimated budget for this run (USD)** field may show `10`. That is a **$10 estimate target**, based on your supplied prices and estimated tokens; generating the plan itself is local and free. Set it to `0` to remove the estimate constraint. Neither value caps a provider bill or authorizes a model call.
 4. Click **Generate route recommendation**. Planning runs locally. Scroll down **past Model pricing and capabilities** to **Route recommendation**. Read the recommended `provider/model`, complexity band, estimated cost or “price needs configuration,” and the **execution channel** badge. In team mode, check each package's objective, difficulty, route, dependencies, verification checklist, and warnings. `Official CLI` means a trusted local launch entry is ready; `Model directory API` means the plan routes through Harness's configured model API.
 5. To improve the recommendation, save each exact `provider/model` route's quality score and input/output prices in **USD per million tokens** in the **Model pricing and capabilities** editor, then click **Generate route recommendation** again. Saving a profile invalidates the previous result; a missing price remains unknown. Review the **Official tools** cards below the result for probe, install/repair, and launch-readiness status. ZCode opens its own installer and requires you to complete its directory choice.
-6. To actually ask or run a model, open an **official Harness session** and request `model_router_consult` for a live second opinion, `model_router_tool_run` for one ready vendor CLI, or `model_router_team_execute` for dependent CLI work packages. You can also use `/router` to request a plan and `/tools` to inspect tools in a session. An editable CLI task requires approval and a clean Git repository; check the vendor run record for the actual model and charge.
+6. To run a read-only task directly from the workbench, use **Run from the workbench** (在工作台执行) below the plan. It reuses the task description and planning mode (single task, team allocation, or one chosen model), lets you pick the preset, and takes an absolute workspace path (left empty, the last run's workspace is reused; the path must exist). **Preview execution plan** asks the Host for the same plan `model_router_execute` would use, including the automatic economy downgrade, plus the cost estimate, the budget check, and every reason that needs confirmation (over budget, unsandboxed headless CLI), listed together. Nothing runs until you press **Confirm and run**; the Host re-checks the reasons and refuses if something changed in the meantime. The result appears in the run history.
+7. For editable runs or a live second opinion, open an **official Harness session** and request `model_router_consult` for a live second opinion, `model_router_tool_run` for one ready vendor CLI, or `model_router_team_execute` for dependent CLI work packages. You can also use `/router` to request a plan and `/tools` to inspect tools in a session. An editable CLI task requires approval and a clean Git repository; check the vendor run record for the actual model and charge.
 
 For example, enter: “**Plan a complex, three-minute science-fiction short film.** Extract the premise and constraints; design a beat sheet and shot list; review visual continuity and production risks; synthesize a handoff checklist.” Choose **Team allocation**, generate the plan, and inspect which configured routes it assigns to the writing and review packages. This plugin produces a *plan* and can delegate supported CLI tasks; it does **not** render a film or control nine creative applications.
 
 The [full Chinese workbench guide](docs/WORKBENCH_USER_GUIDE.zh.md) walks through the controls, result location, model-profile setup, and session handoff.
+
+## Health check, cost control and quality loop
+
+The workbench shows these at the top. The matching session tools are in parentheses.
+
+1. **Onboarding health check** (`model_router_health`). When you first open the workbench, it checks every official tool in the registry: is it installed, does its version match the pinned version, and is it logged in. Login checks only run cheap status commands with short timeouts, or check that a credential file exists (its contents are never read):
+
+   | Tool | How login is detected | Log in with |
+   | --- | --- | --- |
+   | Claude Code | `claude auth status --json` | `claude auth login` |
+   | Codex | `codex login status` | `codex login` |
+   | Gemini CLI | `GEMINI_API_KEY`/`GOOGLE_API_KEY`, or `~/.gemini/oauth_creds.json` | `gemini` |
+   | Kimi Code | `KIMI_API_KEY`/`MOONSHOT_API_KEY`, or `~/.kimi-code/credentials/kimi-code.json` (`$KIMI_CODE_HOME`) | `kimi login` |
+   | MiMo Code | `MIMO_API_KEY`, or `~/.local/share/mimocode/auth.json` (`$XDG_DATA_HOME`; may hold only provider API keys, so billing stays unknown) | `mimo auth login` |
+   | Grok Build | `XAI_API_KEY`, or `~/.grok/auth.json` (`$GROK_HOME`). On Windows with the npm prefix off drive C the plugin runs Grok with `GROK_HOME=<npm prefix>\.model-router-grok`; the health card then names that path | `grok login` (`--device-auth` without a browser); for the relocated home run `$env:GROK_HOME='<path>'; grok login` |
+   | MiniMax Code | `MINIMAX_API_KEY`, or the `status` field of the non-secret `~/.minimax/auth/prod/<cn\|global>/mcode-public/auth-state.json` (`$MINIMAX_DATA_DIR`; `authenticated` → logged in, `anonymous` → unknown because a key saved with `mcode set-minimax-key` still works) | `mcode login` |
+   | ZCode | Desktop app without a status command → unknown. Only the pinned, signature- and hash-verified 3.14.3 is used; another installed version is reported as such, not as missing | Welcome page → *Connect BigModel / Z.ai*; for GLM Coding Plan pick *编程套餐* in Model settings |
+
+   The file paths come from the published packages (kimi-code 2.1.1, mimocode 0.1.15, grok 1.0.41). A missing file is reported as **unknown**, not logged out, because these CLIs can also authenticate through custom providers or (MiMo) a free anonymous channel. The check never starts a login.
+   - **一键安装** (one-click install) reuses the fixed registry installer.
+   - **去登录** (log in) shows the login command so you can copy it.
+   - Results are cached for 10 minutes. Routing **skips logged-out CLIs immediately** and goes straight to the model-catalog API; before this, Codex took about 14 s to fail and fall back. A tool is not skipped when its API key is configured. If a CLI reports a login error at run time, it is also marked as logged out — but because you were running on its subscription, later steps on that route are **paused and ask** (“订阅登录已失效…未自动改用 API Key”) instead of silently using the API key, also after a restart (`authFailures` in `state.json`), until the CLI runs on its subscription again. The same applies when a profile explicitly sets `billing: "subscription-first"` or `"subscription-only"` and the CLI is logged out. Logged-out CLIs without either signal, and CLIs that are not installed, still go straight to the API.
+2. **Visible routing decisions**. Plans show the selected model, preset, difficulty score, estimated cost, and channel (official CLI or API, with a "CLI 未登录" badge when the CLI is logged out). The run history shows each step's actual channel. On fallback it shows the real redacted error: Claude JSON `result`, Codex `turn.failed.error.message`, or a stderr snippet. When `allowManualReassign` is on (the default), you can reassign a step to another configured route and rerun it.
+3. **Cost control**. Set daily and monthly budgets (USD, `0` = unlimited) and see meters for today's and this month's spend.
+   - Before a run, the estimate is checked against the budget.
+   - `model_router_tool_run` is estimated the same way when you name its `provider`/`model` route (without a route the CLI default model has no price, so only an already-exhausted budget pauses it); over budget it returns `paused-budget` until called with `confirmOverBudget: true`.
+   - After a run, the actual cost is recorded. CLI-reported cost is used first (Claude `total_cost_usd`, Grok `total_cost_usd` when the server reported a complete cost, MiMo's per-step `cost`); otherwise token usage × your configured prices. Token usage is read from Claude, Codex, Gemini, Grok (`end` event), MiMo (`step-finish` parts) and MiniMax (`exec.result.usage`). Kimi and ZCode do not report usage in their headless output. Without prices, only token counts are kept.
+   - `overBudgetAction` decides what happens over budget. `downgrade` (the default) re-plans with the economy preset and pauses if it still doesn't fit. `pause` asks you right away. Continuing from a session requires `confirmOverBudget=true`, which triggers a host approval. When a run needs several approvals (editing files, API-key retry, over budget, unsandboxed CLI), they are listed together in **one** prompt.
+   - **Only API-billed spend counts against budgets**: model-catalog API calls, and official CLI calls that use an API key (injected by the plugin, inherited from the environment, or a CLI whose own login is an API key according to the health check).
+   - When an official CLI runs on a **subscription login** with no API key (for example Claude Pro/Max, or Codex signed in with ChatGPT), its reported or usage × price figure is shown separately as **订阅参考费用 (subscription reference cost, priced at API rates)** and is **not** counted toward the daily/monthly budget. The cost card and run history show both the budget-counted spend and the reference cost. Tool rows show whether each CLI is on a subscription login or bills an API key.
+   - When the login type cannot be detected (CLIs without a status command, CLIs launched by the team runner), it is treated as a subscription login unless a matching API-key environment variable is set.
+   - Routed runs follow the [subscription-first rule](#subscription-first-api-key-only-when-the-quota-runs-out) for every provider: the subscription is used first and only quota/rate-limit exhaustion switches the step to an API key, which is then counted.
+4. **Presets** (`routingPreset`): 省钱优先 (economy) / 均衡 (balanced, the default) / 效果优先 (quality). Presets tilt the quality/cost/latency weights and move the quality floor a cheaper substitute must clear by ±0.04. Balanced is identical to the previous planner.
+5. **Subtask DAG** (`model_router_rerun_step`). Team packages are shown in dependency columns. Every `model_router_execute`, `model_router_team_execute` and `model_router_tool_run` call is recorded with its kind and each step's status (done, fallback, failed, blocked). A team run stops at the first failure, so later steps show as blocked. **重跑此步** (rerun this step) reruns only the failed step and its unfinished downstream steps. Finished steps keep their results and feed the rerun as dependency context.
+   - Routed runs: any failed step can be rerun or reassigned.
+   - Team runs: **read-only** team runs support single-step rerun through the same signed runner and Harness sandbox. An **editable** (`workspace-write`) team run that **stopped at a failed step** can be continued (**在新工作区续跑**): a fresh isolated worktree is created from the current checkout, the earlier worktree's changes are applied to it first, then the failed step and its unfinished downstream steps run, and the combined patch is integrated as usual. This needs approval, a clean repository still at the run's base commit (otherwise it refuses), and a run recorded by this version (with its base commit). Runs that were already integrated, or wait for manual integration, cannot be rerun step by step, and successful steps of an editable run cannot be reassigned (their changes would be applied twice).
+   - Tool runs: a failed `model_router_tool_run` call can be repeated (**重新执行此调用**, packageId `direct`) with the same tool, task, mode and model. It is recorded as a new run linked by `rerunOf`; an editable call starts again from a fresh worktree of the current checkout and needs approval.
+6. **Security boundaries**. The workbench card and the plugin settings list each route's readable and writable scope and its sandbox status:
+   - Read-only runs write nothing.
+   - File-modifying runs use an isolated Git worktree and need host approval.
+   - On Linux/macOS, a headless CLI launched directly has no Harness process sandbox. With `confirmUnsandboxedCli` on (the default), you are asked first.
+7. **Quality loop** (`model_router_rate`). `reviewMode` can be `off`, `sample` (uses `reviewSampleRate`), or `always`. When on, a stronger configured model reviews cheap-model output, and the verdict is stored with the run. You can rate each result 👍/👎. Ratings add a small shrunk bias (at most ±0.04) to that exact `provider/model`'s quality score for future routing.
+
+**Local data (on by default)**: run history is **saved locally by default**; there is no switch. It is kept in `~/.dsh/model-router/state.json` (or `$DSH_HOME/model-router/state.json`) and contains:
+- the health report, subscription quota state (which subscriptions are exhausted until when) and CLIs whose subscription login failed at run time;
+- the last 200 runs (routed, team and tool runs), with the **full task text** (up to 20,000 characters) and **each step's answer excerpt** (up to 4,000 characters);
+- workspace paths, routing decisions, costs and ratings.
+
+The file never leaves your machine and holds no API keys. If your tasks contain sensitive content, keep this file in mind. Delete it, or its `runs` array, to clear the history.
+
+Several Host processes can share one DSH home: each write takes `state.json.lock`, re-reads the file, applies its change and replaces the file atomically, so concurrent runs are not lost. Subscription quota marks and runtime login failures written by another process take effect on the next call without a restart (the file is re-read when its mtime/size/inode changes), including clears. If the file cannot be parsed, it is kept as `state.json.corrupt-<time>` and the workbench and `model_router_health` (`notices`) show a warning for 7 days; recover history from that backup if needed.
+
+**Known gaps**:
+- Kimi and ZCode report no token usage in headless output, so their steps show "subscription login, no usage reported" or "cost unknown".
+- ZCode login state stays unknown (no status command); MiniMax is unknown when only an API key or no state file is present. Kimi/MiMo/Grok/MiniMax detection proves only that a credential/state file says so, not that the token is still valid.
+- The workbench starts **read-only** runs only; editable runs still start from a session (`model_router_tool_run`, `model_router_team_execute`).
+- The UI has passed build checks, unit tests and a headless browser pass with the real client bundle and a mock Host bridge. It has not been verified in a real Harness desktop.
+
+## Subscription first, API key only when the quota runs out
+
+Many vendors sell coding subscriptions besides pay-as-you-go API keys: Claude Pro/Max, ChatGPT plans for Codex, Gemini, Kimi Code, the MiniMax Token Plan, the GLM Coding Plan (Zhipu / Z.ai) and others. The router's rule is:
+
+> **If a subscription is available, use it. Only when that subscription hits its quota or rate limit does the same step switch to the API key.**
+
+**Two kinds of subscription.**
+
+| Kind | How it is recognised | How it runs |
+| --- | --- | --- |
+| **CLI account login** (`cli-login`) | The route's provider maps to an official CLI (Claude Code, Codex, Gemini CLI, Kimi Code, MiniMax Code, ZCode for GLM…) and the health check finds an account login. | The CLI runs with **all API-key variables removed** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`/`CODEX_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`, `KIMI_API_KEY`/`MOONSHOT_API_KEY`, `MINIMAX_API_KEY`, `ZAI_API_KEY`, …) and no key is injected, so it can only bill the subscription. |
+| **Coding-plan key route** (`plan-key`) | A Harness provider whose base URL and key are a coding plan, marked with `subscription: "plan-key"` in its model profile. Provider ids such as `glm-coding-plan`, `kimi-code`, `minimax-token-plan` are recognised automatically; the profile setting always wins. | The plan route is called through the model catalog first. Its `apiRoute` names the pay-as-you-go route used when the plan is exhausted. |
+
+Configure a plan-key route in Harness's **Models** page like any Anthropic- or OpenAI-compatible provider, using the vendor's documented plan endpoint and plan key (the plugin never reads or stores keys):
+
+| Plan | Anthropic-compatible base URL (Claude Code style) | OpenAI-compatible base URL |
+| --- | --- | --- |
+| GLM Coding Plan | `https://open.bigmodel.cn/api/anthropic` (intl `https://api.z.ai/api/anthropic`) | `https://open.bigmodel.cn/api/coding/paas/v4` (intl `https://api.z.ai/api/coding/paas/v4`) — not the general `/api/paas/v4`, which bills account balance |
+| Kimi Code | `https://api.kimi.com/coding/` | `https://api.kimi.com/coding/v1`, model `kimi-for-coding` |
+| MiniMax Token Plan | `https://api.minimaxi.com/anthropic` (intl `https://api.minimax.io/anthropic`) | — |
+
+Check each plan's terms first: some vendors (the GLM Coding Plan FAQ, for example) say plan quota applies only inside their supported coding tools, and other API use needs the standard API service. Endpoints and model ids change; verify them in the vendor docs.
+
+**Profile fields** (in “逐模型价格与能力” or `modelProfilesJson`):
+
+```json
+[
+  { "provider": "glm-coding-plan", "model": "glm-4.6", "subscription": "plan-key",
+    "apiRoute": { "provider": "zhipu", "model": "glm-4.6" } },
+  { "provider": "anthropic", "model": "claude-sonnet-4-5", "billing": "subscription-first" },
+  { "provider": "deepseek", "model": "deepseek-chat", "billing": "api-only" }
+]
+```
+
+- `billing`: `subscription-first` (default; may be omitted), `api-only` (never use the subscription), or `subscription-only` (never fall back to an API key; the step fails with the reason instead).
+- `subscription`: `plan-key`, `cli-login`, or `none` (always API). Omitted means automatic.
+- `apiRoute`: only for `plan-key` routes; an exact catalog route. When the router picks that API route directly, it still uses the plan first while the plan has quota.
+
+**Exhaustion detection and switching.** When the subscription attempt fails, its error text is matched against documented vendor messages:
+
+| Vendor | Quota exhausted | Rate limited |
+| --- | --- | --- |
+| Claude Code | “You've hit your session/weekly/Opus limit · resets 3:45pm” | “Server is temporarily limiting requests”, “Request rejected (429)” |
+| Codex | `usage_limit_reached` (`resets_at` / `resets_in_seconds`), “You've hit your usage limit” | `rate_limit_exceeded` |
+| Gemini | `RESOURCE_EXHAUSTED`, “Quota exceeded”, “exhausted your daily quota” (`retry in Xs`) | — |
+| Kimi Code | 403 “You've reached your 5-hour / weekly (7-day) / monthly usage limit” | “concurrent request limit”, 429 “receiving too many requests”, “engine is currently overloaded” |
+| MiniMax | error `2056` “usage limit exceeded” / “Token Plan usage limit reached” | error `2045` |
+| GLM | errors `1308`–`1310`, `1316`–`1321` (“Usage limit reached for … will reset at YYYY-MM-DD HH:MM:SS”, “已达到…使用上限”) | errors `1302`, `1305` |
+| Any | — | HTTP `429`, “Too Many Requests”, “rate limit” |
+
+On a match the subscription is marked **exhausted until the reported reset time** (`resets_at`, `resets_in_seconds`, `retry in Xs`, GLM's reset timestamp, Claude's “resets 3:45pm”), otherwise for `subscriptionCooldownMinutes` (default 60; rate limits without a time are skipped for 1 minute). The **same step is retried on the API key at once**, and later steps skip the exhausted subscription until it recovers. The run history records the channel (`billing: subscription | api`) and the reason, for example **“订阅额度已用尽（预计 10-2 18:30 恢复），已切换 API Key。”** The state survives restarts (`quota` in `state.json`).
+
+**Other subscription failures do not spend the API key silently.** When the subscription really ran and failed for another reason (timeout, crash, unparsable output, non-zero exit, authentication error, a plan endpoint returning 5xx…), the step is **paused** by default (`onSubscriptionFailure: "ask"`). Run history marks it **等待确认** with the real error, and downstream steps wait (**等待上游确认**). In the run history choose **改用 API 重试** (retry on the API key), **重试订阅** (retry the subscription, e.g. after logging in again) or **取消** (cancel the step and the steps waiting on it). In a session, `model_router_execute` returns `status: "paused-subscription-failure"` with `awaitingConfirmation`; the model asks you and calls `model_router_rerun_step` with `subscriptionChoice: "api" | "subscription" | "cancel"`. `api` raises a host approval prompt. Set `onSubscriptionFailure` (cost card: “订阅调用失败（非额度用尽）时”) to `api` for the old automatic fallback, or `fail` to stop the step without asking. A CLI that is not installed or has no headless adapter was never attempted, so its step still uses the catalog API as before.
+
+If a vendor changes its wording, add patterns in `quotaPatternsJson`, keyed by tool id, provider id or `*`:
+
+```json
+{ "kimi-code": { "quota": ["额度已用完"], "rateLimit": ["请求过于频繁"] }, "my-glm-plan": { "quota": ["1308"] } }
+```
+
+Invalid regular expressions are ignored and listed in the health check.
+
+**Health check.** The “订阅与 API Key” card (and `model_router_health` → `billing`) lists each provider with its billing mode, subscription source, subscription state (logged in / coding-plan key route / API-key-only login / logged out / **exhausted until X**) and whether an API-key route is available for fallback. Login probes run with API-key variables removed, so a Claude or Codex account login is detected even when an API key is also set.
+
+**Budget.** Subscription runs (CLI login or plan-key route) are shown as subscription reference cost and are not counted; API-key fallback runs are counted against the daily/monthly budget, for every provider.
+
+**Limits.** `model_router_team_execute` and `model_router_tool_run` edit files through the official CLI only, so a quota hit there is recorded (the step shows the reason and later routed steps skip that subscription) but is **not** retried on an API key automatically. Kimi Code and MiniMax Code CLIs have no portable read-only adapter on Linux/macOS, so their subscriptions are used there through plan-key routes.
 
 ## How the routing decision is derived
 
@@ -118,7 +244,7 @@ The initial bands are `simple` for `C < 0.34`, `balanced` for `0.34 ≤ C < 0.66
 
 ### 2. Split compound work into a directed acyclic graph
 
-A complex request begins with **analysis** and ends with **synthesis**. Action-like lines, bullets, clauses, or sentences can become up to six explicit execution packages. A request for testing or verification adds a verification package. The `dependsOn` edges put analysis before execution, verification after the relevant execution packages, and synthesis after all required results. Sequential wording such as “then” adds an edge between execution packages.
+A complex request begins with **analysis** and ends with **synthesis**. Action-like lines, bullets, clauses, or sentences can become up to six explicit execution packages. A request for testing or verification adds a verification package. The `dependsOn` edges put analysis before execution, verification after the relevant execution packages, and synthesis after all required results. Sequential wording such as “then” adds an edge between execution packages. Explicit references become edges to exactly those steps: “依赖第 1 步”, “基于第 2、3 步”, “第 1 步完成后”, “依赖第 1-3 步”, “depends on step 2”, “after steps 1 and 3” (numbers count the listed requirements; forward references are ignored).
 
 ```text
 analysis ──┬── keyword extraction ────────────┐
@@ -251,9 +377,11 @@ From a Harness session, these plugin tools are available:
 | --- | --- |
 | `model_router_routes` / `model_router_plan` | Show configured routes or generate a local plan. `/router` is the session command for a plan. |
 | `model_router_consult` | Ask another configured Harness model for a live second opinion through the model API. This can incur provider charges. |
-| `model_router_execute` | Run a routed plan, or one explicit model, through each vendor's headless CLI when enabled. Missing or failed CLIs fall back to the model API. Read-only. |
+| `model_router_execute` | Run a routed plan, or one explicit model, through each vendor's headless CLI when enabled. Missing, logged-out, or failed CLIs fall back to the model API (a hung CLI and the processes it started get SIGTERM, then SIGKILL after 5 s; a cancel waits at most 1.5 s; Windows uses `taskkill /T /F`). The task may be up to 64,000 UTF-8 bytes (about 21,000 Chinese or 64,000 English characters) and is checked before any paid call; long tasks and dependency answers are truncated per step so each step's prompt fits. A run that stops on an error after paid steps is still recorded with their cost. Records cost and supports per-step rerun and rating. Read-only. |
+| `model_router_health` | Onboarding health check: installed, version, login state per official tool. Logged-out tools are skipped by routing. |
+| `model_router_rerun_step` / `model_router_rate` | Rerun (optionally reassign) one failed step of a recorded run, continue an editable team run in a fresh seeded worktree, or repeat a failed tool run; rate a result 👍/👎 to nudge future routing. |
 | `model_router_tools` / `model_router_tool_install` | Probe or install a fixed official tool. `/tools` exposes the human command. |
-| `model_router_tool_run` | Run one ready vendor CLI in the approved session workspace. |
+| `model_router_tool_run` | Run one ready vendor CLI in the approved session workspace. Estimated and budget-checked first (`confirmOverBudget`). |
 | `model_router_team_execute` | Run dependent work packages through ready vendor CLIs in order; stop on failure or a reported model mismatch. |
 
 Headless assignment uses fixed adapters: Claude Code `claude -p`, Codex `codex exec`, and Gemini CLI `gemini -p` (`@google/gemini-cli@0.62.0`). DeepSeek and other providers without an adapter stay on the model directory API. A configured provider API key is passed only into that process; otherwise the CLI's own logged-in session is used. The plugin does not store keys in model profiles. Editable writes remain on `model_router_tool_run` and `model_router_team_execute`.
@@ -268,18 +396,17 @@ The planned Harness model ID is not necessarily the vendor CLI's model name. A s
 
 ## Development and verification
 
-Use Node.js **22.19+** and pnpm. From a complete source checkout, run:
+Use Node.js **22.19+** and pnpm 10 (pinned through `packageManager`; `corepack enable` picks it up). From a complete source checkout, run:
 
 ```powershell
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --strict-peer-dependencies
 npm run build:client
 npm test
 npm run check:client
-pnpm peers check
 npm pack --pack-destination dist
 ```
 
-The client must be rebuilt when its source changes; a previously generated bundle does not verify new code. Install the resulting archive through the Desktop plugin manager in a separate test profile to check the router entry and official-tool panel. Test GAL alone and alongside the router using its own repository's instructions. Live sign-in, actual vendor model identity, response quality, and provider billing require the account holder's acceptance checks.
+pnpm 10 has no `pnpm peers check` command; `--strict-peer-dependencies` makes the install fail on unmet peer dependencies instead. The client must be rebuilt when its source changes; a previously generated bundle does not verify new code. Install the resulting archive through the Desktop plugin manager in a separate test profile to check the router entry and official-tool panel. Test GAL alone and alongside the router using its own repository's instructions. Live sign-in, actual vendor model identity, response quality, and provider billing require the account holder's acceptance checks.
 
 The [0.11.1 release report](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md) and [rc.2 compatibility report](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md) preserve the earlier release record. Current split-release results belong in the new project task report; historical test counts do not establish standalone-package compatibility.
 

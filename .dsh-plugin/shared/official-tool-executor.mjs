@@ -24,6 +24,7 @@ import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser } from './vendor-mimo-grok-adapter.mjs'
+import { usageFromEvents, usageFromOutput } from './task-executors.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -134,7 +135,11 @@ function checkedTimeout(timeoutMs) {
   return timeoutMs
 }
 
-function executionEnvironment(toolId) {
+/** API-key variables removed when a run must use the CLI's own subscription login. */
+const API_KEY_VARIABLES = Object.freeze(['ANTHROPIC_API_KEY', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'KIMI_API_KEY',
+  'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'])
+
+function executionEnvironment(toolId, { sessionOnly = false } = {}) {
   const vendorKeys = {
     'claude-code': ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR'],
     codex: ['CODEX_API_KEY', 'OPENAI_API_KEY', 'CODEX_HOME'],
@@ -145,6 +150,7 @@ function executionEnvironment(toolId) {
     zcode: ['ZAI_API_KEY', 'ZCODE_HOME'],
   }
   const keys = [...ENVIRONMENT_KEYS, ...(vendorKeys[toolId] ?? [])]
+    .filter(key => !sessionOnly || !API_KEY_VARIABLES.includes(key))
   const env = {}
   for (const key of keys) {
     if (process.env[key] !== undefined) env[key] = process.env[key]
@@ -507,7 +513,7 @@ function stopProcessTree(child) {
   }
 }
 
-function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
+function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessionOnly = false) {
   return new Promise(resolveResult => {
     let child
     try {
@@ -517,7 +523,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
         windowsHide: true,
         detached: !IS_WINDOWS,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: executionEnvironment(toolId),
+        env: executionEnvironment(toolId, { sessionOnly }),
       })
     } catch (error) {
       resolveResult({ status: 'failed', error: String(error?.message ?? error), exitCode: null })
@@ -531,6 +537,8 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
     let stderrTail = ''
     let outputBytes = 0
     let jsonlBuffer = ''
+    let codexUsageLine = ''
+    let reportedUsage = null
     let terminal = null
     let failedEvent = false
     let finalText = ''
@@ -593,6 +601,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
           }
           return
         }
+        if (event.type === 'turn.completed' && event.usage) codexUsageLine = line
         if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
         // Top-level `error` events include transient reconnect notices; only turn.failed is terminal.
         if (event.type === 'turn.failed') {
@@ -669,7 +678,9 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
         return
       }
       if (miniMaxParser) {
-        settle(miniMaxParser.finish(code))
+        const outcome = miniMaxParser.finish(code)
+        const reported = usageFromEvents('minimax-result', outcome)
+        settle({ ...outcome, usage: reported?.usage ?? null })
         return
       }
       if (nativeParser) {
@@ -690,6 +701,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
           }
           terminal = 'completed'
           finalText = result.result
+          reportedUsage = usageFromOutput('claude-json', stdout)
         } catch {
           settle({ status: 'failed', exitCode: code, error: 'Claude 未返回有效的结果 JSON。' })
           return
@@ -716,7 +728,10 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
         settle({ status: 'failed', exitCode: code, error: protocolError ?? 'Codex 未返回完整成功终态和回答。' })
         return
       }
-      settle({ status: 'succeeded', exitCode: code })
+      if (!reportedUsage && codexUsageLine) reportedUsage = usageFromOutput('codex-jsonl', codexUsageLine)
+      settle({ status: 'succeeded', exitCode: code,
+        ...(reportedUsage?.usage ? { usage: reportedUsage.usage } : {}),
+        ...(reportedUsage?.reportedCostUsd ? { reportedCostUsd: reportedUsage.reportedCostUsd } : {}) })
     })
 
     timeoutTimer = setTimeout(() => requestStop('timed-out'), timeoutMs)
@@ -734,6 +749,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
  */
 export async function runOfficialTool({
   toolId, task, workspace, mode = 'read-only', isolatedRoot, modelId, signal, sandbox, timeoutMs = DEFAULT_TIMEOUT_MS,
+  sessionOnly = false,
 }) {
   const tool = getOfficialTool(toolId)
   if (!tool) return { toolId, status: 'unsupported', reason: '未知的官方工具注册表 ID。' }
@@ -767,7 +783,7 @@ export async function runOfficialTool({
   }
   const startedAt = Date.now()
   const outcome = await captureProcess({ ...spec, file: confined.argv[0], args: confined.argv.slice(1) },
-    prompt, cwd, signal, timeout, tool.id)
+    prompt, cwd, signal, timeout, tool.id, sessionOnly === true)
   return {
     toolId: tool.id,
     mode: executionMode,

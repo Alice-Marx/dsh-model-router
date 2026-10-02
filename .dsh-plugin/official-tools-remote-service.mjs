@@ -20,11 +20,40 @@ function errorText(error) {
   return error instanceof Error ? error.message : String(error)
 }
 
-export class OfficialToolsRemoteService extends TypertRemoteService {
-  constructor(ctx) {
-    super(ctx, OFFICIAL_TOOLS_REMOTE_NAMESPACE)
+const unavailable = () => { throw new Error('模型路由工作台服务尚未加载。') }
 
+/** Wrap a Host operation so the client always receives a plain object. */
+async function settled(operation) {
+  try { return { ok: true, value: await operation() } }
+  catch (error) { return { ok: false, error: errorText(error) } }
+}
+
+export class OfficialToolsRemoteService extends TypertRemoteService {
+  constructor(ctx, services = {}) {
+    super(ctx, OFFICIAL_TOOLS_REMOTE_NAMESPACE)
+    this.services = services
   }
+
+  /** 开箱体检: installed, version and login state per registry tool. */
+  health(fresh) { return settled(() => (this.services.health ?? unavailable)(fresh === true)) }
+
+  completeOnboarding() { return settled(() => (this.services.completeOnboarding ?? unavailable)()) }
+
+  /** Recent runs, spending, budget status and learned route biases. */
+  ledger() { return settled(() => (this.services.ledger ?? unavailable)()) }
+
+  rateResult(request) { return settled(() => (this.services.rate ?? unavailable)(request)) }
+
+  /** Retry one recorded step (optionally reassigned); unfinished downstream steps follow. */
+  rerunStep(request) { return settled(() => (this.services.rerun ?? unavailable)(request)) }
+
+  boundaries() { return settled(() => (this.services.boundaries ?? unavailable)()) }
+
+  /** Plan, cost estimate and the reasons that need the user's confirmation; runs nothing. */
+  previewRun(request) { return settled(() => (this.services.previewRun ?? unavailable)(request)) }
+
+  /** Execute a previewed run once every listed reason was confirmed. */
+  startRun(request) { return settled(() => (this.services.startRun ?? unavailable)(request)) }
 
   /** Re-probe the local fixed registry; the caller cannot supply a command. */
   async list() {
@@ -69,7 +98,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
 }
 
 /** Registration follows the Host plugin fiber; unload withdraws all endpoints. */
-export function registerOfficialToolsRemote(ctx) {
-  new OfficialToolsRemoteService(ctx)
+export function registerOfficialToolsRemote(ctx, services = {}) {
+  new OfficialToolsRemoteService(ctx, services)
   ctx.effect(() => ctx.typert.register(OFFICIAL_TOOLS_HOST_TYPERT), 'model-router-galgame: official tools remote descriptors')
 }

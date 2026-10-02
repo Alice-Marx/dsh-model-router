@@ -17,6 +17,7 @@ import { createBrotliDecompress } from 'node:zlib'
 import { homedir } from 'node:os'
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
+import { usageFromEvents } from './task-executors.mjs'
 
 const VERSIONS = Object.freeze({ 'mimo-code': '0.1.15', 'grok-build': '1.0.41' })
 const PLATFORMS = Object.freeze({
@@ -221,6 +222,8 @@ export function createMiMoGrokParser(toolId) {
   let requestId = null
   let toolErrors = 0
   let events = 0
+  const mimoSteps = []
+  let grokSpend = null
 
   return {
     push(line) {
@@ -254,6 +257,7 @@ export function createMiMoGrokParser(toolId) {
             protocolError = 'MiMo 步骤终态格式无效。'
           } else {
             terminal = event.part.reason === 'stop' ? 'completed' : 'failed'
+            if (event.part.tokens && typeof event.part.tokens === 'object') mimoSteps.push({ tokens: event.part.tokens, cost: event.part.cost })
           }
         } else if (event.type === 'text' && event.part?.type === 'text'
           && typeof event.part.text === 'string' && event.part.time?.end) {
@@ -275,11 +279,16 @@ export function createMiMoGrokParser(toolId) {
             terminal = reason === 'endturn' ? 'completed' : 'failed'
             if (typeof event.sessionId === 'string') sessionId = event.sessionId
             if (typeof event.requestId === 'string') requestId = event.requestId
+            if (event.usage && typeof event.usage === 'object') grokSpend = event
           }
         }
       }
     },
     finish(exitCode) {
+      function spend() {
+        const reported = toolId === 'mimo-code' ? usageFromEvents('mimo-steps', mimoSteps) : usageFromEvents('grok-end', grokSpend)
+        return reported ? { usage: reported.usage, ...(reported.reportedCostUsd ? { reportedCostUsd: reported.reportedCostUsd } : {}) } : {}
+      }
       const good = exitCode === 0 && !protocolError && !vendorError
         && terminal === 'completed' && finalText.trim().length > 0
         && (toolId !== 'grok-build' || Boolean(sessionId))
@@ -291,6 +300,7 @@ export function createMiMoGrokParser(toolId) {
         requestId,
         toolErrors,
         events,
+        ...spend(),
         ...(!good ? { error: protocolError ?? vendorError ?? `${toolId} 未返回完整的成功终态和回答。` } : {}),
       }
     },

@@ -21,6 +21,8 @@ npm 包名仍为 `@ljwei-stak/model-router-galgame`，便于原用户直接升�
 - [安装与版本选择](#安装与版本选择)
 - [开始使用](#开始使用)
 - [工作台页面怎么用](#工作台页面怎么用)
+- [体检、成本与质量回路](#体检成本与质量回路)
+- [订阅优先：额度用尽才切换 API Key](#订阅优先额度用尽才切换-api-key)
 - [路由算法：从输入到分配](#路由算法从输入到分配)
 - [官方工具与执行边界](#官方工具与执行边界)
 - [可选安装 GAL](#可选安装-gal)
@@ -89,7 +91,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 3. 输入任务，先查看单任务、团队计划，或在**指定模型**里直接选一条已配置路线。结果会给出复杂度、工作包目标与依赖、质量门槛、推荐路线、预计费用及 `official-cli` / `harness-llm` 渠道。规划本身**不会调用付费模型**。
 4. 在**逐模型价格与能力**里可以为每条路线选择执行方式：`auto` / `official` 优先该厂商官方工具，缺失或失败时回退模型目录 API；`api` 始终走模型目录。不填写时按 `auto`。
 5. 在**官方工具**卡片上检测、一键下载安装或修复执行入口。工具就绪只说明安装与可信入口通过核验；首次登录、模型权限和真实费用仍要在对应厂商账号中验证。
-6. 在官方会话里使用 `model_router_execute` 按计划或指定模型执行并汇总结果。`model_router_consult` 仍是一次模型目录咨询；`model_router_tool_run` 跑一个已核验的官方 CLI；`model_router_team_execute` 按依赖顺序执行可编辑工作包。可编辑任务需要干净的测试 Git 仓库，并经过宿主的工具审批。
+6. 在官方会话里使用 `model_router_execute` 按计划或指定模型执行并汇总结果。`model_router_consult` 仍是一次模型目录咨询；`model_router_tool_run` 跑一个已核验的官方 CLI；`model_router_team_execute` 按依赖顺序执行可编辑工作包。可编辑任务需要干净的测试 Git 仓库，并经过宿主的工具审批。 体检、重跑和评价另有 `model_router_health`、`model_router_rerun_step`、`model_router_rate`，见下文。
 
 ![0.9.0 隔离安装后的桌面官方工具面板](docs/assets/desktop-official-tools-0.9.0.png)
 
@@ -106,7 +108,8 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 3. **写“任务描述”**：可以粘贴长提案，但最好把要交付的步骤写成编号条目，并写清验收标准。“单任务”只给单项路线建议；“团队分工”会把可执行需求拆成有依赖的工作包，最多六个显式执行包。“指定模型”不比较其他路线，整项任务都交给下拉框里选中的那一条。
 4. **设置预算并生成**：“本次估算预算（USD）”中的 `10` 只是本地估价目标，`0` 表示规划不设预算；两者都**不会限制真实账号扣费**。点**生成路由建议**后，继续向下滚过“逐模型价格与能力”，找到新增的**路由建议**卡片。按钮不会启动模型。
 5. **读结果**：先核对推荐 `provider/model`、复杂度、估算总成本、执行渠道与警告；团队模式再逐包核对目标、难度、依赖、建议模型、估价和验收项。`官方 CLI` 说明本机相应入口可托管；`模型目录 API` 说明可通过 Harness 模型目录调用，但不等于这个包能由插件的 CLI 团队执行器运行。修改任务、预算或档案后重新生成。
-6. **需要实际工作时另开官方会话**：在左侧点**新会话**并选好工作区。要按工作台结果执行，请求 `model_router_execute`；若只要某一个模型，同时给出该路线的 `provider` 和 `model`。`model_router_consult` 只做模型目录咨询。`model_router_tool_run` 与 `model_router_team_execute` 仍负责已核验 CLI 的可编辑任务。团队执行会按照**当前已就绪且支持所选模式的官方 CLI**重新规划，可能与页面上刚才的静态建议不同；它不会直接读取那张结果卡作为执行清单。
+6. **只读任务可以直接在工作台执行**：路由建议下方的“**在工作台执行**”卡片沿用上面的任务描述和规划模式（单任务 / 团队分工 / 指定模型），可另选路由方案，并填写工作区绝对路径（留空则沿用上次运行的工作区，路径必须存在）。点**预览执行计划**后，宿主按 `model_router_execute` 的同一套逻辑生成计划（含超预算自动降级），显示预估费用、预算检查，以及**所有需要确认的原因**（超出预算、不经沙箱启动 CLI）合并在一处。按**全部确认并执行**之前不会调用任何模型；宿主执行前会再核对一次原因，期间有变化（例如预算或登录状态）会拒绝并要求重新确认。结果写入下方执行记录。
+7. **可编辑任务另开官方会话**：在左侧点**新会话**并选好工作区。要按工作台结果执行，请求 `model_router_execute`；若只要某一个模型，同时给出该路线的 `provider` 和 `model`。`model_router_consult` 只做模型目录咨询。`model_router_tool_run` 与 `model_router_team_execute` 仍负责已核验 CLI 的可编辑任务。团队执行会按照**当前已就绪且支持所选模式的官方 CLI**重新规划，可能与页面上刚才的静态建议不同；它不会直接读取那张结果卡作为执行清单。
 
 例如，要先给一个三分钟科幻短片做**前期规划**，可以在任务描述中输入：
 
@@ -122,6 +125,131 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 先选**团队分工**、预算填 `0`、点**生成路由建议**并向下看结果；补齐价格后再用 `10` 等估价目标比较方案。如果只想在会话里再得到一次计划，可发送“请调用 `model_router_plan`，按 `team` 模式规划以下任务，`budgetUsd=10`，先不要执行”。若确认要调用已安装 CLI，可在**测试仓库**中请求“请调用 `model_router_team_execute`，对同一任务先以 `read-only` 模式执行可完成的文字/代码检查，并报告每包的实际状态”。想让 CLI 写文件时改为 `workspace-write`，需要干净 Git 仓库及宿主审批。真实执行可能计费。
 
 当前插件能规划短片任务，并通过已适配的官方**模型编程 CLI**处理它们有能力完成的文本或代码工作。**“生成路由建议”不会操作 Blender、ComfyUI、剪辑软件或导出视频。** 要交付成片，还需为相应创作软件提供可调用的工作流、素材、权限和人工验收。详见[工作台使用指南](docs/WORKBENCH_USER_GUIDE.zh.md)的单工具、团队和常见问题章节。
+
+## 体检、成本与质量回路
+
+工作台顶部按下面顺序展示这些能力。会话内对应的工具在括号里。
+
+1. **开箱体检**（`model_router_health`）。第一次打开工作台时，会对注册表里的每个官方工具检查三件事：是否安装、版本是否等于本版固定版本、是否已登录。登录检查只跑很便宜的状态命令（超时很短），或只检查凭据文件是否存在（从不读取内容）：
+
+   | 工具 | 检测方式 | 登录方法 |
+   | --- | --- | --- |
+   | Claude Code | `claude auth status --json` | `claude auth login` |
+   | Codex | `codex login status` | `codex login` |
+   | Gemini CLI | `GEMINI_API_KEY`/`GOOGLE_API_KEY` 或 `~/.gemini/oauth_creds.json` | `gemini` |
+   | Kimi Code | `KIMI_API_KEY`/`MOONSHOT_API_KEY`，或 `~/.kimi-code/credentials/kimi-code.json`（`$KIMI_CODE_HOME`） | `kimi login` |
+   | MiMo Code | `MIMO_API_KEY`，或 `~/.local/share/mimocode/auth.json`（`$XDG_DATA_HOME`；该文件也可能只存了供应商 API Key，计费方式记为未知） | `mimo auth login` |
+   | Grok Build | `XAI_API_KEY`，或 `~/.grok/auth.json`（`$GROK_HOME`）。Windows 上 npm 全局目录不在 C 盘时，插件以 `GROK_HOME=<npm 全局目录>\.model-router-grok` 启动 Grok，体检会显示这个实际路径 | `grok login`（无浏览器时加 `--device-auth`）；使用该目录时运行 `$env:GROK_HOME='<路径>'; grok login` |
+   | MiniMax Code | `MINIMAX_API_KEY`，或不含密钥的状态文件 `~/.minimax/auth/prod/<cn\|global>/mcode-public/auth-state.json`（`$MINIMAX_DATA_DIR`）中的 `status`：`authenticated` → 已登录；`anonymous` → 未知（用 `mcode set-minimax-key` 保存的 API Key 仍可用） | `mcode login` |
+   | ZCode | 桌面应用，没有状态命令 → 未知。插件只启用签名与 CLI 哈希已核验的 3.14.3；装了其他版本时会如实说明，而不是显示“未安装” | 欢迎页选“连接 BigModel / Z.ai 继续使用”；GLM Coding Plan 在“模型设置 → BigModel”右上角选“编程套餐” |
+
+   文件路径取自官方发布包（kimi-code 2.1.1、mimocode 0.1.15、grok 1.0.41）。找不到文件时显示“未知”而不是“未登录”，因为这些 CLI 也可以通过自定义供应商或（MiMo）免费匿名通道使用。体检不会发起登录。
+   - 未安装的工具点**一键安装**，复用原有的固定注册表安装器。
+   - 未登录的工具点**去登录**，查看并复制登录命令。
+   - 体检结果缓存 10 分钟。路由会**立刻跳过未登录的 CLI**，直接走模型目录 API；以前 Codex 要等约 14 秒才失败回退。配置了对应 API Key 时不跳过。如果执行中 CLI 报出登录错误，也会把该工具标为未登录；但因为你本来在用它的订阅，之后同一路线的步骤会**暂停询问**（“订阅登录已失效……未自动改用 API Key”），不会悄悄改用 API Key，重启后依然如此（记录在 `state.json` 的 `authFailures`），直到该 CLI 再次以订阅成功运行。模型档案明确写了 `billing: "subscription-first"` 或 `"subscription-only"` 而 CLI 未登录时同样暂停询问。没有这两种迹象的未登录 CLI，以及未安装的 CLI，仍直接走 API。点“重新体检”可以刷新。
+2. **路由决策看得见**。路由建议会显示推荐模型、路由方案、难度分和估算成本，以及执行渠道（官方 CLI 还是模型目录 API；未登录时标“CLI 未登录”）。执行记录里每一步都写明实际渠道。如果回退到 API，会显示脱敏后的真实错误：Claude JSON 的 `result`、Codex 的 `turn.failed.error.message`，或 stderr 片段。设置允许时可以**改派并重跑**到另一条已配置路线（`allowManualReassign`，默认开启）。
+3. **成本控制**。“成本控制”卡片显示今日和本月已花费金额及进度条，并可设置**每日/每月预算**（USD，`0` 表示不限）。
+   - 执行前，用本次预估金额检查预算。
+   - `model_router_tool_run` 指定了 `provider`/`model` 路线时同样先预估、检查预算（未指定路线时 CLI 默认模型没有单价，只在预算已用完时暂停）；超预算返回 `paused-budget`，确认后以 `confirmOverBudget: true` 重新调用。
+   - 执行后，记录实际费用：优先用 CLI 回报的费用（Claude 的 `total_cost_usd`；Grok 在服务端回报完整费用时的 `total_cost_usd`；MiMo 每步的 `cost`），否则用 token 用量乘以“模型价格与能力配置”里的单价。token 用量来自 Claude、Codex、Gemini、Grok（`end` 事件）、MiMo（`step-finish`）和 MiniMax（`exec.result.usage`）；Kimi 与 ZCode 的无界面输出不含用量。没有单价时只记录 token 数。
+   - 超出预算时的处理由 `overBudgetAction` 决定：`downgrade`（默认）先改用“省钱优先”重新规划，仍超出就暂停；`pause` 直接暂停，询问你是否继续。会话里继续需要传 `confirmOverBudget=true`，宿主会再弹出一次审批。同一次执行需要多项确认时（修改文件、改用 API Key、超出预算、不经沙箱启动 CLI），会合并到**同一个**审批提示里逐条列出。
+   - **只有走 API 计费的花费计入预算**：模型目录 API 调用，或官方 CLI 使用 API Key（插件注入的、环境变量里的，或体检发现 CLI 本身用 API Key 登录）的调用。
+   - 官方 CLI 用**订阅账号登录**、没有 API Key 时（例如 Claude Pro/Max、ChatGPT 登录的 Codex），CLI 回报的金额或按单价折算的金额只显示为“**订阅参考费用（按 API 价折算）**”，**不计入**每日/每月预算。成本卡片和执行记录会同时显示“计入预算”的金额和订阅参考费用。工具卡片会标出各 CLI 是“订阅账号登录”还是“API Key 计费”。
+   - 判断不了登录方式时（例如 Kimi 等没有状态命令的 CLI、团队执行器启动的 CLI），只要没有检测到对应的 API Key 环境变量，就按订阅登录处理。
+   - 路由执行对所有厂商按[订阅优先规则](#订阅优先额度用尽才切换-api-key)：先用订阅，只有额度用尽或限流才把该步骤切换到 API Key，切换后的花费计入预算。
+4. **预设方案**（`routingPreset`）。可选**省钱优先 / 均衡 / 效果优先**，默认是均衡。方案会调整质量、成本和速度三者的权重，并把替代模型必须达到的质量门槛下调或上调 0.04。均衡和以前的算法完全相同。
+5. **子任务可视化**（`model_router_rerun_step`）。团队分工的工作包按依赖关系分列，显示成依赖图（DAG）。`model_router_execute`、`model_router_team_execute` 和 `model_router_tool_run` 的每次执行都会写入执行记录，并标明类型（路由执行 / 团队执行 / 单工具调用）。每一步都标有状态：完成、已回退、失败或依赖未完成；团队执行在某一步失败后停止，后面的步骤显示为“依赖未完成”。点**重跑此步**只重跑失败的那一步，以及依赖它的未完成步骤，已完成的步骤保留原结果，并作为重跑的依赖上下文。
+   - 路由执行：都可以单步重跑，也可以改派。
+   - 团队执行：**只读**团队运行可以单步重跑（同样经过签名执行器和 Harness 沙箱）。**可编辑**（`workspace-write`）团队运行如果是**在某一步失败后停止**的，可以点“**在新工作区续跑**”：从当前仓库新建一个独立工作树，先套用原工作树里之前步骤的改动，再运行失败步骤及其未完成的下游，成功后照常整合合并补丁。需要审批、工作区干净且仍停在原运行的基线提交（否则拒绝），并且记录来自本版本（记录了基线提交）。已经整合或待人工整合的运行不能单步重跑；可编辑运行中已成功的步骤也不能改派（改动会被套用两次）。
+   - 单工具调用：失败的 `model_router_tool_run` 可以点“**重新执行此调用**”（packageId 为 `direct`），沿用原工具、任务、模式和模型，记录为通过 `rerunOf` 关联的新运行；可编辑调用会从当前仓库的新工作树重新开始，同样需要审批。
+6. **安全边界**。“安全边界”卡片和插件设置页会逐条列出每条路线可读、可写的范围，以及是否经过 Harness 沙箱：
+   - 只读执行不写文件；
+   - 修改文件的执行在独立 Git 工作树里进行，需要宿主审批；
+   - 在 Linux/macOS 上直接启动无界面 CLI 时没有 Harness 进程沙箱，`confirmUnsandboxedCli`（默认开启）会在启动前先询问你。
+7. **质量回路**（`model_router_rate`）。`reviewMode` 可以设为 `off`、`sample` 或 `always`；`sample` 按 `reviewSampleRate` 的比例抽检。开启后，会让更强的已配置模型复核便宜模型的输出，并把结论写进执行记录。你可以对每个结果点 👍/👎。评价会以收缩平均的方式，给对应 `provider/model` 的质量分加一个微调，范围最多 ±0.04，作用于以后的路由。
+
+**本地数据（默认开启）**：执行记录**默认自动保存在本机**，没有开关。保存位置是 `~/.dsh/model-router/state.json`（若设置了 `DSH_HOME`，则在 `$DSH_HOME/model-router/state.json`）。内容包括：
+- 体检结果、订阅额度状态（哪些订阅额度已用尽、预计何时恢复），以及执行中订阅登录失效的 CLI；
+- 最近 200 次执行（路由执行、团队执行、单工具调用）的**完整任务文本**（最多 2 万字）和**每步答案摘要**（每步最多 4000 字）；
+- 工作区路径、路由决策、费用和评价。
+
+这个文件只在本机，不会上传，也不包含 API Key。如果任务里有敏感内容，请留意这个文件；需要清除时直接删除它，或删掉其中的 `runs` 数组。
+
+多个宿主进程可以共用同一个 DSH 目录：每次写入都会先获取 `state.json.lock`，重新读取文件、合并本次改动，再原子替换，并发执行不会丢记录。其他进程写入的订阅额度标记和运行时登录失效（包括清除）会在下一次调用时生效，无需重启（文件的 mtime/大小/inode 变化时才重新读取）。文件无法解析时会保留为 `state.json.corrupt-<时间>`，工作台和 `model_router_health`（`notices`）在 7 天内显示提醒；需要时可从备份中恢复历史。
+
+**当前限制**：
+- Kimi 与 ZCode 的无界面输出不含 token 用量，相应步骤显示“订阅登录，未回报可折算的用量”或“费用未知”。
+- ZCode 的登录状态仍为“未知”（没有状态命令）；MiniMax 只有 API Key 或没有状态文件时也显示“未知”。Kimi/MiMo/Grok/MiniMax 的检测只说明凭据或状态文件存在，不代表令牌仍然有效。
+- 工作台只能发起**只读**执行；可编辑任务仍需在会话中用 `model_router_tool_run` 或 `model_router_team_execute` 开始。
+- 这些界面通过了构建检查、单元测试，以及用真实客户端包 + 模拟宿主桥接的无头浏览器检查，还没有在真实 Harness 桌面里验证。
+
+## 订阅优先：额度用尽才切换 API Key
+
+除按量付费的 API Key 外，很多厂商都有编程订阅：Claude Pro/Max、ChatGPT 套餐（Codex）、Gemini、Kimi Code、MiniMax Token Plan、GLM Coding Plan（智谱 / Z.ai）等。路由的规则是：
+
+> **有订阅就先用订阅；只有订阅额度用尽或触发限流时，同一步骤才改用 API Key。**
+
+**两种订阅方式：**
+
+| 方式 | 怎么识别 | 怎么运行 |
+| --- | --- | --- |
+| **官方 CLI 账号登录**（`cli-login`） | 路线的供应商对应一个官方 CLI（Claude Code、Codex、Gemini CLI、Kimi Code、MiniMax Code、GLM 的 ZCode 等），体检发现已登录订阅账号。 | 启动 CLI 时**去掉所有 API Key 环境变量**（`ANTHROPIC_API_KEY`、`OPENAI_API_KEY`/`CODEX_API_KEY`、`GEMINI_API_KEY`/`GOOGLE_API_KEY`、`KIMI_API_KEY`/`MOONSHOT_API_KEY`、`MINIMAX_API_KEY`、`ZAI_API_KEY` 等），也不注入 Key，只能按订阅计费。 |
+| **编程套餐 Key 路线**（`plan-key`） | Harness 里一个以套餐地址和套餐 Key 配置的供应商，在模型档案中设 `subscription: "plan-key"`。供应商 ID 形如 `glm-coding-plan`、`kimi-code`、`minimax-token-plan` 时会自动识别；档案设置优先。 | 先通过模型目录调用套餐路线；`apiRoute` 指定套餐额度用尽时使用的按量付费路线。 |
+
+套餐路线在 Harness 的**模型**页按普通 Anthropic 兼容或 OpenAI 兼容服务添加，填写厂商文档中的套餐地址和套餐 Key（插件不读取、不保存 Key）：
+
+| 套餐 | Anthropic 兼容地址（Claude Code 方式） | OpenAI 兼容地址 |
+| --- | --- | --- |
+| GLM Coding Plan | `https://open.bigmodel.cn/api/anthropic`（国际版 `https://api.z.ai/api/anthropic`） | `https://open.bigmodel.cn/api/coding/paas/v4`（国际版 `https://api.z.ai/api/coding/paas/v4`）；不要用通用的 `/api/paas/v4`，那个扣账户余额 |
+| Kimi Code | `https://api.kimi.com/coding/` | `https://api.kimi.com/coding/v1`，模型 `kimi-for-coding` |
+| MiniMax Token Plan | `https://api.minimaxi.com/anthropic`（国际版 `https://api.minimax.io/anthropic`） | — |
+
+请先核对各套餐条款：部分厂商（例如 GLM Coding Plan 常见问题）说明套餐额度只在其支持的编程工具中使用，其他 API 用途需开通标准 API 服务。地址和模型 ID 会变化，请以厂商文档为准。
+
+**档案字段**（“逐模型价格与能力”或 `modelProfilesJson`）：
+
+```json
+[
+  { "provider": "glm-coding-plan", "model": "glm-4.6", "subscription": "plan-key",
+    "apiRoute": { "provider": "zhipu", "model": "glm-4.6" } },
+  { "provider": "anthropic", "model": "claude-sonnet-4-5", "billing": "subscription-first" },
+  { "provider": "deepseek", "model": "deepseek-chat", "billing": "api-only" }
+]
+```
+
+- `billing`：`subscription-first`（订阅优先，默认，可省略）、`api-only`（只用 API Key，不用订阅）、`subscription-only`（只用订阅，额度用尽时不切换 API Key，该步骤失败并写明原因）。
+- `subscription`：`plan-key`、`cli-login` 或 `none`（始终按 API 计费）；省略表示自动判断。
+- `apiRoute`：只用于 `plan-key` 路线，填模型目录中的准确路线。路由直接选中这条 API 路线时，套餐还有额度也会先用套餐。
+
+**额度识别与切换。** 订阅调用失败时，把报错与各厂商文档中的文案比对：
+
+| 厂商 | 额度用尽 | 限流 |
+| --- | --- | --- |
+| Claude Code | “You've hit your session/weekly/Opus limit · resets 3:45pm” | “Server is temporarily limiting requests”、“Request rejected (429)” |
+| Codex | `usage_limit_reached`（含 `resets_at` / `resets_in_seconds`）、“You've hit your usage limit” | `rate_limit_exceeded` |
+| Gemini | `RESOURCE_EXHAUSTED`、“Quota exceeded”、“exhausted your daily quota”（`retry in Xs`） | — |
+| Kimi Code | 403 “You've reached your 5-hour / weekly (7-day) / monthly usage limit” | “concurrent request limit”、429 “receiving too many requests”、“engine is currently overloaded” |
+| MiniMax | 错误码 `2056`（“usage limit exceeded” / “Token Plan usage limit reached”） | 错误码 `2045` |
+| GLM | 错误码 `1308`–`1310`、`1316`–`1321`（“Usage limit reached for … will reset at YYYY-MM-DD HH:MM:SS”、“已达到…使用上限”） | 错误码 `1302`、`1305` |
+| 通用 | — | HTTP `429`、“Too Many Requests”、“rate limit” |
+
+识别到后，该订阅**标记为额度已用尽，直到厂商给出的恢复时间**（`resets_at`、`resets_in_seconds`、`retry in Xs`、GLM 的重置时间、Claude 的“resets 3:45pm”）；没给时间时按 `subscriptionCooldownMinutes`（默认 60 分钟）暂停，无时间的限流只暂停 1 分钟。**同一步骤立即改用 API Key 重试**，后续步骤在恢复前直接跳过这份订阅。执行记录会写明计费渠道（`billing: subscription | api`）和原因，例如 **“订阅额度已用尽（预计 10-2 18:30 恢复），已切换 API Key。”** 状态保存在 `state.json` 的 `quota` 中，重启后仍有效。
+
+**其他原因的订阅失败不会悄悄改用 API Key。** 订阅确实调用了、但因其他原因失败（超时、崩溃、输出无法解析、非零退出、登录错误、套餐端点返回 5xx 等）时，默认（`onSubscriptionFailure: "ask"`）**暂停该步骤**：执行记录标为“**等待确认**”并显示真实错误，下游步骤显示“**等待上游确认**”。在执行记录中选择 **改用 API 重试**、**重试订阅**（例如重新登录后）或 **取消**（取消该步骤及等待它的步骤）。在会话中，`model_router_execute` 返回 `status: "paused-subscription-failure"` 和 `awaitingConfirmation`，模型应询问你后调用 `model_router_rerun_step`，`subscriptionChoice` 为 `api`、`subscription` 或 `cancel`；选 `api` 会弹出宿主审批。在成本卡片“订阅调用失败（非额度用尽）时”中可改为 `api`（恢复以前的自动回退）或 `fail`（不询问，直接失败）。CLI 未安装或没有无界面适配器时并没有尝试订阅，仍按原方式走模型目录 API。
+
+厂商改了报错文案时，可在 `quotaPatternsJson` 中按工具 ID、供应商 ID 或 `*` 追加正则：
+
+```json
+{ "kimi-code": { "quota": ["额度已用完"], "rateLimit": ["请求过于频繁"] }, "my-glm-plan": { "quota": ["1308"] } }
+```
+
+无效的正则会被忽略，并在体检中列出。
+
+**体检。** “订阅与 API Key”卡片（以及 `model_router_health` 的 `billing`）按供应商列出：计费方式、订阅来源、订阅状态（已登录订阅账号 / 编程套餐 Key 路线 / 仅 API Key 登录 / 未登录 / **额度已用尽，预计 X 恢复**），以及是否有可回退的 API Key 路线。登录检测时会去掉 API Key 环境变量，所以同时设了 API Key 也能识别 Claude、Codex 的账号登录。
+
+**预算。** 所有厂商的订阅运行（CLI 账号登录或套餐 Key 路线）都只显示订阅参考费用、不计入预算；切换到 API Key 的运行计入每日/每月预算。
+
+**限制。** `model_router_team_execute` 和 `model_router_tool_run` 只通过官方 CLI 修改文件，额度用尽时会记录（该步骤写明原因，之后的路由执行会跳过这份订阅），但**不会自动改用 API Key 重试**。Kimi Code、MiniMax Code 在 Linux/macOS 上没有可移植的只读适配器，在这些平台上请通过套餐 Key 路线使用它们的订阅。
 
 ## 路由算法：从输入到分配
 
@@ -145,7 +273,7 @@ C = clip(
 
 在没有特殊关键词覆盖时，`C < 0.34` 为简单，`0.34 ≤ C < 0.66` 为均衡，其余为复杂。明确的高风险/高难要求可直接判复杂；短小的翻译、摘要、提取等变换请求可直接判简单；识别出的复合需求也会提高到复杂。该值只衡量文本特征，**不等于真实难度测量**。
 
-复合任务从可执行的列表、逐行指令或动作子句中提取需求，避开代码块和作为摘要材料的清单。复杂计划形成“问题分析 → 具体执行包 → 必要验证 → 结果整合”的依赖图；显式执行包最多六个，超出会合并且保留原文。每个包重新评定难度，因而总任务复杂也可以含有便宜模型胜任的简单包。
+复合任务从可执行的列表、逐行指令或动作子句中提取需求，避开代码块和作为摘要材料的清单。复杂计划形成“问题分析 → 具体执行包 → 必要验证 → 结果整合”的依赖图；显式执行包最多六个，超出会合并且保留原文。需求里明确写出的依赖会成为指向对应步骤的边：“依赖第 1 步”“基于第 2、3 步”“第 1 步完成后”“依赖第 1-3 步”“depends on step 2”“after steps 1 and 3”（步骤号按列出的需求顺序计算，指向后面步骤的引用会被忽略）。每个包重新评定难度，因而总任务复杂也可以含有便宜模型胜任的简单包。
 
 ### 2. 设质量下限，再比较效用
 
@@ -229,7 +357,7 @@ U = wq·质量 + wc·成本得分 + wl·(1 - 延迟估值)
 
 | 供应商 | 官方工具 | 无界面调用 | 凭据 |
 | --- | --- | --- | --- |
-| Anthropic / Claude | Claude Code | `claude -p --output-format json`，任务从标准输入读取 | 已配置的 `ANTHROPIC_API_KEY`，否则使用 `claude` 自己的登录会话 |
+| Anthropic / Claude | Claude Code | `claude -p --output-format json`，任务作为位置参数传入 | 已配置的 `ANTHROPIC_API_KEY`，否则使用 `claude` 自己的登录会话 |
 | OpenAI | Codex CLI | `codex exec --json --sandbox read-only` | 已配置的 `OPENAI_API_KEY`，否则使用 `codex` 登录会话 |
 | Google / Gemini | Gemini CLI | `gemini -p --output-format json`，标准输入作为补充上下文 | 已配置的 `GEMINI_API_KEY`，否则使用 Gemini CLI 已缓存的登录 |
 | DeepSeek 及其他没有适配器的供应商 | 无 | 直接使用 Harness 模型目录 API | 使用宿主里已经配置的供应商凭据，插件不另存密钥 |
@@ -242,7 +370,7 @@ npm install -g @openai/codex@0.157.1 --registry=https://registry.npmjs.org/
 npm install -g @google/gemini-cli@0.62.0 --registry=https://registry.npmjs.org/
 ```
 
-Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙箱执行器；入口不可用时才用上面的无界面命令。每次调用都在当前会话工作目录中进行，限制输出体积和超时（默认 10 分钟，上限 45 分钟）。官方命令缺失、超时、非零退出或输出无法解析时，自动改走模型目录 API，并在结果里写明回退原因。密钥只放进该子进程的环境变量，不会写入模型档案或返回文本。
+Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙箱执行器；入口不可用时才用上面的无界面命令。每次调用都在当前会话工作目录中进行，限制输出体积和超时（默认 10 分钟，上限 45 分钟）；超时或取消时向 CLI 及其启动的子进程（整个进程组）发 SIGTERM，5 秒后仍未退出则 SIGKILL；用户取消最多等 1.5 秒；Windows 用 `taskkill /T /F` 结束整个进程树。任务文本上限 64000 个 UTF-8 字节（约 21000 个中文字符或 64000 个英文字符），在任何付费调用前检查，超出时给出中文提示；每步提示词会按上限截断总任务和依赖结果。执行在已有付费步骤之后出错时，仍会写入执行记录并计入费用。官方命令缺失、超时、非零退出或输出无法解析时，自动改走模型目录 API，并在结果里写明回退原因。密钥只放进该子进程的环境变量，不会写入模型档案或返回文本。
 
 每条路线的 `execution` 可以是 `auto`（默认）、`official` 或 `api`。前两者都会先尝试官方工具；`api` 不启动 CLI。可编辑写文件仍使用 `model_router_tool_run` 或 `model_router_team_execute`，不由这次只读汇总改仓库。
 
@@ -256,18 +384,17 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 
 ## 验证与开发
 
-开发环境为 Node.js **22.19+** 与 pnpm。在完整源码根目录运行：
+开发环境为 Node.js **22.19+** 与 pnpm 10（已通过 `packageManager` 固定，`corepack enable` 后自动使用）。在完整源码根目录运行：
 
 ```powershell
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --strict-peer-dependencies
 npm run build:client
 npm test
 npm run check:client
-pnpm peers check
 npm pack --pack-destination dist
 ```
 
-客户端源代码有变化时必须重建；旧生成文件不能验证新实现。将生成的安装包在独立测试 profile 安装，检查路由入口、目录、模型档案和官方工具卡。GAL 的单独安装及与路由共同安装按其仓库步骤验收。真实登录、厂商实际模型、任务质量与计费仍需账号持有人核对。
+pnpm 10 没有 `pnpm peers check` 命令；改用 `--strict-peer-dependencies`，peer 依赖不满足时安装直接失败。客户端源代码有变化时必须重建；旧生成文件不能验证新实现。将生成的安装包在独立测试 profile 安装，检查路由入口、目录、模型档案和官方工具卡。GAL 的单独安装及与路由共同安装按其仓库步骤验收。真实登录、厂商实际模型、任务质量与计费仍需账号持有人核对。
 
 历史记录保留在 [0.11.1 发布报告](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md)和[rc.2 兼容报告](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md)。本次拆分的构建、测试与发布结果写入新的总项目报告；旧合并版的测试数量不代表独立包已经通过验证。
 

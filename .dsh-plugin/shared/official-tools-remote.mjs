@@ -50,6 +50,81 @@ const statusResultCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#Official
   return result
 })
 
+const anyObjectCodec = name => strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${name}`, value => plainObject(value, name))
+
+const freshCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#HealthFresh`, value => {
+  if (typeof value !== 'boolean') throw new TypeError('fresh must be a boolean')
+  return value
+})
+
+const idText = (value, subject) => {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,80}$/.test(value)) throw new TypeError(`${subject} must be a short id`)
+  return value
+}
+
+const optionalRouteText = (value, subject) => {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value !== 'string' || value.length > 240 || value.includes('\0')) throw new TypeError(`${subject} is invalid`)
+  return value
+}
+
+const rateRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RateRequest`, value => {
+  const request = plainObject(value, 'rate request')
+  if (!['up', 'down', 'clear'].includes(request.rating)) throw new TypeError('rating must be up, down or clear')
+  return { runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'), rating: request.rating }
+})
+
+const rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunRequest`, value => {
+  const request = plainObject(value, 'rerun request')
+  const provider = optionalRouteText(request.provider, 'provider')
+  const model = optionalRouteText(request.model, 'model')
+  if (Boolean(provider) !== Boolean(model)) throw new TypeError('provider and model must be supplied together')
+  return {
+    runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'),
+    ...(provider ? { provider, model } : {}),
+    confirmOverBudget: request.confirmOverBudget === true,
+    confirmWrite: request.confirmWrite === true,
+    ...(['api', 'subscription', 'cancel'].includes(request.subscriptionChoice) ? { subscriptionChoice: request.subscriptionChoice } : {}),
+  }
+})
+
+export const RUN_CONFIRMATION_CODES = Object.freeze(['workspace-write', 'rerun-write', 'subscription-api', 'over-budget', 'unsandboxed'])
+const MAX_RUN_TASK_CHARS = 200_000
+
+/**
+ * Workbench "start a run" request. The workspace is a user-typed absolute
+ * directory (validated again on the Host); the run itself is read-only.
+ */
+export function parseRunRequest(value) {
+  const request = plainObject(value, 'run request')
+  if (typeof request.task !== 'string' || !request.task.trim() || request.task.length > MAX_RUN_TASK_CHARS) {
+    throw new TypeError('task must be a non-empty string')
+  }
+  const provider = optionalRouteText(request.provider, 'provider')
+  const model = optionalRouteText(request.model, 'model')
+  if (Boolean(provider) !== Boolean(model)) throw new TypeError('provider and model must be supplied together')
+  const workspace = request.workspace === undefined || request.workspace === null || request.workspace === '' ? undefined : request.workspace
+  if (workspace !== undefined && (typeof workspace !== 'string' || workspace.length > 4_096 || workspace.includes('\0'))) throw new TypeError('workspace is invalid')
+  if (request.budgetUsd !== undefined && (typeof request.budgetUsd !== 'number' || !Number.isFinite(request.budgetUsd) || request.budgetUsd < 0)) {
+    throw new TypeError('budgetUsd must be a non-negative number')
+  }
+  const confirmed = Array.isArray(request.confirmedReasons) ? request.confirmedReasons : []
+  if (confirmed.length > RUN_CONFIRMATION_CODES.length || confirmed.some(code => !RUN_CONFIRMATION_CODES.includes(code))) {
+    throw new TypeError('confirmedReasons contains an unknown reason')
+  }
+  return {
+    task: request.task,
+    ...(provider ? { provider, model } : {}),
+    ...(['single', 'team'].includes(request.planMode) ? { planMode: request.planMode } : {}),
+    ...(['economy', 'balanced', 'quality'].includes(request.preset) ? { preset: request.preset } : {}),
+    ...(request.budgetUsd !== undefined ? { budgetUsd: request.budgetUsd } : {}),
+    ...(workspace ? { workspace } : {}),
+    confirmedReasons: [...new Set(confirmed)],
+  }
+}
+
+const runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest)
+
 function descriptor(method, parameters, result) {
   return Object.freeze({
     id: `${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${OFFICIAL_TOOLS_REMOTE_NAMESPACE}/${method}`,
@@ -65,11 +140,23 @@ function descriptor(method, parameters, result) {
 const toolIdParameter = Object.freeze({
   name: 'toolId', wire: 'toolId', source: 'json', codec: toolIdCodec,
 })
+const jsonParameter = (name, codec) => Object.freeze({ name, wire: name, source: 'json', codec })
+
 export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('list', [], listResultCodec),
   descriptor('installTool', [toolIdParameter], installResultCodec),
   descriptor('cancel', [toolIdParameter], installResultCodec),
   descriptor('status', [toolIdParameter], statusResultCodec),
+  // Workbench: onboarding health check, run ledger, ratings, step retry, security boundaries.
+  descriptor('health', [jsonParameter('fresh', freshCodec)], anyObjectCodec('HealthReport')),
+  descriptor('completeOnboarding', [], anyObjectCodec('OnboardingState')),
+  descriptor('ledger', [], anyObjectCodec('RunLedger')),
+  descriptor('rateResult', [jsonParameter('request', rateRequestCodec)], anyObjectCodec('RateResult')),
+  descriptor('rerunStep', [jsonParameter('request', rerunRequestCodec)], anyObjectCodec('RerunResult')),
+  descriptor('boundaries', [], anyObjectCodec('SecurityBoundaries')),
+  // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
+  descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview')),
+  descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),
 ])
 
 export const OFFICIAL_TOOLS_CLIENT_REMOTE = Object.freeze({

@@ -23,7 +23,7 @@ export function toolInstallAction({ tool, probe, readiness, job, probeStatus }) 
         : newerOrUncertain ? '请人工核对版本'
           : probe?.installed ? '更新到目标版本'
             : job?.status === 'failed' ? '重试安装'
-              : tool.manager === 'signed-windows-installer' ? '下载安装器' : '下载安装'
+              : tool.manager === 'signed-windows-installer' ? '下载安装器' : '一键安装'
   return {
     label,
     disabled: probeStatus !== 'ready' || running || currentAndReady || newerOrUncertain,

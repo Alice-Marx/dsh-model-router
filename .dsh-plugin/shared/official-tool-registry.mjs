@@ -108,7 +108,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
     installArgs: [],
     probeExecutables: [],
     probeNote: '检测经过有效签名的 ZCode.exe 和同目录 GLM 资源；桌面安装器需人工选择安装位置。',
-    providerHints: ['zai', 'z.ai', 'zcode', 'glm', 'zhipu'],
+    providerHints: ['zai', 'z.ai', 'zcode', 'glm', 'zhipu', 'bigmodel'],
   }),
 ])
 

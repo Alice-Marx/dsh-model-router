@@ -21,7 +21,10 @@ test('router upgrade retains its package identity and contains no GAL payload', 
 
 test('router remote retains installer methods and owns no GAL endpoints', () => {
   assert.equal(OFFICIAL_TOOLS_REMOTE_NAMESPACE, 'modelRouterOfficialTools')
-  assert.deepEqual(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.map(item => item.method), ['list', 'installTool', 'cancel', 'status'])
+  assert.deepEqual(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.map(item => item.method), [
+    'list', 'installTool', 'cancel', 'status',
+    'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'boundaries', 'previewRun', 'startRun',
+  ])
   assert.equal(OfficialToolsRemoteService.prototype.galReply, undefined)
   assert.equal(OfficialToolsRemoteService.prototype.cancelGalReply, undefined)
 })

@@ -2,11 +2,15 @@
  * Optional, user supplied information for exact routes in the Harness model
  * directory. Harness does not publish prices or comparative quality scores.
  * This file never accepts credentials, endpoints, packages or shell commands.
+ * `billing`/`subscription`/`apiRoute` only name catalog routes; plan keys and
+ * base URLs stay in the Harness provider settings.
  */
 import { toolForProvider } from './official-tool-registry.mjs'
 const MAX_TEXT = 32_000
 const MAX_PROFILES = 200
 const id = value => typeof value === 'string' ? value.trim() : ''
+const BILLING_VALUES = new Set(['subscription-first', 'api-only', 'subscription-only'])
+const SUBSCRIPTION_VALUES = new Set(['plan-key', 'cli-login', 'none'])
 
 function nonnegative(value, label) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1_000_000) {
@@ -18,7 +22,7 @@ function nonnegative(value, label) {
 function normalizeProfile(entry, index) {
   const label = `第 ${index + 1} 个模型`
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`${label} 必须是对象`)
-  const allowed = new Set(['provider', 'model', 'quality', 'pricing', 'specialties', 'cliModel', 'execution'])
+  const allowed = new Set(['provider', 'model', 'quality', 'pricing', 'specialties', 'cliModel', 'execution', 'billing', 'subscription', 'apiRoute'])
   const unknown = Object.keys(entry).find(key => !allowed.has(key))
   if (unknown) throw new Error(`${label} 含不支持的字段 ${unknown}；不要在这里填写密钥或命令`)
   const provider = id(entry.provider)
@@ -66,7 +70,27 @@ function normalizeProfile(entry, index) {
     }
     if (entry.execution !== 'auto') profile.execution = entry.execution
   }
-  if (Object.keys(profile).length === 2) throw new Error(`${label} 至少提供 quality、pricing、specialties、cliModel 或 execution 之一`)
+  if (entry.billing !== undefined) {
+    if (!BILLING_VALUES.has(entry.billing)) throw new Error(`${label} 的 billing 只能是 subscription-first、api-only 或 subscription-only`)
+    profile.billing = entry.billing
+  }
+  if (entry.subscription !== undefined) {
+    if (!SUBSCRIPTION_VALUES.has(entry.subscription)) throw new Error(`${label} 的 subscription 只能是 plan-key、cli-login 或 none`)
+    profile.subscription = entry.subscription
+  }
+  if (entry.apiRoute !== undefined) {
+    const target = entry.apiRoute
+    if (!target || typeof target !== 'object' || Array.isArray(target) || Object.keys(target).some(key => key !== 'provider' && key !== 'model')) {
+      throw new Error(`${label} 的 apiRoute 必须是 { provider, model }`)
+    }
+    const apiProvider = id(target.provider)
+    const apiModel = id(target.model)
+    if (!apiProvider || !apiModel || apiProvider.length > 160 || apiModel.length > 240) throw new Error(`${label} 的 apiRoute 需要模型目录中的准确 provider 和 model`)
+    if (profile.subscription !== 'plan-key') throw new Error(`${label} 只有 subscription 为 plan-key 时才能设置 apiRoute`)
+    if (apiProvider === provider && apiModel === model) throw new Error(`${label} 的 apiRoute 不能指向自己`)
+    profile.apiRoute = { provider: apiProvider, model: apiModel }
+  }
+  if (Object.keys(profile).length === 2) throw new Error(`${label} 至少提供 quality、pricing、specialties、cliModel、execution、billing 或 subscription 之一`)
   return profile
 }
 
@@ -110,6 +134,9 @@ export function applyModelProfiles(routes, profiles) {
       ...(profile.specialties === undefined ? {} : { specialties: [...profile.specialties] }),
       ...(profile.cliModel === undefined ? {} : { cliModel: profile.cliModel }),
       ...(profile.execution === undefined ? {} : { execution: profile.execution }),
+      ...(profile.billing === undefined ? {} : { billing: profile.billing }),
+      ...(profile.subscription === undefined ? {} : { subscription: profile.subscription }),
+      ...(profile.apiRoute === undefined ? {} : { apiRoute: { ...profile.apiRoute } }),
     }
   })
 }

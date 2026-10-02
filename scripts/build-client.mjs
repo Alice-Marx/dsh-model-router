@@ -8,6 +8,17 @@ const ENTRY = join(ROOT, '.dsh-plugin', 'client', 'official-harness.jsx')
 const OUTPUT = join(ROOT, '.dsh-plugin', 'client.js')
 const PACKAGE = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 
+// Git for Windows checks text files out with CRLF (core.autocrlf=true). The bundle must not
+// depend on that: CSS is inlined verbatim as a string, and the committed client.js on disk
+// may itself have CRLF line endings.
+const lf = text => text.replace(/\r\n/g, '\n')
+const lfCss = {
+  name: 'lf-css',
+  setup(build) {
+    build.onLoad({ filter: /\.css$/ }, args => ({ contents: lf(readFileSync(args.path, 'utf8')), loader: 'text' }))
+  },
+}
+
 function wrapper(body) {
   return [
     'window.__ModuleLoader__.load({',
@@ -41,6 +52,7 @@ export async function generate({ check = false } = {}) {
       'react', 'react/*', 'react-dom', 'react-dom/*',
       '@deepseek-ai/dsh-client-ui-primitives',
     ],
+    plugins: [lfCss],
     outfile: OUTPUT,
     write: false,
     metafile: true,
@@ -56,7 +68,7 @@ export async function generate({ check = false } = {}) {
   }
   let committed = ''
   try { committed = readFileSync(OUTPUT, 'utf8') } catch { return { ok: false, errors: ['client.js does not exist'] } }
-  return committed === code ? { ok: true, output: OUTPUT, bytes: Buffer.byteLength(code) }
+  return lf(committed) === code ? { ok: true, output: OUTPUT, bytes: Buffer.byteLength(code) }
     : { ok: false, errors: ['client.js is not generated from official-harness.jsx'] }
 }
 
