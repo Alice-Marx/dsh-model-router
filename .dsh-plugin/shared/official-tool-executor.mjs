@@ -594,7 +594,8 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
           return
         }
         if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
-        if (event.type === 'turn.failed' || event.type === 'error') {
+        // Top-level `error` events include transient reconnect notices; only turn.failed is terminal.
+        if (event.type === 'turn.failed') {
           failedEvent = true
           terminal = 'failed'
         }

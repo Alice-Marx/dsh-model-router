@@ -110,6 +110,64 @@ test('claude, codex, and gemini adapters use fixed headless arguments and the co
   }
 })
 
+test('claude keeps its instruction positional when no CLI model id is passed', async t => {
+  const cwd = await workspace(t)
+  const { spawnImpl, calls } = fakeSpawn((file, args) => args[0] === '--version'
+    ? { code: 0, stdout: '2.1.287\n' }
+    : { code: 0, stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'OK' }) })
+  const result = await executeAssignedTask({
+    route: { provider: 'anthropic', model: 'Claude Sonnet (catalog name)' },
+    task: '请回答 OK。',
+    workspace: cwd,
+    spawnImpl,
+    apiFallback: () => { throw new Error('api should not run') },
+  })
+  assert.equal(result.ok, true)
+  const args = calls.at(-1).args
+  assert.equal(args.includes('--model'), false)
+  const instruction = args.at(-1)
+  assert.match(instruction, /standard input/)
+  for (const flag of ['--tools', '--disallowedTools']) {
+    assert.equal(args.includes(flag), false, `${flag} must use the = form`)
+    assert.ok(args.some(arg => arg.startsWith(`${flag}=`)), flag)
+  }
+  // A bare variadic flag would consume the following positional value.
+  assert.equal(['--tools', '--disallowedTools'].includes(args.at(-2)), false, `instruction follows ${args.at(-2)}`)
+})
+
+test('codex ignores transient reconnect errors and decides by the turn event', async t => {
+  const cwd = await workspace(t)
+  const lines = events => `${events.map(event => JSON.stringify(event)).join('\n')}\n`
+  const retry = { type: 'error', message: 'Reconnecting... 1/5 (stream disconnected before completion)' }
+  const run = stdout => {
+    const { spawnImpl } = fakeSpawn((file, args) => args[0] === '--version' ? { code: 0, stdout: 'codex-cli 0.160.0\n' } : { code: 0, stdout })
+    return executeAssignedTask({
+      route: { provider: 'openai', model: 'gpt-5' },
+      task: '请回答 OK。',
+      workspace: cwd,
+      spawnImpl,
+      apiFallback: async () => ({ ok: true, answer: 'api answer' }),
+    })
+  }
+  const recovered = await run(lines([
+    { type: 'thread.started', thread_id: 't' }, { type: 'turn.started' }, retry,
+    { type: 'item.completed', item: { id: 'i1', type: 'agent_message', text: 'OK' } },
+    { type: 'turn.completed', usage: {} },
+  ]))
+  assert.equal(recovered.channel, 'official-cli')
+  assert.equal(recovered.answer, 'OK')
+  assert.equal(recovered.fallback, null)
+
+  const failed = await run(lines([
+    { type: 'turn.started' }, retry,
+    { type: 'item.completed', item: { id: 'i1', type: 'agent_message', text: 'partial' } },
+    { type: 'turn.failed', error: { message: 'unexpected status 401 Unauthorized' } },
+  ]))
+  assert.equal(failed.channel, 'harness-llm')
+  assert.equal(failed.answer, 'api answer')
+  assert.match(failed.fallback.reason, /Codex 未返回完整成功终态和回答/)
+})
+
 test('a missing or failed official tool falls back to the model API', async t => {
   const cwd = await workspace(t)
   const missing = fakeSpawn(() => ({ spawnError: 'ENOENT' }))

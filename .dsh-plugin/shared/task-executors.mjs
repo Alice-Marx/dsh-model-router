@@ -50,7 +50,8 @@ export const TASK_ADAPTERS = Object.freeze([
       return [
         '-p', '--output-format', 'json', '--no-session-persistence',
         '--permission-mode', 'dontAsk',
-        '--tools', 'Read,Glob,Grep', '--disallowedTools', 'mcp__*',
+        // `=` keeps these variadic flags from consuming the positional instruction.
+        '--tools=Read,Glob,Grep', '--disallowedTools=mcp__*',
         ...(modelId ? ['--model', modelId] : []),
         READ_ONLY_INSTRUCTION,
       ]
@@ -203,7 +204,8 @@ function parseCodex(stdout) {
     const trimmed = line.trim()
     if (!trimmed) continue
     const event = JSON.parse(trimmed)
-    if (event.type === 'turn.failed' || event.type === 'error') failed = true
+    // Top-level `error` events include transient "Reconnecting... n/5" notices; the turn event decides.
+    if (event.type === 'turn.failed') failed = true
     if (event.type === 'turn.completed' && !failed) completed = true
     if (event.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string') {
       answer = event.item.text
