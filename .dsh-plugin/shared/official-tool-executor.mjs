@@ -24,6 +24,7 @@ import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser } from './vendor-mimo-grok-adapter.mjs'
+import { usageFromOutput } from './task-executors.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -531,6 +532,8 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
     let stderrTail = ''
     let outputBytes = 0
     let jsonlBuffer = ''
+    let codexUsageLine = ''
+    let reportedUsage = null
     let terminal = null
     let failedEvent = false
     let finalText = ''
@@ -593,6 +596,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
           }
           return
         }
+        if (event.type === 'turn.completed' && event.usage) codexUsageLine = line
         if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
         // Top-level `error` events include transient reconnect notices; only turn.failed is terminal.
         if (event.type === 'turn.failed') {
@@ -690,6 +694,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
           }
           terminal = 'completed'
           finalText = result.result
+          reportedUsage = usageFromOutput('claude-json', stdout)
         } catch {
           settle({ status: 'failed', exitCode: code, error: 'Claude 未返回有效的结果 JSON。' })
           return
@@ -716,7 +721,10 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
         settle({ status: 'failed', exitCode: code, error: protocolError ?? 'Codex 未返回完整成功终态和回答。' })
         return
       }
-      settle({ status: 'succeeded', exitCode: code })
+      if (!reportedUsage && codexUsageLine) reportedUsage = usageFromOutput('codex-jsonl', codexUsageLine)
+      settle({ status: 'succeeded', exitCode: code,
+        ...(reportedUsage?.usage ? { usage: reportedUsage.usage } : {}),
+        ...(reportedUsage?.reportedCostUsd ? { reportedCostUsd: reportedUsage.reportedCostUsd } : {}) })
     })
 
     timeoutTimer = setTimeout(() => requestStop('timed-out'), timeoutMs)

@@ -1,7 +1,8 @@
 import React from 'react'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import {
-  LOGIN_LABEL, VERSION_LABEL, budgetMeter, dagLayers, formatUsd, healthSummary, packageStatus,
+  LOGIN_LABEL, RUN_KIND_LABEL, RUN_STATUS_LABEL, VERSION_LABEL, budgetMeter, dagLayers, formatUsd, healthSummary,
+  packageCost, packageStatus, rerunSupport, runTotals,
 } from './insights-state.mjs'
 
 const text = value => typeof value === 'string' ? value.trim() : ''
@@ -52,6 +53,8 @@ export function ToolLoginLine({ entry }) {
     <div className="mr-login">
       <div className="mr-tool-status"><span className={`mr-tool-dot ${state === 'logged-in' ? 'installed' : state === 'logged-out' ? 'missing-strong' : ''}`} />{LOGIN_LABEL[state]} · {VERSION_LABEL[entry.versionStatus] ?? '版本未知'}{entry.pinnedVersion ? `（目标 ${entry.pinnedVersion}）` : ''}</div>
       {entry.login?.detail && <p className="mr-caption mr-tool-detail">{entry.login.detail}</p>}
+      {state === 'logged-in' && entry.login?.billing === 'subscription' && <p className="mr-caption mr-tool-detail">订阅账号登录：费用只作参考显示，不计入预算。</p>}
+      {state === 'logged-in' && entry.login?.billing === 'api-key' && <p className="mr-caption mr-tool-detail">API Key 计费：费用计入每日/每月预算。</p>}
       {state !== 'logged-in' && <button className="mr-button mr-button-secondary mr-tool-button mr-login-button" type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>去登录</button>}
       {open && (
         <div className="mr-login-guide">
@@ -114,14 +117,15 @@ export function CostControlCard({ ledger, settingsScope, onChanged, error }) {
     <section className="mr-card mr-cost" aria-label="成本控制">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">成本控制与路由方案</h2>
-        <p className="mr-card-copy">费用按 CLI 自报金额或 token 用量 × 你配置的单价记录；缺少单价的调用计为“费用未知”。这是本机估算，不是厂商账单。</p>
+        <p className="mr-card-copy">预算只计算走 API Key 或模型目录 API 的花费（CLI 自报金额或 token 用量 × 你配置的单价）。官方 CLI 用订阅账号登录、未注入 API Key 时，只显示按 API 价折算的“订阅参考费用”，不计入预算。缺少单价的调用计为“费用未知”。这是本机估算，不是厂商账单。</p>
       </div></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
         <div className="mr-meters">
-          <Meter label="今日已用" meter={budgetMeter(spent.today, daily)} />
-          <Meter label="本月已用" meter={budgetMeter(spent.month, monthly)} />
+          <Meter label="今日已用（计入预算）" meter={budgetMeter(spent.today, daily)} />
+          <Meter label="本月已用（计入预算）" meter={budgetMeter(spent.month, monthly)} />
         </div>
+        {(spent.subscriptionRunsMonth ?? 0) > 0 && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：今日 {formatUsd(spent.subscriptionToday ?? 0)} · 本月 {formatUsd(spent.subscriptionMonth ?? 0)}，本月共 {spent.subscriptionRunsMonth} 次订阅登录调用。</p>}
         {(spent.unknownToday > 0 || spent.unknownMonth > 0) && <p className="mr-caption">本月有 {spent.unknownMonth} 次调用缺少单价或用量，未计入金额。请在“模型价格与能力”中补齐单价。</p>}
         {ledger?.budget?.exceeded && <p className="mr-error" role="alert">{ledger.budget.message} {ledger.budget.action === 'pause' ? '新的执行会先暂停并请求确认。' : '新的执行会尝试自动降级为“省钱优先”。'}</p>}
         <div className="mr-controls">
@@ -194,13 +198,16 @@ function ChannelText({ item }) {
 
 function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
   const [target, setTarget] = React.useState('')
-  const cost = item.costUsd !== null && item.costUsd !== undefined ? `${formatUsd(item.costUsd)}${item.costSource === 'cli-reported' ? '（CLI 自报）' : ''}` : item.ran ? '费用未知' : '—'
-  const canRerun = !item.ok && !busy
+  const cost = packageCost(item)
+  const rerun = rerunSupport(run)
+  const canRerun = rerun.supported && !item.ok && !busy
   const others = routes.filter(route => `${route.provider}/${route.model}` !== `${item.provider}/${item.model}`)
   return (
     <>
       <p className="mr-package-route">{item.provider}/{item.model}{item.reassigned ? '（已改派）' : ''}</p>
-      <div className="mr-channel-line"><ChannelText item={item} /><span className="mr-caption">预估 {formatUsd(item.estimatedCost)} · 实际 {cost}{item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : ''}</span></div>
+      <div className="mr-channel-line"><ChannelText item={item} /><span className="mr-caption">预估 {formatUsd(item.estimatedCost)} · 实际 {cost.budget}{item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : ''}</span></div>
+      {cost.reference && <p className="mr-package-copy">{cost.reference}</p>}
+      {item.actualModel && <p className="mr-package-copy">CLI 回报模型：{item.actualModel}</p>}
       {item.fallback?.reason && <p className="mr-package-copy">回退原因：{item.fallback.reason}</p>}
       {item.fallback?.error && <p className="mr-package-copy mr-fallback-error">CLI 原始错误：<code>{item.fallback.error}</code></p>}
       {!item.ok && item.error && <p className="mr-package-copy mr-fallback-error">{item.error}</p>}
@@ -212,7 +219,8 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
           <button className="mr-button mr-button-secondary mr-mini" type="button" aria-pressed={item.rating === -1} disabled={busy} onClick={() => onRate(run.id, item.id, item.rating === -1 ? 'clear' : 'down')}>👎 不好</button>
         </>}
         {canRerun && <button className="mr-button mr-mini" type="button" onClick={() => onRerun(run.id, item.id, null)}>重跑此步</button>}
-        {allowReassign && others.length > 0 && !busy && (
+        {!rerun.supported && !item.ok && item.ran && <span className="mr-caption">{rerun.reason}</span>}
+        {rerun.supported && allowReassign && others.length > 0 && !busy && (
           <span className="mr-inline">
             <select className="mr-input mr-mini-select" aria-label="改派到" value={target} onChange={event => setTarget(event.target.value)}>
               <option value="">改派到…</option>
@@ -235,24 +243,27 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
     <section className="mr-card mr-results" aria-label="执行记录">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">执行记录与子任务</h2>
-        <p className="mr-card-copy">来自会话中的 model_router_execute。每个工作包显示分配的模型、原因、渠道、费用；回退时显示 CLI 原始错误。失败的步骤可单独重跑，不会重做已完成的步骤。</p>
+        <p className="mr-card-copy">来自会话中的 model_router_execute、model_router_team_execute 和 model_router_tool_run。每个工作包显示分配的模型、原因、渠道、费用；回退时显示 CLI 原始错误。路由执行和只读团队执行中失败的步骤可单独重跑，不会重做已完成的步骤。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={busy} onClick={onRefresh}>刷新</button></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
-        {runs.length === 0 && <p className="mr-empty">还没有执行记录。在官方会话中调用 model_router_execute 后，这里会显示决策和结果。</p>}
+        {runs.length === 0 && <p className="mr-empty">还没有执行记录。在官方会话中调用 model_router_execute、model_router_team_execute 或 model_router_tool_run 后，这里会显示决策和结果。</p>}
         {runs.length > 0 && (
           <>
             <label className="mr-label" htmlFor="mr-run-select">选择记录</label>
             <select className="mr-input" id="mr-run-select" value={current?.id ?? ''} onChange={event => setOpenId(event.target.value)}>
-              {runs.map(run => <option key={run.id} value={run.id}>{new Date(run.createdAt).toLocaleString()} · {{ completed: '完成', partial: '部分完成', failed: '失败' }[run.status] ?? run.status} · {run.task.slice(0, 40)}</option>)}
+              {runs.map(run => <option key={run.id} value={run.id}>{new Date(run.createdAt).toLocaleString()} · {RUN_KIND_LABEL[run.kind ?? 'assign'] ?? run.kind} · {RUN_STATUS_LABEL[run.status] ?? run.status} · {run.task.slice(0, 40)}</option>)}
             </select>
             {current && (
               <div className="mr-run">
                 <div className="mr-result-grid">
                   <div className="mr-metric"><div className="mr-metric-label">方案</div><div className="mr-metric-value">{ROUTING_PRESETS[current.preset]?.label ?? current.preset}{current.budget?.downgraded ? '（超预算自动降级）' : ''}</div></div>
                   <div className="mr-metric"><div className="mr-metric-label">难度</div><div className="mr-metric-value">{BAND[current.decision?.complexity?.band] ?? '—'}{current.decision?.complexity?.value !== null && current.decision?.complexity?.value !== undefined ? ` · ${current.decision.complexity.value}` : ''}</div></div>
-                  <div className="mr-metric"><div className="mr-metric-label">预估 / 实际</div><div className="mr-metric-value">{formatUsd(current.decision?.estimatedCost)} / {formatUsd(current.packages.reduce((sum, item) => sum + (item.costUsd ?? 0), 0) + (current.reviews ?? []).reduce((sum, item) => sum + (item.costUsd ?? 0), 0))}</div></div>
+                  <div className="mr-metric"><div className="mr-metric-label">预估 / 实际（计入预算）</div><div className="mr-metric-value">{formatUsd(current.decision?.estimatedCost)} / {formatUsd(runTotals(current).budgetUsd)}</div></div>
+                  <div className="mr-metric"><div className="mr-metric-label">类型</div><div className="mr-metric-value">{RUN_KIND_LABEL[current.kind ?? 'assign'] ?? current.kind}{current.kind === 'team' || current.kind === 'tool' ? ` · ${current.executionMode === 'workspace-write' ? '可编辑' : '只读'}` : ''}</div></div>
                 </div>
+                {runTotals(current).subscription && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：{formatUsd(runTotals(current).referenceUsd)}</p>}
+                {current.isolatedWorkspace && <p className="mr-caption">独立工作区：<code>{current.isolatedWorkspace}</code></p>}
                 {current.decision?.reason && <p className="mr-caption">路由原因：{current.decision.reason}</p>}
                 <DagView packages={current.packages} renderNode={item => <RunNode run={current} item={item} routes={routes} allowReassign={ledger?.settings?.allowManualReassign !== false} busy={busy} onRate={onRate} onRerun={onRerun} />} />
               </div>

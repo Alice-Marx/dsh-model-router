@@ -32,6 +32,23 @@ const KEY_ENV = Object.freeze({
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
 })
 
+/** Variables that make the CLI bill an API account rather than a subscription login. */
+const API_KEY_ENV = Object.freeze({
+  'claude-code': ['ANTHROPIC_API_KEY'],
+  codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
+  gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+  'kimi-code': ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
+  'minimax-code': ['MINIMAX_API_KEY'],
+  'mimo-code': ['MIMO_API_KEY'],
+  'grok-build': ['XAI_API_KEY'],
+  zcode: ['ZAI_API_KEY'],
+})
+
+/** True when an API-key variable for this CLI is set in `env` (names only, values are never read out). */
+export function apiKeyEnvPresent(toolId, env = process.env) {
+  return (API_KEY_ENV[toolId] ?? []).some(name => typeof env?.[name] === 'string' && env[name].trim() !== '')
+}
+
 export function compareVersions(left, right) {
   const parts = value => String(value ?? '').split(/[-+]/u)[0].split('.').map(item => Number.parseInt(item, 10) || 0)
   const a = parts(left)
@@ -58,13 +75,16 @@ function guide(toolId) {
  */
 export async function checkLogin(toolId, { runner, env = process.env, exists = async () => false, home = '' } = {}) {
   const keyNames = (KEY_ENV[toolId] ?? []).filter(name => typeof env?.[name] === 'string' && env[name].trim())
-  const viaKey = keyNames.length > 0 ? { state: 'logged-in', detail: `检测到环境变量 ${keyNames.join('、')}（未验证有效性）。`, source: 'environment' } : null
+  const viaKey = keyNames.length > 0 ? { state: 'logged-in', detail: `检测到环境变量 ${keyNames.join('、')}（未验证有效性）。`, source: 'environment',
+    billing: apiKeyEnvPresent(toolId, env) ? 'api-key' : 'subscription' } : null
+  const keyBilling = apiKeyEnvPresent(toolId, env) ? 'api-key' : null
   if (toolId === 'claude-code' && typeof runner === 'function') {
     const outcome = await runner('claude', ['auth', 'status', '--json'], { timeoutMs: LOGIN_CHECK_TIMEOUT_MS })
     if (outcome.timedOut) return viaKey ?? { state: 'unknown', detail: '登录状态检测超时。' }
     try {
       const status = JSON.parse(outcome.stdout)
-      if (status?.loggedIn === true) return { state: 'logged-in', detail: `已登录（${String(status.authMethod ?? 'account')}）。`, source: 'cli' }
+      if (status?.loggedIn === true) return { state: 'logged-in', detail: `已登录（${String(status.authMethod ?? 'account')}）。`, source: 'cli',
+        billing: keyBilling ?? (/api[_-]?key/i.test(String(status.authMethod ?? '')) ? 'api-key' : 'subscription') }
       if (status?.loggedIn === false) return viaKey ?? { state: 'logged-out', detail: 'claude auth status 报告未登录。', source: 'cli' }
     } catch { /* older CLI without JSON status */ }
     return viaKey ?? { state: 'unknown', detail: '无法解析 claude auth status 输出。' }
@@ -74,13 +94,14 @@ export async function checkLogin(toolId, { runner, env = process.env, exists = a
     if (outcome.timedOut) return viaKey ?? { state: 'unknown', detail: '登录状态检测超时。' }
     const output = `${outcome.stdout}\n${outcome.stderr}`
     if (/not logged in/i.test(output)) return viaKey ?? { state: 'logged-out', detail: 'codex login status 报告未登录。', source: 'cli' }
-    if (outcome.ok) return { state: 'logged-in', detail: output.split(/\r?\n/u).map(line => line.trim()).find(Boolean)?.slice(0, 120) || '已登录。', source: 'cli' }
+    if (outcome.ok) return { state: 'logged-in', detail: output.split(/\r?\n/u).map(line => line.trim()).find(Boolean)?.slice(0, 120) || '已登录。', source: 'cli',
+      billing: keyBilling ?? (/api key/i.test(output) ? 'api-key' : /chatgpt/i.test(output) ? 'subscription' : 'unknown') }
     return viaKey ?? { state: 'unknown', detail: 'codex login status 未给出明确结果。' }
   }
   if (toolId === 'gemini') {
     if (viaKey) return viaKey
     const credentialFile = home ? `${home}/.gemini/oauth_creds.json` : ''
-    if (credentialFile && await exists(credentialFile)) return { state: 'logged-in', detail: '检测到 Gemini CLI 登录凭据文件（未验证是否过期）。', source: 'file' }
+    if (credentialFile && await exists(credentialFile)) return { state: 'logged-in', detail: '检测到 Gemini CLI 登录凭据文件（未验证是否过期）。', source: 'file', billing: 'subscription' }
     return { state: 'unknown', detail: 'Gemini CLI 没有登录状态命令；首次运行时会提示登录。' }
   }
   return viaKey ?? { state: 'unknown', detail: '该 CLI 没有可安全调用的登录状态命令；首次运行时以实际结果为准。' }
@@ -144,7 +165,7 @@ export function createHealthCache({ ttlMs = HEALTH_CACHE_MS, now = Date.now } = 
       if (override && now() - override.at < ttlMs) return override
       if (!report || now() - report.checkedAt >= ttlMs) return null
       const entry = report.tools.find(item => item.id === toolId)
-      return entry?.installed ? { state: entry.login?.state ?? 'unknown', detail: entry.login?.detail ?? '' } : null
+      return entry?.installed ? { state: entry.login?.state ?? 'unknown', detail: entry.login?.detail ?? '', billing: entry.login?.billing ?? null } : null
     },
     /** Reason to skip the CLI, or null. A configured API key still lets the CLI authenticate. */
     skipReason({ toolId, hasApiKey = false }) {

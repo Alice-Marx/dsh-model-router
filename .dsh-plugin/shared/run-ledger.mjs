@@ -32,6 +32,30 @@ export function actualCost(result, pricing) {
   return { costUsd, costSource: 'usage' }
 }
 
+/**
+ * Who pays for a package. `api`: an API key or the model-catalog API, counted
+ * against budgets. `subscription`: an official CLI on its own account login with
+ * no API key injected; its CLI-reported or usage × price figure is only an
+ * API-equivalent reference and is not counted against budgets.
+ * `loginBilling` comes from the health check ('api-key' when the CLI's own
+ * login is an API key). `apiKeyPresent` is for runners that do not report
+ * `credentialSource` (the signed team runner inherits vendor key variables).
+ */
+export function billingOf(result, { loginBilling = null, apiKeyPresent = false } = {}) {
+  if (!result || result.blocked) return null
+  if (result.channel !== 'official-cli') return 'api'
+  if (result.credentialSource === 'configured-api-key' || result.credentialSource === 'process-environment') return 'api'
+  if (!result.credentialSource && apiKeyPresent) return 'api'
+  return loginBilling === 'api-key' ? 'api' : 'subscription'
+}
+
+/** Cost fields for storage: subscription runs keep the figure as `referenceCostUsd` only. */
+export function billedCost(result, pricing, billing) {
+  const cost = actualCost(result, pricing)
+  if (billing !== 'subscription') return { ...cost, billing: billing ?? 'api', referenceCostUsd: null }
+  return { costUsd: null, costSource: cost.costSource, billing, referenceCostUsd: cost.costUsd }
+}
+
 const pad = value => String(value).padStart(2, '0')
 /** Local calendar keys (the Host's time zone, which is the user's machine). */
 export const dayKey = at => { const date = new Date(at); return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
@@ -41,7 +65,7 @@ export const monthKey = at => { const date = new Date(at); return `${date.getFul
 export function spending(runs, at = Date.now()) {
   const today = dayKey(at)
   const month = monthKey(at)
-  const total = { today: 0, month: 0, unknownToday: 0, unknownMonth: 0 }
+  const total = { today: 0, month: 0, unknownToday: 0, unknownMonth: 0, subscriptionToday: 0, subscriptionMonth: 0, subscriptionRunsToday: 0, subscriptionRunsMonth: 0 }
   for (const run of Array.isArray(runs) ? runs : []) {
     for (const item of [...(run.packages ?? []), ...(run.reviews ?? [])]) {
       const when = item.finishedAt ?? run.createdAt
@@ -49,7 +73,16 @@ export function spending(runs, at = Date.now()) {
       const inMonth = monthKey(when) === month
       if (!inMonth) continue
       const inDay = dayKey(when) === today
-      if (finite(item.costUsd)) {
+      if (item.billing === 'subscription') {
+        // API-equivalent reference only; a subscription login is not budget spend.
+        if (item.ran !== true) continue
+        total.subscriptionRunsMonth += 1
+        if (inDay) total.subscriptionRunsToday += 1
+        if (finite(item.referenceCostUsd)) {
+          total.subscriptionMonth += item.referenceCostUsd
+          if (inDay) total.subscriptionToday += item.referenceCostUsd
+        }
+      } else if (finite(item.costUsd)) {
         total.month += item.costUsd
         if (inDay) total.today += item.costUsd
       } else if (item.ran === true) {
@@ -117,12 +150,17 @@ export function applyQualityBiases(routes, biases) {
   })
 }
 
-function storedPackage(planned, result, pricing, finishedAt) {
-  const cost = result?.blocked ? { costUsd: null, costSource: 'not-run' } : actualCost(result, pricing)
+function storedPackage(planned, result, pricing, finishedAt, billingFor = billingOf) {
+  const cost = !result || result.blocked
+    ? { costUsd: null, costSource: 'not-run', billing: null, referenceCostUsd: null }
+    : billedCost(result, pricing, billingFor(result))
   return {
     id: planned.id,
     name: planned.name,
     objective: String(planned.objective ?? '').slice(0, 2_000),
+    ...(planned.type ? { type: String(planned.type) } : {}),
+    ...(planned.purpose ? { purpose: String(planned.purpose) } : {}),
+    ...(Array.isArray(planned.verificationChecklist) ? { verificationChecklist: planned.verificationChecklist.slice(0, 12).map(point => String(point).slice(0, 300)) } : {}),
     dependsOn: [...(planned.dependsOn ?? [])],
     recommendedProvider: planned.recommendedProvider,
     recommendedModel: planned.recommendedModel,
@@ -138,6 +176,8 @@ function storedPackage(planned, result, pricing, finishedAt) {
     reassigned: result?.reassigned === true,
     channel: result?.channel ?? null,
     toolId: result?.toolId ?? null,
+    credentialSource: result?.credentialSource ?? null,
+    ...(result?.actualModel ? { actualModel: String(result.actualModel) } : {}),
     fallback: result?.fallback ?? null,
     error: result?.ok ? null : (result?.error ?? null),
     answer: String(result?.answer ?? '').slice(0, MAX_STORED_ANSWER),
@@ -163,7 +203,7 @@ export function plannedPackages(plan, task) {
 }
 
 /** One ledger record for a plan and its execution. */
-export function buildRunRecord({ id, createdAt, task, plan, execution, preset = 'balanced', workspace = '', pricingFor = () => null, budget = null, finishedAt = createdAt }) {
+export function buildRunRecord({ id, createdAt, task, plan, execution, preset = 'balanced', workspace = '', pricingFor = () => null, billingFor = billingOf, budget = null, finishedAt = createdAt, kind = 'assign', executionMode = 'read-only' }) {
   const planned = plannedPackages(plan, task)
   const results = Array.isArray(execution?.packages) ? execution.packages : []
   return {
@@ -172,6 +212,8 @@ export function buildRunRecord({ id, createdAt, task, plan, execution, preset = 
     finishedAt,
     task: String(task ?? '').slice(0, MAX_STORED_TASK),
     workspace,
+    kind,
+    executionMode,
     routingBypassed: plan?.routingBypassed === true,
     mode: plan?.mode ?? 'single',
     preset,
@@ -184,19 +226,19 @@ export function buildRunRecord({ id, createdAt, task, plan, execution, preset = 
     },
     budget,
     status: execution?.status ?? 'pending',
-    packages: planned.map(item => storedPackage(item, results.find(result => result.id === item.id), pricingFor(results.find(result => result.id === item.id) ?? item), finishedAt)),
+    packages: planned.map(item => storedPackage(item, results.find(result => result.id === item.id), pricingFor(results.find(result => result.id === item.id) ?? item), finishedAt, billingFor)),
     reviews: [],
   }
 }
 
 /** Replace the retried packages (`rerunIds`) with new results; untouched ones keep ratings and reviews. */
-export function mergeRerun(run, execution, { rerunIds = [], pricingFor = () => null, finishedAt = Date.now() } = {}) {
+export function mergeRerun(run, execution, { rerunIds = [], pricingFor = () => null, billingFor = billingOf, finishedAt = Date.now() } = {}) {
   const results = Array.isArray(execution?.packages) ? execution.packages : []
   const retried = new Set(rerunIds)
   run.packages = run.packages.map(stored => {
     const result = results.find(item => item.id === stored.id)
     if (!result || !retried.has(stored.id)) return stored
-    return storedPackage({ ...stored, review: null, rating: null }, result, pricingFor(result), finishedAt)
+    return storedPackage({ ...stored, review: null, rating: null }, result, pricingFor(result), finishedAt, billingFor)
   })
   run.status = execution?.status ?? run.status
   run.finishedAt = finishedAt
@@ -210,4 +252,78 @@ export function storedResults(run) {
     channel: item.channel, answer: item.answer, error: item.error, fallback: item.fallback,
     blocked: item.blocked, finishedAt: item.finishedAt,
   }))
+}
+
+const TEAM_FAILURE = new Set(['failed', 'timed-out', 'output-limit', 'model-mismatch', 'unsupported', 'integration-pending'])
+
+/**
+ * Convert the signed team runner's per-package results into the executor
+ * result shape used by the ledger. Packages the runner never reached are
+ * blocked behind the first failure (or by the preflight `blocking` list).
+ */
+export function teamExecutionResults(plan, execution) {
+  const planned = plan?.team?.workPackages ?? []
+  const results = Array.isArray(execution?.results) ? execution.results : []
+  const blockingReason = (execution?.blocking ?? []).map(item => item.reason).filter(Boolean).join('；')
+  const converted = results.map(result => ({
+    id: result.id,
+    ok: result.status === 'succeeded',
+    cancelled: result.status === 'cancelled',
+    provider: result.provider,
+    model: result.recommendedModel,
+    actualModel: result.actualModel ?? null,
+    channel: 'official-cli',
+    toolId: result.toolId ?? null,
+    answer: String(result.finalText ?? ''),
+    error: result.status === 'succeeded' ? null : String(result.error ?? (TEAM_FAILURE.has(result.status) ? result.status : '官方 CLI 未成功完成。')),
+    stderrTail: result.outputTail ?? null,
+    ...(result.usage ? { usage: result.usage } : {}),
+    ...(finite(result.reportedCostUsd) ? { reportedCostUsd: result.reportedCostUsd } : {}),
+  }))
+  const reached = new Set(converted.map(item => item.id))
+  for (const item of planned) {
+    if (reached.has(item.id)) continue
+    converted.push({ id: item.id, ok: false, blocked: true, provider: item.recommendedProvider, model: item.recommendedModel,
+      error: execution?.status === 'blocked' ? (blockingReason || '团队执行预检未通过。')
+        : execution?.status === 'cancelled' ? '团队执行已取消。' : '前置工作包未成功，团队执行已停止。' })
+  }
+  return { status: execution?.status ?? 'pending', packages: converted }
+}
+
+/** A ledger record for model_router_team_execute. */
+export function buildTeamRunRecord({ plan, execution, mode = 'read-only', ...rest }) {
+  const record = buildRunRecord({ ...rest, plan, execution: teamExecutionResults(plan, execution), kind: 'team', executionMode: mode })
+  record.mode = 'team'
+  if (execution?.workspace && execution.workspace !== rest.workspace) record.isolatedWorkspace = String(execution.workspace)
+  if (execution?.integration) record.integration = { ignoredArtifacts: execution.integration.ignoredArtifacts ?? 0 }
+  return record
+}
+
+/** A ledger record for model_router_tool_run (one package, one CLI). */
+export function buildToolRunRecord({ toolId, toolLabel, provider, model, mode = 'read-only', result, ...rest }) {
+  const packageId = 'direct'
+  const plan = {
+    mode: 'single', routingBypassed: true,
+    directRoute: { provider: provider || toolId, model: model || result?.requestedModel || '默认模型' },
+    selected: provider && model ? { provider, model } : null,
+    reason: `直接调用 ${toolLabel ?? toolId}，未经过路由。`,
+    complexity: null, estimatedCost: null, executionChannel: 'official-cli',
+  }
+  const succeeded = result?.status === 'succeeded'
+  const execution = {
+    status: result?.status ?? 'pending',
+    packages: [{
+      id: packageId, ok: succeeded, cancelled: result?.status === 'cancelled',
+      provider: plan.directRoute.provider, model: plan.directRoute.model,
+      channel: 'official-cli', toolId,
+      actualModel: result?.reportedModel && typeof result.reportedModel === 'string' ? result.reportedModel : null,
+      answer: String(result?.finalText ?? ''),
+      error: succeeded ? null : String(result?.error ?? result?.reason ?? result?.status ?? '官方 CLI 未成功完成。'),
+      ...(result?.usage ? { usage: result.usage } : {}),
+      ...(finite(result?.reportedCostUsd) ? { reportedCostUsd: result.reportedCostUsd } : {}),
+    }],
+  }
+  const record = buildRunRecord({ ...rest, plan, execution, kind: 'tool', executionMode: mode })
+  record.packages[0].name = `${toolLabel ?? toolId} 单次调用`
+  return record
 }

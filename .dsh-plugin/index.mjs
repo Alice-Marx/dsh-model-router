@@ -5,10 +5,11 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_ROUTER_SETTINGS, modelMetadata } from './shared/router.mjs'
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
-import { HEALTH_CACHE_MS, healthCache, runHealthCheck } from './shared/tool-health.mjs'
+import { HEALTH_CACHE_MS, apiKeyEnvPresent, healthCache, runHealthCheck } from './shared/tool-health.mjs'
 import { createRouterState } from './shared/router-state.mjs'
 import {
-  applyQualityBiases, budgetCheck, buildRunRecord, mergeRerun, routeQualityBiases, spending, storedResults, actualCost,
+  applyQualityBiases, budgetCheck, buildRunRecord, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
+  routeQualityBiases, spending, storedResults, actualCost, teamExecutionResults,
 } from './shared/run-ledger.mjs'
 import { routeBoundaries } from './shared/security-boundaries.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
@@ -21,7 +22,7 @@ import {
 } from './shared/official-tool-registry.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness, runOfficialTool } from './shared/official-tool-executor.mjs'
 import { runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
-import { executeAssignmentPlan, rerunAssignmentPackage } from './shared/task-executors.mjs'
+import { downstreamPackageIds, executeAssignmentPlan, rerunAssignmentPackage } from './shared/task-executors.mjs'
 import {
   probeAllTools,
   probeToolWith,
@@ -202,6 +203,18 @@ function budgetFor(config, runs, estimateUsd) {
   const settings = budgetSettings(config)
   const spent = spending(runs)
   return { ...budgetCheck({ estimateUsd, spent, ...settings }), spent, ...settings }
+}
+
+/**
+ * API key / API path spend counts against budgets; an official CLI on its own
+ * subscription login (no API key injected or inherited) is reference-only.
+ */
+export function billingForResult(result) {
+  const toolId = result?.toolId ?? null
+  return billingOf(result, {
+    loginBilling: toolId ? healthCache.loginState(toolId)?.billing ?? null : null,
+    apiKeyPresent: toolId ? apiKeyEnvPresent(toolId) : false,
+  })
 }
 
 function routePricing(routes, item) {
@@ -392,7 +405,7 @@ export async function reviewRunPackages(ctx, run, routes, config, { signal, rand
         summary: (summary || text(result.answer) || text(result.error)).slice(0, 300), at: Date.now(),
       }
       const cost = actualCost(result, reviewer.pricing ?? null)
-      const entry = { packageId: item.id, provider: reviewer.provider, model: reviewer.model, ran: true, finishedAt: Date.now(), usage: result.usage ?? null, ...cost }
+      const entry = { packageId: item.id, provider: reviewer.provider, model: reviewer.model, ran: true, finishedAt: Date.now(), usage: result.usage ?? null, ...cost, billing: 'api', referenceCostUsd: null }
       run.reviews.push(entry)
       reviews.push({ ...entry, score })
     } catch (error) {
@@ -479,6 +492,7 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
     id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution,
     preset: plan.preset ?? preset, workspace: options.workspace ?? '',
     pricingFor: item => routePricing(routes, item),
+    billingFor: billingForResult,
     budget: { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: budget.downgraded === true, confirmed: budget.exceeded ? true : undefined },
   })
   const reviews = await reviewRunPackages(ctx, run, routes, config, { signal: options.signal, random: options.random })
@@ -511,6 +525,10 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   } else if (target.ok) {
     throw new Error('该步骤已成功；如需换模型重做，请指定改派的 provider/model。')
   }
+  if (run.kind === 'tool') throw new Error('model_router_tool_run 的单次调用没有可单独重跑的步骤；请直接再次调用 model_router_tool_run。')
+  if (run.kind === 'team' && run.executionMode !== 'read-only') {
+    throw new Error('可编辑（workspace-write）团队运行不支持单步重跑：之前的改动在独立 Git 工作树中，已整合或保留待人工核对。请重新调用 model_router_team_execute。')
+  }
   const sameRoute = !override || (override.provider === target.recommendedProvider && override.model === target.recommendedModel)
   const budget = budgetFor(config, saved.runs, sameRoute ? target.estimatedCost : null)
   if (budget.exceeded && confirmOverBudget !== true) {
@@ -518,6 +536,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   }
   const cwd = text(workspace) || run.workspace
   if (!cwd || !(await fileExists(cwd))) throw new Error('原运行的工作区不可用，无法重跑该步骤。')
+  if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options })
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const execution = await rerunAssignmentPackage({
     task: run.task,
@@ -536,9 +555,77 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     apiFallback: async ({ route, task: packageTask, signal: callSignal }) => consultConfiguredModel(ctx, route, packageTask, limit, callSignal),
   })
   const updated = await routerStateStore().updateRun(run.id, current => {
-    mergeRerun(current, execution, { rerunIds: execution.ranIds, pricingFor: item => routePricing(routes, item) })
+    mergeRerun(current, execution, { rerunIds: execution.ranIds, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
   })
   return { run: updated, execution, budget }
+}
+
+/** Stored team packages in plan shape; `override` reassigns the retried package. */
+function teamPlanFromRun(run, ids, override, targetId) {
+  const workPackages = run.packages.filter(item => ids.includes(item.id)).map(item => ({
+    id: item.id, name: item.name, objective: item.objective, dependsOn: item.dependsOn ?? [],
+    type: item.type ?? 'general', purpose: item.purpose ?? 'execution',
+    verificationChecklist: item.verificationChecklist ?? [],
+    recommendedProvider: item.id === targetId && override ? override.provider : item.recommendedProvider,
+    recommendedModel: item.id === targetId && override ? override.model : item.recommendedModel,
+    estimatedCost: item.estimatedCost ?? null,
+  }))
+  return { mode: 'team', team: { workPackages } }
+}
+
+/**
+ * Read-only team retry: the failed step plus downstream steps that had not
+ * succeeded run through the same signed runner; earlier answers are context.
+ */
+async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options }) {
+  const downstream = downstreamPackageIds(run.packages, target.id)
+    .filter(id => !run.packages.find(item => item.id === id)?.ok)
+  const ids = [target.id, ...downstream]
+  const plan = teamPlanFromRun(run, ids, override, target.id)
+  const cliModels = Object.fromEntries(Object.entries(run.cliModels ?? {}).filter(([key]) => ids.includes(key) && !(override && key === target.id)))
+  const previous = run.packages.filter(item => item.ok && !ids.includes(item.id))
+    .map(item => ({ id: item.id, name: item.name, finalText: item.answer }))
+  const runTeam = options.runTeam ?? runOfficialTeam
+  const installed = Array.isArray(options.installedToolIds) ? options.installedToolIds : await installedToolIds()
+  const execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: cwd, mode: 'read-only',
+    installedIds: installed, cliModels, signal, sandbox: ctx.sandbox, previous, onlyIds: ids, ...(options.runtime ? { runtime: options.runtime } : {}) })
+  const converted = teamExecutionResults(plan, execution)
+  if (override) {
+    const entry = converted.packages.find(item => item.id === target.id)
+    if (entry) entry.reassigned = true
+  }
+  const updated = await routerStateStore().updateRun(run.id, current => {
+    mergeRerun(current, converted, { rerunIds: ids, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
+    current.status = execution?.status ?? current.status
+    if (override) {
+      const stored = current.packages.find(item => item.id === target.id)
+      if (stored) { stored.recommendedProvider = override.provider; stored.recommendedModel = override.model }
+    }
+  })
+  return { run: updated, execution: { ...converted, ranIds: ids, raw: execution }, budget }
+}
+
+/** Ledger record for model_router_team_execute; storage failures never fail the run. */
+export async function recordTeamRun({ task, plan, execution, mode, workspace, routes, cliModels, budget, startedAt, preset }) {
+  const run = buildTeamRunRecord({
+    id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task, plan, execution, mode, workspace,
+    preset: plan?.preset ?? preset ?? DEFAULT_ROUTING_PRESET,
+    pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
+    budget: budget ? { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: false, confirmed: budget.exceeded ? true : undefined } : null,
+  })
+  const bindings = Object.fromEntries(Object.entries(cliModels ?? {}).filter(([, value]) => typeof value === 'string' && value))
+  if (Object.keys(bindings).length) run.cliModels = bindings
+  try { await routerStateStore().appendRun(run); return run } catch { return null }
+}
+
+/** Ledger record for model_router_tool_run. */
+export async function recordToolRun({ toolId, task, provider, model, mode, workspace, result, routes = [], startedAt }) {
+  const run = buildToolRunRecord({
+    id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task, workspace,
+    toolId, toolLabel: getOfficialTool(toolId)?.label ?? toolId, provider, model, mode, result,
+    pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
+  })
+  try { await routerStateStore().appendRun(run); return run } catch { return null }
 }
 
 /** Store a user rating (+1 useful, -1 not useful, 0 clears) for one result. */
@@ -963,8 +1050,13 @@ function registerOfficialToolModels(ctx, config) {
         if (args.tool === 'zcode') throw new Error('ZCode 3.14.3 不支持在单次调用中指定 CLI 模型')
         modelId = args.cliModel
       }
+      const startedAt = Date.now()
       const result = await runOfficialTask({ toolId: args.tool, task: args.task, modelId, workspace: cwd, allowedRoot: root, mode, signal: exec.signal, sandbox: ctx.sandbox })
-      return jsonValue({ ...result,
+      const recorded = result.status === 'unsupported' ? null : await recordToolRun({
+        toolId: args.tool, task: args.task, provider: text(args.provider), model: text(args.model), mode, workspace: cwd, result, startedAt,
+        routes: text(args.provider) ? configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, exec.signal), config) : [],
+      })
+      return jsonValue({ ...result, runId: recorded?.id ?? null,
         ...(!modelId && text(args.model) ? { modelNotice: result.modelNotice
           ?? 'Harness 模型 ID 未经此厂商 CLI 验证；本次使用厂商 CLI 已配置的默认模型。' } : {}),
       })
@@ -1025,7 +1117,7 @@ function registerOfficialToolModels(ctx, config) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_rerun_step',
-    description: 'Re-run one failed work package of a recorded model_router_execute run without restarting finished packages; unfinished downstream packages follow. Supply provider and model to reassign the package to another configured route (if the user allows manual reassignment).',
+    description: 'Re-run one failed work package of a recorded model_router_execute run, or of a read-only model_router_team_execute run, without restarting finished packages; unfinished downstream packages follow. Editable team runs and model_router_tool_run calls cannot be re-run step by step. Supply provider and model to reassign the package to another configured route (if the user allows manual reassignment).',
     parameters: {
       runId: { type: 'string', required: true, description: 'runId returned by model_router_execute.' },
       packageId: { type: 'string', required: true, description: 'Work package id to re-run.' },
@@ -1105,9 +1197,15 @@ function registerOfficialToolModels(ctx, config) {
         catch { throw new Error('cliModelsJson 不是有效的 JSON 对象') }
       }
       cliModels = resolveTeamCliModelBindings(plan, executableRoutes, cliModels ?? {})
+      const startedAt = Date.now()
       const execution = await runOfficialTeam({ plan, task: args.task, workspace: cwd,
         allowedRoot: root, mode, installedIds: installed, cliModels, signal: exec.signal, sandbox: ctx.sandbox })
-      return jsonValue({ plan, execution,
+      const recorded = await recordTeamRun({ task: args.task, plan, execution, mode, workspace: cwd,
+        routes: executableRoutes, cliModels, budget, startedAt })
+      return jsonValue({ plan, execution, runId: recorded?.id ?? null,
+        rerunNotice: mode === 'read-only'
+          ? '失败的工作包可用 model_router_rerun_step 单步重跑（只重跑该步及其未完成的下游）。'
+          : '可编辑团队运行不支持单步重跑；如需重做请重新调用 model_router_team_execute。',
         modelNotice: '已配置 cliModel 的路线按工作包传给官方 CLI；Claude/Codex 在未配置映射时请求 Harness 模型 ID。其他厂商无映射时使用 CLI 默认模型。多数 CLI 尚不返回可核验的实际模型 ID，须以厂商运行记录核对。',
         billingNotice: 'budgetUsd 仅影响估算与路由，无法限制官方 CLI 账号实际费用。' })
     },

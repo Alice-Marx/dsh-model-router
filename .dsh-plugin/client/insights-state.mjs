@@ -92,3 +92,49 @@ export function unwrapRemote(response, fallback) {
   if (inner && typeof inner === 'object' && 'ok' in inner && !inner.ok) throw new Error(String(inner.error ?? '') || fallback)
   return inner && typeof inner === 'object' && 'ok' in inner ? inner.value : inner
 }
+
+export const RUN_KIND_LABEL = Object.freeze({ assign: '路由执行', team: '团队执行', tool: '单工具调用' })
+export const RUN_STATUS_LABEL = Object.freeze({
+  completed: '完成', partial: '部分完成', failed: '失败', 'cli-completed': '完成',
+  incomplete: '未完成', 'integration-pending': '待整合', blocked: '被阻止', cancelled: '已取消', pending: '待执行',
+})
+
+/**
+ * Cost text for one stored package. Budget spend (API key / API path) and the
+ * subscription reference (API-equivalent figure, not counted) are kept apart.
+ */
+export function packageCost(item) {
+  if (item?.billing === 'subscription') {
+    return {
+      budget: '不计入预算',
+      reference: item.referenceCostUsd !== null && item.referenceCostUsd !== undefined
+        ? `订阅参考费用 ${money(item.referenceCostUsd)}（按 API 价折算）` : '订阅登录，未回报可折算的用量',
+    }
+  }
+  if (item?.costUsd !== null && item?.costUsd !== undefined) {
+    return { budget: `${money(item.costUsd)}${item.costSource === 'cli-reported' ? '（CLI 自报）' : ''}`, reference: null }
+  }
+  return { budget: item?.ran ? '费用未知' : '—', reference: null }
+}
+
+/** Run totals: budget-counted spend and the subscription reference figure. */
+export function runTotals(run) {
+  const items = [...(run?.packages ?? []), ...(run?.reviews ?? [])]
+  let budgetUsd = 0
+  let referenceUsd = 0
+  let subscription = false
+  for (const item of items) {
+    if (item.billing === 'subscription') {
+      subscription = true
+      if (typeof item.referenceCostUsd === 'number') referenceUsd += item.referenceCostUsd
+    } else if (typeof item.costUsd === 'number') budgetUsd += item.costUsd
+  }
+  return { budgetUsd, referenceUsd, subscription }
+}
+
+/** Whether one step can be re-run from the workbench, and why not. */
+export function rerunSupport(run) {
+  if (run?.kind === 'tool') return { supported: false, reason: '单工具调用没有可单独重跑的步骤；请在会话中再次调用 model_router_tool_run。' }
+  if (run?.kind === 'team' && run.executionMode !== 'read-only') return { supported: false, reason: '可编辑团队运行不支持单步重跑：改动在独立 Git 工作树中。请在会话中重新调用 model_router_team_execute。' }
+  return { supported: true, reason: '' }
+}

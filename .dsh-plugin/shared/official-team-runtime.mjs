@@ -262,8 +262,15 @@ export function executableTeamPackages(plan, installedIds = [], mode = 'read-onl
 }
 
 /** Sequential execution preserves DAG dependencies and avoids edit conflicts. */
-export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], cliModels, signal, sandbox, runtime }) {
-  const { assigned, blocking } = executableTeamPackages(plan, installedIds, mode)
+export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null }) {
+  // A retry runs only `onlyIds`; earlier results feed dependency context. Only
+  // read-only retries are supported: a write retry would need the earlier
+  // isolated worktree, which is integrated or kept for manual review.
+  const retry = Array.isArray(onlyIds)
+  if (retry && mode !== 'read-only') throw new TypeError('team retry supports read-only mode only')
+  const selected = executableTeamPackages(plan, installedIds, mode)
+  const assigned = retry ? selected.assigned.filter(item => onlyIds.includes(item.id)) : selected.assigned
+  const blocking = retry ? selected.blocking.filter(item => onlyIds.includes(item.id)) : selected.blocking
   if (assigned.length === 0) return { status: 'blocked', blocking: [{ reason: '计划没有工作包。' }], results: [] }
   if (blocking.length > 0) return { status: 'blocked', blocking, results: [] }
   if (mode !== 'read-only' && mode !== 'workspace-write') throw new TypeError('team mode must be read-only or workspace-write')
@@ -280,13 +287,14 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
   const runWorkspace = isolated?.workspace ?? source
   const completed = []
+  const context = retry ? (Array.isArray(previous) ? previous : []).filter(item => item?.id && typeof item.finalText === 'string') : []
   for (const item of assigned) {
     if (signal?.aborted) return { status: 'cancelled', workspace: runWorkspace, results: completed }
     const cliModel = teamCliModel(item, configuredCliModels)
     const result = await runTool({
       toolId: item.toolId,
       modelId: cliModel,
-      task: packagePrompt(task, item, completed),
+      task: packagePrompt(task, item, [...context, ...completed]),
       workspace: runWorkspace,
       mode,
       isolatedRoot: isolated?.isolatedRoot,
@@ -308,6 +316,8 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
         ? 'Harness 推荐模型 ID 未经此厂商 CLI 验证；本包使用厂商 CLI 已配置的默认模型。'
         : reportedModel ? null : '该 CLI 未返回可核验的实际模型 ID；请以厂商运行记录核对。'),
       status: packageStatus, finalText: result.finalText ?? '',
+      ...(result.usage ? { usage: result.usage } : {}),
+      ...(Number.isFinite(result.reportedCostUsd) ? { reportedCostUsd: result.reportedCostUsd } : {}),
       error: modelMismatch ? '官方 CLI 实际模型与指定模型不一致。' : result.error ?? result.reason ?? null,
       outputTail: result.status === 'succeeded' ? null : result.stderrTail ?? result.stdoutTail ?? null })
     if (packageStatus !== 'succeeded') return { status: 'incomplete', workspace: runWorkspace, results: completed }

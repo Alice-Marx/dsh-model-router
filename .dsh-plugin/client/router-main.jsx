@@ -357,7 +357,8 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     const provider = override?.provider ?? item?.provider
     const tool = toolForProvider(provider)
     const healthEntry = health.report?.tools?.find(entry => entry.id === tool?.id)
-    if (ledger.value?.settings?.confirmUnsandboxedCli !== false && tool && HEADLESS_TOOLS.has(tool.id) && healthEntry?.installed && healthEntry.login?.state !== 'logged-out'
+    // Team retries go through the signed runner inside the Harness sandbox.
+    if (run?.kind !== 'team' && ledger.value?.settings?.confirmUnsandboxedCli !== false && tool && HEADLESS_TOOLS.has(tool.id) && healthEntry?.installed && healthEntry.login?.state !== 'logged-out'
       && !window.confirm(`重跑会直接启动 ${tool.label} 的无界面 CLI，不经过 Harness 进程沙箱，只读仅由 CLI 参数保证。继续吗？`)) return
     setBusy(true)
     try {
