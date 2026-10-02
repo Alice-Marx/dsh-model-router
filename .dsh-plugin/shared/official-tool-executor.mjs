@@ -24,7 +24,7 @@ import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser } from './vendor-mimo-grok-adapter.mjs'
-import { usageFromOutput } from './task-executors.mjs'
+import { usageFromEvents, usageFromOutput } from './task-executors.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -678,7 +678,9 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         return
       }
       if (miniMaxParser) {
-        settle(miniMaxParser.finish(code))
+        const outcome = miniMaxParser.finish(code)
+        const reported = usageFromEvents('minimax-result', outcome)
+        settle({ ...outcome, usage: reported?.usage ?? null })
         return
       }
       if (nativeParser) {

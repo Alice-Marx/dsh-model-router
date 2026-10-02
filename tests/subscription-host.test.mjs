@@ -185,6 +185,6 @@ test('retrying a paused step on the API key asks for host approval; the RPC code
   assert.match(decision.displayReason.zh, /改用 API Key 重试/)
   const { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS } = await import('../.dsh-plugin/shared/official-tools-remote.mjs')
   const codec = OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.find(item => item.method === 'rerunStep').parameters[0].codec.create()
-  assert.deepEqual(codec.parse({ runId: 'r', packageId: 'p', subscriptionChoice: 'api' }), { runId: 'r', packageId: 'p', confirmOverBudget: false, subscriptionChoice: 'api' })
-  assert.deepEqual(codec.parse({ runId: 'r', packageId: 'p', subscriptionChoice: 'rm -rf' }), { runId: 'r', packageId: 'p', confirmOverBudget: false })
+  assert.deepEqual(codec.parse({ runId: 'r', packageId: 'p', subscriptionChoice: 'api' }), { runId: 'r', packageId: 'p', confirmOverBudget: false, confirmWrite: false, subscriptionChoice: 'api' })
+  assert.deepEqual(codec.parse({ runId: 'r', packageId: 'p', subscriptionChoice: 'rm -rf' }), { runId: 'r', packageId: 'p', confirmOverBudget: false, confirmWrite: false })
 })

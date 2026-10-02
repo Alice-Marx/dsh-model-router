@@ -105,7 +105,7 @@ test('team runs map runner results to steps; unreached steps are blocked', () =>
   assert.match(blocked.packages[0].error, /沙箱不可用/)
 })
 
-test('tool runs are recorded as one step and cannot be re-run step by step', () => {
+test('tool runs are recorded as one step; a failed one can be re-run, editable teams only when continuable', () => {
   const record = buildToolRunRecord({ id: 'x', createdAt: 1, task: '读代码', toolId: 'codex', toolLabel: 'Codex', mode: 'read-only',
     result: { status: 'succeeded', finalText: '完成', usage: { inputTokens: 1, outputTokens: 1 } } })
   assert.equal(record.kind, 'tool')
@@ -113,8 +113,14 @@ test('tool runs are recorded as one step and cannot be re-run step by step', () 
   assert.equal(record.packages[0].status, 'succeeded')
   assert.equal(record.packages[0].billing, 'subscription')
   assert.equal(record.packages[0].name, 'Codex 单次调用')
-  assert.equal(rerunSupport(record).supported, false)
+  assert.equal(rerunSupport(record).supported, true)
+  assert.equal(rerunSupport(record).reassign, false)
+  assert.equal(rerunSupport({ kind: 'tool', executionMode: 'workspace-write', toolRun: { toolId: 'kimi-code' } }).writes, true)
   assert.equal(rerunSupport({ kind: 'team', executionMode: 'workspace-write' }).supported, false)
+  assert.equal(rerunSupport({ kind: 'team', executionMode: 'workspace-write', status: 'cli-completed', isolatedWorkspace: '/w', baseCommit: 'a'.repeat(40) }).supported, false)
+  const continuable = rerunSupport({ kind: 'team', executionMode: 'workspace-write', status: 'incomplete', isolatedWorkspace: '/w', baseCommit: 'a'.repeat(40) })
+  assert.equal(continuable.supported, true)
+  assert.equal(continuable.writes, true)
   assert.equal(rerunSupport({ kind: 'team', executionMode: 'read-only' }).supported, true)
   assert.equal(rerunSupport({}).supported, true)
 })
@@ -176,15 +182,27 @@ test('read-only team runs are recorded and one failed step re-runs with its down
   assert.ok(ledger.spent.subscriptionMonth >= 1.7)
 })
 
-test('editable team runs and tool runs refuse single-step rerun with a clear reason', async t => {
+test('old editable team records without a base commit refuse rerun; failed tool runs rerun as a linked run', async t => {
   const cwd = await workspace(t)
   const write = await host.recordTeamRun({ task: '改代码', plan: teamPlan(), mode: 'workspace-write', workspace: cwd, routes: [], startedAt: Date.now(),
     execution: { status: 'incomplete', results: [{ id: 'a', status: 'failed', provider: 'anthropic', recommendedModel: 'claude-x', toolId: 'claude-code', finalText: '' }] } })
-  await assert.rejects(() => host.rerunRecordedStep(teamCtx(), {}, { runId: write.id, packageId: 'a' }), /workspace-write/)
+  await assert.rejects(() => host.rerunRecordedStep(teamCtx(), {}, { runId: write.id, packageId: 'a' }), /Git 基线|model_router_team_execute/)
   const tool = await host.recordToolRun({ toolId: 'codex', task: '读', mode: 'read-only', workspace: cwd, startedAt: Date.now(),
     result: { status: 'failed', error: 'boom', finalText: '' } })
   assert.equal(tool.packages[0].status, 'failed')
-  await assert.rejects(() => host.rerunRecordedStep(teamCtx(), {}, { runId: tool.id, packageId: 'direct' }), /model_router_tool_run/)
+  assert.equal(tool.toolRun.toolId, 'codex')
+  const calls = []
+  const rerun = await host.rerunRecordedStep(teamCtx(), {}, { runId: tool.id, packageId: 'direct',
+    runTask: async request => { calls.push(request); return { toolId: 'codex', status: 'succeeded', finalText: '好了' } } })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].toolId, 'codex')
+  assert.equal(calls[0].mode, 'read-only')
+  assert.equal(calls[0].task, '读')
+  assert.equal(rerun.rerunOf, tool.id)
+  assert.notEqual(rerun.newRunId, tool.id)
+  assert.equal(rerun.run.rerunOf, tool.id)
+  assert.equal(rerun.run.packages[0].status, 'succeeded')
+  await assert.rejects(() => host.rerunRecordedStep(teamCtx(), {}, { runId: rerun.newRunId, packageId: 'direct' }), /已成功/)
 })
 
 test('an API key in the environment makes CLI spend count against the budget', () => {

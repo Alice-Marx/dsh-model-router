@@ -399,6 +399,53 @@ export function usageFromOutput(format, stdout = '') {
 }
 
 /**
+ * Usage already parsed from vendor events (no JSON text):
+ * - 'grok-end': the `end`/`result` spend fields of `grok -p --output-format
+ *   streaming-json` (input_tokens is uncached; total_cost_usd only when the
+ *   server reported a complete cost, never with cost_is_partial);
+ * - 'mimo-steps': the `step-finish` parts of `mimo run --format json`
+ *   (tokens.input/output/cache.read/cache.write, cost in USD), summed;
+ * - 'minimax-result': `exec.result.usage` of `mcode exec` (camelCase counts),
+ *   ignored when usageSource is 'unavailable'.
+ */
+export function usageFromEvents(format, value) {
+  if (format === 'grok-end') {
+    const usage = value?.usage
+    if (!usage || typeof usage !== 'object') return null
+    const reported = Number(value.total_cost_usd)
+    return {
+      usage: {
+        inputTokens: count(usage.input_tokens), outputTokens: count(usage.output_tokens),
+        cacheReadTokens: count(usage.cache_read_input_tokens), cacheWriteTokens: count(usage.cache_creation_input_tokens),
+      },
+      ...(value.cost_is_partial !== true && Number.isFinite(reported) && reported > 0 ? { reportedCostUsd: reported } : {}),
+    }
+  }
+  if (format === 'mimo-steps') {
+    const parts = (Array.isArray(value) ? value : []).filter(part => part?.tokens && typeof part.tokens === 'object')
+    if (!parts.length) return null
+    const sum = pick => parts.reduce((total, part) => total + count(pick(part)), 0)
+    const cost = parts.reduce((total, part) => total + (Number.isFinite(part.cost) && part.cost > 0 ? part.cost : 0), 0)
+    return {
+      usage: {
+        inputTokens: sum(part => part.tokens.input), outputTokens: sum(part => part.tokens.output) + sum(part => part.tokens.reasoning),
+        cacheReadTokens: sum(part => part.tokens.cache?.read), cacheWriteTokens: sum(part => part.tokens.cache?.write),
+      },
+      ...(cost > 0 ? { reportedCostUsd: Number(cost.toFixed(8)) } : {}),
+    }
+  }
+  if (format === 'minimax-result') {
+    if (!value?.usage || typeof value.usage !== 'object' || value.usageSource === 'unavailable') return null
+    const usage = value.usage
+    return { usage: {
+      inputTokens: count(usage.inputTokens), outputTokens: count(usage.outputTokens) + count(usage.reasoningTokens),
+      cacheReadTokens: count(usage.cacheReadTokens), cacheWriteTokens: count(usage.cacheWriteTokens),
+    }, ...(value.usageIncomplete === true ? { usageIncomplete: true } : {}) }
+  }
+  return null
+}
+
+/**
  * Signal a CLI and every process it started. POSIX: the child leads its own
  * process group (spawned detached), so the group is signalled. Windows:
  * `taskkill /T /F` ends the process tree. Falls back to the child alone.

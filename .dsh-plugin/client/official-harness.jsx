@@ -304,6 +304,8 @@ function registerUi(ctx) {
       rateResult: request => officialToolsRemote.rateResult(request),
       rerunStep: request => officialToolsRemote.rerunStep(request),
       loadBoundaries: () => officialToolsRemote.boundaries(),
+      previewRun: request => officialToolsRemote.previewRun(request),
+      startRun: request => officialToolsRemote.startRun(request),
     }),
   }, RouterMainPage))), 'model-router-galgame: main workspace')
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

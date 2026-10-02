@@ -83,9 +83,47 @@ const rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunReq
     runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'),
     ...(provider ? { provider, model } : {}),
     confirmOverBudget: request.confirmOverBudget === true,
+    confirmWrite: request.confirmWrite === true,
     ...(['api', 'subscription', 'cancel'].includes(request.subscriptionChoice) ? { subscriptionChoice: request.subscriptionChoice } : {}),
   }
 })
+
+export const RUN_CONFIRMATION_CODES = Object.freeze(['workspace-write', 'rerun-write', 'subscription-api', 'over-budget', 'unsandboxed'])
+const MAX_RUN_TASK_CHARS = 200_000
+
+/**
+ * Workbench "start a run" request. The workspace is a user-typed absolute
+ * directory (validated again on the Host); the run itself is read-only.
+ */
+export function parseRunRequest(value) {
+  const request = plainObject(value, 'run request')
+  if (typeof request.task !== 'string' || !request.task.trim() || request.task.length > MAX_RUN_TASK_CHARS) {
+    throw new TypeError('task must be a non-empty string')
+  }
+  const provider = optionalRouteText(request.provider, 'provider')
+  const model = optionalRouteText(request.model, 'model')
+  if (Boolean(provider) !== Boolean(model)) throw new TypeError('provider and model must be supplied together')
+  const workspace = request.workspace === undefined || request.workspace === null || request.workspace === '' ? undefined : request.workspace
+  if (workspace !== undefined && (typeof workspace !== 'string' || workspace.length > 4_096 || workspace.includes('\0'))) throw new TypeError('workspace is invalid')
+  if (request.budgetUsd !== undefined && (typeof request.budgetUsd !== 'number' || !Number.isFinite(request.budgetUsd) || request.budgetUsd < 0)) {
+    throw new TypeError('budgetUsd must be a non-negative number')
+  }
+  const confirmed = Array.isArray(request.confirmedReasons) ? request.confirmedReasons : []
+  if (confirmed.length > RUN_CONFIRMATION_CODES.length || confirmed.some(code => !RUN_CONFIRMATION_CODES.includes(code))) {
+    throw new TypeError('confirmedReasons contains an unknown reason')
+  }
+  return {
+    task: request.task,
+    ...(provider ? { provider, model } : {}),
+    ...(['single', 'team'].includes(request.planMode) ? { planMode: request.planMode } : {}),
+    ...(['economy', 'balanced', 'quality'].includes(request.preset) ? { preset: request.preset } : {}),
+    ...(request.budgetUsd !== undefined ? { budgetUsd: request.budgetUsd } : {}),
+    ...(workspace ? { workspace } : {}),
+    confirmedReasons: [...new Set(confirmed)],
+  }
+}
+
+const runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest)
 
 function descriptor(method, parameters, result) {
   return Object.freeze({
@@ -116,6 +154,9 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('rateResult', [jsonParameter('request', rateRequestCodec)], anyObjectCodec('RateResult')),
   descriptor('rerunStep', [jsonParameter('request', rerunRequestCodec)], anyObjectCodec('RerunResult')),
   descriptor('boundaries', [], anyObjectCodec('SecurityBoundaries')),
+  // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
+  descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview')),
+  descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),
 ])
 
 export const OFFICIAL_TOOLS_CLIENT_REMOTE = Object.freeze({

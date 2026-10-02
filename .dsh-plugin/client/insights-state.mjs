@@ -92,7 +92,10 @@ export function biasForRoute(ledger, route) {
 export function unwrapRemote(response, fallback) {
   if (!response?.ok) throw new Error(String(response?.error?.message ?? '') || fallback)
   const inner = response.value
-  if (inner && typeof inner === 'object' && 'ok' in inner && !inner.ok) throw new Error(String(inner.error ?? '') || fallback)
+  if (inner && typeof inner === 'object' && 'ok' in inner && !inner.ok) {
+    const error = inner.error
+    throw new Error(String((error && typeof error === 'object' ? error.message : error) ?? '') || fallback)
+  }
   return inner && typeof inner === 'object' && 'ok' in inner ? inner.value : inner
 }
 
@@ -136,10 +139,33 @@ export function runTotals(run) {
 }
 
 /** Whether one step can be re-run from the workbench, and why not. */
+/**
+ * Mirror of the Host's rerun rules for the workbench buttons.
+ * - tool runs: a failed call is repeated as a new linked run (no reassignment);
+ * - editable team runs: only one that stopped at a failed step, with its
+ *   isolated worktree and base commit recorded, continues in a fresh worktree;
+ * - everything else re-runs the failed step and its unfinished downstream steps.
+ * `writes` means the rerun edits files and needs an explicit confirmation.
+ */
 export function rerunSupport(run) {
-  if (run?.kind === 'tool') return { supported: false, reason: '单工具调用没有可单独重跑的步骤；请在会话中再次调用 model_router_tool_run。' }
-  if (run?.kind === 'team' && run.executionMode !== 'read-only') return { supported: false, reason: '可编辑团队运行不支持单步重跑：改动在独立 Git 工作树中。请在会话中重新调用 model_router_team_execute。' }
-  return { supported: true, reason: '' }
+  if (run?.kind === 'tool') {
+    const editable = run.executionMode === 'workspace-write'
+    return { supported: true, writes: editable, reassign: false,
+      reason: '', confirm: editable ? '重跑会在新的独立 Git 工作树中再次执行这次可编辑调用，成功后把改动整合回工作区（工作区须为干净的 Git 仓库）。' : '' }
+  }
+  if (run?.kind === 'team' && run.executionMode === 'workspace-write') {
+    if (!['incomplete', 'cancelled'].includes(run.status)) {
+      return { supported: false, writes: true, reassign: false, reason: run.status === 'integration-pending'
+        ? '改动尚待人工整合（独立工作区已保留），不能单步重跑；请先核对并整合，再在会话中重新执行团队任务。'
+        : '改动已整合到工作区，单步重跑会重复套用改动；如需重做请在会话中重新调用 model_router_team_execute。' }
+    }
+    if (!run.isolatedWorkspace || !run.baseCommit) {
+      return { supported: false, writes: true, reassign: false, reason: '旧版本记录缺少独立工作区或 Git 基线，无法安全续跑；请在会话中重新调用 model_router_team_execute。' }
+    }
+    return { supported: true, writes: true, reassign: true, reason: '',
+      confirm: '续跑会在新的独立 Git 工作树中先套用之前的改动，再重跑该步骤及其下游；成功后把合并补丁整合回工作区（工作区须干净且仍在原基线提交）。' }
+  }
+  return { supported: true, writes: false, reassign: true, reason: '', confirm: '' }
 }
 
 const pad2 = value => String(value).padStart(2, '0')
@@ -184,4 +210,38 @@ export function billingSwitchText(item) {
   const note = item?.billingSwitch
   if (!note?.reason) return null
   return note.reason
+}
+
+/** Workbench run request from the planning inputs; `mode` 'direct' sends the one chosen model. */
+export function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace } = {}) {
+  const budget = Number(budgetUsd)
+  return {
+    task: typeof task === 'string' ? task : '',
+    ...(mode === 'direct' && directRoute ? { provider: directRoute.provider, model: directRoute.model } : { planMode: mode === 'team' ? 'team' : 'single', preset }),
+    ...(Number.isFinite(budget) && budget >= 0 ? { budgetUsd: budget } : {}),
+    ...(typeof workspace === 'string' && workspace.trim() ? { workspace: workspace.trim() } : {}),
+  }
+}
+
+/**
+ * Everything a workbench rerun needs confirmed, as one list for one prompt:
+ * file edits, a direct (unsandboxed) CLI launch, and a likely budget overrun
+ * (estimated locally from the ledger; the Host re-checks).
+ */
+export function rerunConfirmations({ run, item, override = null, choice = null, ledger = null, health = null, toolFor = () => null, headlessIds = new Set() } = {}) {
+  const reasons = []
+  const support = rerunSupport(run)
+  if (support.writes) reasons.push({ code: 'workspace-write', text: support.confirm })
+  if (choice === 'api') reasons.push({ code: 'subscription-api', text: '改用 API Key 重试：会按 API 计费并计入预算。' })
+  const tool = toolFor(override?.provider ?? item?.provider)
+  const entry = (health?.tools ?? []).find(candidate => candidate.id === tool?.id)
+  if (choice !== 'api' && choice !== 'cancel' && run?.kind !== 'team' && run?.kind !== 'tool' && ledger?.settings?.confirmUnsandboxedCli !== false
+    && tool && headlessIds.has(tool.id) && entry?.installed && entry.login?.state !== 'logged-out') {
+    reasons.push({ code: 'unsandboxed', text: `会直接启动 ${tool.label} 的无界面 CLI，不经过 Harness 进程沙箱，只读仅由 CLI 参数保证。` })
+  }
+  const estimate = override ? null : item?.estimatedCost
+  const check = ledger?.budget ? budgetCheck({ estimateUsd: typeof estimate === 'number' ? estimate : null, spent: ledger.spent ?? {},
+    dailyLimitUsd: ledger.budget.dailyLimitUsd, monthlyLimitUsd: ledger.budget.monthlyLimitUsd }) : null
+  if (check?.exceeded) reasons.push({ code: 'over-budget', text: `超出预算：${check.message}` })
+  return reasons
 }

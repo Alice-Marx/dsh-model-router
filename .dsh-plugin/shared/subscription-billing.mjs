@@ -160,15 +160,41 @@ export function exhaustedUntil(info, { now = Date.now(), cooldownMinutes = DEFAU
 }
 
 /** In-memory quota state with an optional persistence callback. Keys: `cli:<tool>` or `plan:<provider>`. */
+const finiteOr = (value, fallback) => (Number.isFinite(value) ? value : fallback)
+
 export function createQuotaTracker({ now = Date.now, persist = null } = {}) {
   const entries = new Map()
   // `removed` lets a shared store merge this snapshot with other processes' entries.
   const save = (removed = []) => { if (typeof persist === 'function') Promise.resolve(persist(Object.fromEntries(entries), { removed })).catch(() => {}) }
+  // markedAt of each entry as last seen in the shared store, so sync() can tell
+  // "another process cleared it" apart from "marked here, not persisted yet".
+  const seen = new Map()
+  const valid = entry => entry && Number.isFinite(entry.until) && entry.until > now()
   return {
     load(saved) {
       for (const [key, entry] of Object.entries(saved ?? {})) {
-        if (entry && Number.isFinite(entry.until) && entry.until > now()) entries.set(key, entry)
+        if (valid(entry)) { entries.set(key, entry); seen.set(key, finiteOr(entry.markedAt, 0)) }
       }
+    },
+    /**
+     * Adopt marks and clears made by other processes. A newer on-disk mark wins;
+     * an entry missing on disk is dropped only if this tracker saw it there before
+     * and has not re-marked it since. Returns the number of changed keys.
+     */
+    sync(saved) {
+      let changed = 0
+      const disk = Object.fromEntries(Object.entries(saved ?? {}).filter(([, entry]) => valid(entry)))
+      for (const [key, entry] of Object.entries(disk)) {
+        const mine = entries.get(key)
+        if (!mine || finiteOr(entry.markedAt, 0) > finiteOr(mine.markedAt, 0)) { entries.set(key, { ...entry }); changed += 1 }
+        seen.set(key, finiteOr(entry.markedAt, 0))
+      }
+      for (const [key, mine] of [...entries]) {
+        if (key in disk) continue
+        if (seen.has(key) && finiteOr(mine.markedAt, 0) <= seen.get(key)) { entries.delete(key); changed += 1 }
+        seen.delete(key)
+      }
+      return changed
     },
     mark(key, info, { cooldownMinutes } = {}) {
       const at = now()

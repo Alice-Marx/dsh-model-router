@@ -49,6 +49,12 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
 
   boundaries() { return settled(() => (this.services.boundaries ?? unavailable)()) }
 
+  /** Plan, cost estimate and the reasons that need the user's confirmation; runs nothing. */
+  previewRun(request) { return settled(() => (this.services.previewRun ?? unavailable)(request)) }
+
+  /** Execute a previewed run once every listed reason was confirmed. */
+  startRun(request) { return settled(() => (this.services.startRun ?? unavailable)(request)) }
+
   /** Re-probe the local fixed registry; the caller cannot supply a command. */
   async list() {
     const tools = await probeAllTools({ fresh: true })

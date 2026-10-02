@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
+import { isAbsolute } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_ROUTER_SETTINGS, modelMetadata } from './shared/router.mjs'
@@ -166,31 +167,31 @@ function recentNotices(saved, now = Date.now()) {
   return (saved?.notices ?? []).filter(item => Number.isFinite(item?.at) && now - item.at < NOTICE_DAYS * 86_400_000)
 }
 
-let healthHydrated = false
+/**
+ * Health and quota caches follow the shared state file: every call re-reads it
+ * (the store caches by mtime/size/inode, so an unchanged file costs one stat)
+ * and adopts marks and clears made by other processes without a restart.
+ */
 async function hydrateHealth() {
-  if (healthHydrated) return
-  healthHydrated = true
   const saved = await savedState()
-  if (saved.health && !healthCache.report()) healthCache.remember(saved.health)
-  // Authentication failures seen while running on a subscription survive a reload.
-  for (const [toolId, entry] of Object.entries(saved.authFailures ?? {})) {
-    if (!healthCache.loginState(toolId) || healthCache.loginState(toolId).source !== 'runtime-auth') healthCache.markLoggedOut(toolId, entry.detail, entry.at)
-  }
+  healthCache.sync(saved)
 }
 
 // Subscription quota: which subscriptions hit their limit, and until when.
 let quotaTracker = null
-let quotaHydrated = false
 function quotaStore() {
   quotaTracker ??= createQuotaTracker({ persist: (snapshot, change) => routerStateStore().saveQuota(snapshot, change) })
   return quotaTracker
 }
 async function hydrateQuota() {
-  if (quotaHydrated) return quotaStore()
-  quotaHydrated = true
   const saved = await savedState()
-  quotaStore().load(saved.quota)
+  quotaStore().sync(saved.quota)
   return quotaStore()
+}
+
+/** Current quota marks after adopting other processes' changes (workbench and tests). */
+export async function currentQuotaSnapshot() {
+  return (await hydrateQuota()).snapshot()
 }
 
 function quotaPatterns(config) {
@@ -367,7 +368,7 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   const provider = text(route?.provider)
   const model = text(route?.model)
   const taskText = text(task)
-  if (!provider || !model) throw new Error('a configured provider and model are required')
+  if (!provider || !model) throw new Error('需要提供已配置的 provider 和 model。')
   if (!taskText) throw new Error('任务内容为空，请先描述任务。')
   throwIfAborted(signal)
   const limit = boundedInteger(outputLimit, 12_000, 1, 50_000)
@@ -544,15 +545,23 @@ function executionHooks(ctx, options) {
   }
 }
 
-/** Route, or honor one explicit model, then run each package through its adapter. */
-export async function executeConfiguredAssignment(ctx, task, config = {}, options = {}) {
+/**
+ * The plan and budget check model_router_execute would use, without running
+ * anything: one explicit model or routing, with the automatic economy
+ * downgrade when the budget would be exceeded. Shared by the workbench preview.
+ */
+export async function planAssignment(ctx, task, config = {}, options = {}) {
   const taskText = text(task)
   // Validate before planning or any paid call: the whole task must fit one CLI/API prompt.
   const problem = taskTextProblem(taskText)
   if (problem) throw new Error(problem)
   const direct = text(options.provider) || text(options.model)
+  if (direct && (!text(options.provider) || !text(options.model))) throw new Error('指定模型需要同时提供 provider 和 model。')
   const saved = await savedState()
   const routes = await routesWithLearning(ctx, config, options.signal, saved.runs)
+  if (direct && !routes.some(route => route.provider === text(options.provider) && route.model === text(options.model))) {
+    throw new Error(`模型 ${text(options.provider)}/${text(options.model)} 不在 Harness 模型目录中；请在模型页添加后重试，或改用自动路由。`)
+  }
   const installed = options.skipToolProbe === true
     ? (Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
     : await installedToolIds()
@@ -585,6 +594,12 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
       plan = cheaper
     }
   }
+  return { taskText, direct: Boolean(direct), plan, budget, routes, preset }
+}
+
+/** Route, or honor one explicit model, then run each package through its adapter. */
+export async function executeConfiguredAssignment(ctx, task, config = {}, options = {}) {
+  const { taskText, direct, plan, budget, routes, preset } = await planAssignment(ctx, task, config, options)
   if (budget.exceeded && options.confirmOverBudget !== true) {
     return {
       plan, execution: null, paused: true,
@@ -649,7 +664,34 @@ async function storedRun(runId) {
 }
 
 /** Re-run one failed (or, with a new route, any) step and its unfinished downstream steps. */
-export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, subscriptionChoice = null, workspace, signal, ...options } = {}) {
+/**
+ * Whether a recorded run can be re-run and whether that rerun edits files.
+ * Editable team reruns continue on a fresh worktree seeded with the earlier,
+ * never integrated worktree; they need a recorded base commit and an
+ * incomplete (not integrated) run.
+ */
+export function rerunSupport(run) {
+  if (!run) return { ok: false, reason: '未找到运行记录。' }
+  if (run.kind === 'tool') {
+    const toolId = run.toolRun?.toolId ?? run.packages?.[0]?.toolId
+    if (!toolId) return { ok: false, reason: '该单次调用记录缺少官方工具 ID，无法重跑；请直接再次调用 model_router_tool_run。' }
+    return { ok: true, kind: 'tool', writes: run.executionMode === 'workspace-write' }
+  }
+  if (run.kind === 'team' && run.executionMode === 'workspace-write') {
+    if (!['incomplete', 'cancelled'].includes(run.status)) {
+      return { ok: false, reason: run.status === 'integration-pending'
+        ? '该可编辑团队运行的改动尚待人工整合（独立工作区已保留）；请先核对并整合，再重新执行整个团队任务。'
+        : '该可编辑团队运行的改动已整合到工作区；单步重跑会重复套用改动。如需重做请重新调用 model_router_team_execute。' }
+    }
+    if (!run.isolatedWorkspace || !run.baseCommit) {
+      return { ok: false, reason: '该可编辑团队运行没有记录独立工作区或 Git 基线（旧版本记录），无法安全续跑；请重新调用 model_router_team_execute。' }
+    }
+    return { ok: true, kind: 'team-write', writes: true }
+  }
+  return { ok: true, kind: run.kind === 'team' ? 'team' : 'assign', writes: false }
+}
+
+export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, confirmWrite = false, subscriptionChoice = null, workspace, root, signal, ...options } = {}) {
   const { run, saved } = await storedRun(runId)
   const target = run.packages.find(item => item.id === text(packageId))
   if (!target) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
@@ -663,16 +705,25 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     if (!text(provider) || !text(model)) throw new Error('改派需要同时提供 provider 和 model')
     if (valueOf(config, 'allowManualReassign', true) === false) throw new Error('设置中已关闭手动改派。')
     if (!routes.some(route => route.provider === text(provider) && route.model === text(model))) {
-      throw new Error(`route ${text(provider)}/${text(model)} is not configured in DeepSeek Harness`)
+      throw new Error(`路线 ${text(provider)}/${text(model)} 不在 Harness 模型目录中；请在官方“模型”页添加后重试，或选择列表中的其他路线。`)
     }
     override = { provider: text(provider), model: text(model) }
   } else if (target.ok) {
     throw new Error('该步骤已成功；如需换模型重做，请指定改派的 provider/model。')
   }
   if (choice && run.kind !== 'assign' && run.kind !== undefined) throw new Error('只有路由执行的步骤会因订阅失败暂停。')
-  if (run.kind === 'tool') throw new Error('model_router_tool_run 的单次调用没有可单独重跑的步骤；请直接再次调用 model_router_tool_run。')
-  if (run.kind === 'team' && run.executionMode !== 'read-only') {
-    throw new Error('可编辑（workspace-write）团队运行不支持单步重跑：之前的改动在独立 Git 工作树中，已整合或保留待人工核对。请重新调用 model_router_team_execute。')
+  const support = rerunSupport(run)
+  if (!support.ok) throw new Error(support.reason)
+  if (support.kind === 'tool') {
+    if (override) throw new Error('单次调用的重跑沿用原工具和模型；如需换模型请直接调用 model_router_tool_run。')
+    return rerunToolRun(ctx, config, { run, confirmOverBudget, confirmWrite, workspace, root, signal, options })
+  }
+  if (support.kind === 'team-write' && target.ok) {
+    throw new Error('可编辑团队运行只能续跑失败或未完成的步骤：已成功步骤的改动已在原独立工作区中，重跑会重复套用。如需重做请重新调用 model_router_team_execute。')
+  }
+  if (support.writes && confirmWrite !== true) {
+    return { paused: true, needsConfirmation: ['workspace-write'], run,
+      budget: null, message: '续跑可编辑团队步骤会在新的独立 Git 工作树中套用之前的改动并修改文件，需要先确认。' }
   }
   const sameRoute = !override || (override.provider === target.recommendedProvider && override.model === target.recommendedModel)
   const budget = budgetFor(config, saved.runs, sameRoute ? target.estimatedCost : null)
@@ -680,8 +731,8 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     return { paused: true, budget: { ...budget, paused: true, message: `${budget.message} 已暂停重跑，请确认后再试。` }, run }
   }
   const cwd = text(workspace) || run.workspace
-  if (!cwd || !(await fileExists(cwd))) throw new Error('原运行的工作区不可用，无法重跑该步骤。')
-  if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options, config })
+  if (!cwd || !(await fileExists(cwd))) throw new Error(`原运行的工作区 ${cwd || '(未记录)'} 不可用，无法重跑该步骤；请恢复该目录，或在原工作区的会话中调用 model_router_rerun_step。`)
+  if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, root: text(root) || cwd, signal, options, config })
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const execution = await rerunAssignmentPackage({
     task: run.task,
@@ -744,7 +795,8 @@ function teamPlanFromRun(run, ids, override, targetId) {
  * Read-only team retry: the failed step plus downstream steps that had not
  * succeeded run through the same signed runner; earlier answers are context.
  */
-async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, signal, options, config = {} }) {
+async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, root, signal, options, config = {} }) {
+  const mode = run.executionMode === 'workspace-write' ? 'workspace-write' : 'read-only'
   const downstream = downstreamPackageIds(run.packages, target.id)
     .filter(id => !run.packages.find(item => item.id === id)?.ok)
   const ids = [target.id, ...downstream]
@@ -754,8 +806,10 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, 
     .map(item => ({ id: item.id, name: item.name, finalText: item.answer }))
   const runTeam = options.runTeam ?? runOfficialTeam
   const installed = Array.isArray(options.installedToolIds) ? options.installedToolIds : await installedToolIds()
-  const execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: cwd, mode: 'read-only',
-    installedIds: installed, cliModels, signal, sandbox: ctx.sandbox, previous, onlyIds: ids, ...(options.runtime ? { runtime: options.runtime } : {}) })
+  const execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: root ?? cwd, mode,
+    installedIds: installed, cliModels, signal, sandbox: ctx.sandbox, previous, onlyIds: ids,
+    ...(mode === 'workspace-write' ? { seedFrom: { workspace: run.isolatedWorkspace, baseCommit: run.baseCommit } } : {}),
+    ...(options.runtime ? { runtime: options.runtime } : {}) })
   const converted = teamExecutionResults(plan, execution)
   if (override) {
     const entry = converted.packages.find(item => item.id === target.id)
@@ -774,12 +828,44 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, 
       if (stored) stored.billingSwitch = note
     }
     current.status = execution?.status ?? current.status
+    if (mode === 'workspace-write' && execution?.workspace && execution.status !== 'blocked') {
+      current.isolatedWorkspace = String(execution.workspace)
+      if (typeof execution.baseCommit === 'string') current.baseCommit = execution.baseCommit
+      if (execution.integration) current.integration = { ignoredArtifacts: execution.integration.ignoredArtifacts ?? 0 }
+    }
     if (override) {
       const stored = current.packages.find(item => item.id === target.id)
       if (stored) { stored.recommendedProvider = override.provider; stored.recommendedModel = override.model }
     }
   })
   return { run: updated, execution: { ...converted, ranIds: ids, raw: execution }, budget }
+}
+
+/**
+ * Repeat a recorded model_router_tool_run call as a new run linked by
+ * `rerunOf`. An editable call starts from a fresh worktree of the current
+ * checkout (the earlier, failed attempt is left in its own worktree).
+ */
+async function rerunToolRun(ctx, config, { run, confirmOverBudget, confirmWrite, workspace, root, signal, options = {} }) {
+  if (run.packages?.[0]?.ok) throw new Error('该单次调用已成功；如需重做请直接再次调用 model_router_tool_run。')
+  const meta = run.toolRun ?? { toolId: run.packages?.[0]?.toolId, provider: null, model: null, cliModel: null }
+  const mode = run.executionMode === 'workspace-write' ? 'workspace-write' : 'read-only'
+  const planned = await (options.planToolRun ?? planToolRun)(ctx, config, {
+    tool: meta.toolId, task: run.task, mode, provider: meta.provider ?? undefined, model: meta.model ?? undefined, cliModel: meta.cliModel ?? undefined,
+  }, { signal })
+  if (planned.budget.exceeded && confirmOverBudget !== true) {
+    return { paused: true, run, budget: { ...planned.budget, paused: true, message: `${planned.budget.message} 已暂停重跑，请确认后再试。` } }
+  }
+  if (mode === 'workspace-write' && confirmWrite !== true) {
+    return { paused: true, needsConfirmation: ['workspace-write'], run, budget: planned.budget,
+      message: '重跑可编辑单次调用会在新的独立 Git 工作树中修改文件并整合回工作区，需要先确认。' }
+  }
+  const cwd = text(workspace) || run.workspace
+  if (!cwd || !(await fileExists(cwd))) throw new Error('原运行的工作区不可用，无法重跑；请在原工作区的会话中重试。')
+  const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root: text(root) || cwd, signal, rerunOf: run.id,
+    ...(options.runTask ? { runTask: options.runTask } : {}) })
+  const execution = { status: result.status, packages: recorded?.packages ?? [], ranIds: ['direct'], raw: result }
+  return { run: recorded ?? run, execution, budget: planned.budget, rerunOf: run.id, newRunId: recorded?.id ?? null }
 }
 
 /** Ledger record for model_router_team_execute; storage failures never fail the run. */
@@ -807,12 +893,63 @@ export async function recordTeamRun({ task, plan, execution, mode, workspace, ro
   try { await routerStateStore().appendRun(run); return run } catch { return null }
 }
 
+/**
+ * Validate a model_router_tool_run request and estimate it. The estimate uses
+ * the configured price of the named provider/model route; without a route (CLI
+ * default model) the cost is unknown and only already-exceeded budgets pause.
+ */
+export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
+  const toolId = text(args.tool)
+  const tool = getOfficialTool(toolId)
+  if (!tool) throw new Error(`未知的官方工具 ${toolId || '(空)'}；可用 ID 见 model_router_tools。`)
+  const taskText = text(args.task)
+  const problem = taskTextProblem(taskText)
+  if (problem) throw new Error(problem)
+  const mode = args.mode === 'workspace-write' ? 'workspace-write' : 'read-only'
+  let modelId = null
+  let route = null
+  let routes = []
+  if (text(args.provider) || text(args.model)) {
+    if (!text(args.provider) || !text(args.model)) throw new Error('provider 和 model 必须同时提供')
+    if (toolForProvider(args.provider)?.id !== toolId) throw new Error('所选模型供应商与官方 CLI 工具不匹配')
+    routes = configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, signal), config)
+    route = routes.find(item => item.provider === text(args.provider) && item.model === text(args.model)) ?? null
+    if (!route) throw new Error('所选 provider/model 不在官方模型目录中')
+    modelId = route.cliModel && toolId !== 'zcode'
+      ? route.cliModel
+      : toolId === 'claude-code' || toolId === 'codex' ? route.model : null
+  }
+  if (text(args.cliModel)) {
+    if (!route) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
+    if (toolId === 'zcode') throw new Error('ZCode 3.14.3 不支持在单次调用中指定 CLI 模型')
+    modelId = text(args.cliModel)
+  }
+  const estimate = route ? createPlanFromRoutes(taskText, routes, { mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost : null
+  const budget = budgetFor(config, (await savedState()).runs, Number.isFinite(estimate) ? estimate : null)
+  return { toolId, tool, taskText, mode, modelId, route, routes, estimate: Number.isFinite(estimate) ? estimate : null, budget,
+    provider: route?.provider ?? '', model: route?.model ?? '', cliModel: text(args.cliModel) || null }
+}
+
+/** Run a planned tool call and record it; `rerunOf` links a rerun to the original run. */
+async function runPlannedTool(ctx, config, planned, { cwd, root, signal, rerunOf = null, runTask = runOfficialTask }) {
+  const startedAt = Date.now()
+  const result = await runTask({ toolId: planned.toolId, task: planned.taskText, modelId: planned.modelId, workspace: cwd, allowedRoot: root ?? cwd,
+    mode: planned.mode, signal, sandbox: ctx.sandbox })
+  const recorded = result.status === 'unsupported' ? null : await recordToolRun({
+    toolId: planned.toolId, task: planned.taskText, provider: planned.provider, model: planned.model, cliModel: planned.cliModel,
+    mode: planned.mode, workspace: cwd, result, startedAt, routes: planned.routes, config,
+    estimatedCost: planned.estimate, budget: planned.budget, rerunOf,
+  })
+  return { result, recorded }
+}
+
 /** Ledger record for model_router_tool_run. */
-export async function recordToolRun({ toolId, task, provider, model, mode, workspace, result, routes = [], startedAt, config = {} }) {
+export async function recordToolRun({ toolId, task, provider, model, cliModel = null, mode, workspace, result, routes = [], startedAt, config = {}, estimatedCost = null, budget = null, rerunOf = null }) {
   const run = buildToolRunRecord({
     id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task, workspace,
-    toolId, toolLabel: getOfficialTool(toolId)?.label ?? toolId, provider, model, mode, result,
+    toolId, toolLabel: getOfficialTool(toolId)?.label ?? toolId, provider, model, cliModel, mode, result, estimatedCost, rerunOf,
     pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
+    budget: budget ? { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: false, confirmed: budget.exceeded ? true : undefined } : null,
   })
   if (result && result.status !== 'succeeded') {
     await annotateCliQuota(run, config, [{ id: 'direct', toolId, text: `${result.error ?? result.reason ?? ''}\n${result.outputTail ?? ''}` }])
@@ -867,10 +1004,10 @@ export async function securityBoundaries(ctx, config = {}) {
 function explicitRoute(args, routes) {
   const provider = text(args.provider)
   const model = text(args.model)
-  if (Boolean(provider) !== Boolean(model)) throw new Error('provider and model must be supplied together')
+  if (Boolean(provider) !== Boolean(model)) throw new Error('provider 和 model 必须同时提供。')
   if (!provider) return null
   const route = routes.find(item => item.provider === provider && item.model === model)
-  if (!route) throw new Error(`route ${provider}/${model} is not configured in DeepSeek Harness`)
+  if (!route) throw new Error(`路线 ${provider}/${model} 不在 Harness 模型目录中；可先调用 model_router_routes 查看可用路线。`)
   return route
 }
 
@@ -959,6 +1096,136 @@ function mayLaunchDirectCli(args = {}) {
   return report.tools.some(item => HEADLESS_CLI_IDS.has(item.id) && item.installed && healthCache.loginState(item.id)?.state !== 'logged-out')
 }
 
+const APPROVAL_TEXT = Object.freeze({
+  'workspace-write': sandbox => ({
+    reason: 'Official CLI models will use their normal tools in an isolated Git worktree and integrate their patch into the current workspace',
+    en: `Edit files: the official CLI model may use shell, skills, configured MCP and other normal tools in an isolated Git worktree, then its patch is applied to this workspace. ${sandbox ? 'Launches are wrapped by the Harness process sandbox.' : 'The Harness process sandbox is unavailable, so the launch will be refused.'}`,
+    zh: `修改文件：官方 CLI 模型会在独立 Git 工作树中使用终端、技能、已配置 MCP 等工具，并把改动补丁应用回当前工作区；可写范围为独立工作树及补丁涉及的源文件。${sandbox ? '启动由 Harness 进程沙箱包装（Windows ACL 后端为部分强制）。' : '当前没有 Harness 进程沙箱，启动会被拒绝。'}`,
+  }),
+  'rerun-write': () => ({
+    reason: 'Re-run an editable step on a fresh isolated Git worktree seeded with the earlier changes, then integrate the patch',
+    en: 'Edit files: the step is re-run in a fresh isolated Git worktree that first receives the earlier run\'s changes; on success the combined patch is applied to this workspace (it must be a clean Git repository at the same commit).',
+    zh: '修改文件：在新的独立 Git 工作树中先套用原运行的改动，再重跑该步骤及其下游；成功后把合并补丁应用回当前工作区（要求工作区干净且仍在原基线提交）。',
+  }),
+  'subscription-api': () => ({
+    reason: 'Retry a paused step on the API key after its subscription attempt failed (not a quota limit)',
+    en: 'Use the API key: the subscription attempt for this step failed for a reason other than quota; the retry is billed to the API account.',
+    zh: '改用 API Key 重试：该步骤的订阅调用失败（不是额度用尽或限流），重试会按 API 计费并计入预算。',
+  }),
+  'over-budget': () => ({
+    reason: 'Run although the configured daily or monthly model budget would be exceeded',
+    en: 'Over budget: this run exceeds the configured daily or monthly budget (estimated from configured prices).',
+    zh: '超出预算：本次执行会超出设置的每日或每月预算（按已配置单价估算）。',
+  }),
+  unsandboxed: () => ({
+    reason: 'An official CLI may be started directly, outside the Harness process sandbox, in read-only headless mode',
+    en: 'Unsandboxed CLI: the routed model may run its official CLI directly (claude -p / codex exec / gemini -p) without the Harness process sandbox; read-only is enforced only by the CLI flags.',
+    zh: '不经沙箱启动 CLI：分配的模型可能直接启动其官方 CLI（claude -p / codex exec / gemini -p），不经过 Harness 进程沙箱；只读仅由 CLI 自身参数保证（Codex 可读取当前用户可读的文件）。可在设置中关闭此确认。',
+  }),
+})
+
+/**
+ * Every reason one model-facing run needs the user's approval, in a fixed
+ * order: file edits, API-key billing, budget, unsandboxed CLI. Returned as
+ * codes so the workbench confirm panel and the approval prompt agree.
+ */
+export function approvalReasonCodes(name, args = {}, config = {}, { rerunRun = null } = {}) {
+  const codes = []
+  const runKinds = ['model_router_execute', 'model_router_rerun_step', 'model_router_team_execute', 'model_router_tool_run']
+  if (!runKinds.includes(name)) return codes
+  if ((name === 'model_router_tool_run' || name === 'model_router_team_execute') && args.mode === 'workspace-write') codes.push('workspace-write')
+  if (name === 'model_router_rerun_step' && rerunRun && rerunSupport(rerunRun).writes) codes.push(rerunRun.kind === 'tool' ? 'workspace-write' : 'rerun-write')
+  if (name === 'model_router_rerun_step' && args.subscriptionChoice === 'api') codes.push('subscription-api')
+  if (args.confirmOverBudget === true) codes.push('over-budget')
+  const directRun = name === 'model_router_execute' || (name === 'model_router_rerun_step' && (!rerunRun || rerunSupport(rerunRun).kind === 'assign'))
+  if (directRun && valueOf(config, 'confirmUnsandboxedCli', true) !== false && mayLaunchDirectCli(args)) codes.push('unsandboxed')
+  return codes
+}
+
+function approvalReasons(name, args, config, { sandboxAvailable = false, rerunRun = null } = {}) {
+  return approvalReasonCodes(name, args, config, { rerunRun }).map(code => ({ code, ...APPROVAL_TEXT[code](sandboxAvailable) }))
+}
+
+/** One approval prompt listing every reason, so the user is asked once. */
+export function combinedAsk(reasons) {
+  if (reasons.length === 1) {
+    const [only] = reasons
+    return { kind: 'ask', reason: only.reason, displayReason: { en: `${only.en} Allow?`, zh: `${only.zh} 允许执行吗？` }, reasons: reasons.map(item => item.code) }
+  }
+  return {
+    kind: 'ask',
+    reason: reasons.map(item => item.reason).join('; '),
+    displayReason: {
+      en: `This run needs your approval for ${reasons.length} reasons:\n${reasons.map((item, index) => `${index + 1}. ${item.en}`).join('\n')}\nAllow?`,
+      zh: `本次执行需要确认以下 ${reasons.length} 项：\n${reasons.map((item, index) => `${index + 1}. ${item.zh}`).join('\n')}\n全部允许并继续吗？`,
+    },
+    reasons: reasons.map(item => item.code),
+  }
+}
+
+/** Reasons in the workbench's shape: code plus the Chinese and English text. */
+export function confirmationReasons(codes, { sandboxAvailable = false } = {}) {
+  return codes.map(code => ({ code, zh: APPROVAL_TEXT[code](sandboxAvailable).zh, en: APPROVAL_TEXT[code](sandboxAvailable).en }))
+}
+
+/**
+ * The workspace for a run started from the workbench: the user-typed absolute
+ * directory, else the workspace of the latest recorded run. The run is
+ * read-only; the directory only scopes headless CLIs.
+ */
+export async function workbenchWorkspace(requested, runs = []) {
+  const chosen = text(requested) || text([...runs].reverse().find(run => text(run?.workspace))?.workspace)
+  if (!chosen) throw new Error('请填写工作区的绝对路径（例如项目根目录）；还没有可沿用的历史运行工作区。')
+  if (!isAbsolute(chosen)) throw new Error(`工作区必须是绝对路径：${chosen}`)
+  let info
+  try { info = await stat(chosen) } catch { throw new Error(`工作区不存在：${chosen}。请检查路径后重试。`) }
+  if (!info.isDirectory()) throw new Error(`工作区不是目录：${chosen}`)
+  return chosen
+}
+
+/** Plan preview for the workbench: decision, estimate, budget and what needs confirming. */
+export async function previewWorkbenchRun(ctx, config, request = {}, options = {}) {
+  const saved = await savedState()
+  const workspace = await workbenchWorkspace(request.workspace, saved.runs)
+  const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
+  const planned = await planAssignment(ctx, request.task, config, {
+    provider: request.provider, model: request.model, planMode: request.planMode, preset: request.preset,
+    budgetUsd: finiteNumber(request.budgetUsd, finiteNumber(configuredBudget, 0)), workspace, signal: options.signal, ...options.planOptions,
+  })
+  await hydrateHealth()
+  const codes = approvalReasonCodes('model_router_execute', { provider: request.provider, confirmOverBudget: Boolean(planned.budget.exceeded) }, config)
+  return {
+    workspace,
+    decision: decisionSummary(planned.plan),
+    selected: planned.plan.selected ?? null,
+    routingBypassed: planned.plan.routingBypassed === true,
+    estimatedCost: planned.plan.estimatedCost ?? null,
+    budget: planned.budget,
+    reasons: confirmationReasons(codes, { sandboxAvailable: typeof ctx.sandbox?.confine === 'function' }),
+    readOnly: true,
+  }
+}
+
+/** Execute from the workbench; refuses until every current reason is in confirmedReasons. */
+export async function startWorkbenchRun(ctx, config, request = {}, options = {}) {
+  const preview = await previewWorkbenchRun(ctx, config, request, options)
+  const confirmed = new Set(Array.isArray(request.confirmedReasons) ? request.confirmedReasons : [])
+  const missing = preview.reasons.filter(item => !confirmed.has(item.code))
+  if (missing.length) return { status: 'needs-confirmation', ...preview, reasons: preview.reasons, missing: missing.map(item => item.code) }
+  const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
+  const result = await (options.execute ?? executeConfiguredAssignment)(ctx, request.task, config, {
+    provider: request.provider, model: request.model, planMode: request.planMode, preset: request.preset,
+    budgetUsd: finiteNumber(request.budgetUsd, finiteNumber(configuredBudget, 0)),
+    confirmOverBudget: confirmed.has('over-budget'), workspace: preview.workspace, signal: options.signal, ...options.planOptions,
+  })
+  const awaiting = result.awaitingConfirmation ?? []
+  return {
+    status: result.paused ? 'paused-budget' : awaiting.length ? 'paused-subscription-failure' : result.execution?.status ?? 'unknown',
+    runId: result.runId ?? null, workspace: preview.workspace, budget: result.budget, decision: decisionSummary(result.plan),
+    ...(awaiting.length ? { awaitingConfirmation: awaiting } : {}),
+  }
+}
+
 /** Host operations behind the workbench RPC; the client never supplies commands or paths. */
 export function routerRemoteServices(ctx, config) {
   return {
@@ -972,10 +1239,12 @@ export function routerRemoteServices(ctx, config) {
     rate: request => rateRecordedResult(request),
     rerun: request => rerunRecordedStep(ctx, config, {
       runId: request?.runId, packageId: request?.packageId, provider: request?.provider, model: request?.model,
-      confirmOverBudget: request?.confirmOverBudget === true,
+      confirmOverBudget: request?.confirmOverBudget === true, confirmWrite: request?.confirmWrite === true,
       ...(request?.subscriptionChoice ? { subscriptionChoice: request.subscriptionChoice } : {}),
     }),
     boundaries: () => securityBoundaries(ctx, config),
+    previewRun: request => previewWorkbenchRun(ctx, config, request),
+    startRun: request => startWorkbenchRun(ctx, config, request),
   }
 }
 
@@ -1006,52 +1275,12 @@ export function apply(ctx, config = {}) {
         },
       }
     }
-    if ((exec.name === 'model_router_tool_run' || exec.name === 'model_router_team_execute')
-      && exec.arguments?.mode === 'workspace-write') {
-      const sandboxNote = typeof ctx.sandbox?.confine === 'function'
-        ? { en: 'Launches are wrapped by the Harness process sandbox.', zh: '启动由 Harness 进程沙箱包装（Windows ACL 后端为部分强制）。' }
-        : { en: 'The Harness process sandbox is unavailable, so the launch will be refused.', zh: '当前没有 Harness 进程沙箱，启动会被拒绝。' }
-      return {
-        kind: 'ask',
-        reason: 'Official CLI models will use their normal tools in an isolated Git worktree and integrate their patch into the current workspace',
-        displayReason: {
-          en: `Allow the official CLI model to use shell, skills, configured MCP and other normal tools in an isolated Git worktree, then apply its patch to this workspace? ${sandboxNote.en}`,
-          zh: `允许官方 CLI 模型在独立 Git 工作区使用终端、技能、已配置 MCP 等工具，并将改动补丁应用回当前工作区？可写范围：独立 Git 工作树及补丁涉及的源文件。${sandboxNote.zh}`,
-        },
-      }
+    let rerunRun = null
+    if (exec.name === 'model_router_rerun_step') {
+      try { rerunRun = (await savedState()).runs.find(item => item.id === text(exec.arguments?.runId)) ?? null } catch { rerunRun = null }
     }
-    if (exec.name === 'model_router_rerun_step' && exec.arguments?.subscriptionChoice === 'api') {
-      return {
-        kind: 'ask',
-        reason: 'Retry a paused step on the API key after its subscription attempt failed (not a quota limit)',
-        displayReason: {
-          en: 'The subscription attempt for this step failed for a reason other than quota. Retry it on the API key (billed to the API account)?',
-          zh: '该步骤的订阅调用失败（不是额度用尽或限流）。改用 API Key 重试吗？会按 API 计费并计入预算。',
-        },
-      }
-    }
-    if ((exec.name === 'model_router_execute' || exec.name === 'model_router_rerun_step' || exec.name === 'model_router_team_execute')
-      && exec.arguments?.confirmOverBudget === true) {
-      return {
-        kind: 'ask',
-        reason: 'Run although the configured daily or monthly model budget would be exceeded',
-        displayReason: {
-          en: 'This run exceeds the configured daily or monthly budget. Continue anyway?',
-          zh: '本次执行会超出设置的每日或每月预算（按已配置单价估算）。仍要继续吗？',
-        },
-      }
-    }
-    if ((exec.name === 'model_router_execute' || exec.name === 'model_router_rerun_step')
-      && valueOf(config, 'confirmUnsandboxedCli', true) !== false && mayLaunchDirectCli(exec.arguments)) {
-      return {
-        kind: 'ask',
-        reason: 'An official CLI may be started directly, outside the Harness process sandbox, in read-only headless mode',
-        displayReason: {
-          en: 'The routed model may run its official CLI directly (claude -p / codex exec / gemini -p) without the Harness process sandbox. It is started read-only, enforced only by the CLI flags. Allow?',
-          zh: '分配的模型可能直接启动其官方 CLI（claude -p / codex exec / gemini -p），不经过 Harness 进程沙箱；只读仅由 CLI 自身参数保证（Codex 可读取当前用户可读的文件）。允许执行？可在设置中关闭此确认。',
-        },
-      }
-    }
+    const reasons = approvalReasons(exec.name, exec.arguments ?? {}, config, { sandboxAvailable: typeof ctx.sandbox?.confine === 'function', rerunRun })
+    if (reasons.length) return combinedAsk(reasons)
     return decision
   })
   registerOfficialToolModels(ctx, config)
@@ -1090,7 +1319,7 @@ export function apply(ctx, config = {}) {
     output: JSON_OUTPUT,
     async execute(args, exec) {
       const routes = await discoverConfiguredRoutes(ctx, exec.signal)
-      if (routes.length === 0) throw new Error('no configured model routes are available')
+      if (routes.length === 0) throw new Error('Harness 模型目录中没有可用路线；请先在官方“模型”页添加模型。')
       const requested = explicitRoute(args, routes)
       const plan = requested ? null : await createRoutePlan(ctx, args.task, config, { signal: exec.signal })
       const route = requested ?? chooseConsultRoute(plan, routes, exec.agent)
@@ -1230,39 +1459,22 @@ function registerOfficialToolModels(ctx, config) {
       model: { type: 'string', description: 'Optional model ID from the Harness directory, paired with provider. This ID is advisory for CLIs except Claude/Codex.' },
       cliModel: { type: 'string', description: 'Optional model name already configured in this vendor CLI; requires provider and model. MiniMax/MiMo require provider/model format. ZCode 3.14.3 cannot switch models per call.' },
       mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default is read-only. Kimi, MiniMax and ZCode require workspace-write. Write mode requires official approval and a clean Git repository.' },
+      confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
       const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
-      const mode = args.mode === 'workspace-write' ? 'workspace-write' : 'read-only'
-      if (mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑 CLI 执行')
-      let modelId = null
-      if (text(args.provider) || text(args.model)) {
-        if (!text(args.provider) || !text(args.model)) throw new Error('provider 和 model 必须同时提供')
-        const tool = toolForProvider(args.provider)
-        if (tool?.id !== args.tool) throw new Error('所选模型供应商与官方 CLI 工具不匹配')
-        const routes = configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, exec.signal), config)
-        const route = routes.find(item => item.provider === args.provider && item.model === args.model)
-        if (!route) throw new Error('所选 provider/model 不在官方模型目录中')
-        modelId = route.cliModel && args.tool !== 'zcode'
-          ? route.cliModel
-          : args.tool === 'claude-code' || args.tool === 'codex' ? args.model : null
+      const planned = await planToolRun(ctx, config, args, { signal: exec.signal })
+      if (planned.mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑 CLI 执行')
+      if (planned.budget.exceeded && args.confirmOverBudget !== true) {
+        return jsonValue({ status: 'paused-budget', budget: { ...planned.budget, paused: true }, estimateUsd: planned.estimate,
+          notice: `${planned.budget.message} 已暂停，未启动 ${planned.tool.label}。请向用户说明后，以 confirmOverBudget: true 重新调用。` })
       }
-      if (text(args.cliModel)) {
-        if (!text(args.provider) || !text(args.model)) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
-        if (args.tool === 'zcode') throw new Error('ZCode 3.14.3 不支持在单次调用中指定 CLI 模型')
-        modelId = args.cliModel
-      }
-      const startedAt = Date.now()
-      const result = await runOfficialTask({ toolId: args.tool, task: args.task, modelId, workspace: cwd, allowedRoot: root, mode, signal: exec.signal, sandbox: ctx.sandbox })
-      const recorded = result.status === 'unsupported' ? null : await recordToolRun({
-        toolId: args.tool, task: args.task, provider: text(args.provider), model: text(args.model), mode, workspace: cwd, result, startedAt,
-        routes: text(args.provider) ? configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, exec.signal), config) : [],
-        config,
-      })
-      return jsonValue({ ...result, runId: recorded?.id ?? null,
-        ...(!modelId && text(args.model) ? { modelNotice: result.modelNotice
+      const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root, signal: exec.signal })
+      return jsonValue({ ...result, runId: recorded?.id ?? null, estimateUsd: planned.estimate, budget: planned.budget,
+        ...(!planned.modelId && planned.model ? { modelNotice: result.modelNotice
           ?? 'Harness 模型 ID 未经此厂商 CLI 验证；本次使用厂商 CLI 已配置的默认模型。' } : {}),
+        ...(planned.estimate === null ? { costNotice: '未指定带单价的 provider/model 路线，无法预估费用；仅在预算已用尽时暂停。' } : {}),
       })
     },
   }))
@@ -1323,7 +1535,7 @@ function registerOfficialToolModels(ctx, config) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_rerun_step',
-    description: 'Re-run one failed work package of a recorded model_router_execute run, or of a read-only model_router_team_execute run, without restarting finished packages; unfinished downstream packages follow. Editable team runs and model_router_tool_run calls cannot be re-run step by step. Supply provider and model to reassign the package to another configured route (if the user allows manual reassignment).',
+    description: 'Re-run one failed work package of a recorded model_router_execute or model_router_team_execute run without restarting finished packages; unfinished downstream packages follow. An editable (workspace-write) team run that stopped at a failed step continues in a fresh isolated Git worktree seeded with the earlier changes (needs approval, a clean repository at the same commit). A failed model_router_tool_run call (packageId "direct") is repeated as a new linked run. Supply provider and model to reassign a routed or team package to another configured route (if the user allows manual reassignment).',
     parameters: {
       runId: { type: 'string', required: true, description: 'runId returned by model_router_execute.' },
       packageId: { type: 'string', required: true, description: 'Work package id to re-run.' },
@@ -1334,15 +1546,19 @@ function registerOfficialToolModels(ctx, config) {
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
-      const { cwd } = await sessionWorkspace(ctx, exec)
+      const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
+      const stored = (await savedState()).runs.find(item => item.id === text(args.runId))
+      if (stored && rerunSupport(stored).writes && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能重跑可编辑的运行')
+      // The pre-execute hook already asked the user about file edits for editable reruns.
       const result = await rerunRecordedStep(ctx, config, {
         runId: args.runId, packageId: args.packageId, provider: args.provider, model: args.model,
-        confirmOverBudget: args.confirmOverBudget === true, workspace: cwd, signal: exec.signal,
+        confirmOverBudget: args.confirmOverBudget === true, confirmWrite: true, workspace: cwd, root, signal: exec.signal,
         ...(text(args.subscriptionChoice) ? { subscriptionChoice: text(args.subscriptionChoice) } : {}),
       })
       return jsonValue({
         ...(result.paused ? { status: 'paused-budget' } : result.cancelled ? { status: 'cancelled' } : result.awaitingConfirmation ? { status: 'paused-subscription-failure', awaitingConfirmation: result.awaitingConfirmation, notice: SUBSCRIPTION_PAUSE_NOTICE } : {}),
         budget: result.budget, execution: result.execution ?? null, runId: result.run?.id ?? args.runId,
+        ...(result.rerunOf ? { rerunOf: result.rerunOf, newRunId: result.newRunId } : {}),
       })
     },
   }))
@@ -1416,7 +1632,7 @@ function registerOfficialToolModels(ctx, config) {
       return jsonValue({ plan, execution, runId: recorded?.id ?? null,
         rerunNotice: mode === 'read-only'
           ? '失败的工作包可用 model_router_rerun_step 单步重跑（只重跑该步及其未完成的下游）。'
-          : '可编辑团队运行不支持单步重跑；如需重做请重新调用 model_router_team_execute。',
+          : '若在某个步骤失败而停止，可用 model_router_rerun_step 在新的独立工作树中套用之前的改动后续跑（需审批）；已整合或待人工整合的运行不能单步重跑。',
         modelNotice: '已配置 cliModel 的路线按工作包传给官方 CLI；Claude/Codex 在未配置映射时请求 Harness 模型 ID。其他厂商无映射时使用 CLI 默认模型。多数 CLI 尚不返回可核验的实际模型 ID，须以厂商运行记录核对。',
         billingNotice: 'budgetUsd 仅影响估算与路由，无法限制官方 CLI 账号实际费用。' })
     },

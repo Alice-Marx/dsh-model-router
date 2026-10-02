@@ -300,7 +300,7 @@ test('workbench RPC codecs accept only ids and paired routes', () => {
   assert.deepEqual(codec('rateResult').parse({ runId: 'r-1', packageId: 'p1', rating: 'up' }), { runId: 'r-1', packageId: 'p1', rating: 'up' })
   assert.throws(() => codec('rateResult').parse({ runId: 'r 1', packageId: 'p', rating: 'up' }))
   assert.throws(() => codec('rerunStep').parse({ runId: 'r', packageId: 'p', provider: 'openai' }))
-  assert.deepEqual(codec('rerunStep').parse({ runId: 'r', packageId: 'p', confirmOverBudget: 'yes' }), { runId: 'r', packageId: 'p', confirmOverBudget: false })
+  assert.deepEqual(codec('rerunStep').parse({ runId: 'r', packageId: 'p', confirmOverBudget: 'yes', confirmWrite: 1 }), { runId: 'r', packageId: 'p', confirmOverBudget: false, confirmWrite: false })
   assert.throws(() => codec('health').parse('true'))
 })
 

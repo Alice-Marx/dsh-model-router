@@ -230,9 +230,9 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
           <button className="mr-button mr-button-secondary mr-mini" type="button" aria-pressed={item.rating === 1} disabled={busy} onClick={() => onRate(run.id, item.id, item.rating === 1 ? 'clear' : 'up')}>👍 有用</button>
           <button className="mr-button mr-button-secondary mr-mini" type="button" aria-pressed={item.rating === -1} disabled={busy} onClick={() => onRate(run.id, item.id, item.rating === -1 ? 'clear' : 'down')}>👎 不好</button>
         </>}
-        {canRerun && <button className="mr-button mr-mini" type="button" onClick={() => onRerun(run.id, item.id, null)}>重跑此步</button>}
+        {canRerun && <button className="mr-button mr-mini" type="button" title={rerun.confirm || undefined} onClick={() => onRerun(run.id, item.id, null)}>{run.kind === 'tool' ? '重新执行此调用' : rerun.writes ? '在新工作区续跑' : '重跑此步'}</button>}
         {!rerun.supported && !item.ok && item.ran && <span className="mr-caption">{rerun.reason}</span>}
-        {rerun.supported && allowReassign && others.length > 0 && !busy && (
+        {rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && (
           <span className="mr-inline">
             <select className="mr-input mr-mini-select" aria-label="改派到" value={target} onChange={event => setTarget(event.target.value)}>
               <option value="">改派到…</option>
@@ -275,11 +275,12 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
     <section className="mr-card mr-results" aria-label="执行记录">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">执行记录与子任务</h2>
-        <p className="mr-card-copy">来自会话中的 model_router_execute、model_router_team_execute 和 model_router_tool_run。每个工作包显示分配的模型、原因、渠道、费用；回退时显示 CLI 原始错误。路由执行和只读团队执行中失败的步骤可单独重跑，不会重做已完成的步骤。</p>
+        <p className="mr-card-copy">来自会话中的 model_router_execute、model_router_team_execute 和 model_router_tool_run。每个工作包显示分配的模型、原因、渠道、费用；回退时显示 CLI 原始错误。失败的步骤可单独重跑，不会重做已完成的步骤；可编辑团队运行会在新的独立工作区先套用之前的改动再续跑，失败的单次调用会作为新运行重新执行，二者都需先确认。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={busy} onClick={onRefresh}>刷新</button></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
-        {runs.length === 0 && <p className="mr-empty">还没有执行记录。在官方会话中调用 model_router_execute、model_router_team_execute 或 model_router_tool_run 后，这里会显示决策和结果。</p>}
+        {!ledger && !error && <p className="mr-empty" role="status">正在读取执行记录…</p>}
+        {ledger && runs.length === 0 && <p className="mr-empty">还没有执行记录。可在上方“在工作台执行”中预览并执行，或在官方会话中调用 model_router_execute、model_router_team_execute、model_router_tool_run，这里会显示决策和结果。</p>}
         {runs.length > 0 && (
           <>
             <label className="mr-label" htmlFor="mr-run-select">选择记录</label>
@@ -296,6 +297,7 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
                 </div>
                 {runTotals(current).subscription && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：{formatUsd(runTotals(current).referenceUsd)}</p>}
                 {current.isolatedWorkspace && <p className="mr-caption">独立工作区：<code>{current.isolatedWorkspace}</code></p>}
+                {current.rerunOf && <p className="mr-caption">重新执行自运行 {current.rerunOf.slice(0, 8)}。</p>}
                 {current.decision?.reason && <p className="mr-caption">路由原因：{current.decision.reason}</p>}
                 <DagView packages={current.packages} renderNode={item => <RunNode run={current} item={item} routes={routes} allowReassign={ledger?.settings?.allowManualReassign !== false} busy={busy} onRate={onRate} onRerun={onRerun} />} />
               </div>
@@ -319,7 +321,7 @@ export function BillingCard({ billing, error, onRefresh, refreshing }) {
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
         {billing?.quotaPatternErrors?.length > 0 && <p className="mr-error" role="alert">额度识别规则有误，已忽略：{billing.quotaPatternErrors.join('；')}</p>}
-        {rows.length === 0 && !error && <p className="mr-empty">{billing ? '模型目录中没有路线。' : '正在读取…'}</p>}
+        {rows.length === 0 && !error && <p className="mr-empty" role={billing ? undefined : 'status'}>{billing ? '模型目录中没有路线；请先在官方“模型”页添加模型，再点“刷新”。' : '正在读取计费状态…'}</p>}
         {rows.length > 0 && (
           <div className="mr-table-wrap"><table className="mr-table">
             <thead><tr><th>供应商</th><th>计费方式</th><th>订阅</th><th>订阅状态 / 恢复时间</th><th>API Key 回退</th></tr></thead>
@@ -352,7 +354,7 @@ export function SecurityCard({ data, error, onRefresh }) {
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
         {data && !data.sandboxAvailable && <p className="mr-error">当前 Host 没有提供 Harness 进程沙箱：可编辑运行会被拒绝，只读的无界面 CLI 将直接启动。</p>}
-        {rows.length === 0 && !error && <p className="mr-empty">{data ? '模型目录中没有路线。' : '正在读取…'}</p>}
+        {rows.length === 0 && !error && <p className="mr-empty" role={data ? undefined : 'status'}>{data ? '模型目录中没有路线；请先在官方“模型”页添加模型，再点“刷新”。' : '正在读取安全边界…'}</p>}
         {rows.length > 0 && (
           <div className="mr-table-wrap"><table className="mr-table">
             <thead><tr><th>路线</th><th>只读运行可读</th><th>只读运行沙箱</th><th>可编辑运行</th></tr></thead>

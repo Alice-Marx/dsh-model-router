@@ -133,7 +133,7 @@ async function isolatedWorktree(workspace, signal, allowedRoot) {
   if (!added.ok) throw gitError('创建独立 Git 工作区', added)
   const runPath = await canonicalDirectory(target)
   if (!within(isolatedRoot, runPath) || runPath === isolatedRoot) throw new Error('独立工作区路径校验失败')
-  return { workspace: runPath, isolatedRoot, baseCommit }
+  return { workspace: runPath, isolatedRoot, baseCommit, source: workspace }
 }
 
 async function integrateWorktree(source, isolated, baseCommit, signal) {
@@ -261,13 +261,55 @@ export function executableTeamPackages(plan, installedIds = [], mode = 'read-onl
   return { assigned, blocking }
 }
 
+/** Remove a worktree this run created but could not use; failures are ignored. */
+async function removeWorktree(source, target) {
+  try { await git(['worktree', 'remove', '--force', target], { cwd: source }) } catch { /* left for manual cleanup */ }
+}
+
+/**
+ * Copy the changes of an earlier, never integrated worktree into a fresh one.
+ * Refuses when the original checkout moved since that run (the patch would be
+ * based on another commit) or when the earlier worktree is not one of ours.
+ */
+async function seedWorktree(isolated, seedFrom, signal) {
+  if (!/^[0-9a-f]{40,64}$/i.test(seedFrom.baseCommit)) throw new Error('原运行没有记录 Git 基线，无法在新工作区续跑。')
+  if (seedFrom.baseCommit !== isolated.baseCommit) {
+    throw new Error('原仓库 HEAD 已不是原运行的基线提交；无法安全套用之前的改动。请核对原独立工作区后重新执行整个团队任务。')
+  }
+  let prior
+  try { prior = await canonicalDirectory(seedFrom.workspace) }
+  catch { throw new Error('原运行的独立工作区已不存在，无法套用之前的改动；请重新执行整个团队任务。') }
+  // Only a worktree of this repository that the plugin created (run-<uuid>) is accepted.
+  const listed = await git(['worktree', 'list', '--porcelain'], { cwd: isolated.source, signal })
+  const worktrees = listed.ok ? listed.output.toString('utf8').split(/\r?\n/).filter(line => line.startsWith('worktree ')).map(line => line.slice(9)) : []
+  const known = await Promise.all(worktrees.map(path => canonicalDirectory(path).catch(() => null)))
+  if (!known.includes(prior) || !/^run-[0-9a-f-]{36}$/i.test(basename(prior)) || basename(dirname(dirname(prior))) !== '.model-router-workspaces' && basename(dirname(prior)) !== '.model-router-workspaces') {
+    throw new Error('原独立工作区不是本仓库由插件创建的 Git 工作树，拒绝读取。')
+  }
+  const staged = await git(['add', '-A'], { cwd: prior, signal })
+  if (!staged.ok) throw gitError('收集原独立工作区变更', staged)
+  const patch = await git(['diff', '--cached', '--binary', seedFrom.baseCommit], { cwd: prior, signal })
+  if (!patch.ok) throw gitError('生成原独立工作区补丁', patch)
+  const names = await git(['diff', '--cached', '--name-only', seedFrom.baseCommit], { cwd: prior, signal })
+  const files = names.ok ? names.output.toString('utf8').trim().split(/\r?\n/).filter(Boolean) : []
+  if (patch.output.length === 0) return { from: prior, files: [] }
+  const checked = await git(['apply', '--check', '--binary', '-'], { cwd: isolated.workspace, input: patch.output, signal })
+  if (!checked.ok) throw gitError('核对之前改动的补丁', checked)
+  const applied = await git(['apply', '--binary', '-'], { cwd: isolated.workspace, input: patch.output, signal })
+  if (!applied.ok) throw gitError('在新工作区套用之前的改动', applied)
+  return { from: prior, files }
+}
+
 /** Sequential execution preserves DAG dependencies and avoids edit conflicts. */
-export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null }) {
-  // A retry runs only `onlyIds`; earlier results feed dependency context. Only
-  // read-only retries are supported: a write retry would need the earlier
-  // isolated worktree, which is integrated or kept for manual review.
+export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null, seedFrom = null }) {
+  // A retry runs only `onlyIds`; earlier results feed dependency context. An
+  // editable retry needs `seedFrom` (the earlier, never integrated worktree and
+  // its base commit): a fresh worktree gets that worktree's changes first, so
+  // the retried steps continue from them and one patch is integrated at the end.
   const retry = Array.isArray(onlyIds)
-  if (retry && mode !== 'read-only') throw new TypeError('team retry supports read-only mode only')
+  if (retry && mode !== 'read-only' && !(seedFrom && typeof seedFrom.workspace === 'string' && typeof seedFrom.baseCommit === 'string')) {
+    throw new TypeError('an editable team retry needs the earlier isolated worktree (seedFrom)')
+  }
   const selected = executableTeamPackages(plan, installedIds, mode)
   const assigned = retry ? selected.assigned.filter(item => onlyIds.includes(item.id)) : selected.assigned
   const blocking = retry ? selected.blocking.filter(item => onlyIds.includes(item.id)) : selected.blocking
@@ -286,6 +328,14 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   if (unready.length > 0) return { status: 'blocked', blocking: unready.map(item => ({ toolId: item.id, reason: item.reason })), results: [] }
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
   const runWorkspace = isolated?.workspace ?? source
+  let seeded = null
+  if (isolated && retry) {
+    try { seeded = await seedWorktree(isolated, seedFrom, signal) }
+    catch (error) {
+      await removeWorktree(source, isolated.workspace)
+      return { status: 'blocked', blocking: [{ reason: String(error?.message ?? error) }], results: [] }
+    }
+  }
   const completed = []
   const context = retry ? (Array.isArray(previous) ? previous : []).filter(item => item?.id && typeof item.finalText === 'string') : []
   for (const item of assigned) {
@@ -320,19 +370,21 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       ...(Number.isFinite(result.reportedCostUsd) ? { reportedCostUsd: result.reportedCostUsd } : {}),
       error: modelMismatch ? '官方 CLI 实际模型与指定模型不一致。' : result.error ?? result.reason ?? null,
       outputTail: result.status === 'succeeded' ? null : result.stderrTail ?? result.stdoutTail ?? null })
-    if (packageStatus !== 'succeeded') return { status: 'incomplete', workspace: runWorkspace, results: completed }
+    if (packageStatus !== 'succeeded') return { status: 'incomplete', workspace: runWorkspace, results: completed,
+      ...(isolated ? { baseCommit: isolated.baseCommit } : {}), ...(seeded ? { seeded } : {}) }
   }
   if (!isolated) return { status: 'cli-completed', workspace: runWorkspace, results: completed,
     notice: '只读模式已收集各工作包结果；模型输出仍需人工验收。' }
   try {
     const integration = await integrateWorktree(source, runWorkspace, isolated.baseCommit, signal)
     return { status: integration.ignoredArtifacts > 0 ? 'integration-pending' : 'cli-completed',
-      workspace: runWorkspace, results: completed, integration,
+      workspace: runWorkspace, results: completed, integration, baseCommit: isolated.baseCommit, ...(seeded ? { seeded } : {}),
       notice: integration.ignoredArtifacts > 0
         ? '受 Git 管理的源文件已整合；忽略产物保留在独立工作区，仍需核对和补交。'
         : '各 CLI 进程成功结束且可用补丁已整合；文件内容仍需按任务要求验收。' }
   } catch (error) {
-    return { status: 'integration-pending', workspace: runWorkspace, results: completed,
+    return { status: 'integration-pending', workspace: runWorkspace, results: completed, baseCommit: isolated.baseCommit,
+      ...(seeded ? { seeded } : {}),
       error: String(error?.message ?? error), notice: '独立工作区已保留；原工作区未自动整合。' }
   }
 }
@@ -346,7 +398,7 @@ export async function runOfficialTask({ toolId, task, workspace, allowedRoot, mo
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
   const result = await runOfficialTool({ toolId, task, modelId, workspace: isolated?.workspace ?? source,
     mode, isolatedRoot: isolated?.isolatedRoot, signal, sandbox })
-  if (!isolated || result.status !== 'succeeded') return { ...result, ...(isolated ? { isolatedWorkspace: isolated.workspace } : {}) }
+  if (!isolated || result.status !== 'succeeded') return { ...result, ...(isolated ? { isolatedWorkspace: isolated.workspace, baseCommit: isolated.baseCommit } : {}) }
   try {
     const integration = await integrateWorktree(source, isolated.workspace, isolated.baseCommit, signal)
     return { ...result,

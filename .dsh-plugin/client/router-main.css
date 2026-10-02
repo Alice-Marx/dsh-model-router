@@ -162,3 +162,17 @@
   .mr-status-ok { background: #193b2b; color: #b4f1cc; }
   .mr-warn-text { color: #ffd38a; }
 }
+/* Keyboard focus: every interactive control shows a visible ring. */
+.mr-workspace button:focus-visible, .mr-workspace select:focus-visible, .mr-workspace input:focus-visible, .mr-workspace textarea:focus-visible, .mr-workspace summary:focus-visible, .mr-workspace a:focus-visible { outline: 2px solid var(--mr-accent); outline-offset: 2px; }
+.mr-segment button:disabled { cursor: not-allowed; opacity: .55; }
+.mr-launch-workspace { flex: 1 1 320px; min-width: min(100%, 260px); }
+.mr-launch-preview { margin-top: 16px; padding: 14px; border: 1px solid var(--mr-line); border-radius: 12px; background: #f9fbfe; }
+.mr-launch-packages { margin: 12px 0 0; padding-left: 20px; font-size: 12px; line-height: 1.7; }
+.mr-confirm-box { margin-top: 12px; padding: 10px 14px; border: 1px solid rgba(217, 140, 30, .35); border-radius: 10px; background: #fff8ec; color: #6d4a12; font-size: 12px; line-height: 1.6; }
+.mr-confirm-box .mr-section-title { margin: 0 0 6px; }
+.mr-confirm-box ol { margin: 0; padding-left: 20px; }
+.mr-break { overflow-wrap: anywhere; }
+@media (prefers-color-scheme: dark) {
+  .mr-launch-preview { background: rgba(255, 255, 255, .04); }
+  .mr-confirm-box { background: rgba(217, 140, 30, .12); color: #f2d39b; }
+}

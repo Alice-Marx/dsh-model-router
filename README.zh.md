@@ -108,7 +108,8 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 3. **写“任务描述”**：可以粘贴长提案，但最好把要交付的步骤写成编号条目，并写清验收标准。“单任务”只给单项路线建议；“团队分工”会把可执行需求拆成有依赖的工作包，最多六个显式执行包。“指定模型”不比较其他路线，整项任务都交给下拉框里选中的那一条。
 4. **设置预算并生成**：“本次估算预算（USD）”中的 `10` 只是本地估价目标，`0` 表示规划不设预算；两者都**不会限制真实账号扣费**。点**生成路由建议**后，继续向下滚过“逐模型价格与能力”，找到新增的**路由建议**卡片。按钮不会启动模型。
 5. **读结果**：先核对推荐 `provider/model`、复杂度、估算总成本、执行渠道与警告；团队模式再逐包核对目标、难度、依赖、建议模型、估价和验收项。`官方 CLI` 说明本机相应入口可托管；`模型目录 API` 说明可通过 Harness 模型目录调用，但不等于这个包能由插件的 CLI 团队执行器运行。修改任务、预算或档案后重新生成。
-6. **需要实际工作时另开官方会话**：在左侧点**新会话**并选好工作区。要按工作台结果执行，请求 `model_router_execute`；若只要某一个模型，同时给出该路线的 `provider` 和 `model`。`model_router_consult` 只做模型目录咨询。`model_router_tool_run` 与 `model_router_team_execute` 仍负责已核验 CLI 的可编辑任务。团队执行会按照**当前已就绪且支持所选模式的官方 CLI**重新规划，可能与页面上刚才的静态建议不同；它不会直接读取那张结果卡作为执行清单。
+6. **只读任务可以直接在工作台执行**：路由建议下方的“**在工作台执行**”卡片沿用上面的任务描述和规划模式（单任务 / 团队分工 / 指定模型），可另选路由方案，并填写工作区绝对路径（留空则沿用上次运行的工作区，路径必须存在）。点**预览执行计划**后，宿主按 `model_router_execute` 的同一套逻辑生成计划（含超预算自动降级），显示预估费用、预算检查，以及**所有需要确认的原因**（超出预算、不经沙箱启动 CLI）合并在一处。按**全部确认并执行**之前不会调用任何模型；宿主执行前会再核对一次原因，期间有变化（例如预算或登录状态）会拒绝并要求重新确认。结果写入下方执行记录。
+7. **可编辑任务另开官方会话**：在左侧点**新会话**并选好工作区。要按工作台结果执行，请求 `model_router_execute`；若只要某一个模型，同时给出该路线的 `provider` 和 `model`。`model_router_consult` 只做模型目录咨询。`model_router_tool_run` 与 `model_router_team_execute` 仍负责已核验 CLI 的可编辑任务。团队执行会按照**当前已就绪且支持所选模式的官方 CLI**重新规划，可能与页面上刚才的静态建议不同；它不会直接读取那张结果卡作为执行清单。
 
 例如，要先给一个三分钟科幻短片做**前期规划**，可以在任务描述中输入：
 
@@ -129,15 +130,29 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 
 工作台顶部按下面顺序展示这些能力。会话内对应的工具在括号里。
 
-1. **开箱体检**（`model_router_health`）。第一次打开工作台时，会对注册表里的每个官方工具检查三件事：是否安装、版本是否等于本版固定版本、是否已登录。登录检查只跑很便宜的状态命令，每条超时都很短：Claude 用 `claude auth status --json`，Codex 用 `codex login status`。Gemini 根据 `GEMINI_API_KEY`/`GOOGLE_API_KEY` 或 `~/.gemini/oauth_creds.json` 推断。其他工具暂时显示“登录状态未知”。体检不会发起登录。
+1. **开箱体检**（`model_router_health`）。第一次打开工作台时，会对注册表里的每个官方工具检查三件事：是否安装、版本是否等于本版固定版本、是否已登录。登录检查只跑很便宜的状态命令（超时很短），或只检查凭据文件是否存在（从不读取内容）：
+
+   | 工具 | 检测方式 | 登录方法 |
+   | --- | --- | --- |
+   | Claude Code | `claude auth status --json` | `claude auth login` |
+   | Codex | `codex login status` | `codex login` |
+   | Gemini CLI | `GEMINI_API_KEY`/`GOOGLE_API_KEY` 或 `~/.gemini/oauth_creds.json` | `gemini` |
+   | Kimi Code | `KIMI_API_KEY`/`MOONSHOT_API_KEY`，或 `~/.kimi-code/credentials/kimi-code.json`（`$KIMI_CODE_HOME`） | `kimi login` |
+   | MiMo Code | `MIMO_API_KEY`，或 `~/.local/share/mimocode/auth.json`（`$XDG_DATA_HOME`；该文件也可能只存了供应商 API Key，计费方式记为未知） | `mimo auth login` |
+   | Grok Build | `XAI_API_KEY`，或 `~/.grok/auth.json`（`$GROK_HOME`） | `grok login`（无浏览器时加 `--device-auth`） |
+   | MiniMax Code | 仅 `MINIMAX_API_KEY`；没有状态命令，凭据可能在系统钥匙串 → 未知 | `mcode login` |
+   | ZCode | 桌面应用，没有状态命令 → 未知 | 欢迎页选“连接 BigModel / Z.ai 继续使用”；GLM Coding Plan 在“模型设置 → BigModel”右上角选“编程套餐” |
+
+   文件路径取自官方发布包（kimi-code 2.1.1、mimocode 0.1.15、grok 1.0.41）。找不到文件时显示“未知”而不是“未登录”，因为这些 CLI 也可以通过自定义供应商或（MiMo）免费匿名通道使用。体检不会发起登录。
    - 未安装的工具点**一键安装**，复用原有的固定注册表安装器。
    - 未登录的工具点**去登录**，查看并复制登录命令。
    - 体检结果缓存 10 分钟。路由会**立刻跳过未登录的 CLI**，直接走模型目录 API；以前 Codex 要等约 14 秒才失败回退。配置了对应 API Key 时不跳过。如果执行中 CLI 报出登录错误，也会把该工具标为未登录；但因为你本来在用它的订阅，之后同一路线的步骤会**暂停询问**（“订阅登录已失效……未自动改用 API Key”），不会悄悄改用 API Key，重启后依然如此（记录在 `state.json` 的 `authFailures`），直到该 CLI 再次以订阅成功运行。模型档案明确写了 `billing: "subscription-first"` 或 `"subscription-only"` 而 CLI 未登录时同样暂停询问。没有这两种迹象的未登录 CLI，以及未安装的 CLI，仍直接走 API。点“重新体检”可以刷新。
 2. **路由决策看得见**。路由建议会显示推荐模型、路由方案、难度分和估算成本，以及执行渠道（官方 CLI 还是模型目录 API；未登录时标“CLI 未登录”）。执行记录里每一步都写明实际渠道。如果回退到 API，会显示脱敏后的真实错误：Claude JSON 的 `result`、Codex 的 `turn.failed.error.message`，或 stderr 片段。设置允许时可以**改派并重跑**到另一条已配置路线（`allowManualReassign`，默认开启）。
 3. **成本控制**。“成本控制”卡片显示今日和本月已花费金额及进度条，并可设置**每日/每月预算**（USD，`0` 表示不限）。
    - 执行前，用本次预估金额检查预算。
-   - 执行后，记录实际费用：优先用 CLI 回报的费用（Claude 的 `total_cost_usd`），否则用 token 用量乘以“模型价格与能力配置”里的单价。没有单价时只记录 token 数。
-   - 超出预算时的处理由 `overBudgetAction` 决定：`downgrade`（默认）先改用“省钱优先”重新规划，仍超出就暂停；`pause` 直接暂停，询问你是否继续。会话里继续需要传 `confirmOverBudget=true`，宿主会再弹出一次审批。
+   - `model_router_tool_run` 指定了 `provider`/`model` 路线时同样先预估、检查预算（未指定路线时 CLI 默认模型没有单价，只在预算已用完时暂停）；超预算返回 `paused-budget`，确认后以 `confirmOverBudget: true` 重新调用。
+   - 执行后，记录实际费用：优先用 CLI 回报的费用（Claude 的 `total_cost_usd`；Grok 在服务端回报完整费用时的 `total_cost_usd`；MiMo 每步的 `cost`），否则用 token 用量乘以“模型价格与能力配置”里的单价。token 用量来自 Claude、Codex、Gemini、Grok（`end` 事件）、MiMo（`step-finish`）和 MiniMax（`exec.result.usage`）；Kimi 与 ZCode 的无界面输出不含用量。没有单价时只记录 token 数。
+   - 超出预算时的处理由 `overBudgetAction` 决定：`downgrade`（默认）先改用“省钱优先”重新规划，仍超出就暂停；`pause` 直接暂停，询问你是否继续。会话里继续需要传 `confirmOverBudget=true`，宿主会再弹出一次审批。同一次执行需要多项确认时（修改文件、改用 API Key、超出预算、不经沙箱启动 CLI），会合并到**同一个**审批提示里逐条列出。
    - **只有走 API 计费的花费计入预算**：模型目录 API 调用，或官方 CLI 使用 API Key（插件注入的、环境变量里的，或体检发现 CLI 本身用 API Key 登录）的调用。
    - 官方 CLI 用**订阅账号登录**、没有 API Key 时（例如 Claude Pro/Max、ChatGPT 登录的 Codex），CLI 回报的金额或按单价折算的金额只显示为“**订阅参考费用（按 API 价折算）**”，**不计入**每日/每月预算。成本卡片和执行记录会同时显示“计入预算”的金额和订阅参考费用。工具卡片会标出各 CLI 是“订阅账号登录”还是“API Key 计费”。
    - 判断不了登录方式时（例如 Kimi 等没有状态命令的 CLI、团队执行器启动的 CLI），只要没有检测到对应的 API Key 环境变量，就按订阅登录处理。
@@ -145,8 +160,8 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 4. **预设方案**（`routingPreset`）。可选**省钱优先 / 均衡 / 效果优先**，默认是均衡。方案会调整质量、成本和速度三者的权重，并把替代模型必须达到的质量门槛下调或上调 0.04。均衡和以前的算法完全相同。
 5. **子任务可视化**（`model_router_rerun_step`）。团队分工的工作包按依赖关系分列，显示成依赖图（DAG）。`model_router_execute`、`model_router_team_execute` 和 `model_router_tool_run` 的每次执行都会写入执行记录，并标明类型（路由执行 / 团队执行 / 单工具调用）。每一步都标有状态：完成、已回退、失败或依赖未完成；团队执行在某一步失败后停止，后面的步骤显示为“依赖未完成”。点**重跑此步**只重跑失败的那一步，以及依赖它的未完成步骤，已完成的步骤保留原结果，并作为重跑的依赖上下文。
    - 路由执行：都可以单步重跑，也可以改派。
-   - 团队执行：**只读**团队运行可以单步重跑（同样经过签名执行器和 Harness 沙箱）。**可编辑**（`workspace-write`）团队运行不支持单步重跑，因为之前的改动在独立 Git 工作树中，已整合或保留待人工核对；请重新调用 `model_router_team_execute`。目前签名执行器只在 Windows 上支持 Claude/Codex 只读运行，Linux/macOS 上的团队执行只能用 Kimi/MiniMax 的可编辑模式，因此在这两个平台上实际上不能单步重跑团队执行。
-   - 单工具调用：只有一步，不提供单步重跑，直接再调用一次 `model_router_tool_run` 即可。
+   - 团队执行：**只读**团队运行可以单步重跑（同样经过签名执行器和 Harness 沙箱）。**可编辑**（`workspace-write`）团队运行如果是**在某一步失败后停止**的，可以点“**在新工作区续跑**”：从当前仓库新建一个独立工作树，先套用原工作树里之前步骤的改动，再运行失败步骤及其未完成的下游，成功后照常整合合并补丁。需要审批、工作区干净且仍停在原运行的基线提交（否则拒绝），并且记录来自本版本（记录了基线提交）。已经整合或待人工整合的运行不能单步重跑；可编辑运行中已成功的步骤也不能改派（改动会被套用两次）。
+   - 单工具调用：失败的 `model_router_tool_run` 可以点“**重新执行此调用**”（packageId 为 `direct`），沿用原工具、任务、模式和模型，记录为通过 `rerunOf` 关联的新运行；可编辑调用会从当前仓库的新工作树重新开始，同样需要审批。
 6. **安全边界**。“安全边界”卡片和插件设置页会逐条列出每条路线可读、可写的范围，以及是否经过 Harness 沙箱：
    - 只读执行不写文件；
    - 修改文件的执行在独立 Git 工作树里进行，需要宿主审批；
@@ -160,13 +175,13 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 
 这个文件只在本机，不会上传，也不包含 API Key。如果任务里有敏感内容，请留意这个文件；需要清除时直接删除它，或删掉其中的 `runs` 数组。
 
-多个宿主进程可以共用同一个 DSH 目录：每次写入都会先获取 `state.json.lock`，重新读取文件、合并本次改动，再原子替换，并发执行不会丢记录。文件无法解析时会保留为 `state.json.corrupt-<时间>`，工作台和 `model_router_health`（`notices`）在 7 天内显示提醒；需要时可从备份中恢复历史。
+多个宿主进程可以共用同一个 DSH 目录：每次写入都会先获取 `state.json.lock`，重新读取文件、合并本次改动，再原子替换，并发执行不会丢记录。其他进程写入的订阅额度标记和运行时登录失效（包括清除）会在下一次调用时生效，无需重启（文件的 mtime/大小/inode 变化时才重新读取）。文件无法解析时会保留为 `state.json.corrupt-<时间>`，工作台和 `model_router_health`（`notices`）在 7 天内显示提醒；需要时可从备份中恢复历史。
 
 **当前限制**：
-- 团队执行和单工具调用的 token 用量只来自 Claude/Codex 的输出；其他 CLI 显示“费用未知”或“订阅登录，未回报可折算的用量”。`model_router_tool_run` 没有执行前费用预估，也不检查预算；`model_router_team_execute` 在执行前检查预算。
-- 工作台还不能直接发起新的执行，任务仍要在会话中开始；重跑和评价可以在工作台里完成。
-- Kimi、MiniMax、MiMo、Grok、ZCode 还没有可靠的登录状态命令，显示的登录命令仅供参考。
-- 这些界面只通过了构建检查和单元测试，还没有在真实 Harness 桌面里验证。
+- Kimi 与 ZCode 的无界面输出不含 token 用量，相应步骤显示“订阅登录，未回报可折算的用量”或“费用未知”。
+- MiniMax 与 ZCode 的登录状态仍为“未知”（没有状态命令或可检查的凭据文件）；Kimi/MiMo/Grok 的检测只说明凭据文件存在，不代表仍然有效。
+- 工作台只能发起**只读**执行；可编辑任务仍需在会话中用 `model_router_tool_run` 或 `model_router_team_execute` 开始。
+- 这些界面通过了构建检查、单元测试，以及用真实客户端包 + 模拟宿主桥接的无头浏览器检查，还没有在真实 Harness 桌面里验证。
 
 ## 订阅优先：额度用尽才切换 API Key
 

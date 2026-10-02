@@ -5,7 +5,8 @@ import { toolInstallAction } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
-import { planBudget, unwrapRemote } from './insights-state.mjs'
+import { planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
+import { RunLauncher } from './run-launcher.jsx'
 import stylesheet from './router-main.css'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
@@ -354,23 +355,25 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   const rerun = async (runId, packageId, override, choice = null) => {
     const run = ledger.value?.runs?.find(item => item.id === runId)
     const item = run?.packages?.find(entry => entry.id === packageId)
-    const provider = override?.provider ?? item?.provider
-    const tool = toolForProvider(provider)
-    const healthEntry = health.report?.tools?.find(entry => entry.id === tool?.id)
-    // Team retries go through the signed runner inside the Harness sandbox.
-    if (choice !== 'api' && choice !== 'cancel' && run?.kind !== 'team' && ledger.value?.settings?.confirmUnsandboxedCli !== false && tool && HEADLESS_TOOLS.has(tool.id) && healthEntry?.installed && healthEntry.login?.state !== 'logged-out'
-      && !window.confirm(`重跑会直接启动 ${tool.label} 的无界面 CLI，不经过 Harness 进程沙箱，只读仅由 CLI 参数保证。继续吗？`)) return
+    // One prompt lists every reason (file edits, unsandboxed CLI, budget); the Host re-checks all of them.
+    const reasons = rerunConfirmations({ run, item, override, choice, ledger: ledger.value, health: health.report, toolFor: toolForProvider, headlessIds: HEADLESS_TOOLS })
+    if (reasons.length && !window.confirm(reasons.length === 1
+      ? `${reasons[0].text}\n继续吗？`
+      : `重跑前需要确认以下 ${reasons.length} 项：\n${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join('\n')}\n全部确认并继续吗？`)) return
+    const codes = new Set(reasons.map(entry => entry.code))
     setBusy(true)
     try {
-      const request = { runId, packageId, ...(override ? { provider: override.provider, model: override.model } : {}), ...(choice ? { subscriptionChoice: choice } : {}) }
+      const request = { runId, packageId, ...(override ? { provider: override.provider, model: override.model } : {}), ...(choice ? { subscriptionChoice: choice } : {}),
+        ...(codes.has('over-budget') ? { confirmOverBudget: true } : {}), ...(codes.has('workspace-write') ? { confirmWrite: true } : {}) }
       let result = await call(() => rerunStep(request), '重跑失败。')
-      if (result?.paused) {
+      if (result?.paused && result.budget?.exceeded && !request.confirmOverBudget) {
+        // The local estimate missed it (for example a reassigned route): ask once more for the budget only.
         if (!window.confirm(`${result.budget?.message ?? '本次重跑会超出预算。'}\n仍要继续吗？`)) return
         result = await call(() => rerunStep({ ...request, confirmOverBudget: true }), '重跑失败。')
       }
       await refreshLedger()
     } catch (error) {
-      if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '重跑失败。' }))
+      if (mounted.current) setLedger(previous => ({ ...previous, error: `${text(error?.message) || '重跑失败。'} 可以修正后再点“重跑此步”，或在官方会话中调用 model_router_rerun_step。` }))
     } finally {
       if (mounted.current) setBusy(false)
     }
@@ -383,7 +386,7 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun }
 }
 
-export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')
@@ -502,7 +505,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
         <div className="mr-grid">
           <section className="mr-card" aria-label="任务规划">
-            <div className="mr-card-head"><div><h2 className="mr-card-title">任务规划</h2><p className="mr-card-copy">规划在本机完成，不会启动模型或团队任务。</p></div></div>
+            <div className="mr-card-head"><div><h2 className="mr-card-title">任务规划</h2><p className="mr-card-copy">“生成路由建议”在本机完成，不会启动模型；要实际执行，请在下方“在工作台执行”中预览并确认。</p></div></div>
             <div className="mr-card-body">
               <label className="mr-label" htmlFor="mr-task">任务描述</label>
               <textarea className="mr-textarea" id="mr-task" value={task} onChange={event => { setTask(event.target.value); invalidatePlan() }} placeholder="例如：分析项目架构，分工修复关键问题，并给出验收清单" />
@@ -529,7 +532,12 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
         <ModelProfileEditor routes={routes} settingsScope={settingsScope} onSaved={invalidatePlan} />
         {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} />}
-        <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.value ? workbench.ledger.error : ''}
+        <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun}
+          directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}
+          defaultPreset={settingsScope.getSnapshot().value?.routingPreset ?? 'balanced'}
+          disabledReason={catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '模型目录读取失败，请在“模型目录”卡片点“刷新”。' : routes.length === 0 ? '请先在官方“模型”页配置至少一条模型路线。' : ''}
+          onStarted={() => { void workbench.refreshLedger() }} />
+        <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.error}
           onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating) => { void workbench.rate(runId, packageId, rating) }}
           onRerun={(runId, packageId, override, choice) => { void workbench.rerun(runId, packageId, override, choice) }} />
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes}
@@ -537,7 +545,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         <BillingCard billing={workbench.health.report?.billing ?? null} error={workbench.health.report ? '' : workbench.health.error}
           refreshing={workbench.health.refreshing} onRefresh={() => { void workbench.refreshHealth(true) }} />
         <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />
-        <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
+        <div className="mr-notice">只读任务可在上方“在工作台执行”中直接预览并执行；在官方会话中可使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
       </div>
     </main>
   )

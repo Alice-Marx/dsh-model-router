@@ -310,18 +310,19 @@ export function buildTeamRunRecord({ plan, execution, mode = 'read-only', ...res
   record.mode = 'team'
   if (execution?.workspace && execution.workspace !== rest.workspace) record.isolatedWorkspace = String(execution.workspace)
   if (execution?.integration) record.integration = { ignoredArtifacts: execution.integration.ignoredArtifacts ?? 0 }
+  if (typeof execution?.baseCommit === 'string') record.baseCommit = execution.baseCommit
   return record
 }
 
 /** A ledger record for model_router_tool_run (one package, one CLI). */
-export function buildToolRunRecord({ toolId, toolLabel, provider, model, mode = 'read-only', result, ...rest }) {
+export function buildToolRunRecord({ toolId, toolLabel, provider, model, cliModel = null, mode = 'read-only', result, estimatedCost = null, rerunOf = null, ...rest }) {
   const packageId = 'direct'
   const plan = {
     mode: 'single', routingBypassed: true,
     directRoute: { provider: provider || toolId, model: model || result?.requestedModel || '默认模型' },
     selected: provider && model ? { provider, model } : null,
     reason: `直接调用 ${toolLabel ?? toolId}，未经过路由。`,
-    complexity: null, estimatedCost: null, executionChannel: 'official-cli',
+    complexity: null, estimatedCost: finite(estimatedCost) ? estimatedCost : null, executionChannel: 'official-cli',
   }
   const succeeded = result?.status === 'succeeded'
   const execution = {
@@ -339,5 +340,9 @@ export function buildToolRunRecord({ toolId, toolLabel, provider, model, mode = 
   }
   const record = buildRunRecord({ ...rest, plan, execution, kind: 'tool', executionMode: mode })
   record.packages[0].name = `${toolLabel ?? toolId} 单次调用`
+  // What a rerun needs to repeat this call exactly (no credentials).
+  record.toolRun = { toolId, provider: provider || null, model: model || null, cliModel: cliModel || null }
+  if (rerunOf) record.rerunOf = String(rerunOf)
+  if (typeof result?.isolatedWorkspace === 'string') record.isolatedWorkspace = result.isolatedWorkspace
   return record
 }
