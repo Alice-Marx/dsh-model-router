@@ -49,6 +49,7 @@
     ".dsh-plugin/shared/official-tools-runtime.mjs",
     ".dsh-plugin/shared/official-tools-remote.mjs",
     ".dsh-plugin/shared/official-tool-executor.mjs",
+    ".dsh-plugin/shared/task-executors.mjs",
     ".dsh-plugin/shared/vendor-minimax-adapter.mjs",
     ".dsh-plugin/shared/vendor-mimo-grok-adapter.mjs",
     ".dsh-plugin/shared/zcode-bundle.mjs",
@@ -69,7 +70,7 @@
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs --check",
-    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs",
+    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs tests/task-executors.test.mjs",
     "prepack": "node scripts/prepack.mjs",
     "pack:local": "npm pack --pack-destination dist"
   },

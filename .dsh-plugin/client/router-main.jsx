@@ -91,6 +91,7 @@ function PlanResults({ plan }) {
               ))}
           </>
         )}
+        {plan.routingBypassed && <p className="mr-caption">已指定单一模型，未与其他路线比较。在官方会话中调用 <code>model_router_execute</code> 并传入该 provider 与 model 即可直接执行；若该模型允许官方工具，会优先使用对应 CLI。</p>}
         {plan.mode === 'team' && <p className="mr-caption">{plan.team.handoff}</p>}
         <div className="mr-notice">{plan.pricingNotice} {plan.qualityNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</div>
       </div>
@@ -247,7 +248,9 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
                   <div className="mr-route-name" title={tool.purpose}>{tool.label}</div>
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
                   <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{tool.version ? ` · 目标 ${tool.version}` : ''}</div>
-                  {probe?.installed && <p className="mr-caption mr-tool-detail">{readiness?.ready
+                  {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.headlessAdapter
+                    ? '已可由 model_router_execute 以无界面方式调用。命令缺失或失败时回退模型目录 API。签名沙箱入口不启动此 CLI。'
+                    : readiness?.ready
                     ? `官方执行入口已核验，可在会话中调用 model_router_tool_run；${capability?.modes?.includes('read-only') ? '支持只读和经审批的可编辑任务' : '仅支持经审批的可编辑隔离工作区任务'}，账号及模型仍需实测。`
                     : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || '执行入口尚未核验。'}`}</p>}
                   {command
@@ -286,6 +289,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')
   const [mode, setMode] = React.useState('single')
+  const [directKey, setDirectKey] = React.useState('')
   const [budget, setBudget] = React.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0))
   const [query, setQuery] = React.useState('')
   const [plan, setPlan] = React.useState(null)
@@ -355,8 +359,11 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
       if (routes.length === 0) throw new Error('请先在官方“模型”页配置至少一条模型路线。')
       const parsedBudget = Number(budget)
       if (!Number.isFinite(parsedBudget) || parsedBudget < 0) throw new Error('预算必须是不小于 0 的数字。')
+      const direct = mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] : null
+      if (mode === 'direct' && !direct) throw new Error('请选择要直接使用的模型。')
       setPlan(createWorkspacePlan(task, catalogState.catalog, {
         mode,
+        ...(direct ? { directProvider: direct.provider, directModel: direct.model } : {}),
         budgetUsd: parsedBudget,
         modelProfilesJson: settingsScope.getSnapshot().value?.modelProfilesJson ?? '[]',
         installedToolIds: (toolProbes?.probes ?? []).filter(probe => probe.installed).map(probe => probe.id),
@@ -388,7 +395,8 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
               <label className="mr-label" htmlFor="mr-task">任务描述</label>
               <textarea className="mr-textarea" id="mr-task" value={task} onChange={event => { setTask(event.target.value); invalidatePlan() }} placeholder="例如：分析项目架构，分工修复关键问题，并给出验收清单" />
               <div className="mr-controls">
-                <div className="mr-control-group"><span className="mr-control-label">规划模式</span><div className="mr-segment" role="group" aria-label="规划模式"><button type="button" aria-pressed={mode === 'single'} onClick={() => { setMode('single'); invalidatePlan() }}>单任务</button><button type="button" aria-pressed={mode === 'team'} onClick={() => { setMode('team'); invalidatePlan() }}>团队分工</button></div></div>
+                <div className="mr-control-group"><span className="mr-control-label">规划模式</span><div className="mr-segment" role="group" aria-label="规划模式"><button type="button" aria-pressed={mode === 'single'} onClick={() => { setMode('single'); invalidatePlan() }}>单任务</button><button type="button" aria-pressed={mode === 'team'} onClick={() => { setMode('team'); invalidatePlan() }}>团队分工</button><button type="button" aria-pressed={mode === 'direct'} onClick={() => { setMode('direct'); invalidatePlan() }}>指定模型</button></div></div>
+                {mode === 'direct' && <div className="mr-control-group mr-direct"><label className="mr-control-label" htmlFor="mr-direct-model">直接使用</label><select className="mr-input" id="mr-direct-model" value={directKey || (routes[0] ? `${routes[0].provider}/${routes[0].model}` : '')} onChange={event => { setDirectKey(event.target.value); invalidatePlan() }}>{routes.map(route => <option key={`${route.provider}/${route.model}`} value={`${route.provider}/${route.model}`}>{route.provider}/{route.model}</option>)}</select></div>}
                 <div className="mr-control-group mr-budget"><label className="mr-control-label" htmlFor="mr-budget">本次估算预算（USD）</label><input className="mr-input" id="mr-budget" type="number" min="0" step="0.01" value={budget} onChange={event => { budgetEdited.current = true; budgetValue.current = event.target.value; setBudget(event.target.value); invalidatePlan() }} /></div>
               </div>
               <div className="mr-actions"><button className="mr-button" type="button" disabled={catalogState.status !== 'ready' || routes.length === 0 || toolProbes === null} onClick={generate}>生成路由建议</button><span className="mr-caption">{toolProbes === null ? '正在检测官方工具…' : '0 表示不限制本次建议；不会设置真实支出上限。'}</span></div>
@@ -410,7 +418,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         <ModelProfileEditor routes={routes} settingsScope={settingsScope} onSaved={invalidatePlan} />
         {plan && <PlanResults plan={plan} />}
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} />
-        <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
+        <div className="mr-notice">实际调用请在官方会话中使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
       </div>
     </main>
   )

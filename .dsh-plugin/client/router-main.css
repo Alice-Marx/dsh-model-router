@@ -43,6 +43,7 @@
 .mr-segment button { border: 0; border-radius: 8px; padding: 8px 12px; background: transparent; color: var(--mr-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .mr-segment button[aria-pressed='true'] { background: #fff; color: var(--mr-ink); box-shadow: 0 2px 8px rgba(20, 35, 56, .1); font-weight: 700; }
 .mr-budget { width: 140px; }
+.mr-direct { min-width: min(100%, 280px); }
 .mr-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 18px; }
 .mr-button { border: 1px solid transparent; border-radius: 10px; min-height: 38px; padding: 8px 14px; background: var(--mr-accent); color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .mr-button:hover:not(:disabled) { filter: brightness(.94); }

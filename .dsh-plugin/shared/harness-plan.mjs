@@ -1,7 +1,10 @@
 import { buildPlan, detectTaskTypes } from './router.mjs'
 import { OFFICIAL_TOOLS, toolForProvider } from './official-tool-registry.mjs'
+import { normalizeExecutionPreference } from './model-profiles.mjs'
 
 const clean = value => typeof value === 'string' ? value.trim() : ''
+
+const HEADLESS_TOOL_IDS = new Set(['claude-code', 'codex', 'gemini'])
 
 /**
  * Resolve the intended execution channel for one provider without touching
@@ -9,25 +12,41 @@ const clean = value => typeof value === 'string' ? value.trim() : ''
  * that the caller reports as installed, `harness-llm` otherwise. The probe
  * snapshot comes from the Host caller, which owns the real process boundary.
  */
-export function channelForProvider(provider, installedToolIds = [], runnableToolIds = []) {
+export function channelForProvider(provider, installedToolIds = [], runnableToolIds = [], route = null) {
+  const preference = normalizeExecutionPreference(route?.execution)
   const tool = toolForProvider(provider)
+  if (preference === 'api') {
+    return {
+      kind: 'harness-llm', preference,
+      ...(tool ? { tool: tool.id, label: tool.label } : {}),
+      detail: '该模型配置为只使用模型目录 API。',
+    }
+  }
   if (!tool || tool.unsupported) {
-    return { kind: 'harness-llm', detail: '通过官方模型目录 API 调用。' }
+    return { kind: 'harness-llm', preference, detail: '通过官方模型目录 API 调用。' }
   }
   const installed = Array.isArray(installedToolIds) && installedToolIds.includes(tool.id)
   const runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id)
-  return runnable
-    ? { kind: 'official-cli', tool: tool.id, label: tool.label, detail: tool.id === 'zcode'
-      ? 'ZCode 已安装，插件可调用其官方编程代理；3.14.3 的 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。'
-      : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。` }
-    : {
-      kind: 'harness-llm',
-      tool: tool.id,
-      label: tool.label,
-      detail: installed
-        ? `${tool.label} 已安装，但当前平台缺少经核验的托管执行适配器；实际调用使用官方模型目录 API。`
-        : `${tool.label} 未安装；实际调用使用官方模型目录 API。可在工作台一键安装，或运行 /tools install ${tool.id}。`,
+  const headless = installed && HEADLESS_TOOL_IDS.has(tool.id)
+  if (runnable || headless) {
+    return {
+      kind: 'official-cli', preference, tool: tool.id, label: tool.label,
+      detail: tool.id === 'zcode'
+        ? 'ZCode 已安装，插件可调用其官方编程代理；3.14.3 的 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。'
+        : headless && !runnable
+          ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。`
+          : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。`,
     }
+  }
+  return {
+    kind: 'harness-llm',
+    preference,
+    tool: tool.id,
+    label: tool.label,
+    detail: installed
+      ? `${tool.label} 已安装，但当前平台缺少经核验的托管执行适配器；实际调用使用官方模型目录 API。`
+      : `${tool.label} 未安装；实际调用使用官方模型目录 API。可在工作台一键安装，或运行 /tools install ${tool.id}。`,
+  }
 }
 
 function annotate(channel) {
@@ -35,6 +54,7 @@ function annotate(channel) {
     executionChannel: channel.kind,
     ...channel.tool ? { channelTool: channel.tool } : {},
     ...channel.label ? { channelLabel: channel.label } : {},
+    ...channel.preference ? { executionPreference: channel.preference } : {},
     channelDetail: channel.detail,
   }
 }
@@ -47,32 +67,49 @@ function annotate(channel) {
 export function createPlanFromRoutes(task, availableRoutes, {
   mode = 'single', budgetUsd = 0, installedToolIds = [], runnableToolIds = [],
   pricing = {}, liveBench = null, cacheReadRatio = 0, cacheWriteRatio = 0,
+  directProvider = '', directModel = '',
 } = {}) {
   const taskText = clean(task)
   if (!taskText) throw new Error('task must contain text')
+  const requestedDirect = mode === 'direct' || clean(directProvider) !== '' || clean(directModel) !== ''
   const selectedMode = mode === 'team' ? 'team' : 'single'
-  const routes = Array.isArray(availableRoutes) ? availableRoutes : []
+  let routes = Array.isArray(availableRoutes) ? availableRoutes : []
+  let directRoute = null
+  if (requestedDirect) {
+    const provider = clean(directProvider)
+    const model = clean(directModel)
+    if (!provider || !model) throw new Error('指定单一模型需要同时提供 provider 和 model')
+    const match = routes.filter(route => route.provider === provider && route.model === model)
+    if (match.length !== 1) throw new Error(`指定模型 ${provider}/${model} 不在当前模型目录中`)
+    routes = match
+    directRoute = { provider, model }
+  }
   const installedIds = Array.isArray(installedToolIds) ? installedToolIds.filter(Boolean) : []
   const channelCache = new Map()
-  const channelOf = provider => {
-    const key = String(provider ?? '')
-    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(key, installedIds, runnableToolIds))
+  const channelOf = (provider, model) => {
+    const route = routes.find(item => item.provider === provider && item.model === model)
+    const key = `${String(provider ?? '')}\0${String(model ?? '')}\0${route?.execution ?? ''}`
+    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(provider, installedIds, runnableToolIds, route))
     return channelCache.get(key)
   }
   const needsImage = detectTaskTypes(taskText).includes('vision')
   const plan = buildPlan({
     text: taskText,
     available: routes,
-    mode: selectedMode,
+    mode: directRoute ? 'single' : selectedMode,
     budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0),
     pricing,
     liveBench,
     cacheReadRatio,
     cacheWriteRatio,
   })
-  const selectedChannel = plan.selected ? channelOf(plan.selected.provider) : null
+  const selectedChannel = plan.selected ? channelOf(plan.selected.provider, plan.selected.model) : null
   return {
     ...plan,
+    mode: directRoute ? 'direct' : plan.mode,
+    routingBypassed: directRoute !== null,
+    directRoute,
+    ...(directRoute ? { reason: `已指定 ${directRoute.provider}/${directRoute.model}，不与其他已配置模型比较。复杂度仍按任务文本估计。` } : {}),
     contractVersion: 2,
     availableRoutes: routes,
     ...(selectedChannel ? annotate(selectedChannel) : {}),
@@ -109,7 +146,7 @@ export function createPlanFromRoutes(task, availableRoutes, {
         recommendedModel: item.recommended,
         estimatedCost: plan.costBreakdown[index]?.estimatedCost ?? null,
         ...item.recommendedReasoningEffort ? { recommendedReasoningEffort: item.recommendedReasoningEffort } : {},
-        ...annotate(channelOf(item.recommendedProvider)),
+        ...annotate(channelOf(item.recommendedProvider, item.recommended)),
         verificationChecklist: item.purpose === 'synthesis'
           ? ['核对各工作包交付物与依赖', '记录冲突、未解决事项和最终验收结果']
           : item.type === 'code'

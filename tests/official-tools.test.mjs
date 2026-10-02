@@ -87,6 +87,9 @@ test('registry pins the verified official npm distributions', () => {
   assert.equal(getOfficialTool('mimo-code').version, '0.1.15')
   assert.equal(getOfficialTool('codex').version, '0.157.1')
   assert.equal(getOfficialTool('grok-build').version, '1.0.41')
+  assert.equal(getOfficialTool('gemini').version, '0.62.0')
+  assert.equal(getOfficialTool('gemini').package, '@google/gemini-cli')
+  assert.ok(getOfficialTool('gemini').installArgs.includes('@google/gemini-cli@0.62.0'))
   assert.ok(getOfficialTool('kimi-code').installArgs.includes('@moonshot-ai/kimi-code@2.1.1'))
 })
 
@@ -98,6 +101,8 @@ test('provider keywords map conservatively to registry tools', () => {
   assert.equal(toolForProvider('minimax-account').id, 'minimax-code')
   assert.equal(toolForProvider('mimo-cloud').id, 'mimo-code')
   assert.equal(toolForProvider('xai').id, 'grok-build')
+  assert.equal(toolForProvider('gemini').id, 'gemini')
+  assert.equal(toolForProvider('google-ai').id, 'gemini')
   assert.equal(toolForProvider('deepseek-account'), null, 'DeepSeek is the host itself')
   assert.equal(toolForProvider('unknown-vendor'), null)
   assert.equal(toolForProvider(''), null)
@@ -109,6 +114,14 @@ test('channel annotation reflects probe truth and never invents tools', () => {
   assert.equal(installed.tool, 'kimi-code')
   const runnable = channelForProvider('anthropic', ['claude-code'], ['claude-code'])
   assert.equal(runnable.kind, 'official-cli')
+  const headless = channelForProvider('anthropic', ['claude-code'], [])
+  assert.equal(headless.kind, 'official-cli', 'an installed headless CLI is an official channel before the signed runner is ready')
+  const apiOnly = channelForProvider('anthropic', ['claude-code'], ['claude-code'], { execution: 'api' })
+  assert.equal(apiOnly.kind, 'harness-llm')
+  assert.equal(apiOnly.preference, 'api')
+  const gemini = channelForProvider('google-ai', ['gemini'], [])
+  assert.equal(gemini.kind, 'official-cli')
+  assert.equal(gemini.tool, 'gemini')
   const missing = channelForProvider('moonshot-main', [])
   assert.equal(missing.kind, 'harness-llm')
   assert.match(missing.detail, /tools install kimi-code/)
@@ -144,8 +157,10 @@ test('probe classifies not-installed, installed and broken CLIs', async () => {
   resetForTests()
   const tool = getOfficialTool('kimi-code')
   const now = () => Date.now()
+  const locator = process.platform === 'win32' ? 'where' : 'which'
+  const located = process.platform === 'win32' ? 'C:\\cli\\kimi.cmd\n' : '/usr/local/bin/kimi\n'
   const missingRunner = async (executable) => {
-    if (executable === 'where') return { ok: false, code: 1, stdout: '', stderr: 'INFO: Could not find', timedOut: false }
+    if (executable === locator) return { ok: false, code: 1, stdout: '', stderr: 'INFO: Could not find', timedOut: false }
     throw new Error(`--version must not run before ${executable} is located`)
   }
   const missing = await probeToolWith(tool, missingRunner, { cache: new Map(), now })
@@ -153,7 +168,7 @@ test('probe classifies not-installed, installed and broken CLIs', async () => {
   assert.equal(missing.installed, false)
 
   const okRunner = async (executable, args) => {
-    if (executable === 'where') return { ok: true, code: 0, stdout: 'C:\\cli\\kimi.cmd\n', stderr: '', timedOut: false }
+    if (executable === locator) return { ok: true, code: 0, stdout: located, stderr: '', timedOut: false }
     if (executable === 'kimi' && args[0] === '--version') return { ok: true, code: 0, stdout: '2.0.2\n', stderr: '', timedOut: false }
     throw new Error('unexpected invocation')
   }
@@ -161,8 +176,8 @@ test('probe classifies not-installed, installed and broken CLIs', async () => {
   assert.equal(installed.status, 'installed')
   assert.equal(installed.version, '2.0.2')
 
-  const brokenRunner = async (executable, args) => {
-    if (executable === 'where') return { ok: true, code: 0, stdout: 'C:\\cli\\kimi.cmd\n', stderr: '', timedOut: false }
+  const brokenRunner = async (executable) => {
+    if (executable === locator) return { ok: true, code: 0, stdout: located, stderr: '', timedOut: false }
     return { ok: false, code: 1, stdout: '', stderr: 'Cannot find module', timedOut: false }
   }
   const broken = await probeToolWith(tool, brokenRunner, { cache: new Map(), now })
@@ -174,9 +189,10 @@ test('probe cache prevents duplicate spawns and expires', async () => {
   const tool = getOfficialTool('kimi-code')
   let spawns = 0
   let clock = 1_000
+  const locator = process.platform === 'win32' ? 'where' : 'which'
   const runner = async (executable) => {
     spawns += 1
-    if (executable === 'where') return { ok: true, code: 0, stdout: 'C:\\cli\\kimi.cmd\n', stderr: '', timedOut: false }
+    if (executable === locator) return { ok: true, code: 0, stdout: process.platform === 'win32' ? 'C:\\cli\\kimi.cmd\n' : '/usr/local/bin/kimi\n', stderr: '', timedOut: false }
     return { ok: true, code: 0, stdout: '2.0.2\n', stderr: '', timedOut: false }
   }
   const cache = new Map()

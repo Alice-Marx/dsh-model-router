@@ -67,6 +67,10 @@ const CAPABILITIES = Object.freeze({
   zcode: Object.freeze(IS_WINDOWS
     ? { supported: true, modes: Object.freeze(['workspace-write']) }
     : { supported: false, reason: 'ZCode 固定桌面发行版目前仅核验了 Windows x64。' }),
+  gemini: Object.freeze({
+    supported: false,
+    reason: 'Gemini 由无界面适配器执行（gemini -p），不走签名沙箱入口；未安装或失败时回退模型目录 API。',
+  }),
 })
 
 /** A UI/Host can show this without implying that installation means execution readiness. */
@@ -590,7 +594,8 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId) {
           return
         }
         if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
-        if (event.type === 'turn.failed' || event.type === 'error') {
+        // Top-level `error` events include transient reconnect notices; only turn.failed is terminal.
+        if (event.type === 'turn.failed') {
           failedEvent = true
           terminal = 'failed'
         }

@@ -42,6 +42,22 @@ test('profile parser rejects malformed prices, duplicates, currency and missing 
   for (const source of invalid) assert.throws(() => parseModelProfilesJson(source), { name: 'Error' }, source)
 })
 
+test('execution preference is limited to auto, official, and api', () => {
+  const official = parseModelProfilesJson(JSON.stringify([
+    { provider: 'anthropic', model: 'claude', execution: 'official' },
+  ]))
+  assert.equal(official[0].execution, 'official')
+  const applied = applyModelProfiles([{ provider: 'anthropic', model: 'claude' }], official)
+  assert.equal(applied[0].execution, 'official')
+  const automatic = parseModelProfilesJson(JSON.stringify([
+    { provider: 'openai', model: 'gpt', quality: 80, execution: 'auto' },
+  ]))
+  assert.equal(automatic[0].execution, undefined)
+  assert.throws(() => parseModelProfilesJson(JSON.stringify([
+    { provider: 'openai', model: 'gpt', execution: 'shell' },
+  ])), /execution/)
+})
+
 test('profile settings do not accept executable or credential fields', () => {
   const source = JSON.stringify([{ provider: 'a', model: 'x', quality: 80, apiKey: 'secret', command: 'bad' }])
   assert.throws(() => parseModelProfilesJson(source), /不支持的字段/)

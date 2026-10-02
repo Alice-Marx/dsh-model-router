@@ -18,7 +18,7 @@ function nonnegative(value, label) {
 function normalizeProfile(entry, index) {
   const label = `第 ${index + 1} 个模型`
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`${label} 必须是对象`)
-  const allowed = new Set(['provider', 'model', 'quality', 'pricing', 'specialties', 'cliModel'])
+  const allowed = new Set(['provider', 'model', 'quality', 'pricing', 'specialties', 'cliModel', 'execution'])
   const unknown = Object.keys(entry).find(key => !allowed.has(key))
   if (unknown) throw new Error(`${label} 含不支持的字段 ${unknown}；不要在这里填写密钥或命令`)
   const provider = id(entry.provider)
@@ -60,8 +60,21 @@ function normalizeProfile(entry, index) {
     if (toolForProvider(provider)?.id === 'zcode') throw new Error(`${label} 对应的 ZCode CLI 暂不支持逐次切换模型`)
     profile.cliModel = cliModel
   }
-  if (Object.keys(profile).length === 2) throw new Error(`${label} 至少提供 quality、pricing、specialties 或 cliModel 之一`)
+  if (entry.execution !== undefined) {
+    if (entry.execution !== 'auto' && entry.execution !== 'official' && entry.execution !== 'api') {
+      throw new Error(`${label} 的 execution 只能是 auto、official 或 api`)
+    }
+    if (entry.execution !== 'auto') profile.execution = entry.execution
+  }
+  if (Object.keys(profile).length === 2) throw new Error(`${label} 至少提供 quality、pricing、specialties、cliModel 或 execution 之一`)
   return profile
+}
+
+/** `auto` is the default and is not stored. `official` and `api` are explicit. */
+export function normalizeExecutionPreference(value) {
+  if (value === undefined || value === null || value === '' || value === 'auto') return 'auto'
+  if (value === 'official' || value === 'api') return value
+  throw new TypeError('execution must be auto, official, or api')
 }
 
 /** Parse a settings field; an empty value intentionally means no overrides. */
@@ -96,6 +109,7 @@ export function applyModelProfiles(routes, profiles) {
       ...(profile.pricing === undefined ? {} : { pricing: { ...profile.pricing }, pricingSource: 'user' }),
       ...(profile.specialties === undefined ? {} : { specialties: [...profile.specialties] }),
       ...(profile.cliModel === undefined ? {} : { cliModel: profile.cliModel }),
+      ...(profile.execution === undefined ? {} : { execution: profile.execution }),
     }
   })
 }

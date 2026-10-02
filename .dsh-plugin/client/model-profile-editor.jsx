@@ -99,6 +99,13 @@ export function ModelProfileEditor({ routes, settingsScope, onSaved }) {
               <label className="mr-profile-field"><span>输出单价（USD / 百万 token）</span><input className="mr-input" type="number" min="0" step="any" value={draft.output} disabled={!writable} onChange={event => edit('output', event.target.value)} placeholder="留空表示未知" /></label>
               <label className="mr-profile-field"><span>擅长方向（英文标签，逗号分隔）</span><input className="mr-input" type="text" value={draft.specialties} disabled={!writable} onChange={event => edit('specialties', event.target.value)} placeholder={PROFILE_SPECIALTY_HINT} /></label>
               <label className="mr-profile-field"><span>官方 CLI 模型名（可选）</span><input className="mr-input" type="text" value={draft.cliModel} disabled={!writable} onChange={event => edit('cliModel', event.target.value)} placeholder="仅在厂商 CLI 支持该准确名称时填写" /></label>
+              <label className="mr-profile-field"><span>执行方式</span>
+                <select className="mr-input" value={draft.execution || 'auto'} disabled={!writable} onChange={event => edit('execution', event.target.value)}>
+                  <option value="auto">自动：已安装则用官方工具，失败回退 API</option>
+                  <option value="official">官方工具：失败或未安装时回退 API</option>
+                  <option value="api">仅模型目录 API</option>
+                </select>
+              </label>
             </div>
             <details className="mr-profile-advanced"><summary>缓存单价（可选）</summary><div className="mr-profile-grid">
               <label className="mr-profile-field"><span>缓存读取（USD / 百万 token）</span><input className="mr-input" type="number" min="0" step="any" value={draft.cacheRead} disabled={!writable} onChange={event => edit('cacheRead', event.target.value)} placeholder="留空按普通输入价格估算" /></label>
@@ -110,7 +117,7 @@ export function ModelProfileEditor({ routes, settingsScope, onSaved }) {
               {saved && <button className="mr-button mr-button-secondary" type="button" disabled={!writable} onClick={() => { void write(true) }}>删除此模型配置</button>}
             </div>
             {notice && <p className={notice.tone === 'error' ? 'mr-error' : 'mr-profile-success'} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
-            <p className="mr-caption">质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算只影响本地规划，不限制实际账单。CLI 模型名须与厂商工具核对。</p>
+            <p className="mr-caption">质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算只影响本地规划，不限制实际账单。CLI 模型名须与厂商工具核对。执行方式决定该模型收到任务时走官方无界面工具还是模型目录 API；官方工具失败时仍会回退 API。</p>
           </>}
       </div>
     </section>
