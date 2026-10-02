@@ -9,7 +9,7 @@ import { join } from 'node:path'
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-gaps-'))
 for (const name of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY', 'KIMI_API_KEY', 'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY']) delete process.env[name]
 
-const { checkLogin, credentialFileFor, createHealthCache, LOGIN_GUIDES, subscriptionLoginOf } = await import('../.dsh-plugin/shared/tool-health.mjs')
+const { checkLogin, credentialFileFor, createHealthCache, LOGIN_GUIDES, minimaxAuthStateFiles, subscriptionLoginOf } = await import('../.dsh-plugin/shared/tool-health.mjs')
 const { createQuotaTracker } = await import('../.dsh-plugin/shared/subscription-billing.mjs')
 const { createRouterState } = await import('../.dsh-plugin/shared/router-state.mjs')
 const { usageFromEvents } = await import('../.dsh-plugin/shared/task-executors.mjs')
@@ -53,7 +53,7 @@ test('Kimi, MiMo and Grok login comes from their verified credential files (exis
   }
 })
 
-test('API-key variables count for Kimi/MiniMax/MiMo/Grok; MiniMax and ZCode stay unknown with official login steps', async () => {
+test('API-key variables count for Kimi/MiniMax/MiMo/Grok; MiniMax without a state file and ZCode stay unknown with official login steps', async () => {
   const viaKey = await checkLogin('kimi-code', { home: '/h', env: { KIMI_API_KEY: 'x' }, exists: () => false })
   assert.equal(viaKey.state, 'logged-in')
   assert.equal(viaKey.billing, 'api-key')
@@ -61,7 +61,7 @@ test('API-key variables count for Kimi/MiniMax/MiMo/Grok; MiniMax and ZCode stay
   assert.equal((await checkLogin('minimax-code', { env: { MINIMAX_API_KEY: 'k' } })).billing, 'api-key')
   const minimax = await checkLogin('minimax-code', { home: '/h', env: {} })
   assert.equal(minimax.state, 'unknown')
-  assert.match(minimax.detail, /没有登录状态命令/)
+  assert.match(minimax.detail, /未找到 MiniMax Code 登录状态文件/)
   const zcode = await checkLogin('zcode', { home: '/h', env: {} })
   assert.equal(zcode.state, 'unknown')
   assert.equal(LOGIN_GUIDES['kimi-code'].command, 'kimi login')
@@ -70,6 +70,35 @@ test('API-key variables count for Kimi/MiniMax/MiMo/Grok; MiniMax and ZCode stay
   assert.equal(LOGIN_GUIDES['grok-build'].command, 'grok login')
   assert.match(LOGIN_GUIDES.zcode.steps, /连接 BigModel|编程套餐/)
   assert.match(LOGIN_GUIDES.zcode.steps, /coding\/paas\/v4/)
+})
+
+test('MiniMax login comes from the status field of its non-secret auth-state.json (per region)', async () => {
+  assert.deepEqual(minimaxAuthStateFiles({ home: 'C:\\Users\\u', env: {} }).map(item => item.path),
+    ['C:\\Users\\u/.minimax/auth/prod/cn/mcode-public/auth-state.json', 'C:\\Users\\u/.minimax/auth/prod/global/mcode-public/auth-state.json'])
+  assert.equal(minimaxAuthStateFiles({ home: '/h', env: { MINIMAX_DATA_DIR: '/data/mm/' } })[0].path, '/data/mm/auth/prod/cn/mcode-public/auth-state.json')
+  const states = map => async path => map[path.includes('/cn/') ? 'cn' : 'global'] ?? null
+  const signedIn = await checkLogin('minimax-code', { home: '/h', env: {}, readAuthState: states({ cn: { status: 'authenticated', storeKind: 'file' } }) })
+  assert.equal(signedIn.state, 'logged-in')
+  assert.match(signedIn.detail, /国内站/)
+  assert.equal(subscriptionLoginOf(signedIn), 'subscription')
+  const anonymous = await checkLogin('minimax-code', { home: '/h', env: {}, readAuthState: states({ cn: { status: 'anonymous' }, global: { status: 'anonymous' } }) })
+  assert.equal(anonymous.state, 'unknown', 'a saved API key (mcode set-minimax-key) still works without OAuth')
+  assert.match(anonymous.detail, /账号未登录.*mcode login/)
+  const broken = await checkLogin('minimax-code', { home: '/h', env: {}, readAuthState: async () => { throw new Error('EACCES') } })
+  assert.equal(broken.state, 'unknown')
+  const keyed = await checkLogin('minimax-code', { home: '/h', env: { MINIMAX_API_KEY: 'k' }, readAuthState: states({ global: { status: 'refreshing' } }) })
+  assert.equal(keyed.state, 'logged-in')
+  assert.equal(keyed.billing, 'api-key', 'an API-key variable still decides billing')
+})
+
+test('Grok login hints name the relocated GROK_HOME the plugin uses on Windows', async () => {
+  const missing = await checkLogin('grok-build', { home: 'C:\\Users\\u', env: { GROK_HOME: 'D:\\npm\\.model-router-grok' }, exists: () => false })
+  assert.equal(missing.state, 'unknown')
+  assert.match(missing.detail, /D:\\npm\\\.model-router-grok\/auth\.json/)
+  assert.match(missing.detail, /\$env:GROK_HOME='D:\\npm\\\.model-router-grok'; grok login/)
+  const plain = await checkLogin('grok-build', { home: '/h', env: {}, exists: () => false })
+  assert.doesNotMatch(plain.detail, /GROK_HOME=/)
+  assert.match(plain.detail, /\/h\/\.grok\/auth\.json/)
 })
 
 // ---------------------------------------------------------------- item 3
@@ -234,6 +263,8 @@ test('workbench run: single model, workspace validation and request codec', asyn
 
 // ---------------------------------------------------------------- item 6
 function git(cwd, ...args) { return execFileSync('git', args, { cwd, stdio: 'pipe' }).toString() }
+// Git for Windows defaults to core.autocrlf=true, so checkouts and `git apply` write CRLF there.
+const readText = async path => (await readFile(path, 'utf8')).replace(/\r\n/g, '\n')
 const sandbox = { confine() { throw new Error('mock runner must never spawn a CLI') } }
 const pkg = (id, provider, dependsOn = []) => ({ id, name: `Package ${id}`, type: 'execution', purpose: 'execution', dependsOn, objective: id, recommendedProvider: provider, recommendedModel: 'm' })
 
@@ -265,7 +296,7 @@ test('an editable team that stopped at a failed step continues in a fresh worktr
       async runTool(options) {
         calls.push(options)
         assert.notEqual(options.workspace, first.workspace, 'a fresh worktree')
-        assert.equal(await readFile(join(options.workspace, 'a.txt'), 'utf8'), 'from a\n', 'earlier changes were applied first')
+        assert.equal(await readText(join(options.workspace, 'a.txt')), 'from a\n', 'earlier changes were applied first')
         await writeFile(join(options.workspace, 'b.txt'), 'from b\n')
         return { status: 'succeeded', finalText: 'b done' }
       },
@@ -274,8 +305,8 @@ test('an editable team that stopped at a failed step continues in a fresh worktr
   assert.match(calls[0].task, /a done/)
   assert.equal(retry.status, 'cli-completed')
   assert.deepEqual(retry.seeded.files, ['a.txt'])
-  assert.equal(await readFile(join(workspace, 'a.txt'), 'utf8'), 'from a\n')
-  assert.equal(await readFile(join(workspace, 'b.txt'), 'utf8'), 'from b\n')
+  assert.equal(await readText(join(workspace, 'a.txt')), 'from a\n')
+  assert.equal(await readText(join(workspace, 'b.txt')), 'from b\n')
   // A moved HEAD makes seeding unsafe: refused, nothing runs.
   git(workspace, 'add', '-A')
   git(workspace, '-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'integrated')

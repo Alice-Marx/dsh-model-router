@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute } from 'node:path'
 import z from '@deepseek-ai/schemastery'
@@ -272,10 +272,20 @@ const fileExists = async path => {
   try { await stat(path); return true } catch { return false }
 }
 
+/** MiniMax's non-secret auth-state.json: only `status` and `storeKind` leave this function. */
+const readAuthState = async path => {
+  try {
+    const info = await stat(path)
+    if (!info.isFile() || info.size > 64 * 1024) return null
+    const value = JSON.parse(await readFile(path, 'utf8'))
+    return value && typeof value === 'object' ? { status: typeof value.status === 'string' ? value.status : null, storeKind: typeof value.storeKind === 'string' ? value.storeKind : null } : null
+  } catch { return null }
+}
+
 /** 开箱体检: install, version and login state for every registry tool. */
 export async function toolHealthReport({ fresh = false, runner = defaultRunner } = {}) {
   const probes = await probeAllTools({ fresh })
-  const report = await runHealthCheck(probes, { runner, home: homedir(), exists: fileExists })
+  const report = await runHealthCheck(probes, { runner, home: homedir(), exists: fileExists, readAuthState })
   healthCache.remember(report)
   try { await routerStateStore().saveHealth(report) } catch { /* the cache still serves this process */ }
   return report

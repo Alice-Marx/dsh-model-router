@@ -139,9 +139,9 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
    | Gemini CLI | `GEMINI_API_KEY`/`GOOGLE_API_KEY` 或 `~/.gemini/oauth_creds.json` | `gemini` |
    | Kimi Code | `KIMI_API_KEY`/`MOONSHOT_API_KEY`，或 `~/.kimi-code/credentials/kimi-code.json`（`$KIMI_CODE_HOME`） | `kimi login` |
    | MiMo Code | `MIMO_API_KEY`，或 `~/.local/share/mimocode/auth.json`（`$XDG_DATA_HOME`；该文件也可能只存了供应商 API Key，计费方式记为未知） | `mimo auth login` |
-   | Grok Build | `XAI_API_KEY`，或 `~/.grok/auth.json`（`$GROK_HOME`） | `grok login`（无浏览器时加 `--device-auth`） |
-   | MiniMax Code | 仅 `MINIMAX_API_KEY`；没有状态命令，凭据可能在系统钥匙串 → 未知 | `mcode login` |
-   | ZCode | 桌面应用，没有状态命令 → 未知 | 欢迎页选“连接 BigModel / Z.ai 继续使用”；GLM Coding Plan 在“模型设置 → BigModel”右上角选“编程套餐” |
+   | Grok Build | `XAI_API_KEY`，或 `~/.grok/auth.json`（`$GROK_HOME`）。Windows 上 npm 全局目录不在 C 盘时，插件以 `GROK_HOME=<npm 全局目录>\.model-router-grok` 启动 Grok，体检会显示这个实际路径 | `grok login`（无浏览器时加 `--device-auth`）；使用该目录时运行 `$env:GROK_HOME='<路径>'; grok login` |
+   | MiniMax Code | `MINIMAX_API_KEY`，或不含密钥的状态文件 `~/.minimax/auth/prod/<cn\|global>/mcode-public/auth-state.json`（`$MINIMAX_DATA_DIR`）中的 `status`：`authenticated` → 已登录；`anonymous` → 未知（用 `mcode set-minimax-key` 保存的 API Key 仍可用） | `mcode login` |
+   | ZCode | 桌面应用，没有状态命令 → 未知。插件只启用签名与 CLI 哈希已核验的 3.14.3；装了其他版本时会如实说明，而不是显示“未安装” | 欢迎页选“连接 BigModel / Z.ai 继续使用”；GLM Coding Plan 在“模型设置 → BigModel”右上角选“编程套餐” |
 
    文件路径取自官方发布包（kimi-code 2.1.1、mimocode 0.1.15、grok 1.0.41）。找不到文件时显示“未知”而不是“未登录”，因为这些 CLI 也可以通过自定义供应商或（MiMo）免费匿名通道使用。体检不会发起登录。
    - 未安装的工具点**一键安装**，复用原有的固定注册表安装器。
@@ -179,7 +179,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-
 
 **当前限制**：
 - Kimi 与 ZCode 的无界面输出不含 token 用量，相应步骤显示“订阅登录，未回报可折算的用量”或“费用未知”。
-- MiniMax 与 ZCode 的登录状态仍为“未知”（没有状态命令或可检查的凭据文件）；Kimi/MiMo/Grok 的检测只说明凭据文件存在，不代表仍然有效。
+- ZCode 的登录状态仍为“未知”（没有状态命令）；MiniMax 只有 API Key 或没有状态文件时也显示“未知”。Kimi/MiMo/Grok/MiniMax 的检测只说明凭据或状态文件存在，不代表令牌仍然有效。
 - 工作台只能发起**只读**执行；可编辑任务仍需在会话中用 `model_router_tool_run` 或 `model_router_team_execute` 开始。
 - 这些界面通过了构建检查、单元测试，以及用真实客户端包 + 模拟宿主桥接的无头浏览器检查，还没有在真实 Harness 桌面里验证。
 

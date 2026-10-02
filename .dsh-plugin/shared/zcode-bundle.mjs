@@ -191,3 +191,18 @@ export async function discoverZCodeBundle({ env = process.env } = {}) {
   }
   return null
 }
+
+/**
+ * ZCode entries in the uninstall registry that did not pass verification, e.g. a
+ * newer release the plugin has not pinned yet. Only used to explain why the
+ * tool shows as unavailable; nothing found here is ever executed.
+ */
+export async function unverifiedZCodeInstalls({ env = process.env } = {}) {
+  if (process.platform !== 'win32') return []
+  const records = await uninstallRecords(env)
+  return records.map(record => ({
+    version: String(record.displayVersion || '') || null,
+    root: [record.installLocation, rootFromCommand(record.displayIcon), rootFromCommand(record.uninstallString)]
+      .find(value => typeof value === 'string' && value.trim()) ?? null,
+  }))
+}

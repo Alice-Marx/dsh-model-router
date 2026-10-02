@@ -5,8 +5,9 @@
  * version?, and logged in? Login checks use only fixed, read-only status
  * commands (`claude auth status --json`, `codex login status`) or the
  * presence of a credential file / environment variable name (Gemini, Kimi,
- * MiMo, Grok). MiniMax and ZCode expose neither and stay 'unknown'. No credential
- * value is read or returned. Results are cached so routing can skip a tool
+ * MiMo, Grok). MiniMax is read from the `status` field of its non-secret
+ * auth-state.json (the CLI refuses to persist OAuth secrets there). ZCode exposes
+ * nothing and stays 'unknown'. No credential value is read or returned. Results are cached so routing can skip a tool
  * that is known to be logged out instead of waiting for its CLI to fail.
  */
 import { OFFICIAL_TOOLS, getOfficialTool } from './official-tool-registry.mjs'
@@ -20,7 +21,7 @@ export const LOGIN_GUIDES = Object.freeze({
   codex: Object.freeze({ command: 'codex login', steps: '在终端运行 codex login，按浏览器提示登录 ChatGPT 账号；或设置 OPENAI_API_KEY 后运行 codex login --with-api-key。' }),
   gemini: Object.freeze({ command: 'gemini', steps: '在终端运行 gemini，选择 “Login with Google” 完成登录；或在环境变量中设置 GEMINI_API_KEY。' }),
   'kimi-code': Object.freeze({ command: 'kimi login', steps: '在终端运行 kimi login（设备码登录，可加 --region mainland-cn 或 --region global），按提示在浏览器中授权 Kimi 账号；也可以设置 KIMI_API_KEY 使用 API 计费。' }),
-  'minimax-code': Object.freeze({ command: 'mcode login', steps: '在终端运行 mcode login（可加 --region cn 或 --region global），在浏览器中登录 MiniMax 账号；或运行 mcode set-minimax-key / 设置 MINIMAX_API_KEY 使用 API Key。MiniMax Code 没有登录状态命令，凭据可能存放在系统钥匙串中，插件无法确认登录状态。' }),
+  'minimax-code': Object.freeze({ command: 'mcode login', steps: '在终端运行 mcode login（可加 --region cn 或 --region global），在浏览器中登录 MiniMax 账号；或运行 mcode set-minimax-key / 设置 MINIMAX_API_KEY 使用 API Key。插件读取 MiniMax Code 的登录状态文件 auth-state.json（不含密钥）判断是否已登录；用 API Key 时状态显示为未知。' }),
   'mimo-code': Object.freeze({ command: 'mimo auth login', steps: '在终端运行 mimo auth login，选择 Xiaomi MiMo Platform 登录小米账号或填入 API Key；mimo auth list 可查看已保存的凭据。未登录时 MiMo Auto 免费匿名通道可能仍可用。' }),
   'grok-build': Object.freeze({ command: 'grok login', steps: '在终端运行 grok login，按浏览器提示登录 xAI 账号；无浏览器环境用 grok login --device-auth，或设置 XAI_API_KEY 使用 API 计费。' }),
   zcode: Object.freeze({ command: null, steps: '打开 ZCode 桌面版，在欢迎页选择“连接 BigModel 继续使用”或“连接 Z.ai 继续使用”完成授权；已订阅 GLM Coding Plan 时在“模型设置 → BigModel”右上角选择“编程套餐”绑定。改用 API Key 时 OpenAI 地址须填 Coding 专用端点 https://open.bigmodel.cn/api/coding/paas/v4。ZCode 没有可调用的登录状态命令。' }),
@@ -54,10 +55,30 @@ export function credentialFileFor(toolId, { home = '', env = process.env } = {})
 }
 
 const FILE_LOGIN = Object.freeze({
-  'kimi-code': { found: '检测到 Kimi Code 登录凭据文件 ~/.kimi-code/credentials/kimi-code.json（未验证是否过期）。', missing: '未找到 Kimi Code 登录凭据文件（也可能通过 config.toml 中的自定义供应商认证），登录状态未知；如未登录请运行 kimi login。', missingState: 'unknown' },
-  'mimo-code': { found: '检测到 MiMo Code 凭据文件 ~/.local/share/mimocode/auth.json（未验证是否有效，也可能只含 API Key）。', missing: '未找到 MiMo Code 凭据文件；MiMo Auto 免费匿名通道可能仍可用，订阅/账号状态未知。', missingState: 'unknown' },
-  'grok-build': { found: '检测到 Grok 登录凭据文件 ~/.grok/auth.json（未验证是否过期）。', missing: '未找到 Grok 登录凭据文件 ~/.grok/auth.json，登录状态未知；如未登录请运行 grok login。', missingState: 'unknown' },
+  'kimi-code': { found: path => `检测到 Kimi Code 登录凭据文件 ${path}（未验证是否过期）。`, missing: path => `未找到 Kimi Code 登录凭据文件 ${path}（也可能通过 config.toml 中的自定义供应商认证），登录状态未知；如未登录请运行 kimi login。`, missingState: 'unknown' },
+  'mimo-code': { found: path => `检测到 MiMo Code 凭据文件 ${path}（未验证是否有效，也可能只含 API Key）。`, missing: path => `未找到 MiMo Code 凭据文件 ${path}；MiMo Auto 免费匿名通道可能仍可用，订阅/账号状态未知。`, missingState: 'unknown' },
+  'grok-build': { found: path => `检测到 Grok 登录凭据文件 ${path}（未验证是否过期）。`, missing: path => `未找到 Grok 登录凭据文件 ${path}，登录状态未知；如未登录请运行 grok login。`, missingState: 'unknown' },
 })
+
+/**
+ * MiniMax Code 0.5.5 keeps OAuth state per region in
+ * `<MINIMAX_DATA_DIR or ~/.minimax>/auth/prod/<cn|global>/mcode-public/auth-state.json`.
+ * That file is the CLI's non-secret state record (`status`: anonymous /
+ * authorizing / refreshing / authenticated / logging_out); the token itself
+ * lives in auth.json next to it or in the OS keyring and is never opened.
+ */
+export function minimaxAuthStateFiles({ home = '', env = process.env } = {}) {
+  const configured = typeof env?.MINIMAX_DATA_DIR === 'string' ? env.MINIMAX_DATA_DIR.trim().replace(/[\\/]+$/u, '') : ''
+  const base = configured || (home ? `${String(home).replace(/[\\/]+$/u, '')}/.minimax` : '')
+  if (!base) return []
+  return ['cn', 'global'].map(region => ({ region, path: `${base}/auth/prod/${region}/mcode-public/auth-state.json` }))
+}
+
+/** Grok runs launched by the plugin may use a relocated GROK_HOME (see ensureNpmPrefixOnPath). */
+function grokHomeHint(env) {
+  const configured = typeof env?.GROK_HOME === 'string' ? env.GROK_HOME.trim() : ''
+  return configured ? `插件启动 Grok 时使用 GROK_HOME=${configured}；请在设置了同样 GROK_HOME 的终端中运行 grok login（PowerShell：$env:GROK_HOME='${configured}'; grok login），否则插件里的 Grok 读不到登录。` : ''
+}
 
 /** Variables that make the CLI bill an API account rather than a subscription login. */
 const API_KEY_ENV = Object.freeze({
@@ -107,7 +128,7 @@ function guide(toolId) {
  * Login state for one installed tool: 'logged-in', 'logged-out', or 'unknown'.
  * `runner(executable, args, { timeoutMs })` resolves { ok, code, stdout, stderr, timedOut }.
  */
-export async function checkLogin(toolId, { runner, env = process.env, exists = async () => false, home = '' } = {}) {
+export async function checkLogin(toolId, { runner, env = process.env, exists = async () => false, home = '', readAuthState = async () => null } = {}) {
   const keyNames = (KEY_ENV[toolId] ?? []).filter(name => typeof env?.[name] === 'string' && env[name].trim())
   const viaKey = keyNames.length > 0 ? { state: 'logged-in', detail: `检测到环境变量 ${keyNames.join('、')}（未验证有效性）。`, source: 'environment',
     billing: apiKeyEnvPresent(toolId, env) ? 'api-key' : 'subscription',
@@ -147,11 +168,26 @@ export async function checkLogin(toolId, { runner, env = process.env, exists = a
     const credentialFile = credentialFileFor(toolId, { home, env })
     const hasFile = Boolean(credentialFile) && await exists(credentialFile)
     if (viaKey) return { ...viaKey, accountLogin: hasFile }
-    if (hasFile) return { state: 'logged-in', detail: text.found, source: 'file', billing: toolId === 'mimo-code' ? 'unknown' : 'subscription', accountLogin: toolId === 'mimo-code' ? null : true }
+    if (hasFile) return { state: 'logged-in', detail: text.found(credentialFile), source: 'file', billing: toolId === 'mimo-code' ? 'unknown' : 'subscription', accountLogin: toolId === 'mimo-code' ? null : true }
     if (!credentialFile) return { state: 'unknown', detail: '无法确定用户目录，登录状态未知。' }
-    return { state: text.missingState, detail: text.missing, source: 'file' }
+    const hint = toolId === 'grok-build' ? grokHomeHint(env) : ''
+    return { state: text.missingState, detail: hint ? `${text.missing(credentialFile)}${hint}` : text.missing(credentialFile), source: 'file' }
   }
-  if (toolId === 'minimax-code') return viaKey ?? { state: 'unknown', detail: 'MiniMax Code 没有登录状态命令，凭据可能存放在系统钥匙串中；登录状态未知，首次运行时以实际结果为准。' }
+  if (toolId === 'minimax-code') {
+    const states = []
+    for (const { region, path } of minimaxAuthStateFiles({ home, env })) {
+      let record = null
+      try { record = await readAuthState(path) } catch { record = null }
+      const status = typeof record?.status === 'string' ? record.status : null
+      if (status) states.push({ region, status })
+    }
+    const signedIn = states.find(item => item.status === 'authenticated' || item.status === 'refreshing')
+    if (signedIn) return { state: 'logged-in', detail: `MiniMax Code 已登录（${signedIn.region === 'cn' ? '国内站' : '国际站'}，状态文件 auth-state.json 为 ${signedIn.status}，未验证令牌是否过期）。`, source: 'file',
+      billing: viaKey?.billing === 'api-key' ? 'api-key' : 'subscription', accountLogin: true }
+    if (viaKey) return viaKey
+    if (states.length) return { state: 'unknown', source: 'file', detail: `MiniMax Code 账号未登录（auth-state.json 为 ${states.map(item => `${item.region}: ${item.status}`).join('、')}）；如果用 mcode set-minimax-key 保存了 API Key 仍可使用，否则请运行 mcode login。` }
+    return { state: 'unknown', detail: '未找到 MiniMax Code 登录状态文件（~/.minimax/auth/prod/<cn|global>/mcode-public/auth-state.json），登录状态未知；如未登录请运行 mcode login。' }
+  }
   if (toolId === 'zcode') return viaKey ?? { state: 'unknown', detail: 'ZCode 是桌面应用，没有可调用的登录状态命令；登录与 GLM Coding Plan 状态请在 ZCode 内查看。' }
   return viaKey ?? { state: 'unknown', detail: '该 CLI 没有可安全调用的登录状态命令；首次运行时以实际结果为准。' }
 }
@@ -175,7 +211,7 @@ export async function checkToolHealth(probe, options = {}) {
   const tool = getOfficialTool(probe?.id)
   if (!tool) throw new TypeError('unknown official tool')
   const installed = probe.installed === true
-  const login = installed ? await checkLogin(tool.id, options) : { state: 'unknown', detail: '尚未安装。' }
+  const login = installed ? await checkLogin(tool.id, options) : { state: 'unknown', detail: probe.status === 'not-installed' && /检测到已安装/.test(String(probe.detail ?? '')) ? String(probe.detail) : '尚未安装。' }
   const { command, steps } = guide(tool.id)
   return {
     id: tool.id,

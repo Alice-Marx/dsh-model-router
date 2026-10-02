@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { getOfficialTool, installCommandLine, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
-import { discoverZCodeBundle } from './zcode-bundle.mjs'
+import { ZCODE_SUPPORTED_VERSION, discoverZCodeBundle, unverifiedZCodeInstalls } from './zcode-bundle.mjs'
 import { openZCodeInstaller } from './zcode-installer.mjs'
 
 const PROBE_TIMEOUT_MS = 8_000
@@ -268,11 +268,13 @@ async function probeUncached(tool, runner) {
   }
   if (tool.manager === 'signed-windows-installer') {
     const bundle = await discoverZCodeBundle()
-    return bundle
-      ? { id: tool.id, installed: true, version: bundle.version, status: 'installed',
-        detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} ${bundle.buildVersion}` }
-      : { id: tool.id, installed: false, version: null, status: 'not-installed',
-        detail: '未找到官方签名、版本和 CLI 脚本哈希均匹配的 ZCode 桌面版。' }
+    if (bundle) return { id: tool.id, installed: true, version: bundle.version, status: 'installed',
+      detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} ${bundle.buildVersion}` }
+    const other = (await unverifiedZCodeInstalls().catch(() => []))[0]
+    return { id: tool.id, installed: false, version: null, status: 'not-installed',
+      detail: other
+        ? `检测到已安装的 ZCode ${other.version ?? '（版本未知）'}${other.root ? `（${other.root}）` : ''}，但插件只启用已核验签名与 CLI 哈希的 ${ZCODE_SUPPORTED_VERSION} 版，因此暂不通过插件调用；可以继续直接使用 ZCode 桌面版，或等待插件更新核验信息。`
+        : '未找到官方签名、版本和 CLI 脚本哈希均匹配的 ZCode 桌面版。' }
   }
   if (tool.id === 'minimax-code' && IS_WINDOWS) {
     // The official Windows installer keeps mcode under a versioned releases

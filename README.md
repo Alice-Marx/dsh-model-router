@@ -112,9 +112,9 @@ The workbench shows these at the top. The matching session tools are in parenthe
    | Gemini CLI | `GEMINI_API_KEY`/`GOOGLE_API_KEY`, or `~/.gemini/oauth_creds.json` | `gemini` |
    | Kimi Code | `KIMI_API_KEY`/`MOONSHOT_API_KEY`, or `~/.kimi-code/credentials/kimi-code.json` (`$KIMI_CODE_HOME`) | `kimi login` |
    | MiMo Code | `MIMO_API_KEY`, or `~/.local/share/mimocode/auth.json` (`$XDG_DATA_HOME`; may hold only provider API keys, so billing stays unknown) | `mimo auth login` |
-   | Grok Build | `XAI_API_KEY`, or `~/.grok/auth.json` (`$GROK_HOME`) | `grok login` (`--device-auth` without a browser) |
-   | MiniMax Code | `MINIMAX_API_KEY` only; no status command, credentials may be in the OS keychain → unknown | `mcode login` |
-   | ZCode | Desktop app without a status command → unknown | Welcome page → *Connect BigModel / Z.ai*; for GLM Coding Plan pick *编程套餐* in Model settings |
+   | Grok Build | `XAI_API_KEY`, or `~/.grok/auth.json` (`$GROK_HOME`). On Windows with the npm prefix off drive C the plugin runs Grok with `GROK_HOME=<npm prefix>\.model-router-grok`; the health card then names that path | `grok login` (`--device-auth` without a browser); for the relocated home run `$env:GROK_HOME='<path>'; grok login` |
+   | MiniMax Code | `MINIMAX_API_KEY`, or the `status` field of the non-secret `~/.minimax/auth/prod/<cn\|global>/mcode-public/auth-state.json` (`$MINIMAX_DATA_DIR`; `authenticated` → logged in, `anonymous` → unknown because a key saved with `mcode set-minimax-key` still works) | `mcode login` |
+   | ZCode | Desktop app without a status command → unknown. Only the pinned, signature- and hash-verified 3.14.3 is used; another installed version is reported as such, not as missing | Welcome page → *Connect BigModel / Z.ai*; for GLM Coding Plan pick *编程套餐* in Model settings |
 
    The file paths come from the published packages (kimi-code 2.1.1, mimocode 0.1.15, grok 1.0.41). A missing file is reported as **unknown**, not logged out, because these CLIs can also authenticate through custom providers or (MiMo) a free anonymous channel. The check never starts a login.
    - **一键安装** (one-click install) reuses the fixed registry installer.
@@ -152,7 +152,7 @@ Several Host processes can share one DSH home: each write takes `state.json.lock
 
 **Known gaps**:
 - Kimi and ZCode report no token usage in headless output, so their steps show "subscription login, no usage reported" or "cost unknown".
-- MiniMax and ZCode login state stays unknown (no status command or credential file the plugin can check); Kimi/MiMo/Grok detection proves only that a credential file exists, not that it is still valid.
+- ZCode login state stays unknown (no status command); MiniMax is unknown when only an API key or no state file is present. Kimi/MiMo/Grok/MiniMax detection proves only that a credential/state file says so, not that the token is still valid.
 - The workbench starts **read-only** runs only; editable runs still start from a session (`model_router_tool_run`, `model_router_team_execute`).
 - The UI has passed build checks, unit tests and a headless browser pass with the real client bundle and a mock Host bridge. It has not been verified in a real Harness desktop.
 
