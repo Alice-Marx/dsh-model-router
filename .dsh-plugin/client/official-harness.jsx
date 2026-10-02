@@ -9,7 +9,6 @@
 import React from 'react'
 import { parseModelProfilesJson } from '../shared/model-profiles.mjs'
 import { RouterMainPage, RouterPanelIcon } from './router-main.jsx'
-import { GalModulePage, GalPanelIcon } from './gal-module-page.jsx'
 import {
   OFFICIAL_TOOLS_CLIENT_REMOTE,
   OFFICIAL_TOOLS_REMOTE_NAMESPACE,
@@ -28,7 +27,6 @@ import {
 export const ROUTER_NAMESPACE = 'model-router-galgame'
 export const ROUTER_PACKAGE = '@ljwei-stak/model-router-galgame'
 export const ROUTER_PANEL = 'model-router-galgame'
-export const GAL_PANEL = 'model-router-gal'
 
 /** Required Cordis services supplied by the official desktop client. */
 export const inject = ['remote']
@@ -226,21 +224,6 @@ function registerUi(ctx) {
     order: 30,
     label: '模型路由',
   }, RouterPanelIcon))), 'model-router-galgame: sidebar entry')
-  ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('main', () => ctx.slots.register({
-    name: 'main',
-    key: GAL_PANEL,
-    inject: () => ({
-      loadCatalog: () => ctx.remote.session.modelCatalog(),
-      galReply: request => officialToolsRemote.galReply(request),
-      cancelGalReply: requestId => officialToolsRemote.cancelGalReply(requestId),
-    }),
-  }, GalModulePage))), 'model-router-galgame: gal module workspace')
-  ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-    name: 'sidebar.panellist',
-    id: GAL_PANEL,
-    order: 31,
-    label: 'Gal 模块',
-  }, GalPanelIcon))), 'model-router-galgame: gal sidebar entry')
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('plugins.detail.actions', () => ctx.slots.register({
     name: 'plugins.detail.actions',
     id: 'model-router-open-workspace',

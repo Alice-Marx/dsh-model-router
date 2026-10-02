@@ -32,8 +32,8 @@ function assertRejected(candidate, runtimeVersion) {
   return issue
 }
 
-test('0.11.1 declares exactly the two supported 0.2 release candidates', () => {
-  assert.equal(manifest.version, '0.11.1')
+test('0.12.0 declares exactly the two supported 0.2 release candidates', () => {
+  assert.equal(manifest.version, '0.12.0')
   assert.ok(dshPeerNames.length > 0)
   for (const name of dshPeerNames) {
     assert.equal(manifest.peerDependencies[name], SUPPORTED_DESKTOP_PEERS)

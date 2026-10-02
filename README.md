@@ -1,98 +1,85 @@
-# Model Router Galgame
+# Model Router · DeepSeek Harness Desktop
 
-> **Current release: 0.11.1.** Install from the versioned [GitHub release archive](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) or enter `@ljwei-stak/model-router-galgame@0.11.1` in the Desktop plugin manager. npm publishes 0.11.1 under the `next` tag; `latest` remains on 0.4.32, so always specify the exact version or use `@next`. Version 0.11.1 keeps the 0.11.0 runtime and corrects release documentation; the old 0.11.0 npm page lacks README metadata. Live model sign-in and billing remain account-holder checks.
+**Version 0.12.0 separates model routing from GAL.** This plugin analyzes a request, gives simpler work to affordable capable models, and reserves stronger routes for difficult work. Compound requests become dependent work packages that supported official vendor tools can execute.
 
-**A model routing and Galgame plugin for DeepSeek Harness Desktop.** It plans which of your configured models should handle a task, gives simpler work to an affordable capable route, and reserves stronger routes for difficult work. Compound requests become dependent work packages that can be run through supported official vendor tools.
+The npm name remains `@ljwei-stak/model-router-galgame` so existing users can upgrade. **The 0.12.0 router package has only the Model Router sidebar entry.** Install the independent [GAL plugin](https://github.com/Alice-Marx/deepseek-harness-galgame) if you also want stories, portraits, music, saves, or free roleplay.
 
-[简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Gal settings guide (Chinese)](docs/GAL_SETTINGS.zh.md) · [Previously published v0.10.1](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1)
+[简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Migration guide](MIGRATION.md) · [GAL repository](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
-> **Host compatibility:** 0.11.1 and 0.11.0 support DeepSeek Harness Desktop **0.2.0-rc.1 and 0.2.0-rc.2**. Version 0.10.2 is an unpublished local compatibility build. Published 0.10.1 accepts only rc.1 and is rejected on rc.2. The 0.11.x Gal controls reuse the five existing stories and artwork; 0.11.1 is a documentation and npm metadata correction, not a new story or artwork release.
+> **Host compatibility:** both the router 0.12.0 and GAL 0.1.0 target DeepSeek Harness Desktop **0.2.0-rc.1 and 0.2.0-rc.2**. Use the exact installation versions below. Releases use npm's `next` tag while this host is a prerelease; a bare package name or a moving tag is not a version pin.
 
-![Diagram of the local routing plan and the separate official-tool execution step](docs/assets/routing-workflow.svg)
+![Diagram of the local routing plan and official-tool execution](docs/assets/routing-workflow.svg)
 
-*Workflow diagram. Planning uses the configured Harness model directory and optional user-provided model data. A plan does not itself start vendor tools or spend tokens.*
+*Planning uses the configured Harness model directory and optional user-provided model data. Generating a plan does not start vendor tools or spend model tokens.*
 
-## What it does
+![Router-only 0.12.0 in the official rc.2 runtime](docs/assets/router-only-0.12.0.png)
+
+*Actual isolated rc.2 profile: only the Model Router sidebar is installed; the catalog uses built-in routes without account calls.*
+
+## What the router does
 
 | Area | Available behavior |
 | --- | --- |
 | **Model Router** | Classifies task type and complexity, splits compound requests into a dependency graph, recommends an exact configured `provider/model` for each work package, and displays quality evidence and estimated cost when available. |
 | **Model profiles** | Lets you enter your own 0–100 quality score, USD input/output price per million tokens, specialties, and an optional vendor CLI model name for an exact Harness route. Missing prices remain unknown. |
-| **Official tools** | Detects and offers one-click, fixed-source installation for Kimi Code, Claude Code, Codex CLI, MiniMax Code, MiMo Code, Grok Build, and ZCode. The panel shows installation and trusted launch readiness separately. |
-| **Execution** | Session tools can consult another configured Harness model, run one supported official CLI, or execute a sequence of dependent work packages with the CLI team runner. |
-| **Gal Module** | Five offline stories, portrait size/position settings, seven music loops and session-only local audio, automatic reading and read-only skipping, three manual slots, an independent quick save, JSON backups, and an open artwork gallery. Free mode can chat through a configured Harness model or copy a roleplay opening prompt. |
+| **Official tools** | Detects and offers one-click, fixed-source installation for Kimi Code, Claude Code, Codex CLI, MiniMax Code, MiMo Code, Grok Build, and ZCode. Installation and trusted launch readiness are shown separately. |
+| **Execution** | Session tools can consult another configured Harness model, run one supported official CLI, or execute dependent work packages with the CLI team runner. |
 
-![Official tools section in an isolated DeepSeek Harness Desktop 0.2.0-rc.1 profile](docs/assets/desktop-official-tools-0.9.0.png)
+![Official tools section in an isolated DeepSeek Harness Desktop profile](docs/assets/desktop-official-tools-0.9.0.png)
 
-*Desktop capture from an isolated compatibility profile. A green launch check means the local entry point passed the plugin's checks; it does not prove that the vendor account can authenticate or that a paid task will succeed.*
+*Historical capture from version 0.9.0 in an isolated rc.1 profile. Its GAL sidebar belongs to the old combined plugin; router 0.12.0 has no GAL entry. A green launch check proves local entry checks passed, not vendor account authentication or paid-task success.*
 
-## Install the right version
+## Install the independent plugins
 
-| Plugin version | Intended host | Install status |
+In **DeepSeek Harness Desktop → Plugins → Add plugin**, enter one exact package name:
+
+| What you want | Installation input | Repository |
 | --- | --- | --- |
-| **0.11.1** | **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2** | GitHub release archive and npm `next` tag; install with the exact version because npm `latest` remains 0.4.32. |
-| **0.11.0** | **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2** | Previous release; runtime is the same, but its npm README metadata is missing and its bundled README is stale. Use 0.11.1. |
-| **0.10.2** | **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2** | Historical local compatibility fix, verified in an isolated official rc.2 runtime; not published. |
-| **0.10.1** | **DeepSeek Harness Desktop 0.2.0-rc.1 only** | Historical prerelease; the Desktop plugin manager rejects it on rc.2. |
-| **0.9.0** | **DeepSeek Harness Desktop 0.2.0-rc.1** | Previously published on npm and GitHub. This older build lacks the new Gal content. |
-| **0.8.0** | DSH 0.1.7-rc.2 dependencies | Incompatible with Desktop 0.2.0-rc.1; the Desktop plugin manager rejects it. |
-| **0.4.32** | Legacy `@deepseek-ai/dsh-settings` peer range `^0.1.1-rc.1 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` | Still carries npm's `latest` tag as of 2026-09-29. Installing without an explicit version can select this older package; this row does not claim every older Desktop build was tested. |
+| Model routing and official tools | `@ljwei-stak/model-router-galgame@0.12.0` | [Model Router](https://github.com/Alice-Marx/model-router-galgame) |
+| GAL only, or GAL alongside the router | `@ljwei-stak/dsh-galgame@0.1.0` | [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) |
 
-### Install 0.11.1
+For npm installation, select the official **HTTPS** source `https://registry.npmjs.org/` if a mirror has not synchronized the exact version. Install, enable, and restart when prompted. Router details should show **0.12.0** and its sidebar **Model Router**; the separate GAL package adds **Gal Module**. Either package can be installed without the other. Global `npm install -g` does not register a plugin in your Desktop profile.
 
-In DeepSeek Harness Desktop, open **Plugins → Add plugin**. Download the versioned GitHub `.tgz` archive from the [v0.11.1 release](https://github.com/Alice-Marx/model-router-galgame/releases/download/v0.11.1/ljwei-stak-model-router-galgame-0.11.1.tgz) and enter its absolute path, or install from npm by entering:
+### Upgrade from the combined 0.11.x plugin
+
+1. Before upgrading, use the old GAL player's **Export save** for each story progress you want to keep, and back up the Harness profile. A JSON export contains the current story state, not all slots, settings, read history, or local audio.
+2. Install `@ljwei-stak/dsh-galgame@0.1.0` in the **same profile**.
+3. Update the existing `@ljwei-stak/model-router-galgame` plugin to **0.12.0** through the plugin manager. Finish both installations before continuing play; this removes the old combined GAL entry and leaves one entry from the independent GAL plugin.
+4. Open the new GAL entry and verify your progress. The standalone plugin retains the old localStorage keys in the same profile. For a different profile or a missing state, select the matching story and import the JSON backup.
+
+The standalone GAL core contains **Echo City: Main Saga** and **Old City Migration: The Unfinished Promise**. Previously separated stories remain in their source archive and are not shipped with either core plugin. See [migration notes](MIGRATION.md) for save limitations and older desktop integrations.
+
+### Install a versioned release archive
+
+Download the `.tgz` attachment from the [router v0.12.0 release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.12.0) or [GAL v0.1.0 release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0). Enter the downloaded file's absolute path, for example:
 
 ```text
-@ljwei-stak/model-router-galgame@0.11.1
+D:\Plugins\ljwei-stak-model-router-galgame-0.12.0.tgz
 ```
 
-If the exact npm version is unavailable, choose the official HTTPS source `https://registry.npmjs.org/` or use the GitHub release archive. Install, enable, and restart if prompted. Confirm plugin details show **0.11.1**, the host is **0.2.0-rc.1 or 0.2.0-rc.2**, and the sidebar shows **Model Router** and **Gal Module**. Global `npm install -g` does not register a plugin in your Desktop profile.
-
-### Upgrading an existing local plugin
-
-If no matching plugin is listed under **Installed**, install the 0.11.1 release directly. If a same-named older copy is present, export current story progress when possible and back up your profile data, then follow the plugin manager's instructions to remove the older instance before adding the release. Disabling the old instance may still leave it marked as installed. Preserve the profile and application data. The existing manual save keys remain compatible.
-
-You can also extract the archive and enter its inner `package` directory, which contains `package.json` and `.dsh-plugin`. Where a checksum sidecar is supplied, compare it with `Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Downloads\ljwei-stak-model-router-galgame-0.11.1.tgz'`. Do not work around the old rc.1-only peer rejection by modifying `app.asar` or bypassing the version check.
-
-### Pin the version when installing from npm
-
-Version 0.11.1 is published on npm under the `next` tag. Install `@ljwei-stak/model-router-galgame@0.11.1` or `@ljwei-stak/model-router-galgame@next`. The npm `latest` tag still points to 0.4.32, so a bare package name can select an incompatible older build. Version 0.11.0 remains available for history; if a mirror has not synchronized 0.11.1, use `https://registry.npmjs.org/` or the v0.11.1 GitHub archive.
-
-### Previously published 0.9.0: install by package name
-
-1. In DeepSeek Harness Desktop, open **Plugins → Add plugin**.
-2. Enter this exact package name, including the version:
-
-   ```text
-   @ljwei-stak/model-router-galgame@0.9.0
-   ```
-
-3. If the selected mirror cannot reach the package, choose an available **HTTPS** npm source, for example `https://registry.npmjs.org/`.
-4. Install and enable the plugin. The sidebar should show **Model Router** and **Gal Module**.
-
-### Previously published 0.9.0: install the release archive
-
-Download [`ljwei-stak-model-router-galgame-0.9.0.tgz`](https://github.com/Alice-Marx/model-router-galgame/releases/download/v0.9.0/ljwei-stak-model-router-galgame-0.9.0.tgz) from the [v0.9.0 GitHub release](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0), then enter its absolute path in the Desktop **Add plugin** input (for example, `D:\Downloads\ljwei-stak-model-router-galgame-0.9.0.tgz`). On Windows, you can check the downloaded file:
+Where a checksum sidecar is supplied, compare it with:
 
 ```powershell
-Get-FileHash 'D:\Downloads\ljwei-stak-model-router-galgame-0.9.0.tgz' -Algorithm SHA256
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-model-router-galgame-0.12.0.tgz'
 ```
 
-The published 0.9.0 archive has SHA-256 `FB06ED5527DE256062BB932EF5A35AF8FF9BEB8B6D2B3F635E2F30D0736A8E4B`. Replace the example path with your download path. The npm and GitHub release archives were downloaded and compared byte for byte during publication.
+You can also extract the archive and enter its inner `package` directory, which contains `package.json` and `.dsh-plugin`. The download may be stored on your preferred drive; runtime data location is controlled by the Harness profile. Upgrade through the plugin manager without modifying `app.asar` or bypassing dependency checks.
 
-### Build the 0.11.1 release from source
+### Version history
 
-With Node.js 22.19+ and pnpm installed, check out the `v0.11.1` tag and run these commands from the repository root:
+| Version | Intended host | Scope |
+| --- | --- | --- |
+| **Router 0.12.0** | **0.2.0-rc.1 / 0.2.0-rc.2** | Independent router release; GAL installs separately. Exact npm version or `@next`. |
+| **GAL 0.1.0** | **0.2.0-rc.1 / 0.2.0-rc.2** | First standalone GAL package, two core stories. Exact npm version or `@next`. |
+| [Combined 0.11.1](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.1) | 0.2.0-rc.1 / 0.2.0-rc.2 | Historical combined router and GAL package; corrected 0.11.0 release documentation. |
+| [Combined 0.11.0](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.11.0) | 0.2.0-rc.1 / 0.2.0-rc.2 | Historical GAL player release. |
+| 0.10.2 | 0.2.0-rc.1 / 0.2.0-rc.2 | Unpublished local compatibility build. |
+| [0.10.1](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.10.1) | 0.2.0-rc.1 only | Historical release; rejected on rc.2 by its peer dependency range. |
+| [0.9.0](https://github.com/Alice-Marx/model-router-galgame/releases/tag/v0.9.0) | 0.2.0-rc.1 | Historical official Desktop adaptation. |
+| 0.8.0 | DSH 0.1.7-rc.2 dependencies | Incompatible with Desktop 0.2.0-rc.1 / rc.2. |
+| 0.4.32 | Legacy DSH settings dependency range | Legacy release; do not use it for the current host. |
 
-```powershell
-pnpm install --frozen-lockfile
-npm run build:client
-npm pack --pack-destination dist
-```
-
-Install the resulting `.tgz` through the plugin manager. Use the plugin manager for upgrades too; do not modify the Desktop application directory or `app.asar`. See the [installation guide](INSTALLATION_GUIDE.zh.md) for the full Windows checklist, including tool installation outside the C drive.
-
-After enabling the plugin, configure your providers, models, and credentials on Harness's official **Models** page. The router only considers routes present there; its profile editor does not accept API keys.
+Configure providers, models, and credentials on Harness's official **Models** page. The router only considers registered routes; its profile editor does not accept API keys.
 
 ## Use the Model Router workbench
 
@@ -102,7 +89,7 @@ After enabling the plugin, configure your providers, models, and credentials on 
 
 1. Open **Model Router** in the sidebar. The top status shows how many providers and routes the official **Model directory** returned. If it is empty, configure a provider and model on Harness's official **Models** page, then click **Refresh** in the workbench's directory card. A route appearing in the directory does **not** prove that its credentials or network connection work.
 2. In **Task planning → Task description**, write what you want done and list distinct actions on separate lines for a compound request. Choose **Single task** for one direct recommendation or **Team allocation** for dependent work packages. Team mode decomposes requests that the router classifies as complex; selecting the mode alone does not start a team.
-3. The **Estimated budget for this run (USD)** field may show `10`. That is **$10 for planning**, based on your supplied prices and estimated tokens. Set it to `0` to remove the estimate constraint. Neither value caps a provider bill or authorizes a model call.
+3. The **Estimated budget for this run (USD)** field may show `10`. That is a **$10 estimate target**, based on your supplied prices and estimated tokens; generating the plan itself is local and free. Set it to `0` to remove the estimate constraint. Neither value caps a provider bill or authorizes a model call.
 4. Click **Generate route recommendation**. Planning runs locally. Scroll down **past Model pricing and capabilities** to **Route recommendation**. Read the recommended `provider/model`, complexity band, estimated cost or “price needs configuration,” and the **execution channel** badge. In team mode, check each package's objective, difficulty, route, dependencies, verification checklist, and warnings. `Official CLI` means a trusted local launch entry is ready; `Model directory API` means the plan routes through Harness's configured model API.
 5. To improve the recommendation, save each exact `provider/model` route's quality score and input/output prices in **USD per million tokens** in the **Model pricing and capabilities** editor, then click **Generate route recommendation** again. Saving a profile invalidates the previous result; a missing price remains unknown. Review the **Official tools** cards below the result for probe, install/repair, and launch-readiness status. ZCode opens its own installer and requires you to complete its directory choice.
 6. To actually ask or run a model, open an **official Harness session** and request `model_router_consult` for a live second opinion, `model_router_tool_run` for one ready vendor CLI, or `model_router_team_execute` for dependent CLI work packages. You can also use `/router` to request a plan and `/tools` to inspect tools in a session. An editable CLI task requires approval and a clean Git repository; check the vendor run record for the actual model and charge.
@@ -265,62 +252,27 @@ Claude Code, Codex, MiMo Code, and Grok Build support read-only and approved edi
 
 The planned Harness model ID is not necessarily the vendor CLI's model name. A saved `cliModel`, or temporary `cliModelsJson` keyed by tool or work-package ID, can provide a known vendor CLI name. A package-specific temporary mapping takes priority over a tool mapping, then the saved profile. ZCode uses its configured default model. Most vendor CLIs do not provide a verifiable actual model ID in their results, so inspect vendor run records to confirm which model and price applied. The plugin's sequential CLI team runner is separate from Harness's built-in Agent Teams lifecycle.
 
-## Gal Module
+## Optional GAL installation
 
-![Illustration from the Gal story, shown as artwork rather than a Desktop screenshot](aipicture/story-backgrounds/model-city-title.webp)
+[DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) owns the story player, artwork, free mode, music, preferences, and saves. Install it separately with `@ljwei-stak/dsh-galgame@0.1.0`; its README contains the player tutorial. It does not require the router, and the router does not require its images or story engines.
 
-*Story artwork from the plugin's Gal assets; it is not a capture of the running interface.*
+## Development and verification
 
-The **Story** tab runs locally: backgrounds, portraits, dialogue, choices, history, endings, autosave, manual slots, quick saves and JSON backups. No model account is needed. Version 0.11.0 retains five episodes:
+Use Node.js **22.19+** and pnpm. From a complete source checkout, run:
 
-The module opens on a **title menu**. Select an episode and choose **Start new story** or **Continue**; settings, the gallery and Free mode are also available there. The in-stage controls remain available in fullscreen.
+```powershell
+pnpm install --frozen-lockfile
+npm run build:client
+npm test
+npm run check:client
+pnpm peers check
+npm pack --pack-destination dist
+```
 
-| Episode in the selector | Scope | Ending distinction |
-| --- | --- | --- |
-| **千桥协议** (Thousand Bridges) | Eight main chapters and character side stories. | Six institutional endings. |
-| **旧城迁移篇** (Old City Migration) | The earlier complete migration story. | Its own existing branches. |
-| **雪灯来信** (Letter by Snowlight) | A **standalone five-chapter adaptation**, nine choices. | Two short-story endings, “各自点灯” and “如常”; neither is the full saga's TRUE END. |
-| **未寄出的春天** (The Unsent Spring) | An **independent twelve-chapter sequel** with nine optional character routes. | Five endings. The conditional “letters” ending requires two preserved originals, asking each person for consent, distributed relay, a shared anchor, and at least two completed side routes. |
-| **回声之城·正篇** (Echo City: Main Saga) | Prologue, eight common chapters, six character routes, hidden *Shadow and Self* with the naming night, and a TRUE END. | **Only the ChatGPT/princess route has separate true and dark endings**; completing all six routes and the hidden route unlocks the ensemble TRUE END. |
+The client must be rebuilt when its source changes; a previously generated bundle does not verify new code. Install the resulting archive through the Desktop plugin manager in a separate test profile to check the router entry and official-tool panel. Test GAL alone and alongside the router using its own repository's instructions. Live sign-in, actual vendor model identity, response quality, and provider billing require the account holder's acceptance checks.
 
-Open **Gal Module → Story mode**, choose an episode, advance the dialogue and select choices. **History** revisits prior lines. **Save 1–3 / Load 1–3** keeps manual checkpoints; Thousand Bridges and Old City Migration retain their historical shared slots, while the three newer episodes have independent slots. A per-episode **Quick save** does not consume those slots. Export a JSON backup before upgrades or moving to another profile; imports accept the same episode, enforce a 2 MB UTF-8 limit, and confirm before replacing current progress.
+The [0.11.1 release report](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md) and [rc.2 compatibility report](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md) preserve the earlier release record. Current split-release results belong in the new project task report; historical test counts do not establish standalone-package compatibility.
 
-For the short story, Spring, and older episodes, directly entering a chapter starts it with fresh state rather than inheriting earlier choices; play from the beginning to see consequences carry through. The **Main Saga** preserves flags and 14 character-affinity values across sequential chapter changes. Its hidden route requires the DeepSeek/snow route's true ending, a complete transcription of the chapter-four note, and two observations of the steward's daily life. All six character routes and the hidden route are required for the TRUE END. The naming night lets you name the steward; the default is 衔雪.
+For installation failures, include the host and plugin versions, plugin installation details, and redacted logs in a [GitHub issue](https://github.com/Alice-Marx/model-router-galgame/issues).
 
-### Portraits, music and reading controls
-
-**Full-body original artwork** is the default stage source, using all 28 existing character originals, including the orange-haired Claude supplied by the user. The stage reserves space above dialogue and choices to keep the complete body visible. **Expression close-ups** remain an alternative. Full-body moods use the same original image; dialogue avatars can still change expressions. This update does not add newly painted full-body expression variants.
-
-Open **Gal Settings** from the page header or Story toolbar. Adjust **Main character default** and **Companion default** separately, or select a named character to create a size/position override. Scale is 40–180%, horizontal position is 0–100%, and bottom offset is −30–50%. The preview updates immediately and settings are saved to the current profile. Clear a character override to inherit the defaults; resetting all Gal settings preserves story saves and read-node records.
-
-Seven built-in music loops play offline after you click **Enable music**. Music and UI effects have separate 0–100% volume controls; zero volume is silent, and **Mute all** covers both. You may select a recognized local audio file up to **30 MB**; it stays on your machine and is available only for the current plugin session, so select it again after reopening. This player has optional UI cues, not voiced character dialogue.
-
-Set text interval (0–120 ms; 0 reveals immediately), font size (12–32 px), auto-reading delay (300–10000 ms), and dialogue opacity (20–100%). **Auto read** waits until each line finishes. **Read-text skip** stops at unread content unless you explicitly enable skipping unread text. Both stop at choices, naming inputs and endings; neither chooses branches. Reading pauses while settings, history or confirmation views are open and while the page is hidden. The music background-pause option separately controls music.
-
-Click the Story stage's blank area to focus it before using **Enter/Space** to reveal or continue, **A/S** for auto/skip, **H/Escape** to hide/restore the interface, **F** for stage fullscreen, **Q/L** for quick save/load, and **←** for the previous line. Text inputs and controls keep their own keys. Previous-line rollback retains at most **30 steps in this reading session** and is cleared by reopening, switching episodes/chapters, or loading a save.
-
-The **Artwork gallery** exposes the existing portraits and scene images from the start, with expression fallbacks and possible spoilers. It is an open asset viewer, not a progression-unlocked CG collection. See the [detailed Chinese player guide](docs/GAL_SETTINGS.zh.md) for every control and recovery step. JSON backups contain current story progress, not the entire profile, settings, music file or all manual slots.
-
-Spring content revision 1 saves remain readable in revision 2; loading them does not invent flags for newly added choices. To experience the new **preserve two originals** and **ask each person** choices, manually save old progress in a slot and restart Spring from its opening. Story saves are local to the current Desktop profile and are not cloud backups. The stories use fictional personifications; their dialogue does not establish real product capabilities or prices. See the [Chinese five-story play guide](docs/ECHO_CITY_STORY.zh.md) for chapter and ending details.
-
-The **Free** tab uses an officially configured model route for in-panel chat, can stop a pending response, or copies the opening prompt into a Harness session. Portrait and text settings are shared with Story mode. Free-mode replies are real model calls and may incur charges. The plugin does not store provider credentials; real sign-in, permissions and billing remain user acceptance checks.
-
-The existing 0.10.1 artwork collection provides **28 original PNG portraits** for base-image display and Free-mode character selection. **27 story characters × six generated expressions = 162** expression sprites, plus six Echo City backgrounds from that earlier update. JEV has an original base portrait and is selectable in Free mode, but has no story appearance or expression set. Two-person scenes use `cast` and `stageCharacters`. This player update reuses those assets; the [portrait provenance guide](docs/GAL_ART_SOURCES.zh.md) separates originals from generated variants.
-
-![0.11.0 title menu](docs/assets/gal-title-0.11.0-preview.jpg)
-
-*The actual 0.11.0 component in a local browser preview: episode selection, new story and continue.*
-
-![Full-body stage in the isolated official rc.2 runtime](docs/assets/gal-official-fullbody-0.11.0.jpg)
-
-*The 0.11.0 archive loaded by the installed official rc.2 runtime in a separate test profile. Full-body art remains above the translucent dialogue box; in-stage controls work in fullscreen.*
-
-![0.11.0 layout preview and audio settings](docs/assets/gal-settings-0.11.0-preview.jpg)
-
-*Claude's complete original portrait with live layout controls, music and reading settings. Title and settings images are local component previews; the stage is from the isolated official rc.2 runtime. The user's current Desktop profile still needs acceptance.*
-
-## Verification status and further reading
-
-The 0.11.1 package carries the 0.11.0 runtime, which passed **153 main tests and 75 additional story/game tests, 228 in total**, and loaded in a separate profile of the installed official rc.2 runtime. This build passes the 153-test suite, peer checks, client build check, and local archive asset verification. npm published 0.11.1 under `next`; its registry shasum matches the uploaded archive. npm `latest` intentionally remains at 0.4.32. Current-profile installation, live sign-in, model identity and billing remain acceptance checks.
-
-The [0.11.1 release report](https://github.com/Alice-Marx/model-router-galgame/blob/main/PROJECT-TASK-REPORT-2026-10-02-NPM-RELEASE-AND-README-FIX.md) records changed files, publication checks, remaining acceptance work and the follow-up plan. The [Gal player report](PROJECT-TASK-REPORT-2026-10-01-GAL-PLAYER.md) covers runtime behavior; the [rc.2 compatibility report](PROJECT-TASK-REPORT-2026-10-01-RC2-COMPAT.md) covers host validation; and [migration notes](MIGRATION.md) cover older integrations.
+License: [MIT](LICENSE).

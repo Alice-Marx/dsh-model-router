@@ -35,7 +35,7 @@ export async function generate({ check = false } = {}) {
     jsxFactory: 'React.createElement',
     jsxFragment: 'React.Fragment',
     // The desktop loader consumes a single self-contained client.js file.
-    // Selected Gal artwork is embedded so installed plugins have no source-path dependency.
+    // The router client has no story engine or image asset dependency.
     loader: { '.css': 'text', '.png': 'dataurl', '.webp': 'dataurl' },
     external: [
       'react', 'react/*', 'react-dom', 'react-dom/*',
@@ -43,7 +43,10 @@ export async function generate({ check = false } = {}) {
     ],
     outfile: OUTPUT,
     write: false,
+    metafile: true,
   })
+  const galInputs = Object.keys(result.metafile.inputs).filter(path => /(?:gal-|Gal[A-Z]|aipicture|echo-portraits|echo-sprites)/.test(path))
+  if (galInputs.length) throw new Error(`Router bundle contains GAL dependencies: ${galInputs.join(', ')}`)
   const output = result.outputFiles.find(file => file.path.endsWith('.js'))
   if (output === undefined) throw new Error('esbuild did not return a JavaScript bundle')
   const code = wrapper(output.text)

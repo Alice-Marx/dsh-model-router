@@ -1,6 +1,4 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write plugins/model-router-galgame/README.md
-README.md: ebd1b7f0acb1c600a3a160207bbe0a97d1e73565
-README.zh.md: 8ac320c41feaae57f571628ed4322dd1edaef9bd
+# README translation pairing for this repository.
+README.md: 4d820ba4402b344268124315ba74228dc6c2e79f
+README.zh.md: f00ed637e2f3a22b28cf7f5e4a4015f9c09eba0c
+
