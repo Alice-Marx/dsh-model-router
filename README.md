@@ -402,6 +402,18 @@ Claude Code, Codex, MiMo Code, and Grok Build support read-only and approved edi
 
 The planned Harness model ID is not necessarily the vendor CLI's model name. A saved `cliModel`, or temporary `cliModelsJson` keyed by tool or work-package ID, can provide a known vendor CLI name. A package-specific temporary mapping takes priority over a tool mapping, then the saved profile. ZCode uses its configured default model. Most vendor CLIs do not provide a verifiable actual model ID in their results, so inspect vendor run records to confirm which model and price applied. The plugin's sequential CLI team runner is separate from Harness's built-in Agent Teams lifecycle.
 
+### Interactive terminal (官方工具终端, 0.14.0-beta.1, branch build)
+
+The workbench has an **官方工具终端** card below the tool health check. It runs your system shell (PowerShell on Windows, your login `$SHELL` elsewhere) or one installed official CLI (`codex`, `claude`, `kimi`, `mcode`, `mimo`, `grok`, `gemini`) interactively, in tabs, with live output: multi-turn conversations, full-screen TUIs, and logins such as `codex login`, `claude auth login`, `kimi login`, `mcode login`, `mimo auth login`, `grok login` (choose **登录**).
+
+- **Boundary.** The terminal is your own terminal: it does **not** go through the Harness process sandbox, uses your own CLI logins and your full login environment (PATH, proxies, API keys), and can read and write anything your account can. Every session starts only after a confirmation that shows the command, the absolute working directory, and this boundary. The `confirmUnsandboxedCli` setting for routed runs is unchanged.
+- **Fixed launch targets.** The client can only name the shell or a registry CLI (plus its fixed login subcommand); it never supplies an executable, arguments, or environment. On Windows, native `.exe` files start directly, npm `.cmd` shims through `cmd.exe /d /s /c`, `.ps1`-only installs through `powershell -File`.
+- **Backend.** A pseudo terminal from the prebuilt, N-API [`@lydell/node-pty`](https://www.npmjs.com/package/@lydell/node-pty) (an optional dependency with per-platform binaries; no build tools or install scripts). It loads in the Harness Desktop Host (Electron 44 running as Node). If it cannot load, sessions fall back to pipes: no TTY, so full-screen TUIs may not render or start, resizing does nothing, arrow keys may not work, and the Host echoes input. Line-based logins and PowerShell work. The card shows which backend is active.
+- **Transport.** Output streams through long-poll reads over the plugin's existing Typert remote (`terminalRead`); keystrokes (`terminalWrite`) and resizes (`terminalResize`) are separate calls.
+- **Lifetime.** Ending the tab, closing the workbench panel, unloading or reloading the plugin, or quitting Harness kills the process. A session that nobody reads for about 2 minutes is killed, and no session runs longer than 6 hours. At most 4 sessions run at once.
+- **Privacy.** Input and output are never logged or saved. The card's history (and `state.json` → `terminalSessions`) stores only the tool, mode, working directory, start/end time, duration, exit code, and end reason.
+- **Keys.** With text selected, Ctrl+C copies; otherwise it interrupts. Ctrl+Shift+V pastes. Drag the terminal's lower-right corner to change its height.
+
 ## Optional GAL installation
 
 [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) owns the story player, artwork, free mode, music, preferences, and saves. Install it separately with `@ljwei-stak/dsh-galgame@0.1.0`; its README contains the player tutorial. It does not require the router, and the router does not require its images or story engines.

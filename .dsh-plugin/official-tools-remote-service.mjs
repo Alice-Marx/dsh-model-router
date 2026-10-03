@@ -55,6 +55,22 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** Execute a previewed run once every listed reason was confirmed. */
   startRun(request) { return settled(() => (this.services.startRun ?? unavailable)(request)) }
 
+  /** Terminal backend (PTY or pipe fallback), limits and live sessions. */
+  terminalInfo() { return settled(() => (this.services.terminalInfo ?? unavailable)()) }
+
+  /** Start one confirmed session: the user's shell or a fixed official CLI. */
+  terminalStart(request) { return settled(() => (this.services.terminalStart ?? unavailable)(request)) }
+
+  /** Long-poll new output from a cursor. */
+  terminalRead(request) { return settled(() => (this.services.terminalRead ?? unavailable)(request)) }
+
+  /** Forward keystrokes verbatim; never logged. */
+  terminalWrite(request) { return settled(() => (this.services.terminalWrite ?? unavailable)(request)) }
+
+  terminalResize(request) { return settled(() => (this.services.terminalResize ?? unavailable)(request)) }
+
+  terminalStop(request) { return settled(() => (this.services.terminalStop ?? unavailable)(request)) }
+
   /** Re-probe the local fixed registry; the caller cannot supply a command. */
   async list() {
     const tools = await probeAllTools({ fresh: true })

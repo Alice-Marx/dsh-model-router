@@ -19,6 +19,14 @@ import { routeBoundaries } from './shared/security-boundaries.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
 import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
+import { createTerminalManager } from './shared/cli-terminal.mjs'
+import {
+  parseTerminalRead,
+  parseTerminalResize,
+  parseTerminalStart,
+  parseTerminalStop,
+  parseTerminalWrite,
+} from './shared/cli-terminal-protocol.mjs'
 import {
   getOfficialTool,
   installCommandLine,
@@ -35,6 +43,7 @@ import {
   installStatus,
   installedToolIds,
   defaultRunner,
+  ensureNpmPrefixOnPath,
 } from './shared/official-tools-runtime.mjs'
 
 // Cordis plugin name, matching the profile entry id; unchanged by the 0.13.0 package rename.
@@ -1254,8 +1263,38 @@ export async function startWorkbenchRun(ctx, config, request = {}, options = {})
 }
 
 /** Host operations behind the workbench RPC; the client never supplies commands or paths. */
-export function routerRemoteServices(ctx, config) {
+/**
+ * One terminal manager per Host plugin fiber. Sessions run outside the
+ * Harness sandbox with the Host's login environment; only metadata is kept.
+ */
+export function createRouterTerminals(options = {}) {
+  return createTerminalManager({
+    prepare: () => ensureNpmPrefixOnPath(),
+    onSessionEnd: record => { void routerStateStore().appendTerminalSession(record).catch(() => {}) },
+    ...options,
+  })
+}
+
+async function terminalHistory(limit = 20) {
+  const saved = await savedState()
+  return (saved.terminalSessions ?? []).slice(-limit).reverse()
+}
+
+function terminalServices(terminals) {
+  if (!terminals) return {}
   return {
+    terminalInfo: async () => ({ ...terminals.info(), history: await terminalHistory() }),
+    terminalStart: async request => terminals.start(parseTerminalStart(request)),
+    terminalRead: async request => terminals.read(parseTerminalRead(request)),
+    terminalWrite: async request => terminals.write(parseTerminalWrite(request)),
+    terminalResize: async request => terminals.resize(parseTerminalResize(request)),
+    terminalStop: async request => terminals.stop(parseTerminalStop(request)),
+  }
+}
+
+export function routerRemoteServices(ctx, config, { terminals = null } = {}) {
+  return {
+    ...terminalServices(terminals),
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })
       const saved = await savedState()
@@ -1279,7 +1318,16 @@ export function routerRemoteServices(ctx, config) {
 export function apply(ctx, config = {}) {
   // The official Host injects typert; direct lightweight uses of apply may
   // supply only the model/command services and do not expose the Desktop RPC.
-  if (ctx.typert) registerOfficialToolsRemote(ctx, routerRemoteServices(ctx, config))
+  if (ctx.typert) {
+    const terminals = createRouterTerminals()
+    // Plugin unload or patch reload kills every interactive session.
+    ctx.effect(() => {
+      const onExit = () => { terminals.disposeAll('dispose') }
+      process.once('exit', onExit)
+      return () => { process.off('exit', onExit); terminals.disposeAll('dispose') }
+    }, 'model-router-galgame: interactive terminals')
+    registerOfficialToolsRemote(ctx, routerRemoteServices(ctx, config, { terminals }))
+  }
   ctx.on('tools/pre-execute', async (exec, next) => {
     const decision = await next()
     if (decision.kind !== 'allow') return decision

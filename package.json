@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.13.3",
+  "version": "0.14.0-beta.1",
   "type": "module",
   "description": "Model Router for official DeepSeek Harness Desktop: cost-aware task routing, dependent work packages and official vendor CLI discovery, installation and execution. GAL is available separately as @ljwei-stak/dsh-galgame.",
   "repository": {
@@ -61,6 +61,8 @@
     ".dsh-plugin/shared/routing-presets.mjs",
     ".dsh-plugin/shared/subscription-billing.mjs",
     ".dsh-plugin/shared/security-boundaries.mjs",
+    ".dsh-plugin/shared/cli-terminal.mjs",
+    ".dsh-plugin/shared/cli-terminal-protocol.mjs",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
@@ -77,7 +79,7 @@
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs --check",
-    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs tests/task-executors.test.mjs tests/roadmap.test.mjs tests/insights-state.test.mjs tests/billing-team-ledger.test.mjs tests/subscription-billing.test.mjs tests/subscription-host.test.mjs tests/test-pass-regressions.test.mjs tests/roadmap-gaps.test.mjs tests/cordis-inject.test.mjs",
+    "test": "node --test tests/router.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs tests/task-executors.test.mjs tests/roadmap.test.mjs tests/insights-state.test.mjs tests/billing-team-ledger.test.mjs tests/subscription-billing.test.mjs tests/subscription-host.test.mjs tests/test-pass-regressions.test.mjs tests/roadmap-gaps.test.mjs tests/cordis-inject.test.mjs tests/cli-terminal.test.mjs",
     "prepack": "node scripts/prepack.mjs",
     "pack:local": "npm pack --pack-destination dist"
   },
@@ -95,6 +97,9 @@
     "@deepseek-ai/dsh-tools": "0.2.0-rc.1 || 0.2.0-rc.2",
     "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.1 || 0.2.0-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "optionalDependencies": {
+    "@lydell/node-pty": "1.2.0-beta.15"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -154,6 +159,8 @@
     "@deepseek-ai/dsh-util-workspace-path": "0.2.0-rc.2",
     "@deepseek-ai/dsh-workspace": "0.2.0-rc.2",
     "@deepseek-ai/schemastery": "3.18.4",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "esbuild": "0.28.2",
     "react": "18.3.1",
     "react-dom": "18.3.1"

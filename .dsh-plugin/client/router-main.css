@@ -176,3 +176,20 @@
   .mr-launch-preview { background: rgba(255, 255, 255, .04); }
   .mr-confirm-box { background: rgba(217, 140, 30, .12); color: #f2d39b; }
 }
+
+/* 官方工具终端 */
+.mr-term-cwd { flex: 1 1 320px; min-width: 240px; }
+.mr-term-cwd .mr-input { width: 100%; box-sizing: border-box; }
+.mr-term-confirm { margin-top: 12px; padding: 12px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-markdown-code-block); font-size: 13px; line-height: 20px; }
+.mr-term-confirm ul { margin: 6px 0 0; padding-left: 20px; }
+.mr-term-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.mr-term-tab { display: inline-flex; align-items: center; border: 1px solid var(--dsw-alias-border-l1); border-radius: 7px; overflow: hidden; font-size: 12px; }
+.mr-term-tab[aria-selected="true"] { border-color: var(--dsw-alias-label-primary, currentColor); font-weight: 600; }
+.mr-term-tab button { border: 0; background: transparent; color: inherit; padding: 4px 8px; cursor: pointer; font: inherit; }
+.mr-term-tab-close { opacity: .7; }
+.mr-term-pane { margin-top: 8px; }
+.mr-term-screen { height: 420px; min-height: 160px; resize: vertical; overflow: hidden; padding: 6px; background: #1e1e1e; border-radius: 8px; box-sizing: border-box; }
+.mr-term-warning { color: var(--dsw-alias-label-danger); }
+.mr-term-history { margin-top: 14px; font-size: 12px; }
+.mr-term-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.mr-term-table th, .mr-term-table td { padding: 4px 6px; border-bottom: 1px solid rgba(127, 127, 127, .25); text-align: left; vertical-align: top; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
