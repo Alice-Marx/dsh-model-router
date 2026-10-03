@@ -16,48 +16,45 @@ import {
   startInstall,
   installStatus,
   resetForTests,
-  pinnedMiniMaxInstaller,
+  officialMiniMaxInstaller,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
 import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { emptyOutputError, outputIsEmpty, usageFromOutput, verifiedDiagnostic } from '../.dsh-plugin/shared/task-executors.mjs'
 
-test('MiniMax official Windows installer entry requires the pinned version and CLI digest',
+test('MiniMax official Windows installer entry: any release, but its code must match the npm registry',
   { skip: process.platform !== 'win32' }, async t => {
     const root = await mkdtemp(join(tmpdir(), 'model-router-minimax-'))
     t.after(async () => {
       if (resolve(root).startsWith(`${resolve(tmpdir())}${sep}`)) await rm(root, { recursive: true, force: true })
     })
-    const packageRoot = join(root, 'releases', '0.5.5', 'node_modules', '@minimax-ai', 'code')
+    const packageRoot = join(root, 'releases', '0.6.2', 'node_modules', '@minimax-ai', 'code')
     const nativeRoot = join(packageRoot, 'node_modules', 'better-sqlite3', 'build', 'Release')
     await mkdir(nativeRoot, { recursive: true })
     await writeFile(join(root, 'mcode.cmd'), '@ECHO off\r\n')
-    await writeFile(join(root, 'current'), '0.5.5\n')
+    await writeFile(join(root, 'current'), '0.6.2\n')
     await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
-      name: '@minimax-ai/code', version: '0.5.5', bin: { mcode: './cli.js' },
+      name: '@minimax-ai/code', version: '0.6.2', bin: { mcode: './cli.js' },
     }))
-    const cli = Buffer.from('official CLI fixture')
-    await writeFile(join(packageRoot, 'cli.js'), cli)
+    await writeFile(join(packageRoot, 'cli.js'), 'official CLI fixture')
     await writeFile(join(nativeRoot, 'better_sqlite3.node'), 'native fixture')
-    const digest = createHash('sha256').update(cli).digest('hex')
-    const found = await findManagedMiniMaxEntry(process.cwd(), [root], digest)
-    assert.equal(found?.source, 'verified-official-windows-installer-bundle')
-    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], '0'.repeat(64)), null)
-    await writeFile(join(root, 'current'), '0.5.4\n')
-    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], digest), null)
-    await writeFile(join(root, 'current'), '0.5.5\n')
-    await writeFile(join(packageRoot, 'cli.js'), 'tampered')
-    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], digest), null)
+    const asked = []
+    const attestor = verdict => ({ async matchesPackage(path, name, version) { asked.push([name, version]); return verdict } })
+    const found = await findManagedMiniMaxEntry(process.cwd(), [root], attestor({ ok: true, files: 1 }))
+    assert.equal(found?.source, 'official-windows-installer-npm-attested')
+    assert.equal(found.version, '0.6.2')
+    assert.deepEqual(asked.at(-1), ['@minimax-ai/code', '0.6.2'], 'the installed release, not a pinned one, is attested')
+    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], attestor({ ok: false, reason: 'tampered' })), null)
+    await writeFile(join(root, 'current'), 'not-a-version\n')
+    assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], attestor({ ok: true })), null)
   })
 
-test('MiniMax installer fallback verifies source bytes and pins the npm version selector', () => {
-  const source = Buffer.from('& $Npm view "$PackageName@latest" version --json\n')
-  const digest = createHash('sha256').update(source).digest('hex')
-  assert.match(pinnedMiniMaxInstaller(source, digest), /\$PackageName@0\.5\.5/)
-  assert.throws(() => pinnedMiniMaxInstaller(Buffer.from('tampered'), digest), /哈希/)
-  const noSelector = Buffer.from('Write-Step "latest"\n')
-  const otherHash = createHash('sha256').update(noSelector).digest('hex')
-  assert.throws(() => pinnedMiniMaxInstaller(noSelector, otherHash), /结构/)
+test('MiniMax installer fallback runs the official script as published (no version patching)', () => {
+  const source = Buffer.from('& $Npm install -g "@minimax-ai/code@latest"\n')
+  assert.equal(officialMiniMaxInstaller(source), source.toString())
+  assert.equal(officialMiniMaxInstaller(Buffer.concat([Buffer.from('\uFEFF'), source])), source.toString())
+  assert.throws(() => officialMiniMaxInstaller(Buffer.from('<html>404</html>')), /官方/)
+  assert.throws(() => officialMiniMaxInstaller(Buffer.from('Write-Host "something else"')), /官方/)
 })
 
 test('registry stays fail-closed and internally consistent', () => {
@@ -68,7 +65,7 @@ test('registry stays fail-closed and internally consistent', () => {
       assert.ok(tool.unsupportedReason.length > 10, `${tool.id} needs an actionable reason`)
       assert.equal(installCommandLine(tool), null, `${tool.id} must not expose an install command`)
     } else if (tool.manager === 'signed-windows-installer') {
-      assert.match(tool.version, /^\d+\.\d+\.\d+$/)
+      assert.equal(tool.version, undefined, `${tool.id} must not pin a version`)
       assert.deepEqual(tool.installArgs, [], `${tool.id} must not expose npm arguments`)
       assert.match(installCommandLine(tool), /官方签名安装器/)
     } else {
@@ -80,18 +77,18 @@ test('registry stays fail-closed and internally consistent', () => {
   assert.equal(getOfficialTool('does-not-exist'), null)
 })
 
-test('registry pins the verified official npm distributions', () => {
-  assert.equal(getOfficialTool('kimi-code').version, '2.1.1')
-  assert.equal(getOfficialTool('claude-code').version, '2.1.283')
-  assert.equal(getOfficialTool('minimax-code').version, '0.5.5')
+test('registry follows each vendor\'s latest release instead of pinning versions', () => {
+  for (const tool of OFFICIAL_TOOLS) {
+    assert.equal(tool.version, undefined, `${tool.id} must not pin a version`)
+    if (tool.manager !== 'npm') continue
+    const spec = tool.installArgs.find(arg => arg.startsWith(`${tool.package}@`))
+    assert.equal(spec, `${tool.package}@latest`, `${tool.id} installs @latest`)
+    assert.ok(tool.installArgs.includes('--registry=https://registry.npmjs.org/'), `${tool.id} uses the official registry`)
+    assert.doesNotMatch(installCommandLine(tool), /@\d+\.\d+\.\d+/)
+  }
   assert.equal(getOfficialTool('minimax-code').package, '@minimax-ai/code')
-  assert.equal(getOfficialTool('mimo-code').version, '0.1.15')
-  assert.equal(getOfficialTool('codex').version, '0.157.1')
-  assert.equal(getOfficialTool('grok-build').version, '1.0.41')
-  assert.equal(getOfficialTool('gemini').version, '0.62.0')
   assert.equal(getOfficialTool('gemini').package, '@google/gemini-cli')
-  assert.ok(getOfficialTool('gemini').installArgs.includes('@google/gemini-cli@0.62.0'))
-  assert.ok(getOfficialTool('kimi-code').installArgs.includes('@moonshot-ai/kimi-code@2.1.1'))
+  assert.match(installCommandLine(getOfficialTool('zcode')), /官方签名安装器/)
 })
 
 test('provider keywords map conservatively to registry tools', () => {

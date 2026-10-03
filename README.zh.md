@@ -143,7 +143,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-rou
 
 工作台顶部按下面顺序展示这些能力。会话内对应的工具在括号里。
 
-1. **开箱体检**（`model_router_health`）。第一次打开工作台时，会对注册表里的每个官方工具检查三件事：是否安装、版本是否等于本版固定版本、是否已登录。登录检查只跑很便宜的状态命令（超时很短），或只检查凭据文件是否存在（从不读取内容）：
+1. **开箱体检**（`model_router_health`）。第一次打开工作台时，会对注册表里的每个官方工具检查三件事：是否安装、已安装哪个版本（旁边显示厂商最新版，有新版本时提示“有新版本”）、是否已登录。插件不再固定版本：最新版本取自 npm registry（`<包名>/latest`）或 ZCode 官方下载页，缓存约 12 小时；离线或查询失败时只显示“最新版本未知”，不影响使用。新版本未经插件测试，解析器会尽量兼容输出格式变化，遇到问题请反馈。登录检查只跑很便宜的状态命令（超时很短），或只检查凭据文件是否存在（从不读取内容）：
 
    | 工具 | 检测方式 | 登录方法 |
    | --- | --- | --- |
@@ -154,10 +154,10 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-rou
    | MiMo Code | `MIMO_API_KEY`，或 `~/.local/share/mimocode/auth.json`（`$XDG_DATA_HOME`；该文件也可能只存了供应商 API Key，计费方式记为未知） | `mimo auth login` |
    | Grok Build | `XAI_API_KEY`，或 `~/.grok/auth.json`（`$GROK_HOME`）。Windows 上 npm 全局目录不在 C 盘时，插件以 `GROK_HOME=<npm 全局目录>\.model-router-grok` 启动 Grok，体检会显示这个实际路径 | `grok login`（无浏览器时加 `--device-auth`）；使用该目录时运行 `$env:GROK_HOME='<路径>'; grok login` |
    | MiniMax Code | `MINIMAX_API_KEY`，或不含密钥的状态文件 `~/.minimax/auth/prod/<cn\|global>/mcode-public/auth-state.json`（`$MINIMAX_DATA_DIR`）中的 `status`：`authenticated` → 已登录；`anonymous` → 未知（用 `mcode set-minimax-key` 保存的 API Key 仍可用） | `mcode login` |
-   | ZCode | 桌面应用，没有状态命令 → 未知。插件只启用签名与 CLI 哈希已核验的 3.14.3；装了其他版本时会如实说明，而不是显示“未安装” | 欢迎页选“连接 BigModel / Z.ai 继续使用”；GLM Coding Plan 在“模型设置 → BigModel”右上角选“编程套餐” |
+   | ZCode | 桌面应用，没有状态命令 → 未知。任何版本只要 `ZCode.exe` 带有北京智谱华章科技股份有限公司的有效 Authenticode 签名即可启用（其 CLI 脚本按签名构建首次使用时记录，详见下文） | 欢迎页选“连接 BigModel / Z.ai 继续使用”；GLM Coding Plan 在“模型设置 → BigModel”右上角选“编程套餐” |
 
-   文件路径取自官方发布包（kimi-code 2.1.1、mimocode 0.1.15、grok 1.0.41）。找不到文件时显示“未知”而不是“未登录”，因为这些 CLI 也可以通过自定义供应商或（MiMo）免费匿名通道使用。体检不会发起登录。
-   - 未安装的工具点**一键安装**，复用原有的固定注册表安装器。
+   文件路径取自各厂商官方发布包。找不到文件时显示“未知”而不是“未登录”，因为这些 CLI 也可以通过自定义供应商或（MiMo）免费匿名通道使用。体检不会发起登录。
+   - 点**一键安装最新版** / **更新到最新版 X**，从官方 registry 安装 `<包名>@latest`（ZCode：官方下载页上最新的签名安装器）。已安装版本高于官方最新正式版时不会降级。
    - 未登录的工具点**去登录**，查看并复制登录命令。
    - 体检结果缓存 10 分钟。路由会**立刻跳过未登录的 CLI**，直接走模型目录 API；以前 Codex 要等约 14 秒才失败回退。配置了对应 API Key 时不跳过。如果执行中 CLI 报出登录错误，也会把该工具标为未登录；但因为你本来在用它的订阅，之后同一路线的步骤会**暂停询问**（“订阅登录已失效……未自动改用 API Key”），不会悄悄改用 API Key，重启后依然如此（记录在 `state.json` 的 `authFailures`），直到该 CLI 再次以订阅成功运行。模型档案明确写了 `billing: "subscription-first"` 或 `"subscription-only"` 而 CLI 未登录时同样暂停询问。没有这两种迹象的未登录 CLI，以及未安装的 CLI，仍直接走 API。点“重新体检”可以刷新。
 2. **路由决策看得见**。路由建议会显示推荐模型、路由方案、难度分和估算成本，以及执行渠道（官方 CLI 还是模型目录 API；未登录时标“CLI 未登录”）。执行记录里每一步都写明实际渠道。如果回退到 API，会显示脱敏后的真实错误：Claude JSON 的 `result`、Codex 的 `turn.failed.error.message`，或 stderr 片段。设置允许时可以**改派并重跑**到另一条已配置路线（`allowManualReassign`，默认开启）。
@@ -351,18 +351,29 @@ U = wq·质量 + wc·成本得分 + wl·(1 - 延迟估值)
 
 ## 官方工具与执行边界
 
-| 工具 | 本版固定目标版本 | 安装与可编辑执行 |
-| --- | --- | --- |
-| Kimi Code | 2.1.1 | 固定官方 npm 包；无界面模式只允许经审批的独立 Git 工作区可编辑任务。 |
-| Claude Code | 2.1.283 | 固定官方 npm 包；支持只读及可编辑模式。 |
-| Codex CLI | 0.157.1 | 固定官方 npm 包；支持只读及可编辑模式。 |
-| MiniMax Code | 0.5.5 | 固定官方 npm 包；Windows 原生依赖安装失败时使用已核验脚本兜底；只允许经审批的独立 Git 工作区可编辑任务。 |
-| MiMo Code | 0.1.15 | 固定官方 npm 包；支持只读及可编辑模式。 |
-| Grok Build | 1.0.41 | 固定官方 npm 包；支持只读及可编辑模式。 |
-| ZCode | 3.14.3 | 固定、校验哈希和签名的 Windows 安装器；用户在原厂窗口选目录；只允许经审批的独立 Git 工作区可编辑任务。 |
-| Gemini CLI | 0.62.0 | 固定官方 npm 包 `@google/gemini-cli`。无界面任务使用 `gemini -p`；签名沙箱入口不启动它。 |
+插件只固定**工具注册表**，不再固定**版本**：npm 工具安装 `<包名>@latest`（`https://registry.npmjs.org/`），ZCode 打开官方下载页上最新的 Windows 安装器。新版本未经插件测试。
 
-插件界面只能请求注册表内的工具 ID，不能传入任意 npm 包名或 shell 命令。下载后还会核验版本和可信执行入口；仅显示版本号但入口不可信时，卡片提供“修复官方执行入口”。MiniMax 已由官方 Windows 安装器管理的 0.5.5 版本也可识别。若 npm 全局前缀在 C 盘，CLI 安装可能占用 C 盘；请先按自己的空间规划调整此前缀。
+| 工具 | 安装与可编辑执行 |
+| --- | --- |
+| Kimi Code | 官方 npm 包最新版；无界面模式只允许经审批的独立 Git 工作区可编辑任务。 |
+| Claude Code | 官方 npm 包最新版；支持只读及可编辑模式。 |
+| Codex CLI | 官方 npm 包最新版；支持只读及可编辑模式。 |
+| MiniMax Code | 官方 npm 包最新版；Windows 原生依赖安装失败时原样运行官方安装脚本兜底；只允许经审批的独立 Git 工作区可编辑任务。 |
+| MiMo Code | 官方 npm 包最新版；支持只读及可编辑模式。 |
+| Grok Build | 官方 npm 包最新版；支持只读及可编辑模式。 |
+| ZCode | 官方下载页上最新的、带智谱有效签名的 Windows 安装器；用户在原厂窗口选目录；只允许经审批的独立 Git 工作区可编辑任务。 |
+| Gemini CLI | 官方 npm 包 `@google/gemini-cli` 最新版。无界面任务使用 `gemini -p`；签名沙箱入口不启动它。 |
+
+保留的、与版本无关的安全校验（逐版本哈希已删除）：
+
+| 工具 | 插件启动前核验 |
+| --- | --- |
+| Codex、Claude Code（Windows） | 有效 Authenticode 签名，发布者为 `OpenAI OpCo, LLC` / `Anthropic, PBC`（Claude 受限参数仍要求 ≥ 2.1.259） |
+| ZCode（Windows） | `ZCode.exe` 由北京智谱华章科技股份有限公司签名（不限版本，版本号取自签名文件）；`resources/glm/.node-bundle-meta.json` 指向 `zcode.cjs`；未签名的 `zcode.cjs` 按签名构建首次使用时记录摘要，同一构建下内容变化则拒绝执行（`model-router/zcode-trust.json`） |
+| ZCode 安装器 | 官方下载页给出的官方 CDN 地址、HTTPS、大小上限、Authenticode 发布者 |
+| MiMo、Grok、MiniMax | 二进制/脚本没有签名：所有代码文件必须与**已安装版本**在官方 npm tarball 中的文件一致（tarball sha512 取自 registry.npmjs.org，结果缓存在 `model-router/npm-attestations.json`）。新版本首次运行需要联网一次。 |
+
+插件界面只能请求注册表内的工具 ID，不能传入任意 npm 包名或 shell 命令。下载后还会核验可信执行入口；仅显示版本号但入口不可信时，卡片提供“修复官方执行入口”。由 MiniMax 官方 Windows 安装器管理的版本也可识别。若 npm 全局前缀在 C 盘，CLI 安装可能占用 C 盘；请先按自己的空间规划调整此前缀。
 
 ### 官方工具如何接到被分配的任务
 
@@ -375,12 +386,12 @@ U = wq·质量 + wc·成本得分 + wl·(1 - 延迟估值)
 | Google / Gemini | Gemini CLI | `gemini -p --output-format json`，标准输入作为补充上下文 | 已配置的 `GEMINI_API_KEY`，否则使用 Gemini CLI 已缓存的登录 |
 | DeepSeek 及其他没有适配器的供应商 | 无 | 直接使用 Harness 模型目录 API | 使用宿主里已经配置的供应商凭据，插件不另存密钥 |
 
-安装示例（版本与工作台一键安装相同）：
+安装示例（与工作台一键安装相同，取最新版）：
 
 ```text
-npm install -g @anthropic-ai/claude-code@2.1.283 --registry=https://registry.npmjs.org/
-npm install -g @openai/codex@0.157.1 --registry=https://registry.npmjs.org/
-npm install -g @google/gemini-cli@0.62.0 --registry=https://registry.npmjs.org/
+npm install -g @anthropic-ai/claude-code@latest --registry=https://registry.npmjs.org/
+npm install -g @openai/codex@latest --registry=https://registry.npmjs.org/
+npm install -g @google/gemini-cli@latest --registry=https://registry.npmjs.org/
 ```
 
 Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙箱执行器；入口不可用时才用上面的无界面命令。每次调用都在当前会话工作目录中进行，限制输出体积和超时（默认 10 分钟，上限 45 分钟）；超时或取消时向 CLI 及其启动的子进程（整个进程组）发 SIGTERM，5 秒后仍未退出则 SIGKILL；用户取消最多等 1.5 秒；Windows 用 `taskkill /T /F` 结束整个进程树。任务文本上限 64000 个 UTF-8 字节（约 21000 个中文字符或 64000 个英文字符），在任何付费调用前检查，超出时给出中文提示；每步提示词会按上限截断总任务和依赖结果。执行在已有付费步骤之后出错时，仍会写入执行记录并计入费用。官方命令缺失、超时、非零退出或输出无法解析时，自动改走模型目录 API，并在结果里写明回退原因。密钥只放进该子进程的环境变量，不会写入模型档案或返回文本。
@@ -389,7 +400,7 @@ Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙
 
 `model_router_tool_run` 用于单工具调用；`model_router_team_execute` 为**插件自有的顺序 CLI 团队执行器**：按依赖运行，失败或回报模型不匹配即停。可编辑工作先在独立 Git worktree 执行，并在原仓库保持干净时整合；被 Git 忽略的输出需单独检查。官方 Harness Agent Teams 的成员生命周期与成员模型仍由宿主管理。
 
-Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设置可填写 `cliModel`；团队执行时临时的“工作包映射 > 工具映射 > 保存映射”。ZCode 3.14.3 不能逐次切换模型。多数 CLI 不回报可核验的实际模型 ID，执行后要对照厂商运行记录、权限和账单。Windows Harness 沙箱的 ACL 文件效果报告为部分隔离，涉及敏感仓库时应先用测试环境验证。
+Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设置可填写 `cliModel`；团队执行时临时的“工作包映射 > 工具映射 > 保存映射”。ZCode 不能逐次切换模型。多数 CLI 不回报可核验的实际模型 ID，执行后要对照厂商运行记录、权限和账单。Windows Harness 沙箱的 ACL 文件效果报告为部分隔离，涉及敏感仓库时应先用测试环境验证。
 
 ### 官方工具终端（0.14.0-beta.3，npm `next`）
 

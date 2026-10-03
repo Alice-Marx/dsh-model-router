@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.14.0-beta.4 — 2026-10-03
+
+Prerelease under the npm `next` tag only (`latest` stays 0.13.3). Quit Harness completely (including the tray icon) and start it again after updating.
+
+### Changed: official tools follow the vendors' latest releases
+- The plugin no longer pins Codex, Claude Code, Kimi Code, MiniMax Code, MiMo, Grok Build, Gemini CLI or ZCode versions. One-click installs use `<package>@latest` from `https://registry.npmjs.org/`; the MiniMax Windows fallback runs the official installer script as published (no hash, no `@0.5.5` patch); ZCode downloads the newest Windows installer linked from `https://zcode.z.ai/en/docs/install` (HTTPS, `cdn-zcode.z.ai` only, size cap).
+- 健康检查 no longer flags installs as "older"/mismatched. Each card shows the installed version and, when available, the latest version with an 有新版本 hint and an 更新到最新版 X button. Latest versions come from the npm registry `<package>/latest` documents and the ZCode download page, cached ~12 h in `model-router/latest-versions.json`; failures are non-fatal (stale value or "最新版本未知"; retried after 30 min). An install newer than the latest release is never downgraded.
+- The health card notes that new vendor versions are untested by the plugin. Parsers stay tolerant of output changes.
+
+### Security checks
+- Kept (version-independent): Authenticode publisher checks for `codex.exe` (OpenAI OpCo, LLC), `claude.exe` (Anthropic, PBC; plus ≥ 2.1.259 for restricted flags), `ZCode.exe` and the ZCode installer (北京智谱华章科技股份有限公司). The ZCode 3.14.3 version gate is gone: any validly signed build is enabled, with the version read from the signed file.
+- Replaced: the per-version hash of ZCode's unsigned `resources/glm/zcode.cjs` became a trust-on-first-use record per (install root, signed build, signer thumbprint) in `model-router/zcode-trust.json`, plus a `.node-bundle-meta.json` entry check. A script that changes under the same signed build is refused; a new signed build re-records it.
+- Replaced: the per-version sha256 pins for MiMo `mimo.exe`, Grok `grok.exe(.br)` and MiniMax `cli.js` (these vendors do not sign them) became registry attestation: every code file must equal the file in the official npm tarball for the installed version, whose sha512 comes from registry.npmjs.org (the npm cache is reused when it matches). Results are cached per package@version in `model-router/npm-attestations.json`; the first run of a new version needs network.
+- Removed: the hash of MiniMax's official installer script (it now runs as published; only a sanity check that it is the official PowerShell script remains).
+
+### Tests
+- New `tests/latest-versions.test.mjs`: latest lookup with mocked fetch (npm + ZCode page), 12 h cache, persistence, offline/stale fallback; npm attestation with an in-test tarball (cache hit, tamper, integrity mismatch, off-host tarball); ZCode signer-only acceptance and TOFU; Codex/Claude signer-only acceptance; installer URL validation. Pin assertions removed from existing tests.
+
 ## 0.14.0-beta.3 — 2026-10-03
 
 Prerelease under the npm `next` tag only (`latest` stays 0.13.3). **Quit Harness completely (including the tray icon) and start it again after updating**, or the Host keeps running the 0.14.0-beta.2 code.

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  packageStatus, dagLayers, healthSummary, budgetMeter, planBudget, biasForRoute, unwrapRemote, formatUsd,
+  packageStatus, dagLayers, healthSummary, versionLine, UNTESTED_VERSION_NOTE, budgetMeter, planBudget, biasForRoute, unwrapRemote, formatUsd,
 } from '../.dsh-plugin/client/insights-state.mjs'
 import { createWorkspacePlan } from '../.dsh-plugin/client/catalog.mjs'
 
@@ -29,14 +29,23 @@ test('packageStatus distinguishes CLI, API and fallback results', () => {
   assert.equal(packageStatus({ status: 'weird' }).label, '待执行')
 })
 
-test('healthSummary counts installed, ready, logged-out and outdated tools', () => {
+test('healthSummary counts installed, ready, logged-out tools and available updates', () => {
   const summary = healthSummary([
-    { installed: true, login: { state: 'logged-in' }, versionStatus: 'ok' },
-    { installed: true, login: { state: 'logged-out' }, versionStatus: 'older' },
+    { installed: true, login: { state: 'logged-in' }, versionStatus: 'latest' },
+    { installed: true, login: { state: 'logged-out' }, versionStatus: 'update-available' },
     { installed: true, login: { state: 'unknown' } },
     { installed: false, login: { state: 'logged-out' } },
   ])
-  assert.deepEqual(summary, { total: 4, installed: 3, ready: 1, loggedOut: 1, unknown: 1, older: 1 })
+  assert.deepEqual(summary, { total: 4, installed: 3, ready: 1, loggedOut: 1, unknown: 1, updates: 1 })
+})
+
+test('versionLine shows the installed version and, when known, the latest one', () => {
+  assert.equal(versionLine({ installed: false }), '')
+  assert.equal(versionLine({ installed: true, version: '0.157.1', latestVersion: '0.160.0', versionStatus: 'update-available' }),
+    '已安装 0.157.1 · 最新 0.160.0（有新版本，可在下方更新）')
+  assert.equal(versionLine({ installed: true, version: '0.160.0', latestVersion: '0.160.0', versionStatus: 'latest' }), '已安装 0.160.0 · 已是最新版')
+  assert.equal(versionLine({ installed: true, version: '3.14.4', latestVersion: null, versionStatus: 'unknown' }), '已安装 3.14.4 · 最新版本未知')
+  assert.match(UNTESTED_VERSION_NOTE, /未经插件测试/)
 })
 
 test('budgetMeter and planBudget reflect configured limits', () => {

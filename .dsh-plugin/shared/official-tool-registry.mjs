@@ -3,9 +3,12 @@
  * (probe + install) and the Desktop panel (display). Pure data: no Node or
  * browser APIs, so both sides and the test suite import it unchanged.
  *
- * The registry is fail-closed by design: versions and installer sources are
- * pinned to the releases checked for this registry, and clients can only name a
- * registry id — never an arbitrary package or command.
+ * The registry is fail-closed by design: installer sources are fixed (the
+ * official npm registry, the vendor's signed installer) and clients can only
+ * name a registry id — never an arbitrary package or command. Versions are not
+ * pinned: installs take each vendor's latest release (`@latest`), and the
+ * executor trusts entries by publisher signature or registry-attested digest
+ * rather than by version.
  */
 
 export const OFFICIAL_TOOLS = Object.freeze([
@@ -15,9 +18,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'Moonshot AI',
     purpose: 'Kimi 官方编程 CLI，提供 kimi 命令与 ACP 会话。',
     package: '@moonshot-ai/kimi-code',
-    version: '2.1.1',
     manager: 'npm',
-    installArgs: ['install', '-g', '@moonshot-ai/kimi-code@2.1.1', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@moonshot-ai/kimi-code@latest', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['kimi'],
     probeNote: 'kimi 与旧 Python 版 kimi-cli 同名；请核对可执行文件来源和版本。',
     providerHints: ['moonshot', 'kimi'],
@@ -28,9 +30,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'Anthropic',
     purpose: 'Anthropic 官方编程 CLI，提供 claude 命令。',
     package: '@anthropic-ai/claude-code',
-    version: '2.1.283',
     manager: 'npm',
-    installArgs: ['install', '-g', '@anthropic-ai/claude-code@2.1.283', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@anthropic-ai/claude-code@latest', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['claude'],
     providerHints: ['anthropic', 'claude'],
   }),
@@ -40,11 +41,10 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'OpenAI',
     purpose: 'OpenAI 官方编程 CLI，提供 codex 命令。',
     package: '@openai/codex',
-    version: '0.157.1',
-    installArgs: ['install', '-g', '@openai/codex@0.157.1', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@openai/codex@latest', '--registry=https://registry.npmjs.org/'],
     manager: 'npm',
     probeExecutables: ['codex'],
-    probeNote: 'Codex 版本横幅由适配层宽匹配；安装时固定版本。',
+    probeNote: 'Codex 版本横幅由适配层宽匹配；安装时取 npm 最新版。',
     providerHints: ['openai', 'gpt', 'codex'],
   }),
   Object.freeze({
@@ -53,9 +53,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'MiniMax',
     purpose: 'MiniMax 官方编程 CLI，提供 mcode 命令。',
     package: '@minimax-ai/code',
-    version: '0.5.5',
     manager: 'npm',
-    installArgs: ['install', '-g', '@minimax-ai/code@0.5.5', '--registry=https://registry.npmjs.org/', '--ignore-scripts=false', '--include=optional', '--allow-scripts=@minimax-ai/code,better-sqlite3'],
+    installArgs: ['install', '-g', '@minimax-ai/code@latest', '--registry=https://registry.npmjs.org/', '--ignore-scripts=false', '--include=optional', '--allow-scripts=@minimax-ai/code,better-sqlite3'],
     probeExecutables: ['mcode'],
     providerHints: ['minimax'],
   }),
@@ -65,9 +64,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'XiaoMi',
     purpose: '小米 MiMo 官方编程 CLI，提供 mimo 命令。',
     package: '@mimo-ai/cli',
-    version: '0.1.15',
     manager: 'npm',
-    installArgs: ['install', '-g', '@mimo-ai/cli@0.1.15', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@mimo-ai/cli@latest', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['mimo'],
     providerHints: ['mimo', 'xiaomi'],
   }),
@@ -77,9 +75,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'xAI',
     purpose: 'xAI 官方编程 CLI，提供 grok 命令与 ACP 会话。',
     package: '@xai-official/grok',
-    version: '1.0.41',
     manager: 'npm',
-    installArgs: ['install', '-g', '@xai-official/grok@1.0.41', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@xai-official/grok@latest', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['grok'],
     providerHints: ['xai', 'grok'],
   }),
@@ -89,9 +86,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     vendor: 'Google',
     purpose: 'Google 官方 Gemini CLI，无界面模式使用 gemini -p。',
     package: '@google/gemini-cli',
-    version: '0.62.0',
     manager: 'npm',
-    installArgs: ['install', '-g', '@google/gemini-cli@0.62.0', '--registry=https://registry.npmjs.org/'],
+    installArgs: ['install', '-g', '@google/gemini-cli@latest', '--registry=https://registry.npmjs.org/'],
     probeExecutables: ['gemini'],
     providerHints: ['gemini', 'google'],
     // Headless runs go through the task adapter. The signed sandbox runner does
@@ -103,7 +99,6 @@ export const OFFICIAL_TOOLS = Object.freeze([
     label: 'ZCode',
     vendor: 'Z.ai',
     purpose: '智谱官方 ZCode 桌面版，内含 GLM 编程代理。Windows 安装器可选择 D 盘目录。',
-    version: '3.14.3',
     manager: 'signed-windows-installer',
     installArgs: [],
     probeExecutables: [],

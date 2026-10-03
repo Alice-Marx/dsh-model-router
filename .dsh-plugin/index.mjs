@@ -7,6 +7,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_ROUTER_SETTINGS, modelMetadata } from './shared/router.mjs'
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
 import { HEALTH_CACHE_MS, apiKeyEnvPresent, healthCache, runHealthCheck, subscriptionLoginOf } from './shared/tool-health.mjs'
+import { latestVersions } from './shared/latest-versions.mjs'
 import {
   DEFAULT_COOLDOWN_MINUTES, billingOverview, createQuotaTracker, detectQuotaExhaustion, parseQuotaPatterns, vendorKey,
 } from './shared/subscription-billing.mjs'
@@ -28,6 +29,7 @@ import {
   parseTerminalWrite,
 } from './shared/cli-terminal-protocol.mjs'
 import {
+  OFFICIAL_TOOLS,
   getOfficialTool,
   installCommandLine,
   toolForProvider,
@@ -293,9 +295,13 @@ const readAuthState = async path => {
 }
 
 /** 开箱体检: install, version and login state for every registry tool. */
-export async function toolHealthReport({ fresh = false, runner = defaultRunner } = {}) {
-  const probes = await probeAllTools({ fresh })
-  const report = await runHealthCheck(probes, { runner, home: homedir(), exists: fileExists, readAuthState })
+export async function toolHealthReport({ fresh = false, runner = defaultRunner, latest = latestVersions } = {}) {
+  // Latest-version lookups run alongside the probes; failures are non-fatal (offline-safe).
+  const [probes, latestById] = await Promise.all([
+    probeAllTools({ fresh }),
+    latest.lookupAll(OFFICIAL_TOOLS).catch(() => ({})),
+  ])
+  const report = await runHealthCheck(probes, { runner, home: homedir(), exists: fileExists, readAuthState, latest: latestById })
   healthCache.remember(report)
   try { await routerStateStore().saveHealth(report) } catch { /* the cache still serves this process */ }
   return report
@@ -957,7 +963,7 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
   }
   if (text(args.cliModel)) {
     if (!route) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
-    if (toolId === 'zcode') throw new Error('ZCode 3.14.3 不支持在单次调用中指定 CLI 模型')
+    if (toolId === 'zcode') throw new Error('ZCode CLI 不支持在单次调用中指定模型')
     modelId = text(args.cliModel)
   }
   const estimate = route ? createPlanFromRoutes(taskText, routes, { mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost : null
@@ -1503,7 +1509,7 @@ function registerOfficialToolModels(ctx, config) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_tool_install',
-    description: 'Install one official model tool by registry id using its pinned official source. ZCode opens a verified interactive desktop installer with a directory picker. Only registry ids are accepted; arbitrary packages or executables are refused.',
+    description: 'Install one official model tool by registry id from its fixed official source at the vendor latest release. ZCode opens the latest publisher-signed interactive desktop installer with a directory picker. Only registry ids are accepted; arbitrary packages or executables are refused.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Registry tool id, e.g. kimi-code.' },
     },
@@ -1532,7 +1538,7 @@ function registerOfficialToolModels(ctx, config) {
       task: { type: 'string', required: true, description: 'Concrete task for the official CLI model.' },
       provider: { type: 'string', description: 'Optional configured provider, paired with model.' },
       model: { type: 'string', description: 'Optional model ID from the Harness directory, paired with provider. This ID is advisory for CLIs except Claude/Codex.' },
-      cliModel: { type: 'string', description: 'Optional model name already configured in this vendor CLI; requires provider and model. MiniMax/MiMo require provider/model format. ZCode 3.14.3 cannot switch models per call.' },
+      cliModel: { type: 'string', description: 'Optional model name already configured in this vendor CLI; requires provider and model. MiniMax/MiMo require provider/model format. ZCode cannot switch models per call.' },
       mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default is read-only. Kimi, MiniMax and ZCode require workspace-write. Write mode requires official approval and a clean Git repository.' },
       confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
     },
@@ -1597,7 +1603,7 @@ function registerOfficialToolModels(ctx, config) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_health',
-    description: 'Onboarding health check: for each official CLI in the fixed registry, report installed, version vs pinned version, and login state (cheap status commands only; never starts a login), plus a per-provider billing table: billing mode (subscription-first by default), subscription state (logged in / coding-plan key route / exhausted until a time) and whether an API-key route is available for fallback. Logged-out tools are skipped by routing until re-checked.',
+    description: 'Onboarding health check: for each official CLI in the fixed registry, report installed version, the latest published version when it can be looked up cheaply (update hint only), and login state (cheap status commands only; never starts a login), plus a per-provider billing table: billing mode (subscription-first by default), subscription state (logged in / coding-plan key route / exhausted until a time) and whether an API-key route is available for fallback. Logged-out tools are skipped by routing until re-checked.',
     parameters: {
       fresh: { type: 'boolean', description: 'Re-probe instead of using the 60s probe cache.' },
     },
@@ -1658,7 +1664,7 @@ function registerOfficialToolModels(ctx, config) {
       task: { type: 'string', required: true, description: 'Full task to plan, distribute and execute.' },
       mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default read-only; workspace-write needs a clean Git repository and approval.' },
       budgetUsd: { type: 'number', description: 'Estimated planning ceiling only, not a vendor billing limit.' },
-      cliModelsJson: { type: 'string', description: 'Optional JSON object mapping official tool IDs or work package IDs to exact model names configured in those CLIs. MiniMax/MiMo require provider/model; ZCode 3.14.3 cannot switch per call.' },
+      cliModelsJson: { type: 'string', description: 'Optional JSON object mapping official tool IDs or work package IDs to exact model names configured in those CLIs. MiniMax/MiMo require provider/model; ZCode cannot switch per call.' },
       confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
     },
     output: JSON_OUTPUT,

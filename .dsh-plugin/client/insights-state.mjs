@@ -44,7 +44,19 @@ export function dagLayers(packages) {
 }
 
 export const LOGIN_LABEL = Object.freeze({ 'logged-in': '已登录', 'logged-out': '未登录', unknown: '登录状态未知' })
-export const VERSION_LABEL = Object.freeze({ ok: '版本符合', older: '版本低于目标', unknown: '版本未知' })
+export const VERSION_LABEL = Object.freeze({ latest: '已是最新版', 'update-available': '有新版本', unknown: '最新版本未知' })
+/** Shown wherever versions appear: the plugin follows each vendor's latest release. */
+export const UNTESTED_VERSION_NOTE = '插件不再固定官方工具版本，安装和更新都取各厂商的最新版；新版本未经插件测试，输出格式变化时插件会尽量兼容，遇到问题请反馈。'
+
+/** "已安装 1.2.3 · 最新 1.2.4（有新版本）" for one health entry. */
+export function versionLine(entry) {
+  if (!entry?.installed) return ''
+  const installed = entry.version ? `已安装 ${entry.version}` : '已安装（版本未知）'
+  if (!entry.latestVersion) return `${installed} · ${VERSION_LABEL.unknown}`
+  return entry.versionStatus === 'update-available'
+    ? `${installed} · 最新 ${entry.latestVersion}（有新版本，可在下方更新）`
+    : `${installed} · ${VERSION_LABEL.latest}`
+}
 
 /** Headline counts for the onboarding banner. */
 export function healthSummary(tools) {
@@ -56,7 +68,7 @@ export function healthSummary(tools) {
     ready: installed.filter(item => item.login?.state === 'logged-in').length,
     loggedOut: installed.filter(item => item.login?.state === 'logged-out').length,
     unknown: installed.filter(item => item.login?.state === 'unknown').length,
-    older: installed.filter(item => item.versionStatus === 'older').length,
+    updates: installed.filter(item => item.versionStatus === 'update-available').length,
   }
 }
 
