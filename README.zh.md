@@ -391,7 +391,7 @@ Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙
 
 Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设置可填写 `cliModel`；团队执行时临时的“工作包映射 > 工具映射 > 保存映射”。ZCode 3.14.3 不能逐次切换模型。多数 CLI 不回报可核验的实际模型 ID，执行后要对照厂商运行记录、权限和账单。Windows Harness 沙箱的 ACL 文件效果报告为部分隔离，涉及敏感仓库时应先用测试环境验证。
 
-### 官方工具终端（0.14.0-beta.2，npm `next`）
+### 官方工具终端（0.14.0-beta.3，npm `next`）
 
 工作台“官方工具 · 体检”下方新增 **官方工具终端** 卡片：以标签页形式交互运行系统终端（Windows 为 PowerShell，其他系统为登录 `$SHELL`）或已安装的官方 CLI（`codex`、`claude`、`kimi`、`mcode`、`mimo`、`grok`、`gemini`），实时输出，可多轮对话、显示全屏界面，也可选 **登录** 直接运行 `codex login`、`claude auth login`、`kimi login`、`mcode login`、`mimo auth login`、`grok login`。
 

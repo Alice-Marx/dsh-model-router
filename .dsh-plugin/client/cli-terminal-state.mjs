@@ -5,9 +5,11 @@
  */
 import { remoteErrorText } from './host-version.mjs'
 import {
+  TERMINAL_LIMITS,
   TERMINAL_SHELL_ID,
   TERMINAL_TOOL_IDS,
   isAbsoluteDirectoryText,
+  isTerminalSessionId,
   terminalCommandPreview,
   terminalTargetLabel,
 } from '../shared/cli-terminal-protocol.mjs'
@@ -77,9 +79,38 @@ export const formatDuration = ms => {
   return minutes < 60 ? `${minutes} 分 ${seconds % 60} 秒` : `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分`
 }
 
-const unwrap = (response, fallback) => {
-  if (response?.ok) return response.value
-  throw new Error(remoteErrorText(text(response?.error?.message) || text(response?.error), fallback))
+/**
+ * Unwrap one terminal remote call. The Host service answers with its own
+ * `{ ok, value | error }` envelope (see official-tools-remote-service.mjs
+ * `settled`), and the Typert gateway wraps that again: the client receives
+ * `{ ok: true, value: { ok: true, value: result } }`. Reading only the outer
+ * level hands the envelope to the caller (0.14.0-beta.1/2: `sessionId`
+ * undefined, so every terminalRead failed boundary validation).
+ */
+export function unwrapTerminal(response, fallback) {
+  if (!response?.ok) throw new Error(remoteErrorText(text(response?.error?.message) || text(response?.error), fallback))
+  const inner = response.value
+  if (inner && typeof inner === 'object' && typeof inner.ok === 'boolean') {
+    if (!inner.ok) throw new Error(remoteErrorText(text(inner.error?.message) || text(inner.error), fallback))
+    return inner.value
+  }
+  return inner
+}
+
+const unwrap = unwrapTerminal
+
+/** Backend, limits, live sessions and metadata-only history. */
+export async function loadTerminalInfo(api) {
+  const info = unwrap(await api.terminalInfo(), '无法读取终端状态。')
+  if (!info || typeof info !== 'object' || !['pty', 'pipe'].includes(info.backend)) throw new Error('终端状态格式无效。')
+  return info
+}
+
+/** Start one confirmed session; returns the Host's session summary. */
+export async function startTerminal(api, request) {
+  const session = unwrap(await api.terminalStart({ ...request, confirmed: true }), '终端启动失败。')
+  if (!isTerminalSessionId(session?.sessionId)) throw new Error('终端启动结果缺少有效的会话 ID。')
+  return session
 }
 
 /**
@@ -102,6 +133,14 @@ export class TerminalConnection {
   }
 
   start() {
+    if (!isTerminalSessionId(this.sessionId)) {
+      // Never send a request the gateway's boundary validation would reject.
+      this.closed = true
+      this.onError?.(new Error('终端会话 ID 无效，无法读取输出。'))
+      this.onExit?.({ endReason: 'lost', exitCode: null })
+      this.loop = Promise.resolve()
+      return this.loop
+    }
     this.loop = this.readLoop()
     return this.loop
   }
@@ -148,7 +187,11 @@ export class TerminalConnection {
   }
 
   resize(cols, rows) {
-    if (this.closed) return
+    if (this.closed || !Number.isFinite(cols) || !Number.isFinite(rows)) return
+    // xterm's fit can report tiny sizes for a collapsed panel; keep the
+    // request inside the Host's accepted bounds instead of failing validation.
+    cols = Math.min(TERMINAL_LIMITS.maxCols, Math.max(TERMINAL_LIMITS.minCols, Math.round(cols)))
+    rows = Math.min(TERMINAL_LIMITS.maxRows, Math.max(TERMINAL_LIMITS.minRows, Math.round(rows)))
     if (this.resizeTimer) this.clearTimer(this.resizeTimer)
     this.resizeTimer = this.setTimer(() => {
       this.resizeTimer = null

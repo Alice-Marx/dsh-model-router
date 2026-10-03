@@ -11601,7 +11601,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.14.0-beta.2" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.14.0-beta.3" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -11723,6 +11723,7 @@ function parseTerminalStop(value) {
   const request = plainObject(value, "terminal stop request");
   return { sessionId: sessionIdOf(request.sessionId) };
 }
+var isTerminalSessionId = (value) => typeof value === "string" && SESSION_ID.test(value);
 
 // .dsh-plugin/client/cli-terminal-state.mjs
 var text3 = (value) => typeof value === "string" ? value.trim() : "";
@@ -11779,10 +11780,26 @@ var formatDuration = (ms2) => {
   const minutes = Math.floor(seconds / 60);
   return minutes < 60 ? `${minutes} \u5206 ${seconds % 60} \u79D2` : `${Math.floor(minutes / 60)} \u5C0F\u65F6 ${minutes % 60} \u5206`;
 };
-var unwrap = (response, fallback) => {
-  if (response?.ok) return response.value;
-  throw new Error(remoteErrorText(text3(response?.error?.message) || text3(response?.error), fallback));
-};
+function unwrapTerminal(response, fallback) {
+  if (!response?.ok) throw new Error(remoteErrorText(text3(response?.error?.message) || text3(response?.error), fallback));
+  const inner = response.value;
+  if (inner && typeof inner === "object" && typeof inner.ok === "boolean") {
+    if (!inner.ok) throw new Error(remoteErrorText(text3(inner.error?.message) || text3(inner.error), fallback));
+    return inner.value;
+  }
+  return inner;
+}
+var unwrap = unwrapTerminal;
+async function loadTerminalInfo(api) {
+  const info = unwrap(await api.terminalInfo(), "\u65E0\u6CD5\u8BFB\u53D6\u7EC8\u7AEF\u72B6\u6001\u3002");
+  if (!info || typeof info !== "object" || !["pty", "pipe"].includes(info.backend)) throw new Error("\u7EC8\u7AEF\u72B6\u6001\u683C\u5F0F\u65E0\u6548\u3002");
+  return info;
+}
+async function startTerminal(api, request) {
+  const session = unwrap(await api.terminalStart({ ...request, confirmed: true }), "\u7EC8\u7AEF\u542F\u52A8\u5931\u8D25\u3002");
+  if (!isTerminalSessionId(session?.sessionId)) throw new Error("\u7EC8\u7AEF\u542F\u52A8\u7ED3\u679C\u7F3A\u5C11\u6709\u6548\u7684\u4F1A\u8BDD ID\u3002");
+  return session;
+}
 var TerminalConnection = class {
   constructor({ api, sessionId, onData, onExit, onError, waitMs = 800, retryMs = 1e3, resizeDelayMs = 120, setTimer = setTimeout, clearTimer = clearTimeout }) {
     Object.assign(this, { api, sessionId, onData, onExit, onError, waitMs, retryMs, resizeDelayMs });
@@ -11796,6 +11813,13 @@ var TerminalConnection = class {
     this.failures = 0;
   }
   start() {
+    if (!isTerminalSessionId(this.sessionId)) {
+      this.closed = true;
+      this.onError?.(new Error("\u7EC8\u7AEF\u4F1A\u8BDD ID \u65E0\u6548\uFF0C\u65E0\u6CD5\u8BFB\u53D6\u8F93\u51FA\u3002"));
+      this.onExit?.({ endReason: "lost", exitCode: null });
+      this.loop = Promise.resolve();
+      return this.loop;
+    }
     this.loop = this.readLoop();
     return this.loop;
   }
@@ -11849,7 +11873,9 @@ var TerminalConnection = class {
     }
   }
   resize(cols, rows) {
-    if (this.closed) return;
+    if (this.closed || !Number.isFinite(cols) || !Number.isFinite(rows)) return;
+    cols = Math.min(TERMINAL_LIMITS.maxCols, Math.max(TERMINAL_LIMITS.minCols, Math.round(cols)));
+    rows = Math.min(TERMINAL_LIMITS.maxRows, Math.max(TERMINAL_LIMITS.minRows, Math.round(rows)));
     if (this.resizeTimer) this.clearTimer(this.resizeTimer);
     this.resizeTimer = this.setTimer(() => {
       this.resizeTimer = null;
@@ -11975,10 +12001,9 @@ function CliTerminalCard({ api, health }) {
   const mounted = import_react4.default.useRef(true);
   const loadInfo = import_react4.default.useCallback(async () => {
     try {
-      const response = await api.terminalInfo();
+      const value = await loadTerminalInfo(api);
       if (!mounted.current) return;
-      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, "\u65E0\u6CD5\u8BFB\u53D6\u7EC8\u7AEF\u72B6\u6001\u3002"));
-      setInfo({ status: "ready", value: response.value, error: "" });
+      setInfo({ status: "ready", value, error: "" });
     } catch (error) {
       if (mounted.current) setInfo({ status: "error", value: null, error: errorText(error, "\u65E0\u6CD5\u8BFB\u53D6\u7EC8\u7AEF\u72B6\u6001\u3002") });
     }
@@ -12007,15 +12032,14 @@ function CliTerminalCard({ api, health }) {
     setStarting(true);
     setStartError("");
     try {
-      const response = await api.terminalStart({ target: selected.id, mode, cwd: text4(cwd), cols: 100, rows: 30, confirmed: true });
-      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, "\u7EC8\u7AEF\u542F\u52A8\u5931\u8D25\u3002"));
+      const session = await startTerminal(api, { target: selected.id, mode, cwd: text4(cwd), cols: 100, rows: 30 });
       storeCwd(text4(cwd));
       if (!mounted.current) {
-        void api.terminalStop({ sessionId: response.value.sessionId });
+        void api.terminalStop({ sessionId: session.sessionId });
         return;
       }
-      setSessions((previous) => [...previous, { ...response.value, ended: null }]);
-      setActiveId(response.value.sessionId);
+      setSessions((previous) => [...previous, { ...session, ended: null }]);
+      setActiveId(session.sessionId);
       setConfirming(false);
     } catch (error) {
       if (mounted.current) setStartError(errorText(error, "\u7EC8\u7AEF\u542F\u52A8\u5931\u8D25\u3002"));

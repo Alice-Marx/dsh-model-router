@@ -402,7 +402,7 @@ Claude Code, Codex, MiMo Code, and Grok Build support read-only and approved edi
 
 The planned Harness model ID is not necessarily the vendor CLI's model name. A saved `cliModel`, or temporary `cliModelsJson` keyed by tool or work-package ID, can provide a known vendor CLI name. A package-specific temporary mapping takes priority over a tool mapping, then the saved profile. ZCode uses its configured default model. Most vendor CLIs do not provide a verifiable actual model ID in their results, so inspect vendor run records to confirm which model and price applied. The plugin's sequential CLI team runner is separate from Harness's built-in Agent Teams lifecycle.
 
-### Interactive terminal (官方工具终端, 0.14.0-beta.2, npm `next`)
+### Interactive terminal (官方工具终端, 0.14.0-beta.3, npm `next`)
 
 The workbench has an **官方工具终端** card below the tool health check. It runs your system shell (PowerShell on Windows, your login `$SHELL` elsewhere) or one installed official CLI (`codex`, `claude`, `kimi`, `mcode`, `mimo`, `grok`, `gemini`) interactively, in tabs, with live output: multi-turn conversations, full-screen TUIs, and logins such as `codex login`, `claude auth login`, `kimi login`, `mcode login`, `mimo auth login`, `grok login` (choose **登录**).
 

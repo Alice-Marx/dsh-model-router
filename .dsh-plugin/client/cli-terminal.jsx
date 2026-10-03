@@ -14,7 +14,9 @@ import {
   confirmationDetails,
   endDescription,
   formatDuration,
+  loadTerminalInfo,
   startProblem,
+  startTerminal,
   terminalTargets,
 } from './cli-terminal-state.mjs'
 import { remoteErrorText } from './host-version.mjs'
@@ -109,10 +111,9 @@ export function CliTerminalCard({ api, health }) {
 
   const loadInfo = React.useCallback(async () => {
     try {
-      const response = await api.terminalInfo()
+      const value = await loadTerminalInfo(api)
       if (!mounted.current) return
-      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, '无法读取终端状态。'))
-      setInfo({ status: 'ready', value: response.value, error: '' })
+      setInfo({ status: 'ready', value, error: '' })
     } catch (error) {
       if (mounted.current) setInfo({ status: 'error', value: null, error: errorText(error, '无法读取终端状态。') })
     }
@@ -138,12 +139,11 @@ export function CliTerminalCard({ api, health }) {
     setStarting(true)
     setStartError('')
     try {
-      const response = await api.terminalStart({ target: selected.id, mode, cwd: text(cwd), cols: 100, rows: 30, confirmed: true })
-      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, '终端启动失败。'))
+      const session = await startTerminal(api, { target: selected.id, mode, cwd: text(cwd), cols: 100, rows: 30 })
       storeCwd(text(cwd))
-      if (!mounted.current) { void api.terminalStop({ sessionId: response.value.sessionId }); return }
-      setSessions(previous => [...previous, { ...response.value, ended: null }])
-      setActiveId(response.value.sessionId)
+      if (!mounted.current) { void api.terminalStop({ sessionId: session.sessionId }); return }
+      setSessions(previous => [...previous, { ...session, ended: null }])
+      setActiveId(session.sessionId)
       setConfirming(false)
     } catch (error) {
       if (mounted.current) setStartError(errorText(error, '终端启动失败。'))

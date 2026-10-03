@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.14.0-beta.3 — 2026-10-03
+
+Prerelease under the npm `next` tag only (`latest` stays 0.13.3). **Quit Harness completely (including the tray icon) and start it again after updating**, or the Host keeps running the 0.14.0-beta.2 code.
+
+### Fixed
+- 官方工具终端: a session (e.g. Kimi Code 登录) opened a black terminal and then failed with `typert gateway: modelRouterOfficialTools/terminalRead: wire field "request" failed boundary validation`; the footer read `undefined · undefined`. The Host methods answer with their own `{ ok, value }` envelope and the Typert gateway wraps that again, so the client receives `{ ok: true, value: { ok: true, value: result } }`. The terminal card read only the outer level, so the session id, command and directory were `undefined` and every `terminalRead` carried no `sessionId`, which the strict request codec rejects at the gateway. Host-side start failures (such as a missing CLI) were hidden the same way. The card now unwraps both levels (`unwrapTerminal`, `loadTerminalInfo`, `startTerminal`) and reports inner errors. The schemas were correct, and the gateway does not strip response fields.
+- The client never sends a read or write for an invalid session id, and it clamps resize requests from a collapsed panel into the accepted 10–500 × 3–300 range instead of failing validation.
+
+### Tests
+- `tests/helpers/typert-gateway.mjs` copies Harness's gateway boundary (`assertExactArguments`, `decode`, `assertJsonValue`, `encodeRpcResult`, JSON wire). `tests/cli-terminal-gateway.test.mjs` sends the card's real payloads for all six terminal methods through it, through the real `OfficialToolsRemoteService` envelope and the real Host services.
+
 ## 0.14.0-beta.2 — 2026-10-03
 
 Prerelease under the npm `next` tag only (`latest` stays 0.13.3).
