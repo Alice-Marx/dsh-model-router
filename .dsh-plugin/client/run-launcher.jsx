@@ -14,17 +14,24 @@ const STATUS_TEXT = Object.freeze({
  * The run is model_router_execute's read-only path; nothing starts before
  * the user presses the confirm button.
  */
-export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason }) {
+export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason, planningRevision }) {
   const [preset, setPreset] = React.useState(defaultPreset || 'balanced')
   const lastWorkspace = [...(ledger?.runs ?? [])].map(run => run.workspace).find(Boolean) ?? ''
   const [workspace, setWorkspace] = React.useState('')
   const [phase, setPhase] = React.useState({ kind: 'idle' })
   const mounted = React.useRef(true)
   const confirmRef = React.useRef(null)
-  React.useEffect(() => () => { mounted.current = false }, [])
+  const pendingRequest = React.useRef(0)
+  const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, preset, workspace, lastWorkspace, planningRevision, disabledReason])
+  const latestSignature = React.useRef(inputSignature)
+  latestSignature.current = inputSignature
+  React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; pendingRequest.current += 1 } }, [])
   React.useEffect(() => { setPreset(defaultPreset || 'balanced') }, [defaultPreset])
   // Any change to the inputs invalidates a shown preview.
-  React.useEffect(() => { setPhase(previous => previous.kind === 'preview' || previous.kind === 'error' ? { kind: 'idle' } : previous) }, [task, mode, directRoute?.provider, directRoute?.model, budgetUsd, preset, workspace])
+  React.useEffect(() => {
+    pendingRequest.current += 1
+    setPhase(previous => ['previewing', 'preview', 'error'].includes(previous.kind) ? { kind: 'idle' } : previous)
+  }, [inputSignature])
   React.useEffect(() => { if (phase.kind === 'preview') confirmRef.current?.focus() }, [phase.kind])
 
   const request = () => launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace: text(workspace) || lastWorkspace })
@@ -33,21 +40,31 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   const busy = phase.kind === 'previewing' || phase.kind === 'running'
 
   const preview = async () => {
+    if (blocked || busy) return
+    const current = ++pendingRequest.current
+    const snapshot = request()
+    const signature = inputSignature
     setPhase({ kind: 'previewing' })
     try {
-      const value = unwrapRemote(await previewRun(request()), '执行预览失败。')
-      if (mounted.current) setPhase({ kind: 'preview', value })
+      const value = unwrapRemote(await previewRun(snapshot), '执行预览失败。')
+      if (mounted.current && current === pendingRequest.current && signature === latestSignature.current) setPhase({ kind: 'preview', value, request: snapshot, signature })
     } catch (error) {
-      if (mounted.current) setPhase({ kind: 'error', message: text(error?.message) || '执行预览失败。' })
+      if (mounted.current && current === pendingRequest.current && signature === latestSignature.current) setPhase({ kind: 'error', message: text(error?.message) || '执行预览失败。' })
     }
   }
   const confirm = async () => {
+    if (phase.kind !== 'preview' || phase.signature !== latestSignature.current) return
     const shown = phase.value
-    setPhase({ kind: 'running', value: shown })
+    const snapshot = phase.request
+    const signature = phase.signature
+    setPhase({ kind: 'running', value: shown, request: snapshot, signature })
     try {
-      const value = unwrapRemote(await startRun({ ...request(), confirmedReasons: shown.reasons.map(item => item.code) }), '执行失败。')
+      const value = unwrapRemote(await startRun({ ...snapshot, confirmedReasons: (shown.reasons ?? []).map(item => item.code) }), '执行失败。')
       if (!mounted.current) return
-      if (value.status === 'needs-confirmation') { setPhase({ kind: 'preview', value, changed: true }); return }
+      if (value.status === 'needs-confirmation') {
+        setPhase(signature === latestSignature.current ? { kind: 'preview', value, request: snapshot, signature, changed: true } : { kind: 'idle' })
+        return
+      }
       setPhase({ kind: 'done', value })
       onStarted?.(value.runId)
     } catch (error) {
@@ -82,7 +99,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
         {(phase.kind === 'preview' || phase.kind === 'running') && <LaunchPreview value={phase.value} changed={phase.changed} running={phase.kind === 'running'} confirmRef={confirmRef}
           onConfirm={() => { void confirm() }} onCancel={() => setPhase({ kind: 'idle' })} />}
         {phase.kind === 'done' && (
-          <div className={phase.value.status === 'failed' || phase.value.status?.startsWith('paused') ? 'mr-error' : 'mr-empty'} role="status">
+          <div className={phase.value.status === 'failed' || phase.value.status === 'partial' || phase.value.status?.startsWith('paused') ? 'mr-error' : 'mr-empty'} role="status">
             {STATUS_TEXT[phase.value.status] ?? `状态：${phase.value.status}`}{phase.value.runId ? `；结果已记录（运行 ${phase.value.runId.slice(0, 8)}），见下方“执行记录与子任务”。` : '。'}
             {phase.value.budget?.message ? ` ${phase.value.budget.exceeded && phase.value.status !== 'paused-budget' ? '已按你的确认超预算执行：' : ''}${phase.value.budget.message}` : ''}
           </div>

@@ -3,7 +3,7 @@ import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BILLING_MODE_LABEL } from '../shared/subscription-billing.mjs'
 import {
   BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, UNTESTED_VERSION_NOTE, budgetMeter, dagLayers, formatUsd, healthSummary,
-  packageCost, packageStatus, rerunSupport, runTotals, versionLine,
+  packageCost, packageStatus, priorAttemptTotals, rerunSupport, runTotals, versionLine,
 } from './insights-state.mjs'
 
 const text = value => typeof value === 'string' ? value.trim() : ''
@@ -274,11 +274,15 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
   const runs = ledger?.runs ?? []
   const [openId, setOpenId] = React.useState(null)
   const current = runs.find(run => run.id === openId) ?? runs[0]
+  const totals = runTotals(current)
+  const prior = priorAttemptTotals(current)
+  const unknownCalls = prior.unknownCalls + [...(current?.packages ?? []), ...(current?.reviews ?? [])]
+    .filter(item => item.ran && item.billing !== 'subscription' && !Number.isFinite(item.costUsd)).length
   return (
     <section className="mr-card mr-results" aria-label="执行记录">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">执行记录与子任务</h2>
-        <p className="mr-card-copy">来自会话中的 model_router_execute、model_router_team_execute 和 model_router_tool_run。每个工作包显示分配的模型、原因、渠道、费用；回退时显示 CLI 原始错误。失败的步骤可单独重跑，不会重做已完成的步骤；可编辑团队运行会在新的独立工作区先套用之前的改动再续跑，失败的单次调用会作为新运行重新执行，二者都需先确认。</p>
+        <p className="mr-card-copy">查看模型分配、逐步结果与费用。失败步骤可重跑或改派；已完成的上游保持原结果。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={busy} onClick={onRefresh}>刷新</button></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
@@ -295,10 +299,12 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
                 <div className="mr-result-grid">
                   <div className="mr-metric"><div className="mr-metric-label">方案</div><div className="mr-metric-value">{ROUTING_PRESETS[current.preset]?.label ?? current.preset}{current.budget?.downgraded ? '（超预算自动降级）' : ''}</div></div>
                   <div className="mr-metric"><div className="mr-metric-label">难度</div><div className="mr-metric-value">{BAND[current.decision?.complexity?.band] ?? '—'}{current.decision?.complexity?.value !== null && current.decision?.complexity?.value !== undefined ? ` · ${current.decision.complexity.value}` : ''}</div></div>
-                  <div className="mr-metric"><div className="mr-metric-label">预估 / 实际（计入预算）</div><div className="mr-metric-value">{formatUsd(current.decision?.estimatedCost)} / {formatUsd(runTotals(current).budgetUsd)}</div></div>
+                  <div className="mr-metric"><div className="mr-metric-label">预估 / {unknownCalls ? '已知实际' : '实际'}（计入预算）</div><div className="mr-metric-value">{formatUsd(current.decision?.estimatedCost)} / {formatUsd(totals.budgetUsd)}</div></div>
                   <div className="mr-metric"><div className="mr-metric-label">类型</div><div className="mr-metric-value">{RUN_KIND_LABEL[current.kind ?? 'assign'] ?? current.kind}{current.kind === 'team' || current.kind === 'tool' ? ` · ${current.executionMode === 'workspace-write' ? '可编辑' : '只读'}` : ''}</div></div>
                 </div>
-                {runTotals(current).subscription && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：{formatUsd(runTotals(current).referenceUsd)}</p>}
+                {totals.subscription && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：{formatUsd(totals.referenceUsd)}</p>}
+                {unknownCalls > 0 && <p className="mr-caption">另有 {unknownCalls} 次调用费用未知，未计入上方金额。</p>}
+                {(prior.budgetUsd > 0 || prior.subscriptionRuns > 0 || prior.unknownCalls > 0) && <p className="mr-caption">累计包含此前重跑尝试：API {formatUsd(prior.budgetUsd)} · 订阅参考 {formatUsd(prior.referenceUsd)}{prior.unknownCalls > 0 ? ` · 费用未知 ${prior.unknownCalls} 次` : ''}。下方节点显示最近一次结果。</p>}
                 {current.isolatedWorkspace && <p className="mr-caption">独立工作区：<code>{current.isolatedWorkspace}</code></p>}
                 {current.rerunOf && <p className="mr-caption">重新执行自运行 {current.rerunOf.slice(0, 8)}。</p>}
                 {current.decision?.reason && <p className="mr-caption">路由原因：{current.decision.reason}</p>}

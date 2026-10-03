@@ -331,9 +331,9 @@ function budgetSettings(config) {
   }
 }
 
-function budgetFor(config, runs, estimateUsd) {
+function budgetFor(config, saved, estimateUsd) {
   const settings = budgetSettings(config)
-  const spent = spending(runs)
+  const spent = spending(saved.runs, undefined, saved.archivedSpending)
   return { ...budgetCheck({ estimateUsd, spent, ...settings }), spent, ...settings }
 }
 
@@ -386,7 +386,7 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
     preset: routingPresetOf(config, options.preset),
     loggedOutToolIds: loggedOut,
   })
-  return { ...plan, budgetStatus: budgetFor(config, saved.runs, plan.estimatedCost) }
+  return { ...plan, budgetStatus: budgetFor(config, saved, plan.estimatedCost) }
 }
 
 /** One bounded, independent call through the same official LLM service. */
@@ -626,10 +626,10 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
       budgetUsd, installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
   let plan = planWith(preset, options.budgetUsd)
-  let budget = budgetFor(config, saved.runs, plan.estimatedCost)
+  let budget = budgetFor(config, saved, plan.estimatedCost)
   if (budget.exceeded && budget.action === 'downgrade' && !direct) {
     const cheaper = planWith('economy', budget.remainingUsd > 0 ? budget.remainingUsd : options.budgetUsd)
-    const recheck = budgetFor(config, saved.runs, cheaper.estimatedCost)
+    const recheck = budgetFor(config, saved, cheaper.estimatedCost)
     if (!recheck.exceeded) {
       budget = { ...recheck, downgraded: true, downgradedFrom: preset,
         message: `原方案${budget.message} 已自动降级为“省钱优先”方案（预估 ${cheaper.estimatedCost === null ? '价格待配置' : formatUsd(cheaper.estimatedCost)}）。` }
@@ -768,7 +768,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
       budget: null, message: '续跑可编辑团队步骤会在新的独立 Git 工作树中套用之前的改动并修改文件，需要先确认。' }
   }
   const sameRoute = !override || (override.provider === target.recommendedProvider && override.model === target.recommendedModel)
-  const budget = budgetFor(config, saved.runs, sameRoute ? target.estimatedCost : null)
+  const budget = budgetFor(config, saved, sameRoute ? target.estimatedCost : null)
   if (budget.exceeded && confirmOverBudget !== true) {
     return { paused: true, budget: { ...budget, paused: true, message: `${budget.message} 已暂停重跑，请确认后再试。` }, run }
   }
@@ -967,7 +967,7 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
     modelId = text(args.cliModel)
   }
   const estimate = route ? createPlanFromRoutes(taskText, routes, { mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost : null
-  const budget = budgetFor(config, (await savedState()).runs, Number.isFinite(estimate) ? estimate : null)
+  const budget = budgetFor(config, await savedState(), Number.isFinite(estimate) ? estimate : null)
   return { toolId, tool, taskText, mode, modelId, route, routes, estimate: Number.isFinite(estimate) ? estimate : null, budget,
     provider: route?.provider ?? '', model: route?.model ?? '', cliModel: text(args.cliModel) || null }
 }
@@ -1013,7 +1013,7 @@ export async function rateRecordedResult({ runId, packageId, rating } = {}) {
 /** Everything the workbench shows: recent runs, spending, budget, learned biases and settings. */
 export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
   const saved = await savedState()
-  const spent = spending(saved.runs)
+  const spent = spending(saved.runs, undefined, saved.archivedSpending)
   const settings = budgetSettings(config)
   return {
     runs: saved.runs.slice(-limit).reverse().map(run => ({
@@ -1692,7 +1692,7 @@ function registerOfficialToolModels(ctx, config) {
         runnableToolIds: installed.filter(id => supported.has(id)),
         preset: routingPresetOf(config),
       })
-      const budget = budgetFor(config, (await savedState()).runs, plan.estimatedCost)
+      const budget = budgetFor(config, await savedState(), plan.estimatedCost)
       if (budget.exceeded && args.confirmOverBudget !== true) {
         return jsonValue({ status: 'paused-budget', budget, plan,
           notice: `${budget.message} 已暂停团队执行。请向用户确认后以 confirmOverBudget: true 重新调用。` })

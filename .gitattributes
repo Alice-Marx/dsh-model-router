@@ -4,11 +4,14 @@
 /.dsh-plugin/index.mjs -text
 /.dsh-plugin/shared/*.mjs -text
 /package.json -text
+/CHANGELOG.md -text
 /cordis.patch.yml -text
 /README.md -text
 /README.zh.md -text
 /README.i18n.yaml -text
 /INSTALLATION_GUIDE.zh.md -text
+/docs/WORKBENCH_USER_GUIDE.zh.md -text
+/docs/assets/*.svg -text
 /MIGRATION.md -text
 /GAL_GAME_CONCEPT.zh.md -text
 /GAL_STORY_V2_OUTLINE.zh.md -text

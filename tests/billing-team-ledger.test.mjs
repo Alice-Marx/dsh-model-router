@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { strictCtx } from './helpers/strict-ctx.mjs'
@@ -10,8 +10,10 @@ process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-billing-'))
 for (const name of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY']) delete process.env[name]
 
 const {
-  billingOf, billedCost, spending, buildRunRecord, teamExecutionResults, buildTeamRunRecord, buildToolRunRecord,
+  billingOf, billedCost, spending, budgetCheck, archiveSpending, mergeRerun, MAX_SPENDING_DAYS, MAX_SPENDING_MONTHS,
+  buildRunRecord, teamExecutionResults, buildTeamRunRecord, buildToolRunRecord,
 } = await import('../.dsh-plugin/shared/run-ledger.mjs')
+const { createRouterState, MAX_RUNS } = await import('../.dsh-plugin/shared/router-state.mjs')
 const { checkLogin, apiKeyEnvPresent } = await import('../.dsh-plugin/shared/tool-health.mjs')
 const { packageCost, runTotals, rerunSupport } = await import('../.dsh-plugin/client/insights-state.mjs')
 const host = await import('../.dsh-plugin/index.mjs')
@@ -175,10 +177,13 @@ test('read-only team runs are recorded and one failed step re-runs with its down
   assert.equal(result.run.packages[1].billing, 'subscription')
   assert.equal(result.run.packages[1].referenceCostUsd, 1, 'usage × configured price is reference-only on a subscription login')
   assert.equal(result.run.status, 'cli-completed')
+  assert.equal(runTotals(result.run).referenceUsd, 1.7)
+  assert.ok(result.run.priorAttemptSpending, 'the rerun response includes the prior attempt totals')
 
   const ledger = await host.ledgerSummary(config)
   const stored = ledger.runs.find(item => item.id === run.id)
   assert.equal(stored.kind, 'team')
+  assert.deepEqual(stored.priorAttemptSpending, result.run.priorAttemptSpending, 'the public ledger preserves the retry aggregates')
   assert.equal(ledger.spent.month, 0)
   assert.ok(ledger.spent.subscriptionMonth >= 1.7)
 })
@@ -212,4 +217,118 @@ test('an API key in the environment makes CLI spend count against the budget', (
     assert.equal(host.billingForResult({ ok: true, channel: 'official-cli', toolId: 'claude-code' }), 'api')
   } finally { delete process.env.ANTHROPIC_API_KEY }
   assert.equal(host.billingForResult({ ok: true, channel: 'official-cli', toolId: 'claude-code' }), 'subscription')
+})
+
+const historyRun = (id, at, packages, reviews = []) => ({ id, createdAt: at, task: 'history test',
+  packages: packages.map(item => ({ answer: '', ...item })), reviews })
+const historySpending = (state, at) => spending(state.runs, at, state.archivedSpending)
+
+test('evicted history keeps API budgets, unknown usage and subscription references across reloads', async t => {
+  const file = join(await workspace(t), 'state.json')
+  const at = new Date(2026, 9, 3, 12).getTime()
+  const yesterday = new Date(2026, 9, 2, 12).getTime()
+  const store = createRouterState({ file, maxRuns: 2 })
+  await store.appendRun(historyRun('first', at, [
+    { ran: true, billing: 'api', costUsd: 1 },
+    { ran: true, billing: 'api', costUsd: null },
+    { ran: true, billing: 'subscription', referenceCostUsd: 2 },
+    { ran: true, billing: 'subscription', referenceCostUsd: null },
+    { ran: false, billing: null, costUsd: null },
+  ], [{ ran: true, billing: 'api', costUsd: 0.5 }]))
+  await store.appendRun(historyRun('second', yesterday, [{ ran: true, costUsd: 2 }], [{ ran: true, costUsd: null }]))
+  await store.appendRun(historyRun('third', at, [{ ran: true, billing: 'api', costUsd: 3 }]))
+  const expected = { today: 4.5, month: 6.5, unknownToday: 1, unknownMonth: 2,
+    subscriptionToday: 2, subscriptionMonth: 2, subscriptionRunsToday: 2, subscriptionRunsMonth: 2 }
+  const saved = await store.read()
+  assert.deepEqual(saved.runs.map(run => run.id), ['second', 'third'])
+  assert.deepEqual(historySpending(saved, at), expected)
+  assert.equal(budgetCheck({ spent: expected, dailyLimitUsd: 4, estimateUsd: 0.1 }).exceeded, 'daily')
+  const reloaded = createRouterState({ file, maxRuns: 2 })
+  assert.deepEqual(historySpending(await reloaded.read(), at), expected)
+  await reloaded.updateRun('third', run => { run.rated = true })
+  assert.deepEqual(historySpending(await store.read(), at), expected, 'an unrelated write does not count evicted history again')
+  await reloaded.appendRun(historyRun('fourth', at, [{ ran: true, billing: 'api', costUsd: 4 }]))
+  assert.deepEqual(historySpending(await store.read(), at), { ...expected, today: 8.5, month: 10.5 })
+})
+
+test('old state without calendar totals migrates without losing or duplicating spend', async t => {
+  const file = join(await workspace(t), 'state.json')
+  const at = new Date(2026, 9, 3, 12).getTime()
+  await writeFile(file, JSON.stringify({ version: 1, runs: Array.from({ length: 3 }, (_, i) =>
+    historyRun(`old-${i}`, at, [{ ran: true, costUsd: 1 }])) }), 'utf8')
+  const store = createRouterState({ file, maxRuns: 2 })
+  assert.equal((await store.read()).runs.length, 2)
+  assert.equal(historySpending(await store.read(), at).today, 3)
+  assert.equal(historySpending(await createRouterState({ file, maxRuns: 2 }).read(), at).today, 3)
+  await store.update(() => {})
+  const disk = JSON.parse(await readFile(file, 'utf8'))
+  assert.equal(disk.runs.length, 2)
+  assert.equal(historySpending(disk, at).today, 3)
+  assert.equal(historySpending(await createRouterState({ file, maxRuns: 2 }).read(), at).today, 3)
+})
+
+test('archived spend follows local calendar rollover and has bounded retention', () => {
+  const before = new Date(2026, 8, 30, 23, 59).getTime()
+  const after = new Date(2026, 9, 1, 0, 1).getTime()
+  const archive = archiveSpending([
+    historyRun('previous-month', before, [{ ran: true, costUsd: 5 }]),
+    historyRun('current-month', after, [{ ran: true, costUsd: 2 }]),
+  ])
+  assert.equal(spending([], after, archive).today, 2)
+  assert.equal(spending([], after, archive).month, 2)
+  assert.equal(spending([], before, archive).month, 5)
+  const many = Array.from({ length: 800 }, (_, i) => historyRun(`day-${i}`, new Date(2023, 0, i + 1, 12).getTime(), [{ ran: true, costUsd: 1 }]))
+  const bounded = archiveSpending(many)
+  assert.equal(Object.keys(bounded.days).length, MAX_SPENDING_DAYS)
+  assert.equal(Object.keys(bounded.months).length, MAX_SPENDING_MONTHS)
+  assert.equal(spending([], many.at(-1).createdAt, bounded).today, 1)
+})
+
+test('retries retain every attempt charge, billing channel and unknown usage after pruning', async t => {
+  const file = join(await workspace(t), 'state.json')
+  const at = new Date(2026, 9, 3, 12).getTime()
+  const yesterday = new Date(2026, 9, 2, 12).getTime()
+  const store = createRouterState({ file, maxRuns: 1 })
+  await store.appendRun(historyRun('retry', yesterday, [
+    { id: 'api', name: 'API', ran: true, billing: 'api', costUsd: 1, finishedAt: yesterday },
+    { id: 'subscription', name: 'Subscription', ran: true, billing: 'subscription', referenceCostUsd: 2, finishedAt: at },
+    { id: 'unknown', name: 'Unknown', ran: true, billing: 'api', costUsd: null, finishedAt: at },
+    { id: 'blocked', name: 'Blocked', ran: false, billing: null, costUsd: null, finishedAt: at },
+  ]))
+  await store.updateRun('retry', run => mergeRerun(run, { status: 'completed', packages: [
+    { id: 'api', ok: true, channel: 'harness-llm', billing: 'api', reportedCostUsd: 3, answer: 'done' },
+    { id: 'subscription', ok: true, channel: 'official-cli', billing: 'subscription', reportedCostUsd: 4, answer: 'done' },
+    { id: 'unknown', ok: true, channel: 'official-cli', billing: 'subscription', answer: 'done' },
+    { id: 'blocked', ok: true, channel: 'harness-llm', billing: 'api', reportedCostUsd: 0.5, answer: 'done' },
+  ] }, { rerunIds: ['api', 'subscription', 'unknown', 'blocked'], finishedAt: at }))
+  const expected = { today: 3.5, month: 4.5, unknownToday: 1, unknownMonth: 1,
+    subscriptionToday: 6, subscriptionMonth: 6, subscriptionRunsToday: 3, subscriptionRunsMonth: 3 }
+  assert.deepEqual(historySpending(await store.read(), at), expected)
+  const reloaded = createRouterState({ file, maxRuns: 1 })
+  assert.deepEqual(historySpending(await reloaded.read(), at), expected)
+  await reloaded.updateRun('retry', run => mergeRerun(run, { status: 'failed', packages: [
+    { id: 'api', ok: false, channel: 'harness-llm', billing: 'api', reportedCostUsd: 2, answer: '', error: 'failed again' },
+  ] }, { rerunIds: ['api'], finishedAt: at }))
+  assert.deepEqual(historySpending(await store.read(), at), { ...expected, today: 5.5, month: 6.5 })
+  await reloaded.appendRun(historyRun('next', at, [{ ran: true, billing: 'api', costUsd: 1 }]))
+  assert.deepEqual(historySpending(await store.read(), at), { ...expected, today: 6.5, month: 7.5 })
+})
+
+test('Host budget planning and ledger include spend beyond the default history cap', async () => {
+  const store = host.routerStateStore()
+  const before = await store.read()
+  const at = Date.now()
+  const spentBefore = historySpending(before, at)
+  await store.update(current => {
+    current.runs.push(...Array.from({ length: MAX_RUNS + 1 }, (_, i) =>
+      historyRun(`history-cap-${i}`, at, [{ ran: true, billing: 'api', costUsd: 1 }])))
+  })
+  const ledger = await host.ledgerSummary({ dailyBudgetUsd: 200, overBudgetAction: 'pause' })
+  assert.equal(ledger.spent.today, spentBefore.today + MAX_RUNS + 1)
+  assert.equal(ledger.budget.exceeded, 'daily')
+  assert.equal((await store.read()).runs.length, MAX_RUNS)
+  const planned = await host.planAssignment(teamCtx(), 'test budget', { dailyBudgetUsd: 200, overBudgetAction: 'pause' },
+    { workspace: process.cwd(), skipToolProbe: true })
+  assert.equal(planned.budget.exceeded, 'daily')
+  assert.equal(planned.budget.spent.today, ledger.spent.today)
 })

@@ -5,7 +5,7 @@ import { toolInstallAction } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
-import { planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
+import { healthSummary, planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
 import { RunLauncher } from './run-launcher.jsx'
 import { CliTerminalCard } from './cli-terminal.jsx'
 import { staleHostNotice } from './host-version.mjs'
@@ -57,21 +57,23 @@ function ChannelBadge({ item }) {
   )
 }
 
-function PlanResults({ plan, ledger }) {
+function PlanResults({ plan, ledger, headingRef }) {
   const selected = plan.selected
   const budget = planBudget(ledger, plan.estimatedCost)
+  const packageNames = new Map((plan.team?.workPackages ?? []).map(item => [item.id, item.name]))
+  const purposeLabel = { analysis: '任务分析', execution: '任务实施', verification: '独立验证', synthesis: '结果整合' }
   return (
     <section className="mr-card mr-results" aria-label="路由建议">
       <div className="mr-card-head">
         <div>
-          <h2 className="mr-card-title">路由建议</h2>
+          <h2 className="mr-card-title" ref={headingRef} tabIndex={-1}>路由建议</h2>
           <p className="mr-card-copy">本地计算完成，未向模型发送任务内容。</p>
         </div>
       </div>
       <div className="mr-card-body">
         <div className="mr-result-grid">
           <div className="mr-metric"><div className="mr-metric-label">推荐路线</div><div className="mr-metric-value">{selected ? `${selected.provider}/${selected.model}` : '暂无路线'}</div></div>
-          <div className="mr-metric"><div className="mr-metric-label">任务复杂度 · 难度分</div><div className="mr-metric-value">{{ simple: '简单', balanced: '中等', complex: '复杂' }[plan.complexity.band] || plan.complexity.band} · {plan.complexity.value}</div></div>
+          <div className="mr-metric"><div className="mr-metric-label">任务复杂度 · 分值（0–1）</div><div className="mr-metric-value">{{ simple: '简单', balanced: '中等', complex: '复杂' }[plan.complexity.band] || plan.complexity.band} · {plan.complexity.value}</div></div>
           <div className="mr-metric"><div className="mr-metric-label">估算总成本</div><div className="mr-metric-value">{money(plan.estimatedCost)}</div></div>
           <div className="mr-metric"><div className="mr-metric-label">路由方案</div><div className="mr-metric-value">{ROUTING_PRESETS[plan.preset]?.label ?? '均衡'}</div></div>
         </div>
@@ -82,7 +84,7 @@ function PlanResults({ plan, ledger }) {
           <span className="mr-control-label">执行渠道</span>
           <ChannelBadge item={plan} />
         </div>
-        <p className="mr-caption">{plan.reason}</p>
+        <details className="mr-plan-explanation"><summary>查看规划依据与估算说明</summary><p className="mr-caption">{plan.reason}</p><p className="mr-caption">{plan.pricingNotice} {plan.qualityNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</p></details>
         {plan.optimization.budgetExceeded && <p className="mr-error">按已提供单价估算，任务可能超过本次预算。预算只影响建议，不会阻止实际扣费。</p>}
         {plan.mode === 'team' && (
           <>
@@ -92,21 +94,20 @@ function PlanResults({ plan, ledger }) {
             {plan.team.workPackages.length === 0
               ? <div className="mr-empty">当前目录没有可分配的模型路线。</div>
               : plan.team.workPackages.map((item, index) => (
-                <article className="mr-package" key={item.id}>
-                  <div className="mr-package-top"><div className="mr-package-name">{index + 1}. {item.name}</div><div className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</div></div>
+                <details className="mr-package mr-package-details" key={item.id}>
+                  <summary><span className="mr-package-name">{index + 1}. {item.name}</span><span className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</span></summary>
                   {item.objective && <p className="mr-package-copy">具体目标：{item.objective}</p>}
-                  <p className="mr-package-copy">{item.purpose}{item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.join('、')}` : ''}</p>
+                  <p className="mr-package-copy">{purposeLabel[item.purpose] ?? item.purpose}{item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.map(id => packageNames.get(id) ?? id).join('、')}` : ''}</p>
                   <p className="mr-package-copy">难度：{{ simple: '简单', balanced: '中等', complex: '困难' }[item.difficulty] || item.difficulty || '待评估'} · 费用：{money(item.estimatedCost)}</p>
                   <p className="mr-package-copy">验收：{item.verificationChecklist.join('；')}</p>
                   <div className="mr-channel-line"><ChannelBadge item={item} />{item.loginRequired && <span className="mr-pill">CLI 未登录</span>}</div>
                   {item.channelDetail && <p className="mr-package-copy">渠道说明：{item.channelDetail}</p>}
-                </article>
+                </details>
               ))}
           </>
         )}
         {plan.routingBypassed && <p className="mr-caption">已指定单一模型，未与其他路线比较。在官方会话中调用 <code>model_router_execute</code> 并传入该 provider 与 model 即可直接执行；若该模型允许官方工具，会优先使用对应 CLI。</p>}
         {plan.mode === 'team' && <p className="mr-caption">{plan.team.handoff}</p>}
-        <div className="mr-notice">{plan.pricingNotice} {plan.qualityNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</div>
       </div>
     </section>
   )
@@ -302,6 +303,12 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
 
 /** Root-scoped official Desktop panel. The plan is local; real calls remain in Host tools. */
 const HEADLESS_TOOLS = new Set(['claude-code', 'codex', 'gemini'])
+const WORKSPACE_VIEWS = [
+  { id: 'plan', label: '任务与执行', number: '01' },
+  { id: 'models', label: '模型配置', number: '02' },
+  { id: 'tools', label: '官方工具', number: '03' },
+  { id: 'controls', label: '预算与安全', number: '04' },
+]
 
 /** Workbench RPC state: health check, run ledger and security boundaries. */
 function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
@@ -399,15 +406,45 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const [plan, setPlan] = React.useState(null)
   const [planError, setPlanError] = React.useState('')
   const [toolProbes, setToolProbes] = React.useState(null)
+  const [routingSettings, setRoutingSettings] = React.useState(() => {
+    const value = settingsScope.getSnapshot().value ?? {}
+    return JSON.stringify([value.modelProfilesJson, value.routingPreset])
+  })
+  const [view, setView] = React.useState('plan')
+  const tabRefs = React.useRef({})
+  const resultHeading = React.useRef(null)
   const budgetEdited = React.useRef(false)
   const budgetValue = React.useRef(budget)
   const mounted = React.useRef(false)
   const catalogRequest = React.useRef(0)
 
   React.useEffect(() => {
+    if (plan) resultHeading.current?.focus({ preventScroll: true })
+  }, [plan])
+
+  const selectView = id => {
+    setView(id)
+    tabRefs.current[id]?.focus({ preventScroll: true })
+  }
+  const navigateTabs = (event, index) => {
+    const next = event.key === 'ArrowRight' ? (index + 1) % WORKSPACE_VIEWS.length
+      : event.key === 'ArrowLeft' ? (index + WORKSPACE_VIEWS.length - 1) % WORKSPACE_VIEWS.length
+        : event.key === 'Home' ? 0 : event.key === 'End' ? WORKSPACE_VIEWS.length - 1 : null
+    if (next === null) return
+    event.preventDefault()
+    selectView(WORKSPACE_VIEWS[next].id)
+  }
+
+  React.useEffect(() => {
     const syncBudget = () => {
+      const value = settingsScope.getSnapshot().value ?? {}
+      const signature = JSON.stringify([value.modelProfilesJson, value.routingPreset])
+      setRoutingSettings(previous => {
+        if (previous === signature) return previous
+        return signature
+      })
       if (budgetEdited.current) return
-      const next = String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)
+      const next = String(value.budgetUsd ?? 0)
       if (next !== budgetValue.current) {
         budgetValue.current = next
         setBudget(next)
@@ -418,6 +455,8 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
     syncBudget()
     return settingsScope.subscribe(syncBudget)
   }, [settingsScope])
+
+  React.useEffect(() => { setPlan(null); setPlanError('') }, [routingSettings])
 
   React.useEffect(() => {
     mounted.current = true
@@ -482,6 +521,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
     }
   }
 
+  const summary = healthSummary(workbench.health.report?.tools)
   return (
     <main className="mr-workspace">
       <style>{stylesheet}</style>
@@ -490,40 +530,70 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           <div>
             <p className="mr-eyebrow">Model Router · DeepSeek Harness</p>
             <h1 className="mr-title">模型路由工作台</h1>
-            <p className="mr-subtitle">查看官方模型目录，为任务生成路线建议与团队工作包。主会话模型仍由官方选择器管理。</p>
+            <p className="mr-subtitle">把任务交给合适的模型。从本地规划，到可确认的执行。</p>
           </div>
           <div className="mr-status"><span className={`mr-status-dot ${catalogState.status === 'loading' ? 'loading' : catalogState.status === 'error' ? 'error' : ''}`} />{catalogState.status === 'ready' ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === 'loading' ? '正在读取模型目录' : '模型目录读取失败'}</div>
         </header>
+
+        <div className="mr-overview" aria-label="工作台概览">
+          <button type="button" className="mr-overview-item" onClick={() => selectView('models')}><span className="mr-overview-label">模型路线</span><strong>{catalogState.status === 'ready' ? routes.length : '—'}</strong><span className="mr-overview-detail">{catalogState.status === 'ready' ? `${providerCount} 个供应商 · 配置价格与能力 →` : '等待目录加载'}</span></button>
+          <button type="button" className="mr-overview-item" onClick={() => selectView('tools')}><span className="mr-overview-label">官方工具</span><strong>{workbench.health.report ? summary.installed : '—'}<small> / {OFFICIAL_TOOLS.length}</small></strong><span className="mr-overview-detail">{workbench.health.report ? `${summary.ready} 个已登录 · 查看体检 →` : '查看安装与登录状态 →'}</span></button>
+          <button type="button" className="mr-overview-item" onClick={() => selectView('controls')}><span className="mr-overview-label">今日 API 费用</span><strong>{workbench.ledger.value ? money(workbench.ledger.value.spent?.today ?? 0) : '—'}</strong><span className="mr-overview-detail">本机记录估算 · 查看预算 →</span></button>
+        </div>
+
+        <div className="mr-workspace-tabs" role="tablist" aria-label="工作台功能">
+          {WORKSPACE_VIEWS.map((item, index) => <button key={item.id} ref={element => { tabRefs.current[item.id] = element }} type="button" role="tab" id={`mr-tab-${item.id}`} aria-selected={view === item.id} aria-controls={`mr-panel-${item.id}`} tabIndex={view === item.id ? 0 : -1} onKeyDown={event => navigateTabs(event, index)} onClick={() => setView(item.id)}><span className="mr-tab-number" aria-hidden="true">{item.number}</span>{item.label}</button>)}
+        </div>
 
         {staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: Boolean(toolProbes?.probes?.length) }) && <div className="mr-error" role="alert">{staleHostNotice({ hostVersion: toolProbes?.hostVersion })}</div>}
         {(workbench.health.report?.notices ?? []).map(notice => (
           <div key={`${notice.kind}-${notice.at}`} className="mr-error" role="alert">{notice.message}</div>
         ))}
-        {workbench.health.report && !workbench.health.report.onboarding?.completedAt && (
-          <OnboardingBanner health={workbench.health.report} error={workbench.health.error} refreshing={workbench.health.refreshing}
-            onRefresh={() => { void workbench.refreshHealth(true) }} onDone={() => { void workbench.finishOnboarding() }} />
-        )}
-        <CostControlCard ledger={workbench.ledger.value} error={workbench.ledger.error && !workbench.ledger.value ? workbench.ledger.error : ''} settingsScope={settingsScope}
-          onChanged={() => { invalidatePlan(); void workbench.refreshLedger() }} />
-
-        <div className="mr-grid">
+        <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-plan" aria-labelledby="mr-tab-plan" hidden={view !== 'plan'}>
+        <div className="mr-grid mr-planning-grid">
           <section className="mr-card" aria-label="任务规划">
-            <div className="mr-card-head"><div><h2 className="mr-card-title">任务规划</h2><p className="mr-card-copy">“生成路由建议”在本机完成，不会启动模型；要实际执行，请在下方“在工作台执行”中预览并确认。</p></div></div>
+            <div className="mr-card-head"><div><h2 className="mr-card-title">任务规划</h2><p className="mr-card-copy">写清目标与验收标准，先生成本地建议，再预览执行。</p></div><span className="mr-pill">本地规划 · 不消耗 token</span></div>
             <div className="mr-card-body">
               <label className="mr-label" htmlFor="mr-task">任务描述</label>
-              <textarea className="mr-textarea" id="mr-task" value={task} onChange={event => { setTask(event.target.value); invalidatePlan() }} placeholder="例如：分析项目架构，分工修复关键问题，并给出验收清单" />
+              <textarea className="mr-textarea" id="mr-task" value={task} onChange={event => { setTask(event.target.value); invalidatePlan() }} placeholder="例如：分析项目架构，分工修复关键问题，并给出验收清单" aria-describedby="mr-task-hint" />
+              <p className="mr-caption mr-task-hint" id="mr-task-hint">团队任务可按编号写出步骤、交付物和依赖；规划不会更改主会话模型。</p>
               <div className="mr-controls">
                 <div className="mr-control-group"><span className="mr-control-label">规划模式</span><div className="mr-segment" role="group" aria-label="规划模式"><button type="button" aria-pressed={mode === 'single'} onClick={() => { setMode('single'); invalidatePlan() }}>单任务</button><button type="button" aria-pressed={mode === 'team'} onClick={() => { setMode('team'); invalidatePlan() }}>团队分工</button><button type="button" aria-pressed={mode === 'direct'} onClick={() => { setMode('direct'); invalidatePlan() }}>指定模型</button></div></div>
                 {mode === 'direct' && <div className="mr-control-group mr-direct"><label className="mr-control-label" htmlFor="mr-direct-model">直接使用</label><select className="mr-input" id="mr-direct-model" value={directKey || (routes[0] ? `${routes[0].provider}/${routes[0].model}` : '')} onChange={event => { setDirectKey(event.target.value); invalidatePlan() }}>{routes.map(route => <option key={`${route.provider}/${route.model}`} value={`${route.provider}/${route.model}`}>{route.provider}/{route.model}</option>)}</select></div>}
                 <div className="mr-control-group mr-budget"><label className="mr-control-label" htmlFor="mr-budget">本次估算预算（USD）</label><input className="mr-input" id="mr-budget" type="number" min="0" step="0.01" value={budget} onChange={event => { budgetEdited.current = true; budgetValue.current = event.target.value; setBudget(event.target.value); invalidatePlan() }} /></div>
               </div>
-              <div className="mr-actions"><button className="mr-button" type="button" disabled={catalogState.status !== 'ready' || routes.length === 0 || toolProbes === null} onClick={generate}>生成路由建议</button><span className="mr-caption">{toolProbes === null ? '正在检测官方工具…' : '0 表示不限制本次建议；不会设置真实支出上限。'}</span></div>
+              <div className="mr-actions"><button className="mr-button" type="button" disabled={catalogState.status !== 'ready' || routes.length === 0 || toolProbes === null} onClick={generate}>生成路由建议</button><span className="mr-caption">{catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在 Harness 的“模型”页添加模型。' : toolProbes === null ? '正在检测官方工具…' : '预算 0 为不限；费用为估算。'}</span></div>
               {planError && <p className="mr-error" role="alert">{planError}</p>}
             </div>
           </section>
 
+          <aside className="mr-planning-guide" aria-label="规划使用提示">
+            <p className="mr-eyebrow">工作流程</p>
+            <ol className="mr-workflow"><li><span>01</span><div><strong>描述任务</strong><p>选择单任务、团队分工或指定模型。</p></div></li><li><span>02</span><div><strong>核对路由建议</strong><p>检查模型、工作包依赖和估算费用。</p></div></li><li><span>03</span><div><strong>预览并确认执行</strong><p>确认后调用模型，结果写入执行记录。</p></div></li></ol>
+            <div className="mr-guide-links"><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('models')}>配置模型价格与能力 →</button><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('tools')}>检查官方工具与登录 →</button></div>
+            <p className="mr-caption">缺少价格时会提示“价格待配置”。只读执行可在此完成；修改文件的任务需在官方会话中审批。</p>
+          </aside>
+        </div>
+
+        {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} headingRef={resultHeading} />}
+        <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun}
+          planningRevision={routingSettings}
+          directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}
+          defaultPreset={settingsScope.getSnapshot().value?.routingPreset ?? 'balanced'}
+          disabledReason={catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '模型目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在官方“模型”页配置至少一条模型路线。' : ''}
+          onStarted={() => { void workbench.refreshLedger() }} />
+        <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.error}
+          onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating) => { void workbench.rate(runId, packageId, rating) }}
+          onRerun={(runId, packageId, override, choice) => { void workbench.rerun(runId, packageId, override, choice) }} />
+        </div>
+
+        <div className="mr-view" role="tabpanel" id="mr-panel-models" aria-labelledby="mr-tab-models" hidden={view !== 'models'}>
+          <div className="mr-view-heading"><h2>模型配置</h2><p>从官方目录选择路线，补齐比较所需的价格、能力与执行方式。</p></div>
+          <div className="mr-grid mr-model-grid">
+          <ModelProfileEditor routes={routes} settingsScope={settingsScope} onSaved={invalidatePlan} />
+
           <section className="mr-card" aria-label="模型目录">
-            <div className="mr-card-head"><div><h2 className="mr-card-title">模型目录</h2><p className="mr-card-copy">只显示官方已登记的 provider/model，不读取 API Key。</p></div><button className="mr-button mr-button-secondary" type="button" onClick={refresh}>刷新</button></div>
+            <div className="mr-card-head"><div><h2 className="mr-card-title">模型目录</h2><p className="mr-card-copy">{routes.length} 条路线 · 只读取官方目录，不读取 API Key。</p></div><button className="mr-button mr-button-secondary" type="button" disabled={catalogState.status === 'loading'} onClick={refresh}>刷新</button></div>
             <div className="mr-card-body">
               {catalogState.status === 'error' && <div className="mr-error" role="alert">{catalogState.error}</div>}
               {catalogState.status === 'loading' && <div className="mr-empty">正在加载官方模型目录…</div>}
@@ -532,24 +602,28 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
             </div>
           </section>
         </div>
+        </div>
 
-        <ModelProfileEditor routes={routes} settingsScope={settingsScope} onSaved={invalidatePlan} />
-        {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} />}
-        <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun}
-          directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}
-          defaultPreset={settingsScope.getSnapshot().value?.routingPreset ?? 'balanced'}
-          disabledReason={catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '模型目录读取失败，请在“模型目录”卡片点“刷新”。' : routes.length === 0 ? '请先在官方“模型”页配置至少一条模型路线。' : ''}
-          onStarted={() => { void workbench.refreshLedger() }} />
-        <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.error}
-          onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating) => { void workbench.rate(runId, packageId, rating) }}
-          onRerun={(runId, packageId, override, choice) => { void workbench.rerun(runId, packageId, override, choice) }} />
+        <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-tools" aria-labelledby="mr-tab-tools" hidden={view !== 'tools'}>
+        <div className="mr-view-heading"><h2>官方工具</h2><p>管理本机 CLI、检查登录状态，或打开交互式终端。</p></div>
+        {workbench.health.report && !workbench.health.report.onboarding?.completedAt && (
+          <OnboardingBanner health={workbench.health.report} error={workbench.health.error} refreshing={workbench.health.refreshing}
+            onRefresh={() => { void workbench.refreshHealth(true) }} onDone={() => { void workbench.finishOnboarding() }} />
+        )}
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes}
           health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
         {terminalApi && <CliTerminalCard api={terminalApi} health={workbench.health.report} />}
+        </div>
+
+        <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-controls" aria-labelledby="mr-tab-controls" hidden={view !== 'controls'}>
+        <div className="mr-view-heading"><h2>预算与安全</h2><p>设置成本与质量策略，核对订阅计费和执行边界。</p></div>
+        <CostControlCard ledger={workbench.ledger.value} error={workbench.ledger.error && !workbench.ledger.value ? workbench.ledger.error : ''} settingsScope={settingsScope}
+          onChanged={() => { invalidatePlan(); void workbench.refreshLedger() }} />
         <BillingCard billing={workbench.health.report?.billing ?? null} error={workbench.health.report ? '' : workbench.health.error}
           refreshing={workbench.health.refreshing} onRefresh={() => { void workbench.refreshHealth(true) }} />
         <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />
-        <div className="mr-notice">只读任务可在上方“在工作台执行”中直接预览并执行；在官方会话中可使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
+        </div>
+        <footer className="mr-footer">主会话模型由 Harness 管理。更多设置：插件 → 已安装 → <code>@ljwei-stak/dsh-model-router</code>。</footer>
       </div>
     </main>
   )

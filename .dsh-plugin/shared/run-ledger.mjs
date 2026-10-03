@@ -63,34 +63,94 @@ const pad = value => String(value).padStart(2, '0')
 export const dayKey = at => { const date = new Date(at); return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
 export const monthKey = at => { const date = new Date(at); return `${date.getFullYear()}-${pad(date.getMonth() + 1)}` }
 
-/** Recorded spending for today and this month, plus packages whose cost is unknown. */
-export function spending(runs, at = Date.now()) {
+/** Detailed history can be evicted without losing the current budget totals. */
+export const MAX_SPENDING_DAYS = 90
+export const MAX_SPENDING_MONTHS = 24
+const emptyPeriodSpending = () => ({ costUsd: 0, unknown: 0, subscriptionUsd: 0, subscriptionRuns: 0 })
+
+function periodSpending(value) {
+  const amount = field => finite(value?.[field]) && value[field] >= 0 ? value[field] : 0
+  return { costUsd: amount('costUsd'), unknown: Math.floor(amount('unknown')),
+    subscriptionUsd: amount('subscriptionUsd'), subscriptionRuns: Math.floor(amount('subscriptionRuns')) }
+}
+
+/** Bounded calendar aggregates contain amounts and counts, never tasks or answers. */
+export function sanitizeArchivedSpending(value) {
+  const periods = (entries, pattern, limit) => Object.fromEntries(Object.entries(entries && typeof entries === 'object' && !Array.isArray(entries) ? entries : {})
+    .filter(([key, entry]) => pattern.test(key) && entry && typeof entry === 'object' && !Array.isArray(entry))
+    .sort(([left], [right]) => left.localeCompare(right)).slice(-limit)
+    .map(([key, entry]) => [key, periodSpending(entry)]))
+  return {
+    days: periods(value?.days, /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/, MAX_SPENDING_DAYS),
+    months: periods(value?.months, /^\d{4}-(?:0[1-9]|1[0-2])$/, MAX_SPENDING_MONTHS),
+  }
+}
+
+function addArchivedSpending(target, source) {
+  const archive = sanitizeArchivedSpending(source)
+  for (const period of ['days', 'months']) {
+    for (const [key, amount] of Object.entries(archive[period])) {
+      const total = target[period][key] ??= emptyPeriodSpending()
+      for (const field of Object.keys(amount)) total[field] += amount[field]
+    }
+  }
+}
+
+function* spendingEntries(runs) {
+  for (const run of Array.isArray(runs) ? runs : []) {
+    for (const item of [...(Array.isArray(run?.packages) ? run.packages : []), ...(Array.isArray(run?.reviews) ? run.reviews : [])]) {
+      if (!item || typeof item !== 'object') continue
+      const when = item.finishedAt ?? run.createdAt
+      if (!finite(when) || !finite(new Date(when).getTime())) continue
+      const amount = emptyPeriodSpending()
+      if (item.billing === 'subscription') {
+        // A subscription login is reference cost only, never budget spend.
+        if (item.ran !== true) continue
+        amount.subscriptionRuns = 1
+        if (finite(item.referenceCostUsd) && item.referenceCostUsd >= 0) amount.subscriptionUsd = item.referenceCostUsd
+      } else if (finite(item.costUsd) && item.costUsd >= 0) amount.costUsd = item.costUsd
+      else if (item.ran === true) amount.unknown = 1
+      else continue
+      yield { when, amount }
+    }
+  }
+}
+
+/** Fold only evicted records into the archive; retained records are counted live. */
+export function archiveSpending(runs, archivedSpending) {
+  const archive = sanitizeArchivedSpending(archivedSpending)
+  for (const run of Array.isArray(runs) ? runs : []) addArchivedSpending(archive, run?.priorAttemptSpending)
+  for (const { when, amount } of spendingEntries(runs)) {
+    for (const [periods, key] of [[archive.days, dayKey(when)], [archive.months, monthKey(when)]]) {
+      const total = periods[key] ??= emptyPeriodSpending()
+      for (const field of Object.keys(amount)) total[field] += amount[field]
+    }
+  }
+  return sanitizeArchivedSpending(archive)
+}
+
+/** Recorded spending, including evicted history, for the local day and month. */
+export function spending(runs, at = Date.now(), archivedSpending = null) {
   const today = dayKey(at)
   const month = monthKey(at)
-  const total = { today: 0, month: 0, unknownToday: 0, unknownMonth: 0, subscriptionToday: 0, subscriptionMonth: 0, subscriptionRunsToday: 0, subscriptionRunsMonth: 0 }
-  for (const run of Array.isArray(runs) ? runs : []) {
-    for (const item of [...(run.packages ?? []), ...(run.reviews ?? [])]) {
-      const when = item.finishedAt ?? run.createdAt
-      if (!finite(when)) continue
-      const inMonth = monthKey(when) === month
-      if (!inMonth) continue
-      const inDay = dayKey(when) === today
-      if (item.billing === 'subscription') {
-        // API-equivalent reference only; a subscription login is not budget spend.
-        if (item.ran !== true) continue
-        total.subscriptionRunsMonth += 1
-        if (inDay) total.subscriptionRunsToday += 1
-        if (finite(item.referenceCostUsd)) {
-          total.subscriptionMonth += item.referenceCostUsd
-          if (inDay) total.subscriptionToday += item.referenceCostUsd
-        }
-      } else if (finite(item.costUsd)) {
-        total.month += item.costUsd
-        if (inDay) total.today += item.costUsd
-      } else if (item.ran === true) {
-        total.unknownMonth += 1
-        if (inDay) total.unknownToday += 1
-      }
+  const archive = sanitizeArchivedSpending(archivedSpending)
+  for (const run of Array.isArray(runs) ? runs : []) addArchivedSpending(archive, run?.priorAttemptSpending)
+  const daily = periodSpending(archive.days[today])
+  const monthly = periodSpending(archive.months[month])
+  const total = { today: daily.costUsd, month: monthly.costUsd, unknownToday: daily.unknown, unknownMonth: monthly.unknown,
+    subscriptionToday: daily.subscriptionUsd, subscriptionMonth: monthly.subscriptionUsd,
+    subscriptionRunsToday: daily.subscriptionRuns, subscriptionRunsMonth: monthly.subscriptionRuns }
+  for (const { when, amount } of spendingEntries(runs)) {
+    if (monthKey(when) !== month) continue
+    total.month += amount.costUsd
+    total.unknownMonth += amount.unknown
+    total.subscriptionMonth += amount.subscriptionUsd
+    total.subscriptionRunsMonth += amount.subscriptionRuns
+    if (dayKey(when) === today) {
+      total.today += amount.costUsd
+      total.unknownToday += amount.unknown
+      total.subscriptionToday += amount.subscriptionUsd
+      total.subscriptionRunsToday += amount.subscriptionRuns
     }
   }
   return total
@@ -248,6 +308,10 @@ export function buildRunRecord({ id, createdAt, task, plan, execution, preset = 
 export function mergeRerun(run, execution, { rerunIds = [], pricingFor = () => null, billingFor = billingOf, finishedAt = Date.now() } = {}) {
   const results = Array.isArray(execution?.packages) ? execution.packages : []
   const retried = new Set(rerunIds)
+  // Retrying replaces the visible result, but earlier attempts still incurred
+  // charges (or unknown usage). Keep their calendar totals before replacement.
+  const replaced = run.packages.filter(stored => retried.has(stored.id) && results.some(item => item.id === stored.id))
+  run.priorAttemptSpending = archiveSpending([{ createdAt: run.createdAt, packages: replaced }], run.priorAttemptSpending)
   run.packages = run.packages.map(stored => {
     const result = results.find(item => item.id === stored.id)
     if (!result || !retried.has(stored.id)) return stored

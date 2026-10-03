@@ -2,7 +2,7 @@
  * Pure view helpers for the workbench insight cards (health check, budget,
  * run DAG). Kept free of React so the test suite can import them directly.
  */
-import { budgetCheck, formatUsd as sharedFormatUsd } from '../shared/run-ledger.mjs'
+import { budgetCheck, formatUsd as sharedFormatUsd, sanitizeArchivedSpending } from '../shared/run-ledger.mjs'
 
 export const PACKAGE_STATUS = Object.freeze({
   pending: Object.freeze({ label: '待执行', tone: 'pending' }),
@@ -135,12 +135,26 @@ export function packageCost(item) {
   return { budget: item?.ran ? '费用未知' : '—', reference: null }
 }
 
-/** Run totals: budget-counted spend and the subscription reference figure. */
+/** Earlier attempts retain monthly totals; daily entries describe the same spend. */
+export function priorAttemptTotals(run) {
+  const months = sanitizeArchivedSpending(run?.priorAttemptSpending).months
+  const totals = { budgetUsd: 0, referenceUsd: 0, unknownCalls: 0, subscriptionRuns: 0 }
+  for (const period of Object.values(months)) {
+    totals.budgetUsd += period.costUsd
+    totals.referenceUsd += period.subscriptionUsd
+    totals.unknownCalls += period.unknown
+    totals.subscriptionRuns += period.subscriptionRuns
+  }
+  return totals
+}
+
+/** Run totals include prior attempts while keeping subscriptions outside budgets. */
 export function runTotals(run) {
   const items = [...(run?.packages ?? []), ...(run?.reviews ?? [])]
-  let budgetUsd = 0
-  let referenceUsd = 0
-  let subscription = false
+  const prior = priorAttemptTotals(run)
+  let budgetUsd = prior.budgetUsd
+  let referenceUsd = prior.referenceUsd
+  let subscription = prior.subscriptionRuns > 0
   for (const item of items) {
     if (item.billing === 'subscription') {
       subscription = true

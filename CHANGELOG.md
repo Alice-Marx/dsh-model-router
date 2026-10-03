@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.15.0 — 2026-10-03
+
+- Reorganize the workbench into task/execution, model configuration, official tools, and budget/security pages. Keep panels mounted so drafts, installation polling, and terminal sessions survive navigation; add keyboard tab navigation and panel-width responsive layouts.
+- Show local routing results immediately after task planning, with expandable work-package details and human-readable dependency names.
+- Discard pending execution previews when their inputs change, and confirm only the request that was actually previewed. Invalidate local plans when model profiles or routing settings change externally.
+- Preserve API spending, unknown-call counts, and subscription reference costs when detailed history is pruned or a step is retried. Retain 200 detailed runs plus bounded calendar aggregates; previously discarded costs cannot be recovered.
+- Add `npm run preview:ui`: a localhost-only preview of the actual client with in-memory fixtures, five normal/error/empty/onboarding/delayed scenarios, and no real model calls or terminal processes.
+- Rewrite the English/Chinese README, installation instructions, and workbench guide around the current capabilities, source setup, execution boundaries, and local-data behavior. Include the guide and a clearly labeled simulated UI screenshot in the package.
+
+Validation: 220 tests passed, with 3 existing Windows-specific skips; the generated client and packaged file bytes were checked. Browser preview checks cover navigation, narrow panels, validation, draft persistence, and stale-preview rejection. Real vendor accounts, paid CLI calls, and Harness Desktop end-to-end execution were not exercised in this release's validation.
+
 ## 0.14.0 — 2026-10-03
 
 Stable release under the npm `latest` tag. It folds in the 0.14.0-beta.1 – beta.4 prereleases (published under `next` only). **After updating, quit Harness completely (including the tray icon) and start it again**: Harness serves the new workbench UI at once, but the running Host keeps the plugin code it already imported, so the new Host methods are missing until a full restart. The workbench now warns when the Host and client versions differ.

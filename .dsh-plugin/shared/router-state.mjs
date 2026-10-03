@@ -14,6 +14,7 @@
 import { mkdir, open, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { archiveSpending, sanitizeArchivedSpending } from './run-ledger.mjs'
 
 export const MAX_RUNS = 200
 const STATE_VERSION = 1
@@ -38,7 +39,7 @@ const LOCK_STALE_MS = 15_000
 const LOCK_TIMEOUT_MS = 10_000
 
 function emptyState() {
-  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], notices: [], terminalSessions: [] }
+  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], archivedSpending: sanitizeArchivedSpending(), notices: [], terminalSessions: [] }
 }
 
 function sanitizeNotices(value) {
@@ -47,19 +48,27 @@ function sanitizeNotices(value) {
     : []
 }
 
-function sanitize(value) {
+function retainRuns(state, maxRuns) {
+  const removed = Math.max(0, state.runs.length - maxRuns)
+  state.archivedSpending = archiveSpending(state.runs.slice(0, removed), state.archivedSpending)
+  state.runs = state.runs.slice(removed)
+  return state
+}
+
+function sanitize(value, maxRuns) {
   if (!value || typeof value !== 'object' || value.version !== STATE_VERSION) return emptyState()
-  return {
+  return retainRuns({
     version: STATE_VERSION,
     onboarding: { completedAt: Number.isFinite(value.onboarding?.completedAt) ? value.onboarding.completedAt : null },
     health: value.health && Array.isArray(value.health.tools) ? value.health : null,
     quota: value.quota && typeof value.quota === 'object' && !Array.isArray(value.quota) ? value.quota : {},
     authFailures: Object.fromEntries(Object.entries(value.authFailures && typeof value.authFailures === 'object' && !Array.isArray(value.authFailures) ? value.authFailures : {})
       .filter(([, entry]) => Number.isFinite(entry?.at))),
-    runs: Array.isArray(value.runs) ? value.runs.filter(run => run && typeof run.id === 'string').slice(-MAX_RUNS) : [],
+    runs: Array.isArray(value.runs) ? value.runs.filter(run => run && typeof run.id === 'string') : [],
+    archivedSpending: sanitizeArchivedSpending(value.archivedSpending),
     notices: sanitizeNotices(value.notices),
     terminalSessions: sanitizeTerminalSessions(value.terminalSessions),
-  }
+  }, maxRuns)
 }
 
 function sanitizeTerminalSessions(value) {
@@ -110,6 +119,7 @@ async function acquireLock(lockFile, { staleMs = LOCK_STALE_MS, timeoutMs = LOCK
 }
 
 export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUNS, now = Date.now } = {}) {
+  const historyLimit = Number.isInteger(maxRuns) && maxRuns > 0 ? Math.min(maxRuns, MAX_RUNS) : MAX_RUNS
   let cache = null
   let cacheKey = ''
   let chain = Promise.resolve()
@@ -127,7 +137,7 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
       if (error?.code === 'ENOENT') return { state: emptyState(), corrupt: false }
       throw error
     }
-    try { return { state: sanitize(JSON.parse(raw)), corrupt: false } }
+    try { return { state: sanitize(JSON.parse(raw), historyLimit), corrupt: false } }
     catch {
       const at = now()
       const backup = `${file}.corrupt-${stamp(at)}`
@@ -171,7 +181,7 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
         const state = await load()
         if (pendingNotices.length) { state.notices.push(...pendingNotices); pendingNotices = [] }
         const result = await change(state)
-        state.runs = state.runs.slice(-maxRuns)
+        retainRuns(state, historyLimit)
         state.notices = sanitizeNotices(state.notices)
         state.terminalSessions = sanitizeTerminalSessions(state.terminalSessions)
         await persist(state)

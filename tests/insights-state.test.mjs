@@ -2,8 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   packageStatus, dagLayers, healthSummary, versionLine, UNTESTED_VERSION_NOTE, budgetMeter, planBudget, biasForRoute, unwrapRemote, formatUsd,
+  priorAttemptTotals, runTotals,
 } from '../.dsh-plugin/client/insights-state.mjs'
 import { createWorkspacePlan } from '../.dsh-plugin/client/catalog.mjs'
+import { archiveSpending, mergeRerun, spending } from '../.dsh-plugin/shared/run-ledger.mjs'
 
 test('dagLayers orders packages by dependency depth and tolerates cycles and unknown ids', () => {
   const layers = dagLayers([
@@ -76,4 +78,38 @@ test('workspace plan applies learned quality biases from ratings', () => {
   const quality = (plan, model) => plan.availableRoutes.find(route => route.model === model)?.qualityBias ?? 0
   assert.equal(quality(plain, 'cheap'), 0)
   assert.equal(quality(biased, 'cheap'), 0.04)
+})
+
+test('run totals count previous retry attempts once and agree with the monthly budget ledger', () => {
+  const at = new Date(2026, 9, 3, 12).getTime()
+  const previousDay = new Date(2026, 9, 2, 12).getTime()
+  const run = { createdAt: previousDay, packages: [
+    { id: 'api', name: 'API', ran: true, billing: 'api', costUsd: 1.5, finishedAt: previousDay },
+    { id: 'subscription', name: 'Subscription', ran: true, billing: 'subscription', referenceCostUsd: 2, finishedAt: previousDay },
+    { id: 'unknown', name: 'Unknown', ran: true, billing: 'api', costUsd: null, finishedAt: previousDay },
+  ], reviews: [{ ran: true, billing: 'api', costUsd: 0.5, finishedAt: at }] }
+  mergeRerun(run, { status: 'completed', packages: [
+    { id: 'api', ok: true, channel: 'harness-llm', billing: 'api', reportedCostUsd: 3, answer: 'done' },
+    { id: 'subscription', ok: true, channel: 'harness-llm', billing: 'api', reportedCostUsd: 4, answer: 'done' },
+    { id: 'unknown', ok: true, channel: 'official-cli', billing: 'subscription', answer: 'done' },
+  ] }, { rerunIds: ['api', 'subscription', 'unknown'], finishedAt: at })
+  assert.deepEqual(priorAttemptTotals(run), { budgetUsd: 1.5, referenceUsd: 2, unknownCalls: 1, subscriptionRuns: 1 })
+  assert.deepEqual(runTotals(run), { budgetUsd: 9, referenceUsd: 2, subscription: true })
+  const spent = spending([run], at)
+  assert.equal(runTotals(run).budgetUsd, spent.month)
+  assert.equal(runTotals(run).referenceUsd, spent.subscriptionMonth)
+  const pruned = spending([], at, archiveSpending([run]))
+  assert.deepEqual(pruned, spent, 'the same retry totals survive history eviction')
+})
+
+test('previous attempts keep subscription status even when the latest call uses an API key', () => {
+  const at = new Date(2026, 9, 3, 12).getTime()
+  const run = {
+    packages: [{ ran: true, billing: 'api', costUsd: 1 }], reviews: [],
+    priorAttemptSpending: archiveSpending([{ createdAt: at,
+      packages: [{ ran: true, billing: 'subscription', referenceCostUsd: null }] }]),
+  }
+  assert.deepEqual(runTotals(run), { budgetUsd: 1, referenceUsd: 0, subscription: true })
+  assert.deepEqual(priorAttemptTotals(null), { budgetUsd: 0, referenceUsd: 0, unknownCalls: 0, subscriptionRuns: 0 })
+  assert.deepEqual(runTotals(null), { budgetUsd: 0, referenceUsd: 0, subscription: false })
 })
