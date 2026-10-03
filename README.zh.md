@@ -6,7 +6,7 @@
 
 [English](README.md) · [安装与验证指南](INSTALLATION_GUIDE.zh.md) · [迁移说明](MIGRATION.md) · [独立 GAL 仓库](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
-> **宿主版本：**模型路由 0.13.3 与 GAL 0.1.0 均声明支持 DeepSeek Harness Desktop **0.2.0-rc.1 和 0.2.0-rc.2**。宿主仍是预发布版本，本轮发布使用 npm `next` 标签；推荐精确版本安装，不要依赖裸包名或不断变化的标签。
+> **宿主版本：**模型路由 0.14.0 与 GAL 0.1.0 均声明支持 DeepSeek Harness Desktop **0.2.0-rc.1 和 0.2.0-rc.2**。路由正式版发布在 npm `latest` 标签（预发布版在 `next`）；推荐精确版本安装，不要依赖裸包名或不断变化的标签。
 
 ![本地规划、按难度选模型与官方工具执行流程](docs/assets/routing-workflow.svg)
 
@@ -34,12 +34,12 @@
 
 | 安装内容 | 输入框填写 | GitHub 仓库 |
 | --- | --- | --- |
-| 模型路由、模型档案与官方工具 | `@ljwei-stak/dsh-model-router@0.13.3` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
+| 模型路由、模型档案与官方工具 | `@ljwei-stak/dsh-model-router@0.14.0` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
 | GAL 剧情、自由模式与播放器 | `@ljwei-stak/dsh-galgame@0.1.0` | [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) |
 
 1. npm 安装源选择官方 **HTTPS** 地址 `https://registry.npmjs.org/`；国内镜像尚未同步时可改用此源或版本化 GitHub 安装包。
 2. 核对安装预览版本与宿主版本，安装并启用；有重启提示时重启。
-3. 路由详情应为 **0.13.3**，侧边栏显示 **模型路由**；独立 GAL 详情应为 **0.1.0**，另显示 **Gal 模块**。
+3. 路由详情应为 **0.14.0**，侧边栏显示 **模型路由**；独立 GAL 详情应为 **0.1.0**，另显示 **Gal 模块**。
 
 普通使用不需要 `npm install -g`：全局 npm 安装不会注册到当前 Harness profile。路由与 GAL 都可以不安装另一插件而运行。
 
@@ -49,30 +49,30 @@
 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`。旧包名的最后版本同样是 0.13.0，内容相同，之后的更新只发布到新包名。插件管理器无法原地更新旧条目：
 
 1. 在插件管理器卸载 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据）。
-2. 添加 `@ljwei-stak/dsh-model-router@0.13.3`，按提示重启。
+2. 添加 `@ljwei-stak/dsh-model-router@0.14.0`，按提示重启。
 3. 不要两个同时安装：二者使用相同的 profile 条目 id `model-router-galgame` 和相同的 `model_router_*` 工具名。条目 id 未变，所以 profile 中保存的路由设置以及 `~/.dsh/model-router/state.json` 里的执行记录会保留。
 
 ### 从合并版 0.11.x 升级
 
 1. **先备份**：旧版 GAL 中对需要保留的剧情进度使用“导出存档”，并备份 Harness profile。JSON 仅包含当前剧情状态，不包含全部手动槽、设置、已读记录与本地音乐。
 2. 在**同一个 profile**安装 `@ljwei-stak/dsh-galgame@0.1.0`。
-3. 在插件管理器卸载原 `@ljwei-stak/model-router-galgame`，再添加 `@ljwei-stak/dsh-model-router@0.13.3`（见上文“从旧包名升级”）。完成两项安装后再游玩；旧合并插件的 GAL 入口随路由升级移除，只留下新 GAL 插件的入口。
+3. 在插件管理器卸载原 `@ljwei-stak/model-router-galgame`，再添加 `@ljwei-stak/dsh-model-router@0.14.0`（见上文“从旧包名升级”）。完成两项安装后再游玩；旧合并插件的 GAL 入口随路由升级移除，只留下新 GAL 插件的入口。
 4. 打开独立 GAL 检查进度。它保留原 localStorage 存档键；更换 profile 或没有读到旧进度时，先选择对应剧目，再导入备份 JSON。
 
 独立 GAL 核心只内置**《回声之城·正篇》**和**《旧城迁移篇：未写完的约定》**。此前分出的其他篇目保留在源代码归档，不随这两个核心插件发布。完整迁移步骤见[迁移说明](MIGRATION.md)。
 
 ### 使用 GitHub 安装包
 
-从[路由 v0.13.0 Release](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.3)或[GAL v0.1.0 Release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0)下载 `.tgz`，在添加插件输入框填写文件绝对路径，例如：
+从[路由 Releases](https://github.com/Alice-Marx/dsh-model-router/releases)（或运行 `npm pack @ljwei-stak/dsh-model-router@0.14.0`）或[GAL v0.1.0 Release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0)下载 `.tgz`，在添加插件输入框填写文件绝对路径，例如：
 
 ```text
-D:\Plugins\ljwei-stak-dsh-model-router-0.13.3.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.14.0.tgz
 ```
 
 如附有 `.sha256` 校验文件，使用以下命令计算摘要并比较：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.3.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.14.0.tgz'
 ```
 
 也可解压并填写内层含 `package.json` 和 `.dsh-plugin` 的 `package` 目录。安装包可放到自选磁盘；运行数据位置由宿主 profile 决定。不要改 `app.asar` 或绕过依赖检查。
@@ -81,7 +81,8 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-rou
 
 | 版本 | 声明的宿主 | 功能范围 |
 | --- | --- | --- |
-| **模型路由 0.13.3** | **0.2.0-rc.1 / rc.2** | 修复 Windows 版 Harness Desktop 中官方 CLI 执行无输出（沙箱启动器环境；Codex 改用自带只读沙箱）。更新后请完全重启 Harness。推荐精确版本，也可用 `@next` / `@latest`。 |
+| **模型路由 0.14.0** | **0.2.0-rc.1 / rc.2** | 新增官方工具终端（系统终端与官方 CLI、登录）；官方工具跟随各厂商最新版并提示更新，保留签名校验。更新后请完全重启 Harness。推荐精确版本，也可用 `@latest`。 |
+| [模型路由 0.13.3](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.3) | 0.2.0-rc.1 / rc.2 | 修复 Windows 版 Harness Desktop 中官方 CLI 执行无输出（沙箱启动器环境；Codex 改用自带只读沙箱）。 |
 | [模型路由 0.13.2](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.2) | 0.2.0-rc.1 / rc.2 | Codex 支持非 Git 工作区；Windows Desktop 中经沙箱的 CLI 执行仍无输出。 |
 | [模型路由 0.13.1](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.1) | 0.2.0-rc.1 / rc.2 | 修复 `cannot get property "credentials" without inject`；Windows 上 Codex 拒绝非 Git 工作区。 |
 | [模型路由 0.13.0](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.0) | 0.2.0-rc.1 / rc.2 | 体检、成本控制、订阅优先、执行记录；在 Harness 中执行会失败（0.13.1 已修复）。 |
@@ -402,7 +403,7 @@ Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙
 
 Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设置可填写 `cliModel`；团队执行时临时的“工作包映射 > 工具映射 > 保存映射”。ZCode 不能逐次切换模型。多数 CLI 不回报可核验的实际模型 ID，执行后要对照厂商运行记录、权限和账单。Windows Harness 沙箱的 ACL 文件效果报告为部分隔离，涉及敏感仓库时应先用测试环境验证。
 
-### 官方工具终端（0.14.0-beta.3，npm `next`）
+### 官方工具终端（0.14.0 起）
 
 工作台“官方工具 · 体检”下方新增 **官方工具终端** 卡片：以标签页形式交互运行系统终端（Windows 为 PowerShell，其他系统为登录 `$SHELL`）或已安装的官方 CLI（`codex`、`claude`、`kimi`、`mcode`、`mimo`、`grok`、`gemini`），实时输出，可多轮对话、显示全屏界面，也可选 **登录** 直接运行 `codex login`、`claude auth login`、`kimi login`、`mcode login`、`mimo auth login`、`grok login`。
 

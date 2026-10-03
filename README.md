@@ -6,7 +6,7 @@
 
 [简体中文说明](README.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Migration guide](MIGRATION.md) · [GAL repository](https://github.com/Alice-Marx/deepseek-harness-galgame)
 
-> **Host compatibility:** both the router 0.13.3 and GAL 0.1.0 target DeepSeek Harness Desktop **0.2.0-rc.1 and 0.2.0-rc.2**. Use the exact installation versions below. Releases use npm's `next` tag while this host is a prerelease; a bare package name or a moving tag is not a version pin.
+> **Host compatibility:** both the router 0.14.0 and GAL 0.1.0 target DeepSeek Harness Desktop **0.2.0-rc.1 and 0.2.0-rc.2**. Use the exact installation versions below. Stable router releases are published under npm's `latest` tag (prereleases under `next`); a bare package name or a moving tag is not a version pin.
 
 ![Diagram of the local routing plan and official-tool execution](docs/assets/routing-workflow.svg)
 
@@ -35,7 +35,7 @@ In **DeepSeek Harness Desktop → Plugins → Add plugin**, enter one exact pack
 
 | What you want | Installation input | Repository |
 | --- | --- | --- |
-| Model routing and official tools | `@ljwei-stak/dsh-model-router@0.13.3` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
+| Model routing and official tools | `@ljwei-stak/dsh-model-router@0.14.0` | [Model Router](https://github.com/Alice-Marx/dsh-model-router) |
 | GAL only, or GAL alongside the router | `@ljwei-stak/dsh-galgame@0.1.0` | [DeepSeek Harness GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) |
 
 For npm installation, select the official **HTTPS** source `https://registry.npmjs.org/` if a mirror has not synchronized the exact version. Install, enable, and restart when prompted. Router details should show **0.13.0** and its sidebar **Model Router**; the separate GAL package adds **Gal Module**. Either package can be installed without the other. Global `npm install -g` does not register a plugin in your Desktop profile.
@@ -45,30 +45,30 @@ For npm installation, select the official **HTTPS** source `https://registry.npm
 The package was renamed in 0.13.0. The old name's last version is also 0.13.0, with identical content, so future updates only come under the new name. The plugin manager cannot update the old entry in place:
 
 1. Remove `@ljwei-stak/model-router-galgame` in the plugin manager (keep profile and application data).
-2. Add `@ljwei-stak/dsh-model-router@0.13.3` and restart when prompted.
+2. Add `@ljwei-stak/dsh-model-router@0.14.0` and restart when prompted.
 3. Do not keep both installed: they share the profile entry id `model-router-galgame` and the `model_router_*` tool names. Because the entry id is unchanged, router settings saved in the profile and the run history in `~/.dsh/model-router/state.json` carry over.
 
 ### Upgrade from the combined 0.11.x plugin
 
 1. Before upgrading, use the old GAL player's **Export save** for each story progress you want to keep, and back up the Harness profile. A JSON export contains the current story state, not all slots, settings, read history, or local audio.
 2. Install `@ljwei-stak/dsh-galgame@0.1.0` in the **same profile**.
-3. Remove the old `@ljwei-stak/model-router-galgame` plugin and add `@ljwei-stak/dsh-model-router@0.13.3` (see above). Finish both installations before continuing play; this removes the old combined GAL entry and leaves one entry from the independent GAL plugin.
+3. Remove the old `@ljwei-stak/model-router-galgame` plugin and add `@ljwei-stak/dsh-model-router@0.14.0` (see above). Finish both installations before continuing play; this removes the old combined GAL entry and leaves one entry from the independent GAL plugin.
 4. Open the new GAL entry and verify your progress. The standalone plugin retains the old localStorage keys in the same profile. For a different profile or a missing state, select the matching story and import the JSON backup.
 
 The standalone GAL core contains **Echo City: Main Saga** and **Old City Migration: The Unfinished Promise**. Previously separated stories remain in their source archive and are not shipped with either core plugin. See [migration notes](MIGRATION.md) for save limitations and older desktop integrations.
 
 ### Install a versioned release archive
 
-Download the `.tgz` attachment from the [router v0.13.0 release](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.3) or [GAL v0.1.0 release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0). Enter the downloaded file's absolute path, for example:
+Download the `.tgz` attachment from the [router releases](https://github.com/Alice-Marx/dsh-model-router/releases) (or run `npm pack @ljwei-stak/dsh-model-router@0.14.0`) or [GAL v0.1.0 release](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0). Enter the downloaded file's absolute path, for example:
 
 ```text
-D:\Plugins\ljwei-stak-dsh-model-router-0.13.3.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.14.0.tgz
 ```
 
 Where a checksum sidecar is supplied, compare it with:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.13.3.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.14.0.tgz'
 ```
 
 You can also extract the archive and enter its inner `package` directory, which contains `package.json` and `.dsh-plugin`. The download may be stored on your preferred drive; runtime data location is controlled by the Harness profile. Upgrade through the plugin manager without modifying `app.asar` or bypassing dependency checks.
@@ -77,7 +77,8 @@ You can also extract the archive and enter its inner `package` directory, which 
 
 | Version | Intended host | Scope |
 | --- | --- | --- |
-| **Router 0.13.3** | **0.2.0-rc.1 / 0.2.0-rc.2** | Official CLI runs work on Harness Desktop for Windows (sandbox runner environment; Codex uses its own read-only sandbox). Restart Harness fully after updating. Exact npm version, `@next` or `@latest`. |
+| **Router 0.14.0** | **0.2.0-rc.1 / 0.2.0-rc.2** | Interactive 官方工具终端 (shell and official CLIs, logins); official tools follow each vendor's latest release with an update hint, keeping signer checks. Restart Harness fully after updating. Exact npm version or `@latest`. |
+| [Router 0.13.3](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.3) | 0.2.0-rc.1 / 0.2.0-rc.2 | Official CLI runs work on Harness Desktop for Windows (sandbox runner environment; Codex uses its own read-only sandbox). |
 | [Router 0.13.2](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.2) | 0.2.0-rc.1 / 0.2.0-rc.2 | Codex in non-Git workspaces; sandboxed CLI runs on Desktop for Windows still produced no output. |
 | [Router 0.13.1](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.1) | 0.2.0-rc.1 / 0.2.0-rc.2 | Fixed `cannot get property "credentials" without inject`; Codex refused non-Git workspaces on Windows. |
 | [Router 0.13.0](https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.13.0) | 0.2.0-rc.1 / 0.2.0-rc.2 | Health check, cost control, subscription-first billing, run history; runs fail in the Harness (fixed in 0.13.1). |
@@ -411,7 +412,7 @@ Claude Code, Codex, MiMo Code, and Grok Build support read-only and approved edi
 
 The planned Harness model ID is not necessarily the vendor CLI's model name. A saved `cliModel`, or temporary `cliModelsJson` keyed by tool or work-package ID, can provide a known vendor CLI name. A package-specific temporary mapping takes priority over a tool mapping, then the saved profile. ZCode uses its configured default model. Most vendor CLIs do not provide a verifiable actual model ID in their results, so inspect vendor run records to confirm which model and price applied. The plugin's sequential CLI team runner is separate from Harness's built-in Agent Teams lifecycle.
 
-### Interactive terminal (官方工具终端, 0.14.0-beta.3, npm `next`)
+### Interactive terminal (官方工具终端, since 0.14.0)
 
 The workbench has an **官方工具终端** card below the tool health check. It runs your system shell (PowerShell on Windows, your login `$SHELL` elsewhere) or one installed official CLI (`codex`, `claude`, `kimi`, `mcode`, `mimo`, `grok`, `gemini`) interactively, in tabs, with live output: multi-turn conversations, full-screen TUIs, and logins such as `codex login`, `claude auth login`, `kimi login`, `mcode login`, `mimo auth login`, `grok login` (choose **登录**).
 
