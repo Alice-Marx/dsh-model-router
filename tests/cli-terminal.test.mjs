@@ -411,3 +411,36 @@ test('client transport: ordered coalesced input, long-poll output, single stop',
   await live.stop()
   assert.equal(calls.filter(call => call[0] === 'stop').length, 1, 'closing the panel stops the session once')
 })
+
+test('stale Host: a 404 for a new remote method becomes restart advice; list() reports the Host version', async () => {
+  const { isMissingRemoteMethod, remoteErrorText, staleHostNotice, STALE_HOST_MESSAGE } = await import('../.dsh-plugin/client/host-version.mjs')
+  // Exact text the Harness client gateway produced for 0.14.0-beta.1 against a Host still running 0.13.3.
+  const observed = 'client api: modelRouterOfficialTools/terminalInfo failed: transport failure for /api/modelRouterOfficialTools/terminalInfo: HTTP 404'
+  assert.equal(isMissingRemoteMethod(observed), true)
+  assert.equal(remoteErrorText(observed, 'x'), STALE_HOST_MESSAGE)
+  assert.match(STALE_HOST_MESSAGE, /插件后台版本较旧，请完全退出并重启 Harness/)
+  assert.equal(remoteErrorText('transport failure for /api/a/b: HTTP 500', 'x'), 'transport failure for /api/a/b: HTTP 500')
+  assert.equal(remoteErrorText('', 'fallback'), 'fallback')
+  assert.match(staleHostNotice({ hostVersion: null, clientVersion: '0.14.0-beta.2' }), /后台为更早版本/)
+  assert.match(staleHostNotice({ hostVersion: '0.14.0-beta.1', clientVersion: '0.14.0-beta.2' }), /后台为 0.14.0-beta.1/)
+  assert.equal(staleHostNotice({ hostVersion: '0.14.0-beta.2', clientVersion: '0.14.0-beta.2' }), '')
+  assert.equal(staleHostNotice({ hostVersion: null, clientVersion: '0.14.0-beta.2', loaded: false }), '')
+
+  // The transport turns that 404 into the same advice.
+  let failure = null
+  const connection = new TerminalConnection({
+    api: { terminalRead: async () => ({ ok: false, error: { message: observed } }) },
+    sessionId: 'term-abcdef123456', onError: error => { failure = error; connection.closed = true },
+  })
+  await connection.start()
+  assert.equal(failure.message, STALE_HOST_MESSAGE)
+
+  const { HOST_PLUGIN_VERSION } = await import('../.dsh-plugin/official-tools-remote-service.mjs')
+  const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.equal(HOST_PLUGIN_VERSION, manifest.version)
+  const source = await readFile(new URL('../.dsh-plugin/official-tools-remote-service.mjs', import.meta.url), 'utf8')
+  assert.match(source, /executionReadiness, hostVersion: HOST_PLUGIN_VERSION/)
+  // The bundled client carries the same version for the comparison.
+  const bundle = await readFile(new URL('../.dsh-plugin/client.js', import.meta.url), 'utf8')
+  assert.ok(bundle.includes(JSON.stringify(manifest.version)), 'client.js embeds its package version')
+})

@@ -1,8 +1,20 @@
 # Changelog
 
-## 0.14.0-beta.1 — unreleased (branch `feat/cli-terminal`)
+## 0.14.0-beta.2 — 2026-10-03
 
-Branch build for testing; not published to npm.
+Prerelease under the npm `next` tag only (`latest` stays 0.13.3).
+
+**After installing or updating, quit Harness completely (including the tray icon) and start it again.** Harness serves the new workbench UI immediately, but the running Host keeps the plugin code it already imported, so new Host methods are missing until a full restart.
+
+### Fixed
+- With 0.14.0-beta.1 installed into a running Harness, the 官方工具终端 card showed `transport failure for /api/modelRouterOfficialTools/terminalInfo: HTTP 404`. The Harness gateway only routes `/api/<namespace>/<method>` for descriptors the Host registered when it applied the plugin; the Host was still running the previous version's code. Nothing in the plugin's routes was wrong. The card now shows "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。" for a missing method and disables 开始.
+
+### Added
+- `list()` reports `hostVersion`, the plugin version the Host actually loaded; the client embeds its own version at build time. When they differ (or the Host is too old to report one), the workbench shows the same restart advice at the top.
+
+## 0.14.0-beta.1 — 2026-10-03
+
+Prerelease under the npm `next` tag (branch `feat/cli-terminal`).
 
 ### Added
 - **官方工具终端** workbench card: interactive sessions of the system shell (PowerShell on Windows) or an installed official CLI (codex, claude, kimi, mcode, mimo, grok, gemini), in tabs, rendered with xterm.js 6 (bundled into `client.js`). Each CLI also has a fixed **登录** mode (`codex login`, `claude auth login`, …). Sessions start only after a confirmation showing the command, the absolute working directory, and that the terminal runs outside the Harness process sandbox with the user's own CLI login and environment.

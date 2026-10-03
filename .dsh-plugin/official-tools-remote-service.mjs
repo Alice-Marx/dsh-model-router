@@ -1,4 +1,5 @@
 /** Host receiver for the official desktop's typed one-click installer RPC. */
+import { readFileSync } from 'node:fs'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { getOfficialTool } from './shared/official-tool-registry.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness } from './shared/official-tool-executor.mjs'
@@ -15,6 +16,12 @@ import {
   OFFICIAL_TOOLS_HOST_TYPERT,
   OFFICIAL_TOOLS_REMOTE_NAMESPACE,
 } from './shared/official-tools-remote.mjs'
+
+/** Version of the plugin code this Host process actually imported. */
+export const HOST_PLUGIN_VERSION = (() => {
+  try { return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version ?? null }
+  catch { return null }
+})()
 
 function errorText(error) {
   return error instanceof Error ? error.message : String(error)
@@ -77,7 +84,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
     const executionReadiness = await Promise.all(tools.map(tool => tool.installed
       ? officialToolReadiness(tool.id)
       : Promise.resolve({ id: tool.id, ready: false, reason: 'CLI 尚未安装或版本检测失败。' })))
-    return { tools, executionCapabilities: officialToolExecutionCapabilities(), executionReadiness }
+    return { tools, executionCapabilities: officialToolExecutionCapabilities(), executionReadiness, hostVersion: HOST_PLUGIN_VERSION }
   }
 
   /** Start one serialized fixed-registry install; return immediately for UI polling. */

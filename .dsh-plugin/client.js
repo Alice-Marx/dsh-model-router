@@ -11600,6 +11600,24 @@ var xterm_default = `/**
 }
 `;
 
+// .dsh-plugin/client/host-version.mjs
+var ROUTER_CLIENT_VERSION = true ? "0.14.0-beta.2" : "";
+var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
+function isMissingRemoteMethod(message) {
+  const value = String(message ?? "");
+  return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
+}
+function remoteErrorText(message, fallback = "") {
+  if (isMissingRemoteMethod(message)) return STALE_HOST_MESSAGE;
+  return String(message ?? "").trim() || fallback;
+}
+function staleHostNotice({ hostVersion, clientVersion = ROUTER_CLIENT_VERSION, loaded = true } = {}) {
+  if (!loaded || !clientVersion) return "";
+  if (typeof hostVersion !== "string" || !hostVersion) return `${STALE_HOST_MESSAGE}\uFF08\u754C\u9762\u4E3A ${clientVersion}\uFF0C\u540E\u53F0\u4E3A\u66F4\u65E9\u7248\u672C\uFF09`;
+  if (hostVersion !== clientVersion) return `${STALE_HOST_MESSAGE}\uFF08\u754C\u9762\u4E3A ${clientVersion}\uFF0C\u540E\u53F0\u4E3A ${hostVersion}\uFF09`;
+  return "";
+}
+
 // .dsh-plugin/shared/cli-terminal-protocol.mjs
 var TERMINAL_TOOL_IDS = Object.freeze(["codex", "claude-code", "kimi-code", "minimax-code", "mimo-code", "grok-build", "gemini"]);
 var TERMINAL_SHELL_ID = "shell";
@@ -11763,7 +11781,7 @@ var formatDuration = (ms2) => {
 };
 var unwrap = (response, fallback) => {
   if (response?.ok) return response.value;
-  throw new Error(text3(response?.error?.message) || text3(response?.error) || fallback);
+  throw new Error(remoteErrorText(text3(response?.error?.message) || text3(response?.error), fallback));
 };
 var TerminalConnection = class {
   constructor({ api, sessionId, onData, onExit, onError, waitMs = 800, retryMs = 1e3, resizeDelayMs = 120, setTimer = setTimeout, clearTimer = clearTimeout }) {
@@ -11856,7 +11874,7 @@ var TerminalConnection = class {
 // .dsh-plugin/client/cli-terminal.jsx
 var CWD_STORAGE_KEY = "model-router.terminal.cwd";
 var text4 = (value) => typeof value === "string" ? value.trim() : "";
-var errorText = (error, fallback) => text4(error?.message) || fallback;
+var errorText = (error, fallback) => remoteErrorText(text4(error?.message), fallback);
 function storedCwd() {
   try {
     return globalThis.localStorage?.getItem(CWD_STORAGE_KEY) ?? "";
@@ -11959,7 +11977,7 @@ function CliTerminalCard({ api, health }) {
     try {
       const response = await api.terminalInfo();
       if (!mounted.current) return;
-      if (!response?.ok) throw new Error(text4(response?.error?.message) || "\u65E0\u6CD5\u8BFB\u53D6\u7EC8\u7AEF\u72B6\u6001\u3002");
+      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, "\u65E0\u6CD5\u8BFB\u53D6\u7EC8\u7AEF\u72B6\u6001\u3002"));
       setInfo({ status: "ready", value: response.value, error: "" });
     } catch (error) {
       if (mounted.current) setInfo({ status: "error", value: null, error: errorText(error, "\u65E0\u6CD5\u8BFB\u53D6\u7EC8\u7AEF\u72B6\u6001\u3002") });
@@ -11990,7 +12008,7 @@ function CliTerminalCard({ api, health }) {
     setStartError("");
     try {
       const response = await api.terminalStart({ target: selected.id, mode, cwd: text4(cwd), cols: 100, rows: 30, confirmed: true });
-      if (!response?.ok) throw new Error(text4(response?.error?.message) || "\u7EC8\u7AEF\u542F\u52A8\u5931\u8D25\u3002");
+      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, "\u7EC8\u7AEF\u542F\u52A8\u5931\u8D25\u3002"));
       storeCwd(text4(cwd));
       if (!mounted.current) {
         void api.terminalStop({ sessionId: response.value.sessionId });
@@ -12046,7 +12064,7 @@ function CliTerminalCard({ api, health }) {
         setConfirming(false);
       }
     }
-  ))), targets.length === 1 && /* @__PURE__ */ import_react4.default.createElement("p", { className: "mr-caption" }, "\u4F53\u68C0\u5C1A\u672A\u53D1\u73B0\u5DF2\u5B89\u88C5\u7684\u5B98\u65B9 CLI\uFF1B\u5B89\u88C5\u540E\u70B9\u201C\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0\u201D\u7684\u201C\u91CD\u65B0\u4F53\u68C0\u201D\uFF0C\u8FD9\u91CC\u4F1A\u51FA\u73B0\u5BF9\u5E94\u9009\u9879\u3002"), !confirming && /* @__PURE__ */ import_react4.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react4.default.createElement("button", { className: "mr-button", type: "button", disabled: Boolean(problem) || live >= maxSessions, onClick: () => {
+  ))), targets.length === 1 && /* @__PURE__ */ import_react4.default.createElement("p", { className: "mr-caption" }, "\u4F53\u68C0\u5C1A\u672A\u53D1\u73B0\u5DF2\u5B89\u88C5\u7684\u5B98\u65B9 CLI\uFF1B\u5B89\u88C5\u540E\u70B9\u201C\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0\u201D\u7684\u201C\u91CD\u65B0\u4F53\u68C0\u201D\uFF0C\u8FD9\u91CC\u4F1A\u51FA\u73B0\u5BF9\u5E94\u9009\u9879\u3002"), !confirming && /* @__PURE__ */ import_react4.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react4.default.createElement("button", { className: "mr-button", type: "button", disabled: Boolean(problem) || live >= maxSessions || info.status !== "ready", onClick: () => {
     setStartError("");
     setConfirming(true);
   } }, "\u5F00\u59CB"), /* @__PURE__ */ import_react4.default.createElement("span", { className: "mr-caption" }, problem || (live >= maxSessions ? `\u6700\u591A\u540C\u65F6\u8FD0\u884C ${maxSessions} \u4E2A\u4F1A\u8BDD\u3002` : `\u5C06\u8FD0\u884C\uFF1A${details.command}`))), confirming && /* @__PURE__ */ import_react4.default.createElement("div", { className: "mr-term-confirm", role: "dialog", "aria-label": "\u786E\u8BA4\u542F\u52A8\u7EC8\u7AEF" }, /* @__PURE__ */ import_react4.default.createElement("strong", null, details.title), /* @__PURE__ */ import_react4.default.createElement("p", { className: "mr-caption" }, "\u547D\u4EE4\uFF1A", /* @__PURE__ */ import_react4.default.createElement("code", null, details.command), /* @__PURE__ */ import_react4.default.createElement("br", null), "\u5DE5\u4F5C\u76EE\u5F55\uFF1A", /* @__PURE__ */ import_react4.default.createElement("code", null, details.cwd)), /* @__PURE__ */ import_react4.default.createElement("ul", null, details.points.map((point) => /* @__PURE__ */ import_react4.default.createElement("li", { key: point }, point))), /* @__PURE__ */ import_react4.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react4.default.createElement("button", { className: "mr-button", type: "button", disabled: starting, onClick: () => {
@@ -12307,7 +12325,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : [];
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : [];
       setProbeState({ status: "ready", probes, capabilities, readiness, error: "" });
-      onProbes({ probes, capabilities, readiness });
+      onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === "string" ? response.value.hostVersion : null });
     } catch (error) {
       if (!mounted.current || current !== request.current) return;
       setProbeState({ status: "error", probes: [], capabilities: [], readiness: [], error: text5(error?.message) || "\u65E0\u6CD5\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u3002" });
@@ -12610,7 +12628,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       setPlanError(text5(error?.message) || "\u65E0\u6CD5\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE\u3002");
     }
   };
-  return /* @__PURE__ */ import_react5.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react5.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react5.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-eyebrow" }, "Model Router \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react5.default.createElement("h1", { className: "mr-title" }, "\u6A21\u578B\u8DEF\u7531\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-subtitle" }, "\u67E5\u770B\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E3A\u4EFB\u52A1\u751F\u6210\u8DEF\u7EBF\u5EFA\u8BAE\u4E0E\u56E2\u961F\u5DE5\u4F5C\u5305\u3002\u4E3B\u4F1A\u8BDD\u6A21\u578B\u4ECD\u7531\u5B98\u65B9\u9009\u62E9\u5668\u7BA1\u7406\u3002")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} \u4E2A\u4F9B\u5E94\u5546 \xB7 ${routes.length} \u6761\u8DEF\u7EBF` : catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55" : "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25")), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react5.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react5.default.createElement(
+  return /* @__PURE__ */ import_react5.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react5.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react5.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-eyebrow" }, "Model Router \xB7 DeepSeek Harness"), /* @__PURE__ */ import_react5.default.createElement("h1", { className: "mr-title" }, "\u6A21\u578B\u8DEF\u7531\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-subtitle" }, "\u67E5\u770B\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E3A\u4EFB\u52A1\u751F\u6210\u8DEF\u7EBF\u5EFA\u8BAE\u4E0E\u56E2\u961F\u5DE5\u4F5C\u5305\u3002\u4E3B\u4F1A\u8BDD\u6A21\u578B\u4ECD\u7531\u5B98\u65B9\u9009\u62E9\u5668\u7BA1\u7406\u3002")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} \u4E2A\u4F9B\u5E94\u5546 \xB7 ${routes.length} \u6761\u8DEF\u7EBF` : catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55" : "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25")), staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: Boolean(toolProbes?.probes?.length) }) && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-error", role: "alert" }, staleHostNotice({ hostVersion: toolProbes?.hostVersion })), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react5.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react5.default.createElement(
     OnboardingBanner,
     {
       health: workbench.health.report,

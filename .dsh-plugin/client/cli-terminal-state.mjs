@@ -3,6 +3,7 @@
  * confirmation copy, and the client side of the long-poll transport.
  * Kept out of the JSX so the test suite can exercise it without a DOM.
  */
+import { remoteErrorText } from './host-version.mjs'
 import {
   TERMINAL_SHELL_ID,
   TERMINAL_TOOL_IDS,
@@ -78,7 +79,7 @@ export const formatDuration = ms => {
 
 const unwrap = (response, fallback) => {
   if (response?.ok) return response.value
-  throw new Error(text(response?.error?.message) || text(response?.error) || fallback)
+  throw new Error(remoteErrorText(text(response?.error?.message) || text(response?.error), fallback))
 }
 
 /**

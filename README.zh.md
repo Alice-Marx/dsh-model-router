@@ -391,7 +391,7 @@ Claude 与 Codex 若本机已有经核验的签名入口，仍优先走原有沙
 
 Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设置可填写 `cliModel`；团队执行时临时的“工作包映射 > 工具映射 > 保存映射”。ZCode 3.14.3 不能逐次切换模型。多数 CLI 不回报可核验的实际模型 ID，执行后要对照厂商运行记录、权限和账单。Windows Harness 沙箱的 ACL 文件效果报告为部分隔离，涉及敏感仓库时应先用测试环境验证。
 
-### 官方工具终端（0.14.0-beta.1，分支构建）
+### 官方工具终端（0.14.0-beta.2，npm `next`）
 
 工作台“官方工具 · 体检”下方新增 **官方工具终端** 卡片：以标签页形式交互运行系统终端（Windows 为 PowerShell，其他系统为登录 `$SHELL`）或已安装的官方 CLI（`codex`、`claude`、`kimi`、`mcode`、`mimo`、`grok`、`gemini`），实时输出，可多轮对话、显示全屏界面，也可选 **登录** 直接运行 `codex login`、`claude auth login`、`kimi login`、`mcode login`、`mimo auth login`、`grok login`。
 
@@ -401,6 +401,7 @@ Harness 目录中的模型 ID 未必是厂商 CLI 接受的名字。逐模型设
 - **传输**：输出通过插件现有 Typert 远程调用的长轮询读取（`terminalRead`）实时推送；按键（`terminalWrite`）和窗口大小（`terminalResize`）分别发送。
 - **生命周期**：结束标签、关闭工作台面板、卸载或重新加载插件、退出 Harness 都会结束进程；约 2 分钟无人读取输出的会话会被结束；单个会话最长 6 小时；最多同时 4 个。
 - **隐私**：输入和输出不会写入日志或保存。卡片中的历史（`state.json` 的 `terminalSessions`）只记录工具、方式、工作目录、开始/结束时间、时长、退出码和结束原因。
+- **安装后需重启**：Harness 会立即加载新界面，但运行中的后台仍是旧插件代码；完全退出 Harness（包括托盘图标）并重新启动前，卡片会提示“插件后台版本较旧，请完全退出并重启 Harness”。
 - **按键**：选中文字时 Ctrl+C 复制，否则发送中断；Ctrl+Shift+V 粘贴；拖动终端右下角调整高度。
 
 ## 可选安装 GAL

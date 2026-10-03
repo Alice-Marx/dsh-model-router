@@ -8,6 +8,7 @@ import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard
 import { planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
 import { RunLauncher } from './run-launcher.jsx'
 import { CliTerminalCard } from './cli-terminal.jsx'
+import { staleHostNotice } from './host-version.mjs'
 import stylesheet from './router-main.css'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
@@ -145,7 +146,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : []
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : []
       setProbeState({ status: 'ready', probes, capabilities, readiness, error: '' })
-      onProbes({ probes, capabilities, readiness })
+      onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === 'string' ? response.value.hostVersion : null })
     } catch (error) {
       if (!mounted.current || current !== request.current) return
       setProbeState({ status: 'error', probes: [], capabilities: [], readiness: [], error: text(error?.message) || '无法检测官方工具。' })
@@ -494,6 +495,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           <div className="mr-status"><span className={`mr-status-dot ${catalogState.status === 'loading' ? 'loading' : catalogState.status === 'error' ? 'error' : ''}`} />{catalogState.status === 'ready' ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === 'loading' ? '正在读取模型目录' : '模型目录读取失败'}</div>
         </header>
 
+        {staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: Boolean(toolProbes?.probes?.length) }) && <div className="mr-error" role="alert">{staleHostNotice({ hostVersion: toolProbes?.hostVersion })}</div>}
         {(workbench.health.report?.notices ?? []).map(notice => (
           <div key={`${notice.kind}-${notice.at}`} className="mr-error" role="alert">{notice.message}</div>
         ))}

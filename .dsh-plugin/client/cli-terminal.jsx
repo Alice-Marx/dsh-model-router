@@ -17,10 +17,11 @@ import {
   startProblem,
   terminalTargets,
 } from './cli-terminal-state.mjs'
+import { remoteErrorText } from './host-version.mjs'
 
 const CWD_STORAGE_KEY = 'model-router.terminal.cwd'
 const text = value => typeof value === 'string' ? value.trim() : ''
-const errorText = (error, fallback) => text(error?.message) || fallback
+const errorText = (error, fallback) => remoteErrorText(text(error?.message), fallback)
 
 function storedCwd() {
   try { return globalThis.localStorage?.getItem(CWD_STORAGE_KEY) ?? '' } catch { return '' }
@@ -110,7 +111,7 @@ export function CliTerminalCard({ api, health }) {
     try {
       const response = await api.terminalInfo()
       if (!mounted.current) return
-      if (!response?.ok) throw new Error(text(response?.error?.message) || '无法读取终端状态。')
+      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, '无法读取终端状态。'))
       setInfo({ status: 'ready', value: response.value, error: '' })
     } catch (error) {
       if (mounted.current) setInfo({ status: 'error', value: null, error: errorText(error, '无法读取终端状态。') })
@@ -138,7 +139,7 @@ export function CliTerminalCard({ api, health }) {
     setStartError('')
     try {
       const response = await api.terminalStart({ target: selected.id, mode, cwd: text(cwd), cols: 100, rows: 30, confirmed: true })
-      if (!response?.ok) throw new Error(text(response?.error?.message) || '终端启动失败。')
+      if (!response?.ok) throw new Error(remoteErrorText(response?.error?.message, '终端启动失败。'))
       storeCwd(text(cwd))
       if (!mounted.current) { void api.terminalStop({ sessionId: response.value.sessionId }); return }
       setSessions(previous => [...previous, { ...response.value, ended: null }])
@@ -196,7 +197,7 @@ export function CliTerminalCard({ api, health }) {
         </div>
         {targets.length === 1 && <p className="mr-caption">体检尚未发现已安装的官方 CLI；安装后点“官方工具 · 体检”的“重新体检”，这里会出现对应选项。</p>}
         {!confirming && <div className="mr-actions">
-          <button className="mr-button" type="button" disabled={Boolean(problem) || live >= maxSessions} onClick={() => { setStartError(''); setConfirming(true) }}>开始</button>
+          <button className="mr-button" type="button" disabled={Boolean(problem) || live >= maxSessions || info.status !== 'ready'} onClick={() => { setStartError(''); setConfirming(true) }}>开始</button>
           <span className="mr-caption">{problem || (live >= maxSessions ? `最多同时运行 ${maxSessions} 个会话。` : `将运行：${details.command}`)}</span>
         </div>}
         {confirming && <div className="mr-term-confirm" role="dialog" aria-label="确认启动终端">

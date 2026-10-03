@@ -402,7 +402,7 @@ Claude Code, Codex, MiMo Code, and Grok Build support read-only and approved edi
 
 The planned Harness model ID is not necessarily the vendor CLI's model name. A saved `cliModel`, or temporary `cliModelsJson` keyed by tool or work-package ID, can provide a known vendor CLI name. A package-specific temporary mapping takes priority over a tool mapping, then the saved profile. ZCode uses its configured default model. Most vendor CLIs do not provide a verifiable actual model ID in their results, so inspect vendor run records to confirm which model and price applied. The plugin's sequential CLI team runner is separate from Harness's built-in Agent Teams lifecycle.
 
-### Interactive terminal (官方工具终端, 0.14.0-beta.1, branch build)
+### Interactive terminal (官方工具终端, 0.14.0-beta.2, npm `next`)
 
 The workbench has an **官方工具终端** card below the tool health check. It runs your system shell (PowerShell on Windows, your login `$SHELL` elsewhere) or one installed official CLI (`codex`, `claude`, `kimi`, `mcode`, `mimo`, `grok`, `gemini`) interactively, in tabs, with live output: multi-turn conversations, full-screen TUIs, and logins such as `codex login`, `claude auth login`, `kimi login`, `mcode login`, `mimo auth login`, `grok login` (choose **登录**).
 
@@ -412,6 +412,7 @@ The workbench has an **官方工具终端** card below the tool health check. It
 - **Transport.** Output streams through long-poll reads over the plugin's existing Typert remote (`terminalRead`); keystrokes (`terminalWrite`) and resizes (`terminalResize`) are separate calls.
 - **Lifetime.** Ending the tab, closing the workbench panel, unloading or reloading the plugin, or quitting Harness kills the process. A session that nobody reads for about 2 minutes is killed, and no session runs longer than 6 hours. At most 4 sessions run at once.
 - **Privacy.** Input and output are never logged or saved. The card's history (and `state.json` → `terminalSessions`) stores only the tool, mode, working directory, start/end time, duration, exit code, and end reason.
+- **Restart after installing.** Harness serves the new card immediately, but a running Host keeps the old plugin code; until you quit Harness completely (including the tray icon) and start it again, the card shows “插件后台版本较旧，请完全退出并重启 Harness”.
 - **Keys.** With text selected, Ctrl+C copies; otherwise it interrupts. Ctrl+Shift+V pastes. Drag the terminal's lower-right corner to change its height.
 
 ## Optional GAL installation
