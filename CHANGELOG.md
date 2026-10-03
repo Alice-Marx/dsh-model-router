@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.14.0-beta.4 — 2026-10-03
+
+Prerelease under the npm `next` tag only (`latest` stays 0.13.3). Quit Harness completely (including the tray icon) and start it again after updating.
+
+### Changed: official tools follow the vendors' latest releases
+- The plugin no longer pins Codex, Claude Code, Kimi Code, MiniMax Code, MiMo, Grok Build, Gemini CLI or ZCode versions. One-click installs use `<package>@latest` from `https://registry.npmjs.org/`; the MiniMax Windows fallback runs the official installer script as published (no hash, no `@0.5.5` patch); ZCode downloads the newest Windows installer linked from `https://zcode.z.ai/en/docs/install` (HTTPS, `cdn-zcode.z.ai` only, size cap).
+- 健康检查 no longer flags installs as "older"/mismatched. Each card shows the installed version and, when available, the latest version with an 有新版本 hint and an 更新到最新版 X button. Latest versions come from the npm registry `<package>/latest` documents and the ZCode download page, cached ~12 h in `model-router/latest-versions.json`; failures are non-fatal (stale value or "最新版本未知"; retried after 30 min). An install newer than the latest release is never downgraded.
+- The health card notes that new vendor versions are untested by the plugin. Parsers stay tolerant of output changes.
+
+### Security checks
+- Kept (version-independent): Authenticode publisher checks for `codex.exe` (OpenAI OpCo, LLC), `claude.exe` (Anthropic, PBC; plus ≥ 2.1.259 for restricted flags), `ZCode.exe` and the ZCode installer (北京智谱华章科技股份有限公司). The ZCode 3.14.3 version gate is gone: any validly signed build is enabled, with the version read from the signed file.
+- Replaced: the per-version hash of ZCode's unsigned `resources/glm/zcode.cjs` became a trust-on-first-use record per (install root, signed build, signer thumbprint) in `model-router/zcode-trust.json`, plus a `.node-bundle-meta.json` entry check. A script that changes under the same signed build is refused; a new signed build re-records it.
+- Replaced: the per-version sha256 pins for MiMo `mimo.exe`, Grok `grok.exe(.br)` and MiniMax `cli.js` (these vendors do not sign them) became registry attestation: every code file must equal the file in the official npm tarball for the installed version, whose sha512 comes from registry.npmjs.org (the npm cache is reused when it matches). Results are cached per package@version in `model-router/npm-attestations.json`; the first run of a new version needs network.
+- Removed: the hash of MiniMax's official installer script (it now runs as published; only a sanity check that it is the official PowerShell script remains).
+
+### Tests
+- New `tests/latest-versions.test.mjs`: latest lookup with mocked fetch (npm + ZCode page), 12 h cache, persistence, offline/stale fallback; npm attestation with an in-test tarball (cache hit, tamper, integrity mismatch, off-host tarball); ZCode signer-only acceptance and TOFU; Codex/Claude signer-only acceptance; installer URL validation. Pin assertions removed from existing tests.
+
+## 0.14.0-beta.3 — 2026-10-03
+
+Prerelease under the npm `next` tag only (`latest` stays 0.13.3). **Quit Harness completely (including the tray icon) and start it again after updating**, or the Host keeps running the 0.14.0-beta.2 code.
+
+### Fixed
+- 官方工具终端: a session (e.g. Kimi Code 登录) opened a black terminal and then failed with `typert gateway: modelRouterOfficialTools/terminalRead: wire field "request" failed boundary validation`; the footer read `undefined · undefined`. The Host methods answer with their own `{ ok, value }` envelope and the Typert gateway wraps that again, so the client receives `{ ok: true, value: { ok: true, value: result } }`. The terminal card read only the outer level, so the session id, command and directory were `undefined` and every `terminalRead` carried no `sessionId`, which the strict request codec rejects at the gateway. Host-side start failures (such as a missing CLI) were hidden the same way. The card now unwraps both levels (`unwrapTerminal`, `loadTerminalInfo`, `startTerminal`) and reports inner errors. The schemas were correct, and the gateway does not strip response fields.
+- The client never sends a read or write for an invalid session id, and it clamps resize requests from a collapsed panel into the accepted 10–500 × 3–300 range instead of failing validation.
+
+### Tests
+- `tests/helpers/typert-gateway.mjs` copies Harness's gateway boundary (`assertExactArguments`, `decode`, `assertJsonValue`, `encodeRpcResult`, JSON wire). `tests/cli-terminal-gateway.test.mjs` sends the card's real payloads for all six terminal methods through it, through the real `OfficialToolsRemoteService` envelope and the real Host services.
+
+## 0.14.0-beta.2 — 2026-10-03
+
+Prerelease under the npm `next` tag only (`latest` stays 0.13.3).
+
+**After installing or updating, quit Harness completely (including the tray icon) and start it again.** Harness serves the new workbench UI immediately, but the running Host keeps the plugin code it already imported, so new Host methods are missing until a full restart.
+
+### Fixed
+- With 0.14.0-beta.1 installed into a running Harness, the 官方工具终端 card showed `transport failure for /api/modelRouterOfficialTools/terminalInfo: HTTP 404`. The Harness gateway only routes `/api/<namespace>/<method>` for descriptors the Host registered when it applied the plugin; the Host was still running the previous version's code. Nothing in the plugin's routes was wrong. The card now shows "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。" for a missing method and disables 开始.
+
+### Added
+- `list()` reports `hostVersion`, the plugin version the Host actually loaded; the client embeds its own version at build time. When they differ (or the Host is too old to report one), the workbench shows the same restart advice at the top.
+
+## 0.14.0-beta.1 — 2026-10-03
+
+Prerelease under the npm `next` tag (branch `feat/cli-terminal`).
+
+### Added
+- **官方工具终端** workbench card: interactive sessions of the system shell (PowerShell on Windows) or an installed official CLI (codex, claude, kimi, mcode, mimo, grok, gemini), in tabs, rendered with xterm.js 6 (bundled into `client.js`). Each CLI also has a fixed **登录** mode (`codex login`, `claude auth login`, …). Sessions start only after a confirmation showing the command, the absolute working directory, and that the terminal runs outside the Harness process sandbox with the user's own CLI login and environment.
+- Host session manager (`shared/cli-terminal.mjs`) on the prebuilt N-API `@lydell/node-pty@1.2.0-beta.15` (new optional dependency, per-platform binaries, no install scripts), with a pipe fallback and a clear limitation note when the PTY cannot load. Verified on Windows inside Harness Desktop (Electron 44 as Node, pnpm 11 install).
+- Typert remote methods `terminalInfo`, `terminalStart`, `terminalRead` (long poll), `terminalWrite`, `terminalResize`, `terminalStop`; every request is validated on both sides (`shared/cli-terminal-protocol.mjs`).
+- Session metadata (tool, mode, directory, start/end, duration, exit code, end reason) in `state.json` → `terminalSessions` and in the card's history. Input and output are never logged or stored.
+- Sessions end on tab stop, panel close, plugin unload/reload, Host exit, after about 2 minutes without a reader, or after 6 hours; at most 4 at once.
+
 ## 0.13.3 — 2026-10-03
 
 Bug-fix release for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under the npm `next` and `latest` tags.

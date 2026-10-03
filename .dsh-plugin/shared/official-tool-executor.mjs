@@ -14,7 +14,6 @@
  * https://moonshotai.github.io/kimi-code/en/reference/kimi-command.html
  */
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { access, readFile, realpath, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { StringDecoder } from 'node:string_decoder'
@@ -23,6 +22,8 @@ import { getOfficialTool, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
 import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
+import { npmAttestor } from './npm-attestation.mjs'
+import { compareReleaseVersions, isReleaseVersion } from './latest-versions.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser } from './vendor-mimo-grok-adapter.mjs'
 import { emptyOutputError, outputIsEmpty, usageFromEvents, usageFromOutput } from './task-executors.mjs'
 
@@ -36,9 +37,6 @@ const STOP_GRACE_MS = 5_000
 const CLAUDE_MIN_RESTRICTED_VERSION = [2, 1, 259]
 const CLAUDE_SIGNER = 'Anthropic, PBC'
 const CODEX_SIGNER = 'OpenAI OpCo, LLC'
-// SHA-256 of package/cli.js in the official @minimax-ai/code@0.5.5 npm tarball.
-// The Windows installer-managed release carries the exact same entry file.
-const MINIMAX_055_CLI_SHA256 = '8d36dec74e93beddf392459557a7afd8655bcdc874121981608d2c82658814ab'
 const WINDOWS_SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 const ENVIRONMENT_KEYS = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec',
@@ -201,19 +199,23 @@ async function findGlobalPackageEntries(packageName, binName, expectedBin, works
   return found
 }
 
-/** The official MiniMax Windows installer uses a versioned releases tree rather than npm -g. */
+/**
+ * The official MiniMax Windows installer uses a versioned releases tree rather
+ * than npm -g. Any release named by its `current` file is accepted, but every
+ * code file of that release must equal the official npm tarball of the same
+ * version (MiniMax does not sign its CLI, so the npm registry is the authority).
+ */
 export async function findManagedMiniMaxEntry(workspace,
   directories = pathDirectories().flatMap(directory => [directory, join(directory, '.minimax-code')]),
-  trustedCliSha256 = MINIMAX_055_CLI_SHA256) {
+  attestor = npmAttestor) {
   if (!IS_WINDOWS) return null
-  const version = getOfficialTool('minimax-code').version
   for (const directory of directories) {
     try {
       const root = await realpath(directory)
       if (root === workspace || inside(workspace, root)) continue
       if (!(await stat(join(root, 'mcode.cmd'))).isFile()) continue
-      const current = (await readFile(join(root, 'current'), 'utf8')).trim()
-      if (current !== version) continue
+      const version = (await readFile(join(root, 'current'), 'utf8')).trim()
+      if (!isReleaseVersion(version)) continue
       const releaseRoot = await realpath(join(root, 'releases', version))
       if (!inside(root, releaseRoot)) continue
       const packageRoot = await realpath(join(releaseRoot, 'node_modules', '@minimax-ai', 'code'))
@@ -223,15 +225,20 @@ export async function findManagedMiniMaxEntry(workspace,
         || String(manifest.bin?.mcode).replace(/^\.\//, '') !== 'cli.js') continue
       const entry = await realpath(join(packageRoot, 'cli.js'))
       if (!inside(packageRoot, entry) || !(await stat(entry)).isFile()) continue
-      const digest = createHash('sha256').update(await readFile(entry)).digest('hex')
-      if (digest !== trustedCliSha256) continue
+      const attested = await attestor.matchesPackage(packageRoot, '@minimax-ai/code', version)
+      if (!attested.ok) continue
       const native = await realpath(join(packageRoot, 'node_modules', 'better-sqlite3',
         'build', 'Release', 'better_sqlite3.node'))
       if (!inside(packageRoot, native) || !(await stat(native)).isFile()) continue
-      return { entry, packageRoot, version, source: 'verified-official-windows-installer-bundle' }
+      return { entry, packageRoot, version, source: 'official-windows-installer-npm-attested' }
     } catch { /* inspect the next PATH directory */ }
   }
   return null
+}
+
+/** Newest installed copy first; versions are not pinned. */
+function newestFirst(entries) {
+  return [...entries].sort((left, right) => (compareReleaseVersions(right.version, left.version) ?? 0))
 }
 
 async function findCodexExecutable(workspace) {
@@ -304,6 +311,17 @@ async function findSignedPackagedCodex(packageRoot, workspace) {
   } catch { return null }
 }
 
+/**
+ * Publisher-only acceptance: a valid Authenticode signature whose signer is the
+ * vendor. No version or file hash is involved, so newer releases are accepted.
+ */
+export function signatureAccepted(signature, expectedSigner) {
+  return signature?.status === 'Valid' && typeof expectedSigner === 'string' && expectedSigner.length > 0
+    && String(signature.subject ?? '').includes(expectedSigner)
+}
+
+export const OFFICIAL_SIGNERS = Object.freeze({ codex: CODEX_SIGNER, 'claude-code': CLAUDE_SIGNER })
+
 /** PATH or package metadata alone is insufficient: verify the Windows EXE publisher. */
 function hasOfficialWindowsSignature(entry, expectedSigner) {
   // Some launch environments inherit a PowerShell module path where the
@@ -342,7 +360,7 @@ function hasOfficialWindowsSignature(entry, expectedSigner) {
       if (code !== 0) { settle(false); return }
       try {
         const signature = JSON.parse(output.trim().replace(/^\uFEFF/, ''))
-        settle(signature.status === 'Valid' && String(signature.subject).includes(expectedSigner))
+        settle(signatureAccepted(signature, expectedSigner))
       } catch { settle(false) }
     })
   })
@@ -402,8 +420,8 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
   if (toolId === 'kimi-code') {
     const tool = getOfficialTool(toolId)
     const entries = await findGlobalPackageEntries(tool.package, 'kimi', 'dist/main.mjs', workspace)
-    const found = entries.find(entry => entry.version === tool.version)
-    if (!found) return { unsupported: `未找到固定版本 ${tool.package}@${tool.version} 的官方入口。` }
+    const found = newestFirst(entries)[0]
+    if (!found) return { unsupported: `未找到官方 npm 包 ${tool.package} 的 kimi 入口（dist/main.mjs）。` }
     const nodeExecutable = await findNodeExecutable(workspace)
     if (!nodeExecutable) return { unsupported: '未找到工作区外的 Node.js 可执行文件。' }
     if (Buffer.byteLength(task, 'utf8') > 16_000) {
@@ -419,9 +437,8 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
   if (toolId === 'minimax-code') {
     const tool = getOfficialTool(toolId)
     const entries = await findGlobalPackageEntries(tool.package, 'mcode', 'cli.js', workspace)
-    const found = entries.find(entry => entry.version === tool.version)
-      ?? await findManagedMiniMaxEntry(workspace)
-    if (!found) return { unsupported: `未找到固定版本 ${tool.package}@${tool.version} 的官方入口。` }
+    const found = newestFirst(entries)[0] ?? await findManagedMiniMaxEntry(workspace)
+    if (!found) return { unsupported: `未找到官方 npm 包 ${tool.package} 的 mcode 入口（cli.js）。` }
     const nodeExecutable = await findNodeExecutable(workspace, [22, 19, 0], version => {
       const major = Number(String(version).split('.')[0])
       return major === 22 || (major >= 24 && major < 27)
@@ -444,7 +461,7 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
   }
   if (toolId === 'zcode') {
     const found = await discoverZCodeBundle()
-    if (!found) return { unsupported: '未找到已签名、版本匹配且 CLI 脚本哈希正确的 ZCode 桌面版。' }
+    if (!found) return { unsupported: '未找到具有智谱有效签名、且 CLI 脚本与首次核验记录一致的 ZCode 桌面版。' }
     const nodeExecutable = await findNodeExecutable(workspace, [24, 14, 0], version =>
       Number(String(version).split('.')[0]) === 24)
     if (!nodeExecutable) return { unsupported: '未找到工作区外的 Node.js 可执行文件。' }
@@ -458,7 +475,7 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
       format: 'zcode-stream-json', source: found.source, stdinTask: false,
       requestedModel: null,
       modelNotice: modelId
-        ? 'ZCode 3.14.3 的 CLI 没有 --model 参数；本次使用 ZCode 已配置的默认模型，不能保证与 Harness 建议模型一致。'
+        ? 'ZCode 的 CLI 没有 --model 参数；本次使用 ZCode 已配置的默认模型，不能保证与 Harness 建议模型一致。'
         : '本次使用 ZCode 已配置的默认模型。',
     }
   }

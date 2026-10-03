@@ -6,6 +6,13 @@
  * accepts a command, package name, URL, argument vector, or executable path.
  */
 import { getOfficialTool } from './official-tool-registry.mjs'
+import {
+  parseTerminalRead,
+  parseTerminalResize,
+  parseTerminalStart,
+  parseTerminalStop,
+  parseTerminalWrite,
+} from './cli-terminal-protocol.mjs'
 
 export const OFFICIAL_TOOLS_REMOTE_PACKAGE = '@ljwei-stak/dsh-model-router'
 export const OFFICIAL_TOOLS_REMOTE_NAMESPACE = 'modelRouterOfficialTools'
@@ -123,6 +130,12 @@ export function parseRunRequest(value) {
   }
 }
 
+const terminalStartCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStart`, parseTerminalStart)
+const terminalReadCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalRead`, parseTerminalRead)
+const terminalWriteCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalWrite`, parseTerminalWrite)
+const terminalResizeCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalResize`, parseTerminalResize)
+const terminalStopCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStop`, parseTerminalStop)
+
 const runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest)
 
 function descriptor(method, parameters, result) {
@@ -157,6 +170,14 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview')),
   descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),
+  // Workbench "官方工具终端": interactive shell / fixed official CLI sessions.
+  // Output streams through long-poll reads; input and resize are unary calls.
+  descriptor('terminalInfo', [], anyObjectCodec('TerminalInfo')),
+  descriptor('terminalStart', [jsonParameter('request', terminalStartCodec)], anyObjectCodec('TerminalStarted')),
+  descriptor('terminalRead', [jsonParameter('request', terminalReadCodec)], anyObjectCodec('TerminalOutput')),
+  descriptor('terminalWrite', [jsonParameter('request', terminalWriteCodec)], anyObjectCodec('TerminalWritten')),
+  descriptor('terminalResize', [jsonParameter('request', terminalResizeCodec)], anyObjectCodec('TerminalResized')),
+  descriptor('terminalStop', [jsonParameter('request', terminalStopCodec)], anyObjectCodec('TerminalStopped')),
 ])
 
 export const OFFICIAL_TOOLS_CLIENT_REMOTE = Object.freeze({

@@ -2,8 +2,8 @@ import React from 'react'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BILLING_MODE_LABEL } from '../shared/subscription-billing.mjs'
 import {
-  BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, VERSION_LABEL, budgetMeter, dagLayers, formatUsd, healthSummary,
-  packageCost, packageStatus, rerunSupport, runTotals,
+  BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, UNTESTED_VERSION_NOTE, budgetMeter, dagLayers, formatUsd, healthSummary,
+  packageCost, packageStatus, rerunSupport, runTotals, versionLine,
 } from './insights-state.mjs'
 
 const text = value => typeof value === 'string' ? value.trim() : ''
@@ -14,12 +14,13 @@ const SUBSCRIPTION_CHOICE_BUTTONS = [['api', '改用 API 重试', false], ['subs
 /** First-open banner: one line per problem, with the way out. */
 export function OnboardingBanner({ health, onDone, onRefresh, refreshing, error }) {
   const summary = healthSummary(health?.tools)
-  const problems = (health?.tools ?? []).filter(item => item.installed && (item.login?.state === 'logged-out' || item.versionStatus === 'older'))
+  const problems = (health?.tools ?? []).filter(item => item.installed && item.login?.state === 'logged-out')
+  const updates = (health?.tools ?? []).filter(item => item.installed && item.versionStatus === 'update-available')
   return (
     <section className="mr-card mr-onboarding" aria-label="开箱体检">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">开箱体检</h2>
-        <p className="mr-card-copy">首次打开时检测每个官方工具是否已安装、版本是否符合、是否已登录。未登录的工具会被路由直接跳过，改走模型目录 API，不必等待 CLI 失败。</p>
+        <p className="mr-card-copy">首次打开时检测每个官方工具是否已安装、当前版本（以及能查到时的最新版本）、是否已登录。未登录的工具会被路由直接跳过，改走模型目录 API，不必等待 CLI 失败。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={refreshing} onClick={onRefresh}>{refreshing ? '检测中…' : '重新体检'}</button></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
@@ -33,8 +34,10 @@ export function OnboardingBanner({ health, onDone, onRefresh, refreshing, error 
               <div className="mr-metric"><div className="mr-metric-label">登录状态未知</div><div className="mr-metric-value">{summary.unknown}</div></div>
             </div>
             {problems.length > 0
-              ? <ul className="mr-checklist">{problems.map(item => <li key={item.id}><strong>{item.label}</strong>：{item.login?.state === 'logged-out' ? `未登录，可在下方点“去登录”查看登录方法（${item.login.command ?? '见说明'}）。` : ''}{item.versionStatus === 'older' ? `当前 ${item.version}，低于目标 ${item.pinnedVersion}，可在下方更新。` : ''}</li>)}</ul>
-              : <p className="mr-caption">已安装的工具没有发现未登录或版本过旧的问题。未安装的工具可在下方一键安装。</p>}
+              ? <ul className="mr-checklist">{problems.map(item => <li key={item.id}><strong>{item.label}</strong>：未登录，可在下方点“去登录”查看登录方法（{item.login.command ?? '见说明'}）。</li>)}</ul>
+              : <p className="mr-caption">已安装的工具没有发现未登录的问题。未安装的工具可在下方一键安装。</p>}
+            {updates.length > 0 && <p className="mr-caption">有新版本：{updates.map(item => `${item.label} ${item.version ?? '?'} → ${item.latestVersion}`).join('；')}。可在下方“官方工具”中更新（可选）。</p>}
+            <p className="mr-caption">{UNTESTED_VERSION_NOTE}</p>
             <div className="mr-actions"><button className="mr-button" type="button" onClick={onDone}>完成体检</button><span className="mr-caption">之后可随时在“官方工具”卡片中重新体检。</span></div>
           </>
         )}
@@ -54,7 +57,7 @@ export function ToolLoginLine({ entry }) {
   }
   return (
     <div className="mr-login">
-      <div className="mr-tool-status"><span className={`mr-tool-dot ${state === 'logged-in' ? 'installed' : state === 'logged-out' ? 'missing-strong' : ''}`} />{LOGIN_LABEL[state]} · {VERSION_LABEL[entry.versionStatus] ?? '版本未知'}{entry.pinnedVersion ? `（目标 ${entry.pinnedVersion}）` : ''}</div>
+      <div className="mr-tool-status"><span className={`mr-tool-dot ${state === 'logged-in' ? 'installed' : state === 'logged-out' ? 'missing-strong' : ''}`} />{LOGIN_LABEL[state]} · {versionLine(entry)}</div>
       {entry.login?.detail && <p className="mr-caption mr-tool-detail">{entry.login.detail}</p>}
       {state === 'logged-in' && entry.login?.billing === 'subscription' && <p className="mr-caption mr-tool-detail">订阅账号登录：费用只作参考显示，不计入预算。</p>}
       {state === 'logged-in' && entry.login?.billing === 'api-key' && <p className="mr-caption mr-tool-detail">API Key 计费：费用计入每日/每月预算。</p>}

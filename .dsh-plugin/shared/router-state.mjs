@@ -32,11 +32,13 @@ export function defaultStatePath(env = process.env) {
 }
 
 export const MAX_NOTICES = 10
+/** Interactive terminal sessions kept as metadata only (no input or output). */
+export const MAX_TERMINAL_SESSIONS = 50
 const LOCK_STALE_MS = 15_000
 const LOCK_TIMEOUT_MS = 10_000
 
 function emptyState() {
-  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], notices: [] }
+  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], notices: [], terminalSessions: [] }
 }
 
 function sanitizeNotices(value) {
@@ -56,6 +58,25 @@ function sanitize(value) {
       .filter(([, entry]) => Number.isFinite(entry?.at))),
     runs: Array.isArray(value.runs) ? value.runs.filter(run => run && typeof run.id === 'string').slice(-MAX_RUNS) : [],
     notices: sanitizeNotices(value.notices),
+    terminalSessions: sanitizeTerminalSessions(value.terminalSessions),
+  }
+}
+
+function sanitizeTerminalSessions(value) {
+  return Array.isArray(value)
+    ? value.filter(item => item && typeof item.id === 'string' && typeof item.target === 'string' && Number.isFinite(item.startedAt)).slice(-MAX_TERMINAL_SESSIONS)
+    : []
+}
+
+/** Session metadata only: never input, output or environment. */
+export function terminalSessionRecord(record) {
+  const finite = value => Number.isFinite(value) ? value : null
+  return {
+    id: String(record.id), target: String(record.target), label: String(record.label ?? record.target).slice(0, 80),
+    mode: record.mode === 'login' ? 'login' : 'interactive', cwd: String(record.cwd ?? '').slice(0, 4_096),
+    backend: record.backend === 'pipe' ? 'pipe' : 'pty', startedAt: finite(record.startedAt), finishedAt: finite(record.finishedAt),
+    durationMs: finite(record.durationMs), exitCode: Number.isInteger(record.exitCode) ? record.exitCode : null,
+    endReason: ['exit', 'stopped', 'orphan', 'lifetime', 'dispose'].includes(record.endReason) ? record.endReason : 'exit',
   }
 }
 
@@ -152,6 +173,7 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
         const result = await change(state)
         state.runs = state.runs.slice(-maxRuns)
         state.notices = sanitizeNotices(state.notices)
+        state.terminalSessions = sanitizeTerminalSessions(state.terminalSessions)
         await persist(state)
         return result
       } finally {
@@ -193,6 +215,11 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
       if (entry) current.authFailures[toolId] = { at: entry.at, detail: String(entry.detail ?? '').slice(0, 200) }
       else delete current.authFailures[toolId]
       return current.authFailures
+    }),
+    appendTerminalSession: record => update(current => {
+      const entry = terminalSessionRecord(record)
+      current.terminalSessions = [...(current.terminalSessions ?? []), entry]
+      return entry
     }),
     appendRun: run => update(current => { current.runs.push(run); return run }),
     updateRun: (id, change) => update(current => {

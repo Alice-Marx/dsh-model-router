@@ -1,8 +1,10 @@
 /**
  * Onboarding health check for the fixed official tool registry.
  *
- * For every registry tool: installed?, version at least the pinned registry
- * version?, and logged in? Login checks use only fixed, read-only status
+ * For every registry tool: installed?, which version (and, when the cheap
+ * latest-version lookup succeeded, is a newer release available?), and logged
+ * in? Versions are never pinned or flagged as wrong; the update hint is advice.
+ * Login checks use only fixed, read-only status
  * commands (`claude auth status --json`, `codex login status`) or the
  * presence of a credential file / environment variable name (Gemini, Kimi,
  * MiMo, Grok). MiniMax is read from the `status` field of its non-secret
@@ -11,6 +13,7 @@
  * that is known to be logged out instead of waiting for its CLI to fail.
  */
 import { OFFICIAL_TOOLS, getOfficialTool } from './official-tool-registry.mjs'
+import { compareReleaseVersions } from './latest-versions.mjs'
 
 export const LOGIN_CHECK_TIMEOUT_MS = 5_000
 export const HEALTH_CACHE_MS = 10 * 60_000
@@ -115,9 +118,22 @@ export function compareVersions(left, right) {
   return 0
 }
 
-export function versionStatus(tool, version) {
-  if (!version || !tool?.version) return 'unknown'
-  return compareVersions(version, tool.version) >= 0 ? 'ok' : 'older'
+/**
+ * 'update-available' when the latest known release is newer than the installed
+ * one, 'latest' when it is not, 'unknown' when either version is unknown.
+ */
+export function versionStatus(installedVersion, latestVersion) {
+  const order = compareReleaseVersions(latestVersion, installedVersion)
+  if (order === null) return 'unknown'
+  return order === 1 ? 'update-available' : 'latest'
+}
+
+function latestFields(latest) {
+  return {
+    latestVersion: latest?.version ?? null,
+    latestCheckedAt: latest?.checkedAt ?? null,
+    ...(latest?.error ? { latestError: latest.error } : {}),
+  }
 }
 
 function guide(toolId) {
@@ -219,8 +235,9 @@ export async function checkToolHealth(probe, options = {}) {
     installed,
     installStatus: probe.status ?? (installed ? 'installed' : 'not-installed'),
     version: probe.version ?? null,
-    pinnedVersion: tool.version ?? null,
-    versionStatus: installed ? versionStatus(tool, probe.version) : 'unknown',
+    ...latestFields(options.latest?.[tool.id]),
+    versionStatus: installed ? versionStatus(probe.version, options.latest?.[tool.id]?.version) : 'unknown',
+    updateAvailable: installed && versionStatus(probe.version, options.latest?.[tool.id]?.version) === 'update-available',
     login: { ...login, command, steps },
     ready: installed && login.state !== 'logged-out',
   }
@@ -235,7 +252,7 @@ export async function runHealthCheck(probes, options = {}) {
     try { return await checkToolHealth(probe, options) }
     catch (error) {
       return { id: tool.id, label: tool.label, installed: probe.installed === true, version: probe.version ?? null,
-        pinnedVersion: tool.version ?? null, versionStatus: 'unknown', ready: probe.installed === true,
+        ...latestFields(options.latest?.[tool.id]), versionStatus: 'unknown', updateAvailable: false, ready: probe.installed === true,
         login: { state: 'unknown', detail: String(error?.message ?? error).slice(0, 200), ...guide(tool.id) } }
     }
   }))

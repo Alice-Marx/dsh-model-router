@@ -9,7 +9,7 @@ const manifest = JSON.parse(read('package.json'))
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.13.3')
+  assert.equal(manifest.version, '0.14.0-beta.4')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)
@@ -40,7 +40,11 @@ test('router remote retains installer methods and owns no GAL endpoints', () => 
   assert.deepEqual(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.map(item => item.method), [
     'list', 'installTool', 'cancel', 'status',
     'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'boundaries', 'previewRun', 'startRun',
+    'terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop',
   ])
+  for (const method of ['terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop']) {
+    assert.equal(typeof OfficialToolsRemoteService.prototype[method], 'function', method)
+  }
   assert.equal(OfficialToolsRemoteService.prototype.galReply, undefined)
   assert.equal(OfficialToolsRemoteService.prototype.cancelGalReply, undefined)
 })

@@ -308,6 +308,14 @@ function registerUi(ctx) {
       loadBoundaries: () => officialToolsRemote.boundaries(),
       previewRun: request => officialToolsRemote.previewRun(request),
       startRun: request => officialToolsRemote.startRun(request),
+      terminalApi: Object.freeze({
+        terminalInfo: () => officialToolsRemote.terminalInfo(),
+        terminalStart: request => officialToolsRemote.terminalStart(request),
+        terminalRead: request => officialToolsRemote.terminalRead(request),
+        terminalWrite: request => officialToolsRemote.terminalWrite(request),
+        terminalResize: request => officialToolsRemote.terminalResize(request),
+        terminalStop: request => officialToolsRemote.terminalStop(request),
+      }),
     }),
   }, RouterMainPage))), 'model-router-galgame: main workspace')
   ctx.effect(() => ctx.configForms.whileServed([ROUTER_NAMESPACE], () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

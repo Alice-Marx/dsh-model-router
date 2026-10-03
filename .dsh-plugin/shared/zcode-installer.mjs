@@ -1,26 +1,37 @@
 /**
- * Fetch and open the pinned official ZCode Windows installer.
+ * Fetch and open the latest official ZCode Windows installer.
+ *
+ * The version and URL come from ZCode's official download page (see
+ * latest-versions.mjs); the URL must be on cdn-zcode.z.ai over HTTPS. The
+ * downloaded installer must carry a valid Authenticode signature from the
+ * expected publisher before it is opened; there is no per-version hash.
  *
  * This module does not perform an unattended install. The visible vendor
  * installer owns the destination picker and any UAC prompt. A successful
  * return means only that the verified installer process was opened.
  */
 import { spawn, execFile } from 'node:child_process'
-import { createHash, randomUUID } from 'node:crypto'
-import { createReadStream, createWriteStream } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { createWriteStream } from 'node:fs'
 import { mkdir, realpath, rename, stat, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
-import {
-  ZCODE_SIGNER, ZCODE_SUPPORTED_VERSION,
-  ZCODE_WINDOWS_INSTALLER_SHA256, ZCODE_WINDOWS_INSTALLER_URL,
-} from './zcode-bundle.mjs'
+import { ZCODE_SIGNER } from './zcode-bundle.mjs'
+import { getOfficialTool } from './official-tool-registry.mjs'
+import { latestVersions } from './latest-versions.mjs'
 
 const execFileAsync = promisify(execFile)
-const INSTALLER_NAME = `ZCode-${ZCODE_SUPPORTED_VERSION}-win-x64.exe`
+const INSTALLER_URL = /^https:\/\/cdn-zcode\.z\.ai\/zcode\/electron\/releases\/(\d+\.\d+\.\d+)\/windows-x64\/ZCode-\1-win-x64\.exe$/
+
+/** Validate a release { version, url } for the Windows x64 installer. */
+export function zcodeInstallerRelease(latest) {
+  const match = INSTALLER_URL.exec(String(latest?.url ?? ''))
+  if (!match || match[1] !== latest?.version) return null
+  return { version: match[1], url: latest.url, fileName: `ZCode-${match[1]}-win-x64.exe` }
+}
 const DOWNLOAD_ENV_VAR = 'MODEL_ROUTER_ZCODE_DOWNLOAD_DIR'
 const MAX_DOWNLOAD_BYTES = 2_000_000_000
 const MAX_REDIRECTS = 4
@@ -47,7 +58,7 @@ function inside(root, child) {
  * otherwise the caller's npm prefix drive is preferred, then a non-C TEMP.
  */
 export async function resolveZCodeDownloadDirectory({
-  downloadDir, npmPrefix, env = process.env,
+  downloadDir, npmPrefix, env = process.env, version = 'latest',
 } = {}) {
   if (process.platform !== 'win32') throw new Error('ZCode 安装器仅支持 Windows。')
   const explicit = downloadDir ?? env[DOWNLOAD_ENV_VAR]
@@ -78,7 +89,7 @@ export async function resolveZCodeDownloadDirectory({
       await mkdir(candidate.path, { recursive: true })
       const parent = await realpath(candidate.path)
       if (!nonCAbsolute(parent)) continue
-      const cache = join(parent, 'model-router-zcode', ZCODE_SUPPORTED_VERSION)
+      const cache = join(parent, 'model-router-zcode', version)
       await mkdir(cache, { recursive: true })
       const canonical = await realpath(cache)
       if (!nonCAbsolute(canonical) || !inside(parent, canonical)) continue
@@ -88,12 +99,6 @@ export async function resolveZCodeDownloadDirectory({
     }
   }
   throw new Error(`没有可写的非 C 盘下载目录；请设置 ${DOWNLOAD_ENV_VAR}。`)
-}
-
-async function sha256File(path) {
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(path)) hash.update(chunk)
-  return hash.digest('hex').toUpperCase()
 }
 
 async function verifyInstallerSignature(path, env) {
@@ -147,16 +152,14 @@ async function boundedResponse(url, signal) {
   throw new Error('ZCode 安装器重定向过多。')
 }
 
-async function fetchVerifiedInstaller(path, { env, signal, onProgress } = {}) {
-  const expected = ZCODE_WINDOWS_INSTALLER_SHA256.toUpperCase()
+async function fetchVerifiedInstaller(path, url, { env, signal, onProgress } = {}) {
   try {
     const info = await stat(path)
     const canonical = await realpath(path)
     if (info.isFile() && info.size <= MAX_DOWNLOAD_BYTES
       && nonCAbsolute(canonical) && inside(dirname(path), canonical)
-      && await sha256File(path) === expected
       && await verifyInstallerSignature(path, env)) return { path, reused: true }
-    throw new Error('已有 ZCode 安装器缓存未通过 SHA-256 或签名校验；请处理该缓存文件后重试。')
+    throw new Error('已有 ZCode 安装器缓存未通过发布者签名校验；请处理该缓存文件后重试。')
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error
   }
@@ -164,8 +167,7 @@ async function fetchVerifiedInstaller(path, { env, signal, onProgress } = {}) {
   const temporary = join(dirname(path), `.download-${randomUUID()}.exe`)
   let created = false
   try {
-    const response = await boundedResponse(ZCODE_WINDOWS_INSTALLER_URL, signal)
-    const hash = createHash('sha256')
+    const response = await boundedResponse(url, signal)
     let receivedBytes = 0
     const declaredBytes = Number(response.headers.get('content-length')) || null
     const meter = new Transform({
@@ -175,7 +177,6 @@ async function fetchVerifiedInstaller(path, { env, signal, onProgress } = {}) {
           callback(new Error('ZCode 安装器超出下载大小限制。'))
           return
         }
-        hash.update(chunk)
         try { onProgress?.({ receivedBytes, declaredBytes }) } catch { /* progress is advisory */ }
         callback(null, chunk)
       },
@@ -184,8 +185,6 @@ async function fetchVerifiedInstaller(path, { env, signal, onProgress } = {}) {
     output.once('open', () => { created = true })
     await pipeline(Readable.fromWeb(response.body), meter,
       output, { signal })
-    const actual = hash.digest('hex').toUpperCase()
-    if (actual !== expected) throw new Error('ZCode 安装器 SHA-256 与官方固定值不符。')
     if (!(await verifyInstallerSignature(temporary, env))) {
       throw new Error('ZCode 安装器未通过官方发布者 Authenticode 签名校验。')
     }
@@ -225,20 +224,22 @@ function openVisibleInstaller(path) {
  * intentionally does not claim that installation or sign-in has completed.
  */
 export async function openZCodeInstaller({
-  downloadDir, npmPrefix, env = process.env, signal, onProgress,
+  downloadDir, npmPrefix, env = process.env, signal, onProgress, latest,
 } = {}) {
   if (process.platform !== 'win32' || process.arch !== 'x64') {
-    throw new Error('此固定安装包仅适用于 Windows x64。')
+    throw new Error('ZCode 安装器下载目前仅适用于 Windows x64。')
   }
-  const cache = await resolveZCodeDownloadDirectory({ downloadDir, npmPrefix, env })
-  const installerPath = join(cache.directory, INSTALLER_NAME)
-  const verified = await fetchVerifiedInstaller(installerPath, { env, signal, onProgress })
+  const release = zcodeInstallerRelease(latest ?? await latestVersions.lookup(getOfficialTool('zcode'), { fresh: true }))
+  if (!release) throw new Error('无法从 ZCode 官方下载页确定最新 Windows x64 安装包；请检查网络，或从 https://zcode.z.ai 手动下载。')
+  const cache = await resolveZCodeDownloadDirectory({ downloadDir, npmPrefix, env, version: release.version })
+  const installerPath = join(cache.directory, release.fileName)
+  const verified = await fetchVerifiedInstaller(installerPath, release.url, { env, signal, onProgress })
   const pid = await openVisibleInstaller(verified.path)
   return {
     status: 'installer-opened',
-    version: ZCODE_SUPPORTED_VERSION,
+    version: release.version,
     installerPath: verified.path,
-    sha256: ZCODE_WINDOWS_INSTALLER_SHA256,
+    url: release.url,
     cacheSource: cache.source,
     reusedDownload: verified.reused,
     installerPid: pid,

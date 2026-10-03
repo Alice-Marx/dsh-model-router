@@ -38,7 +38,7 @@ export function channelForProvider(provider, installedToolIds = [], runnableTool
     return {
       kind: 'official-cli', preference, tool: tool.id, label: tool.label,
       detail: tool.id === 'zcode'
-        ? 'ZCode 已安装，插件可调用其官方编程代理；3.14.3 的 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。'
+        ? 'ZCode 已安装，插件可调用其官方编程代理；其 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。'
         : headless && !runnable
           ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。`
           : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。`,

@@ -115,7 +115,7 @@ The [full Chinese workbench guide](docs/WORKBENCH_USER_GUIDE.zh.md) walks throug
 
 The workbench shows these at the top. The matching session tools are in parentheses.
 
-1. **Onboarding health check** (`model_router_health`). When you first open the workbench, it checks every official tool in the registry: is it installed, does its version match the pinned version, and is it logged in. Login checks only run cheap status commands with short timeouts, or check that a credential file exists (its contents are never read):
+1. **Onboarding health check** (`model_router_health`). When you first open the workbench, it checks every official tool in the registry: is it installed, which version is installed (next to the vendor's latest release, with an **update available** hint), and is it logged in. Versions are no longer pinned: the latest version comes from the npm registry (`<package>/latest`) or, for ZCode, the official download page, cached for about 12 hours; offline or on errors the card just says the latest version is unknown. New vendor releases are not tested by the plugin; parsers tolerate output changes where they can, so please report problems. Login checks only run cheap status commands with short timeouts, or check that a credential file exists (its contents are never read):
 
    | Tool | How login is detected | Log in with |
    | --- | --- | --- |
@@ -126,10 +126,10 @@ The workbench shows these at the top. The matching session tools are in parenthe
    | MiMo Code | `MIMO_API_KEY`, or `~/.local/share/mimocode/auth.json` (`$XDG_DATA_HOME`; may hold only provider API keys, so billing stays unknown) | `mimo auth login` |
    | Grok Build | `XAI_API_KEY`, or `~/.grok/auth.json` (`$GROK_HOME`). On Windows with the npm prefix off drive C the plugin runs Grok with `GROK_HOME=<npm prefix>\.model-router-grok`; the health card then names that path | `grok login` (`--device-auth` without a browser); for the relocated home run `$env:GROK_HOME='<path>'; grok login` |
    | MiniMax Code | `MINIMAX_API_KEY`, or the `status` field of the non-secret `~/.minimax/auth/prod/<cn\|global>/mcode-public/auth-state.json` (`$MINIMAX_DATA_DIR`; `authenticated` → logged in, `anonymous` → unknown because a key saved with `mcode set-minimax-key` still works) | `mcode login` |
-   | ZCode | Desktop app without a status command → unknown. Only the pinned, signature- and hash-verified 3.14.3 is used; another installed version is reported as such, not as missing | Welcome page → *Connect BigModel / Z.ai*; for GLM Coding Plan pick *编程套餐* in Model settings |
+   | ZCode | Desktop app without a status command → unknown. Any release whose `ZCode.exe` carries a valid Authenticode signature from 北京智谱华章科技股份有限公司 is used (trust-on-first-use check of its CLI script per signed build, see below) | Welcome page → *Connect BigModel / Z.ai*; for GLM Coding Plan pick *编程套餐* in Model settings |
 
-   The file paths come from the published packages (kimi-code 2.1.1, mimocode 0.1.15, grok 1.0.41). A missing file is reported as **unknown**, not logged out, because these CLIs can also authenticate through custom providers or (MiMo) a free anonymous channel. The check never starts a login.
-   - **一键安装** (one-click install) reuses the fixed registry installer.
+   The file paths come from the vendors' published packages. A missing file is reported as **unknown**, not logged out, because these CLIs can also authenticate through custom providers or (MiMo) a free anonymous channel. The check never starts a login.
+   - **一键安装最新版** / **更新到最新版 X** installs `<package>@latest` from the official registry (ZCode: the newest signed installer from its download page). An install newer than the published latest is never downgraded.
    - **去登录** (log in) shows the login command so you can copy it.
    - Results are cached for 10 minutes. Routing **skips logged-out CLIs immediately** and goes straight to the model-catalog API; before this, Codex took about 14 s to fail and fall back. A tool is not skipped when its API key is configured. If a CLI reports a login error at run time, it is also marked as logged out — but because you were running on its subscription, later steps on that route are **paused and ask** (“订阅登录已失效…未自动改用 API Key”) instead of silently using the API key, also after a restart (`authFailures` in `state.json`), until the CLI runs on its subscription again. The same applies when a profile explicitly sets `billing: "subscription-first"` or `"subscription-only"` and the CLI is logged out. Logged-out CLIs without either signal, and CLIs that are not installed, still go straight to the API.
 2. **Visible routing decisions**. Plans show the selected model, preset, difficulty score, estimated cost, and channel (official CLI or API, with a "CLI 未登录" badge when the CLI is logged out). The run history shows each step's actual channel. On fallback it shows the real redacted error: Claude JSON `result`, Codex `turn.failed.error.message`, or a stderr snippet. When `allowManualReassign` is on (the default), you can reassign a step to another configured route and rerun it.
@@ -371,7 +371,7 @@ Open **Model Router → Model pricing and capabilities**. Choose a route that ac
 ]
 ```
 
-`quality` is a personal 0–100 comparison score. `pricing.input` and `.output` are nonnegative USD rates per million tokens; optional `cacheRead` and `cacheWrite` rates are supported. The optional `cliModel` must match the name accepted by that vendor's own CLI, which may differ from the Harness directory ID. MiniMax and MiMo expect `provider/model` for that field. ZCode 3.14.3 cannot switch models per call, so it does not accept `cliModel`.
+`quality` is a personal 0–100 comparison score. `pricing.input` and `.output` are nonnegative USD rates per million tokens; optional `cacheRead` and `cacheWrite` rates are supported. The optional `cliModel` must match the name accepted by that vendor's own CLI, which may differ from the Harness directory ID. MiniMax and MiMo expect `provider/model` for that field. ZCode cannot switch models per call, so it does not accept `cliModel`.
 
 `execution` chooses how that route runs when it receives a task. `auto` (the default when omitted) and `official` try the vendor headless CLI first and fall back to the Harness model API if the tool is missing or fails. `api` always uses the model directory API.
 
@@ -381,7 +381,16 @@ In **Task planning**, choose **指定模型** and pick one configured `provider/
 
 ## Official tools and actual execution
 
-The seven tool cards use a fixed registry. Six install version-pinned official npm packages; ZCode opens a pinned, hash-checked, signed Windows desktop installer where you select the destination directory. On Windows, if MiniMax's npm native dependency cannot install, the plugin checks a pinned official installer script and installs the pinned release under the configured npm global prefix. A changed script fails closed until reviewed in a plugin update. Tool cards support detection, installation or repair, cancellation, and logs; they never accept arbitrary package names or shell commands.
+The tool cards use a fixed registry of tools, but **not of versions**: the npm tools install `<package>@latest` from `https://registry.npmjs.org/`, and ZCode opens the newest Windows installer linked from its official download page (HTTPS, `cdn-zcode.z.ai` only, size-capped) after checking its Authenticode publisher; you select the destination directory. On Windows, if MiniMax's npm native dependency cannot install, the plugin runs MiniMax's official installer script as published. Tool cards support detection, installation or update, repair, cancellation, and logs; they never accept arbitrary package names or shell commands.
+
+Integrity checks that do not depend on a version are kept; per-version hashes were removed:
+
+| Tool | What is checked before the plugin runs it |
+| --- | --- |
+| Codex, Claude Code (Windows) | Valid Authenticode signature by `OpenAI OpCo, LLC` / `Anthropic, PBC` (Claude also needs ≥ 2.1.259 for its restricted flags) |
+| ZCode (Windows) | `ZCode.exe` signed by 北京智谱华章科技股份有限公司 (any version; version read from the signed file); `resources/glm/.node-bundle-meta.json` names `zcode.cjs`; the unsigned `zcode.cjs` is recorded on first use per signed build and refused if it later changes under the same build (`model-router/zcode-trust.json`) |
+| ZCode installer | Official CDN URL from the official page, HTTPS, size cap, Authenticode publisher |
+| MiMo, Grok, MiniMax | Unsigned binaries/scripts: every code file must equal the file in the official npm tarball for the **installed** version (tarball sha512 from registry.npmjs.org, cached in `model-router/npm-attestations.json`). The first run of a new version needs network once. |
 
 From a Harness session, these plugin tools are available:
 
@@ -396,11 +405,24 @@ From a Harness session, these plugin tools are available:
 | `model_router_tool_run` | Run one ready vendor CLI in the approved session workspace. Estimated and budget-checked first (`confirmOverBudget`). |
 | `model_router_team_execute` | Run dependent work packages through ready vendor CLIs in order; stop on failure or a reported model mismatch. |
 
-Headless assignment uses fixed adapters: Claude Code `claude -p`, Codex `codex exec`, and Gemini CLI `gemini -p` (`@google/gemini-cli@0.62.0`). DeepSeek and other providers without an adapter stay on the model directory API. A configured provider API key is passed only into that process; otherwise the CLI's own logged-in session is used. The plugin does not store keys in model profiles. Editable writes remain on `model_router_tool_run` and `model_router_team_execute`.
+Headless assignment uses fixed adapters: Claude Code `claude -p`, Codex `codex exec`, and Gemini CLI `gemini -p` (`@google/gemini-cli`, latest release). DeepSeek and other providers without an adapter stay on the model directory API. A configured provider API key is passed only into that process; otherwise the CLI's own logged-in session is used. The plugin does not store keys in model profiles. Editable writes remain on `model_router_tool_run` and `model_router_team_execute`.
 
 Claude Code, Codex, MiMo Code, and Grok Build support read-only and approved editable runs. Kimi Code, MiniMax Code, and ZCode headless modes handle permissions automatically, so the plugin only permits approved editable runs for them in an isolated Git worktree. Editable execution requires a clean Git repository. A successful run applies source changes only after the original checkout remains clean; ignored outputs remain for manual review. The official Harness process sandbox wraps launches, while its Windows ACL backend reports only partial file-effect enforcement.
 
 The planned Harness model ID is not necessarily the vendor CLI's model name. A saved `cliModel`, or temporary `cliModelsJson` keyed by tool or work-package ID, can provide a known vendor CLI name. A package-specific temporary mapping takes priority over a tool mapping, then the saved profile. ZCode uses its configured default model. Most vendor CLIs do not provide a verifiable actual model ID in their results, so inspect vendor run records to confirm which model and price applied. The plugin's sequential CLI team runner is separate from Harness's built-in Agent Teams lifecycle.
+
+### Interactive terminal (官方工具终端, 0.14.0-beta.3, npm `next`)
+
+The workbench has an **官方工具终端** card below the tool health check. It runs your system shell (PowerShell on Windows, your login `$SHELL` elsewhere) or one installed official CLI (`codex`, `claude`, `kimi`, `mcode`, `mimo`, `grok`, `gemini`) interactively, in tabs, with live output: multi-turn conversations, full-screen TUIs, and logins such as `codex login`, `claude auth login`, `kimi login`, `mcode login`, `mimo auth login`, `grok login` (choose **登录**).
+
+- **Boundary.** The terminal is your own terminal: it does **not** go through the Harness process sandbox, uses your own CLI logins and your full login environment (PATH, proxies, API keys), and can read and write anything your account can. Every session starts only after a confirmation that shows the command, the absolute working directory, and this boundary. The `confirmUnsandboxedCli` setting for routed runs is unchanged.
+- **Fixed launch targets.** The client can only name the shell or a registry CLI (plus its fixed login subcommand); it never supplies an executable, arguments, or environment. On Windows, native `.exe` files start directly, npm `.cmd` shims through `cmd.exe /d /s /c`, `.ps1`-only installs through `powershell -File`.
+- **Backend.** A pseudo terminal from the prebuilt, N-API [`@lydell/node-pty`](https://www.npmjs.com/package/@lydell/node-pty) (an optional dependency with per-platform binaries; no build tools or install scripts). It loads in the Harness Desktop Host (Electron 44 running as Node). If it cannot load, sessions fall back to pipes: no TTY, so full-screen TUIs may not render or start, resizing does nothing, arrow keys may not work, and the Host echoes input. Line-based logins and PowerShell work. The card shows which backend is active.
+- **Transport.** Output streams through long-poll reads over the plugin's existing Typert remote (`terminalRead`); keystrokes (`terminalWrite`) and resizes (`terminalResize`) are separate calls.
+- **Lifetime.** Ending the tab, closing the workbench panel, unloading or reloading the plugin, or quitting Harness kills the process. A session that nobody reads for about 2 minutes is killed, and no session runs longer than 6 hours. At most 4 sessions run at once.
+- **Privacy.** Input and output are never logged or saved. The card's history (and `state.json` → `terminalSessions`) stores only the tool, mode, working directory, start/end time, duration, exit code, and end reason.
+- **Restart after installing.** Harness serves the new card immediately, but a running Host keeps the old plugin code; until you quit Harness completely (including the tray icon) and start it again, the card shows “插件后台版本较旧，请完全退出并重启 Harness”.
+- **Keys.** With text selected, Ctrl+C copies; otherwise it interrupts. Ctrl+Shift+V pastes. Drag the terminal's lower-right corner to change its height.
 
 ## Optional GAL installation
 

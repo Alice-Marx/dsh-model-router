@@ -1,17 +1,22 @@
 /**
- * Fixed Windows launch adapters for official MiMo Code 0.1.15 and Grok 1.0.41.
+ * Fixed Windows launch adapters for official MiMo Code and Grok Build (any
+ * installed version; developed against MiMo 0.1.15 and Grok 1.0.41).
  *
  * MiMo source: https://github.com/XiaomiMiMo/MiMo-Code/blob/v0.1.15/packages/opencode/src/cli/cmd/run.ts
  * Grok source: https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/README.md
  * Grok npm bootstrap: https://unpkg.com/@xai-official/grok@1.0.41/bin/grok-bootstrap.js
  *
- * We bypass npm's mutable .cmd/JS launcher. Package names, versions, platform
- * binaries, and file digests are fixed here; only model IDs and task text are
- * supplied by the caller. The Host must still approve write mode and confine
- * the process to its isolated workspace.
+ * We bypass npm's mutable .cmd/JS launcher. Package names and platform
+ * binaries are fixed here; only model IDs and task text are supplied by the
+ * caller. Neither vendor signs its Windows binary, so the native program must
+ * equal the file in the official npm tarball of the installed version, as
+ * attested at runtime by registry.npmjs.org (see npm-attestation.mjs). The Host
+ * must still approve write mode and confine the process to its isolated workspace.
  */
 import { createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { npmAttestor } from './npm-attestation.mjs'
+import { isReleaseVersion } from './latest-versions.mjs'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { createBrotliDecompress } from 'node:zlib'
 import { homedir } from 'node:os'
@@ -19,15 +24,15 @@ import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'n
 import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
 import { usageFromEvents } from './task-executors.mjs'
 
-const VERSIONS = Object.freeze({ 'mimo-code': '0.1.15', 'grok-build': '1.0.41' })
+const TOOL_IDS = Object.freeze(['mimo-code', 'grok-build'])
 const PLATFORMS = Object.freeze({
   'mimo-code': Object.freeze({
-    x64: Object.freeze({ package: '@mimo-ai/mimocode-windows-x64', integrity: 'sha256-6nBnONfwCs5+Y+pLp+Vcc4cwuWDDMP0hLBdlQTHpmkw=', size: 135419392 }),
-    arm64: Object.freeze({ package: '@mimo-ai/mimocode-windows-arm64', integrity: 'sha256-5w/7e0cy90Smv2sBaIlrdLliel4i2VjEKcWm1I2J6eo=', size: 131460608 }),
+    x64: Object.freeze({ package: '@mimo-ai/mimocode-windows-x64', file: 'bin/mimo.exe' }),
+    arm64: Object.freeze({ package: '@mimo-ai/mimocode-windows-arm64', file: 'bin/mimo.exe' }),
   }),
   'grok-build': Object.freeze({
-    x64: Object.freeze({ package: '@xai-official/grok-win32-x64', integrity: 'sha256-ZK5odjiiROsE+OE72BdLTcbZgxKRoSnVFUUyDufuaS8=', size: 46488279 }),
-    arm64: Object.freeze({ package: '@xai-official/grok-win32-arm64', integrity: 'sha256-oJkk4XYpNvNQBk5jbFReagr8WnbCTWRpXPir0Oa7YWg=', size: 41589854 }),
+    x64: Object.freeze({ package: '@xai-official/grok-win32-x64', file: 'bin/grok.exe.br' }),
+    arm64: Object.freeze({ package: '@xai-official/grok-win32-arm64', file: 'bin/grok.exe.br' }),
   }),
 })
 
@@ -57,11 +62,12 @@ function moduleRoots() {
   return [...roots]
 }
 
-async function manifestAt(directory, name, version) {
+async function manifestAt(directory, name, version = null) {
   try {
     const root = await realpath(directory)
     const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
-    if (manifest.name !== name || manifest.version !== version) return null
+    if (manifest.name !== name || !isReleaseVersion(manifest.version)) return null
+    if (version !== null && manifest.version !== version) return null
     return { root, manifest }
   } catch { return null }
 }
@@ -84,31 +90,34 @@ async function realFileWithin(root, candidate, workspace) {
   } catch { return null }
 }
 
-async function optionalPackage(wrapper, toolId, platform, modules, workspace) {
-  if (wrapper.manifest.optionalDependencies?.[platform.package] !== VERSIONS[toolId]) return null
+async function optionalPackage(wrapper, platform, modules, workspace) {
+  // The wrapper pins its platform package to its own version.
+  const version = wrapper.manifest.optionalDependencies?.[platform.package]
+  if (version !== wrapper.manifest.version) return null
   const candidates = [
-    packagePath(modules, platform.package),
     packagePath(join(wrapper.root, 'node_modules'), platform.package),
+    packagePath(modules, platform.package),
   ]
   for (const candidate of candidates) {
-    const optional = await manifestAt(candidate, platform.package, VERSIONS[toolId])
+    const optional = await manifestAt(candidate, platform.package, version)
     if (!optional || optional.root === workspace || inside(workspace, optional.root)) continue
     return optional
   }
   return null
 }
 
-async function findMiMoExecutable(workspace, platform) {
+async function findMiMoExecutable(workspace, platform, attestor, problems) {
   const wrapperInfo = WRAPPERS['mimo-code']
   for (const modules of moduleRoots()) {
-    const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name, VERSIONS['mimo-code'])
+    const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name)
     if (!wrapper || String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//, '') !== wrapperInfo.bin) continue
-    const optional = await optionalPackage(wrapper, 'mimo-code', platform, modules, workspace)
+    const optional = await optionalPackage(wrapper, platform, modules, workspace)
     if (!optional) continue
-    const file = await realFileWithin(optional.root, join(optional.root, 'bin', 'mimo.exe'), workspace)
-    if (!file || (await stat(file)).size !== platform.size) continue
-    if (await hashFile(file) !== platform.integrity) continue
-    return { file, source: 'official-npm-native-sha256' }
+    const file = await realFileWithin(optional.root, join(optional.root, ...platform.file.split('/')), workspace)
+    if (!file) continue
+    const attested = await attestor.matches(file, platform.package, optional.manifest.version, platform.file)
+    if (!attested.ok) { problems.push(attested.reason); continue }
+    return { file, version: optional.manifest.version, source: 'official-npm-registry-attested' }
   }
   return null
 }
@@ -120,20 +129,23 @@ async function grokHome() {
   catch { return join(homedir(), '.grok') }
 }
 
-async function findGrokExecutable(workspace, platform) {
+async function findGrokExecutable(workspace, platform, attestor, problems) {
   const wrapperInfo = WRAPPERS['grok-build']
   for (const modules of moduleRoots()) {
-    const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name, VERSIONS['grok-build'])
+    const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name)
     if (!wrapper || String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//, '') !== wrapperInfo.bin) continue
-    const optional = await optionalPackage(wrapper, 'grok-build', platform, modules, workspace)
+    const optional = await optionalPackage(wrapper, platform, modules, workspace)
     if (!optional) continue
-    const compressed = await realFileWithin(optional.root, join(optional.root, 'bin', 'grok.exe.br'), workspace)
-    if (!compressed || (await stat(compressed)).size !== platform.size) continue
-    if (await hashFile(compressed) !== platform.integrity) continue
+    const version = optional.manifest.version
+    const compressed = await realFileWithin(optional.root, join(optional.root, ...platform.file.split('/')), workspace)
+    if (!compressed) continue
+    const attested = await attestor.matches(compressed, platform.package, version, platform.file)
+    if (!attested.ok) { problems.push(attested.reason); continue }
+    // The attested .br decompresses to the exact program the bootstrap expands.
     const uncompressedIntegrity = await hashFile(compressed, true)
     const home = await grokHome()
     const candidates = [
-      ...(home ? [join(home, 'bin', `grok-${VERSIONS['grok-build']}.exe`), join(home, 'bin', 'grok.exe')] : []),
+      ...(home ? [join(home, 'bin', `grok-${version}.exe`), join(home, 'bin', 'grok.exe')] : []),
       join(optional.root, 'bin', 'grok.exe'),
     ]
     for (const candidate of candidates) {
@@ -141,10 +153,11 @@ async function findGrokExecutable(workspace, platform) {
         const file = await realpath(candidate)
         if (file === workspace || inside(workspace, file) || !(await stat(file)).isFile()) continue
         if (await hashFile(file) === uncompressedIntegrity) {
-          return { file, source: 'official-npm-native-sha256' }
+          return { file, version, source: 'official-npm-registry-attested' }
         }
       } catch { /* try next installed binary */ }
     }
+    problems.push(`尚未找到由已核验 grok.exe.br 解压出的 grok.exe；请先在终端运行一次 grok 完成解压。`)
   }
   return null
 }
@@ -154,8 +167,8 @@ async function findGrokExecutable(workspace, platform) {
  * process runner, or an unsupported reason. The Host retains its own task,
  * workspace, model, approval, timeout, and cancellation validation.
  */
-export async function resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, task }) {
-  if (!(toolId in VERSIONS)) return { unsupported: '未知的 MiMo/Grok 官方工具 ID。' }
+export async function resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, task, attestor = npmAttestor }) {
+  if (!TOOL_IDS.includes(toolId)) return { unsupported: '未知的 MiMo/Grok 官方工具 ID。' }
   if (process.platform !== 'win32') return { unsupported: 'MiMo/Grok 原生入口目前仅完成 Windows 适配。' }
   if (!isAbsolute(workspace) || !['read-only', 'workspace-write'].includes(mode)) {
     return { unsupported: '缺少有效的绝对工作区或执行模式。' }
@@ -170,10 +183,15 @@ export async function resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, 
   if (!platform) return { unsupported: '当前 Windows CPU 架构没有核验的官方原生程序。' }
   await ensureNpmPrefixOnPath()
   const directory = await realpath(workspace)
+  const problems = []
   const found = toolId === 'mimo-code'
-    ? await findMiMoExecutable(directory, platform)
-    : await findGrokExecutable(directory, platform)
-  if (!found) return { unsupported: `未找到与官方 npm ${VERSIONS[toolId]} 发行文件哈希一致的 Windows 原生程序。` }
+    ? await findMiMoExecutable(directory, platform, attestor, problems)
+    : await findGrokExecutable(directory, platform, attestor, problems)
+  if (!found) {
+    return { unsupported: problems.length
+      ? `官方原生程序未通过 npm registry 摘要核验：${problems[0]}`
+      : `未找到官方 npm 包 ${WRAPPERS[toolId].name} 及其 Windows 原生程序。` }
+  }
 
   if (toolId === 'mimo-code') {
     // MiMo's v0.1.15 run command reads all piped stdin and emits JSONL. Its
@@ -213,7 +231,7 @@ export async function resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, 
 
 /** Parse vendor JSONL without treating a clean process exit as proof of work. */
 export function createMiMoGrokParser(toolId) {
-  if (!(toolId in VERSIONS)) throw new TypeError('unsupported vendor parser')
+  if (!TOOL_IDS.includes(toolId)) throw new TypeError('unsupported vendor parser')
   let protocolError = null
   let vendorError = null
   let finalText = ''

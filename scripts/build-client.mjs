@@ -53,6 +53,8 @@ export async function generate({ check = false } = {}) {
       '@deepseek-ai/dsh-client-ui-primitives',
     ],
     plugins: [lfCss],
+    // Lets the client tell a Host that still runs older plugin code (see client/host-version.mjs).
+    define: { __ROUTER_CLIENT_VERSION__: JSON.stringify(PACKAGE.version) },
     outfile: OUTPUT,
     write: false,
     metafile: true,

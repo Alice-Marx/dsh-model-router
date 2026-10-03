@@ -9,12 +9,12 @@
  * always confirmed by a fresh probe rather than the installer's exit code.
  */
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { getOfficialTool, installCommandLine, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
-import { ZCODE_SUPPORTED_VERSION, discoverZCodeBundle, unverifiedZCodeInstalls } from './zcode-bundle.mjs'
+import { discoverZCodeBundle, unverifiedZCodeInstalls } from './zcode-bundle.mjs'
 import { openZCodeInstaller } from './zcode-installer.mjs'
+import { compareReleaseVersions, latestVersions } from './latest-versions.mjs'
 
 const PROBE_TIMEOUT_MS = 8_000
 const INSTALL_TIMEOUT_MS = 900_000
@@ -22,7 +22,6 @@ const OUTPUT_LINE_CAP = 120
 const IS_WINDOWS = process.platform === 'win32'
 const CREATE_NO_WINDOW = 0x0800_0000
 const MINIMAX_INSTALLER_URL = 'https://filecdn.minimax.chat/public/install.ps1'
-const MINIMAX_INSTALLER_SHA256 = '96508631f5874b0ab1519c8a6a463ebc0a80833698346a549c2e03f538680236'
 const MAX_INSTALLER_BYTES = 200_000
 /** Windows ships where.exe in System32; POSIX which is ubiquitous. */
 const LOCATOR = IS_WINDOWS ? 'where' : 'which'
@@ -117,21 +116,21 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, s
   })
 }
 
-/** Preserve the reviewed upstream installer bytes and patch only npm's version selector. */
-export function pinnedMiniMaxInstaller(source, expectedHash = MINIMAX_INSTALLER_SHA256) {
+/**
+ * MiniMax's official Windows installer script is run as published (it installs
+ * `@minimax-ai/code@latest`). Only structural sanity is checked: it must be the
+ * MiniMax Code installer, not an HTML error page or another script.
+ */
+export function officialMiniMaxInstaller(source) {
   const bytes = Buffer.isBuffer(source) ? source : Buffer.from(source)
-  if (createHash('sha256').update(bytes).digest('hex') !== expectedHash) {
-    throw new Error('MiniMax 官方 Windows 安装脚本哈希与审核版本不符，已拒绝执行。')
+  const text = bytes.toString('utf8').replace(/^\uFEFF/, '')
+  if (!text.includes('@minimax-ai/code') || /^\s*</.test(text)) {
+    throw new Error('下载内容不是 MiniMax Code 官方 Windows 安装脚本，已拒绝执行。')
   }
-  const marker = '"$PackageName@latest"'
-  const text = bytes.toString('utf8')
-  if (text.split(marker).length !== 2) {
-    throw new Error('MiniMax 官方安装脚本的版本选择结构已变化，已拒绝执行。')
-  }
-  return text.replace(marker, '"$PackageName@0.5.5"')
+  return text
 }
 
-async function fetchPinnedMiniMaxInstaller(signal) {
+async function fetchOfficialMiniMaxInstaller(signal) {
   const response = await fetch(MINIMAX_INSTALLER_URL, {
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
   })
@@ -143,17 +142,17 @@ async function fetchPinnedMiniMaxInstaller(signal) {
     if (length > MAX_INSTALLER_BYTES) throw new Error('官方安装脚本超过大小上限。')
     chunks.push(chunk)
   }
-  return pinnedMiniMaxInstaller(Buffer.concat(chunks))
+  return officialMiniMaxInstaller(Buffer.concat(chunks))
 }
 
-async function runPinnedMiniMaxInstaller(job) {
+async function runOfficialMiniMaxInstaller(job) {
   let staging = null
   let prefixRoot = null
   try {
     job.finishedAt = null
     job.error = null
     job.phase = 'downloading-and-verifying'
-    pushLine(job, '— npm 原生依赖未就绪；校验 MiniMax 官方 Windows 安装脚本并锁定 0.5.5 —')
+    pushLine(job, '— npm 原生依赖未就绪；改用 MiniMax 官方 Windows 安装脚本（安装最新版）—')
     const prefixResult = await runCapture('npm', ['config', 'get', 'prefix'], {
       timeoutMs: 5_000, useShell: true, signal: job.controller.signal,
     })
@@ -161,7 +160,7 @@ async function runPinnedMiniMaxInstaller(job) {
     if (!prefixResult.ok || !isAbsolute(rawPrefix)) throw new Error('无法确定 npm 全局安装目录。')
     await mkdir(rawPrefix, { recursive: true })
     prefixRoot = await realpath(rawPrefix)
-    const script = await fetchPinnedMiniMaxInstaller(job.controller.signal)
+    const script = await fetchOfficialMiniMaxInstaller(job.controller.signal)
     staging = await mkdtemp(join(prefixRoot, '.model-router-minimax-installer-'))
     const scriptPath = join(staging, 'install.ps1')
     const tempPath = join(staging, 'temp')
@@ -206,12 +205,12 @@ async function runPinnedMiniMaxInstaller(job) {
     const probe = await probeToolWith(job.tool, defaultRunner)
     job.postInstallProbe = probe
     const readiness = await trustedExecutionReadiness(job.tool.id)
-    if (!probe.installed || probe.version !== job.tool.version || !readiness.ready) {
-      throw new Error(`官方安装器完成，但入口未通过固定版本与哈希验收：${readiness.reason ?? probe.detail}`)
+    if (!probe.installed || !readiness.ready) {
+      throw new Error(`官方安装器完成，但执行入口未通过 npm registry 摘要核验：${readiness.reason ?? probe.detail}`)
     }
     job.status = 'succeeded'
     job.finishedAt = new Date().toISOString()
-    pushLine(job, '— 官方安装器、固定版本和执行入口均已核验 —')
+    pushLine(job, `— 官方安装器已完成，MiniMax Code ${probe.version ?? ''} 的执行入口已核验 —`)
   } catch (error) {
     if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }
     job.status = 'failed'
@@ -227,21 +226,12 @@ async function runPinnedMiniMaxInstaller(job) {
   }
 }
 
+/** Tools whose ready-check failure can be repaired by reinstalling the same version. */
+const CAPABILITY_REPAIRABLE = new Set(['claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build'])
+
 function appendBounded(current, addition) {
   const merged = current + addition
   return merged.length > 64_000 ? merged.slice(merged.length - 32_000) : merged
-}
-
-function compareStableVersions(left, right) {
-  const parse = value => /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(value ?? ''))
-  const a = parse(left)
-  const b = parse(right)
-  if (!a || !b) return null
-  for (let index = 1; index <= 3; index += 1) {
-    const difference = Number(a[index]) - Number(b[index])
-    if (difference) return Math.sign(difference)
-  }
-  return 0
 }
 
 /** Extract the first version-looking token from a CLI banner. */
@@ -267,14 +257,16 @@ async function probeUncached(tool, runner) {
     return { id: tool.id, installed: false, version: null, status: 'unsupported', detail: tool.unsupportedReason }
   }
   if (tool.manager === 'signed-windows-installer') {
-    const bundle = await discoverZCodeBundle()
+    let rejected = null
+    const bundle = await discoverZCodeBundle({ onRejected: value => { rejected ??= value } })
     if (bundle) return { id: tool.id, installed: true, version: bundle.version, status: 'installed',
       detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} ${bundle.buildVersion}` }
+    if (rejected) return { id: tool.id, installed: false, version: null, status: 'not-installed', detail: `检测到已安装的 ZCode ${rejected.version}（${rejected.root}）：${rejected.rejected}` }
     const other = (await unverifiedZCodeInstalls().catch(() => []))[0]
     return { id: tool.id, installed: false, version: null, status: 'not-installed',
       detail: other
-        ? `检测到已安装的 ZCode ${other.version ?? '（版本未知）'}${other.root ? `（${other.root}）` : ''}，但插件只启用已核验签名与 CLI 哈希的 ${ZCODE_SUPPORTED_VERSION} 版，因此暂不通过插件调用；可以继续直接使用 ZCode 桌面版，或等待插件更新核验信息。`
-        : '未找到官方签名、版本和 CLI 脚本哈希均匹配的 ZCode 桌面版。' }
+        ? `检测到已安装的 ZCode ${other.version ?? '（版本未知）'}${other.root ? `（${other.root}）` : ''}，但 ZCode.exe 未通过智谱发布者签名或 GLM 组件检查，因此不通过插件调用；可以继续直接使用 ZCode 桌面版。`
+        : '未找到具有智谱有效签名的 ZCode 桌面版。' }
   }
   if (tool.id === 'minimax-code' && IS_WINDOWS) {
     // The official Windows installer keeps mcode under a versioned releases
@@ -283,7 +275,7 @@ async function probeUncached(tool, runner) {
     const { findManagedMiniMaxEntry } = await import('./official-tool-executor.mjs')
     const managed = await findManagedMiniMaxEntry(process.cwd())
     if (managed) return { id: tool.id, installed: true, version: managed.version,
-      status: 'installed', detail: '已核验 MiniMax 官方 Windows 安装器版本及 CLI 哈希。',
+      status: 'installed', detail: '已按官方 npm registry 摘要核验 MiniMax 官方 Windows 安装器中的 CLI 文件。',
       bannerLine: `MiniMax Code ${managed.version}` }
   }
   for (const executable of tool.probeExecutables) {
@@ -460,26 +452,28 @@ async function runInstallJob(manager, args, job) {
   probeCache.delete(job.tool.id)
   const before = await probeToolWith(job.tool, defaultRunner)
   if (job.cancelRequested) { markCancelled(job); return }
-  if (before.installed && job.tool.version) {
-    const order = compareStableVersions(before.version, job.tool.version)
-    if (order === null || order > 0) {
+  if (before.installed) {
+    const latest = await latestVersions.lookup(job.tool, { fresh: true }).catch(() => null)
+    if (job.cancelRequested) { markCancelled(job); return }
+    const order = latest?.version ? compareReleaseVersions(before.version, latest.version) : null
+    if (order === 1) {
       job.status = 'failed'
       job.finishedAt = new Date().toISOString()
       job.postInstallProbe = before
-      job.error = `已安装 ${before.version ?? '未知版本'}，无法证明升级到 ${job.tool.version} 不会降级；请先人工核对。`
+      job.error = `已安装 ${before.version}，高于 npm 最新正式版 ${latest.version}；不会自动降级。`
       return
     }
     if (order === 0) {
       const readiness = await trustedExecutionReadiness(job.tool.id)
       if (job.cancelRequested) { markCancelled(job); return }
-      if (readiness.ready) {
+      if (readiness.ready || !CAPABILITY_REPAIRABLE.has(job.tool.id)) {
         job.status = 'succeeded'
         job.finishedAt = new Date().toISOString()
         job.postInstallProbe = before
-        pushLine(job, `— ${job.tool.label} ${before.version} 的官方执行入口已核验，无需重复安装 —`)
+        pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，无需重复安装 —`)
         return
       }
-      pushLine(job, `— 版本横幅已是 ${before.version}，但执行入口未就绪：${readiness.reason}；按固定来源修复 —`)
+      pushLine(job, `— 已是最新版本 ${before.version}，但执行入口未就绪：${readiness.reason}；重新安装修复 —`)
     }
   }
   job.phase = 'installing'
@@ -508,27 +502,29 @@ async function runInstallJob(manager, args, job) {
     const probe = await probeToolWith(job.tool, defaultRunner)
     if (job.cancelRequested) { markCancelled(job); return }
     job.postInstallProbe = probe
-    if (!probe.installed || (job.tool.version && probe.version !== job.tool.version)) {
+    if (!probe.installed) {
       job.status = 'failed'
-      job.error = probe.installed
-        ? `安装命令已完成，但 PATH 上读到 ${probe.version ?? '未知版本'}；预期 ${job.tool.version}。请检查重复安装。`
-        : `安装命令已完成，但重探测失败：${probe.detail}`
+      job.error = `安装命令已完成，但重探测失败：${probe.detail}`
     } else {
+      const latest = await latestVersions.lookup(job.tool).catch(() => null)
+      if (latest?.version && compareReleaseVersions(probe.version, latest.version) === -1) {
+        pushLine(job, `— 注意：PATH 上的 ${job.tool.label} 仍是 ${probe.version}，低于最新 ${latest.version}；可能有另一份旧安装排在 PATH 前面 —`)
+      }
       const readiness = await trustedExecutionReadiness(job.tool.id)
       if (job.cancelRequested) { markCancelled(job); return }
       if (!readiness.ready) {
-        if (IS_WINDOWS && job.tool.id === 'minimax-code') await runPinnedMiniMaxInstaller(job)
+        if (IS_WINDOWS && job.tool.id === 'minimax-code') await runOfficialMiniMaxInstaller(job)
         else {
           job.status = 'failed'
           job.error = `安装命令和版本探测已成功，但官方执行入口未就绪：${readiness.reason}`
         }
       } else {
         job.status = 'succeeded'
-        pushLine(job, '— 安装、版本和官方执行入口均已核验 —')
+        pushLine(job, `— 已安装 ${job.tool.label} ${probe.version ?? ''}，官方执行入口已核验（新版本未经插件测试）—`)
       }
     }
   } else if (IS_WINDOWS && job.tool.id === 'minimax-code') {
-    await runPinnedMiniMaxInstaller(job)
+    await runOfficialMiniMaxInstaller(job)
   } else {
     job.status = 'failed'
     job.error = `安装命令失败（退出码 ${outcome.code ?? '信号终止'}）。${outcome.stderr.split('\n').find(Boolean)?.slice(0, 200) ?? ''}`
@@ -541,12 +537,14 @@ async function runZCodeInstallJob(job) {
   probeCache.delete(job.tool.id)
   const before = await probeToolWith(job.tool, defaultRunner)
   if (job.cancelRequested) { markCancelled(job); return }
-  if (before.installed && before.version === job.tool.version) {
+  const latest = await latestVersions.lookup(job.tool, { fresh: true }).catch(() => null)
+  if (job.cancelRequested) { markCancelled(job); return }
+  if (before.installed && latest?.version && (compareReleaseVersions(before.version, latest.version) ?? -1) >= 0) {
     job.status = 'succeeded'
     job.phase = 'done'
     job.finishedAt = new Date().toISOString()
     job.postInstallProbe = before
-    pushLine(job, `— 已找到 ZCode ${before.version}，无需重复打开安装器 —`)
+    pushLine(job, `— 已找到 ZCode ${before.version}（最新 ${latest.version}），无需重复打开安装器 —`)
     return
   }
   const prefix = await runCapture('npm', ['config', 'get', 'prefix'], {
@@ -557,6 +555,7 @@ async function runZCodeInstallJob(job) {
   let lastProgress = 0
   try {
     const opened = await openZCodeInstaller({
+      latest,
       npmPrefix: prefix.ok ? prefix.stdout.trim() : undefined,
       signal: job.controller.signal,
       onProgress({ receivedBytes, declaredBytes }) {
@@ -571,7 +570,7 @@ async function runZCodeInstallJob(job) {
     job.phase = 'installer-opened'
     job.finishedAt = new Date().toISOString()
     probeCache.delete(job.tool.id)
-    pushLine(job, `已验证并打开官方安装器：${opened.installerPath}`)
+    pushLine(job, `已验证发布者签名并打开 ZCode ${opened.version} 官方安装器：${opened.installerPath}`)
     pushLine(job, '请在原厂安装界面选择非 C 盘目录；完成后点击“重新检测”。')
   } catch (error) {
     if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }

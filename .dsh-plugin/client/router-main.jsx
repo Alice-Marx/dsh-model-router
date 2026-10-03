@@ -7,6 +7,8 @@ import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
 import { planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
 import { RunLauncher } from './run-launcher.jsx'
+import { CliTerminalCard } from './cli-terminal.jsx'
+import { staleHostNotice } from './host-version.mjs'
 import stylesheet from './router-main.css'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
@@ -144,7 +146,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : []
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : []
       setProbeState({ status: 'ready', probes, capabilities, readiness, error: '' })
-      onProbes({ probes, capabilities, readiness })
+      onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === 'string' ? response.value.hostVersion : null })
     } catch (error) {
       if (!mounted.current || current !== request.current) return
       setProbeState({ status: 'error', probes: [], capabilities: [], readiness: [], error: text(error?.message) || '无法检测官方工具。' })
@@ -237,7 +239,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
     <section className="mr-card" aria-label="官方工具">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">官方工具 · 体检</h2>
-        <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装。未登录的工具点“去登录”查看登录命令。ZCode 会打开官方安装窗口供你选择目录；完成后重新体检。</p>
+        <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。未登录的工具点“去登录”查看登录命令。ZCode 会打开官方安装窗口供你选择目录；完成后重新体检。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新体检</button></div>
       <div className="mr-card-body">
         {probeState.status === 'loading' && <p className="mr-empty" role="status">正在检测本机官方工具…</p>}
@@ -250,7 +252,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
             const readiness = readinessById[tool.id]
             const job = jobs[tool.id]
             const running = job?.status === 'running'
-            const action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status })
+            const action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status, latestVersion: healthById[tool.id]?.latestVersion ?? null })
             const verified = job?.status === 'succeeded' && job.postInstallProbe?.installed === true
             const status = running ? job.cancelRequested ? '正在取消安装…' : '安装中…'
               : job?.status === 'installer-opened' ? '官方安装器已打开，请完成安装后重新检测'
@@ -260,7 +262,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
                 <div className="mr-tool-info">
                   <div className="mr-route-name" title={tool.purpose}>{tool.label}</div>
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
-                  <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{tool.version ? ` · 目标 ${tool.version}` : ''}</div>
+                  <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{probe?.installed && probe.version ? ` · ${probe.version}` : ''}{healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ''}</div>
                   <ToolLoginLine entry={healthById[tool.id]} />
                   {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.headlessAdapter
                     ? '已可由 model_router_execute 以无界面方式调用。命令缺失或失败时回退模型目录 API。签名沙箱入口不启动此 CLI。'
@@ -386,7 +388,7 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun }
 }
 
-export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun }) {
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')
@@ -493,6 +495,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           <div className="mr-status"><span className={`mr-status-dot ${catalogState.status === 'loading' ? 'loading' : catalogState.status === 'error' ? 'error' : ''}`} />{catalogState.status === 'ready' ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === 'loading' ? '正在读取模型目录' : '模型目录读取失败'}</div>
         </header>
 
+        {staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: Boolean(toolProbes?.probes?.length) }) && <div className="mr-error" role="alert">{staleHostNotice({ hostVersion: toolProbes?.hostVersion })}</div>}
         {(workbench.health.report?.notices ?? []).map(notice => (
           <div key={`${notice.kind}-${notice.at}`} className="mr-error" role="alert">{notice.message}</div>
         ))}
@@ -542,10 +545,11 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           onRerun={(runId, packageId, override, choice) => { void workbench.rerun(runId, packageId, override, choice) }} />
         <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes}
           health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
+        {terminalApi && <CliTerminalCard api={terminalApi} health={workbench.health.report} />}
         <BillingCard billing={workbench.health.report?.billing ?? null} error={workbench.health.report ? '' : workbench.health.error}
           refreshing={workbench.health.refreshing} onRefresh={() => { void workbench.refreshHealth(true) }} />
         <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />
-        <div className="mr-notice">只读任务可在上方“在工作台执行”中直接预览并执行；在官方会话中可使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 3.14.3 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
+        <div className="mr-notice">只读任务可在上方“在工作台执行”中直接预览并执行；在官方会话中可使用 <code>model_router_execute</code>（按路由或指定模型执行，官方 CLI 失败则回退 API）、<code>model_router_consult</code>、<code>model_router_tool_run</code> 或 <code>model_router_team_execute</code>。指定模型会跳过路线比较。托管执行能力和就绪状态见上方各工具卡片；实际使用的模型以厂商记录为准。ZCode 使用其自身配置的默认模型。可编辑团队任务要求干净的 Git 仓库，并经官方工具审批。设置位于“插件 → 已安装 → @ljwei-stak/model-router-galgame”。</div>
       </div>
     </main>
   )
