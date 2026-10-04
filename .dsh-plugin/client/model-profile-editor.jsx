@@ -99,6 +99,7 @@ export function ModelProfileEditor({ routes, settingsScope, onSaved }) {
               <label className="mr-profile-field"><span>输出单价（USD / 百万 token）</span><input className="mr-input" type="number" min="0" step="any" value={draft.output} disabled={!writable} onChange={event => edit('output', event.target.value)} placeholder="留空表示未知" /></label>
               <label className="mr-profile-field"><span>擅长方向（英文标签，逗号分隔）</span><input className="mr-input" type="text" value={draft.specialties} disabled={!writable} onChange={event => edit('specialties', event.target.value)} placeholder={PROFILE_SPECIALTY_HINT} /></label>
               <label className="mr-profile-field"><span>官方 CLI 模型名（可选）</span><input className="mr-input" type="text" value={draft.cliModel} disabled={!writable} onChange={event => edit('cliModel', event.target.value)} placeholder="仅在厂商 CLI 支持该准确名称时填写" /></label>
+              <label className="mr-profile-field"><span>LiveBench 准确模型名称（可选）</span><input className="mr-input" type="text" value={draft.benchmarkModel ?? ''} disabled={!writable} onChange={event => edit('benchmarkModel', event.target.value)} placeholder="确认版本与推理档位一致；不自动猜测别名" /></label>
               <label className="mr-profile-field"><span>执行方式</span>
                 <select className="mr-input" value={draft.execution || 'auto'} disabled={!writable} onChange={event => edit('execution', event.target.value)}>
                   <option value="auto">自动：已安装则用官方工具，失败回退 API</option>

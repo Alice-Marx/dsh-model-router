@@ -9,10 +9,15 @@ import { healthSummary, planBudget, rerunConfirmations, unwrapRemote } from './i
 import { RunLauncher } from './run-launcher.jsx'
 import { CliTerminalCard } from './cli-terminal.jsx'
 import { staleHostNotice } from './host-version.mjs'
+import { ADAPTIVE_DEFAULTS } from './adaptive-state.mjs'
 import stylesheet from './router-main.css'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
 const text = value => typeof value === 'string' ? value.trim() : ''
+const routingSettingsSignature = value => JSON.stringify([
+  value.modelProfilesJson, value.routingPreset,
+  ...Object.keys(ADAPTIVE_DEFAULTS).map(key => value[key] ?? ADAPTIVE_DEFAULTS[key]),
+])
 
 /** The sidebar owns button layout and selection; this is only its glyph. */
 export function RouterPanelIcon({ size = 20, active = false }) {
@@ -317,6 +322,7 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   const [boundaries, setBoundaries] = React.useState({ value: null, error: '' })
   const [busy, setBusy] = React.useState(false)
   const mounted = React.useRef(true)
+  const ledgerRequest = React.useRef(0)
   React.useEffect(() => () => { mounted.current = false }, [])
   const call = async (operation, fallback) => {
     if (typeof operation !== 'function') throw new Error('工作台服务尚未加载，请更新插件后重试。')
@@ -332,11 +338,15 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     }
   }
   const refreshLedger = async () => {
+    const request = ++ledgerRequest.current
     try {
       const value = await call(loadLedger, '执行记录读取失败。')
-      if (mounted.current) setLedger({ value, error: '' })
+      if (mounted.current && request === ledgerRequest.current) setLedger({ value, error: '' })
+      if (request !== ledgerRequest.current) return null
+      return value
     } catch (error) {
-      if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '执行记录读取失败。' }))
+      if (mounted.current && request === ledgerRequest.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '执行记录读取失败。' }))
+      return null
     }
   }
   const refreshBoundaries = async () => {
@@ -355,9 +365,9 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
       if (mounted.current) setHealth(previous => ({ ...previous, error: text(error?.message) || '无法保存体检状态。' }))
     }
   }
-  const rate = async (runId, packageId, rating) => {
+  const rate = async (runId, packageId, rating, expectedFinishedAt) => {
     setBusy(true)
-    try { await call(() => rateResult({ runId, packageId, rating }), '评价保存失败。'); await refreshLedger() }
+    try { await call(() => rateResult({ runId, packageId, rating, ...(expectedFinishedAt === undefined ? {} : { expectedFinishedAt }) }), '评价保存失败。'); await refreshLedger() }
     catch (error) { if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '评价保存失败。' })) }
     finally { if (mounted.current) setBusy(false) }
   }
@@ -408,7 +418,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const [toolProbes, setToolProbes] = React.useState(null)
   const [routingSettings, setRoutingSettings] = React.useState(() => {
     const value = settingsScope.getSnapshot().value ?? {}
-    return JSON.stringify([value.modelProfilesJson, value.routingPreset])
+    return routingSettingsSignature(value)
   })
   const [view, setView] = React.useState('plan')
   const tabRefs = React.useRef({})
@@ -417,6 +427,9 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const budgetValue = React.useRef(budget)
   const mounted = React.useRef(false)
   const catalogRequest = React.useRef(0)
+  const generationRequest = React.useRef(0)
+  const generationInputs = React.useRef('')
+  generationInputs.current = JSON.stringify([task, budget, mode, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools])
 
   React.useEffect(() => {
     if (plan) resultHeading.current?.focus({ preventScroll: true })
@@ -438,7 +451,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   React.useEffect(() => {
     const syncBudget = () => {
       const value = settingsScope.getSnapshot().value ?? {}
-      const signature = JSON.stringify([value.modelProfilesJson, value.routingPreset])
+      const signature = routingSettingsSignature(value)
       setRoutingSettings(previous => {
         if (previous === signature) return previous
         return signature
@@ -457,6 +470,11 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   }, [settingsScope])
 
   React.useEffect(() => { setPlan(null); setPlanError('') }, [routingSettings])
+  const dataRevision = workbench.ledger.value?.dynamicData?.revision ?? ''
+  const feedbackRevision = workbench.ledger.value?.learning?.revision ?? ''
+  React.useEffect(() => {
+    if (plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}`) { setPlan(null); setPlanError('') }
+  }, [dataRevision, feedbackRevision, plan])
 
   React.useEffect(() => {
     mounted.current = true
@@ -487,15 +505,19 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
     }
   }
   const invalidatePlan = () => {
+    generationRequest.current += 1
     setPlan(null)
     setPlanError('')
   }
   const handleToolProbes = React.useCallback(snapshot => {
+    generationRequest.current += 1
     setToolProbes(snapshot)
     setPlan(null)
     setPlanError('')
   }, [])
-  const generate = () => {
+  const generate = async () => {
+    const request = ++generationRequest.current
+    const inputs = generationInputs.current
     setPlanError('')
     try {
       if (!text(task)) throw new Error('请先描述任务。')
@@ -504,7 +526,16 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
       if (!Number.isFinite(parsedBudget) || parsedBudget < 0) throw new Error('预算必须是不小于 0 的数字。')
       const direct = mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] : null
       if (mode === 'direct' && !direct) throw new Error('请选择要直接使用的模型。')
-      setPlan(createWorkspacePlan(task, catalogState.catalog, {
+      // Read the Host's exact public snapshot and full-window feedback profile
+      // before local planning. No task text goes to a public data endpoint.
+      const signature = routingSettingsSignature(settingsScope.getSnapshot().value ?? {})
+      const ledger = await workbench.refreshLedger()
+      if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return
+      if (!ledger) throw new Error('请先恢复执行记录连接；无法核对最新数据与学习状态。')
+      if (signature !== routingSettingsSignature(settingsScope.getSnapshot().value ?? {})) throw new Error('规划设置已更新，请重新生成建议。')
+      const next = createWorkspacePlan(task, catalogState.catalog, {
+        ...ledger.routingData,
+        learning: ledger.learning,
         mode,
         ...(direct ? { directProvider: direct.provider, directModel: direct.model } : {}),
         budgetUsd: parsedBudget,
@@ -512,10 +543,11 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         installedToolIds: (toolProbes?.probes ?? []).filter(probe => probe.installed).map(probe => probe.id),
         runnableToolIds: (toolProbes?.readiness ?? []).filter(item => item.ready).map(item => item.id),
         preset: settingsScope.getSnapshot().value?.routingPreset ?? 'balanced',
-        qualityBiases: workbench.ledger.value?.biases ?? null,
         loggedOutToolIds: (workbench.health.report?.tools ?? []).filter(item => item.installed && item.login?.state === 'logged-out').map(item => item.id),
-      }))
+      })
+      setPlan({ ...next, workbenchRevision: `${ledger.dynamicData?.revision ?? ''}/${ledger.learning?.revision ?? ''}` })
     } catch (error) {
+      if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return
       setPlan(null)
       setPlanError(text(error?.message) || '无法生成路由建议。')
     }
@@ -577,13 +609,13 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
         {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} headingRef={resultHeading} />}
         <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun}
-          planningRevision={routingSettings}
+          planningRevision={`${routingSettings}/${dataRevision}/${feedbackRevision}`}
           directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}
           defaultPreset={settingsScope.getSnapshot().value?.routingPreset ?? 'balanced'}
           disabledReason={catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '模型目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在官方“模型”页配置至少一条模型路线。' : ''}
           onStarted={() => { void workbench.refreshLedger() }} />
         <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.error}
-          onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating) => { void workbench.rate(runId, packageId, rating) }}
+          onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating, expectedFinishedAt) => { void workbench.rate(runId, packageId, rating, expectedFinishedAt) }}
           onRerun={(runId, packageId, override, choice) => { void workbench.rerun(runId, packageId, override, choice) }} />
         </div>
 

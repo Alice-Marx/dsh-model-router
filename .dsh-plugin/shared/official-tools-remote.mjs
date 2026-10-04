@@ -78,7 +78,9 @@ const optionalRouteText = (value, subject) => {
 const rateRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RateRequest`, value => {
   const request = plainObject(value, 'rate request')
   if (!['up', 'down', 'clear'].includes(request.rating)) throw new TypeError('rating must be up, down or clear')
-  return { runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'), rating: request.rating }
+  if (request.expectedFinishedAt !== undefined && (!Number.isFinite(request.expectedFinishedAt) || request.expectedFinishedAt < 0)) throw new TypeError('expectedFinishedAt must be a non-negative timestamp')
+  return { runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'), rating: request.rating,
+    ...(request.expectedFinishedAt === undefined ? {} : { expectedFinishedAt: request.expectedFinishedAt }) }
 })
 
 const rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunRequest`, value => {

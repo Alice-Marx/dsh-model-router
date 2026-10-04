@@ -73,7 +73,7 @@ function annotate(channel) {
  */
 export function createPlanFromRoutes(task, availableRoutes, {
   mode = 'single', budgetUsd = 0, installedToolIds = [], runnableToolIds = [],
-  pricing = {}, liveBench = null, cacheReadRatio = 0, cacheWriteRatio = 0,
+  pricing = {}, liveBench = null, liveBenchError = '', dataVersions = null, learning = null, cacheReadRatio = 0, cacheWriteRatio = 0,
   directProvider = '', directModel = '', preset = 'balanced', loggedOutToolIds = [],
 } = {}) {
   const taskText = clean(task)
@@ -107,6 +107,9 @@ export function createPlanFromRoutes(task, availableRoutes, {
     budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0),
     pricing,
     liveBench,
+    liveBenchError,
+    dataVersions,
+    learning,
     cacheReadRatio,
     cacheWriteRatio,
     preset,
@@ -126,7 +129,7 @@ export function createPlanFromRoutes(task, availableRoutes, {
       ? '部分路线尚未配置该供应商的美元输入/输出单价，无法计算可靠的总费用与节省比例；请在模型价格设置中补齐。'
       : '费用按已提供的美元单价和估计 token 数计算，不是供应商账单，也不是硬性支出上限。',
     qualityNotice: plan.optimization.qualityEvidenceComplete
-      ? '模型质量使用已提供评分或基准数据估计，仍需实际任务验证。'
+      ? '模型质量使用已提供评分或基准数据估计；分数与门槛不是答对概率，也不保证实际质量，仍需独立任务验证。'
       : '部分模型质量缺少可核验评分；目录启发式只供选择参考，质量门槛和节省比例无法保证。',
     modalityNotice: needsImage
       ? plan.unassignableTasks.length > 0

@@ -1,12 +1,18 @@
 # Model Router · DeepSeek Harness Desktop
 
+Version: **0.16.0**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
+
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe a task, compare your configured models, inspect the plan, and explicitly choose when to execute it.
 
-Current version: **0.15.0** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+**0.16.0:** [dynamic data and adaptive feedback](docs/ROUTING_ADAPTIVE_LEARNING.zh.md) adds opt-in public benchmark/curated fixed-USD pricing refresh and task-specific, time-decayed, shrinkage-regularized subjective utility. Objective proxy quality floors remain separate. Public sources default off; preferences are shared within one local DSH_HOME and limited to the latest 200 runs. This is not a universal vendor-price scraper or evidence of real quality–cost gains.
+
+Current version: **0.16.0** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 **0.15.0 changes:** a four-tab workbench with routing advice directly below task planning, protection against stale execution previews, preserved spending totals across history pruning and retries, and a standalone mock UI preview for source development.
 
 [简体中文](README.zh.md) · [Workbench guide (Chinese)](docs/WORKBENCH_USER_GUIDE.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Migration](MIGRATION.md) · [Changelog](CHANGELOG.md)
+
+For self-testing, follow the [desktop acceptance and quality–cost experiment steps (Chinese)](docs/ROUTING_SELFTEST_STEPS.zh.md). Start with an 18-question, three-model pilot and an explicit spending limit. Offline helpers do not collect answers or call models; first-stage selection replay is distinct from end-to-end team execution.
 
 ## What is included
 
@@ -32,16 +38,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.15.0
+@ljwei-stak/dsh-model-router@0.16.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.15.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.16.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.15.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.16.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](MIGRATION.md).
 
@@ -155,7 +161,7 @@ The plugin does not persist terminal input/output. It stores session metadata on
 - **Subscription-first:** the default is to prefer a detected CLI account subscription or a configured coding-plan route. API-key environment variables are removed for CLI subscription attempts. `billing` can be `subscription-first`, `api-only` or `subscription-only`; `subscription` can be `cli-login`, `plan-key` or `none`.
 - **Fallback:** detected quota exhaustion/rate limits mark a subscription in cooldown and can retry the routed step on its configured API route, subject to policy and availability. Other attempted subscription failures pause by default (`onSubscriptionFailure: "ask"`): choose API retry, subscription retry or cancel in history. Managed editable/single-tool/team runs do not automatically retry on the API.
 - **Accounting:** API costs count toward budgets. Subscription runs display an API-price reference cost separately. Actual usage is taken from CLI-reported amounts or token usage and supplied prices when available; provider bills remain authoritative. Version 0.15.0 retains spending from evicted detailed runs and replaced retry results, so trimming history or retrying a step does not erase earlier charges. Costs already discarded by older versions cannot be reconstructed.
-- **Quality:** optional `off`/`sample`/`always` stronger-model review can add paid calls. User ratings apply a small bounded adjustment (at most ±0.04 on the normalized quality score) to future routing for that exact route.
+- **Quality and preference:** optional `off`/`sample`/`always` stronger-model review can add paid calls; it is not treated as human feedback. Explicit ratings adjust separate subjective utility for the exact route and task type, using time decay and low-sample shrinkage (default limit ±0.04, configurable up to ±0.1). They do not change objective quality scores or their hard floors; learning can be disabled, ratings withdrawn, or its starting point reset.
 
 Coding-plan keys and endpoints stay in Harness provider settings. A `plan-key` profile may name an exact configured `apiRoute` as its fallback; the profile editor does not accept credentials or arbitrary commands. Vendor plan eligibility and terms must be checked with the vendor.
 
@@ -174,7 +180,7 @@ The implementations are [router.mjs](.dsh-plugin/shared/router.mjs), [harness-pl
 
 ## Data and privacy
 
-Router profiles/preferences are held in the Harness plugin settings. Runtime state is stored in `<DSH_HOME>/model-router/state.json` (default `~/.dsh/model-router/state.json`): health/onboarding, subscription cooldown, ratings, up to 200 recent runs and 50 terminal metadata records.
+Router profiles/preferences are held in the Harness plugin settings. Runtime state is stored in `<DSH_HOME>/model-router/state.json` (default `~/.dsh/model-router/state.json`): health/onboarding, subscription cooldown, ratings, up to 200 recent runs, 50 terminal metadata records and opt-in public data snapshots. Applied rates and data/feedback policy versions are frozen in run records. Preferences are local to that shared DSH_HOME, not authenticated per-user accounts; public data requests do not upload tasks or feedback.
 
 Version 0.15.0 also retains bounded spending aggregates for up to 90 populated calendar dates and 24 months. These contain amounts/counts, not task or response content.
 

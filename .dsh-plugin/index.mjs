@@ -12,9 +12,11 @@ import {
   DEFAULT_COOLDOWN_MINUTES, billingOverview, createQuotaTracker, detectQuotaExhaustion, parseQuotaPatterns, vendorKey,
 } from './shared/subscription-billing.mjs'
 import { createRouterState } from './shared/router-state.mjs'
+import { applyFeedbackProfile, buildFeedbackProfile } from './shared/adaptive-feedback.mjs'
+import { applyPricingSnapshot, createDynamicDataRefresher, dynamicDataSummary, routingData } from './shared/dynamic-data.mjs'
 import {
-  applyQualityBiases, budgetCheck, buildRunRecord, formatUsd, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
-  routeQualityBiases, spending, storedResults, actualCost, teamExecutionResults,
+  budgetCheck, buildRunRecord, formatUsd, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
+  spending, storedResults, actualCost, teamExecutionResults,
 } from './shared/run-ledger.mjs'
 import { routeBoundaries } from './shared/security-boundaries.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
@@ -62,6 +64,15 @@ export const Config = z.object({
   overBudgetAction: z.union(['downgrade', 'pause']).default('downgrade').volatile(),
   reviewMode: z.union(['off', 'sample', 'always']).default('off').volatile(),
   reviewSampleRate: z.number().min(0).max(1).default(0.2).volatile(),
+  feedbackLearningEnabled: z.boolean().default(true).volatile(),
+  feedbackHalfLifeDays: z.number().min(1).max(3650).default(30).volatile(),
+  feedbackPriorWeight: z.number().min(1).max(1_000_000).default(3).volatile(),
+  feedbackMaxAdjustment: z.number().min(0).max(0.1).default(0.04).volatile(),
+  feedbackResetAt: z.number().min(0).default(0).volatile(),
+  dynamicDataEnabled: z.boolean().default(false).volatile(),
+  liveBenchEndpoint: z.string().max(2048).default('https://livebench.ai').volatile(),
+  pricingSnapshotEndpoint: z.string().max(2048).default('').volatile(),
+  dynamicDataTtlMinutes: z.number().min(1).max(10_080).default(1440).volatile(),
   allowManualReassign: z.boolean().default(true).volatile(),
   confirmUnsandboxedCli: z.boolean().default(true).volatile(),
   subscriptionCooldownMinutes: z.number().step(1).min(1).max(10_080).default(DEFAULT_COOLDOWN_MINUTES).volatile(),
@@ -350,13 +361,70 @@ export function billingForResult(result) {
 }
 
 function routePricing(routes, item) {
-  return routes.find(route => route.provider === item?.provider && route.model === item?.model)?.pricing ?? null
+  const route = routes.find(route => route.provider === item?.provider && route.model === item?.model)
+  return route?.pricing ? { ...route.pricing, source: route.pricingSource ?? 'route', version: route.pricingVersion ?? null, asOf: route.snapshotAsOf ?? null } : null
 }
 
-/** Routes with user profiles and the gentle quality bias learned from ratings and reviews. */
-async function routesWithLearning(ctx, config, signal, runs) {
+function feedbackOptions(config) {
+  return {
+    enabled: valueOf(config, 'feedbackLearningEnabled', true) !== false,
+    halfLifeDays: valueOf(config, 'feedbackHalfLifeDays', 30),
+    priorWeight: valueOf(config, 'feedbackPriorWeight', 3),
+    maxAdjustment: valueOf(config, 'feedbackMaxAdjustment', 0.04),
+    resetAt: valueOf(config, 'feedbackResetAt', 0),
+  }
+}
+
+function dynamicOptions(config) {
+  return {
+    enabled: valueOf(config, 'dynamicDataEnabled', false) === true,
+    liveBenchEndpoint: valueOf(config, 'liveBenchEndpoint', 'https://livebench.ai'),
+    pricingSnapshotEndpoint: valueOf(config, 'pricingSnapshotEndpoint', ''),
+    ttlMs: boundedInteger(valueOf(config, 'dynamicDataTtlMinutes', 1440), 1440, 1, 10_080) * 60_000,
+  }
+}
+
+let dynamicRefresher = null
+async function routingSavedState(config) {
+  const options = dynamicOptions(config)
+  let refreshedData = null
+  if (options.enabled) {
+    dynamicRefresher ??= createDynamicDataRefresher({ store: routerStateStore() })
+    // A public-data failure must never turn into a paid probe or prevent
+    // ordinary routing. The refresher preserves last-good snapshots.
+    try { refreshedData = await dynamicRefresher.refresh(options) } catch { /* state/read errors use the normal fallback */ }
+  }
+  const saved = await savedState()
+  // The refresher's projection excludes actively disabled sources while
+  // preserving their last-good snapshots on disk for recovery.
+  if (refreshedData) saved.dynamicData = refreshedData
+  if (saved.dynamicData) {
+    saved.dynamicData = { ...saved.dynamicData, status: { ...saved.dynamicData.status } }
+    for (const [kind, endpoint] of [['pricing', options.pricingSnapshotEndpoint], ['liveBench', options.liveBenchEndpoint]]) {
+      if (!text(endpoint)) {
+        saved.dynamicData[kind] = null
+        saved.dynamicData.status[kind] = { disabled: true, endpoint: '', error: '' }
+      }
+    }
+  }
+  saved.routingLearning = buildFeedbackProfile(saved.runs, feedbackOptions(config))
+  return saved
+}
+
+function planDataOptions(saved, config) {
+  return {
+    ...routingData(saved.dynamicData, dynamicOptions(config).enabled),
+    learning: saved.routingLearning ?? buildFeedbackProfile(saved.runs, feedbackOptions(config)),
+  }
+}
+
+/** Manual exact-route profiles take precedence over public price snapshots.
+ * Only explicit subjective feedback affects utility; reviews stay separate. */
+async function routesWithLearning(ctx, config, signal, runs, dynamicData = null, feedbackProfile = null) {
   const discovered = await discoverConfiguredRoutes(ctx, signal)
-  return applyQualityBiases(configuredRoutesWithProfiles(discovered, config), routeQualityBiases(runs))
+  const profiled = configuredRoutesWithProfiles(discovered, config)
+  const priced = applyPricingSnapshot(profiled, dynamicOptions(config).enabled ? dynamicData?.pricing : null)
+  return applyFeedbackProfile(priced, feedbackProfile ?? buildFeedbackProfile(runs, feedbackOptions(config)))
 }
 
 /** Produce a route recommendation and work packages compatible with official Agent Teams. */
@@ -366,9 +434,9 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
   const mode = options.mode === 'team' ? 'team' : 'single'
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const budgetUsd = Math.max(0, finiteNumber(options.budgetUsd, finiteNumber(configuredBudget, 0)))
-  const saved = await savedState()
+  const saved = await routingSavedState(config)
   const [availableRoutes, installed] = await Promise.all([
-    routesWithLearning(ctx, config, options.signal, saved.runs),
+    routesWithLearning(ctx, config, options.signal, saved.runs, saved.dynamicData, saved.routingLearning),
     options.skipToolProbe === true
       ? Promise.resolve(Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
       : installedToolIds(),
@@ -381,6 +449,7 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
     ? (Array.isArray(options.loggedOutToolIds) ? options.loggedOutToolIds : [])
     : loggedOutIds(await currentHealth())
   const plan = createPlanFromRoutes(taskText, availableRoutes, {
+    ...planDataOptions(saved, config),
     mode, budgetUsd, installedToolIds: installed,
     runnableToolIds: installed.filter(id => executable.has(id)),
     preset: routingPresetOf(config, options.preset),
@@ -599,8 +668,8 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
   if (problem) throw new Error(problem)
   const direct = text(options.provider) || text(options.model)
   if (direct && (!text(options.provider) || !text(options.model))) throw new Error('指定模型需要同时提供 provider 和 model。')
-  const saved = await savedState()
-  const routes = await routesWithLearning(ctx, config, options.signal, saved.runs)
+  const saved = await routingSavedState(config)
+  const routes = await routesWithLearning(ctx, config, options.signal, saved.runs, saved.dynamicData, saved.routingLearning)
   if (direct && !routes.some(route => route.provider === text(options.provider) && route.model === text(options.model))) {
     throw new Error(`模型 ${text(options.provider)}/${text(options.model)} 不在 Harness 模型目录中；请在模型页添加后重试，或改用自动路由。`)
   }
@@ -618,10 +687,12 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
   const preset = routingPresetOf(config, options.preset)
   const planWith = (presetId, budgetUsd) => direct
     ? createPlanFromRoutes(taskText, routes, {
+      ...planDataOptions(saved, config),
       mode: 'direct', directProvider: options.provider, directModel: options.model,
       installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
     : createPlanFromRoutes(taskText, routes, {
+      ...planDataOptions(saved, config),
       mode: options.planMode === 'team' ? 'team' : 'single',
       budgetUsd, installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
@@ -741,7 +812,8 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   if (choice && !['api', 'subscription', 'cancel'].includes(choice)) throw new Error('subscriptionChoice 只能是 api、subscription 或 cancel')
   if (choice && !target.paused) throw new Error('该步骤没有在等待订阅失败的确认；直接重跑即可。')
   if (choice === 'cancel') return { run: await cancelPausedStep(run.id, target.id), execution: null, budget: null, cancelled: true }
-  const routes = await routesWithLearning(ctx, config, signal, saved.runs)
+  const refreshed = await routingSavedState(config)
+  const routes = await routesWithLearning(ctx, config, signal, refreshed.runs, refreshed.dynamicData, refreshed.routingLearning)
   let override = null
   if (text(provider) || text(model)) {
     if (!text(provider) || !text(model)) throw new Error('改派需要同时提供 provider 和 model')
@@ -954,7 +1026,8 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
   if (text(args.provider) || text(args.model)) {
     if (!text(args.provider) || !text(args.model)) throw new Error('provider 和 model 必须同时提供')
     if (toolForProvider(args.provider)?.id !== toolId) throw new Error('所选模型供应商与官方 CLI 工具不匹配')
-    routes = configuredRoutesWithProfiles(await discoverConfiguredRoutes(ctx, signal), config)
+    const refreshed = await routingSavedState(config)
+    routes = await routesWithLearning(ctx, config, signal, refreshed.runs, refreshed.dynamicData, refreshed.routingLearning)
     route = routes.find(item => item.provider === text(args.provider) && item.model === text(args.model)) ?? null
     if (!route) throw new Error('所选 provider/model 不在官方模型目录中')
     modelId = route.cliModel && toolId !== 'zcode'
@@ -1000,19 +1073,28 @@ export async function recordToolRun({ toolId, task, provider, model, cliModel = 
 }
 
 /** Store a user rating (+1 useful, -1 not useful, 0 clears) for one result. */
-export async function rateRecordedResult({ runId, packageId, rating } = {}) {
+export async function rateRecordedResult({ runId, packageId, rating, expectedFinishedAt } = {}, { origin = 'local-explicit-input' } = {}) {
   const value = rating === 'up' || rating === 1 ? 1 : rating === 'down' || rating === -1 ? -1 : rating === 'clear' || rating === 0 ? null : undefined
   if (value === undefined) throw new Error('rating 只能是 up、down 或 clear')
   return routerStateStore().updateRun(text(runId), current => {
     const item = current.packages.find(entry => entry.id === text(packageId))
     if (!item) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
+    if (expectedFinishedAt !== undefined && (!Number.isFinite(expectedFinishedAt) || expectedFinishedAt !== item.finishedAt)) {
+      throw new Error('结果已更新，请刷新执行记录后再评价。')
+    }
+    if (value !== null && (item.ran !== true || item.ok !== true || item.paused || item.waiting || item.blocked)) {
+      throw new Error('只能评价已成功执行的结果；失败和暂停不自动视为不满意。')
+    }
     item.rating = value
+    item.ratedAt = Date.now()
+    item.feedbackPolicyVersion = 'subjective-utility-v1'
+    item.feedbackOrigin = ['desktop-ui', 'approved-tool'].includes(origin) ? origin : 'local-explicit-input'
   })
 }
 
 /** Everything the workbench shows: recent runs, spending, budget, learned biases and settings. */
 export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
-  const saved = await savedState()
+  const saved = await routingSavedState(config)
   const spent = spending(saved.runs, undefined, saved.archivedSpending)
   const settings = budgetSettings(config)
   return {
@@ -1023,7 +1105,14 @@ export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
     })),
     spent,
     budget: { ...settings, ...budgetCheck({ estimateUsd: null, spent, ...settings }) },
-    biases: routeQualityBiases(saved.runs),
+    // Legacy scalar quality biases are intentionally no longer learned.
+    biases: {},
+    learning: saved.routingLearning,
+    dynamicData: dynamicDataSummary(saved.dynamicData, { ...dynamicOptions(config), now: Date.now() }),
+    routingData: {
+      ...routingData(saved.dynamicData, dynamicOptions(config).enabled),
+      pricingSnapshot: dynamicOptions(config).enabled ? saved.dynamicData?.pricing ?? null : null,
+    },
     onboarding: saved.onboarding,
     settings: {
       preset: routingPresetOf(config),
@@ -1308,7 +1397,7 @@ export function routerRemoteServices(ctx, config, { terminals = null } = {}) {
     },
     completeOnboarding: async () => routerStateStore().completeOnboarding(Date.now()),
     ledger: () => ledgerSummary(config),
-    rate: request => rateRecordedResult(request),
+    rate: request => rateRecordedResult(request, { origin: 'desktop-ui' }),
     rerun: request => rerunRecordedStep(ctx, config, {
       runId: request?.runId, packageId: request?.packageId, provider: request?.provider, model: request?.model,
       confirmOverBudget: request?.confirmOverBudget === true, confirmWrite: request?.confirmWrite === true,
@@ -1337,6 +1426,10 @@ export function apply(ctx, config = {}) {
   ctx.on('tools/pre-execute', async (exec, next) => {
     const decision = await next()
     if (decision.kind !== 'allow') return decision
+    if (exec.name === 'model_router_rate') {
+      return { kind: 'ask', reason: 'Confirm the user\'s subjective rating; agents must not self-rate their results',
+        displayReason: { en: 'Save this as your rating and adjust future recommendations?', zh: '确认这是你对该结果的评价，并用于调整以后的推荐？Agent 不能代替你给自己评分。' } }
+    }
     if (exec.name === 'model_router_tool_install') {
       const requested = getOfficialTool(text(exec.arguments?.tool))
       const label = requested?.label ?? '官方 CLI'
@@ -1645,15 +1738,16 @@ function registerOfficialToolModels(ctx, config) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_rate',
-    description: 'Record the user\'s rating of one recorded result (up = useful, down = not useful, clear). Ratings gently adjust future routing for that exact provider/model.',
+    description: 'Record only the user\'s explicitly stated rating of one recorded result (up, down, clear). Requires approval; never self-rate. Feedback adjusts bounded local subjective utility, not objective quality.',
     parameters: {
       runId: { type: 'string', required: true, description: 'runId returned by model_router_execute.' },
       packageId: { type: 'string', required: true, description: 'Work package id.' },
       rating: { type: 'string', required: true, enum: ['up', 'down', 'clear'], description: 'The user\'s rating.' },
+      expectedFinishedAt: { type: 'number', description: 'Completion timestamp of the displayed result; rejects stale feedback after a rerun.' },
     },
     output: JSON_OUTPUT,
     async execute(args) {
-      const run = await rateRecordedResult(args)
+      const run = await rateRecordedResult(args, { origin: 'approved-tool' })
       return jsonValue({ ok: true, runId: run.id, packageId: args.packageId, rating: args.rating })
     },
   }))
@@ -1672,8 +1766,8 @@ function registerOfficialToolModels(ctx, config) {
       const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
       const mode = args.mode === 'workspace-write' ? 'workspace-write' : 'read-only'
       if (mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑团队执行')
-      const [discoveredRoutes, installed] = await Promise.all([discoverConfiguredRoutes(ctx, exec.signal), installedToolIds()])
-      const routes = configuredRoutesWithProfiles(discoveredRoutes, config)
+      const saved = await routingSavedState(config)
+      const [routes, installed] = await Promise.all([routesWithLearning(ctx, config, exec.signal, saved.runs, saved.dynamicData, saved.routingLearning), installedToolIds()])
       const readiness = await Promise.all(installed.map(id => officialToolReadiness(id, cwd)))
       const supported = new Set(readiness.filter(item => item.ready).map(item => item.id))
       const capabilities = new Map(officialToolExecutionCapabilities().map(item => [item.id, item]))
@@ -1688,6 +1782,7 @@ function registerOfficialToolModels(ctx, config) {
       const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
       const budgetUsd = Math.max(0, finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)))
       const plan = createPlanFromRoutes(args.task, executableRoutes, {
+        ...planDataOptions(saved, config),
         mode: 'team', budgetUsd, installedToolIds: installed,
         runnableToolIds: installed.filter(id => supported.has(id)),
         preset: routingPresetOf(config),

@@ -23,7 +23,7 @@ const TASK_ALIASES = Object.freeze({
 const CATEGORY_TO_TASK = Object.freeze({
   reasoning: 'reasoning',
   coding: 'code',
-  'agentic coding': 'code',
+  // Agentic Coding is a different task family, not silently a Coding score.
   mathematics: 'math',
   'data analysis': 'research',
   language: 'writing',
@@ -38,10 +38,12 @@ function normalized(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '')
 }
 
-function asScore(value) {
+function asScore(value, scale) {
+  if (value === null || value === undefined || String(value).trim() === '') return undefined
   const number = Number(value)
   if (!Number.isFinite(number)) return undefined
-  return clamp(number > 1 ? number / 100 : number)
+  if (number < 0 || number > (scale ?? 100)) return undefined
+  return scale === undefined ? (number > 1 ? number / 100 : number) : number / scale
 }
 
 function modelRows(payload) {
@@ -59,13 +61,13 @@ function rowName(row) {
   return String(row.model ?? row.model_name ?? row.name ?? row.id ?? row.slug ?? '')
 }
 
-function rowScores(row) {
+function rowScores(row, scale) {
   const source = row?.scores ?? row?.categories ?? row?.benchmark ?? row
   const scores = {}
   if (source === null || typeof source !== 'object') return scores
   for (const [task, aliases] of Object.entries(TASK_ALIASES)) {
     for (const alias of aliases) {
-      const score = asScore(source[alias])
+      const score = asScore(source[alias], scale)
       if (score !== undefined) {
         scores[task] = score
         break
@@ -77,22 +79,27 @@ function rowScores(row) {
 
 /** Normalize a provider response into `{ models: Record<normalizedId, row> }`. */
 export function normalizeLiveBenchPayload(payload, fetchedAt = Date.now(), source = 'livebench') {
+  const scale = payload?.scoreScale === 1 || payload?.scoreScale === 100 ? payload.scoreScale : undefined
   const models = {}
   for (const row of modelRows(payload)) {
     const id = normalized(rowName(row))
     if (id === '') continue
-    const scores = rowScores(row)
+    const scores = rowScores(row, scale)
     const values = Object.values(scores)
-    const overall = asScore(row?.overall ?? row?.score ?? row?.livebench_score)
+    const suppliedOverall = asScore(row?.overall ?? row?.score ?? row?.livebench_score, scale)
+    const overall = suppliedOverall
       ?? (values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : undefined)
     if (overall === undefined) continue
+    if (models[id]) throw new Error('LiveBench model identifiers collide after normalization')
     models[id] = {
+      model: rowName(row),
       overall: Number(clamp(overall).toFixed(4)),
+      overallSource: suppliedOverall !== undefined && row?.overallSource !== 'derived' ? 'explicit' : 'derived',
       scores,
       rank: Number.isFinite(Number(row?.rank)) ? Number(row.rank) : undefined,
     }
   }
-  return { source, fetchedAt, models }
+  return { source, fetchedAt, models, ...(payload?.publishedAt === undefined ? {} : { publishedAt: payload.publishedAt }) }
 }
 
 /** Parse a small RFC-4180-compatible CSV without adding a runtime dependency. */
@@ -134,13 +141,22 @@ export function parseCsv(text) {
   return rows.slice(1).map(cells => Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ''])))
 }
 
-function mean(values) {
-  const numbers = values.map(asScore).filter(value => value !== undefined)
+function mean(values, percent = false) {
+  const numbers = values.map(value => percent
+    ? (String(value ?? '').trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100 ? Number(value) / 100 : undefined)
+    : asScore(value)).filter(value => value !== undefined)
   return numbers.length === 0 ? undefined : numbers.reduce((sum, value) => sum + value, 0) / numbers.length
 }
 
-function officialCsvPayload(csv, categories = {}) {
+function officialCsvPayload(csv, categories = {}, percent = false, strict = false) {
   const rows = parseCsv(csv)
+  if (strict) for (const row of rows) {
+    if (!row.model) throw new Error('LiveBench row has no model')
+    for (const [column, value] of Object.entries(row)) {
+      if (column === 'model' || String(value).trim() === '') continue
+      if (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 100) throw new Error('LiveBench CSV score is outside 0..100')
+    }
+  }
   const categoryColumns = new Map()
   for (const [label, columns] of Object.entries(categories ?? {})) {
     const task = CATEGORY_TO_TASK[String(label).trim().toLowerCase()]
@@ -149,16 +165,18 @@ function officialCsvPayload(csv, categories = {}) {
   const models = rows.map(row => {
     const scores = {}
     for (const [task, columns] of categoryColumns.entries()) {
-      const score = mean(columns.map(column => row[column]))
+      const score = mean(columns.map(column => row[column]), percent)
       if (score !== undefined) scores[task] = score
     }
     // A mirror may already provide normalized task columns, so preserve them.
     for (const [task, aliases] of Object.entries(TASK_ALIASES)) {
       if (scores[task] !== undefined) continue
-      const score = mean(aliases.map(alias => row[alias]))
+      const score = mean(aliases.map(alias => row[alias]), percent)
       if (score !== undefined) scores[task] = score
     }
-    return { model: row.model, scores, overall: mean(Object.values(row).slice(1)) }
+    const suppliedOverall = mean([row.overall ?? row.score ?? row.livebench_score], percent)
+    return { model: row.model, scores, overall: suppliedOverall ?? mean(Object.values(row).slice(1), percent),
+      overallSource: suppliedOverall === undefined ? 'derived' : 'explicit' }
   })
   return { models }
 }
@@ -194,7 +212,7 @@ async function fetchWithTimeout(fetchImpl, url, signal) {
   return response
 }
 
-async function officialSnapshot({ endpoint, fetchImpl, signal, fetchedAt }) {
+async function officialSnapshot({ endpoint, fetchImpl, signal, fetchedAt, strict }) {
   const base = new URL(endpoint).origin
   let releases = [DEFAULT_RELEASE]
   try {
@@ -219,7 +237,7 @@ async function officialSnapshot({ endpoint, fetchImpl, signal, fetchedAt }) {
       const categoryResponse = await fetchWithTimeout(fetchImpl, absoluteUrl(base, `categories_${token}.json`), signal)
       const table = (await readResponse(tableResponse)).text
       const categories = JSON.parse((await readResponse(categoryResponse)).text)
-      return normalizeLiveBenchPayload(officialCsvPayload(table, categories), fetchedAt, `livebench:${release}`)
+      return normalizeLiveBenchPayload(officialCsvPayload(table, categories, true, strict), fetchedAt, `livebench:${release}`)
     } catch (error) {
       lastError = error
     }
@@ -235,6 +253,7 @@ export async function fetchLiveBenchSnapshot({
   endpoint = 'https://livebench.ai',
   fetchImpl = globalThis.fetch,
   timeoutMs = 8000,
+  strict = false,
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable')
   const controller = new AbortController()
@@ -245,14 +264,29 @@ export async function fetchLiveBenchSnapshot({
     const parsed = new URL(rawEndpoint)
     if ((parsed.hostname === 'livebench.ai' || parsed.hostname === 'www.livebench.ai')
       && (parsed.pathname === '' || parsed.pathname === '/')) {
-      return await officialSnapshot({ endpoint: parsed.toString(), fetchImpl, signal: controller.signal, fetchedAt })
+      return await officialSnapshot({ endpoint: parsed.toString(), fetchImpl, signal: controller.signal, fetchedAt, strict })
     }
     const url = parsed.toString().replace('{release}', DEFAULT_RELEASE)
     const response = await fetchWithTimeout(fetchImpl, url, controller.signal)
     const { type, text } = await readResponse(response)
     const isCsv = type.includes('csv') || /\.csv(?:$|\?)/i.test(parsed.pathname)
-    if (isCsv) return normalizeLiveBenchPayload(officialCsvPayload(text), fetchedAt, 'livebench-csv-mirror')
-    return normalizeLiveBenchPayload(JSON.parse(text), fetchedAt, 'livebench-json-mirror')
+    if (isCsv) {
+      if (strict) throw new Error('Dynamic custom LiveBench feeds require JSON with explicit scoreScale')
+      return normalizeLiveBenchPayload(officialCsvPayload(text), fetchedAt, 'livebench-csv-mirror')
+    }
+    const payload = JSON.parse(text)
+    if (strict) {
+      if (![1, 100].includes(payload?.scoreScale) || modelRows(payload).length === 0) throw new Error('LiveBench feed needs explicit scoreScale and nonempty models')
+      for (const row of modelRows(payload)) {
+        if (!rowName(row) || rowName(row).trim() !== rowName(row)) throw new Error('LiveBench model identifier is invalid')
+        const scores = row?.scores ?? row?.categories ?? row?.benchmark ?? row
+        const values = [row.overall ?? row.score ?? row.livebench_score,
+          ...Object.values(TASK_ALIASES).flatMap(aliases => aliases.map(alias => scores?.[alias]))]
+          .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
+        if (!values.length || values.some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > payload.scoreScale)) throw new Error('LiveBench score is invalid for declared scale')
+      }
+    }
+    return normalizeLiveBenchPayload(payload, fetchedAt, 'livebench-json-mirror')
   } finally {
     clearTimeout(timer)
   }
@@ -260,5 +294,8 @@ export async function fetchLiveBenchSnapshot({
 
 /** Return a model's benchmark row using the same normalization as the adapter. */
 export function liveBenchRow(snapshot, model) {
-  return snapshot?.models?.[normalized(model)] ?? null
+  const row = snapshot?.models?.[normalized(model)] ?? null
+  // Dynamic snapshots require explicit model identity. Old programmatic
+  // snapshots retain their previous normalization-only compatibility.
+  return snapshot?.exactModelMatch === true && row?.model !== model ? null : row
 }

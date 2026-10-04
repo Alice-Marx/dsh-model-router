@@ -1,0 +1,3171 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "controlled-adaptive-routing-v1",
+  "generatedAt": "2026-10-04T04:00:00.000Z",
+  "evidenceLevel": "controlled-synthetic-mechanics-not-real-quality-cost-validation",
+  "provenance": {
+    "synthetic": true,
+    "realUserData": false,
+    "networkCalls": 0,
+    "paidModelCalls": 0,
+    "resultAndUsage": "invented-but-valid-run-ledger-shape",
+    "prices": "hypothetical-USD-per-million-not-official-pricing",
+    "benchmark": "invented-LiveBench-shaped-scores-not-published-LiveBench-observations"
+  },
+  "clocks": {
+    "startAt": 1791086400000,
+    "finalAt": 1791088560000,
+    "stepMs": 60000
+  },
+  "actualInterfaces": [
+    "buildPlan",
+    "createPlanFromRoutes",
+    "buildRunRecord",
+    "buildFeedbackProfile",
+    "applyFeedbackProfile",
+    "spending"
+  ],
+  "task": "请写一行代码返回数字 1。",
+  "baseRoutes": [
+    {
+      "provider": "synthetic-study",
+      "model": "synthetic-a-v1",
+      "quality": 0.9,
+      "qualitySource": "user",
+      "latency": 0.6,
+      "risk": 0.1,
+      "specialties": [
+        "code"
+      ],
+      "pricing": {
+        "input": 1,
+        "output": 1
+      },
+      "pricingSource": "user",
+      "reasoningKnown": true,
+      "reasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "defaultReasoningEffort": "medium",
+      "inputModalities": [
+        "text"
+      ],
+      "execution": "api"
+    },
+    {
+      "provider": "synthetic-study",
+      "model": "synthetic-b-v1",
+      "quality": 0.9,
+      "qualitySource": "user",
+      "latency": 0.6,
+      "risk": 0.1,
+      "specialties": [
+        "code"
+      ],
+      "pricing": {
+        "input": 1,
+        "output": 1
+      },
+      "pricingSource": "user",
+      "reasoningKnown": true,
+      "reasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "defaultReasoningEffort": "medium",
+      "inputModalities": [
+        "text"
+      ],
+      "execution": "api"
+    }
+  ],
+  "policy": {
+    "version": "subjective-utility-v1",
+    "formula": "B * sum(w_i*r_i) / (kappa + sum(w_i)); w_i=2^(-(now-completedAt_i)/halfLifeMs)",
+    "halfLifeDays": 30,
+    "priorWeight": 3,
+    "maxAdjustment": 0.04,
+    "domain": "code",
+    "semantics": "independent-subjective-utility-not-objective-quality-or-success-probability"
+  },
+  "experiments": {
+    "normalUseFeedbackStream": {
+      "labelRule": "synthetic-a-v1: -1; synthetic-b-v1: +1, only when selected",
+      "labelledCalls": 36,
+      "start": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-a-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {},
+        "feedbackCount": 0,
+        "effectiveWeight": 0,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:d9342c19",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 0,
+          "effectiveWeight": 0,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "steps": [
+        {
+          "index": 1,
+          "at": 1791086400000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-a-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0,
+            "adjustments": {},
+            "feedbackCount": 0,
+            "effectiveWeight": 0,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:d9342c19",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 0,
+              "effectiveWeight": 0,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-a-v1",
+            "rating": -1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 2,
+          "at": 1791086460000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009999879662430529
+              }
+            },
+            "feedbackCount": 1,
+            "effectiveWeight": 0.9999839550550974,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:90ddc082",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 1,
+              "effectiveWeight": 0.9999839550550974,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 3,
+          "at": 1791086520000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.009999879662430529,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009999759325826477
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.009999879662430529
+              }
+            },
+            "feedbackCount": 2,
+            "effectiveWeight": 1.9999518654227324,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:a46a8dd3",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 2,
+              "effectiveWeight": 1.9999518654227324,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 4,
+          "at": 1791086580000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.015999768951804837,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009999638990187852
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.015999768951804837
+              }
+            },
+            "feedbackCount": 3,
+            "effectiveWeight": 2.9999037313603414,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:976ca8c8",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 3,
+              "effectiveWeight": 2.9999037313603414,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 5,
+          "at": 1791086640000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.019999679099385693,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999951865551465
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.019999679099385693
+              }
+            },
+            "feedbackCount": 4,
+            "effectiveWeight": 3.9998395531253563,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:47681a15",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 4,
+              "effectiveWeight": 3.9998395531253563,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 6,
+          "at": 1791086700000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.022856749917014703,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009999398321806883
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.022856749917014703
+              }
+            },
+            "feedbackCount": 5,
+            "effectiveWeight": 4.999759330975205,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:1d1eafa5",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 5,
+              "effectiveWeight": 4.999759330975205,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 7,
+          "at": 1791086760000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.024999548732002733,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009999277989064553
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.024999548732002733
+              }
+            },
+            "feedbackCount": 6,
+            "effectiveWeight": 5.999663065167311,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:5c64d801",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 6,
+              "effectiveWeight": 5.999663065167311,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 8,
+          "at": 1791086820000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.02666616748526361,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999915765728766
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.02666616748526361
+              }
+            },
+            "feedbackCount": 7,
+            "effectiveWeight": 6.999550755959094,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:823ae3cd",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 7,
+              "effectiveWeight": 6.999550755959094,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 9,
+          "at": 1791086880000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.027999460882931402,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009999037326476213
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.027999460882931402
+              }
+            },
+            "feedbackCount": 8,
+            "effectiveWeight": 7.999422403607969,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:b5cac2df",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 8,
+              "effectiveWeight": 7.999422403607969,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 10,
+          "at": 1791086940000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.029090336237961163,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009998916996630212
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.029090336237961163
+              }
+            },
+            "feedbackCount": 9,
+            "effectiveWeight": 8.999278008371348,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:09d5e35f",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 9,
+              "effectiveWeight": 8.999278008371348,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 11,
+          "at": 1791087000000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.029999398304107843,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009998796667749664
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.029999398304107843
+              }
+            },
+            "feedbackCount": 10,
+            "effectiveWeight": 9.999117570506638,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:8d9931e8",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 10,
+              "effectiveWeight": 9.999117570506638,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 12,
+          "at": 1791087060000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.030768604149541284,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999867633983457
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.030768604149541284
+              }
+            },
+            "feedbackCount": 11,
+            "effectiveWeight": 10.998941090271243,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:9030dd5c",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 11,
+              "effectiveWeight": 10.998941090271243,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 13,
+          "at": 1791087120000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03142792306745289,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009998556012884935
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03142792306745289
+              }
+            },
+            "feedbackCount": 12,
+            "effectiveWeight": 11.99874856792256,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:e8877da0",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 12,
+              "effectiveWeight": 11.99874856792256,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 14,
+          "at": 1791087180000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03199933251387113,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009998435686900762
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03199933251387113
+              }
+            },
+            "feedbackCount": 13,
+            "effectiveWeight": 12.998540003717984,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:fdf045e6",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 13,
+              "effectiveWeight": 12.998540003717984,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 15,
+          "at": 1791087240000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03249931556428821,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009998315361882056
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03249931556428821
+              }
+            },
+            "feedbackCount": 14,
+            "effectiveWeight": 13.998315397914908,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:d1af17ee",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 14,
+              "effectiveWeight": 13.998315397914908,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 16,
+          "at": 1791087300000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03294047691251101,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999819503782882
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03294047691251101
+              }
+            },
+            "feedbackCount": 15,
+            "effectiveWeight": 14.998074750770718,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:d6c9f44b",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 15,
+              "effectiveWeight": 14.998074750770718,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 17,
+          "at": 1791087360000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03333262020178789,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999807471474106
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03333262020178789
+              }
+            },
+            "feedbackCount": 16,
+            "effectiveWeight": 15.997818062542793,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:b12b3bc2",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 16,
+              "effectiveWeight": 15.997818062542793,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 18,
+          "at": 1791087420000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.033683485145244184,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999795439261878
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.033683485145244184
+              }
+            },
+            "feedbackCount": 17,
+            "effectiveWeight": 16.997545333488517,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:f09e323f",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 17,
+              "effectiveWeight": 16.997545333488517,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 19,
+          "at": 1791087480000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03399926350965465,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009997834071461978
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03399926350965465
+              }
+            },
+            "feedbackCount": 18,
+            "effectiveWeight": 17.99725656386526,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:d77531f4",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 18,
+              "effectiveWeight": 17.99725656386526,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 20,
+          "at": 1791087540000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03428496767494325,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009997713751270664
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03428496767494325
+              }
+            },
+            "feedbackCount": 19,
+            "effectiveWeight": 18.99695175393039,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:0a7a063d",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 19,
+              "effectiveWeight": 18.99695175393039,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 21,
+          "at": 1791087600000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.034544698677235655,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009997593432044842
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.034544698677235655
+              }
+            },
+            "feedbackCount": 20,
+            "effectiveWeight": 19.99663090394128,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:efb2aa66",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 20,
+              "effectiveWeight": 19.99663090394128,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 22,
+          "at": 1791087660000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03478184432749087,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999747311378451
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03478184432749087
+              }
+            },
+            "feedbackCount": 21,
+            "effectiveWeight": 20.996294014155282,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:3023c6b5",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 21,
+              "effectiveWeight": 20.996294014155282,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 23,
+          "at": 1791087720000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03499922780037565,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009997352796489679
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03499922780037565
+              }
+            },
+            "feedbackCount": 22,
+            "effectiveWeight": 21.995941084829767,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:ba10e196",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 22,
+              "effectiveWeight": 21.995941084829767,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 24,
+          "at": 1791087780000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.035199220561740366,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009997232480160349
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.035199220561740366
+              }
+            },
+            "feedbackCount": 23,
+            "effectiveWeight": 22.99557211622208,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:2318f1eb",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 23,
+              "effectiveWeight": 22.99557211622208,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 25,
+          "at": 1791087840000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.0353838292358599,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009997112164796523
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.0353838292358599
+              }
+            },
+            "feedbackCount": 24,
+            "effectiveWeight": 23.99518710858957,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:b1ed90c4",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 24,
+              "effectiveWeight": 23.99518710858957,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 26,
+          "at": 1791087900000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03555476316880881,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996991850398209
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03555476316880881
+              }
+            },
+            "feedbackCount": 25,
+            "effectiveWeight": 24.994786062189583,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:657ffaf6",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 25,
+              "effectiveWeight": 24.994786062189583,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 27,
+          "at": 1791087960000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.035713487513945506,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996871536965405
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.035713487513945506
+              }
+            },
+            "feedbackCount": 26,
+            "effectiveWeight": 25.994368977279457,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:042f2538",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 26,
+              "effectiveWeight": 25.994368977279457,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 28,
+          "at": 1791088020000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.035861265334174566,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.00999675122449812
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.035861265334174566
+              }
+            },
+            "feedbackCount": 27,
+            "effectiveWeight": 26.993935854116536,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:82bd563b",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 27,
+              "effectiveWeight": 26.993935854116536,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 29,
+          "at": 1791088080000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03599919128374309,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996630912996355
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03599919128374309
+              }
+            },
+            "feedbackCount": 28,
+            "effectiveWeight": 27.99348669295815,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:876a3de7",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 28,
+              "effectiveWeight": 27.99348669295815,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 30,
+          "at": 1791088140000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03612821877096957,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996510602460115
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03612821877096957
+              }
+            },
+            "feedbackCount": 29,
+            "effectiveWeight": 28.99302149406163,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:be229c21",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 29,
+              "effectiveWeight": 28.99302149406163,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 31,
+          "at": 1791088200000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03624918202795339,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996390292889405
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03624918202795339
+              }
+            },
+            "feedbackCount": 30,
+            "effectiveWeight": 29.992540257684297,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:5b079f17",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 30,
+              "effectiveWeight": 29.992540257684297,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 32,
+          "at": 1791088260000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03636281416760412,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996269984284226
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03636281416760412
+              }
+            },
+            "feedbackCount": 31,
+            "effectiveWeight": 30.99204298408347,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:204c91b5",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 31,
+              "effectiveWeight": 30.99204298408347,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 33,
+          "at": 1791088320000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03646976205413163,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996149676644583
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03646976205413163
+              }
+            },
+            "feedbackCount": 32,
+            "effectiveWeight": 31.991529673516467,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:64fdf2fb",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 32,
+              "effectiveWeight": 31.991529673516467,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 34,
+          "at": 1791088380000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.03657059862430585,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009996029369970481
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.03657059862430585
+              }
+            },
+            "feedbackCount": 33,
+            "effectiveWeight": 32.9910003262406,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:8abe74ff",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 33,
+              "effectiveWeight": 32.9910003262406,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 35,
+          "at": 1791088440000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.036665833155170476,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009995909064261923
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.036665833155170476
+              }
+            },
+            "feedbackCount": 34,
+            "effectiveWeight": 33.990454942513196,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:80a70059",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 34,
+              "effectiveWeight": 33.990454942513196,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        },
+        {
+          "index": 36,
+          "at": 1791088500000,
+          "beforeFeedback": {
+            "selected": {
+              "provider": "synthetic-study",
+              "model": "synthetic-b-v1",
+              "reasoningEffort": "medium",
+              "estimatedCost": 0.000996,
+              "qualitySource": "user",
+              "pricingSource": "user"
+            },
+            "publicQuality": 0.9,
+            "qualitySource": "user",
+            "qualityFloor": 0.78,
+            "estimatedCostUsd": 0.000996,
+            "subjectiveUtilityAdjustment": 0.036755919866719895,
+            "adjustments": {
+              "synthetic-study\u0000synthetic-a-v1": {
+                "code": -0.009995788759518912
+              },
+              "synthetic-study\u0000synthetic-b-v1": {
+                "code": 0.036755919866719895
+              }
+            },
+            "feedbackCount": 35,
+            "effectiveWeight": 34.98989352259153,
+            "dataVersions": {
+              "pricing": {
+                "revision": "synthetic-equal-price-v1",
+                "source": "controlled-synthetic-price-fixture",
+                "currency": "USD",
+                "unit": "million-tokens",
+                "checkedAt": 1791086400000
+              },
+              "liveBench": null,
+              "modelProfile": {
+                "revision": "synthetic-explicit-profile-v1",
+                "source": "controlled-explicit-model-quality-fixture"
+              }
+            },
+            "personalization": {
+              "policyVersion": "subjective-utility-v1",
+              "revision": "subjective-utility-v1:93089142",
+              "enabled": true,
+              "scope": "local-dsh-home",
+              "window": "last-200-runs",
+              "feedbackCount": 35,
+              "effectiveWeight": 34.98989352259153,
+              "halfLifeDays": 30,
+              "priorWeight": 3,
+              "maxAdjustment": 0.04,
+              "resetAt": 0,
+              "semantics": "subjective-utility-not-objective-quality"
+            }
+          },
+          "observed": {
+            "provider": "synthetic-study",
+            "model": "synthetic-b-v1",
+            "rating": 1,
+            "provenance": "controlled-synthetic-human-label"
+          },
+          "unselectedModelOutcomes": null
+        }
+      ],
+      "final": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-b-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0.03684126516625694,
+        "adjustments": {
+          "synthetic-study\u0000synthetic-a-v1": {
+            "code": -0.009995668455741452
+          },
+          "synthetic-study\u0000synthetic-b-v1": {
+            "code": 0.03684126516625694
+          }
+        },
+        "feedbackCount": 36,
+        "effectiveWeight": 35.98931606673291,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:6950ee69",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 36,
+          "effectiveWeight": 35.98931606673291,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "selectedCounts": {
+        "synthetic-a-v1": 1,
+        "synthetic-b-v1": 35
+      },
+      "unselectedModelOutcomes": "unknown; no counterfactual scores are imputed"
+    },
+    "recencyReversal": {
+      "oldPositiveCount": 40,
+      "oldAgeDays": 180,
+      "recentNegativeCount": 4,
+      "recentAgeHours": 1,
+      "observedModel": "synthetic-a-v1",
+      "defaultHalfLifeDays": 30,
+      "slowDecayControlDays": 3650,
+      "decayed": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-b-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {
+          "synthetic-study\u0000synthetic-a-v1": {
+            "code": -0.01769363820652378
+          }
+        },
+        "feedbackCount": 44,
+        "effectiveWeight": 4.621155897466129,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:dc69564e",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 44,
+          "effectiveWeight": 4.621155897466129,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "slowDecayControl": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-a-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0.0303627195526533,
+        "adjustments": {
+          "synthetic-study\u0000synthetic-a-v1": {
+            "code": 0.0303627195526533
+          }
+        },
+        "feedbackCount": 44,
+        "effectiveWeight": 42.65577098481874,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:fdbbe851",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 44,
+          "effectiveWeight": 42.65577098481874,
+          "halfLifeDays": 3650,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "scope": "controlled-history-drift-probe-not-an-unbiased-live-user-study"
+    },
+    "priceChange": {
+      "beforePrices": [
+        {
+          "model": "synthetic-a-v1",
+          "pricing": {
+            "input": 0.1,
+            "output": 0.1
+          }
+        },
+        {
+          "model": "synthetic-b-v1",
+          "pricing": {
+            "input": 2,
+            "output": 2
+          }
+        }
+      ],
+      "afterPrices": [
+        {
+          "model": "synthetic-a-v1",
+          "pricing": {
+            "input": 5,
+            "output": 5
+          }
+        },
+        {
+          "model": "synthetic-b-v1",
+          "pricing": {
+            "input": 2,
+            "output": 2
+          }
+        }
+      ],
+      "before": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-a-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.0001,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.0000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {},
+        "feedbackCount": 0,
+        "effectiveWeight": 0,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-changing-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:d9342c19",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 0,
+          "effectiveWeight": 0,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "after": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-b-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.001992,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.001992,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {},
+        "feedbackCount": 0,
+        "effectiveWeight": 0,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-changing-price-v2",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:d9342c19",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 0,
+          "effectiveWeight": 0,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "scope": "hypothetical-prices-and-predicted-token-costs-not-recorded-bills"
+    },
+    "benchmarkChange": {
+      "beforeScores": {
+        "source": "synthetic-livebench-mock:synthetic-score-v1",
+        "fetchedAt": 1791086400000,
+        "models": {
+          "syntheticav1": {
+            "model": "synthetic-a-v1",
+            "overall": 0.96,
+            "overallSource": "explicit",
+            "scores": {
+              "code": 0.96
+            }
+          },
+          "syntheticbv1": {
+            "model": "synthetic-b-v1",
+            "overall": 0.85,
+            "overallSource": "explicit",
+            "scores": {
+              "code": 0.85
+            }
+          }
+        },
+        "exactModelMatch": true,
+        "revision": "synthetic-score-v1"
+      },
+      "afterScores": {
+        "source": "synthetic-livebench-mock:synthetic-score-v2",
+        "fetchedAt": 1791086400000,
+        "models": {
+          "syntheticav1": {
+            "model": "synthetic-a-v1",
+            "overall": 0.85,
+            "overallSource": "explicit",
+            "scores": {
+              "code": 0.85
+            }
+          },
+          "syntheticbv1": {
+            "model": "synthetic-b-v1",
+            "overall": 0.96,
+            "overallSource": "explicit",
+            "scores": {
+              "code": 0.96
+            }
+          }
+        },
+        "exactModelMatch": true,
+        "revision": "synthetic-score-v2"
+      },
+      "before": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-a-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "livebench",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.96,
+        "qualitySource": "livebench",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {},
+        "feedbackCount": 0,
+        "effectiveWeight": 0,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": {
+            "revision": "synthetic-score-v1",
+            "source": "controlled-synthetic-score-fixture",
+            "fetchedAt": 1791086400000
+          },
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:d9342c19",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 0,
+          "effectiveWeight": 0,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "after": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-b-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "livebench",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.96,
+        "qualitySource": "livebench",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {},
+        "feedbackCount": 0,
+        "effectiveWeight": 0,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": {
+            "revision": "synthetic-score-v2",
+            "source": "controlled-synthetic-score-fixture",
+            "fetchedAt": 1791086400000
+          },
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:d9342c19",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 0,
+          "effectiveWeight": 0,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "scope": "exact-name-LiveBench-shaped-mock-not-real-published-score-changes"
+    },
+    "objectiveFloorProtection": {
+      "labelledLowQualityResults": 200,
+      "highPreferenceProfile": {
+        "enabled": true,
+        "scope": "local-dsh-home",
+        "policyVersion": "subjective-utility-v1",
+        "feedbackCount": 200,
+        "ignoredCount": 0,
+        "effectiveWeight": 199.99462499640077,
+        "updatedAt": 1791088559000,
+        "halfLifeDays": 30,
+        "priorWeight": 1,
+        "maxAdjustment": 0.1,
+        "resetAt": 0,
+        "window": "last-200-runs",
+        "adjustments": {
+          "synthetic-study\u0000synthetic-a-v1": {
+            "code": 0.09950247425769823
+          }
+        },
+        "revision": "subjective-utility-v1:9e42af31"
+      },
+      "candidatePublicQualities": [
+        {
+          "model": "synthetic-b-v1",
+          "quality": 0.9,
+          "qualitySource": "user"
+        },
+        {
+          "model": "synthetic-a-v1",
+          "quality": 0.65,
+          "qualitySource": "user"
+        }
+      ],
+      "protectedPlan": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-b-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {
+          "synthetic-study\u0000synthetic-a-v1": {
+            "code": 0.09950247425769823
+          }
+        },
+        "feedbackCount": 200,
+        "effectiveWeight": 199.99462499640077,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-floor-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:9e42af31",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 200,
+          "effectiveWeight": 199.99462499640077,
+          "halfLifeDays": 30,
+          "priorWeight": 1,
+          "maxAdjustment": 0.1,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      }
+    },
+    "clearAndReset": {
+      "before": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-b-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0.03684126516625694,
+        "adjustments": {
+          "synthetic-study\u0000synthetic-a-v1": {
+            "code": -0.009995668455741452
+          },
+          "synthetic-study\u0000synthetic-b-v1": {
+            "code": 0.03684126516625694
+          }
+        },
+        "feedbackCount": 36,
+        "effectiveWeight": 35.98931606673291,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:6950ee69",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 36,
+          "effectiveWeight": 35.98931606673291,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "clear": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-a-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {},
+        "feedbackCount": 0,
+        "effectiveWeight": 0,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:3674f2a2",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 0,
+          "effectiveWeight": 0,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 0,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "reset": {
+        "selected": {
+          "provider": "synthetic-study",
+          "model": "synthetic-a-v1",
+          "reasoningEffort": "medium",
+          "estimatedCost": 0.000996,
+          "qualitySource": "user",
+          "pricingSource": "user"
+        },
+        "publicQuality": 0.9,
+        "qualitySource": "user",
+        "qualityFloor": 0.78,
+        "estimatedCostUsd": 0.000996,
+        "subjectiveUtilityAdjustment": 0,
+        "adjustments": {},
+        "feedbackCount": 0,
+        "effectiveWeight": 0,
+        "dataVersions": {
+          "pricing": {
+            "revision": "synthetic-equal-price-v1",
+            "source": "controlled-synthetic-price-fixture",
+            "currency": "USD",
+            "unit": "million-tokens",
+            "checkedAt": 1791086400000
+          },
+          "liveBench": null,
+          "modelProfile": {
+            "revision": "synthetic-explicit-profile-v1",
+            "source": "controlled-explicit-model-quality-fixture"
+          }
+        },
+        "personalization": {
+          "policyVersion": "subjective-utility-v1",
+          "revision": "subjective-utility-v1:f6efd2ab",
+          "enabled": true,
+          "scope": "local-dsh-home",
+          "window": "last-200-runs",
+          "feedbackCount": 0,
+          "effectiveWeight": 0,
+          "halfLifeDays": 30,
+          "priorWeight": 3,
+          "maxAdjustment": 0.04,
+          "resetAt": 1791088560000,
+          "semantics": "subjective-utility-not-objective-quality"
+        }
+      },
+      "scope": "pure-feedback-profile-and-ledger-spending-check-not-persistent-host-store-test",
+      "costBasis": "synthetic-usage-times-hypothetical-price",
+      "spendBefore": {
+        "today": 0.025919999999999978,
+        "month": 0.025919999999999978,
+        "unknownToday": 0,
+        "unknownMonth": 0,
+        "subscriptionToday": 0,
+        "subscriptionMonth": 0,
+        "subscriptionRunsToday": 0,
+        "subscriptionRunsMonth": 0
+      },
+      "spendAfterClear": {
+        "today": 0.025919999999999978,
+        "month": 0.025919999999999978,
+        "unknownToday": 0,
+        "unknownMonth": 0,
+        "subscriptionToday": 0,
+        "subscriptionMonth": 0,
+        "subscriptionRunsToday": 0,
+        "subscriptionRunsMonth": 0
+      },
+      "spendAfterReset": {
+        "today": 0.025919999999999978,
+        "month": 0.025919999999999978,
+        "unknownToday": 0,
+        "unknownMonth": 0,
+        "subscriptionToday": 0,
+        "subscriptionMonth": 0,
+        "subscriptionRunsToday": 0,
+        "subscriptionRunsMonth": 0
+      }
+    }
+  },
+  "checks": {
+    "feedbackChangesNextSelection": true,
+    "objectiveQualityNotRewritten": true,
+    "recencyCanReversePreference": true,
+    "priceChangeReplans": true,
+    "benchmarkChangeReplans": true,
+    "qualityFloorProtected": true,
+    "clearAndResetRestoreUnpersonalizedSelection": true,
+    "clearAndResetPreserveSpending": true,
+    "hostAndSharedPlannerProjectionAgree": true
+  },
+  "limitations": [
+    "Selection transitions were deliberately induced by synthetic labels, prices and scores; they are not measured real-user benefits.",
+    "Only chosen models receive feedback. Unselected outcomes remain unknown; no global optimum, unbiased risk, convergence or calibration is established.",
+    "Preferences are isolated by exact provider/model/task type in one local DSH home, not by authenticated multi-user accounts.",
+    "The latest-200-runs window and completion-time decay are bounded memory, not a permanent personalized model.",
+    "A quality floor applies to uncalibrated objective score proxies, not a guaranteed real-answer quality floor.",
+    "No provider-specific pricing refresh service, paid exploration, benchmark download or network failure behavior is tested here."
+  ]
+}

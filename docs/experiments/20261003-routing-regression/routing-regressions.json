@@ -1,0 +1,3572 @@
+{
+  "schemaVersion": 1,
+  "kind": "deterministic-regressions-not-answer-quality-benchmark",
+  "provenance": "synthetic",
+  "claimScope": "seven-fixed-synthetic-counterexamples-only",
+  "data": "synthetic fixed counterexamples",
+  "baselineVersion": "0.15.0",
+  "sourceVersion": "0.16.0-dev.1",
+  "sourceSHA256": {
+    "baseline": "f36ba13d57bf7f94e5187303ffeefd5c0d2902c8c76bf9d150b7e54ac0cbf13d",
+    "current": "4b7b23010189c995990148d46c20ca1bc832ae869089f2e51d8cd6c0e2f8945f"
+  },
+  "sourceManifests": {
+    "baseline": {
+      "algorithm": "SHA-256",
+      "sha256": "f36ba13d57bf7f94e5187303ffeefd5c0d2902c8c76bf9d150b7e54ac0cbf13d",
+      "files": [
+        {
+          "path": ".dsh-plugin/shared/livebench.mjs",
+          "bytes": 10060,
+          "sha256": "ccce5857b1490a84d84b6c473c8a9c3844324fd6c0d743ee98244a4945725522"
+        },
+        {
+          "path": ".dsh-plugin/shared/router.mjs",
+          "bytes": 62256,
+          "sha256": "41fbfda01963f5d65115853b3293c6f25cf81cc8e2ee5ca4adfaacde41456ebc"
+        },
+        {
+          "path": ".dsh-plugin/shared/routing-presets.mjs",
+          "bytes": 2143,
+          "sha256": "f49e020fca2d8a4673fd3ed5526ade0d0591484d2886fb74dafebdd22a1d18b4"
+        },
+        {
+          "path": "package.json",
+          "bytes": 7673,
+          "sha256": "07c83950ba0201abd18047e012eaf258e11ecf126bda549d7e8ff15f346cb036"
+        }
+      ],
+      "scope": "package.json plus reachable local static or literal-dynamic module imports; bare imports and computed imports are not fingerprinted"
+    },
+    "current": {
+      "algorithm": "SHA-256",
+      "sha256": "4b7b23010189c995990148d46c20ca1bc832ae869089f2e51d8cd6c0e2f8945f",
+      "files": [
+        {
+          "path": ".dsh-plugin/shared/assignment-solver.mjs",
+          "bytes": 4772,
+          "sha256": "841d400116ccc93875c92666f90cdca2238a771f015eab429d720c9ee78c4dbd"
+        },
+        {
+          "path": ".dsh-plugin/shared/livebench.mjs",
+          "bytes": 10491,
+          "sha256": "cee468497dd56d58c4f13e95ab564bafe68c34c5a5f50b0c54781649d81b2c8a"
+        },
+        {
+          "path": ".dsh-plugin/shared/router.mjs",
+          "bytes": 60853,
+          "sha256": "3e9e9d21d25e5e172d7561ffa9100a8aa9b95ea10673c6f08c1b487e50be8b09"
+        },
+        {
+          "path": ".dsh-plugin/shared/routing-presets.mjs",
+          "bytes": 2143,
+          "sha256": "f49e020fca2d8a4673fd3ed5526ade0d0591484d2886fb74dafebdd22a1d18b4"
+        },
+        {
+          "path": "package.json",
+          "bytes": 8294,
+          "sha256": "c7db2b9afe99d35eded694fa3ad8fc83675daa066a9fbdb61989badd0fe5c4dc"
+        }
+      ],
+      "scope": "package.json plus reachable local static or literal-dynamic module imports; bare imports and computed imports are not fingerprinted"
+    }
+  },
+  "limitations": [
+    "These seven deliberately selected synthetic counterexamples measure routing mechanism behavior, not answer correctness, model quality, accuracy gains, or typical workload frequency.",
+    "Both versions receive identical complete saved inputs; estimated costs and quality values are supplied fixtures or router estimates, not measured model executions.",
+    "The normalized-category-evidence input is prepared once using the current normalizer and then passed to both routers; this controls a fixed normalized input rather than comparing two normalization pipelines.",
+    "Declared package versions do not attest to published release integrity; SHA-256 manifests identify the local source bytes, including uncommitted edits, within the stated manifest scope.",
+    "Run each comparison in a fresh CLI process when editing either source tree, because JavaScript module imports may be cached in a long-lived importing process.",
+    "Full outputs retain the routers' live generatedAt timestamps; compare mechanism results with only these timestamp fields excluded, rather than claiming byte-identical full output across runs."
+  ],
+  "cases": [
+    {
+      "name": "budget-candidate-retention",
+      "input": {
+        "text": "请设计一个复杂工程架构并实现代码",
+        "available": [
+          {
+            "provider": "p",
+            "model": "High-0",
+            "quality": 0.98,
+            "latency": 0.01,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-1",
+            "quality": 0.981,
+            "latency": 0.011,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-2",
+            "quality": 0.982,
+            "latency": 0.012,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-3",
+            "quality": 0.983,
+            "latency": 0.013000000000000001,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-4",
+            "quality": 0.984,
+            "latency": 0.014,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-5",
+            "quality": 0.985,
+            "latency": 0.015,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-6",
+            "quality": 0.986,
+            "latency": 0.016,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-7",
+            "quality": 0.987,
+            "latency": 0.017,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-8",
+            "quality": 0.988,
+            "latency": 0.018000000000000002,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-9",
+            "quality": 0.989,
+            "latency": 0.019000000000000003,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-10",
+            "quality": 0.99,
+            "latency": 0.02,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "High-11",
+            "quality": 0.991,
+            "latency": 0.020999999999999998,
+            "risk": 0,
+            "specialties": [
+              "code",
+              "reasoning"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          },
+          {
+            "provider": "p",
+            "model": "Cheap",
+            "quality": 0.85,
+            "latency": 1,
+            "risk": 1,
+            "specialties": [],
+            "pricing": {
+              "input": 0.01,
+              "output": 0.01
+            }
+          }
+        ],
+        "budgetUsd": 0.001
+      },
+      "original": {
+        "assignments": [
+          "High-11",
+          "High-11",
+          "High-11"
+        ],
+        "estimatedCost": 0.003278,
+        "budgetFeasible": false,
+        "budgetExceeded": true,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.003278,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route",
+          "route",
+          "route"
+        ],
+        "search": null
+      },
+      "updated": {
+        "assignments": [
+          "High-11",
+          "Cheap",
+          "Cheap"
+        ],
+        "estimatedCost": 0.0006020299999999999,
+        "budgetFeasible": true,
+        "budgetExceeded": false,
+        "handoffs": 1,
+        "baselineAllStrongCost": 0.003278,
+        "estimatedSavings": 0.8163,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route",
+          "route",
+          "route"
+        ],
+        "search": {
+          "method": "exact",
+          "exact": true,
+          "searchSpace": 1728,
+          "searchSpaceCapped": false,
+          "expandedStates": 36,
+          "beamPruned": 0
+        }
+      },
+      "originalOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "High-11",
+            "score": 0.805,
+            "quality": 0.991,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-10",
+            "score": 0.804,
+            "quality": 0.99,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-9",
+            "score": 0.804,
+            "quality": 0.989,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-8",
+            "score": 0.804,
+            "quality": 0.988,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-7",
+            "score": 0.803,
+            "quality": 0.987,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-6",
+            "score": 0.803,
+            "quality": 0.986,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-5",
+            "score": 0.802,
+            "quality": 0.985,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-4",
+            "score": 0.802,
+            "quality": 0.984,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "High-11",
+          "estimatedCost": 0.00098,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "High-11",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "High-11",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "High-11",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "High-11"
+        },
+        "estimatedCost": 0.003278,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "High-11",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": 0.991,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "High-11",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.001401,
+            "quality": 0.991,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "High-11",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.001302,
+            "quality": 0.991,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "pareto-pruned quality-constrained beam assignment",
+          "qualityFloor": 0.82,
+          "budgetUsd": 0.001,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": true,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.003278,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 3,
+          "beamWidth": 256,
+          "budgetFeasible": false,
+          "minimumFeasibleCost": 0.003278,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知全局约束分配；任务类型为 code，已对 3 个工作包进行 Pareto 剪枝和有界组合搜索。",
+        "generatedAt": "2026-10-03T14:28:51.457Z"
+      },
+      "updatedOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "High-11",
+            "score": 0.849,
+            "quality": 0.991,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-10",
+            "score": 0.849,
+            "quality": 0.99,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-9",
+            "score": 0.848,
+            "quality": 0.989,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-8",
+            "score": 0.848,
+            "quality": 0.988,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-7",
+            "score": 0.848,
+            "quality": 0.987,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-6",
+            "score": 0.847,
+            "quality": 0.986,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-5",
+            "score": 0.847,
+            "quality": 0.985,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "High-4",
+            "score": 0.846,
+            "quality": 0.984,
+            "qualitySource": "route",
+            "specialty": 1,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "High-11",
+          "estimatedCost": 0.000575,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "High-11",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "Cheap",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "Cheap",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "Cheap"
+        },
+        "estimatedCost": 0.0006020299999999999,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "High-11",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": 0.991,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "Cheap",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.000014,
+            "quality": 0.85,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0.015
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "Cheap",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.000013,
+            "quality": 0.85,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "dependency-safe quality-constrained exact/beam assignment",
+          "qualitySemantics": "uncalibrated-surrogate",
+          "costUtility": {
+            "method": "1/(1+estimated-task-cost/reference-task-cost)",
+            "referencePricing": {
+              "input": 1,
+              "output": 5,
+              "cacheRead": 1,
+              "cacheWrite": 1,
+              "currency": "USD"
+            }
+          },
+          "search": {
+            "method": "exact",
+            "exact": true,
+            "searchSpace": 1728,
+            "searchSpaceCapped": false,
+            "expandedStates": 36,
+            "beamPruned": 0
+          },
+          "optimalityScope": "retained-candidates-and-surrogate-objective",
+          "candidateTruncated": 3,
+          "qualityFiltered": 0,
+          "localParetoDisabled": true,
+          "qualityFloor": 0.82,
+          "budgetUsd": 0.001,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": false,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.003278,
+          "estimatedSavings": 0.8163,
+          "distinctRoutes": 2,
+          "handoffCount": 1,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.000033,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知约束分配；任务类型为 code，3 个工作包采用保留候选空间内的精确搜索。质量分与门槛是未校准的估计，不是答对概率。",
+        "generatedAt": "2026-10-03T14:28:51.466Z"
+      }
+    },
+    {
+      "name": "dependency-handoff",
+      "input": {
+        "text": "请设计一个复杂工程架构并实现代码",
+        "available": [
+          {
+            "provider": "p",
+            "model": "A",
+            "quality": 0.9,
+            "latency": 0.5,
+            "risk": 0.2,
+            "pricing": {
+              "input": 0.999,
+              "output": 0.999
+            },
+            "specialties": [
+              "reasoning",
+              "code"
+            ]
+          },
+          {
+            "provider": "p",
+            "model": "B",
+            "quality": 0.9,
+            "latency": 0.5,
+            "risk": 0.2,
+            "pricing": {
+              "input": 1,
+              "output": 1
+            },
+            "specialties": [
+              "reasoning",
+              "code"
+            ]
+          }
+        ],
+        "liveBench": {
+          "source": "synthetic-fixture",
+          "models": {
+            "a": {
+              "scores": {
+                "reasoning": 0.77,
+                "code": 0.9001
+              },
+              "overall": 0.9
+            },
+            "b": {
+              "scores": {
+                "reasoning": 0.9,
+                "code": 0.9
+              },
+              "overall": 0.9
+            }
+          }
+        }
+      },
+      "original": {
+        "assignments": [
+          "B",
+          "A",
+          "B"
+        ],
+        "estimatedCost": 0.003277,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 2,
+        "baselineAllStrongCost": 0.003277,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "livebench",
+          "livebench",
+          "livebench"
+        ],
+        "search": null
+      },
+      "updated": {
+        "assignments": [
+          "B",
+          "B",
+          "B"
+        ],
+        "estimatedCost": 0.0032779999999999997,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.003277,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "livebench",
+          "livebench",
+          "livebench"
+        ],
+        "search": {
+          "method": "exact",
+          "exact": true,
+          "searchSpace": 2,
+          "searchSpaceCapped": false,
+          "expandedStates": 5,
+          "beamPruned": 0
+        }
+      },
+      "originalOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "B",
+            "score": 0.705,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "A",
+            "score": 0.616,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000979,
+            "inputPrice": 0.999,
+            "outputPrice": 0.999,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "B",
+          "estimatedCost": 0.00098,
+          "qualitySource": "livebench",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "B",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "A",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "B",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "B"
+        },
+        "estimatedCost": 0.003277,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "B",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "A",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.0014,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0.015
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "B",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.001302,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0.015
+          }
+        ],
+        "optimization": {
+          "solver": "pareto-pruned quality-constrained beam assignment",
+          "qualityFloor": 0.82,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.003277,
+          "estimatedSavings": 0,
+          "distinctRoutes": 2,
+          "handoffCount": 2,
+          "paretoPruned": 3,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.003277,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知全局约束分配；任务类型为 code，已对 3 个工作包进行 Pareto 剪枝和有界组合搜索。",
+        "generatedAt": "2026-10-03T14:28:51.466Z"
+      },
+      "updatedOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "B",
+            "score": 0.749,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "A",
+            "score": 0.66,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000574,
+            "inputPrice": 0.999,
+            "outputPrice": 0.999,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "B",
+          "estimatedCost": 0.000575,
+          "qualitySource": "livebench",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "B",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "B",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "B",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "B"
+        },
+        "estimatedCost": 0.0032779999999999997,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "B",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "B",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.001401,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "B",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.001302,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "dependency-safe quality-constrained exact/beam assignment",
+          "qualitySemantics": "uncalibrated-surrogate",
+          "costUtility": {
+            "method": "1/(1+estimated-task-cost/reference-task-cost)",
+            "referencePricing": {
+              "input": 1,
+              "output": 5,
+              "cacheRead": 1,
+              "cacheWrite": 1,
+              "currency": "USD"
+            }
+          },
+          "search": {
+            "method": "exact",
+            "exact": true,
+            "searchSpace": 2,
+            "searchSpaceCapped": false,
+            "expandedStates": 5,
+            "beamPruned": 0
+          },
+          "optimalityScope": "retained-candidates-and-surrogate-objective",
+          "candidateTruncated": 0,
+          "qualityFiltered": 2,
+          "localParetoDisabled": true,
+          "qualityFloor": 0.82,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.003277,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.003277,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知约束分配；任务类型为 code，3 个工作包采用保留候选空间内的精确搜索。质量分与门槛是未校准的估计，不是答对概率。",
+        "generatedAt": "2026-10-03T14:28:51.467Z"
+      }
+    },
+    {
+      "name": "irrelevant-price-outlier",
+      "input": {
+        "text": "请简要解释缓存",
+        "available": [
+          {
+            "provider": "p",
+            "model": "Cheap",
+            "quality": 0.8,
+            "latency": 0.5,
+            "risk": 0.2,
+            "pricing": {
+              "input": 0.1,
+              "output": 0.2
+            }
+          },
+          {
+            "provider": "p",
+            "model": "Expensive",
+            "quality": 0.9,
+            "latency": 0.5,
+            "risk": 0.2,
+            "pricing": {
+              "input": 1,
+              "output": 2
+            }
+          },
+          {
+            "provider": "p",
+            "model": "Dominated",
+            "quality": 0.75,
+            "latency": 1,
+            "risk": 1,
+            "pricing": {
+              "input": 10000,
+              "output": 10000
+            }
+          }
+        ]
+      },
+      "original": {
+        "assignments": [
+          "Expensive"
+        ],
+        "estimatedCost": 0.001896,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.001896,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route"
+        ],
+        "search": null
+      },
+      "updated": {
+        "assignments": [
+          "Cheap"
+        ],
+        "estimatedCost": 0.0001896,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.001896,
+        "estimatedSavings": 0.9,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route"
+        ],
+        "search": {
+          "method": "exact",
+          "exact": true,
+          "searchSpace": 2,
+          "searchSpaceCapped": false,
+          "expandedStates": 2,
+          "beamPruned": 0
+        }
+      },
+      "originalOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.101,
+          "band": "simple"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "general",
+        "taskTypes": [
+          "general"
+        ],
+        "objectiveWeights": {
+          "quality": 0.28,
+          "cost": 0.45,
+          "latency": 0.14,
+          "specialty": 0.04,
+          "reasoning": 0.07,
+          "risk": 0.02
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "Expensive",
+            "score": 0.83,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00188,
+            "inputPrice": 1,
+            "outputPrice": 2,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "Cheap",
+            "score": 0.802,
+            "quality": 0.8,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000188,
+            "inputPrice": 0.1,
+            "outputPrice": 0.2,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "Dominated",
+            "score": 0.477,
+            "quality": 0.75,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 9.8,
+            "inputPrice": 10000,
+            "outputPrice": 10000,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "Expensive",
+          "estimatedCost": 0.00188,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "execution",
+            "name": "直接回答与必要校验",
+            "type": "general",
+            "difficulty": "simple",
+            "recommended": "Expensive",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.65,
+            "qualityFloor": 0.75,
+            "dependsOn": []
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "Expensive"
+        },
+        "estimatedCost": 0.001896,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "execution",
+            "difficulty": "simple",
+            "model": "Expensive",
+            "provider": "p",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 900,
+            "estimatedCost": 0.001896,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "pareto-pruned quality-constrained beam assignment",
+          "qualityFloor": 0.75,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.001896,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 1,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.00019,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "低复杂度优先成本、响应速度与较低推理开销；任务类型为 general，已对 1 个工作包进行 Pareto 剪枝和有界组合搜索。",
+        "generatedAt": "2026-10-03T14:28:51.467Z"
+      },
+      "updatedOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.101,
+          "band": "simple"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "general",
+        "taskTypes": [
+          "general"
+        ],
+        "objectiveWeights": {
+          "quality": 0.28,
+          "cost": 0.45,
+          "latency": 0.14,
+          "specialty": 0.04,
+          "reasoning": 0.07,
+          "risk": 0.02
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "Cheap",
+            "score": 0.784,
+            "quality": 0.8,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00019,
+            "inputPrice": 0.1,
+            "outputPrice": 0.2,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "Expensive",
+            "score": 0.698,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.001896,
+            "inputPrice": 1,
+            "outputPrice": 2,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "Dominated",
+            "score": 0.252,
+            "quality": 0.75,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 9.96,
+            "inputPrice": 10000,
+            "outputPrice": 10000,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "Cheap",
+          "estimatedCost": 0.00019,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "execution",
+            "name": "直接回答与必要校验",
+            "type": "general",
+            "difficulty": "simple",
+            "recommended": "Cheap",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.65,
+            "qualityFloor": 0.75,
+            "dependsOn": []
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "Cheap"
+        },
+        "estimatedCost": 0.0001896,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "execution",
+            "difficulty": "simple",
+            "model": "Cheap",
+            "provider": "p",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 900,
+            "estimatedCost": 0.00019,
+            "quality": 0.8,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "dependency-safe quality-constrained exact/beam assignment",
+          "qualitySemantics": "uncalibrated-surrogate",
+          "costUtility": {
+            "method": "1/(1+estimated-task-cost/reference-task-cost)",
+            "referencePricing": {
+              "input": 1,
+              "output": 5,
+              "cacheRead": 1,
+              "cacheWrite": 1,
+              "currency": "USD"
+            }
+          },
+          "search": {
+            "method": "exact",
+            "exact": true,
+            "searchSpace": 2,
+            "searchSpaceCapped": false,
+            "expandedStates": 2,
+            "beamPruned": 0
+          },
+          "optimalityScope": "retained-candidates-and-surrogate-objective",
+          "candidateTruncated": 0,
+          "qualityFiltered": 0,
+          "localParetoDisabled": false,
+          "qualityFloor": 0.75,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.001896,
+          "estimatedSavings": 0.9,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 1,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.00019,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "低复杂度优先成本、响应速度与较低推理开销；任务类型为 general，1 个工作包采用保留候选空间内的精确搜索。质量分与门槛是未校准的估计，不是答对概率。",
+        "generatedAt": "2026-10-03T14:28:51.467Z"
+      }
+    },
+    {
+      "name": "task-specific-quality-evidence",
+      "input": {
+        "text": "请设计一个复杂工程架构并实现代码",
+        "available": [
+          {
+            "provider": "p",
+            "model": "m",
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          }
+        ],
+        "liveBench": {
+          "models": {
+            "m": {
+              "scores": {
+                "code": 0.9
+              }
+            }
+          }
+        }
+      },
+      "original": {
+        "assignments": [
+          "m",
+          "m",
+          "m"
+        ],
+        "estimatedCost": 0.003278,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.003278,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "livebench",
+          "livebench",
+          "livebench"
+        ],
+        "search": null
+      },
+      "updated": {
+        "assignments": [
+          "m",
+          "m",
+          "m"
+        ],
+        "estimatedCost": 0.0032779999999999997,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.003278,
+        "estimatedSavings": null,
+        "qualityEvidenceComplete": false,
+        "qualitySources": [
+          "unknown",
+          "livebench",
+          "unknown"
+        ],
+        "search": {
+          "method": "exact",
+          "exact": true,
+          "searchSpace": 1,
+          "searchSpaceCapped": false,
+          "expandedStates": 3,
+          "beamPruned": 0
+        }
+      },
+      "originalOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "m",
+            "score": 0.632,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "m",
+          "estimatedCost": 0.00098,
+          "qualitySource": "livebench",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "m"
+        },
+        "estimatedCost": 0.003278,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.001401,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.001302,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "pareto-pruned quality-constrained beam assignment",
+          "qualityFloor": 0.82,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.003278,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.003278,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知全局约束分配；任务类型为 code，已对 3 个工作包进行 Pareto 剪枝和有界组合搜索。",
+        "generatedAt": "2026-10-03T14:28:51.468Z"
+      },
+      "updatedOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "m",
+            "score": -0.38,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "m",
+          "estimatedCost": 0.000575,
+          "qualitySource": "unknown",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "m"
+        },
+        "estimatedCost": 0.0032779999999999997,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": null,
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.001401,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.001302,
+            "quality": null,
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "dependency-safe quality-constrained exact/beam assignment",
+          "qualitySemantics": "uncalibrated-surrogate",
+          "costUtility": {
+            "method": "1/(1+estimated-task-cost/reference-task-cost)",
+            "referencePricing": {
+              "input": 1,
+              "output": 5,
+              "cacheRead": 1,
+              "cacheWrite": 1,
+              "currency": "USD"
+            }
+          },
+          "search": {
+            "method": "exact",
+            "exact": true,
+            "searchSpace": 1,
+            "searchSpaceCapped": false,
+            "expandedStates": 3,
+            "beamPruned": 0
+          },
+          "optimalityScope": "retained-candidates-and-surrogate-objective",
+          "candidateTruncated": 0,
+          "qualityFiltered": 0,
+          "localParetoDisabled": true,
+          "qualityFloor": 0.82,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": true,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": false,
+          "baselineAllStrongCost": 0.003278,
+          "estimatedSavings": null,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.003278,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知约束分配；任务类型为 code，3 个工作包采用保留候选空间内的精确搜索。质量分与门槛是未校准的估计，不是答对概率。",
+        "generatedAt": "2026-10-03T14:28:51.468Z"
+      }
+    },
+    {
+      "name": "normalized-category-evidence",
+      "input": {
+        "text": "请设计一个复杂工程架构并实现代码",
+        "available": [
+          {
+            "provider": "p",
+            "model": "m",
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          }
+        ],
+        "liveBench": {
+          "source": "livebench",
+          "fetchedAt": 1,
+          "models": {
+            "m": {
+              "overall": 0.9,
+              "overallSource": "derived",
+              "scores": {
+                "code": 0.9
+              }
+            }
+          }
+        }
+      },
+      "original": {
+        "assignments": [
+          "m",
+          "m",
+          "m"
+        ],
+        "estimatedCost": 0.003278,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.003278,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "livebench",
+          "livebench",
+          "livebench"
+        ],
+        "search": null
+      },
+      "updated": {
+        "assignments": [
+          "m",
+          "m",
+          "m"
+        ],
+        "estimatedCost": 0.0032779999999999997,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.003278,
+        "estimatedSavings": null,
+        "qualityEvidenceComplete": false,
+        "qualitySources": [
+          "unknown",
+          "livebench",
+          "unknown"
+        ],
+        "search": {
+          "method": "exact",
+          "exact": true,
+          "searchSpace": 1,
+          "searchSpaceCapped": false,
+          "expandedStates": 3,
+          "beamPruned": 0
+        }
+      },
+      "originalOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "m",
+            "score": 0.632,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "m",
+          "estimatedCost": 0.00098,
+          "qualitySource": "livebench",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "m"
+        },
+        "estimatedCost": 0.003278,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.001401,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.001302,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "pareto-pruned quality-constrained beam assignment",
+          "qualityFloor": 0.82,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.003278,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.003278,
+          "liveBench": {
+            "source": "livebench",
+            "fetchedAt": 1,
+            "models": 1,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知全局约束分配；任务类型为 code，已对 3 个工作包进行 Pareto 剪枝和有界组合搜索。",
+        "generatedAt": "2026-10-03T14:28:51.468Z"
+      },
+      "updatedOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.746,
+          "band": "complex"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "code",
+        "taskTypes": [
+          "code"
+        ],
+        "objectiveWeights": {
+          "quality": 0.48,
+          "cost": 0.14,
+          "latency": 0.06,
+          "specialty": 0.14,
+          "reasoning": 0.11,
+          "risk": 0.07
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "m",
+            "score": -0.38,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "specialty": 0.9,
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000575,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "m",
+          "estimatedCost": 0.000575,
+          "qualitySource": "unknown",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "analysis",
+            "name": "问题建模与约束提取",
+            "type": "reasoning",
+            "difficulty": "balanced",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "purpose": "analysis",
+            "criticality": 0.8,
+            "qualityFloor": 0.78,
+            "dependsOn": []
+          },
+          {
+            "id": "execution-code",
+            "name": "工程与代码方向处理",
+            "objective": "请设计一个复杂工程架构并实现代码",
+            "type": "code",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.86,
+            "qualityFloor": 0.845,
+            "dependsOn": [
+              "analysis"
+            ]
+          },
+          {
+            "id": "synthesis",
+            "name": "结果校验与整合",
+            "type": "reasoning",
+            "difficulty": "complex",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "purpose": "synthesis",
+            "criticality": 1,
+            "qualityFloor": 0.84,
+            "dependsOn": [
+              "execution-code"
+            ]
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "m"
+        },
+        "estimatedCost": 0.0032779999999999997,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "analysis",
+            "difficulty": "balanced",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "medium",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 80,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 495,
+            "estimatedCost": 0.000575,
+            "quality": null,
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 2,
+            "purpose": "execution",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "high",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1305,
+            "estimatedCost": 0.001401,
+            "quality": 0.9,
+            "qualitySource": "livebench",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          },
+          {
+            "stage": 3,
+            "purpose": "synthesis",
+            "difficulty": "complex",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "xhigh",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 132,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1170,
+            "estimatedCost": 0.001302,
+            "quality": null,
+            "qualitySource": "unknown",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "dependency-safe quality-constrained exact/beam assignment",
+          "qualitySemantics": "uncalibrated-surrogate",
+          "costUtility": {
+            "method": "1/(1+estimated-task-cost/reference-task-cost)",
+            "referencePricing": {
+              "input": 1,
+              "output": 5,
+              "cacheRead": 1,
+              "cacheWrite": 1,
+              "currency": "USD"
+            }
+          },
+          "search": {
+            "method": "exact",
+            "exact": true,
+            "searchSpace": 1,
+            "searchSpaceCapped": false,
+            "expandedStates": 3,
+            "beamPruned": 0
+          },
+          "optimalityScope": "retained-candidates-and-surrogate-objective",
+          "candidateTruncated": 0,
+          "qualityFiltered": 0,
+          "localParetoDisabled": true,
+          "qualityFloor": 0.82,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": true,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": false,
+          "baselineAllStrongCost": 0.003278,
+          "estimatedSavings": null,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.003278,
+          "liveBench": {
+            "source": "livebench",
+            "fetchedAt": 1,
+            "models": 1,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "高复杂度执行包含推理等级的依赖感知约束分配；任务类型为 code，3 个工作包采用保留候选空间内的精确搜索。质量分与门槛是未校准的估计，不是答对概率。",
+        "generatedAt": "2026-10-03T14:28:51.469Z"
+      }
+    },
+    {
+      "name": "image-ineligible-baseline",
+      "input": {
+        "text": "请分析图片中的内容",
+        "available": [
+          {
+            "provider": "p",
+            "model": "Text Only",
+            "quality": 0.99,
+            "inputModalities": [
+              "text"
+            ],
+            "pricing": {
+              "input": 100,
+              "output": 100
+            }
+          },
+          {
+            "provider": "p",
+            "model": "Vision",
+            "quality": 0.9,
+            "inputModalities": [
+              "text",
+              "image"
+            ],
+            "pricing": {
+              "input": 1,
+              "output": 1
+            }
+          }
+        ]
+      },
+      "original": {
+        "assignments": [
+          "Vision"
+        ],
+        "estimatedCost": 0.000996,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.0996,
+        "estimatedSavings": 0.99,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route"
+        ],
+        "search": null
+      },
+      "updated": {
+        "assignments": [
+          "Vision"
+        ],
+        "estimatedCost": 0.000996,
+        "budgetFeasible": true,
+        "budgetExceeded": null,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.000996,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route"
+        ],
+        "search": {
+          "method": "exact",
+          "exact": true,
+          "searchSpace": 1,
+          "searchSpaceCapped": false,
+          "expandedStates": 1,
+          "beamPruned": 0
+        }
+      },
+      "originalOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.277,
+          "band": "simple"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "vision",
+        "taskTypes": [
+          "vision"
+        ],
+        "objectiveWeights": {
+          "quality": 0.28,
+          "cost": 0.45,
+          "latency": 0.14,
+          "specialty": 0.04,
+          "reasoning": 0.07,
+          "risk": 0.02
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "Vision",
+            "score": 0.819,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "specialty": 0.38,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.00098,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "Text Only",
+            "score": 0.622,
+            "quality": 0.99,
+            "qualitySource": "route",
+            "specialty": 0.38,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.098,
+            "inputPrice": 100,
+            "outputPrice": 100,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "Vision",
+          "estimatedCost": 0.00098,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "execution",
+            "name": "直接回答与必要校验",
+            "type": "vision",
+            "difficulty": "simple",
+            "recommended": "Vision",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.65,
+            "qualityFloor": 0.75,
+            "dependsOn": []
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "Vision"
+        },
+        "estimatedCost": 0.000996,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "execution",
+            "difficulty": "simple",
+            "model": "Vision",
+            "provider": "p",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 900,
+            "estimatedCost": 0.000996,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "pareto-pruned quality-constrained beam assignment",
+          "qualityFloor": 0.75,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.0996,
+          "estimatedSavings": 0.99,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.000996,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "低复杂度优先成本、响应速度与较低推理开销；任务类型为 vision，已对 1 个工作包进行 Pareto 剪枝和有界组合搜索。",
+        "generatedAt": "2026-10-03T14:28:51.469Z"
+      },
+      "updatedOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.277,
+          "band": "simple"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "vision",
+        "taskTypes": [
+          "vision"
+        ],
+        "objectiveWeights": {
+          "quality": 0.28,
+          "cost": 0.45,
+          "latency": 0.14,
+          "specialty": 0.04,
+          "reasoning": 0.07,
+          "risk": 0.02
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "Vision",
+            "score": 0.742,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "specialty": 0.38,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000996,
+            "inputPrice": 1,
+            "outputPrice": 1,
+            "pricingSource": "route"
+          },
+          {
+            "provider": "p",
+            "model": "Text Only",
+            "score": 0.417,
+            "quality": 0.99,
+            "qualitySource": "route",
+            "specialty": 0.38,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.0996,
+            "inputPrice": 100,
+            "outputPrice": 100,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "Vision",
+          "estimatedCost": 0.000996,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "execution",
+            "name": "直接回答与必要校验",
+            "type": "vision",
+            "difficulty": "simple",
+            "recommended": "Vision",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.65,
+            "qualityFloor": 0.75,
+            "dependsOn": []
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "Vision"
+        },
+        "estimatedCost": 0.000996,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "execution",
+            "difficulty": "simple",
+            "model": "Vision",
+            "provider": "p",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 900,
+            "estimatedCost": 0.000996,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "dependency-safe quality-constrained exact/beam assignment",
+          "qualitySemantics": "uncalibrated-surrogate",
+          "costUtility": {
+            "method": "1/(1+estimated-task-cost/reference-task-cost)",
+            "referencePricing": {
+              "input": 1,
+              "output": 5,
+              "cacheRead": 1,
+              "cacheWrite": 1,
+              "currency": "USD"
+            }
+          },
+          "search": {
+            "method": "exact",
+            "exact": true,
+            "searchSpace": 1,
+            "searchSpaceCapped": false,
+            "expandedStates": 1,
+            "beamPruned": 0
+          },
+          "optimalityScope": "retained-candidates-and-surrogate-objective",
+          "candidateTruncated": 0,
+          "qualityFiltered": 0,
+          "localParetoDisabled": false,
+          "qualityFloor": 0.75,
+          "budgetUsd": 0,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": null,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.000996,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.000996,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "低复杂度优先成本、响应速度与较低推理开销；任务类型为 vision，1 个工作包采用保留候选空间内的精确搜索。质量分与门槛是未校准的估计，不是答对概率。",
+        "generatedAt": "2026-10-03T14:28:51.469Z"
+      }
+    },
+    {
+      "name": "budget-rounding-boundary",
+      "input": {
+        "text": "请简要解释缓存",
+        "budgetUsd": 0.0009967,
+        "available": [
+          {
+            "provider": "p",
+            "model": "m",
+            "quality": 0.9,
+            "pricing": {
+              "input": 1.0006,
+              "output": 1.0006
+            }
+          }
+        ]
+      },
+      "original": {
+        "assignments": [
+          "m"
+        ],
+        "estimatedCost": 0.000997,
+        "budgetFeasible": true,
+        "budgetExceeded": true,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.000997,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route"
+        ],
+        "search": null
+      },
+      "updated": {
+        "assignments": [
+          "m"
+        ],
+        "estimatedCost": 0.0009965975999999999,
+        "budgetFeasible": true,
+        "budgetExceeded": false,
+        "handoffs": 0,
+        "baselineAllStrongCost": 0.000997,
+        "estimatedSavings": 0,
+        "qualityEvidenceComplete": true,
+        "qualitySources": [
+          "route"
+        ],
+        "search": {
+          "method": "exact",
+          "exact": true,
+          "searchSpace": 1,
+          "searchSpaceCapped": false,
+          "expandedStates": 1,
+          "beamPruned": 0
+        }
+      },
+      "originalOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.101,
+          "band": "simple"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "general",
+        "taskTypes": [
+          "general"
+        ],
+        "objectiveWeights": {
+          "quality": 0.28,
+          "cost": 0.45,
+          "latency": 0.14,
+          "specialty": 0.04,
+          "reasoning": 0.07,
+          "risk": 0.02
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "m",
+            "score": 0.605,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000981,
+            "inputPrice": 1.0006,
+            "outputPrice": 1.0006,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "m",
+          "estimatedCost": 0.000981,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "execution",
+            "name": "直接回答与必要校验",
+            "type": "general",
+            "difficulty": "simple",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.65,
+            "qualityFloor": 0.75,
+            "dependsOn": []
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "m"
+        },
+        "estimatedCost": 0.000997,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "execution",
+            "difficulty": "simple",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 900,
+            "estimatedCost": 0.000997,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "pareto-pruned quality-constrained beam assignment",
+          "qualityFloor": 0.75,
+          "budgetUsd": 0.0009967,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": true,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.000997,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.000997,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "低复杂度优先成本、响应速度与较低推理开销；任务类型为 general，已对 1 个工作包进行 Pareto 剪枝和有界组合搜索。",
+        "generatedAt": "2026-10-03T14:28:51.469Z"
+      },
+      "updatedOutput": {
+        "mode": "collective",
+        "preset": "balanced",
+        "complexity": {
+          "value": 0.101,
+          "band": "simple"
+        },
+        "compound": false,
+        "unassignableTasks": [],
+        "taskType": "general",
+        "taskTypes": [
+          "general"
+        ],
+        "objectiveWeights": {
+          "quality": 0.28,
+          "cost": 0.45,
+          "latency": 0.14,
+          "specialty": 0.04,
+          "reasoning": 0.07,
+          "risk": 0.02
+        },
+        "candidates": [
+          {
+            "provider": "p",
+            "model": "m",
+            "score": 0.75,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "specialty": 0.58,
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningKnown": false,
+            "reasoningEfforts": [],
+            "estimatedCost": 0.000997,
+            "inputPrice": 1.0006,
+            "outputPrice": 1.0006,
+            "pricingSource": "route"
+          }
+        ],
+        "selected": {
+          "provider": "p",
+          "model": "m",
+          "estimatedCost": 0.000997,
+          "qualitySource": "route",
+          "pricingSource": "route"
+        },
+        "subtasks": [
+          {
+            "id": "execution",
+            "name": "直接回答与必要校验",
+            "type": "general",
+            "difficulty": "simple",
+            "recommended": "m",
+            "recommendedProvider": "p",
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "purpose": "execution",
+            "criticality": 0.65,
+            "qualityFloor": 0.75,
+            "dependsOn": []
+          }
+        ],
+        "synthesizer": {
+          "provider": "p",
+          "model": "m"
+        },
+        "estimatedCost": 0.0009965975999999999,
+        "costBreakdown": [
+          {
+            "stage": 1,
+            "purpose": "execution",
+            "difficulty": "simple",
+            "model": "m",
+            "provider": "p",
+            "preferredReasoningEffort": "low",
+            "reasoningFit": 0.55,
+            "reasoningOutputMultiplier": 1,
+            "inputTokens": 96,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 900,
+            "estimatedCost": 0.000997,
+            "quality": 0.9,
+            "qualitySource": "route",
+            "pricingSource": "route",
+            "handoffPenalty": 0
+          }
+        ],
+        "optimization": {
+          "solver": "dependency-safe quality-constrained exact/beam assignment",
+          "qualitySemantics": "uncalibrated-surrogate",
+          "costUtility": {
+            "method": "1/(1+estimated-task-cost/reference-task-cost)",
+            "referencePricing": {
+              "input": 1,
+              "output": 5,
+              "cacheRead": 1,
+              "cacheWrite": 1,
+              "currency": "USD"
+            }
+          },
+          "search": {
+            "method": "exact",
+            "exact": true,
+            "searchSpace": 1,
+            "searchSpaceCapped": false,
+            "expandedStates": 1,
+            "beamPruned": 0
+          },
+          "optimalityScope": "retained-candidates-and-surrogate-objective",
+          "candidateTruncated": 0,
+          "qualityFiltered": 0,
+          "localParetoDisabled": false,
+          "qualityFloor": 0.75,
+          "budgetUsd": 0.0009967,
+          "cacheReadRatio": 0,
+          "cacheWriteRatio": 0,
+          "budgetExceeded": false,
+          "constraintRelaxed": false,
+          "pricingComplete": true,
+          "qualityEvidenceComplete": true,
+          "baselineAllStrongCost": 0.000997,
+          "estimatedSavings": 0,
+          "distinctRoutes": 1,
+          "handoffCount": 0,
+          "paretoPruned": 0,
+          "beamWidth": 256,
+          "budgetFeasible": true,
+          "minimumFeasibleCost": 0.000997,
+          "liveBench": {
+            "source": "experimental-baseline",
+            "fetchedAt": null,
+            "models": 0,
+            "stale": false,
+            "error": ""
+          }
+        },
+        "reason": "低复杂度优先成本、响应速度与较低推理开销；任务类型为 general，1 个工作包采用保留候选空间内的精确搜索。质量分与门槛是未校准的估计，不是答对概率。",
+        "generatedAt": "2026-10-03T14:28:51.469Z"
+      }
+    }
+  ]
+}

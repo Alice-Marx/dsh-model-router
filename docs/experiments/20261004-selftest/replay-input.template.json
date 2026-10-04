@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "dsh-selftest-v1",
+  "queries": [
+    {
+      "id": "TODO-question-id",
+      "groupId": "TODO-independent-source-family-id",
+      "domain": "TODO-domain",
+      "text": "TODO-full-visible-prompt-with-no-gold-answer"
+    }
+  ],
+  "plannerInput": {
+    "available": [],
+    "mode": "single",
+    "preset": "balanced",
+    "pricing": {},
+    "liveBench": null,
+    "budgetUsd": 0,
+    "cacheReadRatio": 0,
+    "cacheWriteRatio": 0
+  }
+}

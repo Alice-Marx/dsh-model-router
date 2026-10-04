@@ -256,6 +256,9 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     answer: String(result?.answer ?? '').slice(0, MAX_STORED_ANSWER),
     answerTruncated: String(result?.answer ?? '').length > MAX_STORED_ANSWER,
     usage: result?.usage ?? null,
+    // Freeze the rates used for this result. Future price updates must not
+    // silently rewrite historical spend calculated from usage.
+    pricingSnapshot: pricing ? { ...pricing } : null,
     ...cost,
     finishedAt,
     review: planned.review ?? null,
@@ -291,6 +294,8 @@ export function buildRunRecord({ id, createdAt, task, plan, execution, preset = 
     mode: plan?.mode ?? 'single',
     preset,
     decision: {
+      dataVersions: plan?.optimization?.dataVersions ?? null,
+      personalization: plan?.optimization?.personalization ?? null,
       selected: plan?.selected ? { provider: plan.selected.provider, model: plan.selected.model } : null,
       reason: String(plan?.reason ?? ''),
       complexity: plan?.complexity ? { band: plan.complexity.band, value: finite(plan.complexity.value) ? Number(plan.complexity.value.toFixed(3)) : null } : null,

@@ -1,0 +1,16 @@
+{
+  "provenance": "synthetic",
+  "models": ["p/cheap", "p/strong", "p/specialist"],
+  "validation": [
+    {"id":"v1","domain":"code","results":{"p/cheap":{"correct":true,"costUsd":0.001},"p/strong":{"correct":true,"costUsd":0.01},"p/specialist":{"correct":true,"costUsd":0.005}}},
+    {"id":"v2","domain":"code","results":{"p/cheap":{"correct":false,"costUsd":0.001},"p/strong":{"correct":false,"costUsd":0.01},"p/specialist":{"correct":true,"costUsd":0.005}}},
+    {"id":"v3","domain":"code","results":{"p/cheap":{"correct":true,"costUsd":0.001},"p/strong":{"correct":true,"costUsd":0.01},"p/specialist":{"correct":true,"costUsd":0.005}}},
+    {"id":"v4","domain":"writing","results":{"p/cheap":{"correct":true,"costUsd":0.001},"p/strong":{"correct":true,"costUsd":0.01},"p/specialist":{"correct":false,"costUsd":0.005}}}
+  ],
+  "test": [
+    {"id":"t1","domain":"code","selected":"p/specialist","routingCostUsd":0.001,"results":{"p/cheap":{"correct":false,"costUsd":0.001},"p/strong":{"correct":false,"costUsd":0.01},"p/specialist":{"correct":true,"costUsd":0.005}}},
+    {"id":"t2","domain":"code","selected":"p/cheap","results":{"p/cheap":{"correct":false,"costUsd":0.001},"p/strong":{"correct":true,"costUsd":0.01},"p/specialist":{"correct":true,"costUsd":0.005}}},
+    {"id":"t3","domain":"writing","selected":"p/cheap","results":{"p/cheap":{"correct":true,"costUsd":0.001},"p/strong":{"correct":true,"costUsd":0.01},"p/specialist":{"correct":false,"costUsd":0.005}}},
+    {"id":"t4","domain":"writing","selected":"p/strong","results":{"p/cheap":{"correct":false,"costUsd":0.001},"p/strong":{"correct":false,"costUsd":0.01},"p/specialist":{"correct":false,"costUsd":0.005}}}
+  ]
+}

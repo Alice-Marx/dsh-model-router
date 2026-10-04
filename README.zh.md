@@ -1,12 +1,18 @@
 # Model Router · DeepSeek Harness 模型路由插件
 
+版本：**0.16.0**。选模求解器概览见[路由研究说明](docs/ROUTING_RESEARCH.zh.md)；公式、条件证明与实验见[数学推导与实验记录](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)。[LiveBench 最新证据与验证协议](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)已核查 2026-06-25 聚合评分/费用；最新逐题质量—费用矩阵尚未取得，不声称真实路由收益。
+
 为 **DeepSeek Harness Desktop** 提供任务规划、成本感知的模型分配和官方工具执行工作台。输入任务，比较已配置模型，审阅计划，再明确选择是否执行。
 
-当前版本为 **0.15.0**，包名为 `@ljwei-stak/dsh-model-router`；声明兼容的宿主为 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**。自 0.12.0 起，路由与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 已拆成两个独立插件。
+**0.16.0 新增**：[动态数据与持续反馈](docs/ROUTING_ADAPTIVE_LEARNING.zh.md)：可选公开价格/LiveBench快照刷新；按任务类型、时间衰减和低样本收缩调整个人偏好，质量门槛独立保留。设置在“预算与安全”，公开源默认关闭；价格源需提供按官方文档核对的固定USD单价JSON，不是通用官网抓价器。本地DSH_HOME共享、最近200运行窗口，暂无真实收益证明。
+
+当前版本为 **0.16.0**，包名为 `@ljwei-stak/dsh-model-router`；声明兼容的宿主为 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**。自 0.12.0 起，路由与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 已拆成两个独立插件。
 
 **0.15.0 更新**：工作台分为四页，路由建议紧接任务规划展示；执行输入变化时丢弃旧预览；裁剪历史或重试后仍保留费用累计；源码开发新增独立模拟 UI 预览。
 
 [English](README.md) · [工作台完整指南](docs/WORKBENCH_USER_GUIDE.zh.md) · [安装与验证](INSTALLATION_GUIDE.zh.md) · [迁移说明](MIGRATION.md) · [更新记录](CHANGELOG.md)
+
+需要自行实测时，按[安装验收与质量—成本实验步骤](docs/ROUTING_SELFTEST_STEPS.zh.md)先完成桌面检查和 18 题×3 模型小样，再决定正式样本与费用上限。方案区分首包选模投影和实际团队执行；配套离线入口不采集、不调用模型，真实收益仍待验证。
 
 ## 当前功能
 
@@ -32,16 +38,16 @@
 打开 **插件 → 添加插件**，填写：
 
 ```text
-@ljwei-stak/dsh-model-router@0.15.0
+@ljwei-stak/dsh-model-router@0.16.0
 ```
 
-镜像缺少该精确版本时使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。安装并启用后，完全退出 Harness（包括托盘进程）再启动。插件详情应显示 **0.15.0**，侧栏出现**模型路由**。仅运行全局 `npm install -g` 不会把插件注册到桌面版 profile。
+镜像缺少该精确版本时使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。安装并启用后，完全退出 Harness（包括托盘进程）再启动。插件详情应显示 **0.16.0**，侧栏出现**模型路由**。仅运行全局 `npm install -g` 不会把插件注册到桌面版 profile。
 
 也可在插件管理器填写本地 `.tgz` 文件的绝对路径，或解压后的内层 `package` 目录；其中应包含 `package.json` 与 `.dsh-plugin`。[历史发布页](https://github.com/Alice-Marx/dsh-model-router/releases)提供归档；已克隆源码的开发方式见下文。
 
 ### 从旧包名升级
 
-`@ljwei-stak/model-router-galgame` 的最后版本为 0.13.0。保留 profile 与应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.15.0`。不要同时安装两个包：它们共用内部插件 id `model-router-galgame` 与工具名；id 保留使已有路由设置和执行历史能够延续。
+`@ljwei-stak/model-router-galgame` 的最后版本为 0.13.0。保留 profile 与应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.16.0`。不要同时安装两个包：它们共用内部插件 id `model-router-galgame` 与工具名；id 保留使已有路由设置和执行历史能够延续。
 
 从 0.11.x 合并版迁移时，先备份 profile 并导出希望保留的 GAL 进度。剧情、立绘、音乐、自由模式和存档属于独立 `@ljwei-stak/dsh-galgame` 插件。导出范围及同 profile 迁移的限制见 [MIGRATION.md](MIGRATION.md)。
 
@@ -155,7 +161,7 @@ CLI 团队是插件自有的顺序依赖执行器。Harness 内建 Agent Teams �
 - **订阅优先**：默认先使用检测到的 CLI 订阅账号或配置的编程套餐路线。尝试 CLI 订阅时去掉 API Key 环境变量。`billing` 可设 `subscription-first`、`api-only`、`subscription-only`；`subscription` 可设 `cli-login`、`plan-key`、`none`。
 - **回退**：识别到额度用尽/限流后，将订阅标记为冷却，并可按策略及可用性用已配置 API 路线重试该路由步骤。其他已尝试的订阅失败默认暂停（`onSubscriptionFailure: "ask"`），在历史中选择 API 重试、重试订阅或取消。单工具/团队托管执行不会自动转 API 重试。
 - **核算**：API 费用计入预算；订阅单独展示按 API 单价折算的参考费用。实际用量可来自 CLI 自报金额，或 token 用量乘你提供的单价；真实消费以厂商账单为准。0.15.0 保留被裁剪历史和被重试结果替换的费用累计，避免重跑或清理详细历史抹掉此前消费；旧版本已经丢弃的费用无法反推恢复。
-- **质量**：强模型复核可设 `off`、`sample`、`always`，会增加真实调用。用户评价对准确路线的后续质量分作小幅调整，归一化分数最多 ±0.04。
+- **质量与偏好**：强模型复核可设 `off`、`sample`、`always`，会增加真实调用，但不作为人工反馈。明确评价按准确路线和任务类型，以时间衰减及低样本收缩调整独立主观效用（默认上限 ±0.04，可配置至 ±0.1）；不修改客观质量分或质量硬门槛。可停用学习、撤回评价或重置学习起点。
 
 编程套餐 Key 与端点留在 Harness 官方供应商设置里。`plan-key` 档案可指定一个准确、已登记的 `apiRoute` 作为回退；模型档案不接收凭据或任意命令。套餐资格及使用条款须向厂商核对。
 
@@ -174,7 +180,7 @@ CLI 团队是插件自有的顺序依赖执行器。Harness 内建 Agent Teams �
 
 ## 数据保存与隐私
 
-模型档案和偏好保存在 Harness 插件设置中。运行状态位于 `<DSH_HOME>/model-router/state.json`，默认 `~/.dsh/model-router/state.json`；包括体检/引导、订阅冷却、评价、最多 200 条近期运行和 50 条终端元数据。
+模型档案和偏好保存在 Harness 插件设置中。运行状态位于 `<DSH_HOME>/model-router/state.json`，默认 `~/.dsh/model-router/state.json`；包括体检/引导、订阅冷却、评价、最多 200 条近期运行、50 条终端元数据与可选公开数据快照。运行记录冻结当时费率及数据/反馈策略版本。偏好在该本地DSH_HOME共享，不是经认证的账号隔离；公开数据请求不上传任务或反馈。
 
 0.15.0 还保存最多 90 个有记录的日期和 24 个月的费用汇总，仅包含金额/次数，不包含任务或回答内容。
 

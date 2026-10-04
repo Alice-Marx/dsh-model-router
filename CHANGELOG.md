@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.16.0 — 2026-10-05
+
+Stable release under the npm `latest` tag. Fully quit Harness, including the tray process, and restart after upgrading so both the Host and client load the new version. Public data refresh is opt-in; enabling it does not authorize paid model exploration.
+
+- Add opt-in versioned public LiveBench/curated pricing snapshots with TTL, failure backoff, last-good fallback and atomic cross-process promotion; explicit manual prices win. Freeze each run's applied rates and data/policy versions, and disable cleared sources immediately without deleting recoverable snapshots.
+- Replace production review/rating quality bias with task-specific, time-decayed, shrinkage-regularized subjective utility. Preserve objective proxy quality floors; expose learning controls/reset and the local DSH_HOME / last-200-runs scope. Agent rating tools require approval; Desktop ratings bind to the displayed result timestamp.
+- Require explicit score scale for dynamic benchmark mirrors and exact benchmark model identity; expose optional benchmarkModel mapping without claiming verified execution effort. Add controlled synthetic adaptation and Host/Client integration tests; no paid exploration, real-user result collection, universal official pricing scraper or actual quality-cost benefit claim.
+
+- Use estimated per-package token cost against a fixed reference pricing scale, not the most expensive configured route; an irrelevant expensive model no longer rescales existing preferences. Remove the model-name-specific synthesis bonus.
+- Protect least-cost known-price candidates before truncating pools. Disable local Pareto pruning for dependency-coupled tasks, where route identity changes later handoff penalties.
+- Solve retained candidate spaces of at most 4,096 combinations exactly; larger spaces use bounded beam search with a protected affordable prefix. Expose exact/approximate search, candidate truncation and the surrogate-objective scope instead of claiming global answer-quality optimality.
+- Correct repeated quality-bias application for unknown models. Explain that benchmark/manual scores and quality floors are not calibrated correctness probabilities.
+- Preserve explicit/derived benchmark provenance, exclude image-ineligible savings baselines, and use unrounded totals for budget gates. Report quality filtering, Pareto pruning, and candidate truncation separately.
+- Add independent exhaustive-oracle tests and a label-matrix offline evaluation tool with validation-selected single-model baselines, random routing, hindsight Oracle, actual recorded costs and rare-expert recall. No paid model calls or real quality-improvement claim.
+- Audit the official LiveBench 2026-06-25 aggregate score/cost release with pinned source hashes, complete-coverage checks and descriptive static Pareto profiles. Add continuous-score, domain-stratified whole-group paired bootstrap tooling and document the missing latest per-question cost/quality matrix. Aggregates are not replayed as question outcomes; no real routing-benefit claim or production routing change.
+
+Validation: 558 tests, with 555 passed, 3 existing platform-condition skips and no failures. Strict frozen-lockfile installation, generated-client check and actual-component mock-preview compilation passed. Nine controlled synthetic adaptation checks passed; these are mechanism tests, not real model quality-cost gains. Real paid model calls, user-result collection, execution-effort validation and Harness Desktop end-to-end acceptance were not part of this verification. Research artifacts are in the complete GitHub source checkout, not the npm runtime package; historical experiments retain their original development-version identifiers.
+
 ## 0.15.0 — 2026-10-03
 
 - Reorganize the workbench into task/execution, model configuration, official tools, and budget/security pages. Keep panels mounted so drafts, installation polling, and terminal sessions survive navigation; add keyboard tab navigation and panel-width responsive layouts.

@@ -174,7 +174,7 @@ function nonnegative(value, label) {
 function normalizeProfile(entry, index) {
   const label = `\u7B2C ${index + 1} \u4E2A\u6A21\u578B`;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error(`${label} \u5FC5\u987B\u662F\u5BF9\u8C61`);
-  const allowed = /* @__PURE__ */ new Set(["provider", "model", "quality", "pricing", "specialties", "cliModel", "execution", "billing", "subscription", "apiRoute"]);
+  const allowed = /* @__PURE__ */ new Set(["provider", "model", "benchmarkModel", "quality", "pricing", "specialties", "cliModel", "execution", "billing", "subscription", "apiRoute"]);
   const unknown = Object.keys(entry).find((key) => !allowed.has(key));
   if (unknown) throw new Error(`${label} \u542B\u4E0D\u652F\u6301\u7684\u5B57\u6BB5 ${unknown}\uFF1B\u4E0D\u8981\u5728\u8FD9\u91CC\u586B\u5199\u5BC6\u94A5\u6216\u547D\u4EE4`);
   const provider = id(entry.provider);
@@ -183,6 +183,11 @@ function normalizeProfile(entry, index) {
     throw new Error(`${label} \u9700\u8981\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u51C6\u786E provider \u548C model`);
   }
   const profile = { provider, model };
+  if (entry.benchmarkModel !== void 0) {
+    const benchmarkModel = id(entry.benchmarkModel);
+    if (!benchmarkModel || benchmarkModel.length > 240 || /[\u0000-\u001f]/u.test(benchmarkModel)) throw new Error(`${label} \u7684 benchmarkModel \u9700\u8981\u51C6\u786E\u7684\u57FA\u51C6\u6A21\u578B\u540D\u79F0`);
+    profile.benchmarkModel = benchmarkModel;
+  }
   if (entry.quality !== void 0) {
     const value = nonnegative(entry.quality, `${label} \u7684 quality`);
     if (value > 100) throw new Error(`${label} \u7684 quality \u5E94\u5728 0 \u5230 100 \u4E4B\u95F4`);
@@ -278,6 +283,7 @@ function applyModelProfiles(routes, profiles) {
     if (!profile) return route;
     return {
       ...route,
+      ...profile.benchmarkModel === void 0 ? {} : { benchmarkModel: profile.benchmarkModel },
       ...profile.quality === void 0 ? {} : { quality: profile.quality, qualitySource: "user" },
       ...profile.pricing === void 0 ? {} : { pricing: { ...profile.pricing }, pricingSource: "user" },
       ...profile.specialties === void 0 ? {} : { specialties: [...profile.specialties] },
@@ -466,7 +472,7 @@ var TASK_ALIASES = Object.freeze({
 var CATEGORY_TO_TASK = Object.freeze({
   reasoning: "reasoning",
   coding: "code",
-  "agentic coding": "code",
+  // Agentic Coding is a different task family, not silently a Coding score.
   mathematics: "math",
   "data analysis": "research",
   language: "writing",
@@ -478,7 +484,85 @@ function normalized(value) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 function liveBenchRow(snapshot, model) {
-  return snapshot?.models?.[normalized(model)] ?? null;
+  const row = snapshot?.models?.[normalized(model)] ?? null;
+  return snapshot?.exactModelMatch === true && row?.model !== model ? null : row;
+}
+
+// .dsh-plugin/shared/assignment-solver.mjs
+var EPSILON = 1e-12;
+var compareText = (a, b2) => a < b2 ? -1 : a > b2 ? 1 : 0;
+var signature = (state) => JSON.stringify(state.choices.map((option) => option.route));
+function compareStates(left, right, minimizeCost = false) {
+  return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || (minimizeCost ? left.cost - right.cost : right.score - left.score) || (minimizeCost ? right.score - left.score : left.cost - right.cost) || left.switches - right.switches || compareText(signature(left), signature(right));
+}
+function solveCandidateAssignments({ tasks = [], pools = [], budget = Infinity, beamWidth = 256, exactLimit = 4096, handoffPenalty = 0.015, minimizeCost = false } = {}) {
+  if (!tasks.length || tasks.length !== pools.length) return null;
+  const preceding = /* @__PURE__ */ new Set();
+  for (const task of tasks) {
+    if (!task.id || preceding.has(task.id) || (task.dependsOn ?? []).some((id2) => !preceding.has(id2))) {
+      throw new RangeError("Assignment tasks must have unique ids and known dependencies in topological order");
+    }
+    preceding.add(task.id);
+  }
+  const constrained = Number.isFinite(budget);
+  const options = pools.map((pool) => (Array.isArray(pool) ? pool : []).filter((option) => Number.isFinite(option.cost) && option.cost >= 0 && Number.isFinite(option.score) && (!constrained || option.pricingKnown === true)));
+  if (options.some((pool) => pool.length === 0)) return null;
+  const suffixMinimum = Array(tasks.length + 1).fill(0);
+  let searchSpace = 1;
+  let searchSpaceCapped = false;
+  for (let index = tasks.length - 1; index >= 0; index--) {
+    suffixMinimum[index] = suffixMinimum[index + 1] + Math.min(...options[index].map((option) => option.cost));
+    const product = searchSpace * options[index].length;
+    if (product > Number.MAX_SAFE_INTEGER) searchSpaceCapped = true;
+    searchSpace = Math.min(Number.MAX_SAFE_INTEGER, product);
+  }
+  if (constrained && suffixMinimum[0] > budget + EPSILON) return null;
+  const exact = !searchSpaceCapped && searchSpace <= Math.max(1, exactLimit);
+  const width = Math.max(1, Math.floor(beamWidth) || 256);
+  const search = { method: exact ? "exact" : "beam", exact, searchSpace, searchSpaceCapped, expandedStates: 0, beamPruned: 0 };
+  let states = [{ choices: [], routesByTask: /* @__PURE__ */ new Map(), score: 0, cost: 0, switches: 0, relaxedCount: 0, qualityShortfall: 0 }];
+  for (let index = 0; index < tasks.length; index++) {
+    const task = tasks[index];
+    const expanded = [];
+    for (const state of states) {
+      for (const option of options[index]) {
+        const cost = state.cost + option.cost;
+        if (constrained && cost + suffixMinimum[index + 1] > budget + EPSILON) continue;
+        const switches = (task.dependsOn ?? []).reduce((count, dependency) => {
+          const route = state.routesByTask.get(dependency);
+          return count + (route !== void 0 && route !== option.route ? 1 : 0);
+        }, 0);
+        const penalty = switches * handoffPenalty;
+        const shortfall = Math.max(0, Number(option.qualityShortfall) || 0);
+        const routesByTask2 = new Map(state.routesByTask);
+        routesByTask2.set(task.id, option.route);
+        expanded.push({
+          choices: [...state.choices, { ...option, handoffPenalty: penalty }],
+          routesByTask: routesByTask2,
+          score: state.score + option.score - penalty,
+          cost,
+          switches: state.switches + switches,
+          relaxedCount: state.relaxedCount + (shortfall > 0 ? 1 : 0),
+          qualityShortfall: state.qualityShortfall + shortfall
+        });
+        search.expandedStates++;
+      }
+    }
+    if (!expanded.length) return null;
+    expanded.sort((left, right) => compareStates(left, right, minimizeCost));
+    if (!exact && expanded.length > width) {
+      states = expanded.slice(0, width);
+      if (constrained && index < tasks.length - 1) {
+        const cheapest = expanded.reduce((best2, state) => compareStates(state, best2, true) < 0 ? state : best2);
+        if (!states.includes(cheapest)) states[width - 1] = cheapest;
+      }
+      search.beamPruned += expanded.length - states.length;
+    } else states = expanded;
+  }
+  states.sort((left, right) => compareStates(left, right, minimizeCost));
+  const best = states[0];
+  const { routesByTask, ...result } = best;
+  return { ...result, minimumCostLowerBound: suffixMinimum[0], search };
 }
 
 // .dsh-plugin/shared/router.mjs
@@ -590,8 +674,11 @@ function specialtyMatch(model, taskType, liveScores = {}) {
   return 0.38;
 }
 function qualityForTask(row, taskType) {
-  const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0;
+  const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.baseQuality ?? row?.quality ?? 0;
   return row?.qualityBias ? clamp(base + row.qualityBias) : base;
+}
+function qualitySourceForTask(row, taskType) {
+  return asScore(row?.liveScores?.[taskType]) !== void 0 || asScore(row?.liveOverall) !== void 0 ? "livebench" : row?.fallbackQualitySource ?? row?.qualitySource ?? "unknown";
 }
 function specialtyForTask(row, taskType) {
   return specialtyMatch(row.metadata, taskType, row.liveScores);
@@ -644,20 +731,7 @@ function normalizedCacheRatios(cacheReadRatio = 0, cacheWriteRatio = 0) {
   const write = Number.isFinite(Number(cacheWriteRatio)) ? Math.min(clamp(Number(cacheWriteRatio)), 1 - read) : 0;
   return { read, write };
 }
-function effectivePricing(pricing, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const { read, write } = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
-  return {
-    input: (1 - read - write) * Number(pricing.input) + read * Number(pricing.cacheRead) + write * Number(pricing.cacheWrite),
-    output: Number(pricing.output)
-  };
-}
-function costScore(pricing, maxCost, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  if (pricing === null) return 0;
-  const effective = effectivePricing(pricing, cacheReadRatio, cacheWriteRatio);
-  const mean = (effective.input + effective.output) / 2;
-  if (maxCost <= 0) return mean === 0 ? 1 : 0;
-  return clamp(1 - mean / maxCost);
-}
+var COST_REFERENCE_PRICING = Object.freeze({ input: 1, output: 5, cacheRead: 1, cacheWrite: 1, currency: "USD" });
 function estimateCost(model, text6, outputTokens = 900, pricingOverrides = {}, cacheReadRatio = 0, cacheWriteRatio = 0) {
   const pricing = pricingFor(model, pricingOverrides);
   if (pricing === null) return null;
@@ -898,13 +972,13 @@ function weightsForTask(weights, task) {
   if (task.weights) return task.weights;
   return task.purpose === "synthesis" ? SYNTHESIS_WEIGHTS : OBJECTIVE_WEIGHTS[task.difficulty] ?? weights;
 }
-function compareText(left, right) {
+function compareText2(left, right) {
   const a = String(left);
   const b2 = String(right);
   return a < b2 ? -1 : a > b2 ? 1 : 0;
 }
 function compareRowsStable(left, right) {
-  return compareText(routeKey(left.provider, left.model), routeKey(right.provider, right.model));
+  return compareText2(routeKey(left.provider, left.model), routeKey(right.provider, right.model));
 }
 function reasoningEffortRank(effort) {
   const normalized2 = String(effort ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -925,7 +999,7 @@ function selectReasoningEffort(efforts, preferred = "medium") {
   return exact.slice().sort((left, right) => {
     const distance = Math.abs(reasoningEffortRank(left) - preferredRank) - Math.abs(reasoningEffortRank(right) - preferredRank);
     if (distance !== 0) return distance;
-    return reasoningEffortRank(left) - reasoningEffortRank(right) || compareText(left, right);
+    return reasoningEffortRank(left) - reasoningEffortRank(right) || compareText2(left, right);
   })[0];
 }
 function reasoningDecision(row, task) {
@@ -951,16 +1025,17 @@ function reasoningDecision(row, task) {
     multiplier: reasoningEffortMultiplier(chosen)
   };
 }
-function candidateUtility(row, task, weights, maxCost, usedRoutes, cacheReadRatio = 0, cacheWriteRatio = 0) {
+function candidateUtility(row, task, weights, cacheReadRatio = 0, cacheWriteRatio = 0, text6 = "", complexity = "balanced") {
   const quality = qualityForTask(row, task.type);
+  const rawPreference = row.preferenceAdjustments?.[task.type];
+  const preferenceAdjustment = Number.isFinite(rawPreference) ? clamp(rawPreference, -0.1, 0.1) : 0;
   const floor = Number(task.qualityFloor ?? taskQualityFloor("complex", task));
   const qualityGap = Math.max(0, floor - quality);
-  const duplicatePenalty = 0;
-  const synthesisPreference = task.purpose === "synthesis" && /deepseek[- ]?v4[- ]?pro/i.test(row.model) ? 0.025 : 0;
   const reasoning = reasoningDecision(row, task);
-  const cost = clamp(costScore(row.pricing, maxCost, cacheReadRatio, cacheWriteRatio) / Math.sqrt(reasoning.multiplier.output));
-  const score = weights.quality * quality + weights.cost * cost + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency)) + weights.specialty * specialtyForTask(row, task.type) + (weights.reasoning ?? 0) * reasoning.reasoningFit - weights.risk * row.risk - duplicatePenalty - qualityGap * (task.criticality ?? 0.75) + synthesisPreference;
-  return { score, floor, qualityGap, ...reasoning };
+  const reference = taskCost({ pricing: COST_REFERENCE_PRICING, reasoningKnown: true, reasoningEfforts: [] }, task, text6, complexity, cacheReadRatio, cacheWriteRatio);
+  const cost = row.pricing === null ? 0 : 1 / (1 + taskCost(row, task, text6, complexity, cacheReadRatio, cacheWriteRatio) / Math.max(reference, 1e-12));
+  const score = weights.quality * quality + weights.cost * cost + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency)) + weights.specialty * specialtyForTask(row, task.type) + (weights.reasoning ?? 0) * reasoning.reasoningFit - weights.risk * row.risk - qualityGap * (task.criticality ?? 0.75) + preferenceAdjustment;
+  return { score, floor, qualityGap, preferenceAdjustment, ...reasoning };
 }
 function taskCost(row, task, text6, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
   if (row?.pricing === null) return 0;
@@ -992,96 +1067,65 @@ function dominates(left, right, task, text6, complexity, cacheReadRatio, cacheWr
   const strictlyBetter = leftValues.quality > rightValues.quality || leftValues.cost < rightValues.cost || leftValues.latency < rightValues.latency || leftValues.specialty > rightValues.specialty || leftValues.reasoning > rightValues.reasoning || leftValues.risk < rightValues.risk;
   return noWorse && strictlyBetter;
 }
-function candidatePool(rows, task, weights, maxCost, text6, complexity, cacheReadRatio, cacheWriteRatio) {
-  const eligibleRows = task.type === "vision" ? rows.filter((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image")) : rows;
+function eligibleRowsForTask(rows, task) {
+  return task.type === "vision" ? rows.filter((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image")) : rows;
+}
+function candidatePool(rows, task, weights, text6, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive = false) {
+  const eligibleRows = eligibleRowsForTask(rows, task);
   const floor = Number(task.qualityFloor ?? 0);
   const feasible = eligibleRows.filter((row) => qualityForTask(row, task.type) >= floor);
   const source = feasible.length > 0 ? feasible : eligibleRows.slice().sort((left, right) => qualityForTask(right, task.type) - qualityForTask(left, task.type) || compareRowsStable(left, right)).slice(0, 3);
   const taskWeights = weightsForTask(weights, task);
   const scored = source.map((row) => ({
     row,
-    decision: candidateUtility(row, task, taskWeights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio),
+    decision: candidateUtility(row, task, taskWeights, cacheReadRatio, cacheWriteRatio, text6, complexity),
     cost: taskCost(row, task, text6, complexity, cacheReadRatio, cacheWriteRatio)
   }));
-  const frontier = scored.filter((item) => !source.some((other) => other !== item.row && dominates(other, item.row, task, text6, complexity, cacheReadRatio, cacheWriteRatio)));
+  const frontier = dependencySensitive ? scored : scored.filter((item) => !scored.some((other) => other !== item && other.decision.score >= item.decision.score && dominates(other.row, item.row, task, text6, complexity, cacheReadRatio, cacheWriteRatio)));
   const essential = [
-    scored.slice().sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
+    scored.filter((item) => item.row.pricing !== null).sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
     scored.slice().sort((left, right) => right.decision.score - left.decision.score || compareRowsStable(left.row, right.row))[0],
     scored.slice().sort((left, right) => qualityForTask(right.row, task.type) - qualityForTask(left.row, task.type) || compareRowsStable(left.row, right.row))[0]
   ].filter(Boolean);
-  const ordered = [...frontier, ...essential].filter((item, index, all) => all.findIndex((candidate) => candidate.row === item.row) === index).sort((left, right) => right.decision.score - left.decision.score || left.cost - right.cost || compareRowsStable(left.row, right.row)).slice(0, ROUTING_CANDIDATE_LIMIT);
+  const all = [...frontier, ...essential].filter((item, index, all2) => all2.findIndex((candidate) => candidate.row === item.row) === index).sort((left, right) => right.decision.score - left.decision.score || left.cost - right.cost || compareRowsStable(left.row, right.row));
+  const anchors = [...new Set(essential)];
+  const ordered = [...anchors, ...all.filter((item) => !anchors.includes(item))].slice(0, ROUTING_CANDIDATE_LIMIT).sort((left, right) => right.decision.score - left.decision.score || left.cost - right.cost || compareRowsStable(left.row, right.row));
   return {
     options: ordered,
     relaxed: feasible.length === 0,
-    pruned: Math.max(0, eligibleRows.length - ordered.length)
+    pruned: Math.max(0, scored.length - all.length),
+    filtered: Math.max(0, eligibleRows.length - source.length),
+    truncated: Math.max(0, all.length - ordered.length),
+    dependencySensitive
   };
 }
-function stateSignature(state) {
-  return state.assignments.map((assignment) => `${routeKey(assignment.row?.provider, assignment.row?.model)}@${assignment.decision?.reasoningEffort ?? "provider-default"}`).join("|");
-}
-function compareUtilityStates(left, right) {
-  return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || right.score - left.score || left.cost - right.cost || left.switches - right.switches || compareText(stateSignature(left), stateSignature(right));
-}
-function compareCostStates(left, right) {
-  return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || left.cost - right.cost || right.score - left.score || left.switches - right.switches || compareText(stateSignature(left), stateSignature(right));
-}
-function solveAssignments({ rows, tasks, weights, maxCost, text: text6, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
-  const pools = tasks.map((task) => candidatePool(rows, task, weights, maxCost, text6, complexity, cacheReadRatio, cacheWriteRatio));
-  if (pools.some((pool) => pool.options.length === 0)) return null;
-  const suffixMinimum = Array(tasks.length + 1).fill(0);
-  for (let index = tasks.length - 1; index >= 0; index -= 1) {
-    const costOptions = Number.isFinite(budget) ? pools[index].options.filter((option) => option.row.pricing !== null) : pools[index].options;
-    if (costOptions.length === 0) return null;
-    suffixMinimum[index] = suffixMinimum[index + 1] + Math.min(...costOptions.map((option) => option.cost));
-  }
-  if (Number.isFinite(budget) && suffixMinimum[0] > budget + 1e-12) return null;
-  let states = [{ assignments: [], routesByTask: /* @__PURE__ */ new Map(), usedRoutes: /* @__PURE__ */ new Set(), score: 0, cost: 0, switches: 0, relaxedCount: 0, qualityShortfall: 0 }];
-  for (let index = 0; index < tasks.length; index += 1) {
-    const task = tasks[index];
-    const pool = pools[index];
-    const expanded = [];
-    for (const state of states) {
-      for (const option of pool.options) {
-        if (Number.isFinite(budget) && option.row.pricing === null) continue;
-        const nextCost = state.cost + option.cost;
-        if (Number.isFinite(budget) && nextCost + suffixMinimum[index + 1] > budget + 1e-12) continue;
-        const taskWeights = weightsForTask(weights, task);
-        const decision = candidateUtility(option.row, task, taskWeights, maxCost, state.usedRoutes, cacheReadRatio, cacheWriteRatio);
-        const route = routeKey(option.row.provider, option.row.model);
-        const dependencySwitches = (task.dependsOn ?? []).reduce((count, dependency) => {
-          const dependencyRoute = state.routesByTask.get(dependency);
-          return count + (dependencyRoute !== void 0 && dependencyRoute !== route ? 1 : 0);
-        }, 0);
-        const handoffPenalty = dependencySwitches * 0.015;
-        const qualityShortfall = Math.max(0, decision.floor - qualityForTask(option.row, task.type));
-        const usedRoutes = new Set(state.usedRoutes);
-        usedRoutes.add(route);
-        const routesByTask = new Map(state.routesByTask);
-        routesByTask.set(task.id, route);
-        expanded.push({
-          assignments: [...state.assignments, { task, row: option.row, decision: { ...decision, relaxed: qualityShortfall > 0 }, estimatedCost: option.cost, handoffPenalty }],
-          routesByTask,
-          usedRoutes,
-          score: state.score + decision.score - handoffPenalty,
-          cost: nextCost,
-          switches: state.switches + dependencySwitches,
-          relaxedCount: state.relaxedCount + (qualityShortfall > 0 ? 1 : 0),
-          qualityShortfall: state.qualityShortfall + qualityShortfall
-        });
-      }
-    }
-    if (expanded.length === 0) return null;
-    expanded.sort(minimizeCost ? compareCostStates : compareUtilityStates);
-    states = expanded.slice(0, ROUTING_BEAM_WIDTH);
-  }
-  states.sort(minimizeCost ? compareCostStates : compareUtilityStates);
+function solveAssignments({ rows, tasks, weights, text: text6, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
+  const dependencySensitive = tasks.some((task) => (task.dependsOn ?? []).length > 0);
+  const pools = tasks.map((task) => candidatePool(rows, task, weights, text6, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive));
+  const result = solveCandidateAssignments({ tasks, pools: pools.map((pool, index) => pool.options.map((option) => ({
+    route: routeKey(option.row.provider, option.row.model),
+    score: option.decision.score,
+    cost: option.cost,
+    qualityShortfall: Math.max(0, option.decision.floor - qualityForTask(option.row, tasks[index].type)),
+    pricingKnown: option.row.pricing !== null,
+    payload: option
+  }))), budget, beamWidth: ROUTING_BEAM_WIDTH, minimizeCost });
+  if (!result) return null;
   return {
-    ...states[0],
+    ...result,
+    assignments: result.choices.map((choice, index) => ({
+      task: tasks[index],
+      row: choice.payload.row,
+      decision: { ...choice.payload.decision, relaxed: choice.qualityShortfall > 0 },
+      estimatedCost: choice.cost,
+      handoffPenalty: choice.handoffPenalty
+    })),
+    usedRoutes: new Set(result.choices.map((choice) => choice.route)),
     candidatePools: pools,
-    minimumFeasibleCost: suffixMinimum[0]
+    minimumFeasibleCost: result.minimumCostLowerBound
   };
 }
-function buildPlan({ text: text6 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+function buildPlan({ text: text6 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", dataVersions = null, learning = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
   const presetId = normalizeRoutingPreset(preset);
   const firstLine = String(text6 ?? "").split(/\r?\n/u)[0].trim();
   const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine) && !/(?:执行|完成|实施|分配)/u.test(firstLine);
@@ -1097,17 +1141,21 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     return {
       provider: String(entry.provider ?? ""),
       model: String(entry.model ?? ""),
+      benchmarkModel: typeof entry.benchmarkModel === "string" ? entry.benchmarkModel : void 0,
       reasoningEfforts: [...new Set(reasoningEfforts)],
       defaultReasoningEffort: entry.defaultReasoningEffort === void 0 ? void 0 : String(entry.defaultReasoningEffort),
       reasoningKnown: entry.reasoningKnown === true || entry.reasoningKnown === void 0 && Array.isArray(entry.reasoningEfforts),
       quality: asScore(entry.quality),
       qualityBias: Number.isFinite(entry.qualityBias) ? clamp(entry.qualityBias, -0.05, 0.05) : 0,
+      preferenceAdjustments: entry.preferenceAdjustments ?? null,
       qualitySource: entry.qualitySource === "user" ? "user" : "route",
       latency: asScore(entry.latency),
       risk: asScore(entry.risk),
       specialties: Array.isArray(entry.specialties) ? entry.specialties.filter((item) => typeof item === "string") : null,
       pricing: normalizePricing({ route: entry.pricing ?? entry.price }).route ?? null,
-      pricingSource: entry.pricingSource === "user" ? "user" : "route",
+      pricingSource: entry.pricingSource === "user" ? "user" : entry.pricingSource === "dynamic" ? "dynamic" : "route",
+      pricingVersion: entry.pricingVersion ?? null,
+      snapshotAsOf: entry.snapshotAsOf ?? null,
       inputModalities: Array.isArray(entry.inputModalities) ? entry.inputModalities.map((item) => String(item).toLowerCase()) : []
     };
   }) : [];
@@ -1123,10 +1171,12 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
       ...route.risk === void 0 ? {} : { risk: route.risk },
       ...route.specialties === null ? {} : { specialties: route.specialties }
     };
-    const live = liveBenchRow(liveBench, route.model);
+    const live = liveBenchRow(liveBench, route.benchmarkModel ?? route.model);
     const liveScores = live?.scores ?? {};
-    const liveOverall = asScore(live?.overall);
-    const quality = clamp((asScore(liveScores?.[taskType]) ?? liveOverall ?? asScore(metadata.quality) ?? 0) + route.qualityBias);
+    const liveOverall = live?.overallSource === "explicit" || live?.overallSource === void 0 && Object.keys(liveScores).length === 0 ? asScore(live?.overall) : void 0;
+    const baseQuality = asScore(metadata.quality) ?? 0;
+    const quality = clamp((asScore(liveScores?.[taskType]) ?? liveOverall ?? baseQuality) + route.qualityBias);
+    const fallbackQualitySource = route.quality !== void 0 ? route.qualitySource : catalog ? "catalog-heuristic" : "unknown";
     const qualitySource = liveOverall !== void 0 || asScore(liveScores?.[taskType]) !== void 0 ? "livebench" : route.quality !== void 0 ? route.qualitySource : catalog ? "catalog-heuristic" : "unknown";
     const userPrice = normalizedPrices[normalize(`${route.provider}/${route.model}`)] ?? normalizedPrices[normalize(route.model)];
     const pricingRow = userPrice ?? route.pricing ?? null;
@@ -1137,9 +1187,14 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
       model: route.model,
       metadata,
       quality,
+      baseQuality,
+      fallbackQualitySource,
       qualityBias: route.qualityBias,
+      preferenceAdjustments: route.preferenceAdjustments,
       qualitySource,
       pricingSource,
+      pricingVersion: route.pricingVersion,
+      snapshotAsOf: route.snapshotAsOf,
       liveScores,
       liveOverall,
       latency: metadata.latency ?? 0.5,
@@ -1160,10 +1215,6 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
       }, text6, 900, {}, cacheReadRatio, cacheWriteRatio)
     });
   }
-  const maxCost = Math.max(1, ...rows.filter((row) => row.pricing !== null).map((row) => {
-    const effective = effectivePricing(row.pricing, cacheReadRatio, cacheWriteRatio);
-    return effective.input + effective.output;
-  }));
   const taskNodes = taskPackages(taskType, text6, complexity.band).map((task) => presetId === DEFAULT_ROUTING_PRESET ? task : {
     ...task,
     qualityFloor: presetFloor(task.qualityFloor, presetId),
@@ -1175,7 +1226,6 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     rows,
     tasks: taskNodes,
     weights,
-    maxCost,
     text: text6,
     complexity: complexity.band,
     budget: Number.POSITIVE_INFINITY,
@@ -1186,7 +1236,6 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     rows,
     tasks: taskNodes,
     weights,
-    maxCost,
     text: text6,
     complexity: complexity.band,
     budget,
@@ -1197,7 +1246,6 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     rows,
     tasks: taskNodes,
     weights,
-    maxCost,
     text: text6,
     complexity: complexity.band,
     budget: Number.POSITIVE_INFINITY,
@@ -1210,7 +1258,8 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
   const usedRoutes = optimized?.usedRoutes ?? /* @__PURE__ */ new Set();
   const constraintRelaxed = (optimized?.relaxedCount ?? 0) > 0;
   for (const row of rows) {
-    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio).score;
+    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, cacheReadRatio, cacheWriteRatio, text6, complexity.band).score;
+    if (row.pricing !== null && taskNodes[0]) row.estimatedCost = taskCost(row, taskNodes[0], text6, complexity.band, cacheReadRatio, cacheWriteRatio);
   }
   rows.sort((left, right) => right.score - left.score || compareRowsStable(left, right));
   const selectedAssignment = assignments[0];
@@ -1225,7 +1274,7 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     difficulty: task.difficulty,
     recommended: row?.model ?? "\u5F85\u53D1\u73B0\u6A21\u578B",
     recommendedProvider: row?.provider ?? "",
-    qualitySource: row?.qualitySource ?? "unknown",
+    qualitySource: qualitySourceForTask(row, task.type),
     pricingSource: row?.pricingSource ?? "unknown",
     recommendedReasoningEffort: decision?.reasoningEffort,
     preferredReasoningEffort: decision?.preferredReasoningEffort ?? task.preferredReasoningEffort,
@@ -1253,25 +1302,25 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
       cacheWriteTokens: tokens.cacheWriteTokens,
       outputTokens: tokens.outputTokens,
       estimatedCost: row?.pricing === null || row === null ? null : Number(taskEstimate.toFixed(6)),
-      quality: row?.qualitySource === "unknown" || row === null ? null : Number(qualityForTask(row, task.type).toFixed(3)),
-      qualitySource: row?.qualitySource ?? "unknown",
+      quality: qualitySourceForTask(row, task.type) === "unknown" || row === null ? null : Number(qualityForTask(row, task.type).toFixed(3)),
+      qualitySource: qualitySourceForTask(row, task.type),
       pricingSource: row?.pricingSource ?? "unknown",
       handoffPenalty: Number(Number(handoffPenalty ?? 0).toFixed(3))
     };
   });
   const pricingComplete = assignments.length > 0 && assignments.every(({ row }) => row?.pricing !== null);
-  const totalEstimate = pricingComplete ? costBreakdown.reduce((sum, row) => sum + row.estimatedCost, 0) : null;
+  const totalEstimate = pricingComplete ? assignments.reduce((sum, { task, row, estimatedCost }) => sum + (estimatedCost ?? taskCost(row, task, text6, complexity.band, cacheReadRatio, cacheWriteRatio)), 0) : null;
   const baselineRows = assignments.map(({ task }) => {
-    const strongest = rows.reduce((best, row) => qualityForTask(row, task.type) > (best === null ? -1 : qualityForTask(best, task.type)) ? row : best, null);
+    const strongest = eligibleRowsForTask(rows, task).reduce((best, row) => qualityForTask(row, task.type) > (best === null ? -1 : qualityForTask(best, task.type)) ? row : best, null);
     return { task, strongest };
   });
   const baselineCost = baselineRows.every((item) => item.strongest?.pricing !== null && item.strongest !== null) ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text6, complexity.band, cacheReadRatio, cacheWriteRatio), 0) : null;
-  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row }) => ["livebench", "route", "user"].includes(row?.qualitySource)) && baselineRows.every(({ strongest }) => ["livebench", "route", "user"].includes(strongest?.qualitySource));
+  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => ["livebench", "route", "user"].includes(qualitySourceForTask(row, task.type))) && baselineRows.every(({ strongest, task }) => ["livebench", "route", "user"].includes(qualitySourceForTask(strongest, task.type)));
   const budgetExceeded = Number(budgetUsd) > 0 && totalEstimate !== null ? totalEstimate > Number(budgetUsd) : null;
   const savings = baselineCost === null || totalEstimate === null || !qualityEvidenceComplete ? null : baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost);
   const paretoPruned = (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.pruned, 0);
   const minimumFeasibleCost = rows.every((row) => row.pricing !== null) ? optimized?.minimumFeasibleCost ?? minimumCostPlan?.cost ?? 0 : null;
-  const reason = selected === null ? unassignableTasks.length > 0 ? `\u56FE\u50CF\u5DE5\u4F5C\u5305 ${unassignableTasks.join("\u3001")} \u6CA1\u6709\u53EF\u7528\u7684\u56FE\u50CF\u6A21\u578B\uFF0C\u65E0\u6CD5\u5F62\u6210\u5B8C\u6574\u5206\u914D\u8BA1\u5212\u3002` : "\u5C1A\u672A\u53D1\u73B0\u53EF\u7528\u6A21\u578B\uFF0C\u4FDD\u7559 Harness \u539F\u59CB\u6A21\u578B\u9009\u62E9\u3002" : `${complexity.band === "simple" ? "\u4F4E\u590D\u6742\u5EA6\u4F18\u5148\u6210\u672C\u3001\u54CD\u5E94\u901F\u5EA6\u4E0E\u8F83\u4F4E\u63A8\u7406\u5F00\u9500" : complexity.band === "balanced" ? "\u5728\u8D28\u91CF\u3001\u6210\u672C\u3001\u63A8\u7406\u7B49\u7EA7\u3001\u5EF6\u8FDF\u4E0E\u98CE\u9669\u4E4B\u95F4\u5E73\u8861" : "\u9AD8\u590D\u6742\u5EA6\u6267\u884C\u5305\u542B\u63A8\u7406\u7B49\u7EA7\u7684\u4F9D\u8D56\u611F\u77E5\u5168\u5C40\u7EA6\u675F\u5206\u914D"}\uFF1B\u4EFB\u52A1\u7C7B\u578B\u4E3A ${taskType}\uFF0C\u5DF2\u5BF9 ${String(subtasks.length)} \u4E2A\u5DE5\u4F5C\u5305\u8FDB\u884C Pareto \u526A\u679D\u548C\u6709\u754C\u7EC4\u5408\u641C\u7D22\u3002`;
+  const reason = selected === null ? unassignableTasks.length > 0 ? `\u56FE\u50CF\u5DE5\u4F5C\u5305 ${unassignableTasks.join("\u3001")} \u6CA1\u6709\u53EF\u7528\u7684\u56FE\u50CF\u6A21\u578B\uFF0C\u65E0\u6CD5\u5F62\u6210\u5B8C\u6574\u5206\u914D\u8BA1\u5212\u3002` : "\u5C1A\u672A\u53D1\u73B0\u53EF\u7528\u6A21\u578B\uFF0C\u4FDD\u7559 Harness \u539F\u59CB\u6A21\u578B\u9009\u62E9\u3002" : `${complexity.band === "simple" ? "\u4F4E\u590D\u6742\u5EA6\u4F18\u5148\u6210\u672C\u3001\u54CD\u5E94\u901F\u5EA6\u4E0E\u8F83\u4F4E\u63A8\u7406\u5F00\u9500" : complexity.band === "balanced" ? "\u5728\u8D28\u91CF\u3001\u6210\u672C\u3001\u63A8\u7406\u7B49\u7EA7\u3001\u5EF6\u8FDF\u4E0E\u98CE\u9669\u4E4B\u95F4\u5E73\u8861" : "\u9AD8\u590D\u6742\u5EA6\u6267\u884C\u5305\u542B\u63A8\u7406\u7B49\u7EA7\u7684\u4F9D\u8D56\u611F\u77E5\u7EA6\u675F\u5206\u914D"}\uFF1B\u4EFB\u52A1\u7C7B\u578B\u4E3A ${taskType}\uFF0C${String(subtasks.length)} \u4E2A\u5DE5\u4F5C\u5305\u91C7\u7528${optimized?.search?.exact ? "\u4FDD\u7559\u5019\u9009\u7A7A\u95F4\u5185\u7684\u7CBE\u786E\u641C\u7D22" : "\u4FDD\u7559\u5019\u9009\u7A7A\u95F4\u5185\u7684\u6709\u754C\u8FD1\u4F3C\u641C\u7D22"}\u3002\u8D28\u91CF\u5206\u4E0E\u95E8\u69DB\u662F\u672A\u6821\u51C6\u7684\u4F30\u8BA1\uFF0C\u4E0D\u662F\u7B54\u5BF9\u6982\u7387\u3002`;
   return {
     mode,
     preset: presetId,
@@ -1282,16 +1331,39 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     taskTypes: [...new Set(taskNodes.map((task) => task.type).filter((type) => type !== "reasoning"))],
     objectiveWeights: weights,
     candidates: rows.slice(0, 8).map((row) => {
-      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === "simple" ? "low" : "medium" }, weights, maxCost, /* @__PURE__ */ new Set(), cacheReadRatio, cacheWriteRatio);
-      return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), quality: row.qualitySource === "unknown" ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource };
+      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === "simple" ? "low" : "medium" }, weights, cacheReadRatio, cacheWriteRatio, text6, complexity.band);
+      return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), preferenceAdjustment: decision.preferenceAdjustment, quality: row.qualitySource === "unknown" ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource, pricingVersion: row.pricingVersion, pricingAsOf: row.snapshotAsOf };
     }),
-    selected: selected === null ? null : { provider: selected.provider, model: selected.model, reasoningEffort: selectedAssignment?.decision?.reasoningEffort, estimatedCost: selected.estimatedCost === null ? null : Number(selected.estimatedCost.toFixed(6)), qualitySource: selected.qualitySource, pricingSource: selected.pricingSource },
+    selected: selected === null ? null : { provider: selected.provider, model: selected.model, reasoningEffort: selectedAssignment?.decision?.reasoningEffort, estimatedCost: selected.estimatedCost === null ? null : Number(selected.estimatedCost.toFixed(6)), qualitySource: qualitySourceForTask(selected, selectedAssignment?.task.type ?? taskType), pricingSource: selected.pricingSource },
     subtasks,
     synthesizer: synthesizer == null ? null : { provider: synthesizer.provider, model: synthesizer.model, reasoningEffort: synthesizerAssignment?.decision?.reasoningEffort },
-    estimatedCost: totalEstimate === null ? null : Number(totalEstimate.toFixed(6)),
+    // Preserve precision for downstream budget gates; formatting belongs to UI.
+    estimatedCost: totalEstimate,
     costBreakdown,
     optimization: {
-      solver: "pareto-pruned quality-constrained beam assignment",
+      dataVersions,
+      personalization: learning ? {
+        policyVersion: learning.policyVersion,
+        revision: learning.revision,
+        enabled: learning.enabled,
+        scope: learning.scope,
+        window: learning.window,
+        feedbackCount: learning.feedbackCount,
+        effectiveWeight: learning.effectiveWeight,
+        halfLifeDays: learning.halfLifeDays,
+        priorWeight: learning.priorWeight,
+        maxAdjustment: learning.maxAdjustment,
+        resetAt: learning.resetAt,
+        semantics: "subjective-utility-not-objective-quality"
+      } : null,
+      solver: "dependency-safe quality-constrained exact/beam assignment",
+      qualitySemantics: "uncalibrated-surrogate",
+      costUtility: { method: "1/(1+estimated-task-cost/reference-task-cost)", referencePricing: COST_REFERENCE_PRICING },
+      search: optimized?.search ?? null,
+      optimalityScope: "retained-candidates-and-surrogate-objective",
+      candidateTruncated: (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.truncated, 0),
+      qualityFiltered: (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.filtered, 0),
+      localParetoDisabled: (optimized?.candidatePools ?? []).some((pool) => pool.dependencySensitive),
       qualityFloor: QUALITY_FLOORS[complexity.band],
       budgetUsd: Number(Number(budgetUsd) > 0 ? Number(budgetUsd) : 0),
       cacheReadRatio: normalizedCacheRatios(cacheReadRatio, cacheWriteRatio).read,
@@ -1308,7 +1380,7 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
       beamWidth: ROUTING_BEAM_WIDTH,
       budgetFeasible: budget <= 0 ? pricingComplete ? true : null : budgetPlan !== null,
       minimumFeasibleCost: minimumFeasibleCost === null ? null : Number(Number(minimumFeasibleCost).toFixed(6)),
-      liveBench: liveBench?.fetchedAt ? { source: liveBench.source ?? "livebench", fetchedAt: liveBench.fetchedAt, models: Object.keys(liveBench.models ?? {}).length, stale: String(liveBenchError).length > 0, error: String(liveBenchError || "") } : { source: "experimental-baseline", fetchedAt: null, models: 0, stale: false, error: String(liveBenchError || "") }
+      liveBench: liveBench?.fetchedAt ?? liveBench?.verifiedAt ? { source: liveBench.source ?? "livebench", fetchedAt: liveBench.fetchedAt ?? liveBench.verifiedAt, verifiedAt: liveBench.verifiedAt ?? liveBench.fetchedAt, publishedAt: liveBench.publishedAt ?? null, version: liveBench.version ?? null, models: Object.keys(liveBench.models ?? {}).length, stale: String(liveBenchError).length > 0, error: String(liveBenchError || "") } : { source: "experimental-baseline", fetchedAt: null, models: 0, stale: false, error: String(liveBenchError || "") }
     },
     reason,
     generatedAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -1379,6 +1451,9 @@ function createPlanFromRoutes(task, availableRoutes, {
   runnableToolIds = [],
   pricing = {},
   liveBench = null,
+  liveBenchError = "",
+  dataVersions = null,
+  learning = null,
   cacheReadRatio = 0,
   cacheWriteRatio = 0,
   directProvider = "",
@@ -1417,6 +1492,9 @@ function createPlanFromRoutes(task, availableRoutes, {
     budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0),
     pricing,
     liveBench,
+    liveBenchError,
+    dataVersions,
+    learning,
     cacheReadRatio,
     cacheWriteRatio,
     preset
@@ -1433,7 +1511,7 @@ function createPlanFromRoutes(task, availableRoutes, {
     ...selectedChannel ? annotate(selectedChannel) : {},
     availabilityNotice: "\u6A21\u578B\u76EE\u5F55\u5217\u51FA\u7684\u8DEF\u7EBF\u5C1A\u672A\u9A8C\u8BC1\u5F53\u524D\u51ED\u636E\u548C\u7F51\u7EDC\uFF1B\u5B9E\u9645\u53EF\u7528\u6027\u4EE5\u5B98\u65B9\u9002\u914D\u5668\u8C03\u7528\u7ED3\u679C\u4E3A\u51C6\u3002",
     pricingNotice: plan.estimatedCost === null ? "\u90E8\u5206\u8DEF\u7EBF\u5C1A\u672A\u914D\u7F6E\u8BE5\u4F9B\u5E94\u5546\u7684\u7F8E\u5143\u8F93\u5165/\u8F93\u51FA\u5355\u4EF7\uFF0C\u65E0\u6CD5\u8BA1\u7B97\u53EF\u9760\u7684\u603B\u8D39\u7528\u4E0E\u8282\u7701\u6BD4\u4F8B\uFF1B\u8BF7\u5728\u6A21\u578B\u4EF7\u683C\u8BBE\u7F6E\u4E2D\u8865\u9F50\u3002" : "\u8D39\u7528\u6309\u5DF2\u63D0\u4F9B\u7684\u7F8E\u5143\u5355\u4EF7\u548C\u4F30\u8BA1 token \u6570\u8BA1\u7B97\uFF0C\u4E0D\u662F\u4F9B\u5E94\u5546\u8D26\u5355\uFF0C\u4E5F\u4E0D\u662F\u786C\u6027\u652F\u51FA\u4E0A\u9650\u3002",
-    qualityNotice: plan.optimization.qualityEvidenceComplete ? "\u6A21\u578B\u8D28\u91CF\u4F7F\u7528\u5DF2\u63D0\u4F9B\u8BC4\u5206\u6216\u57FA\u51C6\u6570\u636E\u4F30\u8BA1\uFF0C\u4ECD\u9700\u5B9E\u9645\u4EFB\u52A1\u9A8C\u8BC1\u3002" : "\u90E8\u5206\u6A21\u578B\u8D28\u91CF\u7F3A\u5C11\u53EF\u6838\u9A8C\u8BC4\u5206\uFF1B\u76EE\u5F55\u542F\u53D1\u5F0F\u53EA\u4F9B\u9009\u62E9\u53C2\u8003\uFF0C\u8D28\u91CF\u95E8\u69DB\u548C\u8282\u7701\u6BD4\u4F8B\u65E0\u6CD5\u4FDD\u8BC1\u3002",
+    qualityNotice: plan.optimization.qualityEvidenceComplete ? "\u6A21\u578B\u8D28\u91CF\u4F7F\u7528\u5DF2\u63D0\u4F9B\u8BC4\u5206\u6216\u57FA\u51C6\u6570\u636E\u4F30\u8BA1\uFF1B\u5206\u6570\u4E0E\u95E8\u69DB\u4E0D\u662F\u7B54\u5BF9\u6982\u7387\uFF0C\u4E5F\u4E0D\u4FDD\u8BC1\u5B9E\u9645\u8D28\u91CF\uFF0C\u4ECD\u9700\u72EC\u7ACB\u4EFB\u52A1\u9A8C\u8BC1\u3002" : "\u90E8\u5206\u6A21\u578B\u8D28\u91CF\u7F3A\u5C11\u53EF\u6838\u9A8C\u8BC4\u5206\uFF1B\u76EE\u5F55\u542F\u53D1\u5F0F\u53EA\u4F9B\u9009\u62E9\u53C2\u8003\uFF0C\u8D28\u91CF\u95E8\u69DB\u548C\u8282\u7701\u6BD4\u4F8B\u65E0\u6CD5\u4FDD\u8BC1\u3002",
     modalityNotice: needsImage ? plan.unassignableTasks.length > 0 ? "\u56FE\u50CF\u5DE5\u4F5C\u5305\u6CA1\u6709\u53EF\u786E\u8BA4\u652F\u6301\u56FE\u50CF\u8F93\u5165\u7684\u8DEF\u7EBF\uFF0C\u5F53\u524D\u8BA1\u5212\u65E0\u6CD5\u5B8C\u6574\u5206\u914D\uFF1B\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u914D\u7F6E\u652F\u6301\u56FE\u50CF\u7684\u6A21\u578B\u3002" : routes.some((route) => !Array.isArray(route.inputModalities) || route.inputModalities.length === 0) ? "\u56FE\u50CF\u5DE5\u4F5C\u5305\u53EA\u5206\u7ED9\u5DF2\u58F0\u660E\u56FE\u50CF\u80FD\u529B\u6216\u672A\u58F0\u660E\u8F93\u5165\u80FD\u529B\u7684\u6A21\u578B\uFF1B\u672A\u58F0\u660E\u80FD\u529B\u7684\u6A21\u578B\u4ECD\u9700\u5B9E\u9645\u9A8C\u8BC1\u3002\u5176\u4ED6\u6587\u672C\u5DE5\u4F5C\u5305\u53EF\u7EE7\u7EED\u4F7F\u7528\u7ECF\u6D4E\u578B\u6587\u672C\u6A21\u578B\u3002" : "\u56FE\u50CF\u5DE5\u4F5C\u5305\u53EA\u5206\u7ED9\u660E\u786E\u652F\u6301\u56FE\u50CF\u8F93\u5165\u7684\u6A21\u578B\uFF1B\u5176\u4ED6\u6587\u672C\u5DE5\u4F5C\u5305\u53EF\u7EE7\u7EED\u4F7F\u7528\u7ECF\u6D4E\u578B\u6587\u672C\u6A21\u578B\u3002" : null,
     toolNotice: "\u6267\u884C\u6E20\u9053\u6309\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868\u548C\u5DF2\u6838\u9A8C\u9002\u914D\u5668\u6807\u6CE8\uFF1Aofficial-cli \u8868\u793A\u8BE5\u5382\u5546\u5B98\u65B9 CLI \u5DF2\u5B89\u88C5\u4E14\u53EF\u6258\u7BA1\u6267\u884C\uFF1Bharness-llm \u8868\u793A\u901A\u8FC7\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u8C03\u7528\u3002\u53EF\u5728\u5DE5\u4F5C\u53F0\u67E5\u770B\u5B89\u88C5\u4E0E\u6267\u884C\u652F\u6301\u72B6\u6001\u3002",
     team: {
@@ -1509,32 +1587,88 @@ function applyQualityBiases(routes, biases) {
   });
 }
 
-// .dsh-plugin/client/catalog.mjs
+// .dsh-plugin/shared/adaptive-feedback.mjs
+var finite2 = (value) => typeof value === "number" && Number.isFinite(value);
 var clean3 = (value) => typeof value === "string" ? value.trim() : "";
+var routeKey3 = (provider, model) => `${provider}\0${model}`;
+function applyFeedbackProfile(routes, profile) {
+  if (!Array.isArray(routes) || profile?.enabled !== true || !profile.adjustments || typeof profile.adjustments !== "object" || Array.isArray(profile.adjustments)) return routes;
+  return routes.map((route) => {
+    if (!route || typeof route !== "object") return route;
+    const key = routeKey3(clean3(route.provider), clean3(route.model));
+    if (!Object.hasOwn(profile.adjustments, key)) return route;
+    const value = profile.adjustments[key];
+    if (!value || typeof value !== "object" || Array.isArray(value)) return route;
+    const adjustments = Object.fromEntries(Object.entries(value).filter(([, bias]) => finite2(bias) && Math.abs(bias) <= 0.1));
+    if (!Object.keys(adjustments).length) return route;
+    return {
+      ...route,
+      preferenceAdjustments: adjustments,
+      preferenceAdjustmentMeta: {
+        policyVersion: profile.policyVersion,
+        revision: profile.revision,
+        scope: profile.scope,
+        feedbackCount: profile.feedbackCount,
+        effectiveWeight: profile.effectiveWeight,
+        updatedAt: profile.updatedAt,
+        halfLifeDays: profile.halfLifeDays,
+        maxAdjustment: profile.maxAdjustment,
+        window: profile.window
+      }
+    };
+  });
+}
+
+// .dsh-plugin/shared/dynamic-data-view.mjs
+var exactRouteKey = (route) => `${String(route?.provider ?? "")}\0${String(route?.model ?? "")}`;
+function applyPricingSnapshot(routes, snapshot) {
+  if (snapshot?.kind !== "pricing" || !snapshot.prices || typeof snapshot.prices !== "object") return routes;
+  return (Array.isArray(routes) ? routes : []).map((route) => {
+    if (route?.pricingSource === "user") return route;
+    const entry = snapshot.prices[exactRouteKey(route)];
+    if (!entry) return route;
+    return {
+      ...route,
+      pricing: {
+        input: entry.input,
+        output: entry.output,
+        currency: "USD",
+        ...entry.cacheRead === void 0 ? {} : { cacheRead: entry.cacheRead },
+        ...entry.cacheWrite === void 0 ? {} : { cacheWrite: entry.cacheWrite }
+      },
+      pricingSource: "dynamic",
+      pricingVersion: snapshot.version,
+      snapshotAsOf: entry.asOf
+    };
+  });
+}
+
+// .dsh-plugin/client/catalog.mjs
+var clean4 = (value) => typeof value === "string" ? value.trim() : "";
 function routesFromModelCatalog(catalog) {
   const groups = Array.isArray(catalog?.groups) ? catalog.groups : [];
   const routable = new Set(Array.isArray(catalog?.routableProviders) ? catalog.routableProviders : []);
   const routes = [];
   const seen = /* @__PURE__ */ new Set();
   for (const group of groups) {
-    const provider = clean3(group?.id);
+    const provider = clean4(group?.id);
     if (!provider || !routable.has(provider)) continue;
     for (const entry of Array.isArray(group.models) ? group.models : []) {
-      const model = clean3(entry?.id);
+      const model = clean4(entry?.id);
       if (!model) continue;
       const key = `${provider}\0${model}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const reasoning = entry?.reasoning;
-      const efforts = Array.isArray(reasoning?.efforts) ? [...new Set(reasoning.efforts.map((item) => clean3(item?.id ?? item)).filter(Boolean))] : [];
+      const efforts = Array.isArray(reasoning?.efforts) ? [...new Set(reasoning.efforts.map((item) => clean4(item?.id ?? item)).filter(Boolean))] : [];
       routes.push({
         provider,
-        providerName: clean3(group.name) || provider,
+        providerName: clean4(group.name) || provider,
         model,
-        name: clean3(entry.name) || model,
+        name: clean4(entry.name) || model,
         reasoningKnown: reasoning !== void 0 && reasoning !== null,
         reasoningEfforts: efforts,
-        ...clean3(reasoning?.defaultEffort) ? { defaultReasoningEffort: clean3(reasoning.defaultEffort) } : {},
+        ...clean4(reasoning?.defaultEffort) ? { defaultReasoningEffort: clean4(reasoning.defaultEffort) } : {},
         // modelCatalog deliberately omits modalities; unknown means the Host
         // must still validate image capability before a real request.
         inputModalities: []
@@ -1545,10 +1679,9 @@ function routesFromModelCatalog(catalog) {
   return routes;
 }
 function createWorkspacePlan(task, catalog, options = {}) {
-  const routes = applyQualityBiases(applyModelProfiles(
-    routesFromModelCatalog(catalog),
-    parseModelProfilesJson(options.modelProfilesJson ?? "[]")
-  ), options.qualityBiases ?? null);
+  const profiled = applyModelProfiles(routesFromModelCatalog(catalog), parseModelProfilesJson(options.modelProfilesJson ?? "[]"));
+  const priced = applyPricingSnapshot(profiled, options.pricingSnapshot ?? null);
+  const routes = options.learning ? applyFeedbackProfile(priced, options.learning) : applyQualityBiases(priced, options.qualityBiases ?? null);
   return createPlanFromRoutes(task, routes, options);
 }
 
@@ -1575,6 +1708,7 @@ function profileDraft(profile) {
     cacheWrite: profile?.pricing?.cacheWrite === void 0 ? "" : String(profile.pricing.cacheWrite),
     specialties: Array.isArray(profile?.specialties) ? profile.specialties.join(", ") : "",
     cliModel: profile?.cliModel ?? "",
+    benchmarkModel: profile?.benchmarkModel ?? "",
     execution: profile?.execution === "official" || profile?.execution === "api" ? profile.execution : "auto",
     billing: BILLING_MODES.includes(profile?.billing) ? profile.billing : DEFAULT_BILLING_MODE,
     subscription: ["plan-key", "cli-login", "none"].includes(profile?.subscription) ? profile.subscription : "auto",
@@ -1586,6 +1720,8 @@ function profileFromDraft(route, draft) {
   const model = field(route?.model);
   if (!provider || !model) throw new Error("\u8BF7\u5148\u4ECE\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u9009\u62E9\u4E00\u6761\u51C6\u786E\u7684\u6A21\u578B\u8DEF\u7EBF\u3002");
   const profile = { provider, model };
+  const benchmarkModel = field(draft?.benchmarkModel);
+  if (benchmarkModel) profile.benchmarkModel = benchmarkModel;
   const quality = nonnegativeField(draft?.quality, "\u8D28\u91CF\u8BC4\u5206", 100);
   if (quality !== null) profile.quality = quality;
   const input = nonnegativeField(draft?.input, "\u8F93\u5165\u5355\u4EF7");
@@ -1655,7 +1791,7 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
   const [notice, setNotice] = import_react.default.useState(null);
   import_react.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
   const route = routes.find((item) => profileRouteKey(item) === selected) ?? routes[0];
-  const routeKey3 = route ? profileRouteKey(route) : "";
+  const routeKey4 = route ? profileRouteKey(route) : "";
   const rawJson = snapshot.value?.modelProfilesJson ?? "[]";
   let profiles = [];
   let loadError = "";
@@ -1664,16 +1800,16 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
   } catch (error) {
     loadError = messageOf(error);
   }
-  const saved = profiles.find((item) => profileRouteKey(item) === routeKey3);
-  const pending = drafts[routeKey3];
+  const saved = profiles.find((item) => profileRouteKey(item) === routeKey4);
+  const pending = drafts[routeKey4];
   const draft = pending?.fields ?? profileDraft(saved);
   const writable = snapshot.status === "ready" && snapshot.writable === true && !saving && !loadError;
   const unmatched = profiles.filter((item) => !routes.some((route2) => profileRouteKey(route2) === profileRouteKey(item))).length;
   const edit = (name, value) => {
     if (!route || !writable) return;
     setDrafts((previous) => {
-      const previousEntry = previous[routeKey3] ?? { fields: profileDraft(saved), baseRevision: snapshot.revision };
-      return { ...previous, [routeKey3]: { ...previousEntry, fields: { ...previousEntry.fields, [name]: value } } };
+      const previousEntry = previous[routeKey4] ?? { fields: profileDraft(saved), baseRevision: snapshot.revision };
+      return { ...previous, [routeKey4]: { ...previousEntry, fields: { ...previousEntry.fields, [name]: value } } };
     });
     setNotice(null);
   };
@@ -1698,7 +1834,7 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
       if (!accepted) throw new Error("\u8BBE\u7F6E\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\u3002\u8F93\u5165\u5DF2\u4FDD\u7559\uFF0C\u8BF7\u91CD\u65B0\u52A0\u8F7D\u540E\u6838\u5BF9\u3002");
       setDrafts((previous) => {
         const next = { ...previous };
-        delete next[routeKey3];
+        delete next[routeKey4];
         return next;
       });
       setNotice({ tone: "success", text: remove ? "\u5DF2\u5220\u9664\u8BE5\u6A21\u578B\u7684\u81EA\u62A5\u914D\u7F6E\u3002" : "\u8BE5\u6A21\u578B\u914D\u7F6E\u5DF2\u4FDD\u5B58\uFF1B\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u5373\u53EF\u4F7F\u7528\u3002" });
@@ -1712,15 +1848,15 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
   const reload = () => {
     setDrafts((previous) => {
       const next = { ...previous };
-      delete next[routeKey3];
+      delete next[routeKey4];
       return next;
     });
     setNotice(null);
   };
-  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u9009\u62E9\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u51C6\u786E\u8DEF\u7EBF\uFF0C\u586B\u5199\u4F60\u638C\u63E1\u7684\u8D28\u91CF\u8BC4\u5206\u4E0E\u5355\u4EF7\u3002\u914D\u7F6E\u7531\u4F60\u63D0\u4F9B\uFF0C\u63D2\u4EF6\u4E0D\u4F1A\u8BFB\u53D6\u8D26\u53F7\u5BC6\u94A5\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, "\u5DF2\u6709\u914D\u7F6E\u65E0\u6CD5\u89E3\u6790\uFF1A", loadError, "\u3002\u8BF7\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6B63 JSON\u3002"), snapshot.status !== "ready" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8BBE\u7F6E\u72B6\u6001\uFF1A", snapshot.status === "loading" ? "\u6B63\u5728\u52A0\u8F7D" : "\u5F53\u524D\u4E0D\u53EF\u7528"), snapshot.status === "ready" && !snapshot.writable && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "status" }, "\u5F53\u524D\u8BBE\u7F6E\u4E3A\u53EA\u8BFB\uFF0C\u8BF7\u5728\u53EF\u5199\u7684\u672C\u673A\u73AF\u5883\u914D\u7F6E\u3002"), routes.length === 0 ? /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-empty" }, "\u8BF7\u5148\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u6DFB\u52A0\u6A21\u578B\uFF0C\u518D\u8FD4\u56DE\u8FD9\u91CC\u586B\u5199\u4EF7\u683C\u4E0E\u80FD\u529B\u3002") : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "\u6A21\u578B\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey3, onChange: (event) => {
+  return /* @__PURE__ */ import_react.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B\u914D\u7F6E" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { className: "mr-card-title" }, "\u9010\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B"), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-card-copy" }, "\u9009\u62E9\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u4E2D\u7684\u51C6\u786E\u8DEF\u7EBF\uFF0C\u586B\u5199\u4F60\u638C\u63E1\u7684\u8D28\u91CF\u8BC4\u5206\u4E0E\u5355\u4EF7\u3002\u914D\u7F6E\u7531\u4F60\u63D0\u4F9B\uFF0C\u63D2\u4EF6\u4E0D\u4F1A\u8BFB\u53D6\u8D26\u53F7\u5BC6\u94A5\u3002"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "alert" }, "\u5DF2\u6709\u914D\u7F6E\u65E0\u6CD5\u89E3\u6790\uFF1A", loadError, "\u3002\u8BF7\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6B63 JSON\u3002"), snapshot.status !== "ready" && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8BBE\u7F6E\u72B6\u6001\uFF1A", snapshot.status === "loading" ? "\u6B63\u5728\u52A0\u8F7D" : "\u5F53\u524D\u4E0D\u53EF\u7528"), snapshot.status === "ready" && !snapshot.writable && /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-error", role: "status" }, "\u5F53\u524D\u8BBE\u7F6E\u4E3A\u53EA\u8BFB\uFF0C\u8BF7\u5728\u53EF\u5199\u7684\u672C\u673A\u73AF\u5883\u914D\u7F6E\u3002"), routes.length === 0 ? /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-empty" }, "\u8BF7\u5148\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u6DFB\u52A0\u6A21\u578B\uFF0C\u518D\u8FD4\u56DE\u8FD9\u91CC\u586B\u5199\u4EF7\u683C\u4E0E\u80FD\u529B\u3002") : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "\u6A21\u578B\u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey4, onChange: (event) => {
     setSelected(event.target.value);
     setNotice(null);
-  } }, routes.map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `\u5DF2\u914D\u7F6E${saved.pricing ? "\u5355\u4EF7" : "\u80FD\u529B\uFF0C\u4EF7\u683C\u672A\u77E5"}` : "\u672A\u914D\u7F6E\uFF0C\u4EF7\u683C\u4E0E\u8D28\u91CF\u6765\u6E90\u672A\u77E5", pending ? " \xB7 \u5F53\u524D\u6709\u672A\u4FDD\u5B58\u8F93\u5165" : "", unmatched > 0 ? ` \xB7 \u53E6\u6709 ${unmatched} \u6761\u914D\u7F6E\u4E0D\u5728\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u4E2D\uFF0C\u4FDD\u5B58\u65F6\u4F1A\u4FDD\u7559` : ""), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8D28\u91CF\u8BC4\u5206\uFF080\u2013100\uFF0C\u81EA\u62A5\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "\u4F8B\u5982 85\uFF1B\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u5165\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u51FA\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u64C5\u957F\u65B9\u5411\uFF08\u82F1\u6587\u6807\u7B7E\uFF0C\u9017\u53F7\u5206\u9694\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u5B98\u65B9 CLI \u6A21\u578B\u540D\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "\u4EC5\u5728\u5382\u5546 CLI \u652F\u6301\u8BE5\u51C6\u786E\u540D\u79F0\u65F6\u586B\u5199" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u6267\u884C\u65B9\u5F0F"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.execution || "auto", disabled: !writable, onChange: (event) => edit("execution", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "auto" }, "\u81EA\u52A8\uFF1A\u5DF2\u5B89\u88C5\u5219\u7528\u5B98\u65B9\u5DE5\u5177\uFF0C\u5931\u8D25\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "official" }, "\u5B98\u65B9\u5DE5\u5177\uFF1A\u5931\u8D25\u6216\u672A\u5B89\u88C5\u65F6\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "api" }, "\u4EC5\u6A21\u578B\u76EE\u5F55 API"))), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8BA1\u8D39\u65B9\u5F0F"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.billing, disabled: !writable, onChange: (event) => edit("billing", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "subscription-first" }, "\u8BA2\u9605\u4F18\u5148\uFF1A\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u65F6\u5207\u6362 API Key"), /* @__PURE__ */ import_react.default.createElement("option", { value: "api-only" }, "\u53EA\u7528 API Key"), /* @__PURE__ */ import_react.default.createElement("option", { value: "subscription-only" }, "\u53EA\u7528\u8BA2\u9605\uFF1A\u989D\u5EA6\u7528\u5C3D\u65F6\u4E0D\u5207\u6362"))), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8BA2\u9605\u6765\u6E90"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.subscription, disabled: !writable, onChange: (event) => edit("subscription", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "auto" }, "\u81EA\u52A8\uFF1A\u6709\u5B98\u65B9 CLI \u65F6\u7528 CLI \u8D26\u53F7\u767B\u5F55"), /* @__PURE__ */ import_react.default.createElement("option", { value: "plan-key" }, "\u7F16\u7A0B\u5957\u9910 Key\uFF1A\u8BE5\u8DEF\u7EBF\u672C\u8EAB\u662F\u5957\u9910\u7AEF\u70B9"), /* @__PURE__ */ import_react.default.createElement("option", { value: "cli-login" }, "\u5B98\u65B9 CLI \u8D26\u53F7\u767B\u5F55"), /* @__PURE__ */ import_react.default.createElement("option", { value: "none" }, "\u65E0\u8BA2\u9605\uFF1A\u59CB\u7EC8\u6309 API \u8BA1\u8D39"))), draft.subscription === "plan-key" && /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u989D\u5EA6\u7528\u5C3D\u65F6\u56DE\u9000\u7684 API \u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.apiRoute, disabled: !writable, onChange: (event) => edit("apiRoute", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "\u4E0D\u56DE\u9000\uFF08\u672A\u914D\u7F6E API \u8DEF\u7EBF\uFF09"), routes.filter((item) => profileRouteKey(item) !== routeKey3).map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))))), /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u7F13\u5B58\u5355\u4EF7\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u8BFB\u53D6\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u5199\u5165\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
+  } }, routes.map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `\u5DF2\u914D\u7F6E${saved.pricing ? "\u5355\u4EF7" : "\u80FD\u529B\uFF0C\u4EF7\u683C\u672A\u77E5"}` : "\u672A\u914D\u7F6E\uFF0C\u4EF7\u683C\u4E0E\u8D28\u91CF\u6765\u6E90\u672A\u77E5", pending ? " \xB7 \u5F53\u524D\u6709\u672A\u4FDD\u5B58\u8F93\u5165" : "", unmatched > 0 ? ` \xB7 \u53E6\u6709 ${unmatched} \u6761\u914D\u7F6E\u4E0D\u5728\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u4E2D\uFF0C\u4FDD\u5B58\u65F6\u4F1A\u4FDD\u7559` : ""), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8D28\u91CF\u8BC4\u5206\uFF080\u2013100\uFF0C\u81EA\u62A5\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "\u4F8B\u5982 85\uFF1B\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u5165\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8F93\u51FA\u5355\u4EF7\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "\u7559\u7A7A\u8868\u793A\u672A\u77E5" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u64C5\u957F\u65B9\u5411\uFF08\u82F1\u6587\u6807\u7B7E\uFF0C\u9017\u53F7\u5206\u9694\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u5B98\u65B9 CLI \u6A21\u578B\u540D\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "\u4EC5\u5728\u5382\u5546 CLI \u652F\u6301\u8BE5\u51C6\u786E\u540D\u79F0\u65F6\u586B\u5199" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "LiveBench \u51C6\u786E\u6A21\u578B\u540D\u79F0\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "text", value: draft.benchmarkModel ?? "", disabled: !writable, onChange: (event) => edit("benchmarkModel", event.target.value), placeholder: "\u786E\u8BA4\u7248\u672C\u4E0E\u63A8\u7406\u6863\u4F4D\u4E00\u81F4\uFF1B\u4E0D\u81EA\u52A8\u731C\u6D4B\u522B\u540D" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u6267\u884C\u65B9\u5F0F"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.execution || "auto", disabled: !writable, onChange: (event) => edit("execution", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "auto" }, "\u81EA\u52A8\uFF1A\u5DF2\u5B89\u88C5\u5219\u7528\u5B98\u65B9\u5DE5\u5177\uFF0C\u5931\u8D25\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "official" }, "\u5B98\u65B9\u5DE5\u5177\uFF1A\u5931\u8D25\u6216\u672A\u5B89\u88C5\u65F6\u56DE\u9000 API"), /* @__PURE__ */ import_react.default.createElement("option", { value: "api" }, "\u4EC5\u6A21\u578B\u76EE\u5F55 API"))), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8BA1\u8D39\u65B9\u5F0F"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.billing, disabled: !writable, onChange: (event) => edit("billing", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "subscription-first" }, "\u8BA2\u9605\u4F18\u5148\uFF1A\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u65F6\u5207\u6362 API Key"), /* @__PURE__ */ import_react.default.createElement("option", { value: "api-only" }, "\u53EA\u7528 API Key"), /* @__PURE__ */ import_react.default.createElement("option", { value: "subscription-only" }, "\u53EA\u7528\u8BA2\u9605\uFF1A\u989D\u5EA6\u7528\u5C3D\u65F6\u4E0D\u5207\u6362"))), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u8BA2\u9605\u6765\u6E90"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.subscription, disabled: !writable, onChange: (event) => edit("subscription", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "auto" }, "\u81EA\u52A8\uFF1A\u6709\u5B98\u65B9 CLI \u65F6\u7528 CLI \u8D26\u53F7\u767B\u5F55"), /* @__PURE__ */ import_react.default.createElement("option", { value: "plan-key" }, "\u7F16\u7A0B\u5957\u9910 Key\uFF1A\u8BE5\u8DEF\u7EBF\u672C\u8EAB\u662F\u5957\u9910\u7AEF\u70B9"), /* @__PURE__ */ import_react.default.createElement("option", { value: "cli-login" }, "\u5B98\u65B9 CLI \u8D26\u53F7\u767B\u5F55"), /* @__PURE__ */ import_react.default.createElement("option", { value: "none" }, "\u65E0\u8BA2\u9605\uFF1A\u59CB\u7EC8\u6309 API \u8BA1\u8D39"))), draft.subscription === "plan-key" && /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u989D\u5EA6\u7528\u5C3D\u65F6\u56DE\u9000\u7684 API \u8DEF\u7EBF"), /* @__PURE__ */ import_react.default.createElement("select", { className: "mr-input", value: draft.apiRoute, disabled: !writable, onChange: (event) => edit("apiRoute", event.target.value) }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "\u4E0D\u56DE\u9000\uFF08\u672A\u914D\u7F6E API \u8DEF\u7EBF\uFF09"), routes.filter((item) => profileRouteKey(item) !== routeKey4).map((item) => /* @__PURE__ */ import_react.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))))), /* @__PURE__ */ import_react.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react.default.createElement("summary", null, "\u7F13\u5B58\u5355\u4EF7\uFF08\u53EF\u9009\uFF09"), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u8BFB\u53D6\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })), /* @__PURE__ */ import_react.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u7F13\u5B58\u5199\u5165\uFF08USD / \u767E\u4E07 token\uFF09"), /* @__PURE__ */ import_react.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "\u7559\u7A7A\u6309\u666E\u901A\u8F93\u5165\u4EF7\u683C\u4F30\u7B97" })))), /* @__PURE__ */ import_react.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
     void write(false);
   } }, saving ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58\u6B64\u6A21\u578B"), /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !pending || saving, onClick: reload }, "\u91CD\u65B0\u52A0\u8F7D\u6B64\u8DEF\u7EBF"), saved && /* @__PURE__ */ import_react.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable, onClick: () => {
     void write(true);
@@ -1978,6 +2114,92 @@ function rerunConfirmations({ run, item, override = null, choice = null, ledger 
   return reasons;
 }
 
+// .dsh-plugin/client/adaptive-state.mjs
+var ADAPTIVE_DEFAULTS = Object.freeze({
+  feedbackLearningEnabled: true,
+  feedbackHalfLifeDays: 30,
+  feedbackPriorWeight: 3,
+  feedbackMaxAdjustment: 0.04,
+  feedbackResetAt: 0,
+  dynamicDataEnabled: false,
+  liveBenchEndpoint: "https://livebench.ai",
+  dynamicDataTtlMinutes: 1440,
+  pricingSnapshotEndpoint: ""
+});
+var ADAPTIVE_NUMBER_FIELDS = Object.freeze([
+  Object.freeze({ key: "feedbackHalfLifeDays", min: 1, max: 3650, step: 1 }),
+  Object.freeze({ key: "feedbackPriorWeight", min: 1, max: 1e6, step: 1 }),
+  Object.freeze({ key: "feedbackMaxAdjustment", min: 0, max: 0.1, step: 0.01 }),
+  Object.freeze({ key: "dynamicDataTtlMinutes", min: 1, max: 10080, step: 1 })
+]);
+function adaptiveSettingValue(settings, key) {
+  return settings?.[key] ?? ADAPTIVE_DEFAULTS[key];
+}
+function parseAdaptiveNumber(key, draft) {
+  const field2 = ADAPTIVE_NUMBER_FIELDS.find((item) => item.key === key);
+  if (!field2) throw new TypeError("Unknown numeric setting");
+  if (typeof draft !== "string" && typeof draft !== "number" || String(draft).trim() === "") throw new TypeError("Enter a number");
+  const value = Number(draft);
+  if (!Number.isFinite(value) || value < field2.min || value > field2.max) throw new RangeError(`Expected ${field2.min}..${field2.max}`);
+  return value;
+}
+function parsePublicEndpoint(key, draft) {
+  if (!["liveBenchEndpoint", "pricingSnapshotEndpoint"].includes(key)) throw new TypeError("Unknown endpoint setting");
+  if (typeof draft !== "string") throw new TypeError("Enter a public HTTPS URL");
+  const value = draft.trim();
+  if (key === "pricingSnapshotEndpoint" && value === "") return "";
+  if (!value || value.length > 2048) throw new TypeError("Enter a public HTTPS URL");
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new TypeError("Enter a public HTTPS URL");
+  }
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.port && parsed.port !== "443") {
+    throw new TypeError("Use a public HTTPS URL without credentials, query or fragment");
+  }
+  if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/iu.test(parsed.hostname) || /(?:^|\.)(?:localhost|local|internal|lan|home|test|invalid)$/iu.test(parsed.hostname)) throw new TypeError("Use a public hostname");
+  return value;
+}
+function publicEndpointDraft(key, value) {
+  try {
+    return parsePublicEndpoint(key, value);
+  } catch {
+    return "";
+  }
+}
+function feedbackRatingArguments(run, item, direction) {
+  if (!["up", "down"].includes(direction)) throw new TypeError("Unknown rating direction");
+  const active = direction === "up" ? item?.rating === 1 : item?.rating === -1;
+  return [run?.id, item?.id, active ? "clear" : direction, item?.finishedAt];
+}
+var nonnegative2 = (value) => Number.isFinite(value) && value >= 0 ? value : 0;
+function learningView(learning, settings = {}) {
+  return {
+    available: Boolean(learning && typeof learning === "object"),
+    enabled: typeof learning?.enabled === "boolean" ? learning.enabled : adaptiveSettingValue(settings, "feedbackLearningEnabled") !== false,
+    feedbackCount: nonnegative2(learning?.feedbackCount),
+    ignoredCount: nonnegative2(learning?.ignoredCount),
+    effectiveWeight: nonnegative2(learning?.effectiveWeight),
+    policyVersion: typeof learning?.policyVersion === "string" ? learning.policyVersion.slice(0, 100) : null,
+    resetAt: nonnegative2(adaptiveSettingValue(settings, "feedbackResetAt"))
+  };
+}
+var STATUS_LABEL = Object.freeze({ disabled: "\u672A\u542F\u7528", missing: "\u5C1A\u65E0\u5FEB\u7167", fresh: "\u5FEB\u7167\u6709\u6548", stale: "\u5FEB\u7167\u8FC7\u671F", error: "\u66F4\u65B0\u5931\u8D25" });
+function dynamicSourceView(source) {
+  const status = Object.hasOwn(STATUS_LABEL, source?.status ?? "") ? source.status : "missing";
+  let publicSource = "";
+  if (typeof source?.source === "string") publicSource = publicEndpointDraft("pricingSnapshotEndpoint", source.source);
+  return {
+    status,
+    label: STATUS_LABEL[status],
+    source: publicSource,
+    version: typeof source?.version === "string" ? source.version.slice(0, 160) : null,
+    verifiedAt: Number.isFinite(source?.verifiedAt) && source.verifiedAt > 0 ? source.verifiedAt : null,
+    count: nonnegative2(source?.modelCount ?? source?.rowCount)
+  };
+}
+
 // .dsh-plugin/client/router-insights.jsx
 var text = (value) => typeof value === "string" ? value.trim() : "";
 var BAND = { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u56F0\u96BE" };
@@ -2028,6 +2250,134 @@ function useSettingsWriter(settingsScope) {
   };
   return { value: snapshot.value ?? {}, writable, write, notice };
 }
+var ADAPTIVE_FIELD_LABEL = {
+  feedbackHalfLifeDays: "\u53CD\u9988\u534A\u8870\u671F\uFF08\u5929\uFF09",
+  feedbackPriorWeight: "\u6536\u7F29\u5F3A\u5EA6",
+  feedbackMaxAdjustment: "\u6700\u5927\u504F\u597D\u6548\u7528\u8C03\u6574",
+  dynamicDataTtlMinutes: "\u516C\u5171\u5FEB\u7167\u68C0\u67E5\u95F4\u9694\uFF08\u5206\u949F\uFF09"
+};
+function AdaptiveNumberControl({ field: field2, value, writable, onSave }) {
+  const [draft, setDraft] = import_react2.default.useState("");
+  const [notice, setNotice] = import_react2.default.useState("");
+  const save = async () => {
+    try {
+      const next = parseAdaptiveNumber(field2.key, draft);
+      setNotice("");
+      if (await onSave(field2.key, next)) setDraft("");
+    } catch {
+      setNotice(`\u8BF7\u8F93\u5165 ${field2.min} \u5230 ${field2.max} \u7684\u6570\u5B57\u3002`);
+    }
+  };
+  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${field2.key}` }, ADAPTIVE_FIELD_LABEL[field2.key]), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement(
+    "input",
+    {
+      className: "mr-input mr-budget",
+      id: `mr-${field2.key}`,
+      type: "number",
+      min: field2.min,
+      max: field2.max,
+      step: field2.step,
+      placeholder: String(value),
+      value: draft,
+      disabled: !writable,
+      onChange: (event) => setDraft(event.target.value)
+    }
+  ), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || draft === "", onClick: () => {
+    void save();
+  } }, "\u4FDD\u5B58")), notice && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-error", role: "alert" }, notice));
+}
+function PublicEndpointControl({ name, label, value, writable, onSave }) {
+  const [draft, setDraft] = import_react2.default.useState(null);
+  const [notice, setNotice] = import_react2.default.useState("");
+  const current = publicEndpointDraft(name, value);
+  const save = async () => {
+    try {
+      const next = parsePublicEndpoint(name, draft ?? current);
+      setNotice("");
+      if (await onSave(name, next)) setDraft(null);
+    } catch {
+      setNotice("\u8BF7\u8F93\u5165\u4E0D\u542B\u8BA4\u8BC1\u3001\u67E5\u8BE2\u53C2\u6570\u6216\u7247\u6BB5\u7684\u516C\u5F00 HTTPS \u5730\u5740\uFF1B\u4EF7\u683C\u5FEB\u7167\u53EF\u7559\u7A7A\u3002");
+    }
+  };
+  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${name}` }, label), /* @__PURE__ */ import_react2.default.createElement(
+    "input",
+    {
+      className: "mr-input",
+      id: `mr-${name}`,
+      type: "url",
+      maxLength: 2048,
+      value: draft ?? current,
+      disabled: !writable,
+      placeholder: name === "liveBenchEndpoint" ? "https://livebench.ai" : "\u7559\u7A7A\uFF1A\u4E0D\u8BFB\u53D6\u8FDC\u7A0B\u4EF7\u683C\u5FEB\u7167",
+      onChange: (event) => setDraft(event.target.value)
+    }
+  ), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || draft === null, onClick: () => {
+    void save();
+  } }, "\u4FDD\u5B58\u5730\u5740"), notice && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-error", role: "alert" }, notice));
+}
+function PublicSourceStatus({ label, source }) {
+  const view = dynamicSourceView(source);
+  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-control-label" }, label, "\uFF1A", view.label), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, view.version ? `\u7248\u672C ${view.version} \xB7 ` : "", view.count, " \u6761\u8BB0\u5F55", view.verifiedAt ? ` \xB7 \u6700\u8FD1\u6821\u9A8C ${new Date(view.verifiedAt).toLocaleString()}` : ""), view.source && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u516C\u5F00\u6765\u6E90\uFF1A", view.source), view.status === "error" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u66F4\u65B0\u5931\u8D25\uFF1B\u662F\u5426\u53EF\u7528\u7531 Host \u6821\u9A8C\uFF0C\u4E0D\u5C06\u7F3A\u5931\u6570\u636E\u5F53\u4F5C\u96F6\u6210\u672C\u6216\u6EE1\u5206\u3002"));
+}
+function AdaptiveControls({ ledger, settings, onChanged }) {
+  const value = settings.value;
+  const learning = learningView(ledger?.learning, value);
+  const [resetBusy, setResetBusy] = import_react2.default.useState(false);
+  const save = async (key, next) => {
+    const accepted = await settings.write(key, next);
+    if (accepted) onChanged?.();
+    return accepted;
+  };
+  const reset = async () => {
+    if (!window.confirm("\u4ECE\u73B0\u5728\u91CD\u65B0\u5B66\u4E60\u4F60\u7684\u504F\u597D\uFF1F\u6B64\u524D\u53CD\u9988\u5C06\u4E0D\u518D\u53C2\u4E0E\u8C03\u6574\uFF0C\u4F46\u6267\u884C\u8BB0\u5F55\u3001\u8D39\u7528\u5386\u53F2\u548C\u539F\u8BC4\u4EF7\u4E0D\u4F1A\u5220\u9664\u3002")) return;
+    setResetBusy(true);
+    try {
+      await save("feedbackResetAt", Date.now());
+    } finally {
+      setResetBusy(false);
+    }
+  };
+  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("h3", { className: "mr-section-title" }, "\u6301\u7EED\u53CD\u9988\u4E0E\u672C\u5730\u504F\u597D"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u53EA\u4F7F\u7528\u4F60\u5BF9\u5DF2\u8BB0\u5F55\u7ED3\u679C\u7684\u70B9\u8D5E / \u4E0D\u597D / \u64A4\u56DE\uFF0C\u6309\u4EFB\u52A1\u7C7B\u578B\u548C\u65F6\u95F4\u8870\u51CF\u8C03\u6574\u504F\u597D\u6548\u7528\uFF1B\u4E0D\u62AC\u9AD8\u8D28\u91CF\u786C\u95E8\u69DB\u3002\u7CFB\u7EDF\u6267\u884C\u6210\u529F\u4E0D\u7B49\u4E8E\u4F60\u6EE1\u610F\uFF0C\u6A21\u578B\u590D\u6838\u4E5F\u4E0D\u4F5C\u4E3A\u4EBA\u5DE5\u8BC4\u5206\u3002\u4E0D\u4F1A\u4E3A\u4E86\u5B66\u4E60\u53D1\u8D77\u4ED8\u8D39\u63A2\u7D22\u3002"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u8303\u56F4\uFF1A\u672C\u5730 DSH_HOME \u5DE5\u4F5C\u5BA4\u5171\u4EAB\uFF0C\u4E0D\u662F\u6309\u8D26\u53F7\u9694\u79BB\uFF1B\u6700\u591A\u6700\u8FD1 200 \u6B21\u8FD0\u884C\u7684\u6ED1\u52A8\u7A97\u53E3\uFF0C\u4E0D\u4E0A\u4F20\u53CD\u9988\u6216\u4EFB\u52A1\u5185\u5BB9\u3002"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react2.default.createElement(
+    "input",
+    {
+      type: "checkbox",
+      checked: adaptiveSettingValue(value, "feedbackLearningEnabled") !== false,
+      disabled: !settings.writable,
+      onChange: (event) => {
+        void save("feedbackLearningEnabled", event.target.checked);
+      }
+    }
+  ), "\u542F\u7528\u7528\u6237\u53CD\u9988\u5B66\u4E60"), ADAPTIVE_NUMBER_FIELDS.filter((field2) => field2.key !== "dynamicDataTtlMinutes").map((field2) => /* @__PURE__ */ import_react2.default.createElement(
+    AdaptiveNumberControl,
+    {
+      key: field2.key,
+      field: field2,
+      value: adaptiveSettingValue(value, field2.key),
+      writable: settings.writable,
+      onSave: save
+    }
+  ))), learning.available ? /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, learning.enabled ? "\u5B66\u4E60\u5DF2\u542F\u7528" : "\u5B66\u4E60\u5DF2\u505C\u7528", " \xB7 \u6709\u6548\u53CD\u9988 ", learning.feedbackCount, " \xB7 \u6709\u6548\u6743\u91CD ", learning.effectiveWeight.toFixed(2), " \xB7 \u5FFD\u7565 ", learning.ignoredCount, learning.policyVersion ? ` \xB7 \u7B56\u7565 ${learning.policyVersion}` : "") : /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B66\u4E60\u6458\u8981\u5C1A\u672A\u8BFB\u53D6\uFF1B\u4FDD\u5B58\u540E\u5237\u65B0\u6267\u884C\u8BB0\u5F55\u67E5\u770B\u3002"), learning.resetAt > 0 && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u5B66\u4E60\u8D77\u70B9\uFF1A", new Date(learning.resetAt).toLocaleString(), "\uFF0C\u6B64\u524D\u53CD\u9988\u4E0D\u518D\u53C2\u4E0E\u8C03\u6574\u3002"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || resetBusy, onClick: () => {
+    void reset();
+  } }, resetBusy ? "\u6B63\u5728\u8BBE\u7F6E\u2026" : "\u4ECE\u73B0\u5728\u91CD\u65B0\u5B66\u4E60"), /* @__PURE__ */ import_react2.default.createElement("h3", { className: "mr-section-title" }, "\u52A8\u6001\u516C\u5171\u6570\u636E"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u9ED8\u8BA4\u5173\u95ED\u3002\u660E\u786E\u542F\u7528\u540E\uFF0C\u5728\u6253\u5F00 / \u5237\u65B0\u8D26\u672C\u53CA\u6267\u884C\u524D\u6309\u68C0\u67E5\u95F4\u9694\u8BFB\u53D6\u516C\u5F00 LiveBench \u548C\u53EF\u9009\u4EF7\u683C\u5FEB\u7167\uFF1B\u4EF7\u683C\u4E0E\u80FD\u529B\u5148\u9A8C\u4FDD\u7559\u7248\u672C\uFF0C\u4E0D\u4EE3\u8868\u771F\u5B9E\u4EFB\u52A1\u6536\u76CA\u3002\u53EA\u6709\u6253\u5F00\u516C\u5171\u6E90\u5F00\u5173\u624D\u4F1A\u8BFB\u53D6\u8FDC\u7A0B\u6570\u636E\uFF0C\u4E0D\u53D1\u9001\u4EFB\u52A1\u6216\u53CD\u9988\u3002"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react2.default.createElement(
+    "input",
+    {
+      type: "checkbox",
+      checked: adaptiveSettingValue(value, "dynamicDataEnabled") === true,
+      disabled: !settings.writable,
+      onChange: (event) => {
+        void save("dynamicDataEnabled", event.target.checked);
+      }
+    }
+  ), "\u542F\u7528\u52A8\u6001\u516C\u5171\u6570\u636E"), /* @__PURE__ */ import_react2.default.createElement(
+    AdaptiveNumberControl,
+    {
+      field: ADAPTIVE_NUMBER_FIELDS.find((field2) => field2.key === "dynamicDataTtlMinutes"),
+      value: adaptiveSettingValue(value, "dynamicDataTtlMinutes"),
+      writable: settings.writable,
+      onSave: save
+    }
+  ), /* @__PURE__ */ import_react2.default.createElement(PublicEndpointControl, { name: "liveBenchEndpoint", label: "LiveBench \u516C\u5F00\u6E90", value: adaptiveSettingValue(value, "liveBenchEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react2.default.createElement(PublicEndpointControl, { name: "pricingSnapshotEndpoint", label: "\u4EF7\u683C\u5FEB\u7167\u516C\u5F00\u6E90\uFF08\u53EF\u9009\uFF09", value: adaptiveSettingValue(value, "pricingSnapshotEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react2.default.createElement(PublicSourceStatus, { label: "LiveBench", source: ledger?.dynamicData?.liveBench }), /* @__PURE__ */ import_react2.default.createElement(PublicSourceStatus, { label: "\u4EF7\u683C", source: ledger?.dynamicData?.pricing })));
+}
 function CostControlCard({ ledger, settingsScope, onChanged, error }) {
   const settings = useSettingsWriter(settingsScope);
   const [dailyDraft, setDailyDraft] = import_react2.default.useState("");
@@ -2066,7 +2416,7 @@ function CostControlCard({ ledger, settingsScope, onChanged, error }) {
     void set("allowManualReassign", event.target.checked);
   } }), "\u5141\u8BB8\u624B\u52A8\u6539\u6D3E\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react2.default.createElement("input", { type: "checkbox", checked: value.confirmUnsandboxedCli !== false, disabled: !settings.writable, onChange: (event) => {
     void set("confirmUnsandboxedCli", event.target.checked);
-  } }), "\u76F4\u63A5\u542F\u52A8\u65E0\u6C99\u7BB1 CLI \u524D\u5148\u786E\u8BA4")), settings.notice && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, settings.notice)));
+  } }), "\u76F4\u63A5\u542F\u52A8\u65E0\u6C99\u7BB1 CLI \u524D\u5148\u786E\u8BA4")), /* @__PURE__ */ import_react2.default.createElement(AdaptiveControls, { ledger, settings, onChanged }), settings.notice && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, settings.notice)));
 }
 function DagView({ packages, renderNode, label = "\u5B50\u4EFB\u52A1\u4F9D\u8D56\u56FE" }) {
   const layers = dagLayers(packages);
@@ -2088,7 +2438,7 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
   const rerun = rerunSupport(run);
   const canRerun = rerun.supported && !item.ok && !busy;
   const others = routes.filter((route) => `${route.provider}/${route.model}` !== `${item.provider}/${item.model}`);
-  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u8BA1\u8D39\uFF1A", BILLING_CHANNEL_LABEL[item.billing] ?? "\u2014", item.subscriptionRoute ? ` \xB7 \u5957\u9910\u8DEF\u7EBF ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` \xB7 ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "\u8BA1\u8D39\u5207\u6362\uFF1A", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(run.id, item.id, item.rating === 1 ? "clear" : "up") }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(run.id, item.id, item.rating === -1 ? "clear" : "down") }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run.id, item.id, null) }, run.kind === "tool" ? "\u91CD\u65B0\u6267\u884C\u6B64\u8C03\u7528" : rerun.writes ? "\u5728\u65B0\u5DE5\u4F5C\u533A\u7EED\u8DD1" : "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
+  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u8BA1\u8D39\uFF1A", BILLING_CHANNEL_LABEL[item.billing] ?? "\u2014", item.subscriptionRoute ? ` \xB7 \u5957\u9910\u8DEF\u7EBF ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` \xB7 ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "\u8BA1\u8D39\u5207\u6362\uFF1A", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "up")) }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "down")) }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run.id, item.id, null) }, run.kind === "tool" ? "\u91CD\u65B0\u6267\u884C\u6B64\u8C03\u7528" : rerun.writes ? "\u5728\u65B0\u5DE5\u4F5C\u533A\u7EED\u8DD1" : "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
     const [provider, model] = target.split("\0");
     onRerun(run.id, item.id, { provider, model });
   } }, "\u6539\u6D3E\u5E76\u91CD\u8DD1"))));
@@ -2173,26 +2523,26 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     if (blocked || busy) return;
     const current = ++pendingRequest.current;
     const snapshot = request();
-    const signature = inputSignature;
+    const signature2 = inputSignature;
     setPhase({ kind: "previewing" });
     try {
       const value = unwrapRemote(await previewRun(snapshot), "\u6267\u884C\u9884\u89C8\u5931\u8D25\u3002");
-      if (mounted.current && current === pendingRequest.current && signature === latestSignature.current) setPhase({ kind: "preview", value, request: snapshot, signature });
+      if (mounted.current && current === pendingRequest.current && signature2 === latestSignature.current) setPhase({ kind: "preview", value, request: snapshot, signature: signature2 });
     } catch (error) {
-      if (mounted.current && current === pendingRequest.current && signature === latestSignature.current) setPhase({ kind: "error", message: text2(error?.message) || "\u6267\u884C\u9884\u89C8\u5931\u8D25\u3002" });
+      if (mounted.current && current === pendingRequest.current && signature2 === latestSignature.current) setPhase({ kind: "error", message: text2(error?.message) || "\u6267\u884C\u9884\u89C8\u5931\u8D25\u3002" });
     }
   };
   const confirm2 = async () => {
     if (phase.kind !== "preview" || phase.signature !== latestSignature.current) return;
     const shown = phase.value;
     const snapshot = phase.request;
-    const signature = phase.signature;
-    setPhase({ kind: "running", value: shown, request: snapshot, signature });
+    const signature2 = phase.signature;
+    setPhase({ kind: "running", value: shown, request: snapshot, signature: signature2 });
     try {
       const value = unwrapRemote(await startRun({ ...snapshot, confirmedReasons: (shown.reasons ?? []).map((item) => item.code) }), "\u6267\u884C\u5931\u8D25\u3002");
       if (!mounted.current) return;
       if (value.status === "needs-confirmation") {
-        setPhase(signature === latestSignature.current ? { kind: "preview", value, request: snapshot, signature, changed: true } : { kind: "idle" });
+        setPhase(signature2 === latestSignature.current ? { kind: "preview", value, request: snapshot, signature: signature2, changed: true } : { kind: "idle" });
         return;
       }
       setPhase({ kind: "done", value });
@@ -11653,7 +12003,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.15.0" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.16.0" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -12431,6 +12781,11 @@ var router_main_default = `.mr-workspace {
 // .dsh-plugin/client/router-main.jsx
 var money2 = (value) => value === null || value === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : `$${Number(value).toFixed(4)}`;
 var text5 = (value) => typeof value === "string" ? value.trim() : "";
+var routingSettingsSignature = (value) => JSON.stringify([
+  value.modelProfilesJson,
+  value.routingPreset,
+  ...Object.keys(ADAPTIVE_DEFAULTS).map((key) => value[key] ?? ADAPTIVE_DEFAULTS[key])
+]);
 function RouterPanelIcon({ size = 20, active = false }) {
   return /* @__PURE__ */ import_react5.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react5.default.createElement("path", { d: "M7 6.5h7M7 17.5h7M15 6.5v11", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }), /* @__PURE__ */ import_react5.default.createElement("circle", { cx: "5", cy: "6.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react5.default.createElement("circle", { cx: "5", cy: "17.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react5.default.createElement("circle", { cx: "17", cy: "12", r: "3", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7" }));
 }
@@ -12611,6 +12966,7 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   const [boundaries, setBoundaries] = import_react5.default.useState({ value: null, error: "" });
   const [busy, setBusy] = import_react5.default.useState(false);
   const mounted = import_react5.default.useRef(true);
+  const ledgerRequest = import_react5.default.useRef(0);
   import_react5.default.useEffect(() => () => {
     mounted.current = false;
   }, []);
@@ -12628,11 +12984,15 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     }
   };
   const refreshLedger = async () => {
+    const request = ++ledgerRequest.current;
     try {
       const value = await call(loadLedger, "\u6267\u884C\u8BB0\u5F55\u8BFB\u53D6\u5931\u8D25\u3002");
-      if (mounted.current) setLedger({ value, error: "" });
+      if (mounted.current && request === ledgerRequest.current) setLedger({ value, error: "" });
+      if (request !== ledgerRequest.current) return null;
+      return value;
     } catch (error) {
-      if (mounted.current) setLedger((previous) => ({ ...previous, error: text5(error?.message) || "\u6267\u884C\u8BB0\u5F55\u8BFB\u53D6\u5931\u8D25\u3002" }));
+      if (mounted.current && request === ledgerRequest.current) setLedger((previous) => ({ ...previous, error: text5(error?.message) || "\u6267\u884C\u8BB0\u5F55\u8BFB\u53D6\u5931\u8D25\u3002" }));
+      return null;
     }
   };
   const refreshBoundaries = async () => {
@@ -12651,10 +13011,10 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
       if (mounted.current) setHealth((previous) => ({ ...previous, error: text5(error?.message) || "\u65E0\u6CD5\u4FDD\u5B58\u4F53\u68C0\u72B6\u6001\u3002" }));
     }
   };
-  const rate = async (runId, packageId, rating) => {
+  const rate = async (runId, packageId, rating, expectedFinishedAt) => {
     setBusy(true);
     try {
-      await call(() => rateResult({ runId, packageId, rating }), "\u8BC4\u4EF7\u4FDD\u5B58\u5931\u8D25\u3002");
+      await call(() => rateResult({ runId, packageId, rating, ...expectedFinishedAt === void 0 ? {} : { expectedFinishedAt } }), "\u8BC4\u4EF7\u4FDD\u5B58\u5931\u8D25\u3002");
       await refreshLedger();
     } catch (error) {
       if (mounted.current) setLedger((previous) => ({ ...previous, error: text5(error?.message) || "\u8BC4\u4EF7\u4FDD\u5B58\u5931\u8D25\u3002" }));
@@ -12714,7 +13074,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
   const [toolProbes, setToolProbes] = import_react5.default.useState(null);
   const [routingSettings, setRoutingSettings] = import_react5.default.useState(() => {
     const value = settingsScope.getSnapshot().value ?? {};
-    return JSON.stringify([value.modelProfilesJson, value.routingPreset]);
+    return routingSettingsSignature(value);
   });
   const [view, setView] = import_react5.default.useState("plan");
   const tabRefs = import_react5.default.useRef({});
@@ -12723,6 +13083,9 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
   const budgetValue = import_react5.default.useRef(budget);
   const mounted = import_react5.default.useRef(false);
   const catalogRequest = import_react5.default.useRef(0);
+  const generationRequest = import_react5.default.useRef(0);
+  const generationInputs = import_react5.default.useRef("");
+  generationInputs.current = JSON.stringify([task, budget, mode, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools]);
   import_react5.default.useEffect(() => {
     if (plan) resultHeading.current?.focus({ preventScroll: true });
   }, [plan]);
@@ -12739,10 +13102,10 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
   import_react5.default.useEffect(() => {
     const syncBudget = () => {
       const value = settingsScope.getSnapshot().value ?? {};
-      const signature = JSON.stringify([value.modelProfilesJson, value.routingPreset]);
+      const signature2 = routingSettingsSignature(value);
       setRoutingSettings((previous) => {
-        if (previous === signature) return previous;
-        return signature;
+        if (previous === signature2) return previous;
+        return signature2;
       });
       if (budgetEdited.current) return;
       const next = String(value.budgetUsd ?? 0);
@@ -12760,6 +13123,14 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     setPlan(null);
     setPlanError("");
   }, [routingSettings]);
+  const dataRevision = workbench.ledger.value?.dynamicData?.revision ?? "";
+  const feedbackRevision = workbench.ledger.value?.learning?.revision ?? "";
+  import_react5.default.useEffect(() => {
+    if (plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}`) {
+      setPlan(null);
+      setPlanError("");
+    }
+  }, [dataRevision, feedbackRevision, plan]);
   import_react5.default.useEffect(() => {
     mounted.current = true;
     const request = ++catalogRequest.current;
@@ -12791,15 +13162,19 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     }
   };
   const invalidatePlan = () => {
+    generationRequest.current += 1;
     setPlan(null);
     setPlanError("");
   };
   const handleToolProbes = import_react5.default.useCallback((snapshot) => {
+    generationRequest.current += 1;
     setToolProbes(snapshot);
     setPlan(null);
     setPlanError("");
   }, []);
-  const generate = () => {
+  const generate = async () => {
+    const request = ++generationRequest.current;
+    const inputs = generationInputs.current;
     setPlanError("");
     try {
       if (!text5(task)) throw new Error("\u8BF7\u5148\u63CF\u8FF0\u4EFB\u52A1\u3002");
@@ -12808,7 +13183,14 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       if (!Number.isFinite(parsedBudget) || parsedBudget < 0) throw new Error("\u9884\u7B97\u5FC5\u987B\u662F\u4E0D\u5C0F\u4E8E 0 \u7684\u6570\u5B57\u3002");
       const direct = mode === "direct" ? routes.find((route) => `${route.provider}/${route.model}` === directKey) ?? routes[0] : null;
       if (mode === "direct" && !direct) throw new Error("\u8BF7\u9009\u62E9\u8981\u76F4\u63A5\u4F7F\u7528\u7684\u6A21\u578B\u3002");
-      setPlan(createWorkspacePlan(task, catalogState.catalog, {
+      const signature2 = routingSettingsSignature(settingsScope.getSnapshot().value ?? {});
+      const ledger = await workbench.refreshLedger();
+      if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return;
+      if (!ledger) throw new Error("\u8BF7\u5148\u6062\u590D\u6267\u884C\u8BB0\u5F55\u8FDE\u63A5\uFF1B\u65E0\u6CD5\u6838\u5BF9\u6700\u65B0\u6570\u636E\u4E0E\u5B66\u4E60\u72B6\u6001\u3002");
+      if (signature2 !== routingSettingsSignature(settingsScope.getSnapshot().value ?? {})) throw new Error("\u89C4\u5212\u8BBE\u7F6E\u5DF2\u66F4\u65B0\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u3002");
+      const next = createWorkspacePlan(task, catalogState.catalog, {
+        ...ledger.routingData,
+        learning: ledger.learning,
         mode,
         ...direct ? { directProvider: direct.provider, directModel: direct.model } : {},
         budgetUsd: parsedBudget,
@@ -12816,10 +13198,11 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
         installedToolIds: (toolProbes?.probes ?? []).filter((probe) => probe.installed).map((probe) => probe.id),
         runnableToolIds: (toolProbes?.readiness ?? []).filter((item) => item.ready).map((item) => item.id),
         preset: settingsScope.getSnapshot().value?.routingPreset ?? "balanced",
-        qualityBiases: workbench.ledger.value?.biases ?? null,
         loggedOutToolIds: (workbench.health.report?.tools ?? []).filter((item) => item.installed && item.login?.state === "logged-out").map((item) => item.id)
-      }));
+      });
+      setPlan({ ...next, workbenchRevision: `${ledger.dynamicData?.revision ?? ""}/${ledger.learning?.revision ?? ""}` });
     } catch (error) {
+      if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return;
       setPlan(null);
       setPlanError(text5(error?.message) || "\u65E0\u6CD5\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE\u3002");
     }
@@ -12856,7 +13239,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       ledger: workbench.ledger.value,
       previewRun,
       startRun,
-      planningRevision: routingSettings,
+      planningRevision: `${routingSettings}/${dataRevision}/${feedbackRevision}`,
       directRoute: mode === "direct" ? routes.find((route) => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null,
       defaultPreset: settingsScope.getSnapshot().value?.routingPreset ?? "balanced",
       disabledReason: catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55\u2026" : catalogState.status === "error" ? "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u201C\u6A21\u578B\u914D\u7F6E\u201D\u4E2D\u5237\u65B0\u3002" : routes.length === 0 ? "\u8BF7\u5148\u5728\u5B98\u65B9\u201C\u6A21\u578B\u201D\u9875\u914D\u7F6E\u81F3\u5C11\u4E00\u6761\u6A21\u578B\u8DEF\u7EBF\u3002" : "",
@@ -12874,8 +13257,8 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       onRefresh: () => {
         void workbench.refreshLedger();
       },
-      onRate: (runId, packageId, rating) => {
-        void workbench.rate(runId, packageId, rating);
+      onRate: (runId, packageId, rating, expectedFinishedAt) => {
+        void workbench.rate(runId, packageId, rating, expectedFinishedAt);
       },
       onRerun: (runId, packageId, override, choice) => {
         void workbench.rerun(runId, packageId, override, choice);
@@ -12987,7 +13370,13 @@ var optionalRouteText = (value, subject) => {
 var rateRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RateRequest`, (value) => {
   const request = plainObject2(value, "rate request");
   if (!["up", "down", "clear"].includes(request.rating)) throw new TypeError("rating must be up, down or clear");
-  return { runId: idText(request.runId, "runId"), packageId: idText(request.packageId, "packageId"), rating: request.rating };
+  if (request.expectedFinishedAt !== void 0 && (!Number.isFinite(request.expectedFinishedAt) || request.expectedFinishedAt < 0)) throw new TypeError("expectedFinishedAt must be a non-negative timestamp");
+  return {
+    runId: idText(request.runId, "runId"),
+    packageId: idText(request.packageId, "packageId"),
+    rating: request.rating,
+    ...request.expectedFinishedAt === void 0 ? {} : { expectedFinishedAt: request.expectedFinishedAt }
+  };
 });
 var rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunRequest`, (value) => {
   const request = plainObject2(value, "rerun request");

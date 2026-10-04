@@ -8,6 +8,7 @@
 
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, presetFloor, presetWeights } from './routing-presets.mjs'
 import { liveBenchRow } from './livebench.mjs'
+import { solveCandidateAssignments } from './assignment-solver.mjs'
 
 export const OBJECTIVE_WEIGHTS = Object.freeze({
   simple: Object.freeze({ quality: 0.28, cost: 0.45, latency: 0.14, specialty: 0.04, reasoning: 0.07, risk: 0.02 }),
@@ -194,9 +195,15 @@ function specialtyMatch(model, taskType, liveScores = {}) {
 }
 
 function qualityForTask(row, taskType) {
-  const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.quality ?? 0
-  // User ratings and reviews nudge a route by at most a few points.
+  const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.baseQuality ?? row?.quality ?? 0
+  // Legacy programmatic scalar bias only. Production feedback uses an
+  // independent preferenceAdjustments utility term, never this quality path.
   return row?.qualityBias ? clamp(base + row.qualityBias) : base
+}
+
+function qualitySourceForTask(row, taskType) {
+  return asScore(row?.liveScores?.[taskType]) !== undefined || asScore(row?.liveOverall) !== undefined
+    ? 'livebench' : row?.fallbackQualitySource ?? row?.qualitySource ?? 'unknown'
 }
 
 function specialtyForTask(row, taskType) {
@@ -258,23 +265,9 @@ function normalizedCacheRatios(cacheReadRatio = 0, cacheWriteRatio = 0) {
   return { read, write }
 }
 
-function effectivePricing(pricing, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const { read, write } = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio)
-  return {
-    input: (1 - read - write) * Number(pricing.input)
-      + read * Number(pricing.cacheRead)
-      + write * Number(pricing.cacheWrite),
-    output: Number(pricing.output),
-  }
-}
-
-function costScore(pricing, maxCost, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  if (pricing === null) return 0
-  const effective = effectivePricing(pricing, cacheReadRatio, cacheWriteRatio)
-  const mean = (effective.input + effective.output) / 2
-  if (maxCost <= 0) return mean === 0 ? 1 : 0
-  return clamp(1 - mean / maxCost)
-}
+// A preference scale, not a vendor quote. Independent of the configured pool,
+// so adding an irrelevant expensive model cannot flatten every cost penalty.
+export const COST_REFERENCE_PRICING = Object.freeze({ input: 1, output: 5, cacheRead: 1, cacheWrite: 1, currency: 'USD' })
 
 export function estimateCost(model, text, outputTokens = 900, pricingOverrides = {}, cacheReadRatio = 0, cacheWriteRatio = 0) {
   const pricing = pricingFor(model, pricingOverrides)
@@ -679,38 +672,26 @@ function reasoningDecision(row, task) {
   }
 }
 
-function candidateUtility(row, task, weights, maxCost, usedRoutes, cacheReadRatio = 0, cacheWriteRatio = 0) {
+function candidateUtility(row, task, weights, cacheReadRatio = 0, cacheWriteRatio = 0, text = '', complexity = 'balanced') {
   const quality = qualityForTask(row, task.type)
+  // Subjective satisfaction is an independent, bounded utility term. It
+  // must never raise benchmark quality, quality floors or evidence labels.
+  const rawPreference = row.preferenceAdjustments?.[task.type]
+  const preferenceAdjustment = Number.isFinite(rawPreference) ? clamp(rawPreference, -0.1, 0.1) : 0
   const floor = Number(task.qualityFloor ?? taskQualityFloor('complex', task))
   const qualityGap = Math.max(0, floor - quality)
-  // Reuse avoids handoff overhead and is preferable when the same affordable
-  // route is suitable for independent, low-risk work packages.
-  const duplicatePenalty = 0
-  const synthesisPreference = task.purpose === 'synthesis' && /deepseek[- ]?v4[- ]?pro/i.test(row.model) ? 0.025 : 0
   const reasoning = reasoningDecision(row, task)
-  const cost = clamp(costScore(row.pricing, maxCost, cacheReadRatio, cacheWriteRatio) / Math.sqrt(reasoning.multiplier.output))
+  const reference = taskCost({ pricing: COST_REFERENCE_PRICING, reasoningKnown: true, reasoningEfforts: [] }, task, text, complexity, cacheReadRatio, cacheWriteRatio)
+  const cost = row.pricing === null ? 0 : 1 / (1 + taskCost(row, task, text, complexity, cacheReadRatio, cacheWriteRatio) / Math.max(reference, 1e-12))
   const score = weights.quality * quality
     + weights.cost * cost
     + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency))
     + weights.specialty * specialtyForTask(row, task.type)
     + (weights.reasoning ?? 0) * reasoning.reasoningFit
     - weights.risk * row.risk
-    - duplicatePenalty
     - qualityGap * (task.criticality ?? 0.75)
-    + synthesisPreference
-  return { score, floor, qualityGap, ...reasoning }
-}
-
-function chooseAssignment(rows, task, weights, maxCost, usedRoutes, preferred, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const ordered = rows
-    .map(row => ({ row, decision: candidateUtility(row, task, weights, maxCost, usedRoutes, cacheReadRatio, cacheWriteRatio) }))
-    .sort((left, right) => right.decision.score - left.decision.score)
-  const feasible = ordered.filter(item => qualityForTask(item.row, task.type) >= item.decision.floor)
-  const chosen = (preferred === true ? feasible : feasible.filter(item => !usedRoutes.has(routeKey(item.row.provider, item.row.model))))[0]
-    ?? feasible[0]
-    ?? ordered[0]
-  if (chosen === undefined) return { row: null, relaxed: true, floor: 0, qualityGap: 1 }
-  return { row: chosen.row, relaxed: qualityForTask(chosen.row, task.type) < chosen.decision.floor, floor: chosen.decision.floor, qualityGap: chosen.decision.qualityGap }
+    + preferenceAdjustment
+  return { score, floor, qualityGap, preferenceAdjustment, ...reasoning }
 }
 
 function taskCost(row, task, text, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
@@ -760,10 +741,14 @@ function dominates(left, right, task, text, complexity, cacheReadRatio, cacheWri
   return noWorse && strictlyBetter
 }
 
-function candidatePool(rows, task, weights, maxCost, text, complexity, cacheReadRatio, cacheWriteRatio) {
-  const eligibleRows = task.type === 'vision'
+function eligibleRowsForTask(rows, task) {
+  return task.type === 'vision'
     ? rows.filter(row => row.inputModalities.length === 0 || row.inputModalities.includes('image'))
     : rows
+}
+
+function candidatePool(rows, task, weights, text, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive = false) {
+  const eligibleRows = eligibleRowsForTask(rows, task)
   const floor = Number(task.qualityFloor ?? 0)
   const feasible = eligibleRows.filter(row => qualityForTask(row, task.type) >= floor)
   const source = feasible.length > 0
@@ -772,109 +757,60 @@ function candidatePool(rows, task, weights, maxCost, text, complexity, cacheRead
   const taskWeights = weightsForTask(weights, task)
   const scored = source.map(row => ({
     row,
-    decision: candidateUtility(row, task, taskWeights, maxCost, new Set(), cacheReadRatio, cacheWriteRatio),
+    decision: candidateUtility(row, task, taskWeights, cacheReadRatio, cacheWriteRatio, text, complexity),
     cost: taskCost(row, task, text, complexity, cacheReadRatio, cacheWriteRatio),
   }))
-  const frontier = scored.filter(item => !source.some(other => other !== item.row && dominates(other, item.row, task, text, complexity, cacheReadRatio, cacheWriteRatio)))
+  // Local dominance is unsafe when route identity changes a later handoff.
+  // Even without dependencies, a pruning proof must preserve actual utility
+  // (including route-specific preferences), not just nominal score axes.
+  const frontier = dependencySensitive ? scored : scored.filter(item => !scored.some(other => other !== item
+    && other.decision.score >= item.decision.score
+    && dominates(other.row, item.row, task, text, complexity, cacheReadRatio, cacheWriteRatio)))
   const essential = [
-    scored.slice().sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
+    scored.filter(item => item.row.pricing !== null).sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
     scored.slice().sort((left, right) => right.decision.score - left.decision.score || compareRowsStable(left.row, right.row))[0],
     scored.slice().sort((left, right) => qualityForTask(right.row, task.type) - qualityForTask(left.row, task.type) || compareRowsStable(left.row, right.row))[0],
   ].filter(Boolean)
-  const ordered = [...frontier, ...essential]
+  const all = [...frontier, ...essential]
     .filter((item, index, all) => all.findIndex(candidate => candidate.row === item.row) === index)
     .sort((left, right) => right.decision.score - left.decision.score || left.cost - right.cost || compareRowsStable(left.row, right.row))
+  const anchors = [...new Set(essential)]
+  // Reserve anchors before truncation: adding expensive high-score routes
+  // must never remove the only budget-feasible, quality-eligible candidate.
+  const ordered = [...anchors, ...all.filter(item => !anchors.includes(item))]
     .slice(0, ROUTING_CANDIDATE_LIMIT)
+    .sort((left, right) => right.decision.score - left.decision.score || left.cost - right.cost || compareRowsStable(left.row, right.row))
   return {
     options: ordered,
     relaxed: feasible.length === 0,
-    pruned: Math.max(0, eligibleRows.length - ordered.length),
+    pruned: Math.max(0, scored.length - all.length),
+    filtered: Math.max(0, eligibleRows.length - source.length),
+    truncated: Math.max(0, all.length - ordered.length),
+    dependencySensitive,
   }
 }
 
-function stateSignature(state) {
-  return state.assignments.map(assignment => `${routeKey(assignment.row?.provider, assignment.row?.model)}@${assignment.decision?.reasoningEffort ?? 'provider-default'}`).join('|')
-}
-
-function compareUtilityStates(left, right) {
-  return left.relaxedCount - right.relaxedCount
-    || left.qualityShortfall - right.qualityShortfall
-    || right.score - left.score
-    || left.cost - right.cost
-    || left.switches - right.switches
-    || compareText(stateSignature(left), stateSignature(right))
-}
-
-function compareCostStates(left, right) {
-  return left.relaxedCount - right.relaxedCount
-    || left.qualityShortfall - right.qualityShortfall
-    || left.cost - right.cost
-    || right.score - left.score
-    || left.switches - right.switches
-    || compareText(stateSignature(left), stateSignature(right))
-}
-
-function solveAssignments({ rows, tasks, weights, maxCost, text, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
-  const pools = tasks.map(task => candidatePool(rows, task, weights, maxCost, text, complexity, cacheReadRatio, cacheWriteRatio))
-  if (pools.some(pool => pool.options.length === 0)) return null
-  const suffixMinimum = Array(tasks.length + 1).fill(0)
-  for (let index = tasks.length - 1; index >= 0; index -= 1) {
-    const costOptions = Number.isFinite(budget)
-      ? pools[index].options.filter(option => option.row.pricing !== null)
-      : pools[index].options
-    if (costOptions.length === 0) return null
-    suffixMinimum[index] = suffixMinimum[index + 1] + Math.min(...costOptions.map(option => option.cost))
-  }
-  if (Number.isFinite(budget) && suffixMinimum[0] > budget + 1e-12) return null
-
-  let states = [{ assignments: [], routesByTask: new Map(), usedRoutes: new Set(), score: 0, cost: 0, switches: 0, relaxedCount: 0, qualityShortfall: 0 }]
-  for (let index = 0; index < tasks.length; index += 1) {
-    const task = tasks[index]
-    const pool = pools[index]
-    const expanded = []
-    for (const state of states) {
-      for (const option of pool.options) {
-        if (Number.isFinite(budget) && option.row.pricing === null) continue
-        const nextCost = state.cost + option.cost
-        if (Number.isFinite(budget) && nextCost + suffixMinimum[index + 1] > budget + 1e-12) continue
-        const taskWeights = weightsForTask(weights, task)
-        const decision = candidateUtility(option.row, task, taskWeights, maxCost, state.usedRoutes, cacheReadRatio, cacheWriteRatio)
-        const route = routeKey(option.row.provider, option.row.model)
-        const dependencySwitches = (task.dependsOn ?? []).reduce((count, dependency) => {
-          const dependencyRoute = state.routesByTask.get(dependency)
-          return count + (dependencyRoute !== undefined && dependencyRoute !== route ? 1 : 0)
-        }, 0)
-        const handoffPenalty = dependencySwitches * 0.015
-        const qualityShortfall = Math.max(0, decision.floor - qualityForTask(option.row, task.type))
-        const usedRoutes = new Set(state.usedRoutes)
-        usedRoutes.add(route)
-        const routesByTask = new Map(state.routesByTask)
-        routesByTask.set(task.id, route)
-        expanded.push({
-          assignments: [...state.assignments, { task, row: option.row, decision: { ...decision, relaxed: qualityShortfall > 0 }, estimatedCost: option.cost, handoffPenalty }],
-          routesByTask,
-          usedRoutes,
-          score: state.score + decision.score - handoffPenalty,
-          cost: nextCost,
-          switches: state.switches + dependencySwitches,
-          relaxedCount: state.relaxedCount + (qualityShortfall > 0 ? 1 : 0),
-          qualityShortfall: state.qualityShortfall + qualityShortfall,
-        })
-      }
-    }
-    if (expanded.length === 0) return null
-    expanded.sort(minimizeCost ? compareCostStates : compareUtilityStates)
-    states = expanded.slice(0, ROUTING_BEAM_WIDTH)
-  }
-  states.sort(minimizeCost ? compareCostStates : compareUtilityStates)
+function solveAssignments({ rows, tasks, weights, text, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
+  const dependencySensitive = tasks.some(task => (task.dependsOn ?? []).length > 0)
+  const pools = tasks.map(task => candidatePool(rows, task, weights, text, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive))
+  const result = solveCandidateAssignments({ tasks, pools: pools.map((pool, index) => pool.options.map(option => ({
+    route: routeKey(option.row.provider, option.row.model), score: option.decision.score, cost: option.cost,
+    qualityShortfall: Math.max(0, option.decision.floor - qualityForTask(option.row, tasks[index].type)),
+    pricingKnown: option.row.pricing !== null, payload: option,
+  }))), budget, beamWidth: ROUTING_BEAM_WIDTH, minimizeCost })
+  if (!result) return null
   return {
-    ...states[0],
+    ...result,
+    assignments: result.choices.map((choice, index) => ({ task: tasks[index], row: choice.payload.row,
+      decision: { ...choice.payload.decision, relaxed: choice.qualityShortfall > 0 },
+      estimatedCost: choice.cost, handoffPenalty: choice.handoffPenalty })),
+    usedRoutes: new Set(result.choices.map(choice => choice.route)),
     candidatePools: pools,
-    minimumFeasibleCost: suffixMinimum[0],
+    minimumFeasibleCost: result.minimumCostLowerBound,
   }
 }
 
-export function buildPlan({ text = '', available = [], mode = 'collective', pricing = {}, liveBench = null, liveBenchError = '', budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+export function buildPlan({ text = '', available = [], mode = 'collective', pricing = {}, liveBench = null, liveBenchError = '', dataVersions = null, learning = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
   const presetId = normalizeRoutingPreset(preset)
   const firstLine = String(text ?? '').split(/\r?\n/u)[0].trim()
   const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine)
@@ -894,18 +830,22 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
         return {
           provider: String(entry.provider ?? ''),
           model: String(entry.model ?? ''),
+          benchmarkModel: typeof entry.benchmarkModel === 'string' ? entry.benchmarkModel : undefined,
           reasoningEfforts: [...new Set(reasoningEfforts)],
           defaultReasoningEffort: entry.defaultReasoningEffort === undefined ? undefined : String(entry.defaultReasoningEffort),
           reasoningKnown: entry.reasoningKnown === true
             || (entry.reasoningKnown === undefined && Array.isArray(entry.reasoningEfforts)),
           quality: asScore(entry.quality),
           qualityBias: Number.isFinite(entry.qualityBias) ? clamp(entry.qualityBias, -0.05, 0.05) : 0,
+          preferenceAdjustments: entry.preferenceAdjustments ?? null,
           qualitySource: entry.qualitySource === 'user' ? 'user' : 'route',
           latency: asScore(entry.latency),
           risk: asScore(entry.risk),
           specialties: Array.isArray(entry.specialties) ? entry.specialties.filter(item => typeof item === 'string') : null,
           pricing: normalizePricing({ route: entry.pricing ?? entry.price }).route ?? null,
-          pricingSource: entry.pricingSource === 'user' ? 'user' : 'route',
+          pricingSource: entry.pricingSource === 'user' ? 'user' : entry.pricingSource === 'dynamic' ? 'dynamic' : 'route',
+          pricingVersion: entry.pricingVersion ?? null,
+          snapshotAsOf: entry.snapshotAsOf ?? null,
           inputModalities: Array.isArray(entry.inputModalities) ? entry.inputModalities.map(item => String(item).toLowerCase()) : [],
         }
       })
@@ -922,10 +862,16 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       ...(route.risk === undefined ? {} : { risk: route.risk }),
       ...(route.specialties === null ? {} : { specialties: route.specialties }),
     }
-    const live = liveBenchRow(liveBench, route.model)
+    const live = liveBenchRow(liveBench, route.benchmarkModel ?? route.model)
     const liveScores = live?.scores ?? {}
-    const liveOverall = asScore(live?.overall)
-    const quality = clamp((asScore(liveScores?.[taskType]) ?? liveOverall ?? asScore(metadata.quality) ?? 0) + route.qualityBias)
+    // A category average cannot provide evidence for an unmeasured task.
+    // Legacy cached category rows have no provenance: use their task scores
+    // but do not promote an ambiguous overall to cross-task evidence.
+    const liveOverall = live?.overallSource === 'explicit' || (live?.overallSource === undefined && Object.keys(liveScores).length === 0)
+      ? asScore(live?.overall) : undefined
+    const baseQuality = asScore(metadata.quality) ?? 0
+    const quality = clamp((asScore(liveScores?.[taskType]) ?? liveOverall ?? baseQuality) + route.qualityBias)
+    const fallbackQualitySource = route.quality !== undefined ? route.qualitySource : catalog ? 'catalog-heuristic' : 'unknown'
     const qualitySource = liveOverall !== undefined || asScore(liveScores?.[taskType]) !== undefined
       ? 'livebench' : route.quality !== undefined ? route.qualitySource : catalog ? 'catalog-heuristic' : 'unknown'
     const userPrice = normalizedPrices[normalize(`${route.provider}/${route.model}`)] ?? normalizedPrices[normalize(route.model)]
@@ -940,9 +886,14 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       model: route.model,
       metadata,
       quality,
+      baseQuality,
+      fallbackQualitySource,
       qualityBias: route.qualityBias,
+      preferenceAdjustments: route.preferenceAdjustments,
       qualitySource,
       pricingSource,
+      pricingVersion: route.pricingVersion,
+      snapshotAsOf: route.snapshotAsOf,
       liveScores,
       liveOverall,
       latency: metadata.latency ?? 0.5,
@@ -960,10 +911,6 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       }, text, 900, {}, cacheReadRatio, cacheWriteRatio),
     })
   }
-  const maxCost = Math.max(1, ...rows.filter(row => row.pricing !== null).map(row => {
-    const effective = effectivePricing(row.pricing, cacheReadRatio, cacheWriteRatio)
-    return effective.input + effective.output
-  }))
   // Presets tilt each package's weights and quality floor; balanced is a no-op.
   const taskNodes = taskPackages(taskType, text, complexity.band).map(task => presetId === DEFAULT_ROUTING_PRESET ? task : {
     ...task,
@@ -978,7 +925,6 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     rows,
     tasks: taskNodes,
     weights,
-    maxCost,
     text,
     complexity: complexity.band,
     budget: Number.POSITIVE_INFINITY,
@@ -990,7 +936,6 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       rows,
       tasks: taskNodes,
       weights,
-      maxCost,
       text,
       complexity: complexity.band,
       budget,
@@ -1003,7 +948,6 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       rows,
       tasks: taskNodes,
       weights,
-      maxCost,
       text,
       complexity: complexity.band,
       budget: Number.POSITIVE_INFINITY,
@@ -1017,7 +961,8 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
   const usedRoutes = optimized?.usedRoutes ?? new Set()
   const constraintRelaxed = (optimized?.relaxedCount ?? 0) > 0
   for (const row of rows) {
-    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, maxCost, new Set(), cacheReadRatio, cacheWriteRatio).score
+    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, cacheReadRatio, cacheWriteRatio, text, complexity.band).score
+    if (row.pricing !== null && taskNodes[0]) row.estimatedCost = taskCost(row, taskNodes[0], text, complexity.band, cacheReadRatio, cacheWriteRatio)
   }
   rows.sort((left, right) => right.score - left.score || compareRowsStable(left, right))
   const selectedAssignment = assignments[0]
@@ -1032,7 +977,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     difficulty: task.difficulty,
     recommended: row?.model ?? '待发现模型',
     recommendedProvider: row?.provider ?? '',
-    qualitySource: row?.qualitySource ?? 'unknown',
+    qualitySource: qualitySourceForTask(row, task.type),
     pricingSource: row?.pricingSource ?? 'unknown',
     recommendedReasoningEffort: decision?.reasoningEffort,
     preferredReasoningEffort: decision?.preferredReasoningEffort ?? task.preferredReasoningEffort,
@@ -1060,23 +1005,24 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       cacheWriteTokens: tokens.cacheWriteTokens,
       outputTokens: tokens.outputTokens,
       estimatedCost: row?.pricing === null || row === null ? null : Number(taskEstimate.toFixed(6)),
-      quality: row?.qualitySource === 'unknown' || row === null ? null : Number(qualityForTask(row, task.type).toFixed(3)),
-      qualitySource: row?.qualitySource ?? 'unknown',
+      quality: qualitySourceForTask(row, task.type) === 'unknown' || row === null ? null : Number(qualityForTask(row, task.type).toFixed(3)),
+      qualitySource: qualitySourceForTask(row, task.type),
       pricingSource: row?.pricingSource ?? 'unknown',
       handoffPenalty: Number(Number(handoffPenalty ?? 0).toFixed(3)),
     }
   })
   const pricingComplete = assignments.length > 0 && assignments.every(({ row }) => row?.pricing !== null)
-  const totalEstimate = pricingComplete ? costBreakdown.reduce((sum, row) => sum + row.estimatedCost, 0) : null
+  const totalEstimate = pricingComplete ? assignments.reduce((sum, { task, row, estimatedCost }) => sum
+    + (estimatedCost ?? taskCost(row, task, text, complexity.band, cacheReadRatio, cacheWriteRatio)), 0) : null
   const baselineRows = assignments.map(({ task }) => {
-    const strongest = rows.reduce((best, row) => qualityForTask(row, task.type) > (best === null ? -1 : qualityForTask(best, task.type)) ? row : best, null)
+    const strongest = eligibleRowsForTask(rows, task).reduce((best, row) => qualityForTask(row, task.type) > (best === null ? -1 : qualityForTask(best, task.type)) ? row : best, null)
     return { task, strongest }
   })
   const baselineCost = baselineRows.every(item => item.strongest?.pricing !== null && item.strongest !== null)
     ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text, complexity.band, cacheReadRatio, cacheWriteRatio), 0)
     : null
-  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row }) => ['livebench', 'route', 'user'].includes(row?.qualitySource))
-    && baselineRows.every(({ strongest }) => ['livebench', 'route', 'user'].includes(strongest?.qualitySource))
+  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => ['livebench', 'route', 'user'].includes(qualitySourceForTask(row, task.type)))
+    && baselineRows.every(({ strongest, task }) => ['livebench', 'route', 'user'].includes(qualitySourceForTask(strongest, task.type)))
   const budgetExceeded = Number(budgetUsd) > 0 && totalEstimate !== null ? totalEstimate > Number(budgetUsd) : null
   const savings = baselineCost === null || totalEstimate === null || !qualityEvidenceComplete
     ? null : baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost)
@@ -1087,7 +1033,7 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     ? unassignableTasks.length > 0
       ? `图像工作包 ${unassignableTasks.join('、')} 没有可用的图像模型，无法形成完整分配计划。`
       : '尚未发现可用模型，保留 Harness 原始模型选择。'
-    : `${complexity.band === 'simple' ? '低复杂度优先成本、响应速度与较低推理开销' : complexity.band === 'balanced' ? '在质量、成本、推理等级、延迟与风险之间平衡' : '高复杂度执行包含推理等级的依赖感知全局约束分配'}；任务类型为 ${taskType}，已对 ${String(subtasks.length)} 个工作包进行 Pareto 剪枝和有界组合搜索。`
+    : `${complexity.band === 'simple' ? '低复杂度优先成本、响应速度与较低推理开销' : complexity.band === 'balanced' ? '在质量、成本、推理等级、延迟与风险之间平衡' : '高复杂度执行包含推理等级的依赖感知约束分配'}；任务类型为 ${taskType}，${String(subtasks.length)} 个工作包采用${optimized?.search?.exact ? '保留候选空间内的精确搜索' : '保留候选空间内的有界近似搜索'}。质量分与门槛是未校准的估计，不是答对概率。`
   return {
     mode,
     preset: presetId,
@@ -1098,16 +1044,33 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     taskTypes: [...new Set(taskNodes.map(task => task.type).filter(type => type !== 'reasoning'))],
     objectiveWeights: weights,
     candidates: rows.slice(0, 8).map(row => {
-      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === 'simple' ? 'low' : 'medium' }, weights, maxCost, new Set(), cacheReadRatio, cacheWriteRatio)
-      return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), quality: row.qualitySource === 'unknown' ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource }
+      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === 'simple' ? 'low' : 'medium' }, weights, cacheReadRatio, cacheWriteRatio, text, complexity.band)
+      return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), preferenceAdjustment: decision.preferenceAdjustment, quality: row.qualitySource === 'unknown' ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource, pricingVersion: row.pricingVersion, pricingAsOf: row.snapshotAsOf }
     }),
-    selected: selected === null ? null : { provider: selected.provider, model: selected.model, reasoningEffort: selectedAssignment?.decision?.reasoningEffort, estimatedCost: selected.estimatedCost === null ? null : Number(selected.estimatedCost.toFixed(6)), qualitySource: selected.qualitySource, pricingSource: selected.pricingSource },
+    selected: selected === null ? null : { provider: selected.provider, model: selected.model, reasoningEffort: selectedAssignment?.decision?.reasoningEffort, estimatedCost: selected.estimatedCost === null ? null : Number(selected.estimatedCost.toFixed(6)), qualitySource: qualitySourceForTask(selected, selectedAssignment?.task.type ?? taskType), pricingSource: selected.pricingSource },
     subtasks,
     synthesizer: synthesizer == null ? null : { provider: synthesizer.provider, model: synthesizer.model, reasoningEffort: synthesizerAssignment?.decision?.reasoningEffort },
-    estimatedCost: totalEstimate === null ? null : Number(totalEstimate.toFixed(6)),
+    // Preserve precision for downstream budget gates; formatting belongs to UI.
+    estimatedCost: totalEstimate,
     costBreakdown,
     optimization: {
-      solver: 'pareto-pruned quality-constrained beam assignment',
+      dataVersions,
+      personalization: learning ? {
+        policyVersion: learning.policyVersion, revision: learning.revision,
+        enabled: learning.enabled, scope: learning.scope, window: learning.window,
+        feedbackCount: learning.feedbackCount, effectiveWeight: learning.effectiveWeight,
+        halfLifeDays: learning.halfLifeDays, priorWeight: learning.priorWeight,
+        maxAdjustment: learning.maxAdjustment, resetAt: learning.resetAt,
+        semantics: 'subjective-utility-not-objective-quality',
+      } : null,
+      solver: 'dependency-safe quality-constrained exact/beam assignment',
+      qualitySemantics: 'uncalibrated-surrogate',
+      costUtility: { method: '1/(1+estimated-task-cost/reference-task-cost)', referencePricing: COST_REFERENCE_PRICING },
+      search: optimized?.search ?? null,
+      optimalityScope: 'retained-candidates-and-surrogate-objective',
+      candidateTruncated: (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.truncated, 0),
+      qualityFiltered: (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.filtered, 0),
+      localParetoDisabled: (optimized?.candidatePools ?? []).some(pool => pool.dependencySensitive),
       qualityFloor: QUALITY_FLOORS[complexity.band],
       budgetUsd: Number(Number(budgetUsd) > 0 ? Number(budgetUsd) : 0),
       cacheReadRatio: normalizedCacheRatios(cacheReadRatio, cacheWriteRatio).read,
@@ -1124,8 +1087,8 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       beamWidth: ROUTING_BEAM_WIDTH,
       budgetFeasible: budget <= 0 ? (pricingComplete ? true : null) : budgetPlan !== null,
       minimumFeasibleCost: minimumFeasibleCost === null ? null : Number(Number(minimumFeasibleCost).toFixed(6)),
-      liveBench: liveBench?.fetchedAt
-        ? { source: liveBench.source ?? 'livebench', fetchedAt: liveBench.fetchedAt, models: Object.keys(liveBench.models ?? {}).length, stale: String(liveBenchError).length > 0, error: String(liveBenchError || '') }
+      liveBench: (liveBench?.fetchedAt ?? liveBench?.verifiedAt)
+        ? { source: liveBench.source ?? 'livebench', fetchedAt: liveBench.fetchedAt ?? liveBench.verifiedAt, verifiedAt: liveBench.verifiedAt ?? liveBench.fetchedAt, publishedAt: liveBench.publishedAt ?? null, version: liveBench.version ?? null, models: Object.keys(liveBench.models ?? {}).length, stale: String(liveBenchError).length > 0, error: String(liveBenchError || '') }
         : { source: 'experimental-baseline', fetchedAt: null, models: 0, stale: false, error: String(liveBenchError || '') },
     },
     reason,

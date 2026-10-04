@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "dsh-selftest-v1",
+  "status": "draft",
+  "experimentScope": "first-stage-fixed-generation-model-choice-projection",
+  "dataset": "TODO: self-authored-or-authorized-dataset-and-date",
+  "maximumCollectionBudgetUsd": null,
+  "stopRules": ["budget-limit", "unverified-model-identity", "unexplained-billing"],
+  "actions": [],
+  "generationAndFailurePolicy": "TODO: exact settings per action, cap, timeout, retries, fallback, grading of failed responses",
+  "gradingPolicy": "TODO: frozen objective tests or blinded rubric, grader version and evaluation cost",
+  "costAccounting": {
+    "basis": "usage-priced",
+    "sourcePolicy": "Official provider pricing and billing/usage documentation for each exact model, version and endpoint.",
+    "invoiceRequired": false,
+    "currencyForAnalysis": "USD",
+    "perActionPricingSnapshots": [],
+    "snapshotFieldsToFill": ["provider", "model", "version", "endpoint", "pricingUrl", "usageDocumentationUrl", "checkedAt", "effectiveAt", "currency", "rateUnits", "rates", "usageFieldMapping", "cacheTTL", "contextAndServiceTiers", "timeWindowRules", "nonTokenFees", "exchangeRateIfNeeded", "sourceSnapshotSha256"],
+    "aggregation": "Sum documented non-overlapping billing meters from actual usage for every attempt, plus applicable non-token fees and declared deployment overhead.",
+    "missingUsagePolicy": "Unknown, never zero or fabricated from visible output; invoice is optional, actual usage and applicable official rates are required.",
+    "claimScope": "Official-price-accounted costs; not account discounts, subscriptions or intermediary invoices. Standard API equivalent costs on other channels must be labeled separately."
+  },
+  "split": {
+    "method": "SHA256('dsh-selftest-v1:' + groupId), first 8 hex digits as integer modulo 100",
+    "train": [0, 59],
+    "validation": [60, 79],
+    "test": [80, 99],
+    "pilotReusedAsTest": false,
+    "pilotSourceFamiliesInTest": false
+  },
+  "oldCommit": "aca9912921aee50858e4b95c8698e3177e22335c",
+  "currentSourceManifest": null,
+  "baselineSelectionPolicy": "Validation mean quality descending, mean cost ascending, stable action ID ascending. Missing validation domain falls back to global validation-best-single; no complete global validation cohort means stop, never use test labels.",
+  "comparisons": [
+    {"strategy": "current-balanced", "reference": "old-balanced"},
+    {"strategy": "current-balanced", "reference": "validation-best-single"},
+    {"strategy": "current-balanced", "reference": "validation-domain-single-diagnostic"}
+  ],
+  "statistics": {
+    "seed": 20261003,
+    "resamples": 4000,
+    "alpha": 0.05,
+    "nonInferiorityMargin": 0
+  },
+  "pilotPlannedQuestions": 18,
+  "formalPlannedQuestions": null,
+  "sampleSizeRationale": "TODO: planning after pilot; no automatic power guarantee",
+  "missingDataPolicy": "Unknown quality/cost is not zero; no outcome-conditioned exclusions; report full coverage and missingness.",
+  "protocolFrozenAt": null,
+  "testOutcomeAccessBeforeFreeze": false
+}

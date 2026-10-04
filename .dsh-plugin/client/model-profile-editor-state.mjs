@@ -25,6 +25,7 @@ export function profileDraft(profile) {
     cacheWrite: profile?.pricing?.cacheWrite === undefined ? '' : String(profile.pricing.cacheWrite),
     specialties: Array.isArray(profile?.specialties) ? profile.specialties.join(', ') : '',
     cliModel: profile?.cliModel ?? '',
+    benchmarkModel: profile?.benchmarkModel ?? '',
     execution: profile?.execution === 'official' || profile?.execution === 'api' ? profile.execution : 'auto',
     billing: BILLING_MODES.includes(profile?.billing) ? profile.billing : DEFAULT_BILLING_MODE,
     subscription: ['plan-key', 'cli-login', 'none'].includes(profile?.subscription) ? profile.subscription : 'auto',
@@ -38,6 +39,8 @@ export function profileFromDraft(route, draft) {
   const model = field(route?.model)
   if (!provider || !model) throw new Error('请先从官方模型目录选择一条准确的模型路线。')
   const profile = { provider, model }
+  const benchmarkModel = field(draft?.benchmarkModel)
+  if (benchmarkModel) profile.benchmarkModel = benchmarkModel
   const quality = nonnegativeField(draft?.quality, '质量评分', 100)
   if (quality !== null) profile.quality = quality
   const input = nonnegativeField(draft?.input, '输入单价')

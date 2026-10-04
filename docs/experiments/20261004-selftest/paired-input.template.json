@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "dsh-selftest-v1",
+  "stage": "pilot",
+  "provenance": "recorded",
+  "costBasis": "usage-priced",
+  "choicesSha256": null,
+  "rows": [
+    {
+      "id": "TODO-question-id",
+      "groupId": "TODO-independent-source-family-id",
+      "domain": "TODO-domain",
+      "outcomes": {
+        "current-balanced": {"quality": null, "costUsd": null},
+        "old-balanced": {"quality": null, "costUsd": null},
+        "validation-best-single": {"quality": null, "costUsd": null},
+        "validation-domain-single-diagnostic": {"quality": null, "costUsd": null}
+      }
+    }
+  ]
+}

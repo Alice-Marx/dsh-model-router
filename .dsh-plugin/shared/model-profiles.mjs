@@ -22,7 +22,7 @@ function nonnegative(value, label) {
 function normalizeProfile(entry, index) {
   const label = `第 ${index + 1} 个模型`
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`${label} 必须是对象`)
-  const allowed = new Set(['provider', 'model', 'quality', 'pricing', 'specialties', 'cliModel', 'execution', 'billing', 'subscription', 'apiRoute'])
+  const allowed = new Set(['provider', 'model', 'benchmarkModel', 'quality', 'pricing', 'specialties', 'cliModel', 'execution', 'billing', 'subscription', 'apiRoute'])
   const unknown = Object.keys(entry).find(key => !allowed.has(key))
   if (unknown) throw new Error(`${label} 含不支持的字段 ${unknown}；不要在这里填写密钥或命令`)
   const provider = id(entry.provider)
@@ -31,6 +31,11 @@ function normalizeProfile(entry, index) {
     throw new Error(`${label} 需要模型目录中的准确 provider 和 model`)
   }
   const profile = { provider, model }
+  if (entry.benchmarkModel !== undefined) {
+    const benchmarkModel = id(entry.benchmarkModel)
+    if (!benchmarkModel || benchmarkModel.length > 240 || /[\u0000-\u001f]/u.test(benchmarkModel)) throw new Error(`${label} 的 benchmarkModel 需要准确的基准模型名称`)
+    profile.benchmarkModel = benchmarkModel
+  }
   if (entry.quality !== undefined) {
     const value = nonnegative(entry.quality, `${label} 的 quality`)
     if (value > 100) throw new Error(`${label} 的 quality 应在 0 到 100 之间`)
@@ -129,6 +134,7 @@ export function applyModelProfiles(routes, profiles) {
     if (!profile) return route
     return {
       ...route,
+      ...(profile.benchmarkModel === undefined ? {} : { benchmarkModel: profile.benchmarkModel }),
       ...(profile.quality === undefined ? {} : { quality: profile.quality, qualitySource: 'user' }),
       ...(profile.pricing === undefined ? {} : { pricing: { ...profile.pricing }, pricingSource: 'user' }),
       ...(profile.specialties === undefined ? {} : { specialties: [...profile.specialties] }),

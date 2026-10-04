@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "evidenceLevel": "model-by-task-aggregates-only",
+  "latestQuestionMatrixAvailable": false,
+  "sameQuestionIdentityEstablished": false,
+  "pairedInferenceAvailable": false,
+  "routingBenefitClaimSupported": false,
+  "source": {
+    "release": "2026-06-25",
+    "revision": "caa4253c8a3aa93b5c7ec234e681d4f120a20240",
+    "verifiedPinnedOfficialInputHashes": true,
+    "status": "byte-identical-to-pinned-official-release",
+    "formulaReferences": {
+      "scores": "https://github.com/LiveBench/new-livebench/blob/caa4253c8a3aa93b5c7ec234e681d4f120a20240/src/Table/Averaging.js",
+      "costs": "https://github.com/LiveBench/new-livebench/blob/caa4253c8a3aa93b5c7ec234e681d4f120a20240/src/lib/compute.js"
+    },
+    "inputs": {
+      "scores": {
+        "name": "table_2026_06_25.csv",
+        "bytes": 11069,
+        "sha256": "1021e4ef211ccba609d6da2c22032f46d695c1546508cf144a58a2f3d6960f3d"
+      },
+      "costs": {
+        "name": "cost_2026_06_25.csv",
+        "bytes": 28845,
+        "sha256": "d572014a891e76ef3f30896f66cc873ec02eb5c7d10909a6796efe450ad05ba9"
+      },
+      "categories": {
+        "name": "categories_2026_06_25.json",
+        "bytes": 725,
+        "sha256": "dad300ad18655b69db720e1b88fc5a5eac06c5b2f0e52c2bf50f10ff057674f3"
+      }
+    }
+  },
+  "coverage": {
+    "models": 66,
+    "scoreRows": 66,
+    "costRows": 66,
+    "domains": 7,
+    "tasks": 23,
+    "scoreOnlyModels": 0,
+    "costOnlyModels": 0,
+    "completeStaticProfiles": 66,
+    "incompleteProfiles": 0,
+    "completeCountVectors": 66,
+    "differentCountVectorModels": 3,
+    "modelsWithReportedZeroCostTasks": 1,
+    "modelsWithAllTaskCostsReportedZero": 1,
+    "commonCompleteEligibleModels": 63,
+    "pricedComparableEligibleModels": 62,
+    "frontierModels": 9
+  },
+  "commonCountVector": [
+    52,
+    50,
+    50,
+    50,
+    71,
+    46,
+    22,
+    30,
+    20,
+    100,
+    100,
+    102,
+    77,
+    47,
+    52,
+    51,
+    50,
+    50,
+    50,
+    50,
+    50,
+    50,
+    50
+  ],
+  "excludedFromPricedComparison": [
+    {
+      "model": "claude-opus-5-max-effort",
+      "reasons": [
+        "different-question-count-vector"
+      ],
+      "priceEvidenceReasons": [
+        "different-question-count-vector"
+      ],
+      "questionCount": 1271,
+      "reportedCostPerQuestionUsd": 0.5599335955940205
+    },
+    {
+      "model": "gpt-5.4-mini-xhigh",
+      "reasons": [
+        "different-question-count-vector"
+      ],
+      "priceEvidenceReasons": [
+        "different-question-count-vector"
+      ],
+      "questionCount": 1257,
+      "reportedCostPerQuestionUsd": 0.2218634844868735
+    },
+    {
+      "model": "gpt-5.4-nano-xhigh",
+      "reasons": [
+        "different-question-count-vector"
+      ],
+      "priceEvidenceReasons": [
+        "different-question-count-vector"
+      ],
+      "questionCount": 1246,
+      "reportedCostPerQuestionUsd": 0.06335650080256822
+    },
+    {
+      "model": "ox-alpha-max",
+      "reasons": [],
+      "priceEvidenceReasons": [
+        "zeroReportedCostNotVerifiedFree"
+      ],
+      "questionCount": 1270,
+      "reportedCostPerQuestionUsd": 0
+    }
+  ],
+  "reportedZeroCosts": {
+    "modelsWithAnyZeroTaskCost": [
+      "ox-alpha-max"
+    ],
+    "allTaskCostsReportedZeroModels": [
+      "ox-alpha-max"
+    ],
+    "commonCompleteModelsExcludedFromPricedFrontier": [
+      "ox-alpha-max"
+    ],
+    "interpretation": "Published zero is preserved as data, not treated as missing or inferred to be verified free production access."
+  },
+  "numericPolicy": {
+    "inputValidation": "Exact decimal sign and bounds; positive integer counts at most Number.MAX_SAFE_INTEGER; nonzero Number underflow is rejected.",
+    "aggregation": "Neumaier compensated sums and means; binary64 values are retained without display rounding.",
+    "frontierQualityTolerance": "32 * Number.EPSILON * max(1, abs(Qa), abs(Qb)); Q is on the 0..100 scale.",
+    "frontierCostTolerance": "32 * Number.EPSILON * max(abs(Ca), abs(Cb)); C is USD/question, with no absolute USD floor.",
+    "frontierTies": "Differences within each metric tolerance are equal for dominance; strict improvement must exceed tolerance in at least one metric.",
+    "display": "Two decimal quality formatting does not affect aggregation or frontier comparisons."
+  },
+  "descriptiveStaticFrontier": [
+    {
+      "model": "deepseek-v4-flash",
+      "overallScorePct": 65.48110714285714,
+      "overallScoreDisplay": "65.48",
+      "costPerQuestionUsd": 0.010533543307086614
+    },
+    {
+      "model": "smaug-flash",
+      "overallScorePct": 77.43529761904763,
+      "overallScoreDisplay": "77.44",
+      "costPerQuestionUsd": 0.01086251968503937
+    },
+    {
+      "model": "deepseek-v4.1-flash-max",
+      "overallScorePct": 81.10970238095238,
+      "overallScoreDisplay": "81.11",
+      "costPerQuestionUsd": 0.02366968503937008
+    },
+    {
+      "model": "gpt-6.1-sol-xhigh",
+      "overallScorePct": 81.11019047619048,
+      "overallScoreDisplay": "81.11",
+      "costPerQuestionUsd": 0.07574393700787402
+    },
+    {
+      "model": "gpt-6.1-sol-max",
+      "overallScorePct": 81.61566666666667,
+      "overallScoreDisplay": "81.62",
+      "costPerQuestionUsd": 0.11555023622047246
+    },
+    {
+      "model": "claude-opus-5-5-xhigh-effort",
+      "overallScorePct": 82.05921428571428,
+      "overallScoreDisplay": "82.06",
+      "costPerQuestionUsd": 0.19920590551181103
+    },
+    {
+      "model": "gpt-6-astra-max",
+      "overallScorePct": 82.16064285714286,
+      "overallScoreDisplay": "82.16",
+      "costPerQuestionUsd": 0.6046051968503937
+    },
+    {
+      "model": "claude-opus-5-5-max-effort",
+      "overallScorePct": 83.21657142857143,
+      "overallScoreDisplay": "83.22",
+      "costPerQuestionUsd": 0.6651269291338583
+    },
+    {
+      "model": "claude-fable-5-1-max-effort",
+      "overallScorePct": 83.41415476190477,
+      "overallScoreDisplay": "83.41",
+      "costPerQuestionUsd": 1.0107648031496064
+    }
+  ],
+  "assumptions": [
+    "Task scores are bounded aggregate scores on 0..100, not assumed to be binary correctness rates.",
+    "Within each category, task scores receive equal weight; complete category means receive equal weight in overall quality.",
+    "Incomplete categories retain a descriptive available-task mean, but any missing task score excludes the overall static profile.",
+    "Costs are released task-total USD divided by released question counts; overall cost is sum of all task totals / sum of all task counts, not a mean of category costs.",
+    "Provided zero USD is valid raw data but is excluded from the priced frontier; absent costs and counts remain null and never become free observations.",
+    "Model IDs, including effort and thinking variants, are preserved exactly; Pareto comparisons use retained binary64 values with the disclosed tiny arithmetic tolerances and retain numerical ties."
+  ],
+  "limitations": [
+    "Equal question-count vectors do not establish that models answered identical questions or used identical evaluation conditions.",
+    "These aggregates cannot support question-paired confidence intervals, per-question routing simulation, or routing-benefit claims.",
+    "Released costs are historical author-reported aggregates, not verified billing receipts; no current pricing or retokenized answer-string estimate is mixed in.",
+    "An explicitly released zero USD aggregate is flagged but does not establish free, available, or reproducible production access.",
+    "Model and task aggregates omit question identities, joint outcomes, failures, and collection-level provenance needed for a true same-question matrix.",
+    "A descriptive priced static frontier compares only positive-cost profiles in the selected complete count cohort, not every model on the leaderboard.",
+    "The source algorithm contains legacy model-specific score exceptions; this audit applies the declared general category-mean formula without such overrides."
+  ],
+  "note": "Derived summary only; full local audit retains per-subtask inputs. No per-question matrix, strategy choices, paired experiment or real routing-benefit claim."
+}

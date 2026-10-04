@@ -39,7 +39,7 @@ const LOCK_STALE_MS = 15_000
 const LOCK_TIMEOUT_MS = 10_000
 
 function emptyState() {
-  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], archivedSpending: sanitizeArchivedSpending(), notices: [], terminalSessions: [] }
+  return { version: STATE_VERSION, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], dynamicData: { liveBench: null, pricing: null, status: {}, revision: '' }, archivedSpending: sanitizeArchivedSpending(), notices: [], terminalSessions: [] }
 }
 
 function sanitizeNotices(value) {
@@ -65,6 +65,7 @@ function sanitize(value, maxRuns) {
     authFailures: Object.fromEntries(Object.entries(value.authFailures && typeof value.authFailures === 'object' && !Array.isArray(value.authFailures) ? value.authFailures : {})
       .filter(([, entry]) => Number.isFinite(entry?.at))),
     runs: Array.isArray(value.runs) ? value.runs.filter(run => run && typeof run.id === 'string') : [],
+    dynamicData: value.dynamicData && typeof value.dynamicData === 'object' && !Array.isArray(value.dynamicData) ? value.dynamicData : { liveBench: null, pricing: null, status: {}, revision: '' },
     archivedSpending: sanitizeArchivedSpending(value.archivedSpending),
     notices: sanitizeNotices(value.notices),
     terminalSessions: sanitizeTerminalSessions(value.terminalSessions),

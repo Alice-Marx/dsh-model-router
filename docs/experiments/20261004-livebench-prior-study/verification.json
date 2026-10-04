@@ -1,0 +1,631 @@
+{
+  "schemaVersion": 1,
+  "experimentScope": "in-sample-descriptive-aggregate-domain-adaptation-quality-only",
+  "date": "2026-10-04",
+  "publicationProjection": {
+    "kind": "path-redacted-publication-copy",
+    "byteIdenticalToOriginalRecord": false,
+    "preservedEvidence": "dates, versions, hashes and numeric verification results",
+    "pathPolicy": "Repository paths are relative; machine-specific input and unpublished verification-driver directories use placeholders. Original archived records are unchanged."
+  },
+  "command": "node \"<LOCAL_VERIFICATION_DRIVER>/run-prior-study.mjs\" \"<REPOSITORY_ROOT>\" \"<LIVEBENCH_INPUT_DIR>\" \"docs/experiments/20261004-livebench-prior-study\"",
+  "publicReproduceCommand": "node scripts/livebench-prior-study.mjs --input-dir \"<LIVEBENCH_INPUT_DIR>\" --output-dir NEW_DIRECTORY",
+  "pinnedOfficialInputHashesVerified": true,
+  "sourcesUnchanged": true,
+  "sourceBefore": [
+    {
+      "name": "Averaging.js.txt",
+      "bytes": 1265,
+      "sha256": "37227d0c251c4f608c42eba936c627b36dcb57edfc911785c79d2142ad9b9b18"
+    },
+    {
+      "name": "LiveBench-DATASHEET.md",
+      "bytes": 12666,
+      "sha256": "8f5036b7330c01de1a9cd5a9f02a0e6f5d359bd08b210d7dde0635731fbce1f4"
+    },
+    {
+      "name": "categories_2026_06_25.json",
+      "bytes": 725,
+      "sha256": "dad300ad18655b69db720e1b88fc5a5eac06c5b2f0e52c2bf50f10ff057674f3"
+    },
+    {
+      "name": "compute.js.txt",
+      "bytes": 8380,
+      "sha256": "3dac80c2f68f619ef3f427b337db3755d24d9f45ce74c13338a6a09903134efe"
+    },
+    {
+      "name": "constants.js.txt",
+      "bytes": 1756,
+      "sha256": "ce56014792362d8c36d3e38d00d61709b849d7c572080c58eef53a4aa748f14d"
+    },
+    {
+      "name": "cost_2026_06_25.csv",
+      "bytes": 28845,
+      "sha256": "d572014a891e76ef3f30896f66cc873ec02eb5c7d10909a6796efe450ad05ba9"
+    },
+    {
+      "name": "download_leaderboard.py.txt",
+      "bytes": 1839,
+      "sha256": "d4e0dace0ee661779c3ec9fbd23ea16cdc5206149db016e0ad527ba45d5bd55e"
+    },
+    {
+      "name": "modelLinks.js.txt",
+      "bytes": 66403,
+      "sha256": "db894fe3de14e8508a03b0ca83594ad2d8e145f600fdbb608ea4355dfb486fcc"
+    },
+    {
+      "name": "model_answer-metadata.json",
+      "bytes": 1868,
+      "sha256": "d0ef3312c51f8c82a01bfe3afa95d51bef513d88ff209039f1be34d5dd0841f2"
+    },
+    {
+      "name": "model_judgment-metadata.json",
+      "bytes": 1811,
+      "sha256": "5c8a8efb86638ae758836a388b2ff7834ce0b2ca4a9fdb7bb1229e5791c6dc63"
+    },
+    {
+      "name": "new-livebench-README.md",
+      "bytes": 3851,
+      "sha256": "5c1d32aad387e00dd62e52ffceee04296585cf44f4f7c4b7a3aacccb40b932df"
+    },
+    {
+      "name": "source-manifest.json",
+      "bytes": 4220,
+      "sha256": "1ee196aff7967869c4b04a3d7c952b33c00117fbd77951285df3f029f9fd1d63"
+    },
+    {
+      "name": "table_2026_06_25.csv",
+      "bytes": 11069,
+      "sha256": "1021e4ef211ccba609d6da2c22032f46d695c1546508cf144a58a2f3d6960f3d"
+    }
+  ],
+  "sourceAfter": [
+    {
+      "name": "Averaging.js.txt",
+      "bytes": 1265,
+      "sha256": "37227d0c251c4f608c42eba936c627b36dcb57edfc911785c79d2142ad9b9b18"
+    },
+    {
+      "name": "LiveBench-DATASHEET.md",
+      "bytes": 12666,
+      "sha256": "8f5036b7330c01de1a9cd5a9f02a0e6f5d359bd08b210d7dde0635731fbce1f4"
+    },
+    {
+      "name": "categories_2026_06_25.json",
+      "bytes": 725,
+      "sha256": "dad300ad18655b69db720e1b88fc5a5eac06c5b2f0e52c2bf50f10ff057674f3"
+    },
+    {
+      "name": "compute.js.txt",
+      "bytes": 8380,
+      "sha256": "3dac80c2f68f619ef3f427b337db3755d24d9f45ce74c13338a6a09903134efe"
+    },
+    {
+      "name": "constants.js.txt",
+      "bytes": 1756,
+      "sha256": "ce56014792362d8c36d3e38d00d61709b849d7c572080c58eef53a4aa748f14d"
+    },
+    {
+      "name": "cost_2026_06_25.csv",
+      "bytes": 28845,
+      "sha256": "d572014a891e76ef3f30896f66cc873ec02eb5c7d10909a6796efe450ad05ba9"
+    },
+    {
+      "name": "download_leaderboard.py.txt",
+      "bytes": 1839,
+      "sha256": "d4e0dace0ee661779c3ec9fbd23ea16cdc5206149db016e0ad527ba45d5bd55e"
+    },
+    {
+      "name": "modelLinks.js.txt",
+      "bytes": 66403,
+      "sha256": "db894fe3de14e8508a03b0ca83594ad2d8e145f600fdbb608ea4355dfb486fcc"
+    },
+    {
+      "name": "model_answer-metadata.json",
+      "bytes": 1868,
+      "sha256": "d0ef3312c51f8c82a01bfe3afa95d51bef513d88ff209039f1be34d5dd0841f2"
+    },
+    {
+      "name": "model_judgment-metadata.json",
+      "bytes": 1811,
+      "sha256": "5c8a8efb86638ae758836a388b2ff7834ce0b2ca4a9fdb7bb1229e5791c6dc63"
+    },
+    {
+      "name": "new-livebench-README.md",
+      "bytes": 3851,
+      "sha256": "5c1d32aad387e00dd62e52ffceee04296585cf44f4f7c4b7a3aacccb40b932df"
+    },
+    {
+      "name": "source-manifest.json",
+      "bytes": 4220,
+      "sha256": "1ee196aff7967869c4b04a3d7c952b33c00117fbd77951285df3f029f9fd1d63"
+    },
+    {
+      "name": "table_2026_06_25.csv",
+      "bytes": 11069,
+      "sha256": "1021e4ef211ccba609d6da2c22032f46d695c1546508cf144a58a2f3d6960f3d"
+    }
+  ],
+  "output": {
+    "name": "aggregate-prior-study.json",
+    "bytes": 102422,
+    "sha256": "0d03e0f68df30df99aa269fe4f8603b5677f22d78705822d856b274e0c9b70ea",
+    "byteReproducibleOnImmediateRepeat": true
+  },
+  "independentChecks": {
+    "independentEligibilityPoolMatches": true,
+    "eligibleModels": 63,
+    "questionCountVectorMatches": true,
+    "taskValuesPreserved": true,
+    "allMeansWithinTolerance": true,
+    "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+    "maximumOverallMeanErrorPercentagePoints": 1.4210854715202004e-14,
+    "selectedModelsAgreeWithExactDecimals": true,
+    "reportedEnvelopeAtLeastBestSingle": true,
+    "everyDomainEnvelopeAtLeastBestSingle": true,
+    "exactEnvelopeAtLeastBestSingle": true
+  },
+  "arithmetic": {
+    "method": "Exact rational arithmetic from original decimal score cells, separately implemented from compensated binary64 means. Strict CSV parsing is shared with the audit.",
+    "verificationTolerance": "32 * Number.EPSILON * max(1, abs(exactReferenceScorePct)), used only to compare arithmetic outputs, never to select or break ties.",
+    "selectionPolicyInStudy": {
+      "aggregation": "Neumaier compensated means of retained binary64 values; no display rounding before selection.",
+      "maximum": "Strict numerical maximum of unrounded retained binary64 scores.",
+      "tieTolerance": 0,
+      "tieBreak": "Exact numerical equality only, then lexicographically smallest exact model ID using ECMAScript UTF-16 code-unit order (<); no locale comparison or ID normalization.",
+      "identity": "Model versions, effort and thinking variants remain separate exact strings."
+    },
+    "bestSingle": {
+      "model": "claude-fable-5-1-max-effort",
+      "scorePct": 83.41415476190477,
+      "exactScorePct": {
+        "numerator": "7006789",
+        "denominator": "84000"
+      }
+    },
+    "envelope": {
+      "scorePct": 87.63425,
+      "exactScorePct": {
+        "numerator": "350537",
+        "denominator": "4000"
+      }
+    },
+    "differencePercentagePoints": {
+      "value": 4.220095238095238,
+      "exact": {
+        "numerator": "44311",
+        "denominator": "10500"
+      }
+    },
+    "byDomain": [
+      {
+        "domain": "Reasoning",
+        "model": "gpt-6-astra-max",
+        "scorePct": 92.65375,
+        "exactScorePct": {
+          "numerator": "74123",
+          "denominator": "800"
+        },
+        "bestSingleScorePct": 91.69225,
+        "differencePercentagePoints": 0.9615
+      },
+      {
+        "domain": "Coding",
+        "model": "claude-sonnet-5-5-max-effort",
+        "scorePct": 91.366,
+        "exactScorePct": {
+          "numerator": "45683",
+          "denominator": "500"
+        },
+        "bestSingleScorePct": 86.375,
+        "differencePercentagePoints": 4.991
+      },
+      {
+        "domain": "Agentic Coding",
+        "model": "deepseek-v4.1-flash-max",
+        "scorePct": 77.27266666666667,
+        "exactScorePct": {
+          "numerator": "115909",
+          "denominator": "1500"
+        },
+        "bestSingleScorePct": 66.06066666666666,
+        "differencePercentagePoints": 11.212
+      },
+      {
+        "domain": "Mathematics",
+        "model": "claude-opus-5-5-max-effort",
+        "scorePct": 97.0775,
+        "exactScorePct": {
+          "numerator": "38831",
+          "denominator": "400"
+        },
+        "bestSingleScorePct": 97.00675,
+        "differencePercentagePoints": 0.07075
+      },
+      {
+        "domain": "Data Analysis",
+        "model": "gpt-6-astra-max",
+        "scorePct": 82.97333333333333,
+        "exactScorePct": {
+          "numerator": "6223",
+          "denominator": "75"
+        },
+        "bestSingleScorePct": 80.27566666666667,
+        "differencePercentagePoints": 2.6976666666666667
+      },
+      {
+        "domain": "Language",
+        "model": "claude-fable-5-max-effort",
+        "scorePct": 90.684,
+        "exactScorePct": {
+          "numerator": "22671",
+          "denominator": "250"
+        },
+        "bestSingleScorePct": 89.501,
+        "differencePercentagePoints": 1.183
+      },
+      {
+        "domain": "IF",
+        "model": "gemini-3.8-flash-high",
+        "scorePct": 81.4125,
+        "exactScorePct": {
+          "numerator": "6513",
+          "denominator": "80"
+        },
+        "bestSingleScorePct": 72.98775,
+        "differencePercentagePoints": 8.42475
+      }
+    ],
+    "profileChecks": [
+      {
+        "model": "claude-fable-5-1-max-effort",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "claude-fable-5-max-effort",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "claude-opus-4-5-20251101-thinking-64k-high-effort",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "claude-opus-4-6-thinking-auto-high-effort",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "claude-opus-4-7-xhigh-effort",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "claude-opus-4-8-max-effort",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "claude-opus-5-5-max-effort",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "claude-opus-5-5-xhigh-effort",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "claude-sonnet-4-6-thinking-auto-medium-effort",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "claude-sonnet-5-5-max-effort",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "claude-sonnet-5-5-xhigh-effort",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "claude-sonnet-5-xhigh-effort",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "deepseek-v4-flash",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "deepseek-v4-flash-0731",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "deepseek-v4-flash-vision-exp",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "deepseek-v4-pro",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "deepseek-v4-pro-0813",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "deepseek-v4.1-flash-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gemini-3.1-pro-preview-high",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gemini-3.5-flash-high",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gemini-3.5-flash-lite-high",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 7.105427357601002e-15
+      },
+      {
+        "model": "gemini-3.6-flash-high",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "gemini-3.7-flash-high",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gemini-3.8-flash-high",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "glm-5.2",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "glm-5.3",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "glm-5.3-flash",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-5.2-2025-12-11-high",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-5.2-codex",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "gpt-5.4-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "gpt-5.5-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-5.6-luna-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-5.6-sol-max",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-5.6-terra-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-6-astra-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-6-luna-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-6-sol-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-6.1-sol-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "gpt-6.1-sol-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "grok-4.3",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "grok-4.5",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "grok-4.6",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "grok-4.7-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "grok-build-0.1",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "inkling-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "kimi-k2.6-thinking",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "kimi-k2.7-code",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "kimi-k3",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "minimax-m3",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "muse-spark-1.1-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "muse-spark-1.2-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "muse-spark-1.3-xhigh",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "nemotron-3-ultra-550b-a55b",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "ox-alpha-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "qwen3.6-27b",
+        "maximumDomainMeanErrorPercentagePoints": 7.105427357601002e-15,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "qwen3.6-plus",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "qwen3.7-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "qwen3.8-27b",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "qwen3.8-flash-next",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 0
+      },
+      {
+        "model": "qwen3.8-max",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "smaug-agentic",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "smaug-flash",
+        "maximumDomainMeanErrorPercentagePoints": 0,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      },
+      {
+        "model": "smaug-mini",
+        "maximumDomainMeanErrorPercentagePoints": 1.4210854715202004e-14,
+        "overallMeanErrorPercentagePoints": 1.4210854715202004e-14
+      }
+    ]
+  },
+  "scriptHashes": {
+    "driver": {
+      "path": "<LOCAL_VERIFICATION_DRIVER>/run-prior-study.mjs",
+      "sha256": "77bc5b978bd1eaa31a3ad4a7ef1859f36a9ba67187365c9dba636a6d1262bf0d"
+    },
+    "unitTests": {
+      "path": "tests/livebench-prior-study.test.mjs",
+      "sha256": "acfad1e8540dcb03db07d8839ee73f5b9dc4496c06d8ef45e9f9e0becc917e70"
+    },
+    "implementation": {
+      "algorithm": "SHA-256",
+      "scripts": [
+        {
+          "path": "scripts/livebench-prior-study.mjs",
+          "bytes": 13336,
+          "sha256": "6c42fb78091b68d473fcebe18cc4df38c93314348f8e7bd9dfb4e25b4b02733f"
+        },
+        {
+          "path": "scripts/livebench-aggregate-audit.mjs",
+          "bytes": 23127,
+          "sha256": "94b42f959b3e0d3e1f8113ac3ced6b3c48171532d6450094da95b9523f1c65e7"
+        }
+      ],
+      "sha256": "705b9808e59acd45f6dbd644000a1891b2769a34b2d6ddab031eab633c36333c"
+    }
+  },
+  "limitations": [
+    "Both maximizers are selected and evaluated on these same published aggregates. This is in-sample descriptive adaptation, not an independent test or an estimate of generalization benefit.",
+    "The domain-wise empirical upper envelope uses known domain labels and hindsight domain maxima. It is not a deployed learned classifier, question-adaptive router, or a universal upper bound on all possible routing policies.",
+    "Equal complete question-count vectors do not establish same-question identities or comparable collection conditions. No question rows, correctness probabilities, confidence intervals, significance tests, bootstrap, or paired inference are fabricated.",
+    "The shared audit parses author cost fields for its completeness/count-cohort predicate. Their amounts are not used in quality means, weights, maxima or reported results; no pricing query, official usage-cost calculation, or cost-saving claim is made.",
+    "Exact model IDs preserve model versions and effort/thinking variants; combining them would alter the fixed descriptive candidate pool.",
+    "The calculation applies the general equal-task-within-domain and equal-domain formula, not legacy model-specific website score exceptions."
+  ]
+}

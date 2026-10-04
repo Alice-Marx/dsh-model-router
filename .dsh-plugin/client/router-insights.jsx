@@ -5,6 +5,10 @@ import {
   BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, UNTESTED_VERSION_NOTE, budgetMeter, dagLayers, formatUsd, healthSummary,
   packageCost, packageStatus, priorAttemptTotals, rerunSupport, runTotals, versionLine,
 } from './insights-state.mjs'
+import {
+  ADAPTIVE_NUMBER_FIELDS, adaptiveSettingValue, dynamicSourceView, feedbackRatingArguments,
+  learningView, parseAdaptiveNumber, parsePublicEndpoint, publicEndpointDraft,
+} from './adaptive-state.mjs'
 
 const text = value => typeof value === 'string' ? value.trim() : ''
 const BAND = { simple: '简单', balanced: '中等', complex: '困难' }
@@ -103,6 +107,103 @@ function useSettingsWriter(settingsScope) {
   return { value: snapshot.value ?? {}, writable, write, notice }
 }
 
+const ADAPTIVE_FIELD_LABEL = {
+  feedbackHalfLifeDays: '反馈半衰期（天）', feedbackPriorWeight: '收缩强度',
+  feedbackMaxAdjustment: '最大偏好效用调整', dynamicDataTtlMinutes: '公共快照检查间隔（分钟）',
+}
+
+/** Number drafts are local until saved; blank never means zero. */
+function AdaptiveNumberControl({ field, value, writable, onSave }) {
+  const [draft, setDraft] = React.useState('')
+  const [notice, setNotice] = React.useState('')
+  const save = async () => {
+    try {
+      const next = parseAdaptiveNumber(field.key, draft)
+      setNotice('')
+      if (await onSave(field.key, next)) setDraft('')
+    } catch { setNotice(`请输入 ${field.min} 到 ${field.max} 的数字。`) }
+  }
+  return <div className="mr-control-group">
+    <label className="mr-control-label" htmlFor={`mr-${field.key}`}>{ADAPTIVE_FIELD_LABEL[field.key]}</label>
+    <div className="mr-inline"><input className="mr-input mr-budget" id={`mr-${field.key}`} type="number" min={field.min} max={field.max} step={field.step}
+      placeholder={String(value)} value={draft} disabled={!writable} onChange={event => setDraft(event.target.value)} />
+      <button className="mr-button mr-button-secondary" type="button" disabled={!writable || draft === ''} onClick={() => { void save() }}>保存</button></div>
+    {notice && <span className="mr-error" role="alert">{notice}</span>}
+  </div>
+}
+
+function PublicEndpointControl({ name, label, value, writable, onSave }) {
+  const [draft, setDraft] = React.useState(null)
+  const [notice, setNotice] = React.useState('')
+  const current = publicEndpointDraft(name, value)
+  const save = async () => {
+    try {
+      const next = parsePublicEndpoint(name, draft ?? current)
+      setNotice('')
+      if (await onSave(name, next)) setDraft(null)
+    } catch { setNotice('请输入不含认证、查询参数或片段的公开 HTTPS 地址；价格快照可留空。') }
+  }
+  return <div className="mr-control-group">
+    <label className="mr-control-label" htmlFor={`mr-${name}`}>{label}</label>
+    <input className="mr-input" id={`mr-${name}`} type="url" maxLength={2048} value={draft ?? current} disabled={!writable}
+      placeholder={name === 'liveBenchEndpoint' ? 'https://livebench.ai' : '留空：不读取远程价格快照'} onChange={event => setDraft(event.target.value)} />
+    <button className="mr-button mr-button-secondary" type="button" disabled={!writable || draft === null} onClick={() => { void save() }}>保存地址</button>
+    {notice && <span className="mr-error" role="alert">{notice}</span>}
+  </div>
+}
+
+function PublicSourceStatus({ label, source }) {
+  const view = dynamicSourceView(source)
+  return <div className="mr-control-group"><span className="mr-control-label">{label}：{view.label}</span>
+    <span className="mr-caption">{view.version ? `版本 ${view.version} · ` : ''}{view.count} 条记录{view.verifiedAt ? ` · 最近校验 ${new Date(view.verifiedAt).toLocaleString()}` : ''}</span>
+    {view.source && <span className="mr-caption">公开来源：{view.source}</span>}
+    {view.status === 'error' && <span className="mr-caption">更新失败；是否可用由 Host 校验，不将缺失数据当作零成本或满分。</span>}
+  </div>
+}
+
+function AdaptiveControls({ ledger, settings, onChanged }) {
+  const value = settings.value
+  const learning = learningView(ledger?.learning, value)
+  const [resetBusy, setResetBusy] = React.useState(false)
+  const save = async (key, next) => {
+    const accepted = await settings.write(key, next)
+    if (accepted) onChanged?.()
+    return accepted
+  }
+  const reset = async () => {
+    if (!window.confirm('从现在重新学习你的偏好？此前反馈将不再参与调整，但执行记录、费用历史和原评价不会删除。')) return
+    setResetBusy(true)
+    try { await save('feedbackResetAt', Date.now()) } finally { setResetBusy(false) }
+  }
+  return <>
+    <h3 className="mr-section-title">持续反馈与本地偏好</h3>
+    <p className="mr-caption">只使用你对已记录结果的点赞 / 不好 / 撤回，按任务类型和时间衰减调整偏好效用；不抬高质量硬门槛。系统执行成功不等于你满意，模型复核也不作为人工评分。不会为了学习发起付费探索。</p>
+    <p className="mr-caption">范围：本地 DSH_HOME 工作室共享，不是按账号隔离；最多最近 200 次运行的滑动窗口，不上传反馈或任务内容。</p>
+    <div className="mr-controls">
+      <label className="mr-check"><input type="checkbox" checked={adaptiveSettingValue(value, 'feedbackLearningEnabled') !== false} disabled={!settings.writable}
+        onChange={event => { void save('feedbackLearningEnabled', event.target.checked) }} />启用用户反馈学习</label>
+      {ADAPTIVE_NUMBER_FIELDS.filter(field => field.key !== 'dynamicDataTtlMinutes').map(field => <AdaptiveNumberControl key={field.key} field={field}
+        value={adaptiveSettingValue(value, field.key)} writable={settings.writable} onSave={save} />)}
+    </div>
+    {learning.available ? <p className="mr-caption" role="status">{learning.enabled ? '学习已启用' : '学习已停用'} · 有效反馈 {learning.feedbackCount} · 有效权重 {learning.effectiveWeight.toFixed(2)} · 忽略 {learning.ignoredCount}{learning.policyVersion ? ` · 策略 ${learning.policyVersion}` : ''}</p>
+      : <p className="mr-caption" role="status">学习摘要尚未读取；保存后刷新执行记录查看。</p>}
+    {learning.resetAt > 0 && <p className="mr-caption">学习起点：{new Date(learning.resetAt).toLocaleString()}，此前反馈不再参与调整。</p>}
+    <button className="mr-button mr-button-secondary" type="button" disabled={!settings.writable || resetBusy} onClick={() => { void reset() }}>{resetBusy ? '正在设置…' : '从现在重新学习'}</button>
+    <h3 className="mr-section-title">动态公共数据</h3>
+    <p className="mr-caption">默认关闭。明确启用后，在打开 / 刷新账本及执行前按检查间隔读取公开 LiveBench 和可选价格快照；价格与能力先验保留版本，不代表真实任务收益。只有打开公共源开关才会读取远程数据，不发送任务或反馈。</p>
+    <div className="mr-controls">
+      <label className="mr-check"><input type="checkbox" checked={adaptiveSettingValue(value, 'dynamicDataEnabled') === true} disabled={!settings.writable}
+        onChange={event => { void save('dynamicDataEnabled', event.target.checked) }} />启用动态公共数据</label>
+      <AdaptiveNumberControl field={ADAPTIVE_NUMBER_FIELDS.find(field => field.key === 'dynamicDataTtlMinutes')}
+        value={adaptiveSettingValue(value, 'dynamicDataTtlMinutes')} writable={settings.writable} onSave={save} />
+      <PublicEndpointControl name="liveBenchEndpoint" label="LiveBench 公开源" value={adaptiveSettingValue(value, 'liveBenchEndpoint')} writable={settings.writable} onSave={save} />
+      <PublicEndpointControl name="pricingSnapshotEndpoint" label="价格快照公开源（可选）" value={adaptiveSettingValue(value, 'pricingSnapshotEndpoint')} writable={settings.writable} onSave={save} />
+      <PublicSourceStatus label="LiveBench" source={ledger?.dynamicData?.liveBench} />
+      <PublicSourceStatus label="价格" source={ledger?.dynamicData?.pricing} />
+    </div>
+  </>
+}
+
 /** 成本控制 + 预设方案: prominent spending meters and the knobs that govern routing cost. */
 export function CostControlCard({ ledger, settingsScope, onChanged, error }) {
   const settings = useSettingsWriter(settingsScope)
@@ -171,6 +272,7 @@ export function CostControlCard({ ledger, settingsScope, onChanged, error }) {
           <label className="mr-check"><input type="checkbox" checked={value.allowManualReassign !== false} disabled={!settings.writable} onChange={event => { void set('allowManualReassign', event.target.checked) }} />允许手动改派工作包</label>
           <label className="mr-check"><input type="checkbox" checked={value.confirmUnsandboxedCli !== false} disabled={!settings.writable} onChange={event => { void set('confirmUnsandboxedCli', event.target.checked) }} />直接启动无沙箱 CLI 前先确认</label>
         </div>
+        <AdaptiveControls ledger={ledger} settings={settings} onChanged={onChanged} />
         {settings.notice && <p className="mr-error" role="alert">{settings.notice}</p>}
       </div>
     </section>
@@ -230,8 +332,8 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
       {item.answer && <details className="mr-tool-log"><summary>查看结果</summary><pre>{item.answer}{item.answerTruncated ? '\n…（已截断）' : ''}</pre></details>}
       <div className="mr-node-actions">
         {item.ok && <>
-          <button className="mr-button mr-button-secondary mr-mini" type="button" aria-pressed={item.rating === 1} disabled={busy} onClick={() => onRate(run.id, item.id, item.rating === 1 ? 'clear' : 'up')}>👍 有用</button>
-          <button className="mr-button mr-button-secondary mr-mini" type="button" aria-pressed={item.rating === -1} disabled={busy} onClick={() => onRate(run.id, item.id, item.rating === -1 ? 'clear' : 'down')}>👎 不好</button>
+          <button className="mr-button mr-button-secondary mr-mini" type="button" aria-pressed={item.rating === 1} disabled={busy} onClick={() => onRate(...feedbackRatingArguments(run, item, 'up'))}>👍 有用</button>
+          <button className="mr-button mr-button-secondary mr-mini" type="button" aria-pressed={item.rating === -1} disabled={busy} onClick={() => onRate(...feedbackRatingArguments(run, item, 'down'))}>👎 不好</button>
         </>}
         {canRerun && <button className="mr-button mr-mini" type="button" title={rerun.confirm || undefined} onClick={() => onRerun(run.id, item.id, null)}>{run.kind === 'tool' ? '重新执行此调用' : rerun.writes ? '在新工作区续跑' : '重跑此步'}</button>}
         {!rerun.supported && !item.ok && item.ran && <span className="mr-caption">{rerun.reason}</span>}

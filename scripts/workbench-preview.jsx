@@ -5,7 +5,9 @@ import { createWorkspacePlan, routesFromModelCatalog } from '../.dsh-plugin/clie
 import { OFFICIAL_TOOLS, toolForProvider } from '../.dsh-plugin/shared/official-tool-registry.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from '../.dsh-plugin/shared/model-profiles.mjs'
 import { billingOverview } from '../.dsh-plugin/shared/subscription-billing.mjs'
-import { budgetCheck, routeQualityBiases } from '../.dsh-plugin/shared/run-ledger.mjs'
+import { budgetCheck } from '../.dsh-plugin/shared/run-ledger.mjs'
+import { buildFeedbackProfile } from '../.dsh-plugin/shared/adaptive-feedback.mjs'
+import { ADAPTIVE_DEFAULTS } from '../.dsh-plugin/client/adaptive-state.mjs'
 
 // Every figure below is a UI fixture, not a current vendor price or real bill.
 const catalog = {
@@ -37,6 +39,7 @@ const blocked = async () => ({ ok: false, error: { message: '本地 UI 演示不
 
 function createSettingsScope() {
   let snapshot = { status: 'ready', writable: true, revision: 1, value: {
+    ...ADAPTIVE_DEFAULTS,
     budgetUsd: 0.1, dailyBudgetUsd: 5, monthlyBudgetUsd: 50,
     routingPreset: 'balanced', overBudgetAction: 'downgrade',
     reviewMode: 'sample', reviewSampleRate: 0.2, allowManualReassign: true,
@@ -72,6 +75,7 @@ function sampleRuns() {
     packages: [
       { id: 'analyze', name: '分析架构', dependsOn: [], provider: 'deepseek', model: 'deepseek-chat',
         status: 'succeeded', ok: true, ran: true, channel: 'harness-llm', billing: 'api',
+        type: 'research', finishedAt: Date.now() - 25 * 60_000,
         difficulty: 'balanced', estimatedCost: 0.003, costUsd: 0.0028, answer: '演示结果：已梳理模块边界，建议补齐关键路径验证。', rating: 1 },
       { id: 'verify', name: '验证关键路径', dependsOn: ['analyze'], provider: 'openai', model: 'gpt-demo',
         status: 'failed', ok: false, ran: true, channel: 'official-cli', toolId: 'codex', billing: 'subscription',
@@ -105,7 +109,12 @@ function createDemoSession(scenario) {
     return { runs: structuredClone(runs), settings: { ...settings }, spent,
       budget: { ...budgetCheck({ spent, dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd }),
         dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd, action: settings.overBudgetAction },
-      biases: routeQualityBiases(runs) }
+      biases: {}, learning: buildFeedbackProfile(runs, {
+        enabled: settings.feedbackLearningEnabled, halfLifeDays: settings.feedbackHalfLifeDays,
+        priorWeight: settings.feedbackPriorWeight, maxAdjustment: settings.feedbackMaxAdjustment, resetAt: settings.feedbackResetAt,
+      }), dynamicData: { enabled: settings.dynamicDataEnabled, revision: 'demo-no-network',
+        liveBench: { status: settings.dynamicDataEnabled ? 'missing' : 'disabled' }, pricing: { status: settings.dynamicDataEnabled ? 'missing' : 'disabled' } },
+      routingData: { liveBench: null, pricingSnapshot: null, dataVersions: { revision: 'demo-no-network' } } }
   }
   const health = () => ({
     tools: structuredClone(tools), onboarding: { completedAt }, notices: [],
@@ -113,6 +122,7 @@ function createDemoSession(scenario) {
   })
   const preview = request => {
     const plan = createWorkspacePlan(request.task, source(), {
+      ...ledger().routingData, learning: ledger().learning,
       mode: request.provider ? 'direct' : request.planMode,
       directProvider: request.provider, directModel: request.model,
       budgetUsd: request.budgetUsd, preset: request.preset ?? settingsScope.getSnapshot().value.routingPreset,
@@ -145,9 +155,10 @@ function createDemoSession(scenario) {
     toolHealth: async () => ok(health()),
     completeOnboarding: async () => { completedAt = Date.now(); return ok({ completedAt }) },
     loadLedger: async () => ok(ledger()),
-    rateResult: async ({ runId, packageId, rating }) => {
+    rateResult: async ({ runId, packageId, rating, expectedFinishedAt }) => {
       const item = runs.find(run => run.id === runId)?.packages.find(entry => entry.id === packageId)
-      if (item) item.rating = rating === 'up' ? 1 : rating === 'down' ? -1 : 0
+      if (item && expectedFinishedAt !== item.finishedAt) return { ok: false, error: { message: '示例结果已更新，请刷新后评价。' } }
+      if (item) { item.rating = rating === 'up' ? 1 : rating === 'down' ? -1 : null; item.ratedAt = Date.now() }
       return ok({ saved: Boolean(item) })
     },
     rerunStep: async ({ runId, packageId, provider, model, subscriptionChoice }) => {
@@ -157,6 +168,7 @@ function createDemoSession(scenario) {
       Object.assign(item, { provider: provider ?? item.provider, model: model ?? item.model,
         status: subscriptionChoice === 'cancel' ? 'cancelled' : 'succeeded', ok: subscriptionChoice !== 'cancel',
         ran: subscriptionChoice !== 'cancel', channel: 'harness-llm', billing: 'api', costUsd: 0,
+        finishedAt: Date.now(), rating: null, review: null,
         error: '', answer: '模拟重跑完成：未调用模型，未修改任何文件。' })
       run.status = run.packages.every(entry => entry.ok) ? 'completed' : 'partial'
       return ok({ runId })
@@ -175,11 +187,12 @@ function createDemoSession(scenario) {
     startRun: async request => {
       const value = preview(request)
       const runId = `demo-${Date.now()}`
-      runs.unshift({ id: runId, kind: request.planMode === 'team' ? 'team' : 'assign', task: request.task,
+      runs.push({ id: runId, kind: request.planMode === 'team' ? 'team' : 'assign', task: request.task,
         createdAt: Date.now(), workspace: value.workspace, executionMode: 'read-only',
         status: 'completed', preset: value.decision.preset, decision: value.decision,
         packages: value.decision.packages.map(item => ({ ...item, status: 'succeeded', ok: true,
           ran: true, channel: 'harness-llm', billing: 'api', costUsd: 0,
+          finishedAt: Date.now(), type: 'general',
           answer: `模拟提交任务：${request.task}\n本地 UI 演示结果：仅生成浏览器内记录，没有调用模型或修改文件。` })),
       })
       return ok({ status: 'completed', runId })

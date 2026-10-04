@@ -11,6 +11,12 @@
 /README.i18n.yaml -text
 /INSTALLATION_GUIDE.zh.md -text
 /docs/WORKBENCH_USER_GUIDE.zh.md -text
+/docs/ROUTING_RESEARCH.zh.md -text
+/docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md -text
+/docs/ROUTING_LIVEBENCH_VALIDATION.zh.md -text
+/docs/ROUTING_LIVEBENCH_DATA_SEARCH.zh.md -text
+/docs/ROUTING_SELFTEST_STEPS.zh.md -text
+/docs/ROUTING_ADAPTIVE_LEARNING.zh.md -text
 /docs/assets/*.svg -text
 /MIGRATION.md -text
 /GAL_GAME_CONCEPT.zh.md -text

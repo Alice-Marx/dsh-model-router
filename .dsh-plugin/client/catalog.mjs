@@ -1,6 +1,8 @@
 import { createPlanFromRoutes } from '../shared/harness-plan.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from '../shared/model-profiles.mjs'
 import { applyQualityBiases } from '../shared/run-ledger.mjs'
+import { applyFeedbackProfile } from '../shared/adaptive-feedback.mjs'
+import { applyPricingSnapshot } from '../shared/dynamic-data-view.mjs'
 
 const clean = value => typeof value === 'string' ? value.trim() : ''
 
@@ -43,7 +45,10 @@ export function routesFromModelCatalog(catalog) {
 
 /** Generate a local plan without sending the task text to an LLM. */
 export function createWorkspacePlan(task, catalog, options = {}) {
-  const routes = applyQualityBiases(applyModelProfiles(routesFromModelCatalog(catalog),
-    parseModelProfilesJson(options.modelProfilesJson ?? '[]')), options.qualityBiases ?? null)
+  const profiled = applyModelProfiles(routesFromModelCatalog(catalog), parseModelProfilesJson(options.modelProfilesJson ?? '[]'))
+  const priced = applyPricingSnapshot(profiled, options.pricingSnapshot ?? null)
+  const routes = options.learning
+    ? applyFeedbackProfile(priced, options.learning)
+    : applyQualityBiases(priced, options.qualityBiases ?? null) // old programmatic callers only
   return createPlanFromRoutes(task, routes, options)
 }
