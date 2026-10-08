@@ -1591,18 +1591,27 @@ function applyQualityBiases(routes, biases) {
 var finite2 = (value) => typeof value === "number" && Number.isFinite(value);
 var clean3 = (value) => typeof value === "string" ? value.trim() : "";
 var routeKey3 = (provider, model) => `${provider}\0${model}`;
+var record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 function applyFeedbackProfile(routes, profile) {
-  if (!Array.isArray(routes) || profile?.enabled !== true || !profile.adjustments || typeof profile.adjustments !== "object" || Array.isArray(profile.adjustments)) return routes;
+  if (!Array.isArray(routes) || !record(profile) || typeof profile.enabled !== "boolean") return routes;
   return routes.map((route) => {
-    if (!route || typeof route !== "object") return route;
+    if (!record(route)) return route;
+    let base = route;
+    if (Object.hasOwn(route, "preferenceAdjustments") || Object.hasOwn(route, "preferenceAdjustmentMeta")) {
+      base = { ...route };
+      delete base.preferenceAdjustments;
+      delete base.preferenceAdjustmentMeta;
+    }
+    if (profile.enabled !== true || !record(profile.adjustments)) return base;
     const key = routeKey3(clean3(route.provider), clean3(route.model));
-    if (!Object.hasOwn(profile.adjustments, key)) return route;
+    if (!Object.hasOwn(profile.adjustments, key)) return base;
     const value = profile.adjustments[key];
-    if (!value || typeof value !== "object" || Array.isArray(value)) return route;
-    const adjustments = Object.fromEntries(Object.entries(value).filter(([, bias]) => finite2(bias) && Math.abs(bias) <= 0.1));
-    if (!Object.keys(adjustments).length) return route;
+    if (!record(value)) return base;
+    const limit = finite2(profile.maxAdjustment) && profile.maxAdjustment >= 0 && profile.maxAdjustment <= 0.1 ? profile.maxAdjustment : 0.1;
+    const adjustments = Object.fromEntries(Object.entries(value).filter(([, bias]) => finite2(bias) && Math.abs(bias) <= limit));
+    if (!Object.keys(adjustments).length) return base;
     return {
-      ...route,
+      ...base,
       preferenceAdjustments: adjustments,
       preferenceAdjustmentMeta: {
         policyVersion: profile.policyVersion,
@@ -1613,7 +1622,11 @@ function applyFeedbackProfile(routes, profile) {
         updatedAt: profile.updatedAt,
         halfLifeDays: profile.halfLifeDays,
         maxAdjustment: profile.maxAdjustment,
-        window: profile.window
+        window: profile.window,
+        cellStats: Object.hasOwn(profile.cellStats ?? {}, key) ? profile.cellStats[key] : {},
+        evaluatedAt: profile.evaluatedAt,
+        decayRefreshMs: profile.decayRefreshMs,
+        revisionSemantics: profile.revisionSemantics
       }
     };
   });
@@ -2176,8 +2189,10 @@ function feedbackRatingArguments(run, item, direction) {
 var nonnegative2 = (value) => Number.isFinite(value) && value >= 0 ? value : 0;
 function learningView(learning, settings = {}) {
   return {
-    available: Boolean(learning && typeof learning === "object"),
-    enabled: typeof learning?.enabled === "boolean" ? learning.enabled : adaptiveSettingValue(settings, "feedbackLearningEnabled") !== false,
+    available: Boolean(learning && typeof learning === "object" && !Array.isArray(learning)),
+    // Current settings govern the next plan; a failed refresh must not make an
+    // older profile claim that a newly disabled policy is still enabled.
+    enabled: adaptiveSettingValue(settings, "feedbackLearningEnabled") !== false,
     feedbackCount: nonnegative2(learning?.feedbackCount),
     ignoredCount: nonnegative2(learning?.ignoredCount),
     effectiveWeight: nonnegative2(learning?.effectiveWeight),
@@ -2185,18 +2200,71 @@ function learningView(learning, settings = {}) {
     resetAt: nonnegative2(adaptiveSettingValue(settings, "feedbackResetAt"))
   };
 }
+function learningEvidenceRows(learning, limit = 12) {
+  const cells = learning?.cellStats;
+  if (!cells || typeof cells !== "object" || Array.isArray(cells)) return { rows: [], total: 0 };
+  const rows = [];
+  for (const [key, domains] of Object.entries(cells)) {
+    const identity = key.split("\0");
+    if (identity.length !== 2 || identity.some((part) => !part.trim()) || !domains || typeof domains !== "object" || Array.isArray(domains)) continue;
+    for (const [domain, cell] of Object.entries(domains)) {
+      if (!domain.trim() || !cell || typeof cell !== "object" || Array.isArray(cell) || !Number.isFinite(cell.adjustment) || Math.abs(cell.adjustment) > 0.1 || ["feedbackCount", "positiveCount", "negativeCount", "effectiveWeight", "effectiveSampleSize"].some((name) => !Number.isFinite(cell[name]) || cell[name] < 0) || !Number.isFinite(cell.shrinkage) || cell.shrinkage < 0 || cell.shrinkage > 1) continue;
+      rows.push({
+        id: JSON.stringify([key, domain]),
+        route: identity.map((part) => part.slice(0, 100)).join("/"),
+        domain: domain.slice(0, 80),
+        feedbackCount: nonnegative2(cell.feedbackCount),
+        positiveCount: nonnegative2(cell.positiveCount),
+        negativeCount: nonnegative2(cell.negativeCount),
+        effectiveWeight: nonnegative2(cell.effectiveWeight),
+        effectiveSampleSize: nonnegative2(cell.effectiveSampleSize),
+        shrinkage: Number.isFinite(cell.shrinkage) && cell.shrinkage >= 0 && cell.shrinkage <= 1 ? cell.shrinkage : 0,
+        adjustment: cell.adjustment
+      });
+    }
+  }
+  rows.sort((left, right) => left.route === right.route ? left.domain.localeCompare(right.domain) : left.route.localeCompare(right.route));
+  const count = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : 12;
+  return { rows: rows.slice(0, count), total: rows.length };
+}
+var EXCLUSION_LABELS = Object.freeze({
+  "unrated": "\u5C1A\u672A\u8BC4\u4EF7\uFF08\u4E0D\u662F\u4E0D\u6EE1\u610F\uFF09",
+  "not-successful": "\u6CA1\u6709\u6210\u529F\u6267\u884C\u7ED3\u679C",
+  "cli-model-unverified": "CLI \u5B9E\u9645\u6A21\u578B\u672A\u6838\u9A8C",
+  "before-reset": "\u7ED3\u679C\u65E9\u4E8E\u5B66\u4E60\u8D77\u70B9",
+  "superseded": "\u5DF2\u88AB\u540C\u4E00\u7ED3\u679C\u7684\u65B0\u8BB0\u5F55\u66FF\u4EE3",
+  "missing-identity": "\u7F3A\u5C11\u8FD0\u884C\u6216\u6B65\u9AA4\u6807\u8BC6",
+  "invalid-route": "\u8DEF\u7EBF\u6807\u8BC6\u65E0\u6548",
+  "invalid-time": "\u7ED3\u679C\u6216\u8BC4\u4EF7\u65F6\u95F4\u65E0\u6548",
+  "future-time": "\u65F6\u95F4\u665A\u4E8E\u5F53\u524D\u65F6\u523B"
+});
+function learningExclusionRows(learning) {
+  return Object.entries(EXCLUSION_LABELS).flatMap(([reason, label]) => {
+    const count = nonnegative2(learning?.exclusionReasons?.[reason]);
+    return count > 0 ? [{ reason, label, count }] : [];
+  });
+}
 var STATUS_LABEL = Object.freeze({ disabled: "\u672A\u542F\u7528", missing: "\u5C1A\u65E0\u5FEB\u7167", fresh: "\u5FEB\u7167\u6709\u6548", stale: "\u5FEB\u7167\u8FC7\u671F", error: "\u66F4\u65B0\u5931\u8D25" });
-function dynamicSourceView(source) {
-  const status = Object.hasOwn(STATUS_LABEL, source?.status ?? "") ? source.status : "missing";
+var PUBLIC_ERROR_CODES = /* @__PURE__ */ new Set(["refresh-failed", "snapshot-rollback-rejected", "storage-failed", "refresh-interrupted"]);
+var positiveTime = (value) => Number.isFinite(value) && value > 0 ? value : null;
+function dynamicSourceView(source, enabled = true) {
+  const status = enabled === false ? "disabled" : Object.hasOwn(STATUS_LABEL, source?.status ?? "") ? source.status : "missing";
   let publicSource = "";
-  if (typeof source?.source === "string") publicSource = publicEndpointDraft("pricingSnapshotEndpoint", source.source);
+  if (enabled !== false && typeof source?.source === "string") publicSource = publicEndpointDraft("pricingSnapshotEndpoint", source.source);
   return {
     status,
     label: STATUS_LABEL[status],
     source: publicSource,
-    version: typeof source?.version === "string" ? source.version.slice(0, 160) : null,
-    verifiedAt: Number.isFinite(source?.verifiedAt) && source.verifiedAt > 0 ? source.verifiedAt : null,
-    count: nonnegative2(source?.modelCount ?? source?.rowCount)
+    version: enabled !== false && typeof source?.version === "string" ? source.version.slice(0, 160) : null,
+    verifiedAt: enabled !== false && Number.isFinite(source?.verifiedAt) && source.verifiedAt > 0 ? source.verifiedAt : null,
+    count: enabled === false ? 0 : nonnegative2(source?.modelCount ?? source?.rowCount),
+    refreshing: enabled !== false && source?.refreshing === true,
+    pending: enabled !== false && source?.pending === true,
+    lastAttemptAt: enabled === false ? null : positiveTime(source?.lastAttemptAt),
+    lastSuccessAt: enabled === false ? null : positiveTime(source?.lastSuccessAt),
+    errorCode: enabled !== false && PUBLIC_ERROR_CODES.has(source?.error) ? source.error : "",
+    endpoint: enabled === false ? "" : publicEndpointDraft("pricingSnapshotEndpoint", source?.configuredEndpoint ?? source?.endpoint ?? ""),
+    lastGoodEndpoint: enabled === false ? "" : publicEndpointDraft("pricingSnapshotEndpoint", source?.lastGoodEndpoint ?? "")
   };
 }
 
@@ -2234,21 +2302,36 @@ function Meter({ label, meter }) {
 function useSettingsWriter(settingsScope) {
   const [snapshot, setSnapshot] = import_react2.default.useState(() => settingsScope.getSnapshot());
   const [notice, setNotice] = import_react2.default.useState("");
+  const [busy, setBusy] = import_react2.default.useState(false);
+  const pending = import_react2.default.useRef(false);
+  const mounted = import_react2.default.useRef(true);
+  import_react2.default.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   import_react2.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
-  const writable = snapshot.status === "ready" && snapshot.writable === true;
+  const writable = snapshot.status === "ready" && snapshot.writable === true && !busy;
   const write = async (key, value) => {
-    if (!writable) return false;
+    const current = settingsScope.getSnapshot();
+    if (pending.current || current.status !== "ready" || current.writable !== true) return false;
+    pending.current = true;
+    setBusy(true);
     setNotice("");
     try {
-      const accepted = await settingsScope.mutate([{ op: "set", path: [key], value }], snapshot.revision);
-      if (!accepted) setNotice("\u8BBE\u7F6E\u672A\u4FDD\u5B58\uFF0C\u53EF\u80FD\u5DF2\u5728\u5176\u4ED6\u9875\u9762\u4FEE\u6539\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+      const accepted = await settingsScope.mutate([{ op: "set", path: [key], value }], current.revision);
+      if (!accepted && mounted.current) setNotice("\u8BBE\u7F6E\u672A\u4FDD\u5B58\uFF0C\u53EF\u80FD\u5DF2\u5728\u5176\u4ED6\u9875\u9762\u4FEE\u6539\uFF0C\u8BF7\u91CD\u8BD5\u3002");
       return accepted;
     } catch (error) {
-      setNotice(text(error?.message) || "\u8BBE\u7F6E\u4FDD\u5B58\u5931\u8D25\u3002");
+      if (mounted.current) setNotice(text(error?.message) || "\u8BBE\u7F6E\u4FDD\u5B58\u5931\u8D25\u3002");
       return false;
+    } finally {
+      pending.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
-  return { value: snapshot.value ?? {}, writable, write, notice };
+  return { value: snapshot.value ?? {}, writable, busy, write, notice };
 }
 var ADAPTIVE_FIELD_LABEL = {
   feedbackHalfLifeDays: "\u53CD\u9988\u534A\u8870\u671F\uFF08\u5929\uFF09",
@@ -2260,12 +2343,18 @@ function AdaptiveNumberControl({ field: field2, value, writable, onSave }) {
   const [draft, setDraft] = import_react2.default.useState("");
   const [notice, setNotice] = import_react2.default.useState("");
   const save = async () => {
+    let next;
     try {
-      const next = parseAdaptiveNumber(field2.key, draft);
-      setNotice("");
-      if (await onSave(field2.key, next)) setDraft("");
+      next = parseAdaptiveNumber(field2.key, draft);
     } catch {
       setNotice(`\u8BF7\u8F93\u5165 ${field2.min} \u5230 ${field2.max} \u7684\u6570\u5B57\u3002`);
+      return;
+    }
+    setNotice("");
+    try {
+      if (await onSave(field2.key, next)) setDraft((current) => current === draft ? "" : current);
+    } catch {
+      setNotice("\u8BBE\u7F6E\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5\u3002");
     }
   };
   return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${field2.key}` }, ADAPTIVE_FIELD_LABEL[field2.key]), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement(
@@ -2291,12 +2380,18 @@ function PublicEndpointControl({ name, label, value, writable, onSave }) {
   const [notice, setNotice] = import_react2.default.useState("");
   const current = publicEndpointDraft(name, value);
   const save = async () => {
+    let next;
     try {
-      const next = parsePublicEndpoint(name, draft ?? current);
-      setNotice("");
-      if (await onSave(name, next)) setDraft(null);
+      next = parsePublicEndpoint(name, draft ?? current);
     } catch {
       setNotice("\u8BF7\u8F93\u5165\u4E0D\u542B\u8BA4\u8BC1\u3001\u67E5\u8BE2\u53C2\u6570\u6216\u7247\u6BB5\u7684\u516C\u5F00 HTTPS \u5730\u5740\uFF1B\u4EF7\u683C\u5FEB\u7167\u53EF\u7559\u7A7A\u3002");
+      return;
+    }
+    setNotice("");
+    try {
+      if (await onSave(name, next)) setDraft((currentDraft) => currentDraft === draft ? null : currentDraft);
+    } catch {
+      setNotice("\u5730\u5740\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5\u3002");
     }
   };
   return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${name}` }, label), /* @__PURE__ */ import_react2.default.createElement(
@@ -2315,25 +2410,42 @@ function PublicEndpointControl({ name, label, value, writable, onSave }) {
     void save();
   } }, "\u4FDD\u5B58\u5730\u5740"), notice && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-error", role: "alert" }, notice));
 }
-function PublicSourceStatus({ label, source }) {
-  const view = dynamicSourceView(source);
-  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-control-label" }, label, "\uFF1A", view.label), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, view.version ? `\u7248\u672C ${view.version} \xB7 ` : "", view.count, " \u6761\u8BB0\u5F55", view.verifiedAt ? ` \xB7 \u6700\u8FD1\u6821\u9A8C ${new Date(view.verifiedAt).toLocaleString()}` : ""), view.source && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u516C\u5F00\u6765\u6E90\uFF1A", view.source), view.status === "error" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u66F4\u65B0\u5931\u8D25\uFF1B\u662F\u5426\u53EF\u7528\u7531 Host \u6821\u9A8C\uFF0C\u4E0D\u5C06\u7F3A\u5931\u6570\u636E\u5F53\u4F5C\u96F6\u6210\u672C\u6216\u6EE1\u5206\u3002"));
+function PublicSourceStatus({ label, source, enabled }) {
+  const view = dynamicSourceView(source, enabled);
+  return /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-control-label" }, label, "\uFF1A", view.label), view.status !== "disabled" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, view.version ? `\u7248\u672C ${view.version} \xB7 ` : "", view.count, " \u6761\u8BB0\u5F55", view.verifiedAt ? ` \xB7 \u6700\u8FD1\u6821\u9A8C ${new Date(view.verifiedAt).toLocaleString()}` : ""), view.source && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u516C\u5F00\u6765\u6E90\uFF1A", view.source), (view.refreshing || view.pending) && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption", role: "status" }, "\u516C\u5F00\u6E90\u6B63\u5728\u5237\u65B0\uFF1B\u4E0A\u9762\u7684\u7248\u672C\u4ECD\u662F\u6700\u8FD1\u4E00\u6B21\u5DF2\u4FDD\u5B58\u5FEB\u7167\uFF0C\u4E0D\u662F\u672C\u6B21\u8BF7\u6C42\u5DF2\u6210\u529F\u3002"), view.lastAttemptAt && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u6700\u8FD1\u5C1D\u8BD5 ", new Date(view.lastAttemptAt).toLocaleString(), view.lastSuccessAt ? ` \xB7 \u6700\u8FD1\u6210\u529F ${new Date(view.lastSuccessAt).toLocaleString()}` : ""), view.status === "error" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u66F4\u65B0\u5931\u8D25\uFF1B\u662F\u5426\u53EF\u7528\u7531 Host \u6821\u9A8C\uFF0C\u4E0D\u5C06\u7F3A\u5931\u6570\u636E\u5F53\u4F5C\u96F6\u6210\u672C\u6216\u6EE1\u5206\u3002"), view.status === "stale" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u4E0A\u6B21\u6709\u6548\u5FEB\u7167\u5DF2\u8FC7\u671F\u6216\u672C\u6B21\u66F4\u65B0\u5931\u8D25\uFF1BHost \u53EF\u80FD\u6CBF\u7528\u65E7\u6570\u636E\uFF0C\u4E0D\u80FD\u5F53\u4F5C\u6700\u65B0\u4EF7\u683C\u6216\u80FD\u529B\u3002"), view.errorCode === "storage-failed" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u672C\u6B21\u72B6\u6001\u4FDD\u5B58\u5931\u8D25\uFF1B\u53EA\u80FD\u4F7F\u7528\u6B64\u524D\u5DF2\u4FDD\u5B58\u7684\u5F53\u524D\u6E90\u5FEB\u7167\uFF0C\u8BF7\u91CD\u8BD5\u5237\u65B0\u3002"), view.errorCode === "refresh-interrupted" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u4E0A\u6B21\u516C\u5F00\u6570\u636E\u5237\u65B0\u4E2D\u65AD\uFF1B\u8BF7\u5237\u65B0\u6458\u8981\u67E5\u770B Host \u7684\u540E\u7EED\u91CD\u8BD5\u72B6\u6001\u3002"), view.lastGoodEndpoint && view.endpoint && view.lastGoodEndpoint !== view.endpoint && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u6B64\u524D\u6765\u6E90\u7684\u6709\u6548\u5FEB\u7167\u4ECD\u4FDD\u7559\u5728\u672C\u5730\uFF0C\u4F46\u4E0D\u5E94\u7528\u5230\u5F53\u524D\u516C\u5F00\u6E90\u3002"), view.status === "disabled" && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u5F53\u524D\u8BBE\u7F6E\u4E0D\u4F7F\u7528\u6B64\u516C\u5F00\u6E90\uFF1B\u4FDD\u7559\u7684\u5386\u53F2\u5FEB\u7167\u4E0D\u4EE3\u8868\u6B63\u5728\u4F7F\u7528\u3002"));
 }
-function AdaptiveControls({ ledger, settings, onChanged }) {
+function LearningEvidence({ learning }) {
+  const evidence = learningEvidenceRows(learning);
+  const exclusions = learningExclusionRows(learning);
+  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, evidence.total > 0 && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u5206\u6A21\u578B / \u4EFB\u52A1\u7C7B\u578B\u7684\u5DF2\u89C2\u5BDF\u53CD\u9988\uFF08", evidence.total, " \u7EC4\uFF09"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u53EA\u63CF\u8FF0\u5DF2\u9009\u62E9\u5E76\u83B7\u5F97\u8BC4\u4EF7\u7684\u7ED3\u679C\uFF0C\u4E0D\u4EE3\u8868\u6240\u6709\u6A21\u578B\u7684\u771F\u5B9E\u8D28\u91CF\u6216\u6536\u76CA\uFF1B\u6709\u6548\u6837\u672C\u91CF\u53CD\u6620\u6743\u91CD\u96C6\u4E2D\u7A0B\u5EA6\uFF0C\u4E0D\u662F\u8D28\u91CF\u7F6E\u4FE1\u5EA6\u3002"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react2.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react2.default.createElement("thead", null, /* @__PURE__ */ import_react2.default.createElement("tr", null, /* @__PURE__ */ import_react2.default.createElement("th", null, "\u8DEF\u7EBF / \u4EFB\u52A1\u7C7B\u578B"), /* @__PURE__ */ import_react2.default.createElement("th", null, "\u6709\u7528 / \u4E0D\u597D"), /* @__PURE__ */ import_react2.default.createElement("th", null, "\u504F\u597D\u6548\u7528\u8C03\u6574"))), /* @__PURE__ */ import_react2.default.createElement("tbody", null, evidence.rows.map((row) => /* @__PURE__ */ import_react2.default.createElement("tr", { key: row.id }, /* @__PURE__ */ import_react2.default.createElement("td", null, row.route, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-caption" }, row.domain)), /* @__PURE__ */ import_react2.default.createElement("td", null, row.positiveCount, " / ", row.negativeCount, /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-caption" }, "\u5DF2\u89C2\u5BDF ", row.feedbackCount, " \xB7 \u6709\u6548\u6743\u91CD ", row.effectiveWeight.toFixed(2), " \xB7 \u6709\u6548\u6837\u672C\u91CF ", row.effectiveSampleSize.toFixed(2))), /* @__PURE__ */ import_react2.default.createElement("td", null, row.adjustment > 0 ? "+" : "", row.adjustment.toFixed(4), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-caption" }, "\u6536\u7F29\u7CFB\u6570 ", row.shrinkage.toFixed(2)))))))), evidence.total > evidence.rows.length && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u4EC5\u5C55\u793A\u524D ", evidence.rows.length, " \u7EC4\uFF1B\u4E0D\u662F\u6240\u6709\u6A21\u578B\u7684\u8986\u76D6\u7387\u3002")), exclusions.length > 0 && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u672A\u53C2\u4E0E\u5B66\u4E60\u7684\u539F\u56E0"), /* @__PURE__ */ import_react2.default.createElement("ul", { className: "mr-checklist" }, exclusions.map((row) => /* @__PURE__ */ import_react2.default.createElement("li", { key: row.reason }, row.label, "\uFF1A", row.count)))));
+}
+function AdaptiveControls({ ledger, settings, onChanged, refreshing }) {
   const value = settings.value;
   const learning = learningView(ledger?.learning, value);
   const [resetBusy, setResetBusy] = import_react2.default.useState(false);
+  const [refreshNotice, setRefreshNotice] = import_react2.default.useState("");
+  const resetPending = import_react2.default.useRef(false);
   const save = async (key, next) => {
     const accepted = await settings.write(key, next);
-    if (accepted) onChanged?.();
+    if (accepted) {
+      setRefreshNotice("");
+      try {
+        await onChanged?.();
+      } catch {
+        setRefreshNotice("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58\uFF0C\u4F46\u6458\u8981\u5237\u65B0\u5931\u8D25\uFF1B\u8BF7\u5237\u65B0\u6267\u884C\u8BB0\u5F55\u540E\u91CD\u65B0\u89C4\u5212\u3002");
+      }
+    }
     return accepted;
   };
   const reset = async () => {
-    if (!window.confirm("\u4ECE\u73B0\u5728\u91CD\u65B0\u5B66\u4E60\u4F60\u7684\u504F\u597D\uFF1F\u6B64\u524D\u53CD\u9988\u5C06\u4E0D\u518D\u53C2\u4E0E\u8C03\u6574\uFF0C\u4F46\u6267\u884C\u8BB0\u5F55\u3001\u8D39\u7528\u5386\u53F2\u548C\u539F\u8BC4\u4EF7\u4E0D\u4F1A\u5220\u9664\u3002")) return;
-    setResetBusy(true);
+    if (resetPending.current || !settings.writable) return;
+    resetPending.current = true;
     try {
+      if (!window.confirm("\u4ECE\u73B0\u5728\u91CD\u65B0\u5B66\u4E60\u4F60\u7684\u504F\u597D\uFF1F\u6B64\u524D\u53CD\u9988\u5C06\u4E0D\u518D\u53C2\u4E0E\u8C03\u6574\uFF0C\u4F46\u6267\u884C\u8BB0\u5F55\u3001\u8D39\u7528\u5386\u53F2\u548C\u539F\u8BC4\u4EF7\u4E0D\u4F1A\u5220\u9664\u3002")) return;
+      setResetBusy(true);
       await save("feedbackResetAt", Date.now());
     } finally {
+      resetPending.current = false;
       setResetBusy(false);
     }
   };
@@ -2356,7 +2468,7 @@ function AdaptiveControls({ ledger, settings, onChanged }) {
       writable: settings.writable,
       onSave: save
     }
-  ))), learning.available ? /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, learning.enabled ? "\u5B66\u4E60\u5DF2\u542F\u7528" : "\u5B66\u4E60\u5DF2\u505C\u7528", " \xB7 \u6709\u6548\u53CD\u9988 ", learning.feedbackCount, " \xB7 \u6709\u6548\u6743\u91CD ", learning.effectiveWeight.toFixed(2), " \xB7 \u5FFD\u7565 ", learning.ignoredCount, learning.policyVersion ? ` \xB7 \u7B56\u7565 ${learning.policyVersion}` : "") : /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B66\u4E60\u6458\u8981\u5C1A\u672A\u8BFB\u53D6\uFF1B\u4FDD\u5B58\u540E\u5237\u65B0\u6267\u884C\u8BB0\u5F55\u67E5\u770B\u3002"), learning.resetAt > 0 && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u5B66\u4E60\u8D77\u70B9\uFF1A", new Date(learning.resetAt).toLocaleString(), "\uFF0C\u6B64\u524D\u53CD\u9988\u4E0D\u518D\u53C2\u4E0E\u8C03\u6574\u3002"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || resetBusy, onClick: () => {
+  ))), settings.busy && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, "\u6B63\u5728\u4FDD\u5B58\u8BBE\u7F6E\uFF0C\u8BF7\u7A0D\u5019\u2026"), refreshing && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u53CD\u9988\u4E0E\u516C\u5F00\u6570\u636E\u6458\u8981\u2026"), refreshNotice && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, refreshNotice), learning.available ? /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, learning.enabled ? "\u5B66\u4E60\u5DF2\u542F\u7528" : "\u5B66\u4E60\u5DF2\u505C\u7528", " \xB7 \u6700\u8FD1\u4E00\u6B21\u8D26\u672C\u6458\u8981\uFF1A\u6709\u6548\u53CD\u9988 ", learning.feedbackCount, " \xB7 \u6709\u6548\u6743\u91CD ", learning.effectiveWeight.toFixed(2), " \xB7 \u5FFD\u7565 ", learning.ignoredCount, learning.policyVersion ? ` \xB7 \u7B56\u7565 ${learning.policyVersion}` : "") : /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B66\u4E60\u6458\u8981\u5C1A\u672A\u8BFB\u53D6\uFF1B\u4FDD\u5B58\u540E\u5237\u65B0\u6267\u884C\u8BB0\u5F55\u67E5\u770B\u3002"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u6458\u8981\u662F\u6700\u8FD1\u4E00\u6B21\u8BFB\u53D6\u7684\u5DF2\u89C2\u5BDF\u8BC1\u636E\u3002\u4FEE\u6539\u8BC4\u4EF7 / \u5B66\u4E60\u8BBE\u7F6E\u540E\u9700\u5237\u65B0\u6458\u8981\u5E76\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\uFF1B\u5237\u65B0\u6309\u68C0\u67E5\u95F4\u9694\u590D\u7528\u516C\u5F00\u5FEB\u7167\uFF0C\u4E0D\u4FDD\u8BC1\u6BCF\u6B21\u4E0B\u8F7D\u65B0\u6570\u636E\u3002"), /* @__PURE__ */ import_react2.default.createElement(LearningEvidence, { learning: ledger?.learning }), learning.resetAt > 0 && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u5B66\u4E60\u8D77\u70B9\uFF1A", new Date(learning.resetAt).toLocaleString(), "\uFF0C\u6B64\u524D\u53CD\u9988\u4E0D\u518D\u53C2\u4E0E\u8C03\u6574\u3002"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || resetBusy, onClick: () => {
     void reset();
   } }, resetBusy ? "\u6B63\u5728\u8BBE\u7F6E\u2026" : "\u4ECE\u73B0\u5728\u91CD\u65B0\u5B66\u4E60"), /* @__PURE__ */ import_react2.default.createElement("h3", { className: "mr-section-title" }, "\u52A8\u6001\u516C\u5171\u6570\u636E"), /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u9ED8\u8BA4\u5173\u95ED\u3002\u660E\u786E\u542F\u7528\u540E\uFF0C\u5728\u6253\u5F00 / \u5237\u65B0\u8D26\u672C\u53CA\u6267\u884C\u524D\u6309\u68C0\u67E5\u95F4\u9694\u8BFB\u53D6\u516C\u5F00 LiveBench \u548C\u53EF\u9009\u4EF7\u683C\u5FEB\u7167\uFF1B\u4EF7\u683C\u4E0E\u80FD\u529B\u5148\u9A8C\u4FDD\u7559\u7248\u672C\uFF0C\u4E0D\u4EE3\u8868\u771F\u5B9E\u4EFB\u52A1\u6536\u76CA\u3002\u53EA\u6709\u6253\u5F00\u516C\u5171\u6E90\u5F00\u5173\u624D\u4F1A\u8BFB\u53D6\u8FDC\u7A0B\u6570\u636E\uFF0C\u4E0D\u53D1\u9001\u4EFB\u52A1\u6216\u53CD\u9988\u3002"), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react2.default.createElement(
     "input",
@@ -2376,9 +2488,9 @@ function AdaptiveControls({ ledger, settings, onChanged }) {
       writable: settings.writable,
       onSave: save
     }
-  ), /* @__PURE__ */ import_react2.default.createElement(PublicEndpointControl, { name: "liveBenchEndpoint", label: "LiveBench \u516C\u5F00\u6E90", value: adaptiveSettingValue(value, "liveBenchEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react2.default.createElement(PublicEndpointControl, { name: "pricingSnapshotEndpoint", label: "\u4EF7\u683C\u5FEB\u7167\u516C\u5F00\u6E90\uFF08\u53EF\u9009\uFF09", value: adaptiveSettingValue(value, "pricingSnapshotEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react2.default.createElement(PublicSourceStatus, { label: "LiveBench", source: ledger?.dynamicData?.liveBench }), /* @__PURE__ */ import_react2.default.createElement(PublicSourceStatus, { label: "\u4EF7\u683C", source: ledger?.dynamicData?.pricing })));
+  ), /* @__PURE__ */ import_react2.default.createElement(PublicEndpointControl, { name: "liveBenchEndpoint", label: "LiveBench \u516C\u5F00\u6E90", value: adaptiveSettingValue(value, "liveBenchEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react2.default.createElement(PublicEndpointControl, { name: "pricingSnapshotEndpoint", label: "\u4EF7\u683C\u5FEB\u7167\u516C\u5F00\u6E90\uFF08\u53EF\u9009\uFF09", value: adaptiveSettingValue(value, "pricingSnapshotEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react2.default.createElement(PublicSourceStatus, { label: "LiveBench", source: ledger?.dynamicData?.liveBench, enabled: adaptiveSettingValue(value, "dynamicDataEnabled") === true }), /* @__PURE__ */ import_react2.default.createElement(PublicSourceStatus, { label: "\u4EF7\u683C", source: ledger?.dynamicData?.pricing, enabled: adaptiveSettingValue(value, "dynamicDataEnabled") === true && Boolean(adaptiveSettingValue(value, "pricingSnapshotEndpoint")) })));
 }
-function CostControlCard({ ledger, settingsScope, onChanged, error }) {
+function CostControlCard({ ledger, settingsScope, onChanged, error, refreshing = false }) {
   const settings = useSettingsWriter(settingsScope);
   const [dailyDraft, setDailyDraft] = import_react2.default.useState("");
   const [monthlyDraft, setMonthlyDraft] = import_react2.default.useState("");
@@ -2416,7 +2528,7 @@ function CostControlCard({ ledger, settingsScope, onChanged, error }) {
     void set("allowManualReassign", event.target.checked);
   } }), "\u5141\u8BB8\u624B\u52A8\u6539\u6D3E\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react2.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react2.default.createElement("input", { type: "checkbox", checked: value.confirmUnsandboxedCli !== false, disabled: !settings.writable, onChange: (event) => {
     void set("confirmUnsandboxedCli", event.target.checked);
-  } }), "\u76F4\u63A5\u542F\u52A8\u65E0\u6C99\u7BB1 CLI \u524D\u5148\u786E\u8BA4")), /* @__PURE__ */ import_react2.default.createElement(AdaptiveControls, { ledger, settings, onChanged }), settings.notice && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, settings.notice)));
+  } }), "\u76F4\u63A5\u542F\u52A8\u65E0\u6C99\u7BB1 CLI \u524D\u5148\u786E\u8BA4")), /* @__PURE__ */ import_react2.default.createElement(AdaptiveControls, { ledger, settings, onChanged, refreshing }), settings.notice && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-error", role: "alert" }, settings.notice)));
 }
 function DagView({ packages, renderNode, label = "\u5B50\u4EFB\u52A1\u4F9D\u8D56\u56FE" }) {
   const layers = dagLayers(packages);
@@ -2432,13 +2544,13 @@ function ChannelText({ item }) {
   return /* @__PURE__ */ import_react2.default.createElement("span", { className: item.channel === "official-cli" ? "mr-pill mr-pill-channel-ok" : "mr-pill" }, item.channel === "official-cli" ? `\u5B98\u65B9 CLI \xB7 ${item.toolId ?? ""}` : "\u6A21\u578B\u76EE\u5F55 API");
 }
 function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
-  if (item.status === "paused") return /* @__PURE__ */ import_react2.default.createElement(PausedNode, { run, item, busy, onRerun });
   const [target, setTarget] = import_react2.default.useState("");
+  if (item.status === "paused") return /* @__PURE__ */ import_react2.default.createElement(PausedNode, { run, item, busy, onRerun });
   const cost = packageCost(item);
   const rerun = rerunSupport(run);
   const canRerun = rerun.supported && !item.ok && !busy;
   const others = routes.filter((route) => `${route.provider}/${route.model}` !== `${item.provider}/${item.model}`);
-  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u8BA1\u8D39\uFF1A", BILLING_CHANNEL_LABEL[item.billing] ?? "\u2014", item.subscriptionRoute ? ` \xB7 \u5957\u9910\u8DEF\u7EBF ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` \xB7 ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "\u8BA1\u8D39\u5207\u6362\uFF1A", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "up")) }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "down")) }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run.id, item.id, null) }, run.kind === "tool" ? "\u91CD\u65B0\u6267\u884C\u6B64\u8C03\u7528" : rerun.writes ? "\u5728\u65B0\u5DE5\u4F5C\u533A\u7EED\u8DD1" : "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
+  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u8BA1\u8D39\uFF1A", BILLING_CHANNEL_LABEL[item.billing] ?? "\u2014", item.subscriptionRoute ? ` \xB7 \u5957\u9910\u8DEF\u7EBF ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` \xB7 ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "\u8BA1\u8D39\u5207\u6362\uFF1A", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === 1 ? "\u518D\u6B21\u70B9\u51FB\u64A4\u56DE\u6709\u7528\u8BC4\u4EF7" : "\u8BC4\u4EF7\u6B64\u7ED3\u679C\u6709\u7528", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "up")) }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === -1 ? "\u518D\u6B21\u70B9\u51FB\u64A4\u56DE\u4E0D\u597D\u8BC4\u4EF7" : "\u8BC4\u4EF7\u6B64\u7ED3\u679C\u4E0D\u597D", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "down")) }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run.id, item.id, null) }, run.kind === "tool" ? "\u91CD\u65B0\u6267\u884C\u6B64\u8C03\u7528" : rerun.writes ? "\u5728\u65B0\u5DE5\u4F5C\u533A\u7EED\u8DD1" : "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
     const [provider, model] = target.split("\0");
     onRerun(run.id, item.id, { provider, model });
   } }, "\u6539\u6D3E\u5E76\u91CD\u8DD1"))));
@@ -12003,7 +12115,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.16.0" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.16.1" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -12962,13 +13074,18 @@ var WORKSPACE_VIEWS = [
 ];
 function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
   const [health, setHealth] = import_react5.default.useState({ report: null, error: "", refreshing: false });
-  const [ledger, setLedger] = import_react5.default.useState({ value: null, error: "" });
+  const [ledger, setLedger] = import_react5.default.useState({ value: null, error: "", refreshing: false });
   const [boundaries, setBoundaries] = import_react5.default.useState({ value: null, error: "" });
   const [busy, setBusy] = import_react5.default.useState(false);
   const mounted = import_react5.default.useRef(true);
   const ledgerRequest = import_react5.default.useRef(0);
-  import_react5.default.useEffect(() => () => {
-    mounted.current = false;
+  const mutationBusy = import_react5.default.useRef(false);
+  import_react5.default.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      ledgerRequest.current += 1;
+    };
   }, []);
   const call = async (operation, fallback) => {
     if (typeof operation !== "function") throw new Error("\u5DE5\u4F5C\u53F0\u670D\u52A1\u5C1A\u672A\u52A0\u8F7D\uFF0C\u8BF7\u66F4\u65B0\u63D2\u4EF6\u540E\u91CD\u8BD5\u3002");
@@ -12985,13 +13102,18 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   };
   const refreshLedger = async () => {
     const request = ++ledgerRequest.current;
+    if (mounted.current) setLedger((previous) => ({ ...previous, error: "", refreshing: true }));
     try {
       const value = await call(loadLedger, "\u6267\u884C\u8BB0\u5F55\u8BFB\u53D6\u5931\u8D25\u3002");
-      if (mounted.current && request === ledgerRequest.current) setLedger({ value, error: "" });
-      if (request !== ledgerRequest.current) return null;
+      if (mounted.current && request === ledgerRequest.current) setLedger({ value, error: "", refreshing: false });
+      if (!mounted.current || request !== ledgerRequest.current) return null;
       return value;
     } catch (error) {
-      if (mounted.current && request === ledgerRequest.current) setLedger((previous) => ({ ...previous, error: text5(error?.message) || "\u6267\u884C\u8BB0\u5F55\u8BFB\u53D6\u5931\u8D25\u3002" }));
+      if (mounted.current && request === ledgerRequest.current) setLedger((previous) => ({
+        ...previous,
+        refreshing: false,
+        error: `${text5(error?.message) || "\u6267\u884C\u8BB0\u5F55\u8BFB\u53D6\u5931\u8D25\u3002"}${previous.value ? " \u4E0B\u65B9\u4FDD\u7559\u6700\u8FD1\u4E00\u6B21\u6458\u8981\uFF0C\u5C1A\u672A\u91CD\u65B0\u6838\u9A8C\u3002" : ""}`
+      }));
       return null;
     }
   };
@@ -13012,6 +13134,8 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     }
   };
   const rate = async (runId, packageId, rating, expectedFinishedAt) => {
+    if (mutationBusy.current) return;
+    mutationBusy.current = true;
     setBusy(true);
     try {
       await call(() => rateResult({ runId, packageId, rating, ...expectedFinishedAt === void 0 ? {} : { expectedFinishedAt } }), "\u8BC4\u4EF7\u4FDD\u5B58\u5931\u8D25\u3002");
@@ -13019,10 +13143,12 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     } catch (error) {
       if (mounted.current) setLedger((previous) => ({ ...previous, error: text5(error?.message) || "\u8BC4\u4EF7\u4FDD\u5B58\u5931\u8D25\u3002" }));
     } finally {
+      mutationBusy.current = false;
       if (mounted.current) setBusy(false);
     }
   };
   const rerun = async (runId, packageId, override, choice = null) => {
+    if (mutationBusy.current) return;
     const run = ledger.value?.runs?.find((item2) => item2.id === runId);
     const item = run?.packages?.find((entry) => entry.id === packageId);
     const reasons = rerunConfirmations({ run, item, override, choice, ledger: ledger.value, health: health.report, toolFor: toolForProvider, headlessIds: HEADLESS_TOOLS });
@@ -13031,6 +13157,8 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
 ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join("\n")}
 \u5168\u90E8\u786E\u8BA4\u5E76\u7EE7\u7EED\u5417\uFF1F`)) return;
     const codes = new Set(reasons.map((entry) => entry.code));
+    if (mutationBusy.current) return;
+    mutationBusy.current = true;
     setBusy(true);
     try {
       const request = {
@@ -13051,6 +13179,7 @@ ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join("\n")}
     } catch (error) {
       if (mounted.current) setLedger((previous) => ({ ...previous, error: `${text5(error?.message) || "\u91CD\u8DD1\u5931\u8D25\u3002"} \u53EF\u4EE5\u4FEE\u6B63\u540E\u518D\u70B9\u201C\u91CD\u8DD1\u6B64\u6B65\u201D\uFF0C\u6216\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_rerun_step\u3002` }));
     } finally {
+      mutationBusy.current = false;
       if (mounted.current) setBusy(false);
     }
   };
@@ -13187,6 +13316,8 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
       const ledger = await workbench.refreshLedger();
       if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return;
       if (!ledger) throw new Error("\u8BF7\u5148\u6062\u590D\u6267\u884C\u8BB0\u5F55\u8FDE\u63A5\uFF1B\u65E0\u6CD5\u6838\u5BF9\u6700\u65B0\u6570\u636E\u4E0E\u5B66\u4E60\u72B6\u6001\u3002");
+      if (ledger.storageAvailable === false) throw new Error("\u6267\u884C\u8BB0\u5F55\u5B58\u50A8\u6682\u4E0D\u53EF\u7528\uFF0C\u65E0\u6CD5\u6838\u5BF9\u8D39\u7528\u4E0E\u5B66\u4E60\u72B6\u6001\uFF1B\u8BF7\u6062\u590D\u8FDE\u63A5\u540E\u518D\u89C4\u5212\u3002");
+      if (ledger.budget?.historyVerified === false) throw new Error("\u8D39\u7528\u5386\u53F2\u4E0D\u5B8C\u6574\uFF0C\u8BF7\u4ECE\u5907\u4EFD\u6062\u590D\u5E76\u6838\u9A8C\u540E\u518D\u89C4\u5212\u3002");
       if (signature2 !== routingSettingsSignature(settingsScope.getSnapshot().value ?? {})) throw new Error("\u89C4\u5212\u8BBE\u7F6E\u5DF2\u66F4\u65B0\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u3002");
       const next = createWorkspacePlan(task, catalogState.catalog, {
         ...ledger.routingData,
@@ -13294,11 +13425,12 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     CostControlCard,
     {
       ledger: workbench.ledger.value,
-      error: workbench.ledger.error && !workbench.ledger.value ? workbench.ledger.error : "",
+      error: workbench.ledger.error || workbench.ledger.value?.storageNotice || "",
+      refreshing: workbench.ledger.refreshing,
       settingsScope,
       onChanged: () => {
         invalidatePlan();
-        void workbench.refreshLedger();
+        return workbench.refreshLedger();
       }
     }
   ), /* @__PURE__ */ import_react5.default.createElement(

@@ -1,12 +1,14 @@
 # Model Router · DeepSeek Harness 模型路由插件
 
-版本：**0.16.0**。选模求解器概览见[路由研究说明](docs/ROUTING_RESEARCH.zh.md)；公式、条件证明与实验见[数学推导与实验记录](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)。[LiveBench 最新证据与验证协议](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)已核查 2026-06-25 聚合评分/费用；最新逐题质量—费用矩阵尚未取得，不声称真实路由收益。
+版本：**0.16.1**。选模求解器概览见[路由研究说明](docs/ROUTING_RESEARCH.zh.md)；公式、条件证明与实验见[数学推导与实验记录](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)。[LiveBench 最新证据与验证协议](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)已核查 2026-06-25 聚合评分/费用；最新逐题质量—费用矩阵尚未取得，不声称真实路由收益。
 
 为 **DeepSeek Harness Desktop** 提供任务规划、成本感知的模型分配和官方工具执行工作台。输入任务，比较已配置模型，审阅计划，再明确选择是否执行。
 
+**0.16.1 成熟度改进**：稳定反馈缓存、分模型/任务解释、刷新与设置竞态保护，以及费用历史不可读取或不完整时的预算门禁。[推导与验证](docs/ROUTING_MATURITY.zh.md)随安装包提供，机制测试不等于真实质量—成本收益。
+
 **0.16.0 新增**：[动态数据与持续反馈](docs/ROUTING_ADAPTIVE_LEARNING.zh.md)：可选公开价格/LiveBench快照刷新；按任务类型、时间衰减和低样本收缩调整个人偏好，质量门槛独立保留。设置在“预算与安全”，公开源默认关闭；价格源需提供按官方文档核对的固定USD单价JSON，不是通用官网抓价器。本地DSH_HOME共享、最近200运行窗口，暂无真实收益证明。
 
-当前版本为 **0.16.0**，包名为 `@ljwei-stak/dsh-model-router`；声明兼容的宿主为 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**。自 0.12.0 起，路由与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 已拆成两个独立插件。
+当前版本为 **0.16.1**，包名为 `@ljwei-stak/dsh-model-router`；声明兼容的宿主为 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**。自 0.12.0 起，路由与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 已拆成两个独立插件。
 
 **0.15.0 更新**：工作台分为四页，路由建议紧接任务规划展示；执行输入变化时丢弃旧预览；裁剪历史或重试后仍保留费用累计；源码开发新增独立模拟 UI 预览。
 
@@ -38,16 +40,16 @@
 打开 **插件 → 添加插件**，填写：
 
 ```text
-@ljwei-stak/dsh-model-router@0.16.0
+@ljwei-stak/dsh-model-router@0.16.1
 ```
 
-镜像缺少该精确版本时使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。安装并启用后，完全退出 Harness（包括托盘进程）再启动。插件详情应显示 **0.16.0**，侧栏出现**模型路由**。仅运行全局 `npm install -g` 不会把插件注册到桌面版 profile。
+镜像缺少该精确版本时使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。安装并启用后，完全退出 Harness（包括托盘进程）再启动。插件详情应显示 **0.16.1**，侧栏出现**模型路由**。仅运行全局 `npm install -g` 不会把插件注册到桌面版 profile。
 
 也可在插件管理器填写本地 `.tgz` 文件的绝对路径，或解压后的内层 `package` 目录；其中应包含 `package.json` 与 `.dsh-plugin`。[历史发布页](https://github.com/Alice-Marx/dsh-model-router/releases)提供归档；已克隆源码的开发方式见下文。
 
 ### 从旧包名升级
 
-`@ljwei-stak/model-router-galgame` 的最后版本为 0.13.0。保留 profile 与应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.16.0`。不要同时安装两个包：它们共用内部插件 id `model-router-galgame` 与工具名；id 保留使已有路由设置和执行历史能够延续。
+`@ljwei-stak/model-router-galgame` 的最后版本为 0.13.0。保留 profile 与应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.16.1`。不要同时安装两个包：它们共用内部插件 id `model-router-galgame` 与工具名；id 保留使已有路由设置和执行历史能够延续。
 
 从 0.11.x 合并版迁移时，先备份 profile 并导出希望保留的 GAL 进度。剧情、立绘、音乐、自由模式和存档属于独立 `@ljwei-stak/dsh-galgame` 插件。导出范围及同 profile 迁移的限制见 [MIGRATION.md](MIGRATION.md)。
 

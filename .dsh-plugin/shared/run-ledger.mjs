@@ -14,21 +14,42 @@ const routeKey = (provider, model) => `${String(provider ?? '')}\u0000${String(m
 
 /** USD cost of one package. Prefers a CLI-reported cost, else usage × configured price. */
 export function actualCost(result, pricing) {
-  if (finite(result?.reportedCostUsd) && result.reportedCostUsd >= 0) {
+  if (result && Object.hasOwn(result, 'reportedCostUsd') && finite(result.reportedCostUsd) && result.reportedCostUsd >= 0) {
     return { costUsd: result.reportedCostUsd, costSource: 'cli-reported' }
   }
-  const usage = result?.usage
-  if (!usage || !pricing || !finite(pricing.input) || !finite(pricing.output)) {
+  const usage = result && Object.hasOwn(result, 'usage') ? result.usage : null
+  if (!usage || !pricing || !Object.hasOwn(pricing, 'input') || !Object.hasOwn(pricing, 'output')
+    || pricing.input === undefined || pricing.input === null || pricing.output === undefined || pricing.output === null) {
     return { costUsd: null, costSource: usage ? 'price-missing' : 'usage-missing' }
   }
-  const input = finite(usage.inputTokens) ? usage.inputTokens : 0
-  const output = finite(usage.outputTokens) ? usage.outputTokens : 0
-  const cacheRead = finite(usage.cacheReadTokens) ? usage.cacheReadTokens : 0
-  const cacheWrite = finite(usage.cacheWriteTokens) ? usage.cacheWriteTokens : 0
-  const costUsd = (input * pricing.input
-    + cacheRead * (finite(pricing.cacheRead) ? pricing.cacheRead : pricing.input)
-    + cacheWrite * (finite(pricing.cacheWrite) ? pricing.cacheWrite : pricing.input)
-    + output * pricing.output) / 1_000_000
+  const nonnegative = value => finite(value) && value >= 0
+  if (typeof pricing !== 'object' || Array.isArray(pricing)
+    || !nonnegative(pricing.input) || !nonnegative(pricing.output)
+    || ['cacheRead', 'cacheWrite'].some(key => Object.hasOwn(pricing, key) && pricing[key] !== undefined && !nonnegative(pricing[key]))) {
+    return { costUsd: null, costSource: 'price-invalid' }
+  }
+  if (typeof usage !== 'object' || Array.isArray(usage)) return { costUsd: null, costSource: 'usage-invalid' }
+  if (!Object.hasOwn(usage, 'inputTokens') || !Object.hasOwn(usage, 'outputTokens')
+    || usage.inputTokens === undefined || usage.inputTokens === null || usage.outputTokens === undefined || usage.outputTokens === null) {
+    return { costUsd: null, costSource: 'usage-missing' }
+  }
+  if (['inputTokens', 'outputTokens'].some(key => !nonnegative(usage[key]))
+    || ['cacheReadTokens', 'cacheWriteTokens'].some(key => Object.hasOwn(usage, key) && usage[key] !== undefined && !nonnegative(usage[key]))) {
+    return { costUsd: null, costSource: 'usage-invalid' }
+  }
+  const input = usage.inputTokens
+  const output = usage.outputTokens
+  const cacheRead = Object.hasOwn(usage, 'cacheReadTokens') ? usage.cacheReadTokens ?? 0 : 0
+  const cacheWrite = Object.hasOwn(usage, 'cacheWriteTokens') ? usage.cacheWriteTokens ?? 0 : 0
+  const cacheReadPrice = Object.hasOwn(pricing, 'cacheRead') ? pricing.cacheRead ?? pricing.input : pricing.input
+  const cacheWritePrice = Object.hasOwn(pricing, 'cacheWrite') ? pricing.cacheWrite ?? pricing.input : pricing.input
+  // Divide each usage counter before multiplication to avoid intermediate
+  // overflow for a finite USD result; an actually unrepresentable cost is unknown.
+  const costUsd = input / 1_000_000 * pricing.input
+    + cacheRead / 1_000_000 * cacheReadPrice
+    + cacheWrite / 1_000_000 * cacheWritePrice
+    + output / 1_000_000 * pricing.output
+  if (!nonnegative(costUsd)) return { costUsd: null, costSource: 'cost-invalid' }
   return { costUsd, costSource: 'usage' }
 }
 

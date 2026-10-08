@@ -13,5 +13,10 @@ __pycache__/
 *.log
 *.tmp
 *.temp
+.npmrc
+.workshop/
+tmp/
+*_token.txt
+*.tgz
 .DS_Store
 Thumbs.db

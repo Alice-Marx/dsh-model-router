@@ -170,7 +170,7 @@ test('disabled and zero adjustment policies preserve evidence semantics without 
   assert.equal(zero.feedbackCount, 1)
   assert.equal(bias(zero), 0)
   const routes = [{ provider: 'p', model: 'm-v1', quality: 0.5, qualitySource: 'unknown' }]
-  assert.equal(applyFeedbackProfile(routes, disabled), routes)
+  assert.deepEqual(applyFeedbackProfile(routes, disabled), routes)
 })
 
 test('revision is deterministic, short, sensitive to policy/time/events and excludes task contents', () => {
@@ -179,7 +179,8 @@ test('revision is deterministic, short, sensitive to policy/time/events and excl
   const profile = buildFeedbackProfile([first, second], opts)
   assert.equal(profile.revision, buildFeedbackProfile([second, first], opts).revision)
   assert.equal(profile.revision, buildFeedbackProfile([run({ task: 'different prompt' }, { answer: 'different answer' }), second], opts).revision)
-  assert.notEqual(profile.revision, buildFeedbackProfile([first, second], { ...opts, now: NOW + 1 }).revision)
+  assert.equal(profile.revision, buildFeedbackProfile([first, second], { ...opts, now: NOW + 1 }).revision)
+  assert.notEqual(profile.revision, buildFeedbackProfile([first, second], { ...opts, now: NOW + 3_600_000 }).revision)
   assert.notEqual(profile.revision, buildFeedbackProfile([first, second], { ...opts, priorWeight: 4 }).revision)
   assert.notEqual(profile.revision, buildFeedbackProfile([first], opts).revision)
   assert.equal(JSON.stringify(profile).includes('secret'), false)

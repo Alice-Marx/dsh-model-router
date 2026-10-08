@@ -14,6 +14,7 @@ import {
 import { createRouterState } from './shared/router-state.mjs'
 import { applyFeedbackProfile, buildFeedbackProfile } from './shared/adaptive-feedback.mjs'
 import { applyPricingSnapshot, createDynamicDataRefresher, dynamicDataSummary, routingData } from './shared/dynamic-data.mjs'
+import { projectDynamicData } from './shared/dynamic-data-view.mjs'
 import {
   budgetCheck, buildRunRecord, formatUsd, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
   spending, storedResults, actualCost, teamExecutionResults,
@@ -180,8 +181,14 @@ export function routerStateStore() {
 }
 
 async function savedState() {
-  try { return await routerStateStore().read() }
-  catch { return { onboarding: { completedAt: null }, health: null, runs: [] } }
+  try {
+    const saved = await routerStateStore().read()
+    const storageAvailable = !(saved.notices ?? []).some(notice => notice.kind === 'state-recovery-pending')
+    return { ...saved, storageAvailable, historyVerified: storageAvailable && saved.historyIncomplete !== true }
+  } catch {
+    return { onboarding: { completedAt: null }, health: null, runs: [], storageAvailable: false, historyVerified: false,
+      notices: [{ kind: 'state-read-failed', at: Date.now(), message: '执行记录暂时无法读取，费用与学习摘要尚未核验；请恢复存储连接后重试。' }] }
+  }
 }
 
 const NOTICE_DAYS = 7
@@ -344,6 +351,9 @@ function budgetSettings(config) {
 
 function budgetFor(config, saved, estimateUsd) {
   const settings = budgetSettings(config)
+  if ((saved.storageAvailable === false || saved.historyVerified === false) && (settings.dailyLimitUsd > 0 || settings.monthlyLimitUsd > 0)) {
+    throw new Error('无法读取费用历史，不能核验日/月预算；请恢复存储连接后再执行。')
+  }
   const spent = spending(saved.runs, undefined, saved.archivedSpending)
   return { ...budgetCheck({ estimateUsd, spent, ...settings }), spent, ...settings }
 }
@@ -395,18 +405,10 @@ async function routingSavedState(config) {
     try { refreshedData = await dynamicRefresher.refresh(options) } catch { /* state/read errors use the normal fallback */ }
   }
   const saved = await savedState()
-  // The refresher's projection excludes actively disabled sources while
-  // preserving their last-good snapshots on disk for recovery.
-  if (refreshedData) saved.dynamicData = refreshedData
-  if (saved.dynamicData) {
-    saved.dynamicData = { ...saved.dynamicData, status: { ...saved.dynamicData.status } }
-    for (const [kind, endpoint] of [['pricing', options.pricingSnapshotEndpoint], ['liveBench', options.liveBenchEndpoint]]) {
-      if (!text(endpoint)) {
-        saved.dynamicData[kind] = null
-        saved.dynamicData.status[kind] = { disabled: true, endpoint: '', error: '' }
-      }
-    }
-  }
+  // Config can change while a public request is in flight. Reproject against
+  // the current settings, not the options captured before awaiting refresh.
+  // Cached source A must not masquerade as a newly configured source B.
+  saved.dynamicData = projectDynamicData(refreshedData ?? saved.dynamicData, dynamicOptions(config))
   saved.routingLearning = buildFeedbackProfile(saved.runs, feedbackOptions(config))
   return saved
 }
@@ -1100,11 +1102,15 @@ export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
   return {
     runs: saved.runs.slice(-limit).reverse().map(run => ({
       ...run,
-      task: run.task.slice(0, 2_000),
-      packages: run.packages.map(item => ({ ...item, answer: item.answer.slice(0, 1_500) })),
+      task: text(run.task).slice(0, 2_000),
+      packages: (Array.isArray(run.packages) ? run.packages : []).filter(item => item && typeof item === 'object')
+        .map(item => ({ ...item, answer: text(item.answer).slice(0, 1_500) })),
     })),
     spent,
-    budget: { ...settings, ...budgetCheck({ estimateUsd: null, spent, ...settings }) },
+    budget: { ...settings, ...budgetCheck({ estimateUsd: null, spent, ...settings }), historyVerified: saved.historyVerified !== false },
+    storageAvailable: saved.storageAvailable !== false,
+    storageNotice: saved.storageAvailable === false ? '执行记录存储暂不可用；下方费用与学习摘要尚未核验，不能当作零花费或没有反馈。'
+      : saved.historyVerified === false ? '此前执行记录已损坏或不完整，当前摘要只包含可读记录；不能视为完整费用历史，请从备份恢复后再核验预算。' : '',
     // Legacy scalar quality biases are intentionally no longer learned.
     biases: {},
     learning: saved.routingLearning,

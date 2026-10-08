@@ -9,15 +9,16 @@
  * their own outbound network policy if untrusted users can configure endpoints.
  */
 import { createHash, randomUUID } from 'node:crypto'
-import { isIP } from 'node:net'
 import { fetchLiveBenchSnapshot } from './livebench.mjs'
-export { applyPricingSnapshot, dynamicDataSummary, routingData } from './dynamic-data-view.mjs'
+import { projectDynamicData, publicDynamicEndpoint } from './dynamic-data-view.mjs'
+export { applyPricingSnapshot, dynamicDataSummary, routingData, projectDynamicData, publicDynamicEndpoint } from './dynamic-data-view.mjs'
 
 const DEFAULT_TTL_MS = 86_400_000
 const TIMEOUT_MS = 8000
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024
 const MAX_ROWS = 2000
 const MAX_CLOCK_SKEW_MS = 60_000
+const RESERVATION_GRACE_MS = 5000
 const ROW_FIELDS = new Set(['provider', 'model', 'input', 'output', 'cacheRead', 'cacheWrite', 'currency', 'unit', 'asOf', 'sourceUrl'])
 const PRICE_FIELDS = new Set(['schemaVersion', 'kind', 'version', 'publishedAt', 'rows'])
 const SCORE_FIELDS = new Set(['reasoning', 'code', 'math', 'research', 'writing', 'vision', 'summarization', 'classification'])
@@ -43,16 +44,7 @@ function revisionOf(data) {
   return hash({ liveBench: data.liveBench?.hash ?? null, pricing: data.pricing?.hash ?? null, status: data.status })
 }
 
-function publicUrl(value) {
-  if (typeof value !== 'string' || value.length > 2048) throw new Error('invalid-public-url')
-  const url = new URL(value)
-  const host = url.hostname.toLowerCase()
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash
-    || (url.port && url.port !== '443') || isIP(host) || host.startsWith('[')
-    || !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/u.test(host)
-    || /(?:^|\.)(?:localhost|local|internal|lan|home|test|invalid)$/u.test(host)) throw new Error('invalid-public-url')
-  return url.toString()
-}
+const publicUrl = publicDynamicEndpoint
 
 function identifier(value, max = 240) {
   if (typeof value !== 'string' || value.trim() !== value || !value || value.length > max
@@ -148,59 +140,94 @@ function mayPromote(previous, candidate) {
   return true
 }
 
-async function limitedText(response) {
+function cancelBody(body) {
+  try { Promise.resolve(body?.cancel?.()).catch(() => {}) } catch { /* best effort; never block rejection */ }
+}
+
+async function limitedText(response, signal) {
   const length = Number(response.headers?.get?.('content-length'))
-  if (Number.isFinite(length) && length > MAX_PAYLOAD_BYTES) throw new Error('payload-too-large')
+  if (Number.isFinite(length) && length > MAX_PAYLOAD_BYTES) {
+    cancelBody(response.body)
+    throw new Error('payload-too-large')
+  }
   if (!response.body?.getReader) {
     const text = await response.text()
     if (Buffer.byteLength(text, 'utf8') > MAX_PAYLOAD_BYTES) throw new Error('payload-too-large')
     return text
   }
   const reader = response.body.getReader()
-  const decoder = new TextDecoder()
+  const decoder = new TextDecoder('utf-8', { fatal: true })
   let size = 0
   let text = ''
+  const cancelReader = () => { try { Promise.resolve(reader.cancel()).catch(() => {}) } catch {} }
+  signal?.addEventListener('abort', cancelReader, { once: true })
   try {
     for (;;) {
+      if (signal?.aborted) throw new Error('refresh-aborted')
       const chunk = await reader.read()
+      if (signal?.aborted) throw new Error('refresh-aborted')
       if (chunk.done) return text + decoder.decode()
       size += chunk.value.byteLength
       if (size > MAX_PAYLOAD_BYTES) throw new Error('payload-too-large')
       text += decoder.decode(chunk.value, { stream: true })
     }
   } catch (error) {
-    await reader.cancel().catch(() => {})
+    cancelReader()
     throw error
-  } finally { reader.releaseLock() }
+  } finally { signal?.removeEventListener('abort', cancelReader); reader.releaseLock() }
 }
 
-function publicFetch(fetchImpl) {
+function publicFetch(fetchImpl, outerSignal) {
   return async (input, options = {}) => {
     const endpoint = publicUrl(String(input))
-    const response = await fetchImpl(endpoint, {
-      method: 'GET', headers: { accept: 'application/json,text/csv,text/html' },
-      credentials: 'omit', redirect: 'error', signal: options.signal,
-    })
-    if (!response?.ok || response.redirected) throw new Error('public-fetch-failed')
-    if (response.url && publicUrl(response.url) !== endpoint) throw new Error('public-fetch-redirected')
-    return { ok: true, status: response.status, headers: response.headers,
-      text: () => limitedText(response) }
+    const controller = new AbortController()
+    const signals = [...new Set([outerSignal, options.signal].filter(Boolean))]
+    const abort = () => controller.abort(new Error('refresh-aborted'))
+    const cleanup = () => { for (const signal of signals) signal.removeEventListener('abort', abort) }
+    for (const signal of signals) {
+      if (signal.aborted) abort()
+      else signal.addEventListener('abort', abort, { once: true })
+    }
+    controller.signal.addEventListener('abort', cleanup, { once: true })
+    let response
+    try {
+      if (controller.signal.aborted) throw new Error('refresh-aborted')
+      response = await fetchImpl(endpoint, {
+        method: 'GET', headers: { accept: 'application/json,text/csv,text/html' },
+        credentials: 'omit', redirect: 'error', signal: controller.signal,
+      })
+      if (controller.signal.aborted || !response?.ok || response.redirected) {
+        throw new Error('public-fetch-failed')
+      }
+      if (response.url && publicUrl(response.url) !== endpoint) {
+        throw new Error('public-fetch-redirected')
+      }
+      return { ok: true, status: response.status, headers: response.headers,
+        text: async () => { try { return await limitedText(response, controller.signal) } finally { cleanup() } } }
+    } catch (error) { cancelBody(response?.body); cleanup(); throw error }
   }
 }
 
-async function withTimeout(run) {
-  const controller = new AbortController()
-  let timer
-  let rejectTimeout
-  const timeout = new Promise((_, reject) => { rejectTimeout = reject })
-  timer = setTimeout(() => { controller.abort(); rejectTimeout(new Error('refresh-timeout')) }, TIMEOUT_MS)
-  try { return await Promise.race([run(controller.signal), timeout]) }
-  finally { clearTimeout(timer) }
+async function withTimeout(run, controller, timeoutMs) {
+  let rejectAborted
+  const aborted = new Promise((_, reject) => { rejectAborted = reject })
+  const onAbort = () => rejectAborted(new Error('refresh-aborted'))
+  controller.signal.addEventListener('abort', onAbort, { once: true })
+  const timer = setTimeout(() => controller.abort(new Error('refresh-timeout')), timeoutMs)
+  try {
+    if (controller.signal.aborted) throw new Error('refresh-aborted')
+    return await Promise.race([run(controller.signal), aborted])
+  } finally { clearTimeout(timer); controller.signal.removeEventListener('abort', onAbort) }
 }
 
 function due(data, kind, endpoint, ttlMs, at, force) {
   const status = data.status?.[kind]
   if (force || status?.endpoint !== endpoint || !finite(status?.lastAttemptAt)) return true
+  if (at < status.lastAttemptAt) return true // a corrected clock must not freeze refresh forever
+  if (status.requestId) {
+    const deadline = finite(status.requestDeadlineAt) ? status.requestDeadlineAt : status.lastAttemptAt + TIMEOUT_MS + RESERVATION_GRACE_MS
+    return at >= deadline
+  }
   const delay = status.error ? Math.min(ttlMs, 300_000) : ttlMs
   return at - status.lastAttemptAt >= delay
 }
@@ -210,11 +237,32 @@ function due(data, kind, endpoint, ttlMs, at, force) {
  * mutates the fresh state under the caller's interprocess/atomic write lock.
  */
 export function createDynamicDataRefresher({ store, fetchImpl = globalThis.fetch, now = Date.now,
-  fetchBenchmark = fetchLiveBenchSnapshot } = {}) {
+  fetchBenchmark = fetchLiveBenchSnapshot, timeoutMs = TIMEOUT_MS } = {}) {
   if (typeof store?.read !== 'function' || typeof store?.update !== 'function') throw new Error('dynamic-data-store-required')
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > TIMEOUT_MS) throw new Error('invalid-refresh-timeout')
   const flights = new Map()
+  const active = new Map()
+  const sourceStates = new Map()
+  const generationOf = kind => sourceStates.get(kind)?.generation ?? 0
   const refresh = async (options = {}) => {
-    if (options.enabled !== true) return emptyData()
+    if (options.enabled !== true) {
+      for (const kind of ['liveBench', 'pricing']) sourceStates.set(kind, { fingerprint: '', generation: generationOf(kind) + 1 })
+      const pending = [...active.values()]
+      for (const request of pending) request.controller.abort()
+      if (pending.length) {
+        try { await store.update(state => {
+          const data = dataOf(state)
+          for (const request of pending) if (data.status[request.kind]?.requestId === request.requestId) {
+            data.status[request.kind] = { ...data.status[request.kind], disabled: true, endpoint: '', error: '' }
+            delete data.status[request.kind].requestId
+            delete data.status[request.kind].requestDeadlineAt
+          }
+          data.revision = revisionOf(data)
+          state.dynamicData = data
+        }) } catch { /* disabled projection is safe even if cancellation cannot be persisted */ }
+      }
+      return emptyData()
+    }
     const ttlMs = finite(options.ttlMs) && options.ttlMs >= 0 ? options.ttlMs : DEFAULT_TTL_MS
     const liveBenchEndpoint = options.liveBenchEndpoint ?? 'https://livebench.ai'
     const pricingSnapshotEndpoint = options.pricingSnapshotEndpoint ?? ''
@@ -225,66 +273,96 @@ export function createDynamicDataRefresher({ store, fetchImpl = globalThis.fetch
       try { return { kind, endpoint: publicUrl(raw), disabled: false, invalid: false } }
       catch { return { kind, endpoint: '', disabled: false, invalid: true } }
     })
-    const key = stable([sources, ttlMs, options.force === true])
+    for (const source of sources) {
+      const fingerprint = stable(source)
+      if (fingerprint !== sourceStates.get(source.kind)?.fingerprint) {
+        sourceStates.set(source.kind, { fingerprint, generation: generationOf(source.kind) + 1 })
+        for (const request of active.values()) if (request.kind === source.kind) request.controller.abort()
+      }
+    }
+    const generations = Object.fromEntries(sources.map(source => [source.kind, generationOf(source.kind)]))
+    const key = stable([sources, generations, ttlMs, options.force === true])
     if (flights.has(key)) return flights.get(key)
     const operation = (async () => {
       const initial = dataOf(await store.read())
+      const storageFailures = new Set()
+      await Promise.all(sources.filter(source => source.disabled && (!initial.status[source.kind]?.disabled || initial.status[source.kind]?.requestId))
+        .map(async ({ kind }) => {
+          try { await store.update(state => {
+            if (generationOf(kind) !== generations[kind]) return
+            const data = dataOf(state)
+            data.status[kind] = { ...(data.status[kind] ?? {}), disabled: true, endpoint: '', error: '' }
+            delete data.status[kind].requestId
+            delete data.status[kind].requestDeadlineAt
+            data.revision = revisionOf(data)
+            state.dynamicData = data
+          }) } catch { storageFailures.add(kind) }
+        }))
       const requests = sources.filter(source => !source.disabled)
         .filter(({ kind, endpoint }) => due(initial, kind, endpoint, ttlMs, now(), options.force === true))
-      await Promise.all(requests.map(async ({ kind, endpoint, invalid }) => {
-        const at = now()
+      const settled = await Promise.allSettled(requests.map(async ({ kind, endpoint, invalid }) => {
         const requestId = randomUUID()
-        // Reserve before network I/O. Another process or source change wins by
-        // replacing this token; a late completion then cannot mutate its data.
-        const reserved = await store.update(state => {
-          const data = dataOf(state)
-          if (!due(data, kind, endpoint, ttlMs, at, options.force === true)) return false
-          data.status[kind] = { ...(data.status[kind] ?? {}), endpoint,
-            lastAttemptAt: at, requestId, error: '' }
-          data.revision = revisionOf(data)
-          state.dynamicData = data
-          return true
-        })
-        if (!reserved) return
-        let candidate
-        let error = ''
+        const controller = new AbortController()
+        const request = { kind, endpoint, requestId, controller }
+        active.set(requestId, request)
         try {
-          if (invalid) throw new Error('invalid-public-url')
-          if (typeof fetchImpl !== 'function') throw new Error('fetch-unavailable')
-          const fetchPublic = publicFetch(fetchImpl)
-          candidate = await withTimeout(async signal => {
-            if (kind === 'liveBench') {
-              const payload = await fetchBenchmark({ endpoint, fetchImpl: fetchPublic, timeoutMs: TIMEOUT_MS, strict: true })
-              return benchmarkSnapshot(payload, endpoint, now())
-            }
-            const response = await fetchPublic(endpoint, { signal })
-            return pricingSnapshot(JSON.parse(await response.text()), endpoint, now())
+          // Reserve before network I/O. Another process or source change wins by
+          // replacing this token; a late completion then cannot mutate its data.
+          const reserved = await store.update(state => {
+            if (generationOf(kind) !== generations[kind] || controller.signal.aborted) return false
+            const data = dataOf(state)
+            const at = now()
+            if (!due(data, kind, endpoint, ttlMs, at, options.force === true)) return false
+            data.status[kind] = { ...(data.status[kind] ?? {}), disabled: false, endpoint,
+              lastAttemptAt: at, requestId, requestDeadlineAt: at + timeoutMs + RESERVATION_GRACE_MS }
+            data.revision = revisionOf(data)
+            state.dynamicData = data
+            return true
           })
-        } catch { error = 'refresh-failed' }
-        await store.update(state => {
-          const data = dataOf(state)
-          if (data.status[kind]?.requestId !== requestId) return false
-          if (candidate && !mayPromote(data[kind], candidate)) error = 'snapshot-rollback-rejected'
-          if (candidate && !error) data[kind] = candidate
-          data.status[kind] = { ...data.status[kind], error,
-            ...(candidate && !error ? { lastSuccessAt: now() } : {}) }
-          delete data.status[kind].requestId
-          data.revision = revisionOf(data)
-          state.dynamicData = data
-          return true
-        })
+          if (!reserved) return
+          let candidate
+          let error = ''
+          try {
+            if (invalid) throw new Error('invalid-public-url')
+            if (typeof fetchImpl !== 'function') throw new Error('fetch-unavailable')
+            candidate = await withTimeout(async signal => {
+              const fetchPublic = publicFetch(fetchImpl, signal)
+              if (kind === 'liveBench') {
+                const payload = await fetchBenchmark({ endpoint, fetchImpl: fetchPublic, timeoutMs, signal, strict: true })
+                return benchmarkSnapshot(payload, endpoint, now())
+              }
+              const response = await fetchPublic(endpoint, { signal })
+              return pricingSnapshot(JSON.parse(await response.text()), endpoint, now())
+            }, controller, timeoutMs)
+          } catch { error = 'refresh-failed' }
+          await store.update(state => {
+            const data = dataOf(state)
+            if (data.status[kind]?.requestId !== requestId) return false
+            if (candidate && !mayPromote(data[kind], candidate)) error = 'snapshot-rollback-rejected'
+            if (candidate && !error) data[kind] = candidate
+            data.status[kind] = { ...data.status[kind], error,
+              ...(candidate && !error ? { lastSuccessAt: now() } : {}) }
+            delete data.status[kind].requestId
+            delete data.status[kind].requestDeadlineAt
+            data.revision = revisionOf(data)
+            state.dynamicData = data
+            return true
+          })
+        } finally { active.delete(requestId) }
       }))
+      for (let index = 0; index < settled.length; index += 1) if (settled[index].status === 'rejected') storageFailures.add(requests[index].kind)
       const result = dataOf(await store.read())
+      for (const kind of storageFailures) {
+        const endpoint = sources.find(source => source.kind === kind)?.endpoint ?? ''
+        result.status[kind] = { ...(result.status[kind]?.endpoint === endpoint ? result.status[kind] : {}),
+          endpoint, error: 'storage-failed' }
+        delete result.status[kind].requestId
+        delete result.status[kind].requestDeadlineAt
+      }
       // A user clearing a source disables its use immediately, without erasing
       // recoverable last-good snapshots from disk.
-      for (const { kind, disabled } of sources) {
-        if (disabled) {
-          result[kind] = null
-          result.status[kind] = { disabled: true, endpoint: '', error: '' }
-        }
-      }
       result.revision = revisionOf(result)
-      return result
+      return projectDynamicData(result, options)
     })()
     flights.set(key, operation)
     try { return await operation }

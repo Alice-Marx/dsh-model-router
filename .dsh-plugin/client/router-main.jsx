@@ -318,12 +318,16 @@ const WORKSPACE_VIEWS = [
 /** Workbench RPC state: health check, run ledger and security boundaries. */
 function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
   const [health, setHealth] = React.useState({ report: null, error: '', refreshing: false })
-  const [ledger, setLedger] = React.useState({ value: null, error: '' })
+  const [ledger, setLedger] = React.useState({ value: null, error: '', refreshing: false })
   const [boundaries, setBoundaries] = React.useState({ value: null, error: '' })
   const [busy, setBusy] = React.useState(false)
   const mounted = React.useRef(true)
   const ledgerRequest = React.useRef(0)
-  React.useEffect(() => () => { mounted.current = false }, [])
+  const mutationBusy = React.useRef(false)
+  React.useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; ledgerRequest.current += 1 }
+  }, [])
   const call = async (operation, fallback) => {
     if (typeof operation !== 'function') throw new Error('工作台服务尚未加载，请更新插件后重试。')
     return unwrapRemote(await operation(), fallback)
@@ -339,13 +343,15 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   }
   const refreshLedger = async () => {
     const request = ++ledgerRequest.current
+    if (mounted.current) setLedger(previous => ({ ...previous, error: '', refreshing: true }))
     try {
       const value = await call(loadLedger, '执行记录读取失败。')
-      if (mounted.current && request === ledgerRequest.current) setLedger({ value, error: '' })
-      if (request !== ledgerRequest.current) return null
+      if (mounted.current && request === ledgerRequest.current) setLedger({ value, error: '', refreshing: false })
+      if (!mounted.current || request !== ledgerRequest.current) return null
       return value
     } catch (error) {
-      if (mounted.current && request === ledgerRequest.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '执行记录读取失败。' }))
+      if (mounted.current && request === ledgerRequest.current) setLedger(previous => ({ ...previous, refreshing: false,
+        error: `${text(error?.message) || '执行记录读取失败。'}${previous.value ? ' 下方保留最近一次摘要，尚未重新核验。' : ''}` }))
       return null
     }
   }
@@ -366,12 +372,15 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     }
   }
   const rate = async (runId, packageId, rating, expectedFinishedAt) => {
+    if (mutationBusy.current) return
+    mutationBusy.current = true
     setBusy(true)
     try { await call(() => rateResult({ runId, packageId, rating, ...(expectedFinishedAt === undefined ? {} : { expectedFinishedAt }) }), '评价保存失败。'); await refreshLedger() }
     catch (error) { if (mounted.current) setLedger(previous => ({ ...previous, error: text(error?.message) || '评价保存失败。' })) }
-    finally { if (mounted.current) setBusy(false) }
+    finally { mutationBusy.current = false; if (mounted.current) setBusy(false) }
   }
   const rerun = async (runId, packageId, override, choice = null) => {
+    if (mutationBusy.current) return
     const run = ledger.value?.runs?.find(item => item.id === runId)
     const item = run?.packages?.find(entry => entry.id === packageId)
     // One prompt lists every reason (file edits, unsandboxed CLI, budget); the Host re-checks all of them.
@@ -380,6 +389,8 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
       ? `${reasons[0].text}\n继续吗？`
       : `重跑前需要确认以下 ${reasons.length} 项：\n${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join('\n')}\n全部确认并继续吗？`)) return
     const codes = new Set(reasons.map(entry => entry.code))
+    if (mutationBusy.current) return
+    mutationBusy.current = true
     setBusy(true)
     try {
       const request = { runId, packageId, ...(override ? { provider: override.provider, model: override.model } : {}), ...(choice ? { subscriptionChoice: choice } : {}),
@@ -394,6 +405,7 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     } catch (error) {
       if (mounted.current) setLedger(previous => ({ ...previous, error: `${text(error?.message) || '重跑失败。'} 可以修正后再点“重跑此步”，或在官方会话中调用 model_router_rerun_step。` }))
     } finally {
+      mutationBusy.current = false
       if (mounted.current) setBusy(false)
     }
   }
@@ -532,6 +544,8 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
       const ledger = await workbench.refreshLedger()
       if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return
       if (!ledger) throw new Error('请先恢复执行记录连接；无法核对最新数据与学习状态。')
+      if (ledger.storageAvailable === false) throw new Error('执行记录存储暂不可用，无法核对费用与学习状态；请恢复连接后再规划。')
+      if (ledger.budget?.historyVerified === false) throw new Error('费用历史不完整，请从备份恢复并核验后再规划。')
       if (signature !== routingSettingsSignature(settingsScope.getSnapshot().value ?? {})) throw new Error('规划设置已更新，请重新生成建议。')
       const next = createWorkspacePlan(task, catalogState.catalog, {
         ...ledger.routingData,
@@ -649,8 +663,8 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
         <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-controls" aria-labelledby="mr-tab-controls" hidden={view !== 'controls'}>
         <div className="mr-view-heading"><h2>预算与安全</h2><p>设置成本与质量策略，核对订阅计费和执行边界。</p></div>
-        <CostControlCard ledger={workbench.ledger.value} error={workbench.ledger.error && !workbench.ledger.value ? workbench.ledger.error : ''} settingsScope={settingsScope}
-          onChanged={() => { invalidatePlan(); void workbench.refreshLedger() }} />
+        <CostControlCard ledger={workbench.ledger.value} error={workbench.ledger.error || workbench.ledger.value?.storageNotice || ''} refreshing={workbench.ledger.refreshing} settingsScope={settingsScope}
+          onChanged={() => { invalidatePlan(); return workbench.refreshLedger() }} />
         <BillingCard billing={workbench.health.report?.billing ?? null} error={workbench.health.report ? '' : workbench.health.error}
           refreshing={workbench.health.refreshing} onRefresh={() => { void workbench.refreshHealth(true) }} />
         <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.16.1 — 2026-10-08
+
+Stable maturity patch under the npm `latest` tag. Fully quit Harness, including the tray process, and restart after upgrading. Existing 0.16.0 artifacts remain unchanged.
+
+- Separate stable feedback evidence identity from hourly decay invalidation; expose bounded per-route/domain observed feedback diagnostics and exclusion reasons without changing objective quality floors.
+- Remove superseded personalization, reject invalid/missing usage costs instead of treating them as free, and retain immutable historical charges.
+- Recover interrupted public refresh leases, propagate overall timeout/cancellation, isolate source changes, sanitize public status, and reproject in-flight responses against current settings.
+- Guard settings/rating submissions, preserve newer drafts, await summary refresh, fix paused-result Hook order, and surface retained-but-unverified summaries.
+- Never steal live state locks; detach committed state, roll back rejected updates, preserve unsupported schemas and unique corrupt backups, and prevent incomplete charge history from passing configured budgets.
+- Package the maturity derivations, regression reproduction and remaining limits in `docs/ROUTING_MATURITY.zh.md`. Release validation: 622 tests passed, 3 conditional skips, client/preview checks passed. No paid calls, real-user ledger changes or real quality-cost benefit claim.
+
 ## 0.16.0 — 2026-10-05
 
 Stable release under the npm `latest` tag. Fully quit Harness, including the tray process, and restart after upgrading so both the Host and client load the new version. Public data refresh is opt-in; enabling it does not authorize paid model exploration.

@@ -62,7 +62,7 @@ test('learning summary does not infer satisfaction from success or model review 
   assert.equal(absent.enabled, true)
   assert.equal(absent.feedbackCount, 0)
   const view = learningView({ enabled: false, feedbackCount: 4, effectiveWeight: 1.125, ignoredCount: 2,
-    policyVersion: 'explicit-feedback-v1', review: { score: 5 }, ok: true }, { feedbackResetAt: 9 })
+    policyVersion: 'explicit-feedback-v1', review: { score: 5 }, ok: true }, { feedbackLearningEnabled: false, feedbackResetAt: 9 })
   assert.deepEqual(view, { available: true, enabled: false, feedbackCount: 4, effectiveWeight: 1.125,
     ignoredCount: 2, policyVersion: 'explicit-feedback-v1', resetAt: 9 })
   assert.equal(learningView({ feedbackCount: -1, effectiveWeight: NaN }).feedbackCount, 0)
@@ -71,7 +71,8 @@ test('learning summary does not infer satisfaction from success or model review 
 test('dynamic source summary displays status/version while not echoing errors or credential URLs', () => {
   assert.deepEqual(dynamicSourceView({ status: 'fresh', source: 'https://public.example/rates.json', version: 'v2',
     verifiedAt: 123, rowCount: 7, error: 'secret failure' }), { status: 'fresh', label: '快照有效',
-    source: 'https://public.example/rates.json', version: 'v2', verifiedAt: 123, count: 7 })
+    source: 'https://public.example/rates.json', version: 'v2', verifiedAt: 123, count: 7,
+    refreshing: false, pending: false, lastAttemptAt: null, lastSuccessAt: null, errorCode: '', endpoint: '', lastGoodEndpoint: '' })
   const error = dynamicSourceView({ status: 'error', source: 'https://user:secret@example.org/?token=secret', error: 'secret failure' })
   assert.equal(error.source, '')
   assert.ok(!JSON.stringify(error).includes('secret'))
@@ -116,7 +117,7 @@ test('cost card SSR renders Host summaries, preserves history reset wording and 
     dynamicData: { liveBench: { status: 'fresh', verifiedAt: 123, version: '2026-06-25', modelCount: 66, source: 'https://livebench.ai' },
       pricing: { status: 'error', rowCount: 1, source: 'https://user:NEVER_DISPLAY@example.org/', error: 'NEVER_DISPLAY' } } }
   const html = renderToStaticMarkup(React.createElement(CostControlCard, { ledger,
-    settingsScope: settingsScope({ feedbackResetAt: 123, pricingSnapshotEndpoint: 'https://user:NEVER_DISPLAY@example.org/' }) }))
+    settingsScope: settingsScope({ dynamicDataEnabled: true, feedbackResetAt: 123, pricingSnapshotEndpoint: 'https://user:NEVER_DISPLAY@example.org/' }) }))
   assert.match(html, /有效反馈 5/)
   assert.match(html, /有效权重 2.50/)
   assert.match(html, /忽略 1/)
