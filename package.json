@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "type": "module",
   "description": "Model Router for official DeepSeek Harness Desktop: cost-aware task routing, dependent work packages and official vendor CLI discovery, installation and execution. GAL is available separately as @ljwei-stak/dsh-galgame.",
   "repository": {
@@ -57,6 +57,7 @@
     ".dsh-plugin/shared/vendor-minimax-adapter.mjs",
     ".dsh-plugin/shared/vendor-mimo-grok-adapter.mjs",
     ".dsh-plugin/shared/latest-versions.mjs",
+    ".dsh-plugin/shared/version-order.mjs",
     ".dsh-plugin/shared/npm-attestation.mjs",
     ".dsh-plugin/shared/zcode-bundle.mjs",
     ".dsh-plugin/shared/zcode-installer.mjs",

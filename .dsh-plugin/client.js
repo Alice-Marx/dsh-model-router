@@ -1876,32 +1876,72 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
   } }, "\u5220\u9664\u6B64\u6A21\u578B\u914D\u7F6E")), notice && /* @__PURE__ */ import_react.default.createElement("p", { className: notice.tone === "error" ? "mr-error" : "mr-profile-success", role: notice.tone === "error" ? "alert" : "status" }, notice.text), /* @__PURE__ */ import_react.default.createElement("p", { className: "mr-caption" }, "\u8D28\u91CF\u8BC4\u5206\u548C\u4EF7\u683C\u90FD\u662F\u7528\u6237\u63D0\u4F9B\u7684\u4F30\u503C\u3002\u672A\u586B\u5199\u5355\u4EF7\u65F6\u663E\u793A\u201C\u4EF7\u683C\u5F85\u914D\u7F6E\u201D\uFF1B\u9884\u7B97\u53EA\u5F71\u54CD\u672C\u5730\u89C4\u5212\uFF0C\u4E0D\u9650\u5236\u5B9E\u9645\u8D26\u5355\u3002CLI \u6A21\u578B\u540D\u987B\u4E0E\u5382\u5546\u5DE5\u5177\u6838\u5BF9\u3002\u6267\u884C\u65B9\u5F0F\u51B3\u5B9A\u8BE5\u6A21\u578B\u6536\u5230\u4EFB\u52A1\u65F6\u8D70\u5B98\u65B9\u65E0\u754C\u9762\u5DE5\u5177\u8FD8\u662F\u6A21\u578B\u76EE\u5F55 API\uFF1B\u5B98\u65B9\u5DE5\u5177\u5931\u8D25\u65F6\u4ECD\u4F1A\u56DE\u9000 API\u3002\u8BA1\u8D39\u65B9\u5F0F\u9ED8\u8BA4\u8BA2\u9605\u4F18\u5148\uFF1A\u5148\u7528 CLI \u8D26\u53F7\u767B\u5F55\u6216\u7F16\u7A0B\u5957\u9910 Key \u8DEF\u7EBF\uFF0C\u8BA2\u9605\u989D\u5EA6\u7528\u5C3D\u6216\u9650\u6D41\u65F6\u540C\u4E00\u6B65\u9AA4\u81EA\u52A8\u6539\u7528 API Key\uFF0C\u5E76\u8BB0\u5165\u8FD0\u884C\u5386\u53F2\u3002"))));
 }
 
-// .dsh-plugin/client/tool-install-state.mjs
-function stableVersionOrder(left, right) {
-  const parse = (value) => /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(value ?? ""));
-  const current = parse(left);
-  const target = parse(right);
-  if (!current || !target) return null;
-  for (let index = 1; index <= 3; index += 1) {
-    const delta = Number(current[index]) - Number(target[index]);
-    if (delta) return Math.sign(delta);
+// .dsh-plugin/shared/version-order.mjs
+var VERSION = /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})(?:-[0-9A-Za-z.-]{1,64})?$/;
+function compareReleaseVersions(left, right) {
+  const parse = (value) => {
+    const match = VERSION.exec(String(value ?? ""));
+    return match ? { parts: match.slice(1, 4).map(Number), pre: String(value).includes("-") } : null;
+  };
+  const a = parse(left);
+  const b2 = parse(right);
+  if (!a || !b2) return null;
+  for (let index = 0; index < 3; index += 1) {
+    if (a.parts[index] !== b2.parts[index]) return a.parts[index] > b2.parts[index] ? 1 : -1;
   }
+  if (a.pre !== b2.pre) return a.pre ? -1 : 1;
   return 0;
 }
+
+// .dsh-plugin/client/tool-install-state.mjs
 function toolInstallAction({ tool, probe, readiness, job, probeStatus, latestVersion = null }) {
   const running = job?.status === "running";
   const installed = probe?.installed === true;
-  const order = installed && latestVersion ? stableVersionOrder(probe.version, latestVersion) : null;
+  const order = installed && latestVersion ? compareReleaseVersions(probe.version, latestVersion) : null;
   const ready = readiness?.ready === true;
   const desktop = tool.manager === "signed-windows-installer";
   const noRunner = desktop || tool.headlessAdapter === true;
   const repair = installed && !noRunner && readiness?.ready === false;
   const label = running ? "\u5B89\u88C5\u4E2D\u2026" : !installed ? job?.status === "failed" ? "\u91CD\u8BD5\u5B89\u88C5" : desktop ? "\u4E0B\u8F7D\u6700\u65B0\u5B89\u88C5\u5668" : "\u4E00\u952E\u5B89\u88C5\u6700\u65B0\u7248" : order === -1 ? `\u66F4\u65B0\u5230\u6700\u65B0\u7248 ${latestVersion}` : order === 1 ? "\u5DF2\u9AD8\u4E8E\u6700\u65B0\u6B63\u5F0F\u7248" : repair ? "\u4FEE\u590D\u5B98\u65B9\u6267\u884C\u5165\u53E3" : order === 0 ? "\u5DF2\u662F\u6700\u65B0\u7248\u672C" : "\u5B89\u88C5\u6700\u65B0\u7248";
   const current = order === 0 && (ready || noRunner);
+  const interactive = probeStatus === "ready" || probeStatus === "refreshing";
   return {
     label,
-    disabled: probeStatus !== "ready" || running || installed && (order === 1 || current)
+    disabled: !interactive || running || installed && (order === 1 || current)
   };
+}
+function installClickRefusal({ tool, submitting = false, running = false } = {}) {
+  if (!tool) return "\u672A\u77E5\u5B98\u65B9\u5DE5\u5177\uFF0C\u65E0\u6CD5\u5F00\u59CB\u5B89\u88C5\u3002";
+  if (tool.unsupported) return String(tool.unsupportedReason ?? "").trim() || "\u6B64\u5DE5\u5177\u6682\u4E0D\u652F\u6301\u4E00\u952E\u5B89\u88C5\u3002";
+  if (submitting || running) return "\u8BE5\u5DE5\u5177\u6B63\u5728\u5B89\u88C5\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002";
+  return "";
+}
+function payloadError(payload, fallback) {
+  if (!payload || typeof payload !== "object") return fallback;
+  if (typeof payload.error === "string" && payload.error.trim()) return payload.error.trim();
+  const message = payload.error?.message;
+  if (typeof message === "string" && message.trim()) return message.trim();
+  return fallback;
+}
+function acceptedInstallJob(response) {
+  const fallback = "\u5B89\u88C5\u4EFB\u52A1\u672A\u88AB\u63A5\u53D7\u3002";
+  if (!response || typeof response !== "object") return { job: null, error: fallback };
+  let payload = response;
+  if (payload.ok === false) return { job: null, error: payloadError(payload, fallback) };
+  if (payload.ok === true && payload.value && typeof payload.value === "object") {
+    payload = payload.value;
+    if (payload.ok === false) return { job: null, error: payloadError(payload, fallback) };
+    if (payload.ok === true && payload.value && typeof payload.value === "object") payload = payload.value;
+  }
+  if (payload.accepted === true && payload.job && typeof payload.job === "object") return { job: payload.job, error: "" };
+  return { job: null, error: payloadError(payload, fallback) };
+}
+function shouldApplyInstallStatus(localJob, remoteJob) {
+  if (!remoteJob || typeof remoteJob !== "object") return false;
+  const localStarted = typeof localJob?.startedAt === "string" ? localJob.startedAt : "";
+  const remoteStarted = typeof remoteJob.startedAt === "string" ? remoteJob.startedAt : "";
+  if (!localStarted || !remoteStarted) return true;
+  return remoteStarted >= localStarted;
 }
 
 // .dsh-plugin/client/router-insights.jsx
@@ -12115,7 +12155,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.16.1" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.16.2" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -12921,7 +12961,10 @@ function PlanResults({ plan, ledger, headingRef }) {
   const purposeLabel = { analysis: "\u4EFB\u52A1\u5206\u6790", execution: "\u4EFB\u52A1\u5B9E\u65BD", verification: "\u72EC\u7ACB\u9A8C\u8BC1", synthesis: "\u7ED3\u679C\u6574\u5408" };
   return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8DEF\u7531\u5EFA\u8BAE" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title", ref: headingRef, tabIndex: -1 }, "\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u672C\u5730\u8BA1\u7B97\u5B8C\u6210\uFF0C\u672A\u5411\u6A21\u578B\u53D1\u9001\u4EFB\u52A1\u5185\u5BB9\u3002"))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u63A8\u8350\u8DEF\u7EBF"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "\u6682\u65E0\u8DEF\u7EBF")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u4EFB\u52A1\u590D\u6742\u5EA6 \xB7 \u5206\u503C\uFF080\u20131\uFF09"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u590D\u6742" }[plan.complexity.band] || plan.complexity.band, " \xB7 ", plan.complexity.value)), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u4F30\u7B97\u603B\u6210\u672C"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, money2(plan.estimatedCost))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u8DEF\u7531\u65B9\u6848"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[plan.preset]?.label ?? "\u5747\u8861"))), budget?.exceeded && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, "\u6267\u884C\u524D\u9884\u7B97\u68C0\u67E5\uFF1A", budget.message, " \u5B9E\u9645\u6267\u884C\u65F6\u5C06\u6309\u8BBE\u7F6E\u81EA\u52A8\u964D\u7EA7\u6216\u6682\u505C\u8BE2\u95EE\u3002"), budget?.limited && !budget.exceeded && budget.estimateKnown && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u6267\u884C\u524D\u9884\u7B97\u68C0\u67E5\uFF1A\u672C\u6B21\u9884\u4F30 ", money2(plan.estimatedCost), "\uFF0C\u5269\u4F59\u989D\u5EA6 ", money2(budget.remainingUsd), "\u3002"), plan.loginRequired && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u63A8\u8350\u6A21\u578B\u7684\u5B98\u65B9 CLI \u672A\u767B\u5F55\uFF0C\u6267\u884C\u65F6\u76F4\u63A5\u8D70\u6A21\u578B\u76EE\u5F55 API\uFF1B\u53EF\u5728\u201C\u5B98\u65B9\u5DE5\u5177\u201D\u5361\u7247\u70B9\u201C\u53BB\u767B\u5F55\u201D\u3002"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-control-label" }, "\u6267\u884C\u6E20\u9053"), /* @__PURE__ */ import_react5.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-plan-explanation" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u67E5\u770B\u89C4\u5212\u4F9D\u636E\u4E0E\u4F30\u7B97\u8BF4\u660E"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.reason), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.pricingNotice, " ", plan.qualityNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")), plan.optimization.budgetExceeded && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error" }, "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u4EFB\u52A1\u53EF\u80FD\u8D85\u8FC7\u672C\u6B21\u9884\u7B97\u3002\u9884\u7B97\u53EA\u5F71\u54CD\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u963B\u6B62\u5B9E\u9645\u6263\u8D39\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("h3", { className: "mr-section-title" }, "\u56E2\u961F\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u4E0B\u65B9\u6A21\u578B\u662F\u89C4\u5212\u5EFA\u8BAE\uFF1B\u6258\u7BA1\u6267\u884C\u4F1A\u6309\u5382\u5546 CLI \u7684\u6A21\u578B\u540D\u89C4\u5219\u9009\u7528\uFF0C\u672A\u6838\u9A8C\u6620\u5C04\u65F6\u4F7F\u7528\u8BE5 CLI \u7684\u9ED8\u8BA4\u6A21\u578B\u3002"), plan.team.workPackages.length > 1 && /* @__PURE__ */ import_react5.default.createElement(DagView, { packages: plan.team.workPackages, label: "\u5DE5\u4F5C\u5305\u4F9D\u8D56\u56FE", renderNode: (item) => /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel) }), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-empty" }, "\u5F53\u524D\u76EE\u5F55\u6CA1\u6709\u53EF\u5206\u914D\u7684\u6A21\u578B\u8DEF\u7EBF\u3002") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-package mr-package-details", key: item.id }, /* @__PURE__ */ import_react5.default.createElement("summary", null, /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel)), item.objective && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u5177\u4F53\u76EE\u6807\uFF1A", item.objective), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, purposeLabel[item.purpose] ?? item.purpose, item.dependsOn.length > 0 ? ` \xB7 \u4F9D\u8D56\uFF1A${item.dependsOn.map((id2) => packageNames.get(id2) ?? id2).join("\u3001")}` : ""), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u96BE\u5EA6\uFF1A", { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u56F0\u96BE" }[item.difficulty] || item.difficulty || "\u5F85\u8BC4\u4F30", " \xB7 \u8D39\u7528\uFF1A", money2(item.estimatedCost)), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u9A8C\u6536\uFF1A", item.verificationChecklist.join("\uFF1B")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react5.default.createElement(ChannelBadge, { item }), item.loginRequired && /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-pill" }, "CLI \u672A\u767B\u5F55")), item.channelDetail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u6E20\u9053\u8BF4\u660E\uFF1A", item.channelDetail)))), plan.routingBypassed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u5DF2\u6307\u5B9A\u5355\u4E00\u6A21\u578B\uFF0C\u672A\u4E0E\u5176\u4ED6\u8DEF\u7EBF\u6BD4\u8F83\u3002\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u8C03\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_execute"), " \u5E76\u4F20\u5165\u8BE5 provider \u4E0E model \u5373\u53EF\u76F4\u63A5\u6267\u884C\uFF1B\u82E5\u8BE5\u6A21\u578B\u5141\u8BB8\u5B98\u65B9\u5DE5\u5177\uFF0C\u4F1A\u4F18\u5148\u4F7F\u7528\u5BF9\u5E94 CLI\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.team.handoff)));
 }
-var remoteError = (response, fallback) => text5(response?.error?.message) || text5(response?.value?.error) || fallback;
+var remoteError = (response, fallback) => remoteErrorText(
+  text5(response?.error?.message) || text5(response?.value?.error) || (typeof response?.error === "string" ? response.error : ""),
+  fallback
+);
 function probeLabel(probe) {
   if (!probe) return "\u5C1A\u672A\u68C0\u6D4B";
   if (probe.installed) return `\u5DF2\u5B89\u88C5${probe.version ? ` \xB7 ${probe.version}` : ""}`;
@@ -12939,10 +12982,22 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   const request = import_react5.default.useRef(0);
   const submitting = import_react5.default.useRef(/* @__PURE__ */ new Set());
   const polling = import_react5.default.useRef(/* @__PURE__ */ new Set());
+  const jobsRef = import_react5.default.useRef({});
+  const rememberJobs = (updater) => {
+    setJobs((previous) => {
+      const next = typeof updater === "function" ? updater(previous) : updater;
+      jobsRef.current = next;
+      return next;
+    });
+  };
   const refresh = async () => {
     onRefreshHealth?.();
     const current = ++request.current;
-    setProbeState((previous) => ({ ...previous, status: "loading", error: "" }));
+    setProbeState((previous) => ({
+      ...previous,
+      status: previous.probes.length > 0 ? "refreshing" : "loading",
+      error: ""
+    }));
     try {
       if (typeof listOfficialTools !== "function") throw new Error("\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002");
       const response = await listOfficialTools();
@@ -12955,8 +13010,16 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === "string" ? response.value.hostVersion : null });
     } catch (error) {
       if (!mounted.current || current !== request.current) return;
-      setProbeState({ status: "error", probes: [], capabilities: [], readiness: [], error: text5(error?.message) || "\u65E0\u6CD5\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u3002" });
-      onProbes({ probes: [], capabilities: [], readiness: [] });
+      const message = remoteErrorText(text5(error?.message), "\u65E0\u6CD5\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u3002");
+      let kept = false;
+      setProbeState((previous) => {
+        if (previous.probes.length > 0) {
+          kept = true;
+          return { ...previous, status: "ready", error: message };
+        }
+        return { status: "error", probes: [], capabilities: [], readiness: [], error: message };
+      });
+      if (!kept) onProbes({ probes: [], capabilities: [], readiness: [] });
     }
   };
   import_react5.default.useEffect(() => {
@@ -12971,7 +13034,16 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
           return null;
         }
       })).then((entries) => {
-        if (mounted.current) setJobs((previous) => ({ ...Object.fromEntries(entries.filter(Boolean)), ...previous }));
+        if (!mounted.current) return;
+        rememberJobs((previous) => {
+          const next = { ...previous };
+          for (const entry of entries) {
+            if (!entry) continue;
+            const [id2, job] = entry;
+            if (shouldApplyInstallStatus(previous[id2], job)) next[id2] = job;
+          }
+          return next;
+        });
       });
     }
     return () => {
@@ -12991,12 +13063,20 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
         if (!listening || !mounted.current) return;
         if (!response?.ok) throw new Error(remoteError(response, "\u65E0\u6CD5\u83B7\u53D6\u5B89\u88C5\u8FDB\u5EA6\u3002"));
         const job = response.value?.job;
-        if (!job) throw new Error("\u5B89\u88C5\u4EFB\u52A1\u72B6\u6001\u6682\u4E0D\u53EF\u7528\u3002");
-        setJobs((previous) => ({ ...previous, [id2]: job }));
-        setRowErrors((previous) => ({ ...previous, [id2]: "" }));
+        const local = jobsRef.current[id2];
+        if (!job) {
+          if (local?.status === "running") return;
+          throw new Error("\u5B89\u88C5\u4EFB\u52A1\u72B6\u6001\u6682\u4E0D\u53EF\u7528\u3002");
+        }
+        if (!shouldApplyInstallStatus(local, job)) return;
+        rememberJobs((previous) => shouldApplyInstallStatus(previous[id2], job) ? { ...previous, [id2]: job } : previous);
+        setRowErrors((previous) => ({
+          ...previous,
+          [id2]: job.status === "failed" ? text5(job.error) || "\u5B89\u88C5\u5931\u8D25\u3002" : ""
+        }));
         if (job.status !== "running") void refresh();
       } catch (error) {
-        if (listening && mounted.current) setRowErrors((previous) => ({ ...previous, [id2]: text5(error?.message) || "\u5B89\u88C5\u72B6\u6001\u8BFB\u53D6\u5931\u8D25\uFF0C\u5C06\u7EE7\u7EED\u91CD\u8BD5\u3002" }));
+        if (listening && mounted.current) setRowErrors((previous) => ({ ...previous, [id2]: remoteErrorText(text5(error?.message), "\u5B89\u88C5\u72B6\u6001\u8BFB\u53D6\u5931\u8D25\uFF0C\u5C06\u7EE7\u7EED\u91CD\u8BD5\u3002") }));
       } finally {
         polling.current.delete(id2);
       }
@@ -13011,21 +13091,43 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   }, [jobs, officialToolInstallStatus]);
   const install = async (id2) => {
     const tool = OFFICIAL_TOOLS.find((item) => item.id === id2);
-    if (!tool || tool.unsupported || submitting.current.has(id2) || jobs[id2]?.status === "running") return;
+    const refusal = installClickRefusal({
+      tool,
+      submitting: submitting.current.has(id2),
+      running: jobsRef.current[id2]?.status === "running"
+    });
+    if (refusal) {
+      setRowErrors((previous) => ({ ...previous, [id2]: refusal }));
+      return;
+    }
     submitting.current.add(id2);
+    const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     setRowErrors((previous) => ({ ...previous, [id2]: "" }));
-    setJobs((previous) => ({ ...previous, [id2]: { tool: id2, status: "running", outputTail: [] } }));
+    rememberJobs((previous) => ({
+      ...previous,
+      [id2]: { tool: id2, status: "running", outputTail: [], startedAt, error: null }
+    }));
     try {
       if (typeof installOfficialTool !== "function") throw new Error("\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002");
       const response = await installOfficialTool(id2);
       if (!mounted.current) return;
-      if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, "\u5B89\u88C5\u4EFB\u52A1\u672A\u88AB\u63A5\u53D7\u3002"));
-      setJobs((previous) => ({ ...previous, [id2]: response.value.job }));
+      const accepted = acceptedInstallJob(response);
+      if (!accepted.job) throw new Error(remoteErrorText(accepted.error, "\u5B89\u88C5\u4EFB\u52A1\u672A\u88AB\u63A5\u53D7\u3002"));
+      rememberJobs((previous) => shouldApplyInstallStatus(previous[id2], accepted.job) ? { ...previous, [id2]: accepted.job } : previous);
     } catch (error) {
-      if (mounted.current) {
-        setJobs((previous) => ({ ...previous, [id2]: { tool: id2, status: "failed", error: text5(error?.message) || "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002" } }));
-        setRowErrors((previous) => ({ ...previous, [id2]: text5(error?.message) || "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002" }));
-      }
+      if (!mounted.current) return;
+      const message = remoteErrorText(text5(error?.message), "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002");
+      rememberJobs((previous) => ({
+        ...previous,
+        [id2]: {
+          ...previous[id2] ?? {},
+          tool: id2,
+          status: "failed",
+          error: message,
+          startedAt: previous[id2]?.startedAt || startedAt
+        }
+      }));
+      setRowErrors((previous) => ({ ...previous, [id2]: message }));
     } finally {
       submitting.current.delete(id2);
     }
@@ -13037,7 +13139,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       const response = await cancelOfficialToolInstall(id2);
       if (!mounted.current) return;
       if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, "\u53D6\u6D88\u8BF7\u6C42\u672A\u88AB\u63A5\u53D7\u3002"));
-      setJobs((previous) => ({ ...previous, [id2]: response.value.job }));
+      rememberJobs((previous) => ({ ...previous, [id2]: response.value.job }));
       if (response.value.job.status !== "running") void refresh();
     } catch (error) {
       if (mounted.current) setRowErrors((previous) => ({ ...previous, [id2]: text5(error?.message) || "\u65E0\u6CD5\u53D6\u6D88\u5B89\u88C5\u3002" }));
@@ -13048,7 +13150,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   const readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item]));
   return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u3001\u7248\u672C\u548C\u767B\u5F55\u72B6\u6001\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u5B89\u88C5\u6216\u66F4\u65B0\u5230\u5404\u5382\u5546\u6700\u65B0\u7248\uFF08\u65B0\u7248\u672C\u672A\u7ECF\u63D2\u4EF6\u6D4B\u8BD5\uFF09\u3002\u672A\u767B\u5F55\u7684\u5DE5\u5177\u70B9\u201C\u53BB\u767B\u5F55\u201D\u67E5\u770B\u767B\u5F55\u547D\u4EE4\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u4F53\u68C0\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     void refresh();
-  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.status === "error" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
+  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.error && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
     const command = installCommandLine(tool);
     const probe = byId[tool.id];
     const capability = capabilitiesById[tool.id];

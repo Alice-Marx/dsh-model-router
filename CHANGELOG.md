@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.2 — 2026-10-09
+
+Stable patch under the npm `latest` tag. Fully quit Harness, including the tray process, and restart after upgrading. Existing 0.16.1 artifacts remain unchanged.
+
+- Official-tools update/install clicks keep the job started by that click. A status poll no longer replaces it with an older finished job or clears a failure.
+- Refreshing an existing probe no longer disables the update button. A click that cannot start, and an install whose probed version is still older than latest, show an error on that row.
+- Installed Claude Code runs `claude update` before the registry npm install. Installed Windows MiniMax runs the official installer. Other registry cards share the same click path and fail visibly when the probed version does not advance.
+- Release validation: 628 tests passed, 4 conditional skips, client check passed. No paid calls or real CLI installs were part of this verification.
+
 ## 0.16.1 — 2026-10-08
 
 Stable maturity patch under the npm `latest` tag. Fully quit Harness, including the tray process, and restart after upgrading. Existing 0.16.0 artifacts remain unchanged.

@@ -1,14 +1,14 @@
 import React from 'react'
 import { createWorkspacePlan, routesFromModelCatalog } from './catalog.mjs'
 import { ModelProfileEditor } from './model-profile-editor.jsx'
-import { toolInstallAction } from './tool-install-state.mjs'
+import { acceptedInstallJob, installClickRefusal, shouldApplyInstallStatus, toolInstallAction } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
 import { healthSummary, planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
 import { RunLauncher } from './run-launcher.jsx'
 import { CliTerminalCard } from './cli-terminal.jsx'
-import { staleHostNotice } from './host-version.mjs'
+import { remoteErrorText, staleHostNotice } from './host-version.mjs'
 import { ADAPTIVE_DEFAULTS } from './adaptive-state.mjs'
 import stylesheet from './router-main.css'
 
@@ -118,7 +118,10 @@ function PlanResults({ plan, ledger, headingRef }) {
   )
 }
 
-const remoteError = (response, fallback) => text(response?.error?.message) || text(response?.value?.error) || fallback
+const remoteError = (response, fallback) => remoteErrorText(
+  text(response?.error?.message) || text(response?.value?.error) || (typeof response?.error === 'string' ? response.error : ''),
+  fallback,
+)
 
 function probeLabel(probe) {
   if (!probe) return '尚未检测'
@@ -138,11 +141,23 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   const request = React.useRef(0)
   const submitting = React.useRef(new Set())
   const polling = React.useRef(new Set())
+  const jobsRef = React.useRef({})
+  const rememberJobs = updater => {
+    setJobs(previous => {
+      const next = typeof updater === 'function' ? updater(previous) : updater
+      jobsRef.current = next
+      return next
+    })
+  }
 
   const refresh = async () => {
     onRefreshHealth?.()
     const current = ++request.current
-    setProbeState(previous => ({ ...previous, status: 'loading', error: '' }))
+    setProbeState(previous => ({
+      ...previous,
+      status: previous.probes.length > 0 ? 'refreshing' : 'loading',
+      error: '',
+    }))
     try {
       if (typeof listOfficialTools !== 'function') throw new Error('官方工具安装桥尚未加载。')
       const response = await listOfficialTools()
@@ -155,8 +170,16 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === 'string' ? response.value.hostVersion : null })
     } catch (error) {
       if (!mounted.current || current !== request.current) return
-      setProbeState({ status: 'error', probes: [], capabilities: [], readiness: [], error: text(error?.message) || '无法检测官方工具。' })
-      onProbes({ probes: [], capabilities: [], readiness: [] })
+      const message = remoteErrorText(text(error?.message), '无法检测官方工具。')
+      let kept = false
+      setProbeState(previous => {
+        if (previous.probes.length > 0) {
+          kept = true
+          return { ...previous, status: 'ready', error: message }
+        }
+        return { status: 'error', probes: [], capabilities: [], readiness: [], error: message }
+      })
+      if (!kept) onProbes({ probes: [], capabilities: [], readiness: [] })
     }
   }
 
@@ -170,7 +193,16 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
           return response?.ok && response.value?.job ? [tool.id, response.value.job] : null
         } catch { return null }
       })).then(entries => {
-        if (mounted.current) setJobs(previous => ({ ...Object.fromEntries(entries.filter(Boolean)), ...previous }))
+        if (!mounted.current) return
+        rememberJobs(previous => {
+          const next = { ...previous }
+          for (const entry of entries) {
+            if (!entry) continue
+            const [id, job] = entry
+            if (shouldApplyInstallStatus(previous[id], job)) next[id] = job
+          }
+          return next
+        })
       })
     }
     return () => { mounted.current = false; request.current += 1 }
@@ -188,12 +220,20 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
         if (!listening || !mounted.current) return
         if (!response?.ok) throw new Error(remoteError(response, '无法获取安装进度。'))
         const job = response.value?.job
-        if (!job) throw new Error('安装任务状态暂不可用。')
-        setJobs(previous => ({ ...previous, [id]: job }))
-        setRowErrors(previous => ({ ...previous, [id]: '' }))
+        const local = jobsRef.current[id]
+        if (!job) {
+          if (local?.status === 'running') return
+          throw new Error('安装任务状态暂不可用。')
+        }
+        if (!shouldApplyInstallStatus(local, job)) return
+        rememberJobs(previous => shouldApplyInstallStatus(previous[id], job) ? { ...previous, [id]: job } : previous)
+        setRowErrors(previous => ({
+          ...previous,
+          [id]: job.status === 'failed' ? (text(job.error) || '安装失败。') : '',
+        }))
         if (job.status !== 'running') void refresh()
       } catch (error) {
-        if (listening && mounted.current) setRowErrors(previous => ({ ...previous, [id]: text(error?.message) || '安装状态读取失败，将继续重试。' }))
+        if (listening && mounted.current) setRowErrors(previous => ({ ...previous, [id]: remoteErrorText(text(error?.message), '安装状态读取失败，将继续重试。') }))
       } finally {
         polling.current.delete(id)
       }
@@ -204,21 +244,45 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
 
   const install = async id => {
     const tool = OFFICIAL_TOOLS.find(item => item.id === id)
-    if (!tool || tool.unsupported || submitting.current.has(id) || jobs[id]?.status === 'running') return
+    const refusal = installClickRefusal({
+      tool,
+      submitting: submitting.current.has(id),
+      running: jobsRef.current[id]?.status === 'running',
+    })
+    if (refusal) {
+      setRowErrors(previous => ({ ...previous, [id]: refusal }))
+      return
+    }
     submitting.current.add(id)
+    const startedAt = new Date().toISOString()
     setRowErrors(previous => ({ ...previous, [id]: '' }))
-    setJobs(previous => ({ ...previous, [id]: { tool: id, status: 'running', outputTail: [] } }))
+    rememberJobs(previous => ({
+      ...previous,
+      [id]: { tool: id, status: 'running', outputTail: [], startedAt, error: null },
+    }))
     try {
       if (typeof installOfficialTool !== 'function') throw new Error('官方工具安装桥尚未加载。')
       const response = await installOfficialTool(id)
       if (!mounted.current) return
-      if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, '安装任务未被接受。'))
-      setJobs(previous => ({ ...previous, [id]: response.value.job }))
+      const accepted = acceptedInstallJob(response)
+      if (!accepted.job) throw new Error(remoteErrorText(accepted.error, '安装任务未被接受。'))
+      rememberJobs(previous => (
+        shouldApplyInstallStatus(previous[id], accepted.job) ? { ...previous, [id]: accepted.job } : previous
+      ))
     } catch (error) {
-      if (mounted.current) {
-        setJobs(previous => ({ ...previous, [id]: { tool: id, status: 'failed', error: text(error?.message) || '安装启动失败。' } }))
-        setRowErrors(previous => ({ ...previous, [id]: text(error?.message) || '安装启动失败。' }))
-      }
+      if (!mounted.current) return
+      const message = remoteErrorText(text(error?.message), '安装启动失败。')
+      rememberJobs(previous => ({
+        ...previous,
+        [id]: {
+          ...(previous[id] ?? {}),
+          tool: id,
+          status: 'failed',
+          error: message,
+          startedAt: previous[id]?.startedAt || startedAt,
+        },
+      }))
+      setRowErrors(previous => ({ ...previous, [id]: message }))
     } finally {
       submitting.current.delete(id)
     }
@@ -231,7 +295,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       const response = await cancelOfficialToolInstall(id)
       if (!mounted.current) return
       if (!response?.ok || !response.value?.accepted || !response.value?.job) throw new Error(remoteError(response, '取消请求未被接受。'))
-      setJobs(previous => ({ ...previous, [id]: response.value.job }))
+      rememberJobs(previous => ({ ...previous, [id]: response.value.job }))
       if (response.value.job.status !== 'running') void refresh()
     } catch (error) {
       if (mounted.current) setRowErrors(previous => ({ ...previous, [id]: text(error?.message) || '无法取消安装。' }))
@@ -249,7 +313,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新体检</button></div>
       <div className="mr-card-body">
         {probeState.status === 'loading' && <p className="mr-empty" role="status">正在检测本机官方工具…</p>}
-        {probeState.status === 'error' && <p className="mr-error" role="alert">{probeState.error}</p>}
+        {probeState.error && <p className="mr-error" role="alert">{probeState.error}</p>}
         <div className="mr-tools" role="list" aria-label="官方工具注册表">
           {OFFICIAL_TOOLS.map(tool => {
             const command = installCommandLine(tool)
