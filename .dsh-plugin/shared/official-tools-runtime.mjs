@@ -39,18 +39,44 @@ const CLAUDE_UPDATE_TIMEOUT_MS = 180_000
 export const CLAUDE_UPDATE_ARGS = Object.freeze(['update'])
 
 /**
- * Quote a fixed registry command for `shell: true`.
- * Node concatenates shell arguments without escaping; Windows cmd would otherwise
- * split on characters inside package specs such as `@scope/pkg@latest`.
+ * Spawn shape for a fixed registry command.
+ *
+ * Windows needs `shell: true` so `npm.cmd` / `where.exe` resolve. Node itself
+ * wraps that as `cmd.exe /d /s /c`. Pre-quoting every argument (0.16.2) made
+ * cmd strip the wrong quotes and launch `node` against a missing script:
+ * `MODULE_NOT_FOUND` at `executeUserEntryPoint` with an empty requireStack.
+ * That failed `npm config get prefix`, `--version`, and `npm install -g` for
+ * every official tool. Keep the executable and argv separate.
  */
-export function shellCommandLine(executable, args, platform = process.platform) {
-  const quote = value => {
-    const text = String(value)
-    if (text.includes('\0') || /[\r\n]/.test(text)) throw new Error('命令参数含有非法字符。')
-    if (platform === 'win32') return `"${text.replace(/"/g, '""')}"`
-    return `'${text.replace(/'/g, `'"'"'`)}'`
+export function shellSpawnSpec(executable, args = [], { useShell = false } = {}) {
+  return { file: String(executable), args: [...(args ?? [])], shell: Boolean(useShell) }
+}
+
+/** Decode a CLI banner. Native Windows exes often write UTF-16 to a pipe. */
+export function decodeProcessOutput(value) {
+  const bytes = Buffer.isBuffer(value) ? value : Buffer.from(value ?? '')
+  if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
+    return bytes.toString('utf16le').replace(/^\uFEFF/, '')
   }
-  return [executable, ...(args ?? [])].map(quote).join(' ')
+  if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
+    const swapped = Buffer.from(bytes)
+    swapped.swap16()
+    return swapped.toString('utf16le').replace(/^\uFEFF/, '')
+  }
+  const sample = bytes.subarray(0, Math.min(bytes.length, 64))
+  let zeros = 0
+  for (let index = 1; index < sample.length; index += 2) if (sample[index] === 0) zeros += 1
+  const pairs = Math.floor(sample.length / 2)
+  if (pairs >= 4 && zeros >= pairs * 0.6) return bytes.toString('utf16le').replace(/\u0000/g, '')
+  return bytes.toString('utf8').replace(/^\uFEFF/, '')
+}
+
+/** Absolute paths printed by `where` / `which`, one per line. */
+export function locatorPaths(stdout) {
+  return String(stdout ?? '').split(/\r?\n/).map(line => line.trim().replace(/^"|"$/g, '')).filter(line => {
+    if (!line || /^INFO:/i.test(line)) return false
+    return isAbsolute(line)
+  })
 }
 
 /** Visible failure when the installer exited cleanly but the probed copy is still older. */
@@ -85,22 +111,28 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, s
       resolve({ ok: false, code: null, stdout: '', stderr: '', timedOut: false, cancelled: true })
       return
     }
-    let stdout = ''
-    let stderr = ''
+    const stdoutChunks = []
+    const stderrChunks = []
+    const decoded = chunks => decodeProcessOutput(Buffer.concat(chunks))
+    const pushChunk = (chunks, data) => {
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data)
+      chunks.push(buf)
+      let total = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+      while (total > 64_000 && chunks.length > 1) total -= chunks.shift().length
+      return decodeProcessOutput(buf)
+    }
     let settled = false
     let stopReason = null
     let child
     try {
-      // One pre-quoted command string so Node's shell wrapper cannot split
-      // `@scope/pkg@latest`. PowerShell keeps useShell false and an args array.
-      const command = useShell ? shellCommandLine(executable, args) : executable
-      child = spawn(command, useShell ? [] : args, {
+      const spec = shellSpawnSpec(executable, args, { useShell })
+      child = spawn(spec.file, spec.args, {
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
         // Windows npm CLIs install as .cmd shims; only cmd.exe can execute
         // them. Safe here because every executable and argument comes from
         // the fixed registry — caller input never reaches this boundary.
-        shell: useShell,
+        shell: spec.shell,
         ...(env ? { env } : {}),
       })
     } catch (error) {
@@ -131,7 +163,7 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, s
       } else {
         try { child.kill('SIGTERM') } catch { /* already gone */ }
       }
-      graceTimer = setTimeout(() => finish({ ok: false, code: null, stdout, stderr,
+      graceTimer = setTimeout(() => finish({ ok: false, code: null, stdout: decoded(stdoutChunks), stderr: decoded(stderrChunks),
         timedOut: reason === 'timeout', cancelled: reason === 'cancel' }), 5_000)
       graceTimer.unref?.()
     }
@@ -141,20 +173,20 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, s
     if (signal?.aborted) onAbort()
     child.stdout?.on('data', data => {
       if (settled || stopReason) return
-      stdout = appendBounded(stdout, String(data))
-      onOutput?.(String(data))
+      onOutput?.(pushChunk(stdoutChunks, data))
     })
     child.stderr?.on('data', data => {
       if (settled || stopReason) return
-      stderr = appendBounded(stderr, String(data))
-      onOutput?.(String(data))
+      onOutput?.(pushChunk(stderrChunks, data))
     })
     child.on('error', error => {
+      const stdout = decoded(stdoutChunks)
+      const stderr = decoded(stderrChunks)
       finish({ ok: false, code: null, stdout, stderr: `${stderr}${error.message}`.trim(),
         timedOut: stopReason === 'timeout', cancelled: stopReason === 'cancel' })
     })
     child.on('close', (code, signal) => {
-      finish({ ok: !stopReason && code === 0, code, stdout, stderr,
+      finish({ ok: !stopReason && code === 0, code, stdout: decoded(stdoutChunks), stderr: decoded(stderrChunks),
         timedOut: stopReason === 'timeout', cancelled: stopReason === 'cancel', signal })
     })
   })
@@ -277,11 +309,6 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
 /** Tools whose ready-check failure can be repaired by reinstalling the same version. */
 const CAPABILITY_REPAIRABLE = new Set(['claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build'])
 
-function appendBounded(current, addition) {
-  const merged = current + addition
-  return merged.length > 64_000 ? merged.slice(merged.length - 32_000) : merged
-}
-
 /** Extract the first version-looking token from a CLI banner. */
 export function versionFromBanner(banner) {
   const match = String(banner ?? '').match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?/)
@@ -336,16 +363,28 @@ async function probeUncached(tool, runner) {
     if (!located.ok || !located.stdout.trim()) {
       continue
     }
-    const attempt = await runner(executable, ['--version'], { timeoutMs: PROBE_TIMEOUT_MS })
+    const attempt = await runner(executable, ['--version'], { timeoutMs: PROBE_TIMEOUT_MS, useShell: IS_WINDOWS })
     if (attempt.timedOut) {
       return { id: tool.id, installed: false, version: null, status: 'probe-timeout', detail: `${executable} --version 超时（${PROBE_TIMEOUT_MS / 1000}s）` }
     }
-    if (attempt.ok) {
-      const banner = `${attempt.stdout}\n${attempt.stderr}`.trim()
+    const attempts = [attempt]
+    if (!versionFromBanner(probeBanner(attempt))) {
+      for (const target of locatorPaths(located.stdout)) {
+        if (target === executable) continue
+        const direct = await runner(target, ['--version'], { timeoutMs: PROBE_TIMEOUT_MS, useShell: false })
+        attempts.push(direct)
+        if (direct.timedOut) break
+        if (direct.ok || versionFromBanner(probeBanner(direct))) break
+      }
+    }
+    const chosen = attempts.find(item => item && (item.ok || versionFromBanner(probeBanner(item)))) ?? attempt
+    const banner = probeBanner(chosen)
+    const version = versionFromBanner(banner)
+    if (chosen.ok || version) {
       return {
         id: tool.id,
         installed: true,
-        version: versionFromBanner(banner),
+        version,
         status: 'installed',
         detail: tool.probeNote ?? '',
         bannerLine: banner.split('\n').find(Boolean)?.slice(0, 200) ?? '',
@@ -356,7 +395,7 @@ async function probeUncached(tool, runner) {
       installed: false,
       version: null,
       status: 'probe-failed',
-      detail: `${executable} --version 退出码 ${attempt.code ?? '信号终止'}；程序可能损坏或版本过旧。${attempt.stderr.split('\n').find(Boolean)?.slice(0, 120) ?? ''}`,
+      detail: `${executable} --version 退出码 ${chosen.code ?? '信号终止'}；程序可能损坏或版本过旧。${String(chosen.stderr ?? '').split('\n').find(Boolean)?.slice(0, 120) ?? ''}`,
     }
   }
   return { id: tool.id, installed: false, version: null, status: 'not-installed', detail: '未在 PATH 中找到官方命令。' }
@@ -364,7 +403,7 @@ async function probeUncached(tool, runner) {
 
 /** Default runner: real spawn with the platform's shell for .cmd shims. */
 export const defaultRunner = (executable, args, options = {}) =>
-  runCapture(executable, args, { ...options, useShell: IS_WINDOWS })
+  runCapture(executable, args, { useShell: IS_WINDOWS, ...options })
 
 let prefixPromise = null
 
@@ -413,10 +452,29 @@ export async function installedToolIds() {
  * Probe every registry tool in parallel (the slowest single probe bounds the
  * wall time; the cache keeps repeat calls instant).
  */
+/** One tool's probe failure must not reject detection of the rest of the page. */
+export async function probeToolSafely(tool, runner, options) {
+  try {
+    return await probeToolWith(tool, runner, options)
+  } catch (error) {
+    return {
+      id: tool.id,
+      installed: false,
+      version: null,
+      status: 'probe-failed',
+      detail: `检测失败：${String(error?.message ?? error).slice(0, 200)}`,
+    }
+  }
+}
+
 export async function probeAllTools({ fresh = false } = {}) {
   await ensureNpmPrefixOnPath()
-  return Promise.all(OFFICIAL_TOOLS.map(tool => probeToolWith(tool, defaultRunner,
+  return Promise.all(OFFICIAL_TOOLS.map(tool => probeToolSafely(tool, defaultRunner,
     fresh ? { cacheMs: 0 } : {})))
+}
+
+function probeBanner(attempt) {
+  return `${attempt?.stdout ?? ''}\n${attempt?.stderr ?? ''}`.trim()
 }
 
 export function probeSnapshot() {

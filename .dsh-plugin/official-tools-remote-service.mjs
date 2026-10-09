@@ -81,9 +81,14 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** Re-probe the local fixed registry; the caller cannot supply a command. */
   async list() {
     const tools = await probeAllTools({ fresh: true })
-    const executionReadiness = await Promise.all(tools.map(tool => tool.installed
-      ? officialToolReadiness(tool.id)
-      : Promise.resolve({ id: tool.id, ready: false, reason: 'CLI 尚未安装或版本检测失败。' })))
+    const executionReadiness = await Promise.all(tools.map(async tool => {
+      if (!tool.installed) return { id: tool.id, ready: false, reason: 'CLI 尚未安装或版本检测失败。' }
+      try {
+        return await officialToolReadiness(tool.id)
+      } catch (error) {
+        return { id: tool.id, ready: false, reason: `执行入口检测失败：${String(error?.message ?? error).slice(0, 200)}` }
+      }
+    }))
     return { tools, executionCapabilities: officialToolExecutionCapabilities(), executionReadiness, hostVersion: HOST_PLUGIN_VERSION }
   }
 

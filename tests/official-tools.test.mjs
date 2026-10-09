@@ -17,13 +17,16 @@ import {
   installStatus,
   resetForTests,
   officialMiniMaxInstaller,
-  shellCommandLine,
+  shellSpawnSpec,
+  decodeProcessOutput,
+  locatorPaths,
+  probeToolSafely,
   staleInstallMessage,
   officialUpdatePlan,
   CLAUDE_UPDATE_ARGS,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
-import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, packageBinCandidates, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { emptyOutputError, outputIsEmpty, usageFromOutput, verifiedDiagnostic } from '../.dsh-plugin/shared/task-executors.mjs'
 
 test('MiniMax official Windows installer entry: any release, but its code must match the npm registry',
@@ -207,13 +210,55 @@ test('probe cache prevents duplicate spawns and expires', async () => {
   assert.equal(spawns, 4, 'cache expired, probe runs again')
 })
 
-test('shell install lines keep scoped package specs quoted', () => {
-  const command = shellCommandLine('npm', ['install', '-g', '@anthropic-ai/claude-code@latest', '--registry=https://registry.npmjs.org/'], 'win32')
-  assert.match(command, /"@anthropic-ai\/claude-code@latest"/)
-  assert.match(command, /"--registry=https:\/\/registry\.npmjs\.org\/"/)
-  assert.throws(() => shellCommandLine('npm', ['install\n-g'], 'win32'), /非法字符/)
-  const posix = shellCommandLine('npm', ['install', '-g', '@openai/codex@latest'], 'linux')
-  assert.match(posix, /'@openai\/codex@latest'/)
+test('package bin lookup accepts ./dist/main.mjs and a moved entry inside the same package', () => {
+  assert.deepEqual(packageBinCandidates({ kimi: './dist/main.mjs' }, 'kimi', 'dist/main.mjs'), ['dist/main.mjs'])
+  assert.deepEqual(packageBinCandidates({ kimi: 'dist/index.mjs' }, 'kimi', 'dist/main.mjs'), ['dist/index.mjs', 'dist/main.mjs'])
+  assert.deepEqual(packageBinCandidates({ claude: 'bin/claude.exe' }, 'claude', 'bin/claude.exe'), ['bin/claude.exe'])
+  assert.deepEqual(packageBinCandidates({ kimi: '../outside.mjs' }, 'kimi', 'dist/main.mjs'), ['dist/main.mjs'])
+})
+
+test('windows shell spawn keeps argv separate so cmd is not double-quoted', () => {
+  const spec = shellSpawnSpec('npm', ['install', '-g', '@anthropic-ai/claude-code@latest', '--registry=https://registry.npmjs.org/'], { useShell: true })
+  assert.equal(spec.file, 'npm')
+  assert.equal(spec.shell, true)
+  assert.deepEqual(spec.args, ['install', '-g', '@anthropic-ai/claude-code@latest', '--registry=https://registry.npmjs.org/'])
+  assert.equal(spec.file.includes('"') || spec.args.some(arg => arg.includes('"')), false)
+  const probed = shellSpawnSpec('claude', ['--version'], { useShell: true })
+  assert.deepEqual(probed, { file: 'claude', args: ['--version'], shell: true })
+})
+
+test('probe banners decode UTF-16 and a non-zero exit with a version still counts as installed', async () => {
+  const utf16 = Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from('2.1.295 (Claude Code)\n', 'utf16le')])
+  assert.match(decodeProcessOutput(utf16), /2\.1\.295/)
+  const bare = Buffer.from('2.1.295\n', 'utf16le')
+  assert.match(decodeProcessOutput(bare), /2\.1\.295/)
+  assert.deepEqual(locatorPaths('INFO: Could not find\n"D:\\Program Files\\Claude\\claude.exe"\n'), process.platform === 'win32'
+    ? ['D:\\Program Files\\Claude\\claude.exe'] : [])
+
+  const claude = getOfficialTool('claude-code')
+  const exe = process.platform === 'win32' ? 'D:\\Program Files\\Claude\\claude.exe' : '/opt/Claude/claude.exe'
+  const locator = process.platform === 'win32' ? 'where' : 'which'
+  const versionDespiteExit = await probeToolWith(claude, async (executable) => {
+    if (executable === locator) return { ok: true, code: 0, stdout: `${exe}\n`, stderr: '', timedOut: false }
+    return { ok: false, code: 1, stdout: '2.1.295 (Claude Code)\n', stderr: '', timedOut: false }
+  }, { cache: new Map(), now: () => Date.now() })
+  assert.equal(versionDespiteExit.status, 'installed')
+  assert.equal(versionDespiteExit.version, '2.1.295')
+
+  const direct = await probeToolWith(claude, async (executable, args, options = {}) => {
+    if (executable === locator) return { ok: true, code: 0, stdout: `${exe}\n`, stderr: '', timedOut: false }
+    if (executable === 'claude') return { ok: false, code: 1, stdout: '', stderr: 'garbled', timedOut: false }
+    assert.equal(executable, exe)
+    assert.equal(options.useShell, false)
+    assert.deepEqual(args, ['--version'])
+    return { ok: true, code: 0, stdout: '2.1.295 (Claude Code)\n', stderr: '', timedOut: false }
+  }, { cache: new Map(), now: () => Date.now() })
+  assert.equal(direct.status, 'installed')
+  assert.equal(direct.version, '2.1.295')
+
+  const isolated = await probeToolSafely(claude, async () => { throw new Error('probe exploded') }, { cache: new Map() })
+  assert.equal(isolated.status, 'probe-failed')
+  assert.match(isolated.detail, /probe exploded/)
 })
 
 test('an update that leaves the probed version behind is a visible failure', () => {

@@ -1898,12 +1898,11 @@ function toolInstallAction({ tool, probe, readiness, job, probeStatus, latestVer
   const running = job?.status === "running";
   const installed = probe?.installed === true;
   const order = installed && latestVersion ? compareReleaseVersions(probe.version, latestVersion) : null;
-  const ready = readiness?.ready === true;
   const desktop = tool.manager === "signed-windows-installer";
   const noRunner = desktop || tool.headlessAdapter === true;
-  const repair = installed && !noRunner && readiness?.ready === false;
+  const repair = installed && !noRunner && readiness?.ready === false && order !== 0;
   const label = running ? "\u5B89\u88C5\u4E2D\u2026" : !installed ? job?.status === "failed" ? "\u91CD\u8BD5\u5B89\u88C5" : desktop ? "\u4E0B\u8F7D\u6700\u65B0\u5B89\u88C5\u5668" : "\u4E00\u952E\u5B89\u88C5\u6700\u65B0\u7248" : order === -1 ? `\u66F4\u65B0\u5230\u6700\u65B0\u7248 ${latestVersion}` : order === 1 ? "\u5DF2\u9AD8\u4E8E\u6700\u65B0\u6B63\u5F0F\u7248" : repair ? "\u4FEE\u590D\u5B98\u65B9\u6267\u884C\u5165\u53E3" : order === 0 ? "\u5DF2\u662F\u6700\u65B0\u7248\u672C" : "\u5B89\u88C5\u6700\u65B0\u7248";
-  const current = order === 0 && (ready || noRunner);
+  const current = order === 0;
   const interactive = probeStatus === "ready" || probeStatus === "refreshing";
   return {
     label,
@@ -12155,7 +12154,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.16.2" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.16.3" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");

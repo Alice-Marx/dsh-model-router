@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.3 — 2026-10-09
+
+Stable patch under the npm `latest` tag. Fully quit Harness, including a WebUI server process or the desktop tray, and restart after upgrading so the Host reloads. Existing 0.16.2 artifacts remain unchanged.
+
+- Windows `shell: true` spawns again pass the executable and arguments separately. 0.16.2 pre-quoted that command line; cmd then started Node on a missing script (`MODULE_NOT_FOUND`, empty `requireStack`, Node 24) for every official tool's probe, `npm config get prefix`, and `npm install -g`.
+- A `--version` banner that contains a version counts as installed, including UTF-16 output from a native Windows executable. If the name on PATH fails, the absolute path from `where`/`which` is tried without a shell. One probe or readiness failure stays on that card.
+- Package entry lookup accepts `./dist/main.mjs` and a `bin/` directory that is itself on PATH. A CLI that is already the latest release stays on “已是最新版本” instead of “修复官方执行入口”.
+- The 0.16.2 update-button behavior remains: the click keeps its own job, refresh does not disable a visible update, and an install that leaves the probed version older fails with a row error.
+- Release validation on Linux: 630 tests passed, 4 conditional skips, `npm run check:client` passed. No Harness WebUI, Harness Desktop, or Windows `cmd.exe` run was available in this environment.
+
 ## 0.16.2 — 2026-10-09
 
 Stable patch under the npm `latest` tag. Fully quit Harness, including the tray process, and restart after upgrading. Existing 0.16.1 artifacts remain unchanged.

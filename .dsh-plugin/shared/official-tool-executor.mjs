@@ -171,6 +171,42 @@ function versionAtLeast(value, minimum) {
   return true
 }
 
+/** Relative bin path inside a package. Reject `..` and empty segments. */
+export function normalizeRelativeBin(value) {
+  const text = String(value ?? '').trim().replace(/\\/g, '/').replace(/^\.\//, '')
+  if (!text || text.split('/').some(part => part === '' || part === '..')) return ''
+  return text
+}
+
+/**
+ * Official entry files to try, declared bin first. `./dist/main.mjs` matches
+ * the pinned `dist/main.mjs`. A package whose bin moved still resolves when
+ * the file stays inside that package.
+ */
+export function packageBinCandidates(binField, binName, expectedBin) {
+  const declared = normalizeRelativeBin(binField && typeof binField === 'object' ? binField[binName] : binField)
+  const expected = normalizeRelativeBin(expectedBin)
+  return [...new Set([declared, expected].filter(Boolean))]
+}
+
+async function readPackageEntry(packageDirectory, packageName, binName, expectedBin, workspace, seen) {
+  try {
+    const manifest = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
+    if (manifest.name !== packageName) return null
+    const packageRoot = await realpath(packageDirectory)
+    if (packageRoot === workspace || inside(workspace, packageRoot) || seen.has(packageRoot)) return null
+    for (const relativeBin of packageBinCandidates(manifest.bin, binName, expectedBin)) {
+      try {
+        const entry = await realpath(join(packageRoot, relativeBin))
+        if (!inside(packageRoot, entry) || !(await stat(entry)).isFile()) continue
+        seen.add(packageRoot)
+        return { entry, packageRoot, version: manifest.version, source: 'verified-npm-package' }
+      } catch { /* try the package's other bin candidate */ }
+    }
+  } catch { /* this directory is not the requested package */ }
+  return null
+}
+
 /** Resolve the package's real `bin` file, never its Windows .cmd shim. */
 async function findGlobalPackageEntries(packageName, binName, expectedBin, workspace) {
   await ensureNpmPrefixOnPath()
@@ -181,19 +217,13 @@ async function findGlobalPackageEntries(packageName, binName, expectedBin, works
     const moduleParents = [join(directory, 'node_modules')]
     if (basename(directory).toLowerCase() === '.bin') moduleParents.push(resolve(directory, '..'))
     if (!IS_WINDOWS) moduleParents.push(resolve(directory, '..', 'lib', 'node_modules'))
-    for (const modules of moduleParents) {
-      const packageDirectory = join(modules, ...packageParts)
-      try {
-        const manifest = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
-        if (manifest.name !== packageName || manifest.bin?.[binName] !== expectedBin) continue
-        const packageRoot = await realpath(packageDirectory)
-        if (packageRoot === workspace || inside(workspace, packageRoot)) continue
-        if (seen.has(packageRoot)) continue
-        const entry = await realpath(join(packageRoot, expectedBin))
-        if (!inside(packageRoot, entry) || !(await stat(entry)).isFile()) continue
-        seen.add(packageRoot)
-        found.push({ entry, packageRoot, version: manifest.version, source: 'verified-npm-package' })
-      } catch { /* this PATH entry is not the requested package */ }
+    const candidates = moduleParents.map(modules => join(modules, ...packageParts))
+    // Native installs put the exe in `<package>/bin` and that directory on PATH
+    // (for example D:\Program Files\Claude\node_modules\@anthropic-ai\claude-code\bin).
+    candidates.push(directory, resolve(directory, '..'))
+    for (const packageDirectory of candidates) {
+      const entry = await readPackageEntry(packageDirectory, packageName, binName, expectedBin, workspace, seen)
+      if (entry) found.push(entry)
     }
   }
   return found
