@@ -1,14 +1,16 @@
 # Model Router · DeepSeek Harness Desktop
 
-Version: **0.16.1**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
+Version: **0.16.2**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe a task, compare your configured models, inspect the plan, and explicitly choose when to execute it.
+
+**0.16.2:** the official-tools update/install button keeps the job started by that click, stays usable while a previous probe is refreshing, and shows a row error when the click cannot start or the probed version does not advance. Installed Claude Code runs `claude update` before the registry npm install. Installed Windows MiniMax runs the official installer.
 
 **0.16.1:** [maturity improvements and validation](docs/ROUTING_MATURITY.zh.md) adds stable feedback cache identity, per-model/task feedback explanations, source-refresh and settings-race protection, and budget gates for unreadable or incomplete cost history. Mechanism tests do not establish real quality–cost gains.
 
 **0.16.0:** [dynamic data and adaptive feedback](docs/ROUTING_ADAPTIVE_LEARNING.zh.md) adds opt-in public benchmark/curated fixed-USD pricing refresh and task-specific, time-decayed, shrinkage-regularized subjective utility. Objective proxy quality floors remain separate. Public sources default off; preferences are shared within one local DSH_HOME and limited to the latest 200 runs. This is not a universal vendor-price scraper or evidence of real quality–cost gains.
 
-Current version: **0.16.1** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.16.2** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 **0.15.0 changes:** a four-tab workbench with routing advice directly below task planning, protection against stale execution previews, preserved spending totals across history pruning and retries, and a standalone mock UI preview for source development.
 
@@ -40,16 +42,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.16.1
+@ljwei-stak/dsh-model-router@0.16.2
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.16.1** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.16.2** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.16.1`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.16.2`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](MIGRATION.md).
 
