@@ -173,11 +173,16 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, s
     if (signal?.aborted) onAbort()
     child.stdout?.on('data', data => {
       if (settled || stopReason) return
-      onOutput?.(pushChunk(stdoutChunks, data))
+      // Always keep the bytes. Optional chaining must not guard pushChunk:
+      // version and PATH probes omit onOutput, and a skipped push leaves
+      // stdout empty so every installed CLI looks not-installed.
+      const text = pushChunk(stdoutChunks, data)
+      onOutput?.(text)
     })
     child.stderr?.on('data', data => {
       if (settled || stopReason) return
-      onOutput?.(pushChunk(stderrChunks, data))
+      const text = pushChunk(stderrChunks, data)
+      onOutput?.(text)
     })
     child.on('error', error => {
       const stdout = decoded(stdoutChunks)
