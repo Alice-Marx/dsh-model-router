@@ -17,6 +17,7 @@ import {
   installStatus,
   resetForTests,
   officialMiniMaxInstaller,
+  defaultRunner,
   shellSpawnSpec,
   decodeProcessOutput,
   locatorPaths,
@@ -215,6 +216,16 @@ test('package bin lookup accepts ./dist/main.mjs and a moved entry inside the sa
   assert.deepEqual(packageBinCandidates({ kimi: 'dist/index.mjs' }, 'kimi', 'dist/main.mjs'), ['dist/index.mjs', 'dist/main.mjs'])
   assert.deepEqual(packageBinCandidates({ claude: 'bin/claude.exe' }, 'claude', 'bin/claude.exe'), ['bin/claude.exe'])
   assert.deepEqual(packageBinCandidates({ kimi: '../outside.mjs' }, 'kimi', 'dist/main.mjs'), ['dist/main.mjs'])
+})
+
+test('defaultRunner keeps stdout and stderr when onOutput is omitted', async () => {
+  const outcome = await defaultRunner(process.execPath, ['-e', 'process.stdout.write("probe-stdout"); process.stderr.write("probe-stderr")'], {
+    timeoutMs: 10_000,
+    useShell: false,
+  })
+  assert.equal(outcome.ok, true)
+  assert.match(outcome.stdout, /probe-stdout/)
+  assert.match(outcome.stderr, /probe-stderr/)
 })
 
 test('windows shell spawn keeps argv separate so cmd is not double-quoted', () => {
