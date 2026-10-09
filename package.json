@@ -57,6 +57,7 @@
     ".dsh-plugin/shared/vendor-minimax-adapter.mjs",
     ".dsh-plugin/shared/vendor-mimo-grok-adapter.mjs",
     ".dsh-plugin/shared/latest-versions.mjs",
+    ".dsh-plugin/shared/version-order.mjs",
     ".dsh-plugin/shared/npm-attestation.mjs",
     ".dsh-plugin/shared/zcode-bundle.mjs",
     ".dsh-plugin/shared/zcode-installer.mjs",

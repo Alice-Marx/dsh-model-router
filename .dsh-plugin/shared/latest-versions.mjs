@@ -12,6 +12,9 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { resolveStateHome } from './router-state.mjs'
 import { OFFICIAL_TOOLS } from './official-tool-registry.mjs'
+import { compareReleaseVersions, isReleaseVersion } from './version-order.mjs'
+
+export { compareReleaseVersions, isReleaseVersion } from './version-order.mjs'
 
 export const LATEST_CACHE_MS = 12 * 60 * 60_000
 export const LATEST_FAILURE_RETRY_MS = 30 * 60_000
@@ -19,27 +22,6 @@ export const LATEST_TIMEOUT_MS = 5_000
 export const NPM_REGISTRY = 'https://registry.npmjs.org'
 export const ZCODE_DOWNLOAD_PAGE = 'https://zcode.z.ai/en/docs/install'
 const MAX_DOCUMENT_BYTES = 2_000_000
-const VERSION = /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})(?:-[0-9A-Za-z.-]{1,64})?$/
-
-export function isReleaseVersion(value) {
-  return typeof value === 'string' && VERSION.test(value)
-}
-
-/** Numeric comparison of x.y.z[-pre]; a prerelease sorts below its release. */
-export function compareReleaseVersions(left, right) {
-  const parse = value => {
-    const match = VERSION.exec(String(value ?? ''))
-    return match ? { parts: match.slice(1, 4).map(Number), pre: String(value).includes('-') } : null
-  }
-  const a = parse(left)
-  const b = parse(right)
-  if (!a || !b) return null
-  for (let index = 0; index < 3; index += 1) {
-    if (a.parts[index] !== b.parts[index]) return a.parts[index] > b.parts[index] ? 1 : -1
-  }
-  if (a.pre !== b.pre) return a.pre ? -1 : 1
-  return 0
-}
 
 /** True only when both versions parse and the latest is strictly newer. */
 export function updateAvailable(installed, latest) {

@@ -17,6 +17,10 @@ import {
   installStatus,
   resetForTests,
   officialMiniMaxInstaller,
+  shellCommandLine,
+  staleInstallMessage,
+  officialUpdatePlan,
+  CLAUDE_UPDATE_ARGS,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
 import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
@@ -201,6 +205,36 @@ test('probe cache prevents duplicate spawns and expires', async () => {
   clock += 61_000
   await probeToolWith(tool, runner, { cache, now })
   assert.equal(spawns, 4, 'cache expired, probe runs again')
+})
+
+test('shell install lines keep scoped package specs quoted', () => {
+  const command = shellCommandLine('npm', ['install', '-g', '@anthropic-ai/claude-code@latest', '--registry=https://registry.npmjs.org/'], 'win32')
+  assert.match(command, /"@anthropic-ai\/claude-code@latest"/)
+  assert.match(command, /"--registry=https:\/\/registry\.npmjs\.org\/"/)
+  assert.throws(() => shellCommandLine('npm', ['install\n-g'], 'win32'), /非法字符/)
+  const posix = shellCommandLine('npm', ['install', '-g', '@openai/codex@latest'], 'linux')
+  assert.match(posix, /'@openai\/codex@latest'/)
+})
+
+test('an update that leaves the probed version behind is a visible failure', () => {
+  const message = staleInstallMessage('Claude Code', '2.1.282', '2.1.295')
+  assert.match(message, /2\.1\.282/)
+  assert.match(message, /2\.1\.295/)
+  assert.match(message, /没有生效/)
+})
+
+test('installed Claude, Codex and MiniMax choose an updater instead of a silent success', () => {
+  assert.deepEqual(CLAUDE_UPDATE_ARGS, ['update'])
+  assert.equal(officialUpdatePlan({ toolId: 'claude-code', installed: true, order: -1, platform: 'win32' }), 'claude-update-then-registry')
+  assert.equal(officialUpdatePlan({ toolId: 'codex', installed: true, order: -1, platform: 'win32' }), 'registry-install')
+  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32' }), 'minimax-official-installer')
+  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: null, platform: 'win32' }), 'minimax-official-installer')
+  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'linux' }), 'registry-install')
+  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: false, order: null, platform: 'win32' }), 'registry-install')
+  assert.equal(officialUpdatePlan({ toolId: 'kimi-code', installed: true, order: -1, platform: 'darwin' }), 'registry-install')
+  assert.equal(officialUpdatePlan({ toolId: 'gemini', installed: true, order: -1, platform: 'win32' }), 'registry-install')
+  assert.equal(officialUpdatePlan({ toolId: 'claude-code', installed: true, order: 0, platform: 'win32' }), 'already-current')
+  assert.equal(officialUpdatePlan({ toolId: 'codex', installed: true, order: 1, platform: 'win32' }), 'refuse-downgrade')
 })
 
 test('installer refuses unknown tools outright', () => {
