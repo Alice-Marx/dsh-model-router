@@ -7,10 +7,13 @@ import { versionStillOlder } from '../.dsh-plugin/shared/version-order.mjs'
 
 const tool = { manager: 'npm' }
 
-test('same version remains installable when the official executable is not ready', () => {
-  const action = toolInstallAction({ tool, probe: { installed: true, version: '2.1.1' }, latestVersion: '2.1.1',
-    readiness: { ready: false, reason: 'wrong distribution' }, probeStatus: 'ready' })
-  assert.deepEqual(action, { label: '修复官方执行入口', disabled: false })
+test('a current install stays current when the hosted entry is missing; an unknown latest can still repair', () => {
+  assert.deepEqual(toolInstallAction({ tool, probe: { installed: true, version: '2.1.1' }, latestVersion: '2.1.1',
+    readiness: { ready: false, reason: '未找到 dist/main.mjs' }, probeStatus: 'ready' }),
+  { label: '已是最新版本', disabled: true })
+  assert.deepEqual(toolInstallAction({ tool, probe: { installed: true, version: '2.1.1' }, latestVersion: null,
+    readiness: { ready: false, reason: 'wrong distribution' }, probeStatus: 'ready' }),
+  { label: '修复官方执行入口', disabled: false })
 })
 
 test('latest verified version is not reinstalled; older versions update to the latest', () => {

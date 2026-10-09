@@ -12,10 +12,12 @@ export function toolInstallAction({ tool, probe, readiness, job, probeStatus, la
   const running = job?.status === 'running'
   const installed = probe?.installed === true
   const order = installed && latestVersion ? compareReleaseVersions(probe.version, latestVersion) : null
-  const ready = readiness?.ready === true
   const desktop = tool.manager === 'signed-windows-installer'
   const noRunner = desktop || tool.headlessAdapter === true
-  const repair = installed && !noRunner && readiness?.ready === false
+  // A CLI that is already the latest release stays on “已是最新版本”.
+  // A missing hosted entry is explained on the row; it must not turn the card
+  // into a reinstall that runs against every other tool's shared npm path.
+  const repair = installed && !noRunner && readiness?.ready === false && order !== 0
   const label = running ? '安装中…'
     : !installed ? job?.status === 'failed' ? '重试安装' : desktop ? '下载最新安装器' : '一键安装最新版'
       : order === -1 ? `更新到最新版 ${latestVersion}`
@@ -23,7 +25,7 @@ export function toolInstallAction({ tool, probe, readiness, job, probeStatus, la
           : repair ? '修复官方执行入口'
             : order === 0 ? '已是最新版本'
               : '安装最新版'
-  const current = order === 0 && (ready || noRunner)
+  const current = order === 0
   const interactive = probeStatus === 'ready' || probeStatus === 'refreshing'
   return {
     label,
