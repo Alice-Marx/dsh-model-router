@@ -7,6 +7,7 @@ Stable patch under the npm `latest` tag. Fully quit Harness, including the tray 
 - PATH probes and `npm config get prefix` omit the install-log callback. 0.16.3 only stored stdout inside `onOutput?.(...)`, so the optional call skipped capture and `where` / `--version` returned success with empty output. Every PATH CLI was reported not-installed. MiniMax and ZCode still appeared because they do not use that probe.
 - Capture now always records stdout and stderr, then forwards text to `onOutput` when a caller supplied one. Install logs are unchanged.
 - The 0.16.3 spawn shape (no pre-quoted Windows command line) and the 0.16.2 update-button job ownership remain.
+- Linux validation: 631 tests passed, 4 conditional skips, `npm run check:client` passed. This environment did not re-run the Windows PATH probe.
 
 ## 0.16.3 — 2026-10-09
 
