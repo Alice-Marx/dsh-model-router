@@ -10,6 +10,8 @@ import React from 'react'
 import { parseModelProfilesJson } from '../shared/model-profiles.mjs'
 import { parseQuotaPatterns } from '../shared/subscription-billing.mjs'
 import { toolBoundary } from '../shared/security-boundaries.mjs'
+import { DEFAULT_NPM_REGISTRY, OFFICIAL_TOOLS } from '../shared/official-tool-registry.mjs'
+import { expandInstallDir, normalizeSourceUrl, parseInstallPreferences } from '../shared/tool-install-preferences.mjs'
 import { RouterMainPage, RouterPanelIcon } from './router-main.jsx'
 import {
   OFFICIAL_TOOLS_CLIENT_REMOTE,
@@ -100,6 +102,68 @@ function quotaPatternsField() {
 }
 
 /**
+ * Install-address settings. The Host schema checks the shapes too; these keep a
+ * half-typed value from ever reaching it, so the form can explain the problem
+ * inline instead of failing the whole save.
+ */
+function installDirField() {
+  const field = settingsTextField('toolInstallDir')
+  return {
+    ...field,
+    parse: text => {
+      if (!String(text ?? '').trim()) return field.parse(text)
+      try { expandInstallDir(text) } catch { return undefined }
+      return field.parse(text)
+    },
+  }
+}
+
+function npmRegistryField() {
+  const field = settingsTextField('toolNpmRegistry')
+  return {
+    ...field,
+    parse: text => {
+      const raw = String(text ?? '').trim() || DEFAULT_NPM_REGISTRY
+      try { normalizeSourceUrl(raw, 'npm 源') } catch { return undefined }
+      return field.parse(text)
+    },
+  }
+}
+
+function scriptUrlsField() {
+  const field = settingsTextField('toolScriptUrlsJson')
+  return {
+    ...field,
+    parse: text => {
+      const raw = String(text ?? '').trim() || '{}'
+      try {
+        const parsed = JSON.parse(raw)
+        // Same closed set the Host enforces: only known tool ids, only https.
+        parseInstallPreferences({ toolScriptUrlsJson: raw }, { tools: OFFICIAL_TOOLS })
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+      } catch { return undefined }
+      return field.parse(text)
+    },
+  }
+}
+
+function installMethodsField() {
+  const field = settingsTextField('toolInstallMethodsJson')
+  return {
+    ...field,
+    parse: text => {
+      const raw = String(text ?? '').trim() || '{}'
+      try {
+        const parsed = JSON.parse(raw)
+        parseInstallPreferences({ toolInstallMethodsJson: raw }, { tools: OFFICIAL_TOOLS })
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+      } catch { return undefined }
+      return field.parse(text)
+    },
+  }
+}
+
+/**
  * Bridges the Host config form onto a slot-friendly snapshot store.
  *
  * The config must expose these volatile schema fields: budgetUsd and
@@ -116,6 +180,10 @@ export class RouterSettingsCardController {
       boundedNumberField('subscriptionCooldownMinutes', { minimum: 1, maximum: 10_080, integer: true }),
       modelProfilesField(),
       quotaPatternsField(),
+      installDirField(),
+      npmRegistryField(),
+      installMethodsField(),
+      scriptUrlsField(),
     ])
     this.store = this.form.bind(() => ({
       ...this.form.shell(),
@@ -127,6 +195,10 @@ export class RouterSettingsCardController {
       subscriptionCooldownMinutes: this.form.field('subscriptionCooldownMinutes'),
       modelProfilesJson: this.form.field('modelProfilesJson'),
       quotaPatternsJson: this.form.field('quotaPatternsJson'),
+      toolInstallDir: this.form.field('toolInstallDir'),
+      toolNpmRegistry: this.form.field('toolNpmRegistry'),
+      toolInstallMethodsJson: this.form.field('toolInstallMethodsJson'),
+      toolScriptUrlsJson: this.form.field('toolScriptUrlsJson'),
     }))
   }
 
@@ -257,6 +329,66 @@ export function RouterSettingsCard(props) {
         <button type="button" disabled={disabled} onClick={() => props.resetField('quotaPatternsJson')}>恢复默认规则</button>
       </div>
 
+      <div style={styles.profileEditor}>
+        <span style={styles.profileLabel}>官方工具统一安装设置</span>
+        <p style={styles.noticeText}>
+          对所有官方工具的一键安装、修复和卸载生效。工作台的“官方工具”页也能改同样的字段，并会实时显示每个工具将要执行的命令。
+          安装命令始终来自固定注册表，这里只决定目录与下载源，不接受自定义包名或任意地址。
+        </p>
+        <SettingsValueField
+          id="model-router-tool-install-dir"
+          label="统一安装目录"
+          hint="留空表示使用各厂商默认位置（npm 全局目录 / 厂商脚本目录）。npm 与 pnpm 方式会带上 --prefix；厂商安装脚本是否支持目录参数取决于该厂商。必须是绝对路径。"
+          disabled={disabled}
+          {...state.toolInstallDir}
+          overriddenLabel={FIELD_COPY.overridden}
+          resetLabel={FIELD_COPY.reset}
+          invalidLabel="请输入绝对路径，或留空恢复默认。"
+          onEdit={value => { props.edit('toolInstallDir', value) }}
+          onReset={() => { props.resetField('toolInstallDir') }}
+        />
+        <SettingsValueField
+          id="model-router-tool-npm-registry"
+          label="npm 源地址"
+          hint="所有包管理器安装方式从该地址下载，必须是 https 链接。国内网络可填镜像源，例如 https://registry.npmmirror.com/。"
+          disabled={disabled}
+          {...state.toolNpmRegistry}
+          overriddenLabel={FIELD_COPY.overridden}
+          resetLabel={FIELD_COPY.reset}
+          invalidLabel="需要 https 开头的完整地址。"
+          onEdit={value => { props.edit('toolNpmRegistry', value) }}
+          onReset={() => { props.resetField('toolNpmRegistry') }}
+        />
+        <SettingsValueField
+          id="model-router-tool-install-methods"
+          label="默认安装方式（JSON，可选）"
+          hint="按工具 ID 固定一种安装方式，例如固定 Step Code 在 Windows 上用 irm | iex。留空表示使用该工具的默认方式。可选值：npm、pnpm、script-bash（curl | bash）、script-powershell（irm | iex）。"
+          disabled={disabled}
+          {...state.toolInstallMethodsJson}
+          overriddenLabel={FIELD_COPY.overridden}
+          resetLabel={FIELD_COPY.reset}
+          invalidLabel="需要 JSON 对象，且每个键都是官方工具 ID、每个值都是该工具支持的安装方式。"
+          onEdit={value => { props.edit('toolInstallMethodsJson', value) }}
+          onReset={() => { props.resetField('toolInstallMethodsJson') }}
+        />
+        <SettingsValueField
+          id="model-router-tool-script-urls"
+          label="安装脚本源覆盖（JSON，可选）"
+          hint="按工具 ID 指定厂商安装脚本的镜像地址（必须是 https）。插件会先下载脚本、核对它仍然是该厂商的官方安装脚本，再执行本地副本；镜像不能替换成别的程序。"
+          disabled={disabled}
+          {...state.toolScriptUrlsJson}
+          overriddenLabel={FIELD_COPY.overridden}
+          resetLabel={FIELD_COPY.reset}
+          invalidLabel="需要 JSON 对象，键是官方工具 ID，值是 https 链接。"
+          onEdit={value => { props.edit('toolScriptUrlsJson', value) }}
+          onReset={() => { props.resetField('toolScriptUrlsJson') }}
+        />
+        <details style={styles.profileExample}><summary>查看格式</summary><pre>{`{
+  "stepcode": "https://mirror.example.com/stepcode/install.ps1",
+  "opencode": "https://mirror.example.com/opencode/install"
+}`}</pre><p style={styles.noticeText}>安装脚本方式（curl / irm）可以在工作台的“官方工具”页关闭；关闭后所有工具只能通过 npm 或 pnpm 安装。</p></details>
+      </div>
+
       <aside style={styles.notice} aria-label="模型路由使用说明">
         <div style={styles.titleLine}><Tag tone="info">官方模型配置</Tag></div>
         <p style={styles.noticeText}>
@@ -297,7 +429,9 @@ function registerUi(ctx) {
       loadCatalog: () => ctx.remote.session.modelCatalog(),
       settingsScope,
       listOfficialTools: () => officialToolsRemote.list(),
-      installOfficialTool: toolId => officialToolsRemote.installTool(toolId),
+      installOfficialTool: request => officialToolsRemote.installTool(request),
+      uninstallOfficialTool: request => officialToolsRemote.uninstallTool(request),
+      repairOfficialTool: request => officialToolsRemote.repairTool(request),
       cancelOfficialToolInstall: toolId => officialToolsRemote.cancel(toolId),
       officialToolInstallStatus: toolId => officialToolsRemote.status(toolId),
       toolHealth: fresh => officialToolsRemote.health(fresh),

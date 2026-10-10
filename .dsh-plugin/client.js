@@ -46,6 +46,40 @@ module.exports = __toCommonJS(official_harness_exports);
 var import_react6 = __toESM(require("react"), 1);
 
 // .dsh-plugin/shared/official-tool-registry.mjs
+var DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org/";
+function packageManagerMethod(id2, label, manager, spec, { registryFlag = "--registry=" } = {}) {
+  return Object.freeze({
+    id: id2,
+    label,
+    kind: "package-manager",
+    manager,
+    spec,
+    registryFlag,
+    installArgs: Object.freeze(["install", "-g", spec]),
+    uninstallArgs: Object.freeze(["uninstall", "-g", spec.replace(/@latest$/, "")]),
+    /** npm/pnpm both accept --prefix to place a global install off the default. */
+    supportsInstallDir: true,
+    supportsRegistry: true
+  });
+}
+function scriptMethod(id2, label, { shell, scriptUrl, verify, installArg = [], env = [], platforms, supportsInstallDir = false }) {
+  return Object.freeze({
+    id: id2,
+    label,
+    kind: "script",
+    shell,
+    scriptUrl,
+    verify,
+    /** Passed after the staged script path; empty means the script takes no argument. */
+    installArgs: Object.freeze(installArg),
+    /** Environment the vendor script itself documents for this install. */
+    env: Object.freeze(env),
+    platforms: Object.freeze(platforms),
+    /** Whether the vendor script honours a caller-chosen directory at all. */
+    supportsInstallDir,
+    supportsRegistry: false
+  });
+}
 var OFFICIAL_TOOLS = Object.freeze([
   Object.freeze({
     id: "kimi-code",
@@ -55,9 +89,14 @@ var OFFICIAL_TOOLS = Object.freeze([
     package: "@moonshot-ai/kimi-code",
     manager: "npm",
     installArgs: ["install", "-g", "@moonshot-ai/kimi-code@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@moonshot-ai/kimi-code"],
     probeExecutables: ["kimi"],
     probeNote: "kimi \u4E0E\u65E7 Python \u7248 kimi-cli \u540C\u540D\uFF1B\u8BF7\u6838\u5BF9\u53EF\u6267\u884C\u6587\u4EF6\u6765\u6E90\u548C\u7248\u672C\u3002",
-    providerHints: ["moonshot", "kimi"]
+    providerHints: ["moonshot", "kimi"],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@moonshot-ai/kimi-code@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@moonshot-ai/kimi-code@latest")
+    ])
   }),
   Object.freeze({
     id: "claude-code",
@@ -67,8 +106,13 @@ var OFFICIAL_TOOLS = Object.freeze([
     package: "@anthropic-ai/claude-code",
     manager: "npm",
     installArgs: ["install", "-g", "@anthropic-ai/claude-code@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@anthropic-ai/claude-code"],
     probeExecutables: ["claude"],
-    providerHints: ["anthropic", "claude"]
+    providerHints: ["anthropic", "claude"],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@anthropic-ai/claude-code@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@anthropic-ai/claude-code@latest")
+    ])
   }),
   Object.freeze({
     id: "codex",
@@ -76,11 +120,16 @@ var OFFICIAL_TOOLS = Object.freeze([
     vendor: "OpenAI",
     purpose: "OpenAI \u5B98\u65B9\u7F16\u7A0B CLI\uFF0C\u63D0\u4F9B codex \u547D\u4EE4\u3002",
     package: "@openai/codex",
-    installArgs: ["install", "-g", "@openai/codex@latest", "--registry=https://registry.npmjs.org/"],
     manager: "npm",
+    installArgs: ["install", "-g", "@openai/codex@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@openai/codex"],
     probeExecutables: ["codex"],
     probeNote: "Codex \u7248\u672C\u6A2A\u5E45\u7531\u9002\u914D\u5C42\u5BBD\u5339\u914D\uFF1B\u5B89\u88C5\u65F6\u53D6 npm \u6700\u65B0\u7248\u3002",
-    providerHints: ["openai", "gpt", "codex"]
+    providerHints: ["openai", "gpt", "codex"],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@openai/codex@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@openai/codex@latest")
+    ])
   }),
   Object.freeze({
     id: "minimax-code",
@@ -90,8 +139,13 @@ var OFFICIAL_TOOLS = Object.freeze([
     package: "@minimax-ai/code",
     manager: "npm",
     installArgs: ["install", "-g", "@minimax-ai/code@latest", "--registry=https://registry.npmjs.org/", "--ignore-scripts=false", "--include=optional", "--allow-scripts=@minimax-ai/code,better-sqlite3"],
+    uninstallArgs: ["uninstall", "-g", "@minimax-ai/code"],
     probeExecutables: ["mcode"],
-    providerHints: ["minimax"]
+    providerHints: ["minimax"],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@minimax-ai/code@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@minimax-ai/code@latest")
+    ])
   }),
   Object.freeze({
     id: "mimo-code",
@@ -101,8 +155,13 @@ var OFFICIAL_TOOLS = Object.freeze([
     package: "@mimo-ai/cli",
     manager: "npm",
     installArgs: ["install", "-g", "@mimo-ai/cli@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@mimo-ai/cli"],
     probeExecutables: ["mimo"],
-    providerHints: ["mimo", "xiaomi"]
+    providerHints: ["mimo", "xiaomi"],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@mimo-ai/cli@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@mimo-ai/cli@latest")
+    ])
   }),
   Object.freeze({
     id: "grok-build",
@@ -112,8 +171,13 @@ var OFFICIAL_TOOLS = Object.freeze([
     package: "@xai-official/grok",
     manager: "npm",
     installArgs: ["install", "-g", "@xai-official/grok@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@xai-official/grok"],
     probeExecutables: ["grok"],
-    providerHints: ["xai", "grok"]
+    providerHints: ["xai", "grok"],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@xai-official/grok@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@xai-official/grok@latest")
+    ])
   }),
   Object.freeze({
     id: "gemini",
@@ -123,11 +187,93 @@ var OFFICIAL_TOOLS = Object.freeze([
     package: "@google/gemini-cli",
     manager: "npm",
     installArgs: ["install", "-g", "@google/gemini-cli@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@google/gemini-cli"],
     probeExecutables: ["gemini"],
     providerHints: ["gemini", "google"],
     // Headless runs go through the task adapter. The signed sandbox runner does
     // not launch this CLI; a missing or failed process falls back to the API.
-    headlessAdapter: true
+    headlessAdapter: true,
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@google/gemini-cli@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@google/gemini-cli@latest")
+    ])
+  }),
+  Object.freeze({
+    id: "opencode",
+    label: "OpenCode",
+    vendor: "anomalyco / SST",
+    purpose: "\u5F00\u6E90\u7EC8\u7AEF\u7F16\u7A0B\u4EE3\u7406\uFF0C\u63D0\u4F9B opencode \u547D\u4EE4\uFF1B\u53EF\u7528 npm/pnpm \u6216\u5B98\u65B9\u5B89\u88C5\u811A\u672C\u83B7\u53D6\u3002",
+    package: "opencode-ai",
+    manager: "npm",
+    installArgs: ["install", "-g", "opencode-ai@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "opencode-ai"],
+    probeExecutables: ["opencode"],
+    probeNote: "opencode \u547D\u4EE4\u7531 npm \u5168\u5C40\u5305\u6216\u5B98\u65B9\u811A\u672C\u5B89\u88C5\u7684\u4E8C\u8FDB\u5236\u63D0\u4F9B\uFF1B\u811A\u672C\u5B89\u88C5\u56FA\u5B9A\u843D\u5728 ~/.opencode/bin\u3002",
+    providerHints: ["opencode", "anomalyco"],
+    /** File an uninstall may delete, when the copy came from a script install. */
+    scriptBinaryNames: Object.freeze(["opencode", "opencode.exe"]),
+    /** Where the vendor script puts the binary when the user sets no directory. */
+    defaultScriptInstallDir: ".opencode/bin",
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "opencode-ai@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "opencode-ai@latest"),
+      // The published script hardcodes $HOME/.opencode/bin, so it cannot honour
+      // a custom install directory; the npm/pnpm methods above can.
+      scriptMethod("script-bash", "curl | bash", {
+        shell: "bash",
+        scriptUrl: "https://opencode.ai/install",
+        platforms: ["linux", "darwin"],
+        // The published script hardcodes $HOME/.opencode/bin, so it cannot honour
+        // a custom install directory; the npm/pnpm methods above can.
+        supportsInstallDir: false,
+        verify: Object.freeze({
+          mustInclude: ["anomalyco/opencode", "opencode.ai"],
+          mustNotInclude: ["static-openapi.stepfun.com"]
+        })
+      })
+    ])
+  }),
+  Object.freeze({
+    id: "stepcode",
+    label: "Step Code",
+    vendor: "StepFun \u9636\u8DC3\u661F\u8FB0",
+    purpose: "\u9636\u8DC3\u661F\u8FB0\u5F00\u6E90\u7EC8\u7AEF\u7F16\u7A0B\u4EE3\u7406\uFF0C\u63D0\u4F9B step \u547D\u4EE4\uFF1B\u5B98\u65B9\u53EA\u53D1\u5E03\u5B89\u88C5\u811A\u672C\uFF0C\u6CA1\u6709 npm \u5305\u3002",
+    manager: "script-installer",
+    installArgs: [],
+    uninstallArgs: [],
+    probeExecutables: ["step"],
+    probeNote: "step \u547D\u4EE4\u6765\u81EA\u9636\u8DC3\u5B98\u65B9\u5B89\u88C5\u811A\u672C\uFF0C\u6821\u9A8C\u548C\u5199\u5165 ~/.stepcode\uFF1B\u914D\u7F6E\u4E0E\u51ED\u636E\u540C\u5728\u8BE5\u76EE\u5F55\uFF0C\u5378\u8F7D\u53EA\u5220\u9664\u53EF\u6267\u884C\u6587\u4EF6\u3002",
+    providerHints: ["stepfun", "stepcode"],
+    scriptBinaryNames: Object.freeze(["step", "step.exe"]),
+    defaultScriptInstallDir: ".stepcode/bin",
+    /** The vendor installer writes this marked block into the shell profile. */
+    pathProfileMarkers: Object.freeze(["# stepcode"]),
+    installMethods: Object.freeze([
+      scriptMethod("script-bash", "curl | bash", {
+        shell: "bash",
+        scriptUrl: "https://static-openapi.stepfun.com/stepcode/install.sh",
+        platforms: ["linux", "darwin"],
+        installArg: ["--install-dir"],
+        env: ["STEP_INSTALL_DIR", "STEP_RELEASE_BASE_URL"],
+        supportsInstallDir: true,
+        verify: Object.freeze({
+          mustInclude: ["static-openapi.stepfun.com", "stepcode installer"],
+          mustNotInclude: ["anomalyco/opencode"]
+        })
+      }),
+      scriptMethod("script-powershell", "irm | iex", {
+        shell: "powershell",
+        scriptUrl: "https://static-openapi.stepfun.com/stepcode/install.ps1",
+        platforms: ["win32"],
+        installArg: ["-InstallDir"],
+        env: ["STEP_INSTALL_DIR", "STEP_RELEASE_BASE_URL"],
+        supportsInstallDir: true,
+        verify: Object.freeze({
+          mustInclude: ["static-openapi.stepfun.com", "stepcode"],
+          mustNotInclude: ["anomalyco/opencode"]
+        })
+      })
+    ])
   }),
   Object.freeze({
     id: "zcode",
@@ -136,6 +282,7 @@ var OFFICIAL_TOOLS = Object.freeze([
     purpose: "\u667A\u8C31\u5B98\u65B9 ZCode \u684C\u9762\u7248\uFF0C\u5185\u542B GLM \u7F16\u7A0B\u4EE3\u7406\u3002Windows \u5B89\u88C5\u5668\u53EF\u9009\u62E9 D \u76D8\u76EE\u5F55\u3002",
     manager: "signed-windows-installer",
     installArgs: [],
+    uninstallArgs: [],
     probeExecutables: [],
     probeNote: "\u68C0\u6D4B\u7ECF\u8FC7\u6709\u6548\u7B7E\u540D\u7684 ZCode.exe \u548C\u540C\u76EE\u5F55 GLM \u8D44\u6E90\uFF1B\u684C\u9762\u5B89\u88C5\u5668\u9700\u4EBA\u5DE5\u9009\u62E9\u5B89\u88C5\u4F4D\u7F6E\u3002",
     providerHints: ["zai", "z.ai", "zcode", "glm", "zhipu", "bigmodel"]
@@ -153,10 +300,30 @@ function toolForProvider(provider) {
   }
   return null;
 }
+function installMethodsFor(tool) {
+  return Array.isArray(tool?.installMethods) ? tool.installMethods : [];
+}
+function installMethodFor(tool, methodId) {
+  const wanted = String(methodId ?? "").trim();
+  if (!wanted) return null;
+  return installMethodsFor(tool).find((method) => method.id === wanted) ?? null;
+}
+function defaultInstallMethod(tool) {
+  return installMethodsFor(tool)[0] ?? null;
+}
 function installCommandLine(tool) {
   if (!tool || tool.unsupported) return null;
   if (tool.manager === "signed-windows-installer") return "\u6253\u5F00\u5B98\u65B9\u7B7E\u540D\u5B89\u88C5\u5668\uFF08\u9009\u62E9\u5B89\u88C5\u76EE\u5F55\uFF09";
-  return tool.manager === "npm" ? `npm ${tool.installArgs.join(" ")}` : `${tool.manager} ${tool.installArgs.join(" ")}`;
+  return installCommandLineFor(tool, defaultInstallMethod(tool));
+}
+function installCommandLineFor(tool, method) {
+  if (!tool || tool.unsupported) return null;
+  if (!method) return null;
+  if (method.kind === "script") {
+    const piped = method.shell === "powershell" ? `irm ${method.scriptUrl} | iex` : `curl -fsSL ${method.scriptUrl} | bash`;
+    return method.installArgs.length ? `${piped} ${method.installArgs[0]} <\u5B89\u88C5\u76EE\u5F55>` : piped;
+  }
+  return `${method.manager} ${method.installArgs.join(" ")}`;
 }
 
 // .dsh-plugin/shared/model-profiles.mjs
@@ -411,6 +578,112 @@ function toolBoundary(toolId, { sandboxed = false, platform = "unknown" } = {}) 
   };
 }
 
+// .dsh-plugin/shared/tool-install-preferences.mjs
+var MAX_INSTALL_DIR_CHARS = 4096;
+var MAX_SOURCE_URL_CHARS = 2048;
+var MAX_OVERRIDES = 64;
+function isAbsolutePath(value) {
+  const raw = String(value ?? "");
+  if (!raw) return false;
+  if (raw.startsWith("/")) return true;
+  if (/^[A-Za-z]:[\\/]/.test(raw)) return true;
+  return /^\\\\[^\\]+\\[^\\]+/.test(raw);
+}
+function joinPath(base, ...segments) {
+  const separator = String(base ?? "").includes("\\") && !String(base ?? "").includes("/") ? "\\" : "/";
+  const parts = [String(base ?? "").replace(/[\\/]+$/, ""), ...segments.map((item) => String(item ?? "").replace(/^[\\/]+|[\\/]+$/g, ""))];
+  return parts.filter(Boolean).join(separator) || separator;
+}
+function expandInstallDir(value, { home = "", env = {} } = {}) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (raw.includes("\0")) throw new Error("\u5B89\u88C5\u76EE\u5F55\u5305\u542B\u65E0\u6548\u5B57\u7B26\u3002");
+  let expanded = raw;
+  const userHome = String(home ?? "");
+  if (expanded === "~") expanded = userHome;
+  else if (expanded.startsWith("~/") || expanded.startsWith("~\\")) expanded = joinPath(userHome, expanded.slice(2));
+  expanded = expanded.replace(/%([A-Za-z_][A-Za-z0-9_]*)%/g, (match, name) => env[name] ?? match).replace(/\$([A-Za-z_][A-Za-z0-9_]*)/g, (match, name) => env[name] ?? match);
+  if (expanded.length > MAX_INSTALL_DIR_CHARS) throw new Error("\u5B89\u88C5\u76EE\u5F55\u8FC7\u957F\u3002");
+  if (!isAbsolutePath(expanded)) throw new Error("\u5B89\u88C5\u76EE\u5F55\u5FC5\u987B\u662F\u7EDD\u5BF9\u8DEF\u5F84\u3002");
+  const withoutTrailing = expanded.replace(/[\\/]+$/, "");
+  if (!withoutTrailing) throw new Error("\u5B89\u88C5\u76EE\u5F55\u4E0D\u80FD\u662F\u6587\u4EF6\u7CFB\u7EDF\u6839\u76EE\u5F55\u3002");
+  if (/^[A-Za-z]:$/.test(withoutTrailing)) throw new Error("\u5B89\u88C5\u76EE\u5F55\u4E0D\u80FD\u662F\u6587\u4EF6\u7CFB\u7EDF\u6839\u76EE\u5F55\u3002");
+  if (/^\\\\[^\\]+\\[^\\]+$/.test(withoutTrailing)) throw new Error("\u5B89\u88C5\u76EE\u5F55\u4E0D\u80FD\u662F\u7F51\u7EDC\u5171\u4EAB\u6839\u76EE\u5F55\u3002");
+  return expanded;
+}
+function normalizeSourceUrl(value, subject) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (raw.length > MAX_SOURCE_URL_CHARS) throw new Error(`${subject}\u5730\u5740\u8FC7\u957F\u3002`);
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`${subject}\u4E0D\u662F\u6709\u6548\u7F51\u5740\u3002`);
+  }
+  if (url.protocol !== "https:") throw new Error(`${subject}\u5FC5\u987B\u4F7F\u7528 https\u3002`);
+  if (url.username || url.password) throw new Error(`${subject}\u4E0D\u80FD\u5305\u542B\u8D26\u53F7\u5BC6\u7801\u3002`);
+  return url.toString();
+}
+function parseJsonObject(value, subject) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${subject}\u4E0D\u662F\u6709\u6548 JSON\u3002`);
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${subject}\u5FC5\u987B\u662F JSON \u5BF9\u8C61\u3002`);
+  }
+  const entries = Object.entries(parsed);
+  if (entries.length > MAX_OVERRIDES) throw new Error(`${subject}\u6761\u76EE\u8FC7\u591A\u3002`);
+  return Object.fromEntries(entries.filter(([, item]) => typeof item === "string" && item.trim()));
+}
+function valueOf(config, key, fallback) {
+  const value = config?.[key];
+  return value !== void 0 && typeof value?.get === "function" ? value.get() : value ?? fallback;
+}
+function keepKnownToolIds(raw, known, subject) {
+  for (const key of Object.keys(raw)) {
+    if (!known.has(key)) throw new Error(`${subject}\u4E2D\u7684 ${key} \u4E0D\u662F\u5B98\u65B9\u5DE5\u5177 ID\u3002`);
+  }
+  return raw;
+}
+function parseInstallPreferences(config = {}, { tools = [] } = {}) {
+  const known = new Set(tools.map((tool) => tool.id));
+  const installDir = expandInstallDir(valueOf(config, "toolInstallDir", ""));
+  const registry = normalizeSourceUrl(valueOf(config, "toolNpmRegistry", DEFAULT_NPM_REGISTRY), "npm \u6E90") || DEFAULT_NPM_REGISTRY;
+  const methodRaw = keepKnownToolIds(
+    parseJsonObject(valueOf(config, "toolInstallMethodsJson", "{}"), "\u5B89\u88C5\u65B9\u5F0F\u8986\u76D6"),
+    known,
+    "\u5B89\u88C5\u65B9\u5F0F\u8986\u76D6"
+  );
+  const scriptRaw = keepKnownToolIds(
+    parseJsonObject(valueOf(config, "toolScriptUrlsJson", "{}"), "\u5B89\u88C5\u811A\u672C\u6E90\u8986\u76D6"),
+    known,
+    "\u5B89\u88C5\u811A\u672C\u6E90\u8986\u76D6"
+  );
+  const methods = {};
+  const scriptUrls = {};
+  for (const [id2, methodId] of Object.entries(methodRaw)) methods[id2] = methodId.trim();
+  for (const [id2, url] of Object.entries(scriptRaw)) scriptUrls[id2] = normalizeSourceUrl(url, `${id2} \u5B89\u88C5\u811A\u672C\u6E90`);
+  for (const [id2, methodId] of Object.entries(methods)) {
+    if (!installMethodFor({ id: id2, installMethods: tools.find((tool) => tool.id === id2)?.installMethods }, methodId)) {
+      throw new Error(`${id2} \u4E0D\u652F\u6301\u5B89\u88C5\u65B9\u5F0F ${methodId}\u3002`);
+    }
+  }
+  return {
+    installDir,
+    registry,
+    methods,
+    scriptUrls,
+    /** Script execution stays a deliberate act; a config file alone must not run one. */
+    allowScriptInstall: valueOf(config, "toolAllowScriptInstall", true) !== false
+  };
+}
+
 // .dsh-plugin/client/router-main.jsx
 var import_react5 = __toESM(require("react"), 1);
 
@@ -621,8 +894,8 @@ var OPENCODE_CATALOG_PROVIDERS = Object.freeze([
   "opencode-zen",
   "opencode-go-zen"
 ]);
-function classifyTask(text6) {
-  const value = String(text6 ?? "");
+function classifyTask(text7) {
+  const value = String(text7 ?? "");
   if (value.length < 80 && /翻译|解释|translate|explain/i.test(value)) return "general";
   return detectTaskTypes(value)[0] ?? "general";
 }
@@ -642,8 +915,8 @@ var TASK_TYPE_LABELS = Object.freeze({
   summarization: "\u6458\u8981\u4E0E\u6574\u7406",
   writing: "\u5199\u4F5C\u4E0E\u8868\u8FBE"
 });
-function detectTaskTypes(text6) {
-  const value = String(text6 ?? "");
+function detectTaskTypes(text7) {
+  const value = String(text7 ?? "");
   const ranked = TASK_TYPE_RULES.map(([type, pattern]) => ({
     type,
     signals: value.match(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`))?.length ?? 0
@@ -651,8 +924,8 @@ function detectTaskTypes(text6) {
   ranked.sort((left, right) => right.signals - left.signals || left.type.localeCompare(right.type));
   return ranked.map((item) => item.type);
 }
-function assessComplexity(text6) {
-  const value = String(text6 ?? "");
+function assessComplexity(text7) {
+  const value = String(text7 ?? "");
   const lengthScore = clamp(value.length / 2200);
   const requirementScore = clamp((value.match(/(?:^|\n)\s*(?:[-*]|\d+[.)]|[一二三四五六七八九十]+[、.])/g) ?? []).length / 8);
   const codeScore = /(代码|工程|架构|接口|实现|部署|测试|code|api|debug)/i.test(value) ? 0.22 : 0;
@@ -732,10 +1005,10 @@ function normalizedCacheRatios(cacheReadRatio = 0, cacheWriteRatio = 0) {
   return { read, write };
 }
 var COST_REFERENCE_PRICING = Object.freeze({ input: 1, output: 5, cacheRead: 1, cacheWrite: 1, currency: "USD" });
-function estimateCost(model, text6, outputTokens = 900, pricingOverrides = {}, cacheReadRatio = 0, cacheWriteRatio = 0) {
+function estimateCost(model, text7, outputTokens = 900, pricingOverrides = {}, cacheReadRatio = 0, cacheWriteRatio = 0) {
   const pricing = pricingFor(model, pricingOverrides);
   if (pricing === null) return null;
-  const inputTokens = Math.max(80, Math.ceil(String(text6 ?? "").length / 3.7));
+  const inputTokens = Math.max(80, Math.ceil(String(text7 ?? "").length / 3.7));
   const ratios = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
   const cacheReadTokens = Math.min(inputTokens, Math.max(0, Math.round(inputTokens * ratios.read)));
   const cacheWriteTokens = Math.min(inputTokens - cacheReadTokens, Math.max(0, Math.round(inputTokens * ratios.write)));
@@ -747,8 +1020,8 @@ function modelMetadata(name) {
   if (!key) return null;
   return MODEL_CATALOG.find((model) => model.aliases.some((alias) => key === normalize(alias))) ?? null;
 }
-function taskTokenBudget(text6, task, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
-  const inputTokens = Math.max(80, Math.ceil(String(text6 ?? "").length / 3.7));
+function taskTokenBudget(text7, task, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const inputTokens = Math.max(80, Math.ceil(String(text7 ?? "").length / 3.7));
   const multipliers = {
     analysis: { input: 0.9, output: 0.55 },
     execution: { input: 1.2, output: (task.difficulty ?? complexity) === "complex" ? 1.45 : 1 },
@@ -812,10 +1085,10 @@ function looksLikeRequirement(value) {
   const item = requirementText(value);
   return item.length >= 3 && !/[:：]$/u.test(item) && !/(?:以下|下列|如下)(?:的)?(?:任务|需求|工作|事项|要求)/u.test(item) && REQUIREMENT_ACTION.test(item.slice(0, 32));
 }
-function explicitRequirements(text6) {
+function explicitRequirements(text7) {
   const visibleLines = [];
   let fence = null;
-  for (const line of String(text6 ?? "").split(/\r?\n/u)) {
+  for (const line of String(text7 ?? "").split(/\r?\n/u)) {
     const marker2 = /^\s*(`{3,}|~{3,})/u.exec(line);
     if (fence) {
       if (marker2 && marker2[1][0] === fence.char && marker2[1].length >= fence.length && !line.slice(marker2[0].length).trim()) fence = null;
@@ -888,16 +1161,16 @@ function explicitStepReferences(objective) {
   }
   return [...found].sort((a, b2) => a - b2);
 }
-function taskPackages(taskType, text6, band) {
+function taskPackages(taskType, text7, band) {
   if (band !== "complex") {
     const task = { id: "execution", name: "\u76F4\u63A5\u56DE\u7B54\u4E0E\u5FC5\u8981\u6821\u9A8C", type: taskType, purpose: "execution", difficulty: band, criticality: 0.65, dependsOn: [], preferredReasoningEffort: band === "simple" ? "low" : "medium" };
     return [{ ...task, qualityFloor: taskQualityFloor(band, task) }];
   }
-  const value = String(text6 ?? "");
+  const value = String(text7 ?? "");
   const packages = [
     { id: "analysis", name: "\u95EE\u9898\u5EFA\u6A21\u4E0E\u7EA6\u675F\u63D0\u53D6", type: "reasoning", purpose: "analysis", difficulty: "balanced", criticality: 0.8, dependsOn: [], preferredReasoningEffort: "medium" }
   ];
-  const requirements = explicitRequirements(text6);
+  const requirements = explicitRequirements(text7);
   if (requirements.length >= 2) {
     const groups = requirements.length > MAX_EXPLICIT_EXECUTION_PACKAGES ? [
       ...requirements.slice(0, MAX_EXPLICIT_EXECUTION_PACKAGES - 1).map((item) => [item]),
@@ -924,7 +1197,7 @@ function taskPackages(taskType, text6, band) {
       });
     });
   } else {
-    const domains = [...new Set([...detectTaskTypes(text6), taskType].filter((type) => type !== "general"))];
+    const domains = [...new Set([...detectTaskTypes(text7), taskType].filter((type) => type !== "general"))];
     for (const type of domains.length > 0 ? domains : [taskType]) {
       const objective = value.split(/[，,。；;]|最后|然后|接着|并且/u).map((item) => item.trim()).filter((item) => detectTaskTypes(item).includes(type)).join("\uFF1B") || value;
       const difficulty = requirementDifficulty(objective, type);
@@ -1025,31 +1298,31 @@ function reasoningDecision(row, task) {
     multiplier: reasoningEffortMultiplier(chosen)
   };
 }
-function candidateUtility(row, task, weights, cacheReadRatio = 0, cacheWriteRatio = 0, text6 = "", complexity = "balanced") {
+function candidateUtility(row, task, weights, cacheReadRatio = 0, cacheWriteRatio = 0, text7 = "", complexity = "balanced") {
   const quality = qualityForTask(row, task.type);
   const rawPreference = row.preferenceAdjustments?.[task.type];
   const preferenceAdjustment = Number.isFinite(rawPreference) ? clamp(rawPreference, -0.1, 0.1) : 0;
   const floor = Number(task.qualityFloor ?? taskQualityFloor("complex", task));
   const qualityGap = Math.max(0, floor - quality);
   const reasoning = reasoningDecision(row, task);
-  const reference = taskCost({ pricing: COST_REFERENCE_PRICING, reasoningKnown: true, reasoningEfforts: [] }, task, text6, complexity, cacheReadRatio, cacheWriteRatio);
-  const cost = row.pricing === null ? 0 : 1 / (1 + taskCost(row, task, text6, complexity, cacheReadRatio, cacheWriteRatio) / Math.max(reference, 1e-12));
+  const reference = taskCost({ pricing: COST_REFERENCE_PRICING, reasoningKnown: true, reasoningEfforts: [] }, task, text7, complexity, cacheReadRatio, cacheWriteRatio);
+  const cost = row.pricing === null ? 0 : 1 / (1 + taskCost(row, task, text7, complexity, cacheReadRatio, cacheWriteRatio) / Math.max(reference, 1e-12));
   const score = weights.quality * quality + weights.cost * cost + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency)) + weights.specialty * specialtyForTask(row, task.type) + (weights.reasoning ?? 0) * reasoning.reasoningFit - weights.risk * row.risk - qualityGap * (task.criticality ?? 0.75) + preferenceAdjustment;
   return { score, floor, qualityGap, preferenceAdjustment, ...reasoning };
 }
-function taskCost(row, task, text6, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
+function taskCost(row, task, text7, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
   if (row?.pricing === null) return 0;
   const decision = row === null ? null : reasoningDecision(row, task);
-  const tokens = taskTokenBudget(text6, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity, cacheReadRatio, cacheWriteRatio);
+  const tokens = taskTokenBudget(text7, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity, cacheReadRatio, cacheWriteRatio);
   return row === null ? 0 : ((tokens.inputTokens - tokens.cacheReadTokens - tokens.cacheWriteTokens) * row.pricing.input + tokens.cacheReadTokens * row.pricing.cacheRead + tokens.cacheWriteTokens * row.pricing.cacheWrite + tokens.outputTokens * row.pricing.output) / 1e6;
 }
-function dominates(left, right, task, text6, complexity, cacheReadRatio, cacheWriteRatio) {
+function dominates(left, right, task, text7, complexity, cacheReadRatio, cacheWriteRatio) {
   if (left.pricing === null || right.pricing === null) return false;
   const leftReasoning = reasoningDecision(left, task);
   const rightReasoning = reasoningDecision(right, task);
   const leftValues = {
     quality: qualityForTask(left, task.type),
-    cost: taskCost(left, task, text6, complexity, cacheReadRatio, cacheWriteRatio),
+    cost: taskCost(left, task, text7, complexity, cacheReadRatio, cacheWriteRatio),
     latency: clamp(left.latency * leftReasoning.multiplier.latency),
     specialty: specialtyForTask(left, task.type),
     reasoning: leftReasoning.reasoningFit,
@@ -1057,7 +1330,7 @@ function dominates(left, right, task, text6, complexity, cacheReadRatio, cacheWr
   };
   const rightValues = {
     quality: qualityForTask(right, task.type),
-    cost: taskCost(right, task, text6, complexity, cacheReadRatio, cacheWriteRatio),
+    cost: taskCost(right, task, text7, complexity, cacheReadRatio, cacheWriteRatio),
     latency: clamp(right.latency * rightReasoning.multiplier.latency),
     specialty: specialtyForTask(right, task.type),
     reasoning: rightReasoning.reasoningFit,
@@ -1070,7 +1343,7 @@ function dominates(left, right, task, text6, complexity, cacheReadRatio, cacheWr
 function eligibleRowsForTask(rows, task) {
   return task.type === "vision" ? rows.filter((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image")) : rows;
 }
-function candidatePool(rows, task, weights, text6, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive = false) {
+function candidatePool(rows, task, weights, text7, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive = false) {
   const eligibleRows = eligibleRowsForTask(rows, task);
   const floor = Number(task.qualityFloor ?? 0);
   const feasible = eligibleRows.filter((row) => qualityForTask(row, task.type) >= floor);
@@ -1078,10 +1351,10 @@ function candidatePool(rows, task, weights, text6, complexity, cacheReadRatio, c
   const taskWeights = weightsForTask(weights, task);
   const scored = source.map((row) => ({
     row,
-    decision: candidateUtility(row, task, taskWeights, cacheReadRatio, cacheWriteRatio, text6, complexity),
-    cost: taskCost(row, task, text6, complexity, cacheReadRatio, cacheWriteRatio)
+    decision: candidateUtility(row, task, taskWeights, cacheReadRatio, cacheWriteRatio, text7, complexity),
+    cost: taskCost(row, task, text7, complexity, cacheReadRatio, cacheWriteRatio)
   }));
-  const frontier = dependencySensitive ? scored : scored.filter((item) => !scored.some((other) => other !== item && other.decision.score >= item.decision.score && dominates(other.row, item.row, task, text6, complexity, cacheReadRatio, cacheWriteRatio)));
+  const frontier = dependencySensitive ? scored : scored.filter((item) => !scored.some((other) => other !== item && other.decision.score >= item.decision.score && dominates(other.row, item.row, task, text7, complexity, cacheReadRatio, cacheWriteRatio)));
   const essential = [
     scored.filter((item) => item.row.pricing !== null).sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
     scored.slice().sort((left, right) => right.decision.score - left.decision.score || compareRowsStable(left.row, right.row))[0],
@@ -1099,9 +1372,9 @@ function candidatePool(rows, task, weights, text6, complexity, cacheReadRatio, c
     dependencySensitive
   };
 }
-function solveAssignments({ rows, tasks, weights, text: text6, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
+function solveAssignments({ rows, tasks, weights, text: text7, complexity, budget, cacheReadRatio, cacheWriteRatio, minimizeCost = false }) {
   const dependencySensitive = tasks.some((task) => (task.dependsOn ?? []).length > 0);
-  const pools = tasks.map((task) => candidatePool(rows, task, weights, text6, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive));
+  const pools = tasks.map((task) => candidatePool(rows, task, weights, text7, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive));
   const result = solveCandidateAssignments({ tasks, pools: pools.map((pool, index) => pool.options.map((option) => ({
     route: routeKey(option.row.provider, option.row.model),
     score: option.decision.score,
@@ -1125,15 +1398,15 @@ function solveAssignments({ rows, tasks, weights, text: text6, complexity, budge
     minimumFeasibleCost: result.minimumCostLowerBound
   };
 }
-function buildPlan({ text: text6 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", dataVersions = null, learning = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+function buildPlan({ text: text7 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", dataVersions = null, learning = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
   const presetId = normalizeRoutingPreset(preset);
-  const firstLine = String(text6 ?? "").split(/\r?\n/u)[0].trim();
+  const firstLine = String(text7 ?? "").split(/\r?\n/u)[0].trim();
   const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine) && !/(?:执行|完成|实施|分配)/u.test(firstLine);
-  const assessed = assessComplexity(transformOnly ? firstLine : text6);
-  const requirements = explicitRequirements(text6);
+  const assessed = assessComplexity(transformOnly ? firstLine : text7);
+  const requirements = explicitRequirements(text7);
   const compound = shouldSplitRequirements(requirements);
   const complexity = compound && assessed.band !== "complex" ? { value: Math.max(0.66, assessed.value), band: "complex" } : assessed;
-  const taskType = classifyTask(transformOnly ? firstLine : text6);
+  const taskType = classifyTask(transformOnly ? firstLine : text7);
   const weights = presetWeights(OBJECTIVE_WEIGHTS[complexity.band], presetId);
   const discovered = Array.isArray(available) ? available.map((entry) => {
     const rawEfforts = Array.isArray(entry.reasoningEfforts) ? entry.reasoningEfforts : [];
@@ -1212,10 +1485,10 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
         costOut: pricingRow.output,
         cacheRead: pricingRow.cacheRead,
         cacheWrite: pricingRow.cacheWrite
-      }, text6, 900, {}, cacheReadRatio, cacheWriteRatio)
+      }, text7, 900, {}, cacheReadRatio, cacheWriteRatio)
     });
   }
-  const taskNodes = taskPackages(taskType, text6, complexity.band).map((task) => presetId === DEFAULT_ROUTING_PRESET ? task : {
+  const taskNodes = taskPackages(taskType, text7, complexity.band).map((task) => presetId === DEFAULT_ROUTING_PRESET ? task : {
     ...task,
     qualityFloor: presetFloor(task.qualityFloor, presetId),
     weights: presetWeights(weightsForTask(weights, task), presetId)
@@ -1226,7 +1499,7 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     rows,
     tasks: taskNodes,
     weights,
-    text: text6,
+    text: text7,
     complexity: complexity.band,
     budget: Number.POSITIVE_INFINITY,
     cacheReadRatio,
@@ -1236,7 +1509,7 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     rows,
     tasks: taskNodes,
     weights,
-    text: text6,
+    text: text7,
     complexity: complexity.band,
     budget,
     cacheReadRatio,
@@ -1246,7 +1519,7 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     rows,
     tasks: taskNodes,
     weights,
-    text: text6,
+    text: text7,
     complexity: complexity.band,
     budget: Number.POSITIVE_INFINITY,
     cacheReadRatio,
@@ -1258,8 +1531,8 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
   const usedRoutes = optimized?.usedRoutes ?? /* @__PURE__ */ new Set();
   const constraintRelaxed = (optimized?.relaxedCount ?? 0) > 0;
   for (const row of rows) {
-    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, cacheReadRatio, cacheWriteRatio, text6, complexity.band).score;
-    if (row.pricing !== null && taskNodes[0]) row.estimatedCost = taskCost(row, taskNodes[0], text6, complexity.band, cacheReadRatio, cacheWriteRatio);
+    row.score = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band] }, weights, cacheReadRatio, cacheWriteRatio, text7, complexity.band).score;
+    if (row.pricing !== null && taskNodes[0]) row.estimatedCost = taskCost(row, taskNodes[0], text7, complexity.band, cacheReadRatio, cacheWriteRatio);
   }
   rows.sort((left, right) => right.score - left.score || compareRowsStable(left, right));
   const selectedAssignment = assignments[0];
@@ -1285,8 +1558,8 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     dependsOn: [...task.dependsOn ?? []]
   }));
   const costBreakdown = assignments.map(({ task, row, decision, estimatedCost, handoffPenalty }, index) => {
-    const tokens = taskTokenBudget(text6, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity.band, cacheReadRatio, cacheWriteRatio);
-    const taskEstimate = estimatedCost ?? taskCost(row, task, text6, complexity.band, cacheReadRatio, cacheWriteRatio);
+    const tokens = taskTokenBudget(text7, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity.band, cacheReadRatio, cacheWriteRatio);
+    const taskEstimate = estimatedCost ?? taskCost(row, task, text7, complexity.band, cacheReadRatio, cacheWriteRatio);
     return {
       stage: index + 1,
       purpose: task.purpose,
@@ -1309,12 +1582,12 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     };
   });
   const pricingComplete = assignments.length > 0 && assignments.every(({ row }) => row?.pricing !== null);
-  const totalEstimate = pricingComplete ? assignments.reduce((sum, { task, row, estimatedCost }) => sum + (estimatedCost ?? taskCost(row, task, text6, complexity.band, cacheReadRatio, cacheWriteRatio)), 0) : null;
+  const totalEstimate = pricingComplete ? assignments.reduce((sum, { task, row, estimatedCost }) => sum + (estimatedCost ?? taskCost(row, task, text7, complexity.band, cacheReadRatio, cacheWriteRatio)), 0) : null;
   const baselineRows = assignments.map(({ task }) => {
     const strongest = eligibleRowsForTask(rows, task).reduce((best, row) => qualityForTask(row, task.type) > (best === null ? -1 : qualityForTask(best, task.type)) ? row : best, null);
     return { task, strongest };
   });
-  const baselineCost = baselineRows.every((item) => item.strongest?.pricing !== null && item.strongest !== null) ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text6, complexity.band, cacheReadRatio, cacheWriteRatio), 0) : null;
+  const baselineCost = baselineRows.every((item) => item.strongest?.pricing !== null && item.strongest !== null) ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text7, complexity.band, cacheReadRatio, cacheWriteRatio), 0) : null;
   const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => ["livebench", "route", "user"].includes(qualitySourceForTask(row, task.type))) && baselineRows.every(({ strongest, task }) => ["livebench", "route", "user"].includes(qualitySourceForTask(strongest, task.type)));
   const budgetExceeded = Number(budgetUsd) > 0 && totalEstimate !== null ? totalEstimate > Number(budgetUsd) : null;
   const savings = baselineCost === null || totalEstimate === null || !qualityEvidenceComplete ? null : baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost);
@@ -1331,7 +1604,7 @@ function buildPlan({ text: text6 = "", available = [], mode = "collective", pric
     taskTypes: [...new Set(taskNodes.map((task) => task.type).filter((type) => type !== "reasoning"))],
     objectiveWeights: weights,
     candidates: rows.slice(0, 8).map((row) => {
-      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === "simple" ? "low" : "medium" }, weights, cacheReadRatio, cacheWriteRatio, text6, complexity.band);
+      const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === "simple" ? "low" : "medium" }, weights, cacheReadRatio, cacheWriteRatio, text7, complexity.band);
       return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), preferenceAdjustment: decision.preferenceAdjustment, quality: row.qualitySource === "unknown" ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource, pricingVersion: row.pricingVersion, pricingAsOf: row.snapshotAsOf };
     }),
     selected: selected === null ? null : { provider: selected.provider, model: selected.model, reasoningEffort: selectedAssignment?.decision?.reasoningEffort, estimatedCost: selected.estimatedCost === null ? null : Number(selected.estimatedCost.toFixed(6)), qualitySource: qualitySourceForTask(selected, selectedAssignment?.task.type ?? taskType), pricingSource: selected.pricingSource },
@@ -1909,10 +2182,34 @@ function toolInstallAction({ tool, probe, readiness, job, probeStatus, latestVer
     disabled: !interactive || running || installed && (order === 1 || current)
   };
 }
-function installClickRefusal({ tool, submitting = false, running = false } = {}) {
+function toolMaintenanceActions({ tool, probe, job, probeStatus, summary }) {
+  const running = job?.status === "running";
+  const installed = probe?.installed === true;
+  const interactive = probeStatus === "ready" || probeStatus === "refreshing";
+  const desktop = tool.manager === "signed-windows-installer";
+  const busy = running || !interactive;
+  return {
+    repair: {
+      label: "\u4E00\u952E\u4FEE\u590D",
+      title: "\u7528\u540C\u4E00\u6761\u56FA\u5B9A\u5B98\u65B9\u5B89\u88C5\u547D\u4EE4\u91CD\u65B0\u5B89\u88C5\u4E00\u904D\uFF0C\u4FEE\u590D\u635F\u574F\u6216\u4E0D\u5B8C\u6574\u7684\u5B89\u88C5",
+      disabled: busy || desktop || summary?.installable === false
+    },
+    uninstall: {
+      label: "\u4E00\u952E\u5378\u8F7D",
+      title: "\u53EA\u5220\u9664\u7A0B\u5E8F\u672C\u8EAB\uFF1B\u914D\u7F6E\u3001\u767B\u5F55\u4FE1\u606F\u548C\u5386\u53F2\u8BB0\u5F55\u4FDD\u7559",
+      disabled: busy || desktop || !installed || summary?.removable === false
+    }
+  };
+}
+function installClickRefusal({ tool, submitting = false, running = false, operation = "install" } = {}) {
   if (!tool) return "\u672A\u77E5\u5B98\u65B9\u5DE5\u5177\uFF0C\u65E0\u6CD5\u5F00\u59CB\u5B89\u88C5\u3002";
   if (tool.unsupported) return String(tool.unsupportedReason ?? "").trim() || "\u6B64\u5DE5\u5177\u6682\u4E0D\u652F\u6301\u4E00\u952E\u5B89\u88C5\u3002";
-  if (submitting || running) return "\u8BE5\u5DE5\u5177\u6B63\u5728\u5B89\u88C5\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002";
+  if (tool.manager === "signed-windows-installer" && operation !== "install") {
+    return `${tool.label} \u7531\u5B98\u65B9\u7B7E\u540D\u684C\u9762\u5B89\u88C5\u5668\u5B89\u88C5\uFF0C\u8BF7\u5728\u7CFB\u7EDF\u201C\u5E94\u7528\u201D\u4E2D\u5378\u8F7D\u5B83\u3002`;
+  }
+  if (submitting || running) {
+    return operation === "uninstall" ? "\u8BE5\u5DE5\u5177\u6B63\u5728\u5378\u8F7D\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002" : operation === "repair" ? "\u8BE5\u5DE5\u5177\u6B63\u5728\u4FEE\u590D\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002" : "\u8BE5\u5DE5\u5177\u6B63\u5728\u5B89\u88C5\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002";
+  }
   return "";
 }
 function payloadError(payload, fallback) {
@@ -12154,7 +12451,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.16.4" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.17.0" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -12752,6 +13049,16 @@ var router_main_default = `.mr-workspace {
 .mr-tool-log { margin-top: 7px; color: var(--mr-muted); font-size: 11px; }
 .mr-tool-log summary { cursor: pointer; }
 .mr-tool-log pre { max-height: 140px; overflow: auto; padding: 8px; border-radius: 7px; background: var(--dsw-alias-markdown-code-block); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mr-tool-methods { display: flex; align-items: center; gap: 6px; margin-right: 2px; }
+.mr-tool-methods label { display: flex; align-items: center; gap: 6px; color: var(--mr-muted); font-size: 11px; }
+.mr-install-settings { margin-bottom: 14px; padding: 13px 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: var(--mr-card); }
+.mr-install-settings-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mr-install-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.mr-install-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--mr-muted); }
+.mr-install-field > span { font-weight: 600; color: var(--mr-ink); }
+.mr-install-field small { font-size: 11px; line-height: 1.6; }
+.mr-install-error { color: #d95360; }
+.mr-install-toggle-row { display: flex; align-items: center; gap: 7px; }
 .mr-channel-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
 .mr-pill-channel-ok { border-color: var(--dsw-alias-success, #2f9e63); color: var(--dsw-alias-success, #2f9e63); }
 .mr-pill-warn { border-color: var(--dsw-alias-warning, #c27c0e); color: var(--dsw-alias-warning, #c27c0e); }
@@ -12972,9 +13279,115 @@ function probeLabel(probe) {
   if (probe.status === "probe-failed") return "\u68C0\u6D4B\u5931\u8D25";
   return probe.detail || "\u672A\u5B89\u88C5";
 }
-function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth }) {
+var INSTALL_SETTING_FIELDS = [
+  {
+    key: "toolInstallDir",
+    label: "\u7EDF\u4E00\u5B89\u88C5\u76EE\u5F55",
+    fallback: "",
+    placeholder: "\u7559\u7A7A = \u5404\u5382\u5546\u9ED8\u8BA4\u76EE\u5F55",
+    hint: "npm / pnpm \u65B9\u5F0F\u4F1A\u52A0 --prefix\uFF1B\u811A\u672C\u65B9\u5F0F\u770B\u5382\u5546\u662F\u5426\u652F\u6301\u76EE\u5F55\u53C2\u6570\u3002",
+    validate: () => null
+  },
+  {
+    key: "toolNpmRegistry",
+    label: "npm \u6E90\u5730\u5740",
+    fallback: "https://registry.npmjs.org/",
+    placeholder: "https://registry.npmjs.org/",
+    hint: "\u5FC5\u987B\u4EE5 https:// \u5F00\u5934\u3002\u6362\u6210\u56FD\u5185\u955C\u50CF\u540E\uFF0C\u6240\u6709\u5305\u7BA1\u7406\u5668\u65B9\u5F0F\u90FD\u4ECE\u8FD9\u91CC\u4E0B\u8F7D\u3002",
+    validate: (raw) => /^https:\/\/\S+$/i.test(raw.trim()) ? null : "\u9700\u8981 https \u5F00\u5934\u7684\u5B8C\u6574\u5730\u5740\uFF0C\u4F8B\u5982 https://registry.npmmirror.com/"
+  },
+  {
+    key: "toolScriptUrlsJson",
+    label: "\u5B89\u88C5\u811A\u672C\u6E90\u8986\u76D6\uFF08JSON\uFF0C\u53EF\u9009\uFF09",
+    fallback: "{}",
+    placeholder: '{ "stepcode": "https://mirror/stepcode/install.ps1" }',
+    hint: "\u6309\u5DE5\u5177 ID \u6307\u5B9A\u5382\u5546\u5B89\u88C5\u811A\u672C\u7684\u955C\u50CF\u5730\u5740\u3002\u811A\u672C\u4ECD\u4F1A\u4E0B\u8F7D\u540E\u6821\u9A8C\u5382\u5546\u6807\u8BB0\u518D\u6267\u884C\uFF0C\u955C\u50CF\u4E0D\u80FD\u6362\u6210\u522B\u7684\u7A0B\u5E8F\u3002",
+    validate: (raw) => {
+      if (!raw.trim()) return null;
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return "JSON \u683C\u5F0F\u65E0\u6548\u3002";
+      }
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return "\u9700\u8981 JSON \u5BF9\u8C61\u3002";
+      for (const [id2, url] of Object.entries(parsed)) {
+        if (!OFFICIAL_TOOLS.some((tool) => tool.id === id2)) return `${id2} \u4E0D\u662F\u5B98\u65B9\u5DE5\u5177 ID\u3002`;
+        if (typeof url !== "string" || !/^https:\/\/\S+$/i.test(url.trim())) return `${id2} \u7684\u5730\u5740\u5FC5\u987B\u662F https \u94FE\u63A5\u3002`;
+      }
+      return null;
+    }
+  }
+];
+function InstallSettings({ settingsScope, install }) {
+  const [snapshot, setSnapshot] = import_react5.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false });
+  const [drafts, setDrafts] = import_react5.default.useState({});
+  const [saving, setSaving] = import_react5.default.useState(false);
+  const [notice, setNotice] = import_react5.default.useState("");
+  import_react5.default.useEffect(() => {
+    if (typeof settingsScope?.subscribe !== "function") return void 0;
+    const unsubscribe = settingsScope.subscribe(() => {
+      setSnapshot(settingsScope.getSnapshot());
+      setDrafts({});
+    });
+    setSnapshot(settingsScope.getSnapshot());
+    return unsubscribe;
+  }, [settingsScope]);
+  if (!settingsScope) return null;
+  const writable = snapshot.writable === true && !saving;
+  const shown = (field2) => drafts[field2.key] ?? String(snapshot.value?.[field2.key] ?? field2.fallback);
+  const errors = Object.fromEntries(INSTALL_SETTING_FIELDS.map((field2) => [field2.key, field2.validate(shown(field2))]));
+  const apply2 = async (entries, successText) => {
+    setSaving(true);
+    setNotice("");
+    try {
+      const accepted = await settingsScope.mutate(entries, snapshot.revision);
+      if (!accepted) throw new Error("\u8BBE\u7F6E\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\uFF1B\u8F93\u5165\u5DF2\u4FDD\u7559\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u3002");
+      setNotice(successText);
+    } catch (error) {
+      setNotice(text5(error?.message) || "\u5B89\u88C5\u8BBE\u7F6E\u4FDD\u5B58\u5931\u8D25\u3002");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const commit = (field2) => {
+    const saved = String(snapshot.value?.[field2.key] ?? field2.fallback);
+    const raw = shown(field2);
+    if (raw === saved || errors[field2.key]) return;
+    return apply2([{ op: "set", path: [field2.key], value: raw }], `\u5DF2\u4FDD\u5B58${field2.label}\uFF0C\u4E0B\u4E00\u6B21\u5B89\u88C5\u8D77\u751F\u6548\u3002`);
+  };
+  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-settings", "aria-label": "\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-settings-head" }, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, "\u5BF9\u6240\u6709\u5B98\u65B9\u5DE5\u5177\u751F\u6548\uFF0C\u6539\u52A8\u540E\u4E0B\u4E00\u6B21\u4E00\u952E\u5B89\u88C5\u3001\u4FEE\u590D\u6216\u5378\u8F7D\u7ACB\u5373\u4F7F\u7528\u3002\u63D2\u4EF6\u8BBE\u7F6E\u9875\u91CC\u6709\u540C\u6837\u7684\u5B57\u6BB5\u3002")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-grid" }, INSTALL_SETTING_FIELDS.map((field2) => /* @__PURE__ */ import_react5.default.createElement("label", { className: "mr-install-field", key: field2.key }, /* @__PURE__ */ import_react5.default.createElement("span", null, field2.label), /* @__PURE__ */ import_react5.default.createElement(
+    "input",
+    {
+      className: "mr-input",
+      value: shown(field2),
+      placeholder: field2.placeholder,
+      disabled: !writable,
+      "aria-invalid": Boolean(errors[field2.key]),
+      onChange: (event) => setDrafts((previous) => ({ ...previous, [field2.key]: event.target.value })),
+      onBlur: () => {
+        void commit(field2);
+      }
+    }
+  ), errors[field2.key] ? /* @__PURE__ */ import_react5.default.createElement("small", { className: "mr-install-error", role: "alert" }, errors[field2.key]) : /* @__PURE__ */ import_react5.default.createElement("small", null, field2.hint))), /* @__PURE__ */ import_react5.default.createElement("label", { className: "mr-install-field" }, /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5B89\u88C5\u811A\u672C\u65B9\u5F0F"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-install-toggle-row" }, /* @__PURE__ */ import_react5.default.createElement(
+    "input",
+    {
+      type: "checkbox",
+      checked: snapshot.value?.toolAllowScriptInstall !== false,
+      disabled: !writable,
+      onChange: (event) => {
+        const allowed = event.target.checked;
+        void apply2(
+          [{ op: "set", path: ["toolAllowScriptInstall"], value: allowed }],
+          allowed ? "\u5DF2\u5141\u8BB8\u811A\u672C\u5B89\u88C5\u65B9\u5F0F\uFF08curl / irm\uFF09\u3002" : "\u5DF2\u5173\u95ED\u811A\u672C\u5B89\u88C5\u65B9\u5F0F\uFF0C\u53EA\u80FD\u4F7F\u7528 npm / pnpm\u3002"
+        );
+      }
+    }
+  ), /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5141\u8BB8 curl / irm \u5B89\u88C5\u811A\u672C")), /* @__PURE__ */ import_react5.default.createElement("small", null, "\u5173\u95ED\u540E\u53EA\u80FD\u4F7F\u7528 npm / pnpm \u65B9\u5F0F\uFF1B\u811A\u672C\u65B9\u5F0F\u9700\u8981\u5148\u4E0B\u8F7D\u5E76\u6821\u9A8C\u5382\u5546\u6807\u8BB0\u518D\u6267\u884C\u3002"))), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, "\u5F53\u524D\u751F\u6548\uFF1A\u5B89\u88C5\u76EE\u5F55 ", install?.installDir || "\uFF08\u5404\u5382\u5546\u9ED8\u8BA4\uFF09", " \xB7 npm \u6E90 ", install?.registry || "\uFF08\u9ED8\u8BA4\uFF09", notice ? ` \xB7 ${notice}` : ""));
+}
+function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
   const healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item]));
-  const [probeState, setProbeState] = import_react5.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], error: "" });
+  const [probeState, setProbeState] = import_react5.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" });
   const [jobs, setJobs] = import_react5.default.useState({});
   const [rowErrors, setRowErrors] = import_react5.default.useState({});
   const mounted = import_react5.default.useRef(false);
@@ -13005,7 +13418,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       const probes = Array.isArray(response.value?.tools) ? response.value.tools : [];
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : [];
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : [];
-      setProbeState({ status: "ready", probes, capabilities, readiness, error: "" });
+      setProbeState({ status: "ready", probes, capabilities, readiness, install: response.value?.install ?? null, error: "" });
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === "string" ? response.value.hostVersion : null });
     } catch (error) {
       if (!mounted.current || current !== request.current) return;
@@ -13016,7 +13429,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
           kept = true;
           return { ...previous, status: "ready", error: message };
         }
-        return { status: "error", probes: [], capabilities: [], readiness: [], error: message };
+        return { status: "error", probes: [], capabilities: [], readiness: [], install: null, error: message };
       });
       if (!kept) onProbes({ probes: [], capabilities: [], readiness: [] });
     }
@@ -13088,34 +13501,36 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       clearInterval(timer);
     };
   }, [jobs, officialToolInstallStatus]);
-  const install = async (id2) => {
+  const run = async (id2, operation) => {
     const tool = OFFICIAL_TOOLS.find((item) => item.id === id2);
+    const bridge = { install: installOfficialTool, repair: repairOfficialTool, uninstall: uninstallOfficialTool }[operation];
     const refusal = installClickRefusal({
       tool,
       submitting: submitting.current.has(id2),
-      running: jobsRef.current[id2]?.status === "running"
+      running: jobsRef.current[id2]?.status === "running",
+      operation
     });
     if (refusal) {
       setRowErrors((previous) => ({ ...previous, [id2]: refusal }));
       return;
     }
+    if (typeof bridge !== "function") throw new Error("\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002");
     submitting.current.add(id2);
     const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     setRowErrors((previous) => ({ ...previous, [id2]: "" }));
     rememberJobs((previous) => ({
       ...previous,
-      [id2]: { tool: id2, status: "running", outputTail: [], startedAt, error: null }
+      [id2]: { tool: id2, operation, status: "running", outputTail: [], startedAt, error: null }
     }));
     try {
-      if (typeof installOfficialTool !== "function") throw new Error("\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002");
-      const response = await installOfficialTool(id2);
+      const response = await bridge({ tool: id2 });
       if (!mounted.current) return;
       const accepted = acceptedInstallJob(response);
-      if (!accepted.job) throw new Error(remoteErrorText(accepted.error, "\u5B89\u88C5\u4EFB\u52A1\u672A\u88AB\u63A5\u53D7\u3002"));
+      if (!accepted.job) throw new Error(remoteErrorText(accepted.error, "\u4EFB\u52A1\u672A\u88AB\u63A5\u53D7\u3002"));
       rememberJobs((previous) => shouldApplyInstallStatus(previous[id2], accepted.job) ? { ...previous, [id2]: accepted.job } : previous);
     } catch (error) {
       if (!mounted.current) return;
-      const message = remoteErrorText(text5(error?.message), "\u5B89\u88C5\u542F\u52A8\u5931\u8D25\u3002");
+      const message = remoteErrorText(text5(error?.message), "\u542F\u52A8\u5931\u8D25\u3002");
       rememberJobs((previous) => ({
         ...previous,
         [id2]: {
@@ -13129,6 +13544,29 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
       setRowErrors((previous) => ({ ...previous, [id2]: message }));
     } finally {
       submitting.current.delete(id2);
+    }
+  };
+  const install = (id2) => run(id2, "install");
+  const repair = (id2) => run(id2, "repair");
+  const uninstall = (id2) => run(id2, "uninstall");
+  const setInstallMethod = async (toolId, methodId) => {
+    const snapshot = settingsScope?.getSnapshot?.();
+    if (!snapshot) return;
+    let map = {};
+    try {
+      map = JSON.parse(String(snapshot.value?.toolInstallMethodsJson ?? "{}")) || {};
+    } catch {
+      map = {};
+    }
+    if (typeof map !== "object" || Array.isArray(map)) map = {};
+    if (methodId) map[toolId] = methodId;
+    else delete map[toolId];
+    try {
+      const accepted = await settingsScope.mutate([{ op: "set", path: ["toolInstallMethodsJson"], value: JSON.stringify(map) }], snapshot.revision);
+      if (!accepted) throw new Error("\u5B89\u88C5\u65B9\u5F0F\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\u3002");
+      void refresh();
+    } catch (error) {
+      if (mounted.current) setRowErrors((previous) => ({ ...previous, [toolId]: text5(error?.message) || "\u5B89\u88C5\u65B9\u5F0F\u4FDD\u5B58\u5931\u8D25\u3002" }));
     }
   };
   const cancel = async (id2) => {
@@ -13147,24 +13585,50 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, cancelOffic
   const byId = Object.fromEntries(probeState.probes.map((probe) => [probe.id, probe]));
   const capabilitiesById = Object.fromEntries(probeState.capabilities.map((item) => [item.id, item]));
   const readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item]));
-  return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u3001\u7248\u672C\u548C\u767B\u5F55\u72B6\u6001\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u5B89\u88C5\u6216\u66F4\u65B0\u5230\u5404\u5382\u5546\u6700\u65B0\u7248\uFF08\u65B0\u7248\u672C\u672A\u7ECF\u63D2\u4EF6\u6D4B\u8BD5\uFF09\u3002\u672A\u767B\u5F55\u7684\u5DE5\u5177\u70B9\u201C\u53BB\u767B\u5F55\u201D\u67E5\u770B\u767B\u5F55\u547D\u4EE4\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u4F53\u68C0\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
+  const installById = Object.fromEntries((probeState.install?.tools ?? []).map((item) => [item.id, item]));
+  return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u3001\u7248\u672C\u548C\u767B\u5F55\u72B6\u6001\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u5B89\u88C5\u6216\u66F4\u65B0\u5230\u5404\u5382\u5546\u6700\u65B0\u7248\uFF08\u65B0\u7248\u672C\u672A\u7ECF\u63D2\u4EF6\u6D4B\u8BD5\uFF09\u3002\u53EF\u6309\u5DE5\u5177\u9009\u62E9 npm\u3001pnpm \u6216\u5382\u5546\u5B89\u88C5\u811A\u672C\u65B9\u5F0F\uFF0C\u5E76\u7EDF\u4E00\u8BBE\u7F6E\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF1B\u5378\u8F7D\u53EA\u5220\u9664\u7A0B\u5E8F\uFF0C\u914D\u7F6E\u4E0E\u767B\u5F55\u4FDD\u7559\u3002\u672A\u767B\u5F55\u7684\u5DE5\u5177\u70B9\u201C\u53BB\u767B\u5F55\u201D\u67E5\u770B\u767B\u5F55\u547D\u4EE4\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u4F53\u68C0\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     void refresh();
-  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.error && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
-    const command = installCommandLine(tool);
+  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement(InstallSettings, { settingsScope, install: probeState.install }), probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.error && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
+    const summary = installById[tool.id];
+    const command = summary?.command ?? installCommandLine(tool);
+    const methods = summary?.methods ?? installMethodsFor(tool).map((method) => ({ id: method.id, label: method.label }));
     const probe = byId[tool.id];
     const capability = capabilitiesById[tool.id];
     const readiness = readinessById[tool.id];
     const job = jobs[tool.id];
     const running = job?.status === "running";
     const action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status, latestVersion: healthById[tool.id]?.latestVersion ?? null });
-    const verified = job?.status === "succeeded" && job.postInstallProbe?.installed === true;
-    const status = running ? job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u5B89\u88C5\u2026" : "\u5B89\u88C5\u4E2D\u2026" : job?.status === "installer-opened" ? "\u5B98\u65B9\u5B89\u88C5\u5668\u5DF2\u6253\u5F00\uFF0C\u8BF7\u5B8C\u6210\u5B89\u88C5\u540E\u91CD\u65B0\u68C0\u6D4B" : job?.status === "cancelled" ? "\u5B89\u88C5\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B" : verified ? "\u5B89\u88C5\u6210\u529F\u5E76\u9A8C\u8BC1" : probeLabel(probe);
-    return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` \xB7 ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` \xB7 \u6700\u65B0 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react5.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.headlessAdapter ? "\u5DF2\u53EF\u7531 model_router_execute \u4EE5\u65E0\u754C\u9762\u65B9\u5F0F\u8C03\u7528\u3002\u547D\u4EE4\u7F3A\u5931\u6216\u5931\u8D25\u65F6\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002\u7B7E\u540D\u6C99\u7BB1\u5165\u53E3\u4E0D\u542F\u52A8\u6B64 CLI\u3002" : readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react5.default.createElement("code", { className: "mr-tool-command" }, command) : /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, tool.unsupportedReason), probe?.detail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react5.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), command && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-actions" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: action.disabled, onClick: () => {
+    const maintenance = toolMaintenanceActions({
+      tool,
+      probe,
+      job,
+      probeStatus: probeState.status,
+      summary: { installable: !summary?.error, removable: !summary?.error }
+    });
+    const verified = job?.status === "succeeded" && (job.operation === "uninstall" ? job.postInstallProbe?.installed === false : job.postInstallProbe?.installed === true);
+    const operation = job?.operation === "uninstall" ? "\u5378\u8F7D" : job?.operation === "repair" ? "\u4FEE\u590D" : "\u5B89\u88C5";
+    const status = running ? job.cancelRequested ? `\u6B63\u5728\u53D6\u6D88${operation}\u2026` : `${operation}\u4E2D\u2026` : job?.status === "installer-opened" ? "\u5B98\u65B9\u5B89\u88C5\u5668\u5DF2\u6253\u5F00\uFF0C\u8BF7\u5B8C\u6210\u5B89\u88C5\u540E\u91CD\u65B0\u68C0\u6D4B" : job?.status === "cancelled" ? `${operation}\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B` : verified ? `${operation}\u6210\u529F\u5E76\u9A8C\u8BC1` : probeLabel(probe);
+    return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` \xB7 ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` \xB7 \u6700\u65B0 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react5.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.headlessAdapter ? "\u5DF2\u53EF\u7531 model_router_execute \u4EE5\u65E0\u754C\u9762\u65B9\u5F0F\u8C03\u7528\u3002\u547D\u4EE4\u7F3A\u5931\u6216\u5931\u8D25\u65F6\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002\u7B7E\u540D\u6C99\u7BB1\u5165\u53E3\u4E0D\u542F\u52A8\u6B64 CLI\u3002" : readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react5.default.createElement("code", { className: "mr-tool-command" }, command) : /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react5.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), command && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-actions" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-methods" }, /* @__PURE__ */ import_react5.default.createElement("label", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5B89\u88C5\u65B9\u5F0F"), /* @__PURE__ */ import_react5.default.createElement(
+      "select",
+      {
+        className: "mr-mini-select",
+        value: summary?.savedMethodId ?? summary?.methodId ?? "",
+        disabled: running || methods.length === 0,
+        onChange: (event) => {
+          void setInstallMethod(tool.id, event.target.value);
+        }
+      },
+      methods.map((method) => /* @__PURE__ */ import_react5.default.createElement("option", { key: method.id, value: method.id, disabled: Boolean(method.blocked) }, method.label, method.blocked ? `\uFF08${method.blocked}\uFF09` : ""))
+    ))), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: action.disabled, onClick: () => {
       void install(tool.id);
-    } }, action.label), running && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
+    } }, action.label), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.repair.disabled, title: maintenance.repair.title, onClick: () => {
+      void repair(tool.id);
+    } }, maintenance.repair.label), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.uninstall.disabled, title: maintenance.uninstall.title, onClick: () => {
+      void uninstall(tool.id);
+    } }, maintenance.uninstall.label), running && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
       void cancel(tool.id);
-    } }, job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u2026" : "\u53D6\u6D88\u5B89\u88C5")));
-  })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u7531 Host \u6309\u6CE8\u518C\u8868\u56FA\u5B9A\u6765\u6E90\u6267\u884C\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\uFF1B\u53EF\u70B9\u201C\u53D6\u6D88\u5B89\u88C5\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u5B9E\u9645\u7248\u672C\u3002ZCode \u5B89\u88C5\u5668\u542F\u52A8\u540E\u4ECD\u9700\u5728\u539F\u5382\u7A97\u53E3\u9009\u62E9\u76EE\u5F55\u5E76\u5B8C\u6210\u5B89\u88C5\u3002Agent \u4E5F\u53EF\u8C03\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_install"), "\uFF0C\u6216\u5728\u4F1A\u8BDD\u4F7F\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "/tools"), "\u3002")));
+    } }, job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u2026" : `\u53D6\u6D88${operation}`)));
+  })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u7531 Host \u6309\u6CE8\u518C\u8868\u56FA\u5B9A\u6765\u6E90\u6267\u884C\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\uFF1B\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u6765\u81EA\u4F60\u81EA\u5DF1\u586B\u5199\u7684\u8BBE\u7F6E\uFF0C\u547D\u4EE4\u4E0A\u65B9\u5B9E\u65F6\u663E\u793A\u5C06\u8981\u6267\u884C\u7684\u5185\u5BB9\u3002\u53EF\u70B9\u201C\u53D6\u6D88\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u5B9E\u9645\u7248\u672C\u3002\u4E00\u952E\u5378\u8F7D\u53EA\u5220\u9664\u7A0B\u5E8F\u672C\u8EAB\uFF08\u811A\u672C\u5B89\u88C5\u4F1A\u987A\u5E26\u6E05\u6389\u5B83\u5728 shell \u914D\u7F6E\u91CC\u5199\u7684 PATH \u8BB0\u5F55\uFF09\uFF0C\u914D\u7F6E\u3001\u767B\u5F55\u4FE1\u606F\u548C\u5386\u53F2\u8BB0\u5F55\u4FDD\u7559\u3002ZCode \u5B89\u88C5\u5668\u542F\u52A8\u540E\u4ECD\u9700\u5728\u539F\u5382\u7A97\u53E3\u9009\u62E9\u76EE\u5F55\u5E76\u5B8C\u6210\u5B89\u88C5\u3002Agent \u4E5F\u53EF\u8C03\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_install"), " / ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_repair"), " / ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_uninstall"), "\uFF0C\u6216\u5728\u4F1A\u8BDD\u4F7F\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "/tools"), "\u3002")));
 }
 var HEADLESS_TOOLS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]);
 var WORKSPACE_VIEWS = [
@@ -13291,7 +13755,7 @@ ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join("\n")}
   }, []);
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun };
 }
-function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
+function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries });
   const [catalogState, setCatalogState] = import_react5.default.useState({ status: "loading", catalog: null, error: "" });
   const [task, setTask] = import_react5.default.useState("");
@@ -13514,9 +13978,12 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     {
       listOfficialTools,
       installOfficialTool,
+      uninstallOfficialTool,
+      repairOfficialTool,
       cancelOfficialToolInstall,
       officialToolInstallStatus,
       onProbes: handleToolProbes,
+      settingsScope,
       health: workbench.health.report,
       onRefreshHealth: () => {
         void workbench.refreshHealth(true);
@@ -13566,6 +14033,26 @@ var toolIdCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolId`,
     throw new TypeError("toolId must name a fixed official tool");
   }
   return value;
+});
+var MAX_METHOD_ID_CHARS = 40;
+var text6 = (value) => typeof value === "string" ? value.trim() : "";
+var toolActionCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolAction`, (value) => {
+  const request = plainObject2(value, "tool action request");
+  for (const key of Object.keys(request)) {
+    if (key !== "tool" && key !== "method") throw new TypeError(`unknown field ${key} in tool action request`);
+  }
+  const tool = getOfficialTool(text6(request.tool));
+  if (!tool) throw new TypeError("tool must name a fixed official tool");
+  const method = request.method === void 0 || request.method === null || request.method === "" ? null : text6(request.method);
+  if (method !== null) {
+    if (method.length > MAX_METHOD_ID_CHARS || !/^[A-Za-z0-9-]+$/.test(method)) {
+      throw new TypeError("method must be one of the tool's declared install methods");
+    }
+    if (!installMethodsFor(tool).some((item) => item.id === method)) {
+      throw new TypeError(`${tool.label} does not offer the install method ${method}`);
+    }
+  }
+  return method === null ? { tool: tool.id } : { tool: tool.id, method };
 });
 var listResultCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolList`, (value) => {
   const result = plainObject2(value, "tool list result");
@@ -13680,7 +14167,9 @@ var toolIdParameter = Object.freeze({
 var jsonParameter = (name, codec) => Object.freeze({ name, wire: name, source: "json", codec });
 var OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor("list", [], listResultCodec),
-  descriptor("installTool", [toolIdParameter], installResultCodec),
+  descriptor("installTool", [jsonParameter("request", toolActionCodec)], installResultCodec),
+  descriptor("uninstallTool", [jsonParameter("request", toolActionCodec)], installResultCodec),
+  descriptor("repairTool", [jsonParameter("request", toolActionCodec)], installResultCodec),
   descriptor("cancel", [toolIdParameter], installResultCodec),
   descriptor("status", [toolIdParameter], statusResultCodec),
   // Workbench: onboarding health check, run ledger, ratings, step retry, security boundaries.
@@ -13744,8 +14233,8 @@ function boundedNumberField(field2, { minimum = 0, maximum = Number.MAX_SAFE_INT
   const numeric = (0, import_dsh_client_ui_primitives.settingsNumberField)(field2);
   return {
     ...numeric,
-    parse: (text6) => {
-      const write = numeric.parse(text6);
+    parse: (text7) => {
+      const write = numeric.parse(text7);
       if (write?.kind !== "set") return write;
       const value = write.value;
       if (typeof value !== "number" || value < minimum || value > maximum) return void 0;
@@ -13758,10 +14247,10 @@ function modelProfilesField() {
   const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("modelProfilesJson");
   return {
     ...field2,
-    parse: (text6) => {
+    parse: (text7) => {
       try {
-        parseModelProfilesJson(text6);
-        return field2.parse(text6);
+        parseModelProfilesJson(text7);
+        return field2.parse(text7);
       } catch {
         return void 0;
       }
@@ -13772,15 +14261,79 @@ function quotaPatternsField() {
   const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("quotaPatternsJson");
   return {
     ...field2,
-    parse: (text6) => {
-      const raw = String(text6 ?? "").trim() || "{}";
+    parse: (text7) => {
+      const raw = String(text7 ?? "").trim() || "{}";
       try {
         const value = JSON.parse(raw);
         if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
       } catch {
         return void 0;
       }
-      return parseQuotaPatterns(raw).errors.length ? void 0 : field2.parse(text6);
+      return parseQuotaPatterns(raw).errors.length ? void 0 : field2.parse(text7);
+    }
+  };
+}
+function installDirField() {
+  const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("toolInstallDir");
+  return {
+    ...field2,
+    parse: (text7) => {
+      if (!String(text7 ?? "").trim()) return field2.parse(text7);
+      try {
+        expandInstallDir(text7);
+      } catch {
+        return void 0;
+      }
+      return field2.parse(text7);
+    }
+  };
+}
+function npmRegistryField() {
+  const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("toolNpmRegistry");
+  return {
+    ...field2,
+    parse: (text7) => {
+      const raw = String(text7 ?? "").trim() || DEFAULT_NPM_REGISTRY;
+      try {
+        normalizeSourceUrl(raw, "npm \u6E90");
+      } catch {
+        return void 0;
+      }
+      return field2.parse(text7);
+    }
+  };
+}
+function scriptUrlsField() {
+  const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("toolScriptUrlsJson");
+  return {
+    ...field2,
+    parse: (text7) => {
+      const raw = String(text7 ?? "").trim() || "{}";
+      try {
+        const parsed = JSON.parse(raw);
+        parseInstallPreferences({ toolScriptUrlsJson: raw }, { tools: OFFICIAL_TOOLS });
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return void 0;
+      } catch {
+        return void 0;
+      }
+      return field2.parse(text7);
+    }
+  };
+}
+function installMethodsField() {
+  const field2 = (0, import_dsh_client_ui_primitives.settingsTextField)("toolInstallMethodsJson");
+  return {
+    ...field2,
+    parse: (text7) => {
+      const raw = String(text7 ?? "").trim() || "{}";
+      try {
+        const parsed = JSON.parse(raw);
+        parseInstallPreferences({ toolInstallMethodsJson: raw }, { tools: OFFICIAL_TOOLS });
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return void 0;
+      } catch {
+        return void 0;
+      }
+      return field2.parse(text7);
     }
   };
 }
@@ -13794,7 +14347,11 @@ var RouterSettingsCardController = class {
       boundedNumberField("reviewSampleRate", { minimum: 0, maximum: 1 }),
       boundedNumberField("subscriptionCooldownMinutes", { minimum: 1, maximum: 10080, integer: true }),
       modelProfilesField(),
-      quotaPatternsField()
+      quotaPatternsField(),
+      installDirField(),
+      npmRegistryField(),
+      installMethodsField(),
+      scriptUrlsField()
     ]);
     this.store = this.form.bind(() => ({
       ...this.form.shell(),
@@ -13805,7 +14362,11 @@ var RouterSettingsCardController = class {
       reviewSampleRate: this.form.field("reviewSampleRate"),
       subscriptionCooldownMinutes: this.form.field("subscriptionCooldownMinutes"),
       modelProfilesJson: this.form.field("modelProfilesJson"),
-      quotaPatternsJson: this.form.field("quotaPatternsJson")
+      quotaPatternsJson: this.form.field("quotaPatternsJson"),
+      toolInstallDir: this.form.field("toolInstallDir"),
+      toolNpmRegistry: this.form.field("toolNpmRegistry"),
+      toolInstallMethodsJson: this.form.field("toolInstallMethodsJson"),
+      toolScriptUrlsJson: this.form.field("toolScriptUrlsJson")
     }));
   }
   /** Supply the snapshot hook and staged form actions to the Plugins slot. */
@@ -13838,8 +14399,8 @@ function RouterSettingsCard(props) {
       overriddenLabel: FIELD_COPY.overridden,
       resetLabel: FIELD_COPY.reset,
       invalidLabel: FIELD_COPY.invalidNumber,
-      onEdit: (text6) => {
-        props.edit("budgetUsd", text6);
+      onEdit: (text7) => {
+        props.edit("budgetUsd", text7);
       },
       onReset: () => {
         props.resetField("budgetUsd");
@@ -13857,8 +14418,8 @@ function RouterSettingsCard(props) {
       overriddenLabel: FIELD_COPY.overridden,
       resetLabel: FIELD_COPY.reset,
       invalidLabel: FIELD_COPY.invalidNumber,
-      onEdit: (text6) => {
-        props.edit("maxConsultOutputChars", text6);
+      onEdit: (text7) => {
+        props.edit("maxConsultOutputChars", text7);
       },
       onReset: () => {
         props.resetField("maxConsultOutputChars");
@@ -13881,8 +14442,8 @@ function RouterSettingsCard(props) {
       overriddenLabel: FIELD_COPY.overridden,
       resetLabel: FIELD_COPY.reset,
       invalidLabel: FIELD_COPY.invalidNumber,
-      onEdit: (text6) => {
-        props.edit(key, text6);
+      onEdit: (text7) => {
+        props.edit(key, text7);
       },
       onReset: () => {
         props.resetField(key);
@@ -13929,7 +14490,82 @@ function RouterSettingsCard(props) {
   ), state.quotaPatternsJson.invalid && /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.profileError, role: "alert" }, "\u9700\u8981 JSON \u5BF9\u8C61\uFF0C\u4E14\u6BCF\u6761\u89C4\u5219\u90FD\u662F\u6709\u6548\u7684\u6B63\u5219\u8868\u8FBE\u5F0F\u3002"), /* @__PURE__ */ import_react6.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react6.default.createElement("summary", null, "\u67E5\u770B\u89C4\u5219\u683C\u5F0F"), /* @__PURE__ */ import_react6.default.createElement("pre", null, `{
   "kimi-code": { "quota": ["\u989D\u5EA6\u5DF2\u7528\u5B8C"], "rateLimit": ["\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41"] },
   "my-glm-plan": { "quota": ["Usage limit reached for", "1308"] }
-}`)), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("quotaPatternsJson") }, "\u6062\u590D\u9ED8\u8BA4\u89C4\u5219")), /* @__PURE__ */ import_react6.default.createElement("aside", { style: styles.notice, "aria-label": "\u6A21\u578B\u8DEF\u7531\u4F7F\u7528\u8BF4\u660E" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react6.default.createElement(import_dsh_client_ui_primitives.Tag, { tone: "info" }, "\u5B98\u65B9\u6A21\u578B\u914D\u7F6E")), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u8BF7\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u9762\u914D\u7F6E DeepSeek\u3001OpenAI \u517C\u5BB9\u6216 Anthropic \u517C\u5BB9\u670D\u52A1\u3002\u6B64\u63D2\u4EF6\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E0D\u4FDD\u5B58 API Key\uFF1B\u76EE\u5F55\u4E2D\u7684\u8DEF\u7EBF\u4ECD\u9700\u901A\u8FC7\u5B9E\u9645\u8C03\u7528\u9A8C\u8BC1\u8D26\u53F7\u548C\u7F51\u7EDC\u53EF\u7528\u6027\u3002"), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u4F7F\u7528 ", /* @__PURE__ */ import_react6.default.createElement("code", null, "model_router_plan"), " \u83B7\u53D6\u53EF\u5BA1\u9605\u7684\u8DEF\u7531\u5EFA\u8BAE\uFF0C\u4F7F\u7528 ", /* @__PURE__ */ import_react6.default.createElement("code", null, "model_router_consult"), " \u54A8\u8BE2\u4E00\u4E2A\u5DF2\u914D\u7F6E\u6A21\u578B\u3002\u5EFA\u8BAE\u4E0D\u4F1A\u6539\u5199\u4E3B\u4F1A\u8BDD\u6A21\u578B\uFF1B\u591A\u4EBA\u5206\u5DE5\u7531\u5B98\u65B9 Agent Teams \u5DE5\u5177\u6267\u884C\u3002")));
+}`)), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("quotaPatternsJson") }, "\u6062\u590D\u9ED8\u8BA4\u89C4\u5219")), /* @__PURE__ */ import_react6.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react6.default.createElement("span", { style: styles.profileLabel }, "\u5B98\u65B9\u5DE5\u5177\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E"), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u5BF9\u6240\u6709\u5B98\u65B9\u5DE5\u5177\u7684\u4E00\u952E\u5B89\u88C5\u3001\u4FEE\u590D\u548C\u5378\u8F7D\u751F\u6548\u3002\u5DE5\u4F5C\u53F0\u7684\u201C\u5B98\u65B9\u5DE5\u5177\u201D\u9875\u4E5F\u80FD\u6539\u540C\u6837\u7684\u5B57\u6BB5\uFF0C\u5E76\u4F1A\u5B9E\u65F6\u663E\u793A\u6BCF\u4E2A\u5DE5\u5177\u5C06\u8981\u6267\u884C\u7684\u547D\u4EE4\u3002 \u5B89\u88C5\u547D\u4EE4\u59CB\u7EC8\u6765\u81EA\u56FA\u5B9A\u6CE8\u518C\u8868\uFF0C\u8FD9\u91CC\u53EA\u51B3\u5B9A\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\u6216\u4EFB\u610F\u5730\u5740\u3002"), /* @__PURE__ */ import_react6.default.createElement(
+    import_dsh_client_ui_primitives.SettingsValueField,
+    {
+      id: "model-router-tool-install-dir",
+      label: "\u7EDF\u4E00\u5B89\u88C5\u76EE\u5F55",
+      hint: "\u7559\u7A7A\u8868\u793A\u4F7F\u7528\u5404\u5382\u5546\u9ED8\u8BA4\u4F4D\u7F6E\uFF08npm \u5168\u5C40\u76EE\u5F55 / \u5382\u5546\u811A\u672C\u76EE\u5F55\uFF09\u3002npm \u4E0E pnpm \u65B9\u5F0F\u4F1A\u5E26\u4E0A --prefix\uFF1B\u5382\u5546\u5B89\u88C5\u811A\u672C\u662F\u5426\u652F\u6301\u76EE\u5F55\u53C2\u6570\u53D6\u51B3\u4E8E\u8BE5\u5382\u5546\u3002\u5FC5\u987B\u662F\u7EDD\u5BF9\u8DEF\u5F84\u3002",
+      disabled,
+      ...state.toolInstallDir,
+      overriddenLabel: FIELD_COPY.overridden,
+      resetLabel: FIELD_COPY.reset,
+      invalidLabel: "\u8BF7\u8F93\u5165\u7EDD\u5BF9\u8DEF\u5F84\uFF0C\u6216\u7559\u7A7A\u6062\u590D\u9ED8\u8BA4\u3002",
+      onEdit: (value) => {
+        props.edit("toolInstallDir", value);
+      },
+      onReset: () => {
+        props.resetField("toolInstallDir");
+      }
+    }
+  ), /* @__PURE__ */ import_react6.default.createElement(
+    import_dsh_client_ui_primitives.SettingsValueField,
+    {
+      id: "model-router-tool-npm-registry",
+      label: "npm \u6E90\u5730\u5740",
+      hint: "\u6240\u6709\u5305\u7BA1\u7406\u5668\u5B89\u88C5\u65B9\u5F0F\u4ECE\u8BE5\u5730\u5740\u4E0B\u8F7D\uFF0C\u5FC5\u987B\u662F https \u94FE\u63A5\u3002\u56FD\u5185\u7F51\u7EDC\u53EF\u586B\u955C\u50CF\u6E90\uFF0C\u4F8B\u5982 https://registry.npmmirror.com/\u3002",
+      disabled,
+      ...state.toolNpmRegistry,
+      overriddenLabel: FIELD_COPY.overridden,
+      resetLabel: FIELD_COPY.reset,
+      invalidLabel: "\u9700\u8981 https \u5F00\u5934\u7684\u5B8C\u6574\u5730\u5740\u3002",
+      onEdit: (value) => {
+        props.edit("toolNpmRegistry", value);
+      },
+      onReset: () => {
+        props.resetField("toolNpmRegistry");
+      }
+    }
+  ), /* @__PURE__ */ import_react6.default.createElement(
+    import_dsh_client_ui_primitives.SettingsValueField,
+    {
+      id: "model-router-tool-install-methods",
+      label: "\u9ED8\u8BA4\u5B89\u88C5\u65B9\u5F0F\uFF08JSON\uFF0C\u53EF\u9009\uFF09",
+      hint: "\u6309\u5DE5\u5177 ID \u56FA\u5B9A\u4E00\u79CD\u5B89\u88C5\u65B9\u5F0F\uFF0C\u4F8B\u5982\u56FA\u5B9A Step Code \u5728 Windows \u4E0A\u7528 irm | iex\u3002\u7559\u7A7A\u8868\u793A\u4F7F\u7528\u8BE5\u5DE5\u5177\u7684\u9ED8\u8BA4\u65B9\u5F0F\u3002\u53EF\u9009\u503C\uFF1Anpm\u3001pnpm\u3001script-bash\uFF08curl | bash\uFF09\u3001script-powershell\uFF08irm | iex\uFF09\u3002",
+      disabled,
+      ...state.toolInstallMethodsJson,
+      overriddenLabel: FIELD_COPY.overridden,
+      resetLabel: FIELD_COPY.reset,
+      invalidLabel: "\u9700\u8981 JSON \u5BF9\u8C61\uFF0C\u4E14\u6BCF\u4E2A\u952E\u90FD\u662F\u5B98\u65B9\u5DE5\u5177 ID\u3001\u6BCF\u4E2A\u503C\u90FD\u662F\u8BE5\u5DE5\u5177\u652F\u6301\u7684\u5B89\u88C5\u65B9\u5F0F\u3002",
+      onEdit: (value) => {
+        props.edit("toolInstallMethodsJson", value);
+      },
+      onReset: () => {
+        props.resetField("toolInstallMethodsJson");
+      }
+    }
+  ), /* @__PURE__ */ import_react6.default.createElement(
+    import_dsh_client_ui_primitives.SettingsValueField,
+    {
+      id: "model-router-tool-script-urls",
+      label: "\u5B89\u88C5\u811A\u672C\u6E90\u8986\u76D6\uFF08JSON\uFF0C\u53EF\u9009\uFF09",
+      hint: "\u6309\u5DE5\u5177 ID \u6307\u5B9A\u5382\u5546\u5B89\u88C5\u811A\u672C\u7684\u955C\u50CF\u5730\u5740\uFF08\u5FC5\u987B\u662F https\uFF09\u3002\u63D2\u4EF6\u4F1A\u5148\u4E0B\u8F7D\u811A\u672C\u3001\u6838\u5BF9\u5B83\u4ECD\u7136\u662F\u8BE5\u5382\u5546\u7684\u5B98\u65B9\u5B89\u88C5\u811A\u672C\uFF0C\u518D\u6267\u884C\u672C\u5730\u526F\u672C\uFF1B\u955C\u50CF\u4E0D\u80FD\u66FF\u6362\u6210\u522B\u7684\u7A0B\u5E8F\u3002",
+      disabled,
+      ...state.toolScriptUrlsJson,
+      overriddenLabel: FIELD_COPY.overridden,
+      resetLabel: FIELD_COPY.reset,
+      invalidLabel: "\u9700\u8981 JSON \u5BF9\u8C61\uFF0C\u952E\u662F\u5B98\u65B9\u5DE5\u5177 ID\uFF0C\u503C\u662F https \u94FE\u63A5\u3002",
+      onEdit: (value) => {
+        props.edit("toolScriptUrlsJson", value);
+      },
+      onReset: () => {
+        props.resetField("toolScriptUrlsJson");
+      }
+    }
+  ), /* @__PURE__ */ import_react6.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react6.default.createElement("summary", null, "\u67E5\u770B\u683C\u5F0F"), /* @__PURE__ */ import_react6.default.createElement("pre", null, `{
+  "stepcode": "https://mirror.example.com/stepcode/install.ps1",
+  "opencode": "https://mirror.example.com/opencode/install"
+}`), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u5B89\u88C5\u811A\u672C\u65B9\u5F0F\uFF08curl / irm\uFF09\u53EF\u4EE5\u5728\u5DE5\u4F5C\u53F0\u7684\u201C\u5B98\u65B9\u5DE5\u5177\u201D\u9875\u5173\u95ED\uFF1B\u5173\u95ED\u540E\u6240\u6709\u5DE5\u5177\u53EA\u80FD\u901A\u8FC7 npm \u6216 pnpm \u5B89\u88C5\u3002"))), /* @__PURE__ */ import_react6.default.createElement("aside", { style: styles.notice, "aria-label": "\u6A21\u578B\u8DEF\u7531\u4F7F\u7528\u8BF4\u660E" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react6.default.createElement(import_dsh_client_ui_primitives.Tag, { tone: "info" }, "\u5B98\u65B9\u6A21\u578B\u914D\u7F6E")), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u8BF7\u5728 DeepSeek Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u9762\u914D\u7F6E DeepSeek\u3001OpenAI \u517C\u5BB9\u6216 Anthropic \u517C\u5BB9\u670D\u52A1\u3002\u6B64\u63D2\u4EF6\u8BFB\u53D6\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\uFF0C\u4E0D\u4FDD\u5B58 API Key\uFF1B\u76EE\u5F55\u4E2D\u7684\u8DEF\u7EBF\u4ECD\u9700\u901A\u8FC7\u5B9E\u9645\u8C03\u7528\u9A8C\u8BC1\u8D26\u53F7\u548C\u7F51\u7EDC\u53EF\u7528\u6027\u3002"), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u4F7F\u7528 ", /* @__PURE__ */ import_react6.default.createElement("code", null, "model_router_plan"), " \u83B7\u53D6\u53EF\u5BA1\u9605\u7684\u8DEF\u7531\u5EFA\u8BAE\uFF0C\u4F7F\u7528 ", /* @__PURE__ */ import_react6.default.createElement("code", null, "model_router_consult"), " \u54A8\u8BE2\u4E00\u4E2A\u5DF2\u914D\u7F6E\u6A21\u578B\u3002\u5EFA\u8BAE\u4E0D\u4F1A\u6539\u5199\u4E3B\u4F1A\u8BDD\u6A21\u578B\uFF1B\u591A\u4EBA\u5206\u5DE5\u7531\u5B98\u65B9 Agent Teams \u5DE5\u5177\u6267\u884C\u3002")));
 }
 function OpenRouterWorkspace({ subject, openPanel }) {
   if (subject?.kind !== "bundle" || subject.pkg?.name !== ROUTER_PACKAGE) return null;
@@ -13954,7 +14590,9 @@ function registerUi(ctx) {
       loadCatalog: () => ctx.remote.session.modelCatalog(),
       settingsScope,
       listOfficialTools: () => officialToolsRemote.list(),
-      installOfficialTool: (toolId) => officialToolsRemote.installTool(toolId),
+      installOfficialTool: (request) => officialToolsRemote.installTool(request),
+      uninstallOfficialTool: (request) => officialToolsRemote.uninstallTool(request),
+      repairOfficialTool: (request) => officialToolsRemote.repairTool(request),
       cancelOfficialToolInstall: (toolId) => officialToolsRemote.cancel(toolId),
       officialToolInstallStatus: (toolId) => officialToolsRemote.status(toolId),
       toolHealth: (fresh) => officialToolsRemote.health(fresh),

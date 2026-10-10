@@ -143,11 +143,21 @@ The CLI team runner is the plugin's own sequential dependency executor. It does 
 | `mimo-code` | MiMo Code | `read-only`, approved `workspace-write` |
 | `grok-build` | Grok Build | `read-only`, approved `workspace-write` |
 | `gemini` | Gemini CLI | Routed headless adapter; not the managed single-tool/team runner |
+| `opencode` | OpenCode | Install, probe and login check; no verified restricted execution entry yet |
+| `stepcode` | Step Code | Install, probe and login check; no verified restricted execution entry yet |
 | `zcode` | ZCode | Windows; approved `workspace-write` |
 
-Installers use fixed official npm packages at each vendor's `@latest`, or the official publisher-signed Windows ZCode installer. An installation newer than the reported latest is not downgraded. Latest-version lookups are cached for about 12 hours; unavailable lookups leave the version unknown. New vendor releases are not automatically validated by this project. ZCode's installation window still requires you to choose a directory and finish installation.
+Installers use fixed official npm packages at each vendor's `@latest`, the vendor's own installer script, or the official publisher-signed Windows ZCode installer. An installation newer than the reported latest is not downgraded. Latest-version lookups are cached for about 12 hours; unavailable lookups leave the version unknown. New vendor releases are not automatically validated by this project. ZCode's installation window still requires you to choose a directory and finish installation.
+
+**Unified install settings.** The top of the **官方工具** page (also in the plugin settings form) sets the install address for every tool at once: one install directory (empty means each vendor's default location), an npm source, and per-tool overrides for vendor installer-script mirrors. Directories must be absolute; sources must be https. Each row picks its own install method from `npm`, `pnpm` or the vendor script (`curl | bash` or `irm | iex`); a method that cannot run on this platform says so on the row instead of being silently swapped. The exact command is shown above the buttons before anything runs.
+
+**Script installs never pipe remote content into an interpreter.** The plugin downloads the vendor script, checks it is still that vendor's official installer (vendor markers required, HTML pages and other vendors' scripts refused), and runs the local copy. A mirror may rehost the same script; it may not substitute a different program. Step Code's script accepts an install directory; the OpenCode script hardcodes `~/.opencode/bin`, so a custom directory only applies to it through npm/pnpm's `--prefix`. Script installs can be switched off entirely, leaving only the package managers.
+
+**One-click repair and uninstall.** Repair re-runs the same fixed official command, which is what a broken install needs even when it already reports the latest version. Uninstall removes only the program: a package-manager install goes back through the same manager, and a script install deletes just the executable the vendor installer placed plus that install's own PATH entry in the shell profile. **Configuration, credentials and session history are always kept.**
 
 Installation, trusted launch readiness, account login and model entitlement are separate checks. An unknown login status is not proof of logout. On Windows, supported managed launch entries are checked against publisher signatures or official npm-tarball attestations; ZCode also records trust for its bundled script per signed build. See [the registry](.dsh-plugin/shared/official-tool-registry.mjs) and [executor](.dsh-plugin/shared/official-tool-executor.mjs) for the exact platform rules.
+
+In a session, `/tools install|uninstall|repair|method <tool-id> [method]` does the same; agents can call `model_router_tool_install`, `model_router_tool_repair` and `model_router_tool_uninstall`. The install directory and download sources always come from the user's own plugin settings and never travel over the RPC, so no call can redirect an install at an arbitrary package or URL.
 
 `model_router_execute` has fixed headless adapters for Claude, Codex and Gemini. Other suppliers use the model-directory API unless a supported subscription route applies. Missing/unusable CLIs can fall back to that API; subscription failures follow the policy below.
 

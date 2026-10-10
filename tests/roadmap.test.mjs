@@ -18,6 +18,7 @@ const { createPlanFromRoutes, channelForProvider } = await import('../.dsh-plugi
 const { presetWeights, normalizeRoutingPreset } = await import('../.dsh-plugin/shared/routing-presets.mjs')
 const { routeBoundaries } = await import('../.dsh-plugin/shared/security-boundaries.mjs')
 const { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS } = await import('../.dsh-plugin/shared/official-tools-remote.mjs')
+const { OFFICIAL_TOOLS } = await import('../.dsh-plugin/shared/official-tool-registry.mjs')
 const { getOfficialTool } = await import('../.dsh-plugin/shared/official-tool-registry.mjs')
 const host = await import('../.dsh-plugin/index.mjs')
 
@@ -88,7 +89,7 @@ test('health report covers every registry tool with version status and a login g
   const latest = { codex: { version: '0.160.0', checkedAt: 40, source: 'npm' }, 'claude-code': { version: '2.1.288', checkedAt: 40, source: 'npm' } }
   const report = await runHealthCheck(probes, { runner, env: {}, now: () => 42, latest })
   assert.equal(report.checkedAt, 42)
-  assert.equal(report.tools.length, 8)
+  assert.equal(report.tools.length, OFFICIAL_TOOLS.length)
   const codex = report.tools.find(item => item.id === 'codex')
   assert.equal(codex.versionStatus, 'latest')
   assert.equal(codex.latestVersion, '0.160.0')

@@ -21,6 +21,12 @@ export const LATEST_FAILURE_RETRY_MS = 30 * 60_000
 export const LATEST_TIMEOUT_MS = 5_000
 export const NPM_REGISTRY = 'https://registry.npmjs.org'
 export const ZCODE_DOWNLOAD_PAGE = 'https://zcode.z.ai/en/docs/install'
+/**
+ * Step Code has no npm package; its own installer reads this release manifest,
+ * so it is the same document the install will use — and the same URL its
+ * mirror override redirects to.
+ */
+export const STEPCODE_RELEASE_BASE = 'https://static-openapi.stepfun.com/stepcode'
 const MAX_DOCUMENT_BYTES = 2_000_000
 
 /** True only when both versions parse and the latest is strictly newer. */
@@ -59,11 +65,20 @@ async function boundedText(fetchImpl, url, timeoutMs, accept) {
   return body
 }
 
+/** The release version out of a Step Code `latest.json` manifest. */
+export function parseStepCodeManifest(text) {
+  let body
+  try { body = JSON.parse(String(text ?? '')) } catch { throw new Error('阶跃发布清单不是有效 JSON') }
+  if (!isReleaseVersion(body?.version)) throw new Error('阶跃发布清单缺少正式版本号')
+  return { version: body.version, url: `${STEPCODE_RELEASE_BASE}/${body.version}/manifest.json` }
+}
+
 /** Where to look up a tool's latest release; null when there is no cheap source. */
 export function latestSourceFor(tool) {
   if (!tool || tool.unsupported) return null
   if (tool.manager === 'npm' && typeof tool.package === 'string') return { kind: 'npm', package: tool.package }
   if (tool.id === 'zcode') return { kind: 'zcode-download-page' }
+  if (tool.id === 'stepcode') return { kind: 'stepcode-release-manifest' }
   return null
 }
 
@@ -77,6 +92,10 @@ async function lookupSource(source, { fetchImpl, timeoutMs }) {
     const found = parseZCodeDownloadPage(await boundedText(fetchImpl, ZCODE_DOWNLOAD_PAGE, timeoutMs, 'text/html'))
     if (!found) throw new Error('官方下载页没有 Windows x64 安装包链接')
     return { version: found.version, url: found.url, source: 'zcode-download-page' }
+  }
+  if (source.kind === 'stepcode-release-manifest') {
+    const found = parseStepCodeManifest(await boundedText(fetchImpl, `${STEPCODE_RELEASE_BASE}/latest.json`, timeoutMs, 'application/json'))
+    return { ...found, source: 'stepcode-release-manifest' }
   }
   throw new Error('不支持的版本来源')
 }

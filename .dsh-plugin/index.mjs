@@ -35,8 +35,12 @@ import {
   OFFICIAL_TOOLS,
   getOfficialTool,
   installCommandLine,
+  installCommandLineFor,
+  installMethodFor,
+  installMethodsFor,
   toolForProvider,
 } from './shared/official-tool-registry.mjs'
+import { parseInstallPreferences, resolveInstallPlan } from './shared/tool-install-preferences.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness, runOfficialTool } from './shared/official-tool-executor.mjs'
 import { runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
 import { downstreamPackageIds, executeAssignmentPlan, rerunAssignmentPackage, taskTextProblem } from './shared/task-executors.mjs'
@@ -44,11 +48,17 @@ import {
   probeAllTools,
   probeToolWith,
   startInstall,
+  startRepair,
+  startUninstall,
   cancelInstall,
+  currentInstallOptions,
   installStatus,
   installedToolIds,
   defaultRunner,
   ensureNpmPrefixOnPath,
+  installPreferences,
+  planCommandLine,
+  setInstallPreferences,
 } from './shared/official-tools-runtime.mjs'
 
 // Cordis plugin name, matching the profile entry id; unchanged by the 0.13.0 package rename.
@@ -79,6 +89,12 @@ export const Config = z.object({
   subscriptionCooldownMinutes: z.number().step(1).min(1).max(10_080).default(DEFAULT_COOLDOWN_MINUTES).volatile(),
   quotaPatternsJson: z.string().max(8_000).default('{}').volatile(),
   onSubscriptionFailure: z.union(['ask', 'api', 'fail']).default('ask').volatile(),
+  // 官方工具安装设置：统一安装目录 + 下载源。两者都只在本机生效，不会随计划上传。
+  toolInstallDir: z.string().max(4_096).default('').volatile(),
+  toolNpmRegistry: z.string().max(2_048).default('https://registry.npmjs.org/').volatile(),
+  toolInstallMethodsJson: z.string().max(8_000).default('{}').volatile(),
+  toolScriptUrlsJson: z.string().max(8_000).default('{}').volatile(),
+  toolAllowScriptInstall: z.boolean().default(true).volatile(),
 })
 
 const JSON_OUTPUT = {
@@ -1417,6 +1433,12 @@ export function routerRemoteServices(ctx, config, { terminals = null } = {}) {
 
 /** Register model-facing tools and the human /router command. */
 export function apply(ctx, config = {}) {
+  // Install addresses (directory, npm source, per-tool method and script source)
+  // live in volatile config, so re-apply picks up whatever the user last saved.
+  // A malformed value is reported here rather than at the first click.
+  let installPreferenceError = null
+  try { setInstallPreferences(parseInstallPreferences(config, { tools: OFFICIAL_TOOLS })) }
+  catch (error) { installPreferenceError = errorText(error) }
   // The official Host injects typert; direct lightweight uses of apply may
   // supply only the model/command services and do not expose the Desktop RPC.
   if (ctx.typert) {
@@ -1436,22 +1458,35 @@ export function apply(ctx, config = {}) {
       return { kind: 'ask', reason: 'Confirm the user\'s subjective rating; agents must not self-rate their results',
         displayReason: { en: 'Save this as your rating and adjust future recommendations?', zh: '确认这是你对该结果的评价，并用于调整以后的推荐？Agent 不能代替你给自己评分。' } }
     }
-    if (exec.name === 'model_router_tool_install') {
+    if (exec.name === 'model_router_tool_install' || exec.name === 'model_router_tool_uninstall' || exec.name === 'model_router_tool_repair') {
       const requested = getOfficialTool(text(exec.arguments?.tool))
       const label = requested?.label ?? '官方 CLI'
+      const method = installMethodFor(requested, text(exec.arguments?.method))
+      const how = method ? `（${method.label}）` : ''
       const desktopInstaller = requested?.manager === 'signed-windows-installer'
+      const uninstalling = exec.name === 'model_router_tool_uninstall'
+      const repairing = exec.name === 'model_router_tool_repair'
+      const verb = uninstalling ? 'Uninstall' : repairing ? 'Reinstall to repair' : 'Install'
       return {
         kind: 'ask',
         reason: desktopInstaller
           ? `Download and open the verified official ${label} desktop installer`
-          : `Install ${label} globally with the plugin's fixed official command`,
+          : `${verb} ${label}${how} on this machine`,
         displayReason: {
           en: desktopInstaller
             ? `Download and open the verified ${label} installer? You can select the installation directory in its window.`
-            : `Install ${label} globally using the fixed official package?`,
+            : uninstalling
+              ? `Uninstall ${label}${how}? Its settings, login and history are kept; only the program is removed.`
+              : repairing
+                ? `Reinstall ${label}${how} to repair a broken install?`
+                : `Install ${label}${how} using the plugin's fixed official source?`,
           zh: desktopInstaller
             ? `下载并打开已验签的 ${label} 安装器？安装窗口中可选择非 C 盘目录。`
-            : `使用插件固定的官方软件包，在本机全局安装 ${label}？`,
+            : uninstalling
+              ? `卸载 ${label}${how}？配置、登录信息和历史记录都会保留，只删除程序本身。`
+              : repairing
+                ? `重新安装 ${label}${how} 以修复损坏的安装？`
+                : `使用插件固定的官方来源，在本机安装 ${label}${how}？`,
         },
       }
     }
@@ -1524,49 +1559,76 @@ export function apply(ctx, config = {}) {
   })
   ctx.commands.register({
     name: 'tools',
-    description: 'Show official model CLI install status, or install one registry tool.',
-    input: { hint: '留空查看状态；或输入 install/cancel <工具id>' },
+    description: 'Show official model CLI install status, or install/uninstall/repair one registry tool.',
+    input: { hint: '留空查看状态；或输入 install/cancel/uninstall/repair/method <工具id> [安装方式]' },
     async handler({ rawInput, signal }) {
       const input = text(rawInput)
-      const installMatch = input.match(/^install\s+([A-Za-z0-9_-]+)$/i)
-      const cancelMatch = input.match(/^cancel\s+([A-Za-z0-9_-]+)$/i)
-      if (cancelMatch) {
-        try { return { kind: 'success', text: `已请求取消 ${cancelInstall(cancelMatch[1]).tool} 的安装；请使用 /tools 查看最新状态。` } }
+      const matched = input.match(/^(install|uninstall|repair|cancel|method)\s+([A-Za-z0-9_-]+)(?:\s+([A-Za-z0-9-]+))?$/i)
+      if (!matched && input) {
+        return { kind: 'error', text: '用法：/tools 查看状态，或 /tools install/uninstall/repair/cancel/method <工具id> [安装方式]' }
+      }
+      if (matched && matched[1].toLowerCase() === 'cancel') {
+        try { return { kind: 'success', text: `已请求取消 ${cancelInstall(matched[2]).tool} 的安装；请使用 /tools 查看最新状态。` } }
         catch (error) { return { kind: 'error', text: `无法取消安装：${errorText(error)}` } }
       }
-      if (!installMatch) {
-        if (input) return { kind: 'error', text: '用法：/tools 查看状态，或 /tools install/cancel <工具id>' }
+      if (matched && matched[1].toLowerCase() === 'method') {
+        // Printing the methods is a read-only answer; persisting one is a config
+        // change and stays in the settings form / workbench panel.
+        const tool = getOfficialTool(matched[2])
+        if (!tool) return { kind: 'error', text: `未知工具：${matched[2]}。` }
+        const lines = installMethodsFor(tool).map(method => `• ${method.id}：${method.label}`)
+        return {
+          kind: 'success',
+          text: lines.length
+            ? `${tool.label} 可用的安装方式：\n${lines.join('\n')}\n在“模型路由工作台 → 官方工具”里切换，或在插件设置里固定默认方式。`
+            : `${tool.label} 没有可切换的安装方式（${tool.manager === 'signed-windows-installer' ? '官方签名桌面安装器' : '不支持'}）。`,
+        }
+      }
+      if (!matched) {
         try {
           const probes = await probeAllTools({ fresh: true })
           const lines = probes.map(probe => {
             const tool = getOfficialTool(probe.id)
-            const command = installCommandLine(tool)
+            let command = null
+            try { command = planCommandLine(resolveInstallPlan(tool, undefined, installPreferences(), currentInstallOptions())) }
+            catch { command = installCommandLine(tool) }
             const status = probe.status === 'installed'
               ? `已安装 ${probe.version ?? ''}`
               : probe.status === 'unsupported'
                 ? '不支持一键安装'
                 : '未安装'
-            return `• ${tool.label}（${probe.id}）：${status}${command && probe.status === 'not-installed' ? `\n  安装：/tools install ${probe.id}（即 ${command}）` : ''}`
+            const methods = installMethodsFor(tool).map(method => method.id).join(' / ')
+            return `• ${tool.label}（${probe.id}）：${status}${methods ? `［${methods}］` : ''}`
+              + `${command && probe.status === 'not-installed' ? `\n  安装：/tools install ${probe.id}（即 ${command}）` : ''}`
           })
-          return { kind: 'success', text: `官方工具状态：\n${lines.join('\n')}` }
+          const header = installPreferenceError ? `⚠ 官方工具安装设置无效：${installPreferenceError}\n` : ''
+          return { kind: 'success', text: `${header}官方工具状态：\n${lines.join('\n')}` }
         } catch (error) {
           return { kind: 'error', text: `探测失败：${errorText(error)}` }
         }
       }
+      const action = matched[1].toLowerCase()
+      const toolId = matched[2]
+      const method = matched[3]
       try {
-        const job = startInstall(installMatch[1])
-        const tool = getOfficialTool(installMatch[1])
+        const job = action === 'uninstall' ? startUninstall(toolId, { method })
+          : action === 'repair' ? startRepair(toolId, { method })
+            : startInstall(toolId, { method })
+        const tool = getOfficialTool(toolId)
         const settled = await waitForInstall(job.tool, signal)
+        const done = { uninstall: '卸载完成', repair: '修复完成', install: '安装完成' }[action]
         if (settled.status === 'succeeded') {
-          const probe = await probeToolWith(tool, defaultRunner)
-          return { kind: 'success', text: `${tool.label} 安装完成${probe.version ? `，探测版本 ${probe.version}` : ''}。` }
+          const probe = await probeToolWith(tool, defaultRunner, { cacheMs: 0 })
+          const suffix = probe.version ? `，探测版本 ${probe.version}` : ''
+          if (settled.error) return { kind: 'success', text: `${tool.label} ${done}${suffix}。${settled.error}` }
+          return { kind: 'success', text: `${tool.label} ${done}${suffix}。` }
         }
         if (settled.status === 'installer-opened') {
           return { kind: 'success', text: `${tool.label} 官方安装器已验证并打开。请在安装窗口选择非 C 盘目录并完成安装，然后运行 /tools 重新检测；当前尚未确认安装完成。` }
         }
-        return { kind: 'error', text: `${tool.label} 安装失败：${settled.error ?? '未知原因'}\n${settled.outputTail.slice(-6).join('\n')}` }
+        return { kind: 'error', text: `${tool.label} ${action === 'uninstall' ? '卸载' : action === 'repair' ? '修复' : '安装'}失败：${settled.error ?? '未知原因'}\n${settled.outputTail.slice(-6).join('\n')}` }
       } catch (error) {
-        return { kind: 'error', text: `无法开始安装：${errorText(error)}` }
+        return { kind: 'error', text: `无法开始${action === 'uninstall' ? '卸载' : '安装'}：${errorText(error)}` }
       }
     },
   })
@@ -1590,7 +1652,7 @@ async function waitForInstall(toolId, signal) {
 function registerOfficialToolModels(ctx, config) {
   ctx.tools.register(defineTool({
     name: 'model_router_tools',
-    description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, ZCode, Gemini CLI) and report which are installed with their versions. Never reads credentials.',
+    description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini CLI, OpenCode, Step Code, ZCode) and report which are installed with their versions, plus each tool\'s available install methods and the effective install directory and npm source. Never reads credentials.',
     parameters: {},
     output: JSON_OUTPUT,
     async execute(_args, exec) {
@@ -1602,30 +1664,74 @@ function registerOfficialToolModels(ctx, config) {
         executionReadiness: await Promise.all(probes.map(probe => probe.installed
           ? officialToolReadiness(probe.id)
           : Promise.resolve({ id: probe.id, ready: false, reason: 'CLI 尚未安装或版本检测失败。' }))),
-        installHint: '未安装的工具可由 model_router_tool_install 按注册表固定命令安装；版本与包名不接受自定义。',
+        installMethods: Object.fromEntries(OFFICIAL_TOOLS.map(tool => [tool.id, installMethodsFor(tool).map(method => ({
+          id: method.id, label: method.label, kind: method.kind,
+        }))])),
+        installHint: '未安装的工具可由 model_router_tool_install 按注册表固定命令安装，损坏的用 model_router_tool_repair 修复，多余的用 model_router_tool_uninstall 卸载；安装目录与下载源来自用户设置，版本与包名不接受自定义。',
       })
     },
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_tool_install',
-    description: 'Install one official model tool by registry id from its fixed official source at the vendor latest release. ZCode opens the latest publisher-signed interactive desktop installer with a directory picker. Only registry ids are accepted; arbitrary packages or executables are refused.',
+    description: 'Install one official model tool by registry id from its fixed official source at the vendor latest release, using one of that tool\'s declared install methods (npm, pnpm, or the vendor installer script). ZCode opens the latest publisher-signed interactive desktop installer with a directory picker. Only registry ids and declared method ids are accepted; arbitrary packages, URLs or executables are refused. The install directory and download sources come from the user\'s own plugin settings.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Registry tool id, e.g. kimi-code.' },
+      method: { type: 'string', description: 'Install method id for this tool, e.g. npm, pnpm, script-bash or script-powershell. Omit to use the user\'s configured default.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
-      const job = startInstall(args.tool)
+      const job = startInstall(args.tool, { method: text(args.method) || undefined })
       const settled = await waitForInstall(job.tool, exec.signal)
       const tool = getOfficialTool(args.tool)
       const probe = settled.status === 'succeeded'
-        ? await probeToolWith(tool, defaultRunner)
+        ? await probeToolWith(tool, defaultRunner, { cacheMs: 0 })
         : null
       return jsonValue({
         ...settled,
         postInstallProbe: probe,
         notice: settled.status === 'installer-opened'
           ? '已打开 ZCode 官方安装窗口，请选择安装目录并完成安装，之后重新检测；此状态不代表安装完成。'
-          : '安装命令完全来自服务端注册表；实际版本以探测横幅为准。',
+          : '安装命令完全来自服务端注册表与用户设置；实际版本以探测横幅为准。',
+      })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_tool_repair',
+    description: 'Reinstall one official model tool by registry id, even when it already reports the latest version, to repair a broken or incomplete install. Settings and login are kept. Only registry ids and declared method ids are accepted.',
+    parameters: {
+      tool: { type: 'string', required: true, description: 'Registry tool id, e.g. codex.' },
+      method: { type: 'string', description: 'Install method id for this tool. Omit to use the user\'s configured default.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const job = startRepair(args.tool, { method: text(args.method) || undefined })
+      const settled = await waitForInstall(job.tool, exec.signal)
+      const tool = getOfficialTool(args.tool)
+      const probe = settled.status === 'succeeded'
+        ? await probeToolWith(tool, defaultRunner, { cacheMs: 0 })
+        : null
+      return jsonValue({
+        ...settled,
+        postInstallProbe: probe,
+        notice: '修复会重新执行同一条固定官方安装命令；工具的配置与登录信息不受影响。',
+      })
+    },
+  }))
+  ctx.tools.register(defineTool({
+    name: 'model_router_tool_uninstall',
+    description: 'Remove one official model tool by registry id. Package-manager installs are removed with the same manager; vendor-script installs delete only the executable the vendor installer placed, plus that install\'s own PATH entry in the shell profile. Configuration, credentials and session history are always kept. Only registry ids and declared method ids are accepted.',
+    parameters: {
+      tool: { type: 'string', required: true, description: 'Registry tool id, e.g. opencode.' },
+      method: { type: 'string', description: 'The install method it was installed with, so the matching removal runs. Omit to use the user\'s configured default.' },
+    },
+    output: JSON_OUTPUT,
+    async execute(args, exec) {
+      const job = startUninstall(args.tool, { method: text(args.method) || undefined })
+      const settled = await waitForInstall(job.tool, exec.signal)
+      const tool = getOfficialTool(args.tool)
+      return jsonValue({
+        ...settled,
+        notice: '卸载只删除程序本身；工具的配置、登录信息和历史记录保留，重新安装后仍在。',
       })
     },
   }))

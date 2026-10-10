@@ -9,7 +9,7 @@ const manifest = JSON.parse(read('package.json'))
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.16.4')
+  assert.equal(manifest.version, '0.17.0')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)
@@ -38,10 +38,24 @@ test('0.13.0 package rename: the loader imports the new name, the profile entry 
 test('router remote retains installer methods and owns no GAL endpoints', () => {
   assert.equal(OFFICIAL_TOOLS_REMOTE_NAMESPACE, 'modelRouterOfficialTools')
   assert.deepEqual(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.map(item => item.method), [
-    'list', 'installTool', 'cancel', 'status',
+    'list', 'installTool', 'uninstallTool', 'repairTool', 'cancel', 'status',
     'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'boundaries', 'previewRun', 'startRun',
     'terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop',
   ])
+  for (const method of ['installTool', 'uninstallTool', 'repairTool']) {
+    assert.equal(typeof OfficialToolsRemoteService.prototype[method], 'function', method)
+    // All three take one strict request object, never a bare id: a bare id could
+    // not carry a method, and a free-form object could carry a command.
+    const descriptor = OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.find(item => item.method === method)
+    assert.equal(descriptor.parameters.length, 1, method)
+    assert.equal(descriptor.parameters[0].name, 'request', method)
+    const parse = descriptor.parameters[0].codec.create().parse
+    assert.deepEqual(parse({ tool: 'opencode', method: 'npm' }), { tool: 'opencode', method: 'npm' }, method)
+    assert.deepEqual(parse({ tool: 'opencode' }), { tool: 'opencode' }, `${method} without a method`)
+    assert.throws(() => parse({ tool: 'nope' }), /official tool/, method)
+    assert.throws(() => parse({ tool: 'opencode', method: 'apt-get' }), /does not offer/, method)
+    assert.throws(() => parse({ tool: 'opencode', args: ['-g', 'x'] }), TypeError, method)
+  }
   for (const method of ['terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop']) {
     assert.equal(typeof OfficialToolsRemoteService.prototype[method], 'function', method)
   }

@@ -28,6 +28,8 @@ export const LOGIN_GUIDES = Object.freeze({
   'mimo-code': Object.freeze({ command: 'mimo auth login', steps: '在终端运行 mimo auth login，选择 Xiaomi MiMo Platform 登录小米账号或填入 API Key；mimo auth list 可查看已保存的凭据。未登录时 MiMo Auto 免费匿名通道可能仍可用。' }),
   'grok-build': Object.freeze({ command: 'grok login', steps: '在终端运行 grok login，按浏览器提示登录 xAI 账号；无浏览器环境用 grok login --device-auth，或设置 XAI_API_KEY 使用 API 计费。' }),
   zcode: Object.freeze({ command: null, steps: '打开 ZCode 桌面版，在欢迎页选择“连接 BigModel 继续使用”或“连接 Z.ai 继续使用”完成授权；已订阅 GLM Coding Plan 时在“模型设置 → BigModel”右上角选择“编程套餐”绑定。改用 API Key 时 OpenAI 地址须填 Coding 专用端点 https://open.bigmodel.cn/api/coding/paas/v4。ZCode 没有可调用的登录状态命令。' }),
+  opencode: Object.freeze({ command: 'opencode auth login', steps: '在终端运行 opencode auth login，按提示完成登录；OpenCode 支持多家供应商，用 /connect 在会话内选择并保存凭据。也可在 opencode.json 中配置 provider 的 API Key。' }),
+  stepcode: Object.freeze({ command: 'step login', steps: '在终端运行 step login（step login status --json 可查看状态），按提示完成阶跃账号登录；登录信息保存在 ~/.stepcode/auth.json。卸载本工具不会删除该文件。' }),
 })
 
 /** Environment variable names whose presence means a CLI can authenticate without a session. */
@@ -39,6 +41,8 @@ const KEY_ENV = Object.freeze({
   'minimax-code': ['MINIMAX_API_KEY'],
   'mimo-code': ['MIMO_API_KEY'],
   'grok-build': ['XAI_API_KEY'],
+  opencode: ['OPENCODE_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'],
+  stepcode: ['STEP_API_KEY', 'STEPCODE_API_KEY'],
 })
 
 /**
@@ -54,6 +58,8 @@ export function credentialFileFor(toolId, { home = '', env = process.env } = {})
   if (toolId === 'mimo-code') { const root = value('XDG_DATA_HOME') || (base && `${base}/.local/share`); return root ? `${root}/mimocode/auth.json` : '' }
   if (toolId === 'grok-build') { const root = value('GROK_HOME') || (base && `${base}/.grok`); return root ? `${root}/auth.json` : '' }
   if (toolId === 'gemini') return base ? `${base}/.gemini/oauth_creds.json` : ''
+  if (toolId === 'stepcode') { const root = value('STEP_CODING_AGENT_DIR') || (base && `${base}/.stepcode`); return root ? `${root}/auth.json` : '' }
+  if (toolId === 'opencode') return base ? `${base}/.local/share/opencode/auth.json` : ''
   return ''
 }
 
@@ -61,6 +67,7 @@ const FILE_LOGIN = Object.freeze({
   'kimi-code': { found: path => `检测到 Kimi Code 登录凭据文件 ${path}（未验证是否过期）。`, missing: path => `未找到 Kimi Code 登录凭据文件 ${path}（也可能通过 config.toml 中的自定义供应商认证），登录状态未知；如未登录请运行 kimi login。`, missingState: 'unknown' },
   'mimo-code': { found: path => `检测到 MiMo Code 凭据文件 ${path}（未验证是否有效，也可能只含 API Key）。`, missing: path => `未找到 MiMo Code 凭据文件 ${path}；MiMo Auto 免费匿名通道可能仍可用，订阅/账号状态未知。`, missingState: 'unknown' },
   'grok-build': { found: path => `检测到 Grok 登录凭据文件 ${path}（未验证是否过期）。`, missing: path => `未找到 Grok 登录凭据文件 ${path}，登录状态未知；如未登录请运行 grok login。`, missingState: 'unknown' },
+  'stepcode': { found: path => `检测到 Step Code 登录凭据文件 ${path}（未验证是否过期）。`, missing: path => `未找到 Step Code 凭据文件 ${path}，登录状态未知；如未登录请运行 step login。`, missingState: 'unknown' },
 })
 
 /**

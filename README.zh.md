@@ -143,11 +143,21 @@ CLI 团队是插件自有的顺序依赖执行器。Harness 内建 Agent Teams �
 | `mimo-code` | MiMo Code | `read-only`、经审批的 `workspace-write` |
 | `grok-build` | Grok Build | `read-only`、经审批的 `workspace-write` |
 | `gemini` | Gemini CLI | 路由执行的无界面适配器；不属于单工具/团队托管执行器 |
+| `opencode` | OpenCode | 安装、检测与登录体检；尚未完成受限执行入口核验 |
+| `stepcode` | Step Code | 安装、检测与登录体检；尚未完成受限执行入口核验 |
 | `zcode` | ZCode | Windows；经审批的 `workspace-write` |
 
-安装使用固定官方 npm 包的 `@latest`，或 ZCode 官方、经过发布者签名验证的 Windows 安装器。已安装版本比查询到的最新版更高时不会降级。最新版查询缓存约 12 小时；离线/查询失败时保持未知。厂商新版本没有自动获得本项目验证。ZCode 打开安装窗口后，仍需手动选目录并完成安装。
+安装使用固定官方 npm 包的 `@latest`、厂商官方安装脚本，或 ZCode 官方、经过发布者签名验证的 Windows 安装器。已安装版本比查询到的最新版更高时不会降级。最新版查询缓存约 12 小时；离线/查询失败时保持未知。厂商新版本没有自动获得本项目验证。ZCode 打开安装窗口后，仍需手动选目录并完成安装。
+
+**统一安装设置。** 在**官方工具**页顶部（或插件设置页）可以一次设定所有工具的安装目录与下载源：统一安装目录（留空=各厂商默认位置）、npm 源地址，以及按工具 ID 覆盖厂商安装脚本的镜像地址。目录必须是绝对路径，下载地址必须是 https。每个工具都可以在**安装方式**下拉框里单独选择 `npm`、`pnpm`、厂商安装脚本（`curl | bash` 或 `irm | iex`）；选了某个平台不支持的方式时，行内会写明原因而不是悄悄换成别的。每行上方实时显示将要执行的完整命令。
+
+**脚本方式不会把远程内容直接管道给解释器。** 插件先下载厂商安装脚本、核对它仍然是该厂商的官方脚本（校验厂商标记、拒绝 HTML 页面和其他厂商的脚本），再执行本地副本。镜像可以重新托管同一个脚本，但不能替换成别的程序。阶跃的脚本还支持安装目录参数，OpenCode 的官方脚本写死了 `~/.opencode/bin`，因此自定义安装目录对它只能通过 npm/pnpm 的 `--prefix` 生效。脚本方式可以整体关闭，只保留包管理器方式。
+
+**一键修复与一键卸载。** 修复会用同一条固定官方命令重新安装一遍，适合修复损坏或不完整的安装；卸载只删除程序本身——包管理器安装走同一个管理器卸载，脚本安装只删除厂商安装器放下的那一个可执行文件，并顺带清掉它在 shell 配置里写的 PATH 记录。**配置、登录信息和历史记录一律保留**，重新安装后仍在。
 
 **已安装、可信入口就绪、账号已登录、模型有权限是不同状态。** 登录未知不代表已退出。在 Windows，托管入口按发布者签名或官方 npm tarball 校验；ZCode 另对签名构建中的脚本记录首次信任摘要。平台细则见[注册表](.dsh-plugin/shared/official-tool-registry.mjs)和[执行器](.dsh-plugin/shared/official-tool-executor.mjs)。
+
+会话内可用 `/tools install|uninstall|repair|method <工具id> [安装方式]`；Agent 可调用 `model_router_tool_install`、`model_router_tool_repair` 和 `model_router_tool_uninstall`。安装目录与下载源始终来自用户自己的插件设置，不会由客户端或 Agent 传入，因此任何一条调用都无法把安装指向自定义包名或任意地址。
 
 `model_router_execute` 的固定无界面适配器为 Claude、Codex 和 Gemini；其他供应商经模型目录 API 或适用的订阅路线执行。CLI 缺失/不可用时可回退 API；真正尝试后的订阅失败按下方策略处理。
 

@@ -70,6 +70,14 @@ const CAPABILITIES = Object.freeze({
     supported: false,
     reason: 'Gemini 由无界面适配器执行（gemini -p），不走签名沙箱入口；未安装或失败时回退模型目录 API。',
   }),
+  opencode: Object.freeze({
+    supported: false,
+    reason: 'OpenCode 尚未完成受限执行入口核验；插件负责安装、检测与登录体检，执行仍需在终端中直接使用。',
+  }),
+  stepcode: Object.freeze({
+    supported: false,
+    reason: 'Step Code 尚未完成受限执行入口核验；插件负责安装、检测与登录体检，执行仍需在终端中直接使用。',
+  }),
 })
 
 /** A UI/Host can show this without implying that installation means execution readiness. */

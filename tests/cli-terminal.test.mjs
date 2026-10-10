@@ -439,7 +439,7 @@ test('stale Host: a 404 for a new remote method becomes restart advice; list() r
   const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
   assert.equal(HOST_PLUGIN_VERSION, manifest.version)
   const source = await readFile(new URL('../.dsh-plugin/official-tools-remote-service.mjs', import.meta.url), 'utf8')
-  assert.match(source, /executionReadiness, hostVersion: HOST_PLUGIN_VERSION/)
+  assert.match(source, /hostVersion: HOST_PLUGIN_VERSION/)
   // The bundled client carries the same version for the comparison.
   const bundle = await readFile(new URL('../.dsh-plugin/client.js', import.meta.url), 'utf8')
   assert.ok(bundle.includes(JSON.stringify(manifest.version)), 'client.js embeds its package version')

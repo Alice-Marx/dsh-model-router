@@ -100,6 +100,16 @@
 .mr-tool-log { margin-top: 7px; color: var(--mr-muted); font-size: 11px; }
 .mr-tool-log summary { cursor: pointer; }
 .mr-tool-log pre { max-height: 140px; overflow: auto; padding: 8px; border-radius: 7px; background: var(--dsw-alias-markdown-code-block); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mr-tool-methods { display: flex; align-items: center; gap: 6px; margin-right: 2px; }
+.mr-tool-methods label { display: flex; align-items: center; gap: 6px; color: var(--mr-muted); font-size: 11px; }
+.mr-install-settings { margin-bottom: 14px; padding: 13px 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: var(--mr-card); }
+.mr-install-settings-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mr-install-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.mr-install-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--mr-muted); }
+.mr-install-field > span { font-weight: 600; color: var(--mr-ink); }
+.mr-install-field small { font-size: 11px; line-height: 1.6; }
+.mr-install-error { color: #d95360; }
+.mr-install-toggle-row { display: flex; align-items: center; gap: 7px; }
 .mr-channel-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
 .mr-pill-channel-ok { border-color: var(--dsw-alias-success, #2f9e63); color: var(--dsw-alias-success, #2f9e63); }
 .mr-pill-warn { border-color: var(--dsw-alias-warning, #c27c0e); color: var(--dsw-alias-warning, #c27c0e); }

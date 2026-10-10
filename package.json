@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.16.4",
+  "version": "0.17.0",
   "type": "module",
   "description": "Model Router for official DeepSeek Harness Desktop: cost-aware task routing, dependent work packages and official vendor CLI discovery, installation and execution. GAL is available separately as @ljwei-stak/dsh-galgame.",
   "repository": {
@@ -54,6 +54,7 @@
     ".dsh-plugin/shared/official-tools-remote.mjs",
     ".dsh-plugin/shared/official-tool-executor.mjs",
     ".dsh-plugin/shared/task-executors.mjs",
+    ".dsh-plugin/shared/tool-install-preferences.mjs",
     ".dsh-plugin/shared/vendor-minimax-adapter.mjs",
     ".dsh-plugin/shared/vendor-mimo-grok-adapter.mjs",
     ".dsh-plugin/shared/latest-versions.mjs",
@@ -102,7 +103,7 @@
     "experiment:routing-summary": "node scripts/summarize-routing-search.mjs",
     "experiment:routing-adaptive": "node scripts/adaptive-routing-study.mjs",
     "audit:livebench": "node scripts/livebench-aggregate-audit.mjs",
-    "test": "node --test tests/adaptive-*.test.mjs tests/dynamic-data.test.mjs tests/router.test.mjs tests/routing-optimizer.test.mjs tests/routing-evaluation.test.mjs tests/routing-paired-statistics.test.mjs tests/routing-selftest-tools.test.mjs tests/livebench-aggregate-audit.test.mjs tests/livebench-prior-study.test.mjs tests/routing-search-experiment.test.mjs tests/routing-regression-study.test.mjs tests/routing-search-summary.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs tests/task-executors.test.mjs tests/roadmap.test.mjs tests/insights-state.test.mjs tests/billing-team-ledger.test.mjs tests/subscription-billing.test.mjs tests/subscription-host.test.mjs tests/test-pass-regressions.test.mjs tests/roadmap-gaps.test.mjs tests/cordis-inject.test.mjs tests/cli-terminal.test.mjs tests/cli-terminal-gateway.test.mjs tests/latest-versions.test.mjs",
+    "test": "node --test tests/adaptive-*.test.mjs tests/dynamic-data.test.mjs tests/router.test.mjs tests/routing-optimizer.test.mjs tests/routing-evaluation.test.mjs tests/routing-paired-statistics.test.mjs tests/routing-selftest-tools.test.mjs tests/livebench-aggregate-audit.test.mjs tests/livebench-prior-study.test.mjs tests/routing-search-experiment.test.mjs tests/routing-regression-study.test.mjs tests/routing-search-summary.test.mjs tests/harness-*.test.mjs tests/official-tools.test.mjs tests/official-team-runtime.test.mjs tests/model-profiles.test.mjs tests/model-profile-editor.test.mjs tests/tool-install-state.test.mjs tests/vendor-adapters.test.mjs tests/desktop-compat.test.mjs tests/plugin-split.test.mjs tests/task-executors.test.mjs tests/tool-install-preferences.test.mjs tests/roadmap.test.mjs tests/insights-state.test.mjs tests/billing-team-ledger.test.mjs tests/subscription-billing.test.mjs tests/subscription-host.test.mjs tests/test-pass-regressions.test.mjs tests/roadmap-gaps.test.mjs tests/cordis-inject.test.mjs tests/cli-terminal.test.mjs tests/cli-terminal-gateway.test.mjs tests/latest-versions.test.mjs",
     "prepack": "node scripts/prepack.mjs",
     "pack:local": "npm pack --pack-destination dist"
   },

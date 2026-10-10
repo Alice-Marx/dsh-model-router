@@ -1,16 +1,22 @@
 /** Host receiver for the official desktop's typed one-click installer RPC. */
 import { readFileSync } from 'node:fs'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { getOfficialTool } from './shared/official-tool-registry.mjs'
+import { getOfficialTool, installMethodBlockReason, OFFICIAL_TOOLS } from './shared/official-tool-registry.mjs'
+import { resolveInstallPlan, resolveUninstallPlan } from './shared/tool-install-preferences.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness } from './shared/official-tool-executor.mjs'
 import {
-  defaultRunner,
   cancelInstall,
+  currentInstallOptions,
+  defaultRunner,
   ensureNpmPrefixOnPath,
+  installPreferences,
   installStatus,
+  planCommandLine,
   probeAllTools,
   probeToolWith,
   startInstall,
+  startRepair,
+  startUninstall,
 } from './shared/official-tools-runtime.mjs'
 import {
   OFFICIAL_TOOLS_HOST_TYPERT,
@@ -28,6 +34,49 @@ function errorText(error) {
 }
 
 const unavailable = () => { throw new Error('模型路由工作台服务尚未加载。') }
+
+/**
+ * What the panel needs to render the install controls: the effective settings
+ * and, per tool, every method with the reason it is unavailable here plus the
+ * command line that would actually run. The panel shows this before the user
+ * clicks, so an install is never a surprise command.
+ */
+function installSummary() {
+  const preferences = installPreferences()
+  return {
+    installDir: preferences.installDir ?? '',
+    registry: preferences.registry ?? '',
+    allowScriptInstall: preferences.allowScriptInstall !== false,
+    scriptUrls: { ...(preferences.scriptUrls ?? {}) },
+    methods: { ...(preferences.methods ?? {}) },
+    tools: OFFICIAL_TOOLS.map(tool => {
+      const entry = {
+        id: tool.id,
+        methods: [],
+        command: null,
+        uninstallCommand: null,
+        methodId: null,
+        // What the user pinned, which may differ from the effective method when
+        // the pinned one does not run on this platform.
+        savedMethodId: preferences.methods?.[tool.id] ?? null,
+        notices: [],
+      }
+      for (const method of tool.installMethods ?? []) {
+        entry.methods.push({ id: method.id, label: method.label, kind: method.kind, blocked: installMethodBlockReason(method) })
+      }
+      try {
+        const plan = resolveInstallPlan(tool, undefined, preferences, currentInstallOptions())
+        entry.methodId = plan.methodId
+        entry.command = planCommandLine(plan)
+        entry.notices = plan.notices ?? []
+        entry.uninstallCommand = planCommandLine(resolveUninstallPlan(tool, plan.methodId, preferences, currentInstallOptions()), 'uninstall')
+      } catch (error) {
+        entry.error = errorText(error).slice(0, 200)
+      }
+      return entry
+    }),
+  }
+}
 
 /** Wrap a Host operation so the client always receives a plain object. */
 async function settled(operation) {
@@ -89,20 +138,43 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
         return { id: tool.id, ready: false, reason: `执行入口检测失败：${String(error?.message ?? error).slice(0, 200)}` }
       }
     }))
-    return { tools, executionCapabilities: officialToolExecutionCapabilities(), executionReadiness, hostVersion: HOST_PLUGIN_VERSION }
-  }
-
-  /** Start one serialized fixed-registry install; return immediately for UI polling. */
-  async installTool(toolId) {
-    try {
-      await ensureNpmPrefixOnPath()
-      return { accepted: true, job: startInstall(toolId) }
-    } catch (error) {
-      return { accepted: false, error: errorText(error) }
+    return {
+      tools,
+      executionCapabilities: officialToolExecutionCapabilities(),
+      executionReadiness,
+      hostVersion: HOST_PLUGIN_VERSION,
+      install: installSummary(),
     }
   }
 
-  /** Stop a queued or running npm install, retaining its bounded job log. */
+  /** Start one serialized fixed-registry install; return immediately for UI polling. */
+  async installTool(request) {
+    return settled(async () => {
+      await ensureNpmPrefixOnPath()
+      return { accepted: true, job: startInstall(request.tool, { method: request.method }) }
+    })
+  }
+
+  /**
+   * Remove one tool. Configuration, credentials and session history are kept;
+   * only the program itself (and the vendor installer's own PATH block) goes.
+   */
+  async uninstallTool(request) {
+    return settled(async () => {
+      await ensureNpmPrefixOnPath()
+      return { accepted: true, job: startUninstall(request.tool, { method: request.method }) }
+    })
+  }
+
+  /** Reinstall the tool even when it already reports the latest version. */
+  async repairTool(request) {
+    return settled(async () => {
+      await ensureNpmPrefixOnPath()
+      return { accepted: true, job: startRepair(request.tool, { method: request.method }) }
+    })
+  }
+
+  /** Stop a queued or running install, retaining its bounded job log. */
   cancel(toolId) {
     try {
       return { accepted: true, job: cancelInstall(toolId) }

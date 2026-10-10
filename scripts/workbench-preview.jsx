@@ -2,7 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterMainPage } from '../.dsh-plugin/client/router-main.jsx'
 import { createWorkspacePlan, routesFromModelCatalog } from '../.dsh-plugin/client/catalog.mjs'
-import { OFFICIAL_TOOLS, toolForProvider } from '../.dsh-plugin/shared/official-tool-registry.mjs'
+import { OFFICIAL_TOOLS, defaultInstallMethod, installCommandLine, installMethodsFor, toolForProvider } from '../.dsh-plugin/shared/official-tool-registry.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from '../.dsh-plugin/shared/model-profiles.mjs'
 import { billingOverview } from '../.dsh-plugin/shared/subscription-billing.mjs'
 import { budgetCheck } from '../.dsh-plugin/shared/run-ledger.mjs'
@@ -45,6 +45,10 @@ function createSettingsScope() {
     reviewMode: 'sample', reviewSampleRate: 0.2, allowManualReassign: true,
     confirmUnsandboxedCli: true, onSubscriptionFailure: 'ask',
     modelProfilesJson: JSON.stringify(profiles, null, 2),
+    // The demo mirrors the real install settings so the panel renders exactly
+    // as it does against a real Host, which always sends them in config.
+    toolInstallDir: '', toolNpmRegistry: 'https://registry.npmjs.org/',
+    toolInstallMethodsJson: '{}', toolScriptUrlsJson: '{}', toolAllowScriptInstall: true,
   } }
   const listeners = new Set()
   return {
@@ -149,8 +153,21 @@ function createDemoSession(scenario) {
     listOfficialTools: async () => ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, tools: structuredClone(tools),
       executionCapabilities: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, mode: 'headless', available: installed.has(tool.id) })),
       executionReadiness: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ready: tool.id !== 'gemini' && installed.has(tool.id) })),
+      install: {
+        installDir: '', registry: 'https://registry.npmjs.org/', allowScriptInstall: true, scriptUrls: {}, methods: {},
+        tools: OFFICIAL_TOOLS.map(tool => ({
+          id: tool.id,
+          methods: installMethodsFor(tool).map(method => ({ id: method.id, label: method.label, kind: method.kind, blocked: null })),
+          methodId: defaultInstallMethod(tool)?.id ?? null,
+          savedMethodId: null,
+          command: installCommandLine(tool),
+          uninstallCommand: tool.manager === 'signed-windows-installer' ? null : '演示模式不执行命令',
+          notices: [],
+        })),
+      },
     }),
-    installOfficialTool: blocked, cancelOfficialToolInstall: blocked,
+    installOfficialTool: blocked, uninstallOfficialTool: blocked, repairOfficialTool: blocked,
+    cancelOfficialToolInstall: blocked,
     officialToolInstallStatus: async () => ok({ job: null }),
     toolHealth: async () => ok(health()),
     completeOnboarding: async () => { completedAt = Date.now(); return ok({ completedAt }) },

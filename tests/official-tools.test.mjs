@@ -9,14 +9,24 @@ import {
   getOfficialTool,
   toolForProvider,
   installCommandLine,
+  installCommandLineFor,
+  installMethodBlockReason,
+  installMethodFor,
+  installMethodsFor,
 } from '../.dsh-plugin/shared/official-tool-registry.mjs'
+import {
+  resolveInstallPlan,
+  resolveUninstallPlan,
+} from '../.dsh-plugin/shared/tool-install-preferences.mjs'
 import {
   versionFromBanner,
   probeToolWith,
   startInstall,
   installStatus,
   resetForTests,
+  installPreferences,
   officialMiniMaxInstaller,
+  stripPathBlock,
   defaultRunner,
   shellSpawnSpec,
   decodeProcessOutput,
@@ -24,6 +34,8 @@ import {
   probeToolSafely,
   staleInstallMessage,
   officialUpdatePlan,
+  vendorScriptInvocation,
+  verifiedVendorScript,
   CLAUDE_UPDATE_ARGS,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
@@ -69,6 +81,9 @@ test('registry stays fail-closed and internally consistent', () => {
   const ids = OFFICIAL_TOOLS.map(tool => tool.id)
   assert.equal(new Set(ids).size, ids.length, 'tool ids must be unique')
   for (const tool of OFFICIAL_TOOLS) {
+    const methods = installMethodsFor(tool)
+    const methodIds = methods.map(method => method.id)
+    assert.equal(new Set(methodIds).size, methodIds.length, `${tool.id} method ids must be unique`)
     if (tool.unsupported) {
       assert.ok(tool.unsupportedReason.length > 10, `${tool.id} needs an actionable reason`)
       assert.equal(installCommandLine(tool), null, `${tool.id} must not expose an install command`)
@@ -76,13 +91,67 @@ test('registry stays fail-closed and internally consistent', () => {
       assert.equal(tool.version, undefined, `${tool.id} must not pin a version`)
       assert.deepEqual(tool.installArgs, [], `${tool.id} must not expose npm arguments`)
       assert.match(installCommandLine(tool), /官方签名安装器/)
+    } else if (tool.manager === 'script-installer') {
+      // No npm package exists for this vendor; its installer script is the only
+      // official way in, so the tool declares script methods and nothing else.
+      assert.equal(tool.package, undefined, `${tool.id} must not claim a package it does not publish`)
+      assert.ok(methods.length > 0, `${tool.id} needs at least one installer script`)
+      assert.ok(methods.every(method => method.kind === 'script'), `${tool.id} declares only script methods`)
+      assert.ok(methods.some(method => installCommandLineFor(tool, method).includes('|')), `${tool.id} shows a script command`)
     } else {
       assert.ok(tool.package && tool.installArgs.length > 0, `${tool.id} needs a fixed install`)
       assert.ok(Array.isArray(tool.probeExecutables) && tool.probeExecutables.length > 0, `${tool.id} needs probe executables`)
       assert.equal(installCommandLine(tool).split(/\s+/)[0], tool.manager)
     }
+    for (const method of methods) {
+      assert.ok(installCommandLineFor(tool, method), `${tool.id}/${method.id} needs a command line`)
+      assert.equal(installMethodFor(tool, method.id), method, `${tool.id}/${method.id} is resolvable by id`)
+      if (method.kind === 'script') {
+        assert.match(method.scriptUrl, /^https:\/\//, `${tool.id}/${method.id} script must be https`)
+        assert.ok(method.verify?.mustInclude?.length, `${tool.id}/${method.id} needs markers to verify the script`)
+        // A method that claims a custom directory must actually pass one on.
+        if (method.supportsInstallDir) assert.ok(method.installArgs.length, `${tool.id}/${method.id} needs its install-dir argument`)
+      } else {
+        assert.ok(method.uninstallArgs.length, `${tool.id}/${method.id} needs an uninstall command`)
+      }
+      const blocked = installMethodBlockReason(method, 'plan9')
+      assert.equal(blocked, method.platforms ? `此安装方式仅支持 ${method.platforms.join(' / ')}。` : null,
+        `${tool.id}/${method.id} platform gate`)
+    }
   }
   assert.equal(getOfficialTool('does-not-exist'), null)
+})
+
+test('every tool can be installed and removed again', () => {
+  for (const tool of OFFICIAL_TOOLS) {
+    const methods = installMethodsFor(tool)
+    if (tool.manager === 'signed-windows-installer') {
+      assert.equal(installMethodFor(tool, 'npm'), null, 'the desktop installer offers no method id')
+      continue
+    }
+    const plan = resolveInstallPlan(tool, methods[0].id, installPreferences(), { platform: methods[0].platforms?.[0] ?? 'linux' })
+    assert.ok(plan.methodId, `${tool.id} resolves an install plan`)
+    const removal = resolveUninstallPlan(tool, plan.methodId, installPreferences(), { platform: plan.method.platforms?.[0] ?? 'linux' })
+    assert.ok(removal.methodId, `${tool.id} resolves an uninstall plan`)
+    if (removal.kind === 'script') {
+      assert.ok(removal.binaries.length, `${tool.id} names the files it may delete`)
+      assert.ok(removal.dir, `${tool.id} knows where it installed`)
+    } else {
+      assert.match(removal.args.join(' '), /^uninstall -g /, `${tool.id} uninstalls through its package manager`)
+    }
+  }
+})
+
+test('a mirror may rehost a vendor script but never a different program', () => {
+  const stepcode = getOfficialTool('stepcode')
+  const method = installMethodFor(stepcode, 'script-bash')
+  assert.ok(verifiedVendorScript(Buffer.from('#!/bin/sh\n# stepcode installer: https://static-openapi.stepfun.com/stepcode\n'), method.verify))
+  assert.throws(() => verifiedVendorScript(Buffer.from('<html>404</html>'), method.verify), /安装脚本/)
+  assert.throws(() => verifiedVendorScript(Buffer.from('echo hi\n'), method.verify), /官方安装脚本/)
+  const opencode = installMethodFor(getOfficialTool('opencode'), 'script-bash')
+  // A mirror that serves the wrong vendor's script is refused, not run.
+  assert.throws(() => verifiedVendorScript(Buffer.from('# stepcode installer static-openapi.stepfun.com\n'), opencode.verify), /其他厂商/)
+  assert.throws(() => verifiedVendorScript(Buffer.from(''), opencode.verify), /为空/)
 })
 
 test('registry follows each vendor\'s latest release instead of pinning versions', () => {

@@ -5,7 +5,7 @@
  * the Host Typert registry owns the matching strict descriptors. No endpoint
  * accepts a command, package name, URL, argument vector, or executable path.
  */
-import { getOfficialTool } from './official-tool-registry.mjs'
+import { getOfficialTool, installMethodsFor } from './official-tool-registry.mjs'
 import {
   parseTerminalRead,
   parseTerminalResize,
@@ -33,6 +33,40 @@ const toolIdCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolId
     throw new TypeError('toolId must name a fixed official tool')
   }
   return value
+})
+
+const MAX_METHOD_ID_CHARS = 40
+
+const text = value => (typeof value === 'string' ? value.trim() : '')
+
+/**
+ * One install/uninstall request: a registry id plus, optionally, which of that
+ * tool's declared install methods to use. The install directory, the npm source
+ * and the installer-script source are Host settings and never travel on this
+ * call, so a compromised client cannot redirect an install at a package or URL
+ * of its choosing.
+ */
+const toolActionCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolAction`, value => {
+  const request = plainObject(value, 'tool action request')
+  // Closed shape: an unknown key is refused rather than ignored, so a client
+  // cannot smuggle a command, URL or argument list past the codec.
+  for (const key of Object.keys(request)) {
+    if (key !== 'tool' && key !== 'method') throw new TypeError(`unknown field ${key} in tool action request`)
+  }
+  const tool = getOfficialTool(text(request.tool))
+  if (!tool) throw new TypeError('tool must name a fixed official tool')
+  const method = request.method === undefined || request.method === null || request.method === ''
+    ? null
+    : text(request.method)
+  if (method !== null) {
+    if (method.length > MAX_METHOD_ID_CHARS || !/^[A-Za-z0-9-]+$/.test(method)) {
+      throw new TypeError('method must be one of the tool\'s declared install methods')
+    }
+    if (!installMethodsFor(tool).some(item => item.id === method)) {
+      throw new TypeError(`${tool.label} does not offer the install method ${method}`)
+    }
+  }
+  return method === null ? { tool: tool.id } : { tool: tool.id, method }
 })
 
 const listResultCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolList`, value => {
@@ -159,7 +193,9 @@ const jsonParameter = (name, codec) => Object.freeze({ name, wire: name, source:
 
 export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('list', [], listResultCodec),
-  descriptor('installTool', [toolIdParameter], installResultCodec),
+  descriptor('installTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
+  descriptor('uninstallTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
+  descriptor('repairTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
   descriptor('cancel', [toolIdParameter], installResultCodec),
   descriptor('status', [toolIdParameter], statusResultCodec),
   // Workbench: onboarding health check, run ledger, ratings, step retry, security boundaries.

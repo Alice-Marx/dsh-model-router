@@ -1,19 +1,32 @@
 /**
  * Host-side probe and install runtime for the official tool registry.
  *
- * The DeepSeek Harness plugin host runs as a full Node module, so probing and
- * installing official CLIs uses node:child_process directly. Every command is
- * built exclusively from the fixed registry: callers supply a tool id, never
- * a package name, executable or argument. Installs are serialized (npm global
- * state must not interleave), output is kept as a bounded tail, and success is
- * always confirmed by a fresh probe rather than the installer's exit code.
- * When a newer release is known, a probe that is still older fails the job
- * instead of reporting success.
+ * The DeepSeek Harness plugin host runs as a full Node module, so probing,
+ * installing, uninstalling and repairing official CLIs uses node:child_process
+ * directly. Every command is built exclusively from the fixed registry plus the
+ * user's own Host-side settings: callers supply a tool id and one of that tool's
+ * declared method ids — never a package name, executable or argument. Installs
+ * are serialized (npm global state must not interleave), output is kept as a
+ * bounded tail, and success is always confirmed by a fresh probe rather than the
+ * installer's exit code. When a newer release is known, a probe that is still
+ * older fails the job instead of reporting success.
  */
 import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
-import { isAbsolute, join, relative, sep } from 'node:path'
-import { getOfficialTool, installCommandLine, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import {
+  defaultInstallMethod,
+  getOfficialTool,
+  installMethodFor,
+  installCommandLine,
+  OFFICIAL_TOOLS,
+} from './official-tool-registry.mjs'
+import {
+  resolveInstallLocation,
+  resolveInstallPlan,
+  resolveUninstallPlan,
+} from './tool-install-preferences.mjs'
 import { discoverZCodeBundle, unverifiedZCodeInstalls } from './zcode-bundle.mjs'
 import { openZCodeInstaller } from './zcode-installer.mjs'
 import { compareReleaseVersions, latestVersions } from './latest-versions.mjs'
@@ -21,6 +34,7 @@ import { versionStillOlder } from './version-order.mjs'
 
 const PROBE_TIMEOUT_MS = 8_000
 const INSTALL_TIMEOUT_MS = 900_000
+const UNINSTALL_TIMEOUT_MS = 300_000
 const OUTPUT_LINE_CAP = 120
 const IS_WINDOWS = process.platform === 'win32'
 const CREATE_NO_WINDOW = 0x0800_0000
@@ -37,6 +51,32 @@ const CLAUDE_UPDATE_TIMEOUT_MS = 180_000
 
 /** Non-interactive updater for a native Claude Code install. npm does not move that copy. */
 export const CLAUDE_UPDATE_ARGS = Object.freeze(['update'])
+
+/**
+ * Host-side install preferences (install directory, npm source, per-tool method
+ * and script source). Refreshed from plugin config on every apply, so a client
+ * can only ever pick a method id — these addresses never arrive over the wire.
+ */
+let preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true }
+
+export function setInstallPreferences(next) {
+  if (next && typeof next === 'object') {
+    const changedDirectory = preferences.installDir !== next.installDir
+    preferences = { ...preferences, ...next }
+    // A new directory needs its own PATH entry before the next probe runs.
+    if (changedDirectory) prefixPromise = null
+  }
+  return preferences
+}
+
+export function installPreferences() {
+  return { ...preferences }
+}
+
+/** The machine this Host runs on; the plan resolver needs both to be explicit. */
+export function currentInstallOptions() {
+  return { platform: process.platform, home: homedir() }
+}
 
 /**
  * Spawn shape for a fixed registry command.
@@ -311,8 +351,241 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
   }
 }
 
+/**
+ * The downloaded bytes must still be the vendor script this registry entry
+ * names — never an HTML error page, never another vendor's installer that a
+ * mirror substituted. Markers are the same ones the vendor's own docs publish
+ * inside the script, so a mirror may rehost the file but not rewrite it into a
+ * different program.
+ */
+export function verifiedVendorScript(source, verify = {}) {
+  const bytes = Buffer.isBuffer(source) ? source : Buffer.from(source)
+  const text = bytes.toString('utf8').replace(/^\uFEFF/, '')
+  if (!text.trim()) throw new Error('下载内容为空，已拒绝执行。')
+  if (/^\s*</.test(text)) throw new Error('下载内容不是安装脚本（收到 HTML 页面），已拒绝执行。')
+  // Check "wrong vendor" first: a mirror that substituted another installer is
+  // a different diagnosis from a truncated download, and the clearer one.
+  const foreign = (verify.mustNotInclude ?? []).filter(marker => text.includes(marker))
+  if (foreign.length) throw new Error('下载内容属于其他厂商的安装脚本，已拒绝执行。')
+  const missing = (verify.mustInclude ?? []).filter(marker => !text.includes(marker))
+  if (missing.length) {
+    throw new Error(`下载内容不是该厂商的官方安装脚本（缺少 ${missing.join('、')}），已拒绝执行。`)
+  }
+  return text
+}
+
+async function fetchVendorScript(url, signal) {
+  const response = await fetch(url, {
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
+  })
+  if (!response.ok || !response.body) throw new Error(`官方脚本下载失败：HTTP ${response.status}`)
+  const chunks = []
+  let length = 0
+  for await (const chunk of response.body) {
+    length += chunk.length
+    if (length > MAX_INSTALLER_BYTES) throw new Error('官方安装脚本超过大小上限。')
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks)
+}
+
+const POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32',
+  'WindowsPowerShell', 'v1.0', 'powershell.exe')
+
+/** argv that runs one staged vendor script; no remote content ever reaches the interpreter. */
+export function vendorScriptInvocation(plan, scriptPath) {
+  // `installArg` is the vendor's own single flag (`--install-dir` / `-InstallDir`).
+  const directoryArgs = plan.installArg?.[0] && plan.installDir ? [plan.installArg[0], plan.installDir] : []
+  if (plan.shell === 'powershell') {
+    return {
+      file: POWERSHELL,
+      args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...directoryArgs],
+    }
+  }
+  return { file: 'bash', args: [scriptPath, ...directoryArgs] }
+}
+
+/**
+ * Install one tool from its vendor script: download, verify, stage, run the
+ * staged copy. The binary lands in a directory the plugin appends to its own
+ * PATH, so the fresh probe below sees the copy this job just installed rather
+ * than an older one that happened to be on PATH first.
+ */
+async function runVendorScriptInstallJob(job, plan) {
+  let staging = null
+  try {
+    job.phase = 'downloading-and-verifying'
+    for (const notice of plan.notices ?? []) pushLine(job, notice)
+    pushLine(job, `— 下载官方安装脚本：${plan.scriptUrl}`)
+    const source = verifiedVendorScript(await fetchVendorScript(plan.scriptUrl, job.controller.signal), plan.verify)
+    staging = await mkdtemp(join(tmpdir(), '.model-router-tool-install-'))
+    const isPowerShell = plan.shell === 'powershell'
+    const scriptPath = join(staging, isPowerShell ? 'install.ps1' : 'install.sh')
+    // Windows PowerShell 5 reads a BOM-less .ps1 using the system ANSI page;
+    // both vendor scripts contain non-ASCII text, so write a UTF-8 BOM.
+    await writeFile(scriptPath, isPowerShell ? `\uFEFF${source}` : source, 'utf8')
+    const invocation = vendorScriptInvocation(plan, scriptPath)
+    job.phase = 'installing'
+    pushLine(job, `$ ${plan.label}${invocation.args.length > 1 ? ` ${invocation.args.slice(1).join(' ')}` : ''}`)
+    const outcome = await runCapture(invocation.file, invocation.args, {
+      timeoutMs: INSTALL_TIMEOUT_MS,
+      signal: job.controller.signal,
+      env: { ...process.env, ...plan.env },
+      onOutput: captureLines(job),
+    })
+    if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
+    job.exitCode = outcome.code
+    job.timedOut = outcome.timedOut
+    if (!outcome.ok) {
+      throw new Error(outcome.timedOut ? '官方安装脚本超时并已终止。'
+        : `官方安装脚本退出码 ${outcome.code ?? '信号终止'}。${String(outcome.stderr ?? '').split('\n').find(Boolean)?.slice(0, 200) ?? ''}`)
+    }
+    const location = resolveInstallLocation(job.tool, plan.method, preferences, currentInstallOptions())
+    if (location?.dir) appendToProcessPath(location.dir)
+    job.phase = 'verifying'
+    probeCache.delete(job.tool.id)
+    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0 })
+    job.postInstallProbe = probe
+    if (!probe.installed) {
+      throw new Error(`官方安装脚本已完成，但 PATH 上仍找不到 ${job.tool.probeExecutables?.[0] ?? job.tool.label}：${probe.detail}`)
+    }
+    const latest = await latestVersions.lookup(job.tool).catch(() => null)
+    if (latest?.version && versionStillOlder(probe.version, latest.version)) {
+      throw new Error(staleInstallMessage(job.tool.label, probe.version, latest.version))
+    }
+    job.status = 'succeeded'
+    job.finishedAt = new Date().toISOString()
+    pushLine(job, `— 已通过 ${plan.label} 安装 ${job.tool.label} ${probe.version ?? ''} —`)
+  } catch (error) {
+    if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }
+    job.status = 'failed'
+    job.error = `${job.tool.label} 安装失败：${String(error?.message ?? error).slice(0, 300)}`
+    job.finishedAt = new Date().toISOString()
+  } finally {
+    if (staging) await rm(staging, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+/**
+ * Guard rail for the one destructive operation: deleting a vendor binary. Every
+ * part of the path came from the fixed registry and the user's own settings,
+ * and this re-checks all of it — the basename must be one the registry names,
+ * the file must sit inside that tool's install directory, and it can never be a
+ * home directory or a filesystem root.
+ */
+export function checkedRemovableFile(candidate, { allowedNames, installDir, home = homedir() }) {
+  const target = resolve(candidate)
+  const base = target.split(sep).pop() ?? ''
+  if (!allowedNames.includes(base)) throw new Error(`拒绝删除 ${base}：不在该工具的固定可执行文件名列表中。`)
+  if (target === resolve(home) || target === resolve(target, '..')) {
+    throw new Error('拒绝删除用户主目录或文件系统根目录。')
+  }
+  if (installDir && !isInsideDirectory(installDir, target)) {
+    throw new Error(`拒绝删除 ${target}：不在该工具的安装目录 ${installDir} 内。`)
+  }
+  return target
+}
+
+function isInsideDirectory(parent, child) {
+  const canonical = resolve(parent)
+  return child === canonical || child.startsWith(canonical.endsWith(sep) ? canonical : `${canonical}${sep}`)
+}
+
+/**
+ * Remove one tool. Package-manager installs go back through the same manager;
+ * script installs delete the executable the vendor script placed, and only that
+ * file — the vendor's config, credentials and session history stay, so a
+ * reinstall keeps the user's login.
+ */
+async function runVendorScriptUninstallJob(job, plan) {
+  try {
+    job.phase = 'removing'
+    const location = resolveInstallLocation(job.tool, plan.method, preferences, currentInstallOptions())
+    const removed = []
+    for (const binary of location?.binaries ?? []) {
+      const candidate = join(location.dir, binary)
+      // checkedRemovableFile re-checks the basename, the install directory and
+      // the root/home guards even though every part came from the registry.
+      const target = checkedRemovableFile(candidate, {
+        allowedNames: location.binaries, installDir: location.dir, home: homedir(),
+      })
+      if (!(await stat(target).catch(() => null))?.isFile()) continue
+      await rm(target, { force: true })
+      removed.push(target)
+    }
+    const stripped = await stripPathProfileBlocks(job.tool).catch(error => `（未能清理 PATH 配置：${String(error?.message ?? error).slice(0, 120)}）`)
+    if (removed.length === 0) {
+      throw new Error(`在 ${location?.dir || '安装目录'} 下没有找到 ${job.tool.label} 的可执行文件；它可能是用包管理器安装的，请改用该方式卸载。`)
+    }
+    for (const path of removed) pushLine(job, `已删除 ${path}`)
+    if (stripped.length) pushLine(job, `已清理 shell 配置中的 PATH 记录：${stripped.join('、')}`)
+    pushLine(job, `已保留 ${job.tool.label} 的配置与登录信息（${homedir()}/${String(job.tool.defaultScriptInstallDir ?? '').split('/')[0]}）。`)
+    job.phase = 'verifying'
+    probeCache.delete(job.tool.id)
+    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0 })
+    job.postInstallProbe = probe
+    job.status = 'succeeded'
+    job.finishedAt = new Date().toISOString()
+    job.error = probe.installed
+      ? `已删除本次安装的可执行文件，但 PATH 上仍有另一份 ${job.tool.label}，请检查其他安装来源。`
+      : null
+  } catch (error) {
+    if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }
+    job.status = 'failed'
+    job.error = `${job.tool.label} 卸载失败：${String(error?.message ?? error).slice(0, 300)}`
+    job.finishedAt = new Date().toISOString()
+  }
+}
+
+/**
+ * Remove the vendor installer's own marked block from the shell profiles it
+ * writes. Only a well-formed `# stepcode … # stepcode end` block is removed; a
+ * bare mention is left alone, exactly as the vendor's installer decides.
+ */
+export function stripPathBlock(content, marker) {
+  const text = String(content ?? '')
+  if (!text.includes(marker)) return null
+  const lines = text.split(/\r?\n/)
+  const kept = []
+  let removed = 0
+  let inside = false
+  for (const line of lines) {
+    if (!inside && line.trim() === marker) { inside = true; removed += 1; continue }
+    if (inside) {
+      removed += 1
+      if (line.trim() === `${marker} end`) inside = false
+      continue
+    }
+    kept.push(line)
+  }
+  return removed > 0 ? kept.join('\n') : null
+}
+
+const SHELL_PROFILES = ['.bashrc', '.bash_profile', '.zshrc', '.profile']
+
+async function stripPathProfileBlocks(tool) {
+  const markers = tool?.pathProfileMarkers ?? []
+  if (markers.length === 0) return []
+  const touched = []
+  for (const profile of SHELL_PROFILES) {
+    const path = join(homedir(), profile)
+    let content
+    try { content = await readFile(path, 'utf8') } catch { continue }
+    let next = content
+    for (const marker of markers) next = stripPathBlock(next, marker) ?? next
+    if (next === content) continue
+    const temporary = `${path}.model-router-${process.pid}.tmp`
+    await writeFile(temporary, next, 'utf8')
+    await rename(temporary, path)
+    touched.push(profile)
+  }
+  return touched
+}
+
 /** Tools whose ready-check failure can be repaired by reinstalling the same version. */
-const CAPABILITY_REPAIRABLE = new Set(['claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build'])
+const CAPABILITY_REPAIRABLE = new Set([
+  'claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build', 'opencode', 'stepcode',
+])
 
 /** Extract the first version-looking token from a CLI banner. */
 export function versionFromBanner(banner) {
@@ -412,12 +685,25 @@ export const defaultRunner = (executable, args, options = {}) =>
 
 let prefixPromise = null
 
+/** Add one directory to this process's PATH unless it is already there. */
+function appendToProcessPath(directory) {
+  const target = String(directory ?? '').trim()
+  if (!target || !isAbsolute(target)) return
+  const separator = IS_WINDOWS ? ';' : ':'
+  const current = process.env.PATH ?? ''
+  if (current.split(separator).some(entry => entry.toLowerCase() === target.toLowerCase())) return
+  process.env.PATH = current ? `${current}${separator}${target}` : target
+  // POSIX package managers put global binaries in <prefix>/bin.
+  if (!IS_WINDOWS) appendToProcessPath(join(target, 'bin'))
+}
+
 /**
  * Users frequently move the npm global prefix off the default location (for
  * example to save C-drive space), so globally installed CLIs are missing from
- * PATH. Resolve the real prefix once and append it to this process's PATH so
- * probes and installs see the user's actual tools. Best effort: any failure
- * leaves the environment untouched.
+ * PATH. Resolve the real prefix once and append it — plus the directory the
+ * user configured for this plugin — to this process's PATH so probes and
+ * installs see the user's actual tools. Best effort: any failure leaves the
+ * environment untouched.
  */
 export function ensureNpmPrefixOnPath() {
   if (prefixPromise === null) {
@@ -437,10 +723,11 @@ export function ensureNpmPrefixOnPath() {
           // the same non-C drive as this user's npm global prefix.
           process.env.GROK_HOME = join(prefix, '.model-router-grok')
         }
-        const current = process.env.PATH ?? ''
-        if (current.split(IS_WINDOWS ? ';' : ':').includes(prefix)) return
-        process.env.PATH = current ? `${current}${IS_WINDOWS ? ';' : ':'}${prefix}` : prefix
+        appendToProcessPath(prefix)
       } catch { /* environment stays untouched */ }
+      // A --prefix install lands outside the npm prefix, so it needs its own
+      // PATH entry or every later probe reports the tool as missing.
+      try { appendToProcessPath(preferences.installDir) } catch { /* environment stays untouched */ }
     })()
   }
   return prefixPromise
@@ -490,6 +777,9 @@ function jobView(job) {
   if (!job) return null
   return {
     tool: job.tool.id,
+    operation: job.operation,
+    methodId: job.methodId,
+    installDir: job.installDir,
     command: job.command,
     status: job.status,
     phase: job.phase,
@@ -513,23 +803,16 @@ function pushLine(job, line) {
   job.outputTail.push(line)
 }
 
-/**
- * Start the fixed install for one registry tool id. Returns the job snapshot
- * synchronously; poll installStatus until status is succeeded/failed.
- */
-export function startInstall(toolId) {
-  const tool = getOfficialTool(toolId)
-  if (!tool) throw new Error(`未知工具：${toolId}。只允许安装注册表中的官方工具。`)
-  if (tool.unsupported) throw new Error(tool.unsupportedReason)
+/** Reserve the single per-tool job slot and serialise against every other tool. */
+function beginJob(tool, { operation, methodId, command, installDir = '', run }) {
   const existing = installJobs.get(tool.id)
-  if (existing?.status === 'running') throw new Error(`${tool.label} 已有安装任务正在执行。`)
-  const command = installCommandLine(tool)
-  if (!command) throw new Error(tool.unsupportedReason)
-  // With shell mode on Windows the bare name resolves npm.cmd/uv.exe.
-  const manager = tool.manager === 'npm' ? 'npm' : tool.manager === 'signed-windows-installer' ? 'signed-windows-installer' : 'uv'
+  if (existing?.status === 'running') throw new Error(`${tool.label} 已有${operation === 'uninstall' ? '卸载' : '安装'}任务正在执行。`)
   const job = {
     tool,
+    operation,
+    methodId,
     command,
+    installDir,
     status: 'running',
     phase: 'queued',
     cancelRequested: false,
@@ -545,14 +828,140 @@ export function startInstall(toolId) {
   }
   installJobs.set(tool.id, job)
   probeCache.delete(tool.id)
-  installChain = installChain.then(() => manager === 'signed-windows-installer'
-    ? runZCodeInstallJob(job) : runInstallJob(manager, tool.installArgs, job)).catch(error => {
-    if (job.status === 'cancelled') return
+  installChain = installChain.then(() => run(job)).catch(error => {
+    if (job.status !== 'running') return
     job.status = 'failed'
     job.finishedAt = new Date().toISOString()
-    job.error = `安装流程失败：${String(error?.message ?? error).slice(0, 200)}`
+    job.error = `${operation === 'uninstall' ? '卸载' : '安装'}流程失败：${String(error?.message ?? error).slice(0, 200)}`
   })
   return jobView(job)
+}
+
+/** One-line summary of a resolved plan, for the job log and the UI. */
+export function planCommandLine(plan, operation = 'install') {
+  if (plan.kind === 'script') {
+    const piped = plan.shell === 'powershell' ? `irm ${plan.scriptUrl} | iex` : `curl -fsSL ${plan.scriptUrl} | bash`
+    return operation === 'uninstall'
+      ? `删除 ${plan.dir} 下的 ${(plan.binaries ?? []).join('、') || '可执行文件'}`
+      : `${piped}${plan.installDir ? ` ${plan.installArg} ${plan.installDir}` : ''}`
+  }
+  return `${plan.manager} ${plan.args.join(' ')}`
+}
+
+/**
+ * Start the fixed install for one registry tool id. `method` names one of that
+ * tool's declared install methods; the default comes from the user's settings
+ * and then from the registry. Returns the job snapshot synchronously; poll
+ * installStatus until status is succeeded/failed.
+ */
+export function startInstall(toolId, { method } = {}) {
+  const tool = getOfficialTool(toolId)
+  if (!tool) throw new Error(`未知工具：${toolId}。只允许安装注册表中的官方工具。`)
+  if (tool.unsupported) throw new Error(tool.unsupportedReason)
+  if (tool.manager === 'signed-windows-installer') {
+    const command = installCommandLine(tool)
+    if (!command) throw new Error(tool.unsupportedReason)
+    return beginJob(tool, { operation: 'install', methodId: 'signed-windows-installer', command, run: runZCodeInstallJob })
+  }
+  const plan = resolveInstallPlan(tool, method, preferences, currentInstallOptions())
+  return beginJob(tool, {
+    operation: 'install',
+    methodId: plan.methodId,
+    command: planCommandLine(plan),
+    installDir: plan.installDir ?? '',
+    run: job => (plan.kind === 'script'
+      ? runVendorScriptInstallJob(job, plan)
+      : runInstallJob(plan.manager, plan.args, job)),
+  })
+}
+
+/** Reinstall the tool even when it is already the latest release. */
+export function startRepair(toolId, { method } = {}) {
+  const tool = getOfficialTool(toolId)
+  if (!tool) throw new Error(`未知工具：${toolId}。`)
+  if (tool.manager === 'signed-windows-installer') {
+    return beginJob(tool, {
+      operation: 'repair', methodId: 'signed-windows-installer',
+      command: installCommandLine(tool), run: runZCodeInstallJob,
+    })
+  }
+  const plan = resolveInstallPlan(tool, method, preferences, currentInstallOptions())
+  return beginJob(tool, {
+    operation: 'repair',
+    methodId: plan.methodId,
+    command: `修复：${planCommandLine(plan)}`,
+    installDir: plan.installDir ?? '',
+    run: async job => {
+      job.repair = true
+      if (plan.kind === 'script') return runVendorScriptInstallJob(job, plan)
+      return runInstallJob(plan.manager, plan.args, job)
+    },
+  })
+}
+
+/**
+ * Remove one tool: through its package manager, or by deleting the single file
+ * the vendor installer placed. Configuration and credentials are never touched.
+ */
+export function startUninstall(toolId, { method } = {}) {
+  const tool = getOfficialTool(toolId)
+  if (!tool) throw new Error(`未知工具：${toolId}。只允许卸载注册表中的官方工具。`)
+  const plan = resolveUninstallPlan(tool, method, preferences, currentInstallOptions())
+  return beginJob(tool, {
+    operation: 'uninstall',
+    methodId: plan.methodId,
+    command: planCommandLine(plan, 'uninstall'),
+    installDir: plan.dir ?? plan.installDir ?? '',
+    run: job => (plan.kind === 'script'
+      ? runVendorScriptUninstallJob(job, plan)
+      : runPackageManagerUninstallJob(job, plan)),
+  })
+}
+
+async function runPackageManagerUninstallJob(job, plan) {
+  try {
+    job.phase = 'preflight'
+    await ensureNpmPrefixOnPath()
+    const before = await probeToolWith(job.tool, defaultRunner)
+    if (job.cancelRequested) { markCancelled(job); return }
+    if (!before.installed) {
+      job.status = 'succeeded'
+      job.finishedAt = new Date().toISOString()
+      job.postInstallProbe = before
+      pushLine(job, `— ${job.tool.label} 本就未安装，无需卸载 —`)
+      return
+    }
+    job.phase = 'uninstalling'
+    const outcome = await runCapture(plan.manager, plan.args, {
+      timeoutMs: UNINSTALL_TIMEOUT_MS,
+      useShell: IS_WINDOWS,
+      signal: job.controller.signal,
+      onOutput: captureLines(job),
+    })
+    if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
+    job.exitCode = outcome.code
+    job.timedOut = outcome.timedOut
+    if (!outcome.ok) {
+      throw new Error(outcome.timedOut ? '卸载超时并已终止。'
+        : `卸载命令失败（退出码 ${outcome.code ?? '信号终止'}）。${String(outcome.stderr ?? '').split('\n').find(Boolean)?.slice(0, 200) ?? ''}`)
+    }
+    job.phase = 'verifying'
+    probeCache.delete(job.tool.id)
+    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0 })
+    job.postInstallProbe = probe
+    job.status = 'succeeded'
+    job.finishedAt = new Date().toISOString()
+    if (probe.installed) {
+      job.error = `${plan.manager} 已卸载 ${job.tool.label}，但 PATH 上仍有另一份；请检查其他安装来源。`
+    } else {
+      pushLine(job, `— 已卸载 ${job.tool.label}，PATH 上已找不到 ${job.tool.probeExecutables?.[0] ?? ''} —`)
+    }
+  } catch (error) {
+    if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }
+    job.status = 'failed'
+    job.error = `${job.tool.label} 卸载失败：${String(error?.message ?? error).slice(0, 300)}`
+    job.finishedAt = new Date().toISOString()
+  }
 }
 
 function captureLines(job) {
@@ -659,14 +1068,20 @@ async function runInstallJob(manager, args, job) {
     if (order === 0) {
       const readiness = await trustedExecutionReadiness(job.tool.id)
       if (job.cancelRequested) { markCancelled(job); return }
-      if (readiness.ready || !CAPABILITY_REPAIRABLE.has(job.tool.id)) {
+      // A repair re-runs the same command even when nothing looks stale: a
+      // broken install reports the right version, so "already current" is
+      // exactly the case the user pressed 修复 for.
+      if (job.repair) {
+        pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，按修复流程重新安装 —`)
+      } else if (readiness.ready || !CAPABILITY_REPAIRABLE.has(job.tool.id)) {
         job.status = 'succeeded'
         job.finishedAt = new Date().toISOString()
         job.postInstallProbe = before
         pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，无需重复安装 —`)
         return
+      } else {
+        pushLine(job, `— 已是最新版本 ${before.version}，但执行入口未就绪：${readiness.reason}；重新安装修复 —`)
       }
-      pushLine(job, `— 已是最新版本 ${before.version}，但执行入口未就绪：${readiness.reason}；重新安装修复 —`)
     }
   }
   const plan = officialUpdatePlan({
@@ -792,12 +1207,15 @@ async function runZCodeInstallJob(job) {
 }
 
 function markCancelled(job) {
+  const uninstalling = job.operation === 'uninstall'
   job.status = 'cancelled'
   job.phase = 'done'
   job.finishedAt = new Date().toISOString()
-  job.error = '已取消安装。若 npm 已开始写入，可能需要重新检测或修复该工具。'
+  job.error = uninstalling
+    ? '已取消卸载。若删除已经开始，请重新检测实际状态。'
+    : '已取消安装。若包管理器已开始写入，可能需要重新检测或修复该工具。'
   probeCache.delete(job.tool.id)
-  pushLine(job, '— 安装已取消；请重新检测实际状态 —')
+  pushLine(job, uninstalling ? '— 卸载已取消；请重新检测实际状态 —' : '— 安装已取消；请重新检测实际状态 —')
 }
 
 /** Cancel a queued or running install; cancellation is reflected after its process exits. */
@@ -843,9 +1261,11 @@ export async function executionChannels(providers) {
   return resolved
 }
 
-/** Test-only: drop caches and jobs. */
+/** Test-only: drop caches, jobs and any preferences a previous test left behind. */
 export function resetForTests() {
   probeCache.clear()
   installJobs.clear()
   installChain = Promise.resolve()
+  prefixPromise = null
+  preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true }
 }

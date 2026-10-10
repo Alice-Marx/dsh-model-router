@@ -33,11 +33,44 @@ export function toolInstallAction({ tool, probe, readiness, job, probeStatus, la
   }
 }
 
+/**
+ * Repair and uninstall are separate destructive-ish actions, so they get their
+ * own labels and gates: repair is offered whenever a copy exists, uninstall
+ * only once one is actually installed. Both wait for the probe to settle, and
+ * neither is offered for the interactive signed desktop installer.
+ */
+export function toolMaintenanceActions({ tool, probe, job, probeStatus, summary }) {
+  const running = job?.status === 'running'
+  const installed = probe?.installed === true
+  const interactive = probeStatus === 'ready' || probeStatus === 'refreshing'
+  const desktop = tool.manager === 'signed-windows-installer'
+  const busy = running || !interactive
+  return {
+    repair: {
+      label: '一键修复',
+      title: '用同一条固定官方安装命令重新安装一遍，修复损坏或不完整的安装',
+      disabled: busy || desktop || summary?.installable === false,
+    },
+    uninstall: {
+      label: '一键卸载',
+      title: '只删除程序本身；配置、登录信息和历史记录保留',
+      disabled: busy || desktop || !installed || summary?.removable === false,
+    },
+  }
+}
+
 /** Non-empty when a click must not start another install. The caller shows this text. */
-export function installClickRefusal({ tool, submitting = false, running = false } = {}) {
+export function installClickRefusal({ tool, submitting = false, running = false, operation = 'install' } = {}) {
   if (!tool) return '未知官方工具，无法开始安装。'
   if (tool.unsupported) return String(tool.unsupportedReason ?? '').trim() || '此工具暂不支持一键安装。'
-  if (submitting || running) return '该工具正在安装，请等待当前任务结束。'
+  if (tool.manager === 'signed-windows-installer' && operation !== 'install') {
+    return `${tool.label} 由官方签名桌面安装器安装，请在系统“应用”中卸载它。`
+  }
+  if (submitting || running) {
+    return operation === 'uninstall' ? '该工具正在卸载，请等待当前任务结束。'
+      : operation === 'repair' ? '该工具正在修复，请等待当前任务结束。'
+        : '该工具正在安装，请等待当前任务结束。'
+  }
   return ''
 }
 
