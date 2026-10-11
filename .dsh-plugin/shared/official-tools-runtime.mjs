@@ -23,6 +23,7 @@ import {
   OFFICIAL_TOOLS,
 } from './official-tool-registry.mjs'
 import {
+  minimaxScriptRegistry,
   resolveInstallLocation,
   resolveInstallPlan,
   resolveUninstallPlan,
@@ -39,7 +40,9 @@ const OUTPUT_LINE_CAP = 120
 const IS_WINDOWS = process.platform === 'win32'
 const CREATE_NO_WINDOW = 0x0800_0000
 const MINIMAX_INSTALLER_URL = 'https://filecdn.minimax.chat/public/install.ps1'
-const MAX_INSTALLER_BYTES = 200_000
+// Codex's Windows installer is already ~70KB and MiniMax's is ~57KB. 1MiB still
+// rejects an HTML error page or a substituted archive.
+const MAX_INSTALLER_BYTES = 1_048_576
 /** Windows ships where.exe in System32; POSIX which is ubiquitous. */
 const LOCATOR = IS_WINDOWS ? 'where' : 'which'
 /** Cached probe results keep plan generation fast; installs invalidate them. */
@@ -128,11 +131,16 @@ export function staleInstallMessage(label, installedVersion, latestVersion) {
  * Which updater to run. `order` is compareReleaseVersions(installed, latest):
  * -1 older, 0 same, 1 newer, null when either version is unknown.
  */
-export function officialUpdatePlan({ toolId, installed, order, platform }) {
+export function officialUpdatePlan({ toolId, installed, order, platform, methodId }) {
   if (installed && order === 1) return 'refuse-downgrade'
   if (installed && order === 0) return 'already-current'
   if (installed && order === -1 && toolId === 'claude-code') return 'claude-update-then-registry'
   if (installed && (order === -1 || order === null) && toolId === 'minimax-code' && platform === 'win32') {
+    // npm/pnpm is the method the user picked, so that command runs first. The
+    // official Windows installer stays the fallback when that copy does not
+    // advance, and it is the direct plan when no package manager was named
+    // (the historical one-click update of an official-layout install).
+    if (methodId === 'npm' || methodId === 'pnpm') return 'registry-install'
     return 'minimax-official-installer'
   }
   return 'registry-install'
@@ -238,17 +246,59 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, s
 }
 
 /**
+ * Decode installer bytes the way a terminal would. The MiniMax CDN serves the
+ * PowerShell script as `application/octet-stream` UTF-8; a UTF-16 copy (BOM or
+ * null-padded) is the same script and must not be rejected as a mismatch.
+ */
+export function installerScriptText(source) {
+  return decodeProcessOutput(Buffer.isBuffer(source) ? source : Buffer.from(source ?? '')).replace(/^\uFEFF/, '')
+}
+
+/**
+ * An HTML/XML document is not an installer. PowerShell comment-based help
+ * starts with `<#`, which is not a tag: the published MiniMax, Kimi and MiMo
+ * Windows scripts all open that way. Treating every leading `<` as HTML
+ * rejected those official scripts.
+ */
+export function isMarkupDocument(text) {
+  const head = String(text ?? '').replace(/^\uFEFF/, '').trimStart()
+  if (!head.startsWith('<')) return false
+  if (head.startsWith('<#')) return false
+  return /^<(?:!|\?|[A-Za-z])/.test(head)
+}
+
+const MINIMAX_INSTALLER_MARKERS = Object.freeze(['@minimax-ai/code', 'MCODE_INSTALL_DIR', 'MiniMax Code'])
+
+/**
  * MiniMax's official Windows installer script is run as published (it installs
- * `@minimax-ai/code@latest`). Only structural sanity is checked: it must be the
- * MiniMax Code installer, not an HTML error page or another script.
+ * `@minimax-ai/code@latest`). Structural checks only: the vendor's own markers,
+ * and a refusal of HTML/XML. Content-Type is not consulted — the CDN labels
+ * the real script `application/octet-stream`.
  */
 export function officialMiniMaxInstaller(source) {
-  const bytes = Buffer.isBuffer(source) ? source : Buffer.from(source)
-  const text = bytes.toString('utf8').replace(/^\uFEFF/, '')
-  if (!text.includes('@minimax-ai/code') || /^\s*</.test(text)) {
-    throw new Error('下载内容不是 MiniMax Code 官方 Windows 安装脚本，已拒绝执行。')
+  const text = installerScriptText(source)
+  if (!text.trim()) throw new Error('下载内容为空，已拒绝执行。')
+  if (isMarkupDocument(text)) {
+    throw new Error('下载内容不是 MiniMax Code 官方 Windows 安装脚本（收到 HTML 页面），已拒绝执行。')
+  }
+  const missing = MINIMAX_INSTALLER_MARKERS.filter(marker => !text.includes(marker))
+  if (missing.length) {
+    throw new Error(`下载内容不是 MiniMax Code 官方 Windows 安装脚本（缺少 ${missing.join('、')}），已拒绝执行。`)
   }
   return text
+}
+
+/**
+ * Directory the Windows installer must use. A configured path wins. Otherwise
+ * an already-installed official layout is updated in place. With neither, the
+ * vendor default is `%USERPROFILE%\.minimax-code` — not the npm prefix.
+ */
+export function minimaxOfficialInstallDir(preferences = {}, home = homedir(), existingRoot = '') {
+  const configured = String(preferences?.installDir ?? '').trim()
+  if (configured) return configured
+  const existing = String(existingRoot ?? '').trim()
+  if (existing) return existing
+  return join(home, '.minimax-code')
 }
 
 async function fetchOfficialMiniMaxInstaller(signal) {
@@ -266,30 +316,50 @@ async function fetchOfficialMiniMaxInstaller(signal) {
   return officialMiniMaxInstaller(Buffer.concat(chunks))
 }
 
+async function existingMiniMaxInstallRoot() {
+  const paths = (process.env.PATH ?? '').split(IS_WINDOWS ? ';' : ':').filter(Boolean)
+  const candidates = []
+  for (const directory of paths) candidates.push(directory, join(directory, '.minimax-code'))
+  candidates.push(join(homedir(), '.minimax-code'))
+  const seen = new Set()
+  for (const directory of candidates) {
+    const key = directory.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    try {
+      if (!(await stat(join(directory, 'mcode.cmd'))).isFile()) continue
+      if (!(await stat(join(directory, 'current'))).isFile()) continue
+      return await realpath(directory)
+    } catch { /* try the next candidate */ }
+  }
+  return ''
+}
+
 async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
   let staging = null
-  let prefixRoot = null
+  let stagingParent = null
   try {
     job.finishedAt = null
     job.error = null
     job.phase = 'downloading-and-verifying'
     pushLine(job, reason || '— npm 原生依赖未就绪；改用 MiniMax 官方 Windows 安装脚本（安装最新版）—')
-    const prefixResult = await runCapture('npm', ['config', 'get', 'prefix'], {
-      timeoutMs: 5_000, useShell: true, signal: job.controller.signal,
-    })
-    const rawPrefix = prefixResult.stdout.trim().replace(/^\\\\\?\\/, '')
-    if (!prefixResult.ok || !isAbsolute(rawPrefix)) throw new Error('无法确定 npm 全局安装目录。')
-    await mkdir(rawPrefix, { recursive: true })
-    prefixRoot = await realpath(rawPrefix)
+    const existingRoot = preferences.installDir ? '' : await existingMiniMaxInstallRoot()
+    const installDir = minimaxOfficialInstallDir(preferences, homedir(), existingRoot)
+    pushLine(job, preferences.installDir
+      ? `— 使用已配置的安装目录：${installDir} —`
+      : existingRoot
+        ? `— 未配置统一安装目录，沿用已安装的官方目录：${installDir} —`
+        : `— 未配置统一安装目录，使用 MiniMax 官方默认位置：${installDir} —`)
+    await mkdir(installDir, { recursive: true })
+    stagingParent = await realpath(installDir)
     const script = await fetchOfficialMiniMaxInstaller(job.controller.signal)
-    staging = await mkdtemp(join(prefixRoot, '.model-router-minimax-installer-'))
+    staging = await mkdtemp(join(stagingParent, '.model-router-minimax-installer-'))
     const scriptPath = join(staging, 'install.ps1')
     const tempPath = join(staging, 'temp')
     await mkdir(tempPath)
     // Windows PowerShell 5 reads a BOM-less .ps1 using the system ANSI page.
     // The upstream installer contains Unicode art, so write a UTF-8 BOM.
     await writeFile(scriptPath, `\uFEFF${script}`, 'utf8')
-    const installDir = join(prefixRoot, '.minimax-code')
     const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32',
       'WindowsPowerShell', 'v1.0', 'powershell.exe')
     const utilityModule = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32',
@@ -299,13 +369,17 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
       + 'Import-Module -Name $env:MODEL_ROUTER_UTILITY_MODULE -ErrorAction Stop; '
       + '& $env:MODEL_ROUTER_MINIMAX_INSTALL_SCRIPT'
     job.phase = 'installing'
+    const scriptRegistry = minimaxScriptRegistry(preferences.registry || 'https://registry.npmjs.org/')
+    if (!scriptRegistry && preferences.registry) {
+      pushLine(job, '— MiniMax 官方脚本不接受当前 npm 源，本次使用脚本自己的默认源 —')
+    }
     const outcome = await runCapture(powershell,
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], {
         timeoutMs: INSTALL_TIMEOUT_MS, signal: job.controller.signal,
         env: { ...process.env, MCODE_INSTALL_DIR: installDir,
-          MCODE_NO_MODIFY_PATH: '1', MCODE_DOWNLOAD_MIRROR: 'global',
-          MCODE_NPM_REGISTRY: 'https://registry.npmjs.org/',
-          npm_config_cache: join(prefixRoot, '.model-router-npm-cache'),
+          MCODE_NO_MODIFY_PATH: '1',
+          ...(scriptRegistry ? { MCODE_NPM_REGISTRY: scriptRegistry } : {}),
+          npm_config_cache: join(staging, 'npm-cache'),
           TEMP: tempPath, TMP: tempPath,
           MODEL_ROUTER_UTILITY_MODULE: utilityModule,
           MODEL_ROUTER_MINIMAX_INSTALL_SCRIPT: scriptPath },
@@ -319,8 +393,7 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
     if (!outcome.ok) throw new Error(outcome.timedOut
       ? '官方安装脚本超时并已终止。'
       : `官方安装脚本退出码 ${outcome.code ?? '信号终止'}。${outcome.stderr.split('\n').find(Boolean)?.slice(0, 180) ?? ''}`)
-    const currentPath = process.env.PATH ?? ''
-    if (!currentPath.split(';').includes(installDir)) process.env.PATH = `${currentPath};${installDir}`
+    appendToProcessPath(installDir)
     job.phase = 'verifying'
     probeCache.delete(job.tool.id)
     const probe = await probeToolWith(job.tool, defaultRunner)
@@ -342,9 +415,9 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
     job.error = `MiniMax 官方安装兜底失败：${String(error?.message ?? error).slice(0, 300)}`
     job.finishedAt = new Date().toISOString()
   } finally {
-    if (staging && prefixRoot) {
-      const part = relative(prefixRoot, staging)
-      if (part.startsWith('.model-router-minimax-installer-') && !part.includes(sep)) {
+    if (staging && stagingParent) {
+      const part = relative(stagingParent, staging)
+      if (part.startsWith('.model-router-minimax-installer-') && !part.includes(sep) && !part.startsWith('..')) {
         await rm(staging, { recursive: true, force: true }).catch(() => {})
       }
     }
@@ -359,10 +432,9 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
  * different program.
  */
 export function verifiedVendorScript(source, verify = {}) {
-  const bytes = Buffer.isBuffer(source) ? source : Buffer.from(source)
-  const text = bytes.toString('utf8').replace(/^\uFEFF/, '')
+  const text = installerScriptText(source)
   if (!text.trim()) throw new Error('下载内容为空，已拒绝执行。')
-  if (/^\s*</.test(text)) throw new Error('下载内容不是安装脚本（收到 HTML 页面），已拒绝执行。')
+  if (isMarkupDocument(text)) throw new Error('下载内容不是安装脚本（收到 HTML 页面），已拒绝执行。')
   // Check "wrong vendor" first: a mirror that substituted another installer is
   // a different diagnosis from a truncated download, and the clearer one.
   const foreign = (verify.mustNotInclude ?? []).filter(marker => text.includes(marker))
@@ -441,7 +513,13 @@ async function runVendorScriptInstallJob(job, plan) {
         : `官方安装脚本退出码 ${outcome.code ?? '信号终止'}。${String(outcome.stderr ?? '').split('\n').find(Boolean)?.slice(0, 200) ?? ''}`)
     }
     const location = resolveInstallLocation(job.tool, plan.method, preferences, currentInstallOptions())
-    if (location?.dir) appendToProcessPath(location.dir)
+    if (location?.dir) {
+      appendToProcessPath(location.dir)
+      for (const relative of location.relatives ?? []) {
+        const folder = String(relative).split(/[\\/]/).slice(0, -1).filter(Boolean).join(sep)
+        if (folder) appendToProcessPath(join(location.dir, folder))
+      }
+    }
     job.phase = 'verifying'
     probeCache.delete(job.tool.id)
     const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0 })
@@ -473,6 +551,15 @@ async function runVendorScriptInstallJob(job, plan) {
  * the file must sit inside that tool's install directory, and it can never be a
  * home directory or a filesystem root.
  */
+/** One relative path under an install directory. `..` never leaves that directory. */
+export function scriptBinaryCandidate(installDir, relative) {
+  const parts = String(relative ?? '').split(/[\\/]/).filter(Boolean)
+  if (parts.length === 0 || parts.some(part => part === '.' || part === '..')) {
+    throw new Error('拒绝删除安装目录之外的文件。')
+  }
+  return join(installDir, ...parts)
+}
+
 export function checkedRemovableFile(candidate, { allowedNames, installDir, home = homedir() }) {
   const target = resolve(candidate)
   const base = target.split(sep).pop() ?? ''
@@ -502,8 +589,9 @@ async function runVendorScriptUninstallJob(job, plan) {
     job.phase = 'removing'
     const location = resolveInstallLocation(job.tool, plan.method, preferences, currentInstallOptions())
     const removed = []
-    for (const binary of location?.binaries ?? []) {
-      const candidate = join(location.dir, binary)
+    const relatives = location?.relatives?.length ? location.relatives : (location?.binaries ?? [])
+    for (const relative of relatives) {
+      const candidate = scriptBinaryCandidate(location.dir, relative)
       // checkedRemovableFile re-checks the basename, the install directory and
       // the root/home guards even though every part came from the registry.
       const target = checkedRemovableFile(candidate, {
@@ -624,9 +712,18 @@ async function probeUncached(tool, runner) {
   if (tool.id === 'minimax-code' && IS_WINDOWS) {
     // The official Windows installer keeps mcode under a versioned releases
     // directory. A partial npm install can leave a broken shim earlier on PATH;
-    // prefer the checksum-verified installer release in that case.
+    // prefer the checksum-verified installer release in that case. Also look at
+    // the configured directory and the vendor default, which may not be on PATH
+    // yet when the installer was told not to edit the user PATH.
     const { findManagedMiniMaxEntry } = await import('./official-tool-executor.mjs')
-    const managed = await findManagedMiniMaxEntry(process.cwd())
+    const directed = minimaxOfficialInstallDir(preferences, homedir())
+    // The configured directory is the copy updates write, so it wins over an
+    // older install that happens to sit earlier on PATH.
+    let managed = preferences.installDir
+      ? await findManagedMiniMaxEntry(process.cwd(), [directed, join(directed, '.minimax-code')])
+      : null
+    if (!managed) managed = await findManagedMiniMaxEntry(process.cwd())
+    if (!managed) managed = await findManagedMiniMaxEntry(process.cwd(), [directed, join(directed, '.minimax-code')])
     if (managed) return { id: tool.id, installed: true, version: managed.version,
       status: 'installed', detail: '已按官方 npm registry 摘要核验 MiniMax 官方 Windows 安装器中的 CLI 文件。',
       bannerLine: `MiniMax Code ${managed.version}` }
@@ -686,15 +783,17 @@ export const defaultRunner = (executable, args, options = {}) =>
 let prefixPromise = null
 
 /** Add one directory to this process's PATH unless it is already there. */
-function appendToProcessPath(directory) {
+function appendToProcessPath(directory, { includeBin = true } = {}) {
   const target = String(directory ?? '').trim()
   if (!target || !isAbsolute(target)) return
   const separator = IS_WINDOWS ? ';' : ':'
   const current = process.env.PATH ?? ''
-  if (current.split(separator).some(entry => entry.toLowerCase() === target.toLowerCase())) return
-  process.env.PATH = current ? `${current}${separator}${target}` : target
-  // POSIX package managers put global binaries in <prefix>/bin.
-  if (!IS_WINDOWS) appendToProcessPath(join(target, 'bin'))
+  if (!current.split(separator).some(entry => entry.toLowerCase() === target.toLowerCase())) {
+    process.env.PATH = current ? `${current}${separator}${target}` : target
+  }
+  // POSIX package managers put global binaries in <prefix>/bin. One level only:
+  // recursing would append bin/bin/bin until the process runs out of memory.
+  if (includeBin && !IS_WINDOWS) appendToProcessPath(join(target, 'bin'), { includeBin: false })
 }
 
 /**
@@ -728,6 +827,14 @@ export function ensureNpmPrefixOnPath() {
       // A --prefix install lands outside the npm prefix, so it needs its own
       // PATH entry or every later probe reports the tool as missing.
       try { appendToProcessPath(preferences.installDir) } catch { /* environment stays untouched */ }
+      // Vendor script defaults, so a one-click install that did not edit the
+      // user PATH is still visible to the next probe in this process.
+      for (const relative of [
+        '.minimax-code', '.local/bin', '.kimi-code/bin', '.grok/bin', '.mimocode/bin',
+        '.opencode/bin', '.stepcode/bin', 'AppData/Local/Programs/OpenAI/Codex/bin',
+      ]) {
+        try { appendToProcessPath(join(homedir(), ...relative.split('/'))) } catch { /* skip */ }
+      }
     })()
   }
   return prefixPromise
@@ -841,9 +948,12 @@ function beginJob(tool, { operation, methodId, command, installDir = '', run }) 
 export function planCommandLine(plan, operation = 'install') {
   if (plan.kind === 'script') {
     const piped = plan.shell === 'powershell' ? `irm ${plan.scriptUrl} | iex` : `curl -fsSL ${plan.scriptUrl} | bash`
-    return operation === 'uninstall'
-      ? `删除 ${plan.dir} 下的 ${(plan.binaries ?? []).join('、') || '可执行文件'}`
-      : `${piped}${plan.installDir ? ` ${plan.installArg} ${plan.installDir}` : ''}`
+    if (operation === 'uninstall') {
+      return `删除 ${plan.dir} 下的 ${(plan.binaries ?? []).join('、') || '可执行文件'}`
+    }
+    if (plan.installDir && plan.installArg?.[0]) return `${piped} ${plan.installArg[0]} ${plan.installDir}`
+    if (plan.installDir && plan.installDirEnv) return `${piped}（${plan.installDirEnv}=${plan.installDir}）`
+    return piped
   }
   return `${plan.manager} ${plan.args.join(' ')}`
 }
@@ -1089,6 +1199,7 @@ async function runInstallJob(manager, args, job) {
     installed: before.installed === true,
     order,
     platform: process.platform,
+    methodId: job.methodId,
   })
   let triedClaudeUpdate = false
   if (plan === 'claude-update-then-registry') {

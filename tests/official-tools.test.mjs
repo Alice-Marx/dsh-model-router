@@ -26,6 +26,9 @@ import {
   resetForTests,
   installPreferences,
   officialMiniMaxInstaller,
+  isMarkupDocument,
+  installerScriptText,
+  minimaxOfficialInstallDir,
   stripPathBlock,
   defaultRunner,
   shellSpawnSpec,
@@ -69,12 +72,38 @@ test('MiniMax official Windows installer entry: any release, but its code must m
     assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], attestor({ ok: true })), null)
   })
 
-test('MiniMax installer fallback runs the official script as published (no version patching)', () => {
-  const source = Buffer.from('& $Npm install -g "@minimax-ai/code@latest"\n')
-  assert.equal(officialMiniMaxInstaller(source), source.toString())
-  assert.equal(officialMiniMaxInstaller(Buffer.concat([Buffer.from('\uFEFF'), source])), source.toString())
-  assert.throws(() => officialMiniMaxInstaller(Buffer.from('<html>404</html>')), /官方/)
-  assert.throws(() => officialMiniMaxInstaller(Buffer.from('Write-Host "something else"')), /官方/)
+const MINIMAX_OFFICIAL_SCRIPT = [
+  '<#',
+  '.SYNOPSIS',
+  '  Zero-dependency MiniMax Code CLI installer for Windows PowerShell 5.1+.',
+  '#>',
+  "$PackageName = '@minimax-ai/code'",
+  "$InstallDir = if ($env:MCODE_INSTALL_DIR) { $env:MCODE_INSTALL_DIR } else { Join-Path $env:USERPROFILE '.minimax-code' }",
+  "Write-Host 'MiniMax Code'",
+].join('\n')
+
+test('MiniMax installer accepts the official PowerShell comment header and rejects HTML', () => {
+  const source = Buffer.from(MINIMAX_OFFICIAL_SCRIPT)
+  assert.equal(isMarkupDocument(MINIMAX_OFFICIAL_SCRIPT), false)
+  assert.equal(isMarkupDocument('<html>404</html>'), true)
+  assert.equal(isMarkupDocument('<!DOCTYPE html><html></html>'), true)
+  assert.equal(officialMiniMaxInstaller(source), MINIMAX_OFFICIAL_SCRIPT)
+  assert.equal(officialMiniMaxInstaller(Buffer.concat([Buffer.from('\uFEFF'), source])), MINIMAX_OFFICIAL_SCRIPT)
+  const utf16 = Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from(MINIMAX_OFFICIAL_SCRIPT, 'utf16le')])
+  assert.equal(installerScriptText(utf16), MINIMAX_OFFICIAL_SCRIPT)
+  assert.equal(officialMiniMaxInstaller(utf16), MINIMAX_OFFICIAL_SCRIPT)
+  assert.throws(() => officialMiniMaxInstaller(Buffer.from('<html>@minimax-ai/code MCODE_INSTALL_DIR MiniMax Code</html>')), /HTML/)
+  assert.throws(() => officialMiniMaxInstaller(Buffer.from('Write-Host "something else"')), /缺少/)
+  assert.throws(() => officialMiniMaxInstaller(Buffer.from('')), /为空/)
+  const method = installMethodFor(getOfficialTool('minimax-code'), 'script-powershell')
+  assert.equal(verifiedVendorScript(source, method.verify), MINIMAX_OFFICIAL_SCRIPT)
+  assert.throws(() => verifiedVendorScript(Buffer.from('<#\nnot the installer\n#>'), method.verify), /官方安装脚本/)
+})
+
+test('MiniMax update directory is the configured path, otherwise the vendor default', () => {
+  assert.equal(minimaxOfficialInstallDir({ installDir: 'D:/AI/tools' }, '/home/tester', 'C:/old'), 'D:/AI/tools')
+  assert.equal(minimaxOfficialInstallDir({ installDir: '' }, '/home/tester', 'C:/Users/tester/.minimax-code'), 'C:/Users/tester/.minimax-code')
+  assert.equal(minimaxOfficialInstallDir({}, '/home/tester', ''), join('/home/tester', '.minimax-code'))
 })
 
 test('registry stays fail-closed and internally consistent', () => {
@@ -110,7 +139,10 @@ test('registry stays fail-closed and internally consistent', () => {
         assert.match(method.scriptUrl, /^https:\/\//, `${tool.id}/${method.id} script must be https`)
         assert.ok(method.verify?.mustInclude?.length, `${tool.id}/${method.id} needs markers to verify the script`)
         // A method that claims a custom directory must actually pass one on.
-        if (method.supportsInstallDir) assert.ok(method.installArgs.length, `${tool.id}/${method.id} needs its install-dir argument`)
+        if (method.supportsInstallDir) {
+          assert.ok(method.installArgs.length || method.installDirEnv,
+            `${tool.id}/${method.id} needs its install-dir argument or environment variable`)
+        }
       } else {
         assert.ok(method.uninstallArgs.length, `${tool.id}/${method.id} needs an uninstall command`)
       }
@@ -354,6 +386,9 @@ test('installed Claude, Codex and MiniMax choose an updater instead of a silent 
   assert.equal(officialUpdatePlan({ toolId: 'codex', installed: true, order: -1, platform: 'win32' }), 'registry-install')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32' }), 'minimax-official-installer')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: null, platform: 'win32' }), 'minimax-official-installer')
+  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32', methodId: 'npm' }), 'registry-install')
+  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32', methodId: 'pnpm' }), 'registry-install')
+  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32', methodId: 'script-powershell' }), 'minimax-official-installer')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'linux' }), 'registry-install')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: false, order: null, platform: 'win32' }), 'registry-install')
   assert.equal(officialUpdatePlan({ toolId: 'kimi-code', installed: true, order: -1, platform: 'darwin' }), 'registry-install')

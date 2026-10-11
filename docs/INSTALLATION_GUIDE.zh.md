@@ -101,7 +101,7 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 
 注册表包含 Kimi、Claude、Codex、MiniMax、MiMo、Grok、Gemini 和 ZCode。Claude、Codex、MiMo、Grok 支持单工具/团队只读或可编辑执行；Kimi、MiniMax、ZCode 仅支持获批的可编辑托管执行。Gemini 有路由无界面适配器，不进入单工具/团队托管执行器。详见[官方工具与托管模式](../README.zh.md#官方工具与托管模式)。CLI 模型名可能不同于 Harness 目录；多数 CLI 不提供可核验的实际模型 ID，要看厂商记录与账单。
 
-安装使用固定官方 npm 包的 `@latest` 或 ZCode 签名安装器。希望 npm 工具安装在非 C 盘时，先按自己的空间规划配置全局前缀；Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，仅检查大小和基本内容结构后原样执行，**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex/ZCode Windows 入口验证发布者签名，ZCode 内置脚本还有每个签名构建的首次信任摘要检查。具体规则见[执行器](../.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](../.dsh-plugin/shared/npm-attestation.mjs)。
+安装使用固定官方来源：npm/pnpm 的 `@latest`，厂商发布的 `curl | bash` / `irm | iex` 脚本（Claude、Codex、MiniMax、Kimi、MiMo、Grok、OpenCode、Step Code，按平台显示），或 ZCode 签名安装器。在**官方工具**里为每个工具选择方式，并填写统一安装目录；一键安装和更新都使用这一选择。npm/pnpm 会带上 `--prefix`。支持目录的脚本把该路径传给厂商自己的变量（MiniMax 是 `MCODE_INSTALL_DIR`）。写死路径的脚本会在该行写明实际落点。未填写目录时，MiniMax Windows 更新使用已有官方目录，否则使用 `%USERPROFILE%\.minimax-code`，不再改放到 npm 全局前缀。Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，检查大小、UTF-8/UTF-16 文本和厂商标记后原样执行（PowerShell 的 `<#` 说明头不是 HTML），**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex/ZCode Windows 入口验证发布者签名，ZCode 内置脚本还有每个签名构建的首次信任摘要检查。具体规则见[执行器](../.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](../.dsh-plugin/shared/npm-attestation.mjs)。
 
 ## 6. GAL 第一次使用
 
