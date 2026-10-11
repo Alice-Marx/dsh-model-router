@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+## 0.17.1 — 2026-10-11
+
+Stable patch under the npm `latest` tag. Fully quit Harness, including the tray or WebUI host process, and restart after upgrading so the Host reloads. Existing 0.17.0 artifacts remain unchanged.
+
 - **MiniMax Windows one-click update accepts the official installer again.** The published `install.ps1` opens with PowerShell comment-based help (`<#`), and the sanity check treated every leading `<` as an HTML page, so the real script was refused before it ran. HTML and XML documents are still refused. UTF-8/UTF-16 BOMs are decoded first. Content-Type is not used: the CDN serves the script as `application/octet-stream`. A download that is empty, HTML, or missing `@minimax-ai/code`, `MCODE_INSTALL_DIR` and `MiniMax Code` still fails with the missing piece named.
 - **Official script installers are selectable.** Claude Code, Codex, MiniMax, Kimi, MiMo and Grok now offer the vendor `curl | bash` / `irm | iex` installer next to npm and pnpm, on the platforms that script supports. Gemini stays on npm/pnpm. ZCode stays the signed desktop installer. One-click install, repair and uninstall run the method shown on the row. MiniMax on Windows defaults to `irm | iex` (that is the copy npm does not update); pinning npm or pnpm runs that manager instead, and still falls back to the official script if the probed version does not advance.
 - **Updates use the configured install directory.** npm/pnpm keep `--prefix`. Scripts that document a directory variable (`MCODE_INSTALL_DIR`, `CODEX_INSTALL_DIR`, `KIMI_INSTALL_DIR`, `GROK_BIN_DIR`, `MIMOCODE_INSTALL_DIR`, Step Code's flag) receive that path. The MiniMax Windows fallback no longer substitutes the npm prefix: a configured directory wins, otherwise an existing official layout is updated in place, otherwise `%USERPROFILE%\.minimax-code`. Scripts that hardcode a path (Claude, OpenCode, MiMo on Unix) say so on the row.
+- Windows validation for this patch: MiniMax `irm | iex` against a configured install directory completed with `mcode.cmd` present and version 0.6.8; the false “not an official Windows install script” refusal did not recur on main tip `1162f276`.
 
 ## 0.17.0 — 2026-10-11
 
