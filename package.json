@@ -87,8 +87,8 @@
     "docs/assets/desktop-official-tools-0.9.0.png",
     "docs/assets/workbench-usage.svg",
     "docs/assets/candidate-pruning.svg",
-    "INSTALLATION_GUIDE.zh.md",
-    "MIGRATION.md",
+    "docs/INSTALLATION_GUIDE.zh.md",
+    "docs/archive/MIGRATION.md",
     "LICENSE",
     "CHANGELOG.md",
     "docs/assets/router-only-0.12.0.png"

@@ -144,7 +144,7 @@ Prerelease for DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2, published under
 
 ### Package renamed
 - The npm package is now **`@ljwei-stak/dsh-model-router`**. The last version under the old name `@ljwei-stak/model-router-galgame` is 0.13.0, with the same content as `@ljwei-stak/dsh-model-router@0.13.0`; the old name will get no further updates. Upgrade by removing the old plugin and adding the new one; do not install both.
-- The profile entry id, panel id, settings namespace and Cordis plugin name stay `model-router-galgame`, and state stays in `~/.dsh/model-router/`, so saved settings and run history carry over. See [MIGRATION.md](MIGRATION.md).
+- The profile entry id, panel id, settings namespace and Cordis plugin name stay `model-router-galgame`, and state stays in `~/.dsh/model-router/`, so saved settings and run history carry over. See [MIGRATION.md](docs/archive/MIGRATION.md).
 
 ### Official CLI execution (PR #1)
 - Assigned work packages run through the official vendor CLIs (Claude Code, Codex, Gemini CLI, Kimi Code, MiniMax Code, MiMo Code, Grok Build) with headless adapters; failures fall back to the Harness model catalog API.

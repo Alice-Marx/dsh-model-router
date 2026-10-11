@@ -17,7 +17,7 @@
 联调显示：模型列表、图片 attachment 和官方调用链均已恢复。视觉引擎已切换为 DeepSeek
 官方兼容接口，当前样本识别正确但耗时约 10.34 秒。严格代码错误、图表、成本和
 `<3 秒` 验收仍未全部完成。详见
-[MODLENS_REAL_USAGE_REPORT_2026-09-02.md](MODLENS_REAL_USAGE_REPORT_2026-09-02.md)。
+[MODLENS_REAL_USAGE_REPORT_2026-09-02.md](../../MODEL-file/MODLENS_REAL_USAGE_REPORT_2026-09-02.md)。
 任务二采用固定随机种子的离线数据和执行模拟器，验证路由算法、指标计算和报告
 生成流程，不把模拟结果描述为真实供应商 API 的质量评测。
 
@@ -96,7 +96,7 @@ GAL 过去依赖自身的 ModelDirectory 投影，恢复会话或 adapter 刷新
 | 成本节省 >95% | 未验证 |
 | 理解时间 <3 秒 | 未通过，DeepSeek Vision Exp 实测约 10.34 秒 |
 
-真实结果见 [MODLENS_REAL_USAGE_REPORT_2026-09-02.md](MODLENS_REAL_USAGE_REPORT_2026-09-02.md)。
+真实结果见 [MODLENS_REAL_USAGE_REPORT_2026-09-02.md](../../MODEL-file/MODLENS_REAL_USAGE_REPORT_2026-09-02.md)。
 
 ## 4. 任务二：实验插件实施过程
 
@@ -342,9 +342,9 @@ npm start
 - [SettingsTab.jsx](/F:/DeepSeek_harness/model-router-galgame/.dsh-plugin/client/SettingsTab.jsx)
 - [modlens-routing.test.mjs](/F:/DeepSeek_harness/model-router-galgame/tests/modlens-routing.test.mjs)
 - [model-directory-bridge.test.mjs](/F:/DeepSeek_harness/model-router-galgame/tests/model-directory-bridge.test.mjs)
-- [MODLENS_DEPLOYMENT.md](/F:/DeepSeek_harness/model-router-galgame/MODLENS_DEPLOYMENT.md)
-- [MODLENS_TEST_REPORT.md](/F:/DeepSeek_harness/model-router-galgame/MODLENS_TEST_REPORT.md)
-- [MODLENS_REAL_USAGE_REPORT_2026-09-02.md](/F:/DeepSeek_harness/model-router-galgame/MODLENS_REAL_USAGE_REPORT_2026-09-02.md)
+- [MODLENS_DEPLOYMENT.md](../../MODEL-file/MODLENS_DEPLOYMENT.md)
+- [MODLENS_TEST_REPORT.md](../../MODEL-file/MODLENS_TEST_REPORT.md)
+- [MODLENS_REAL_USAGE_REPORT_2026-09-02.md](../../MODEL-file/MODLENS_REAL_USAGE_REPORT_2026-09-02.md)
 
 ### 实验插件
 

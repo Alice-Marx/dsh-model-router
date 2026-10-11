@@ -50,4 +50,4 @@
 | 剧情与自由对话 | 独立 GAL 管理故事、立绘、音乐、设置和存档；自由模式经宿主模型服务调用，可能计费。 |
 | 更新 | 通过官方插件管理器分别安装各自的新版本；路由正式版发布在 npm `latest`（预发布版在 `next`），推荐精确版本。 |
 
-登录、厂商实际模型和账单仍由账号持有人验收。完整步骤与安装后的检查见 [INSTALLATION_GUIDE.zh.md](INSTALLATION_GUIDE.zh.md)，GAL 播放器教程见[独立仓库](https://github.com/Alice-Marx/deepseek-harness-galgame#readme)。
+登录、厂商实际模型和账单仍由账号持有人验收。完整步骤与安装后的检查见 [INSTALLATION_GUIDE.zh.md](../INSTALLATION_GUIDE.zh.md)，GAL 播放器教程见[独立仓库](https://github.com/Alice-Marx/deepseek-harness-galgame#readme)。

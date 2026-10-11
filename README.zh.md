@@ -18,7 +18,7 @@
 
 **0.15.0 更新**：工作台分为四页，路由建议紧接任务规划展示；执行输入变化时丢弃旧预览；裁剪历史或重试后仍保留费用累计；源码开发新增独立模拟 UI 预览。
 
-[English](README.md) · [工作台完整指南](docs/WORKBENCH_USER_GUIDE.zh.md) · [安装与验证](INSTALLATION_GUIDE.zh.md) · [迁移说明](MIGRATION.md) · [更新记录](CHANGELOG.md)
+[English](README.md) · [工作台完整指南](docs/WORKBENCH_USER_GUIDE.zh.md) · [安装与验证](docs/INSTALLATION_GUIDE.zh.md) · [迁移说明](docs/archive/MIGRATION.md) · [更新记录](CHANGELOG.md)
 
 需要自行实测时，按[安装验收与质量—成本实验步骤](docs/ROUTING_SELFTEST_STEPS.zh.md)先完成桌面检查和 18 题×3 模型小样，再决定正式样本与费用上限。方案区分首包选模投影和实际团队执行；配套离线入口不采集、不调用模型，真实收益仍待验证。
 
@@ -57,7 +57,7 @@
 
 `@ljwei-stak/model-router-galgame` 的最后版本为 0.13.0。保留 profile 与应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.16.4`。不要同时安装两个包：它们共用内部插件 id `model-router-galgame` 与工具名；id 保留使已有路由设置和执行历史能够延续。
 
-从 0.11.x 合并版迁移时，先备份 profile 并导出希望保留的 GAL 进度。剧情、立绘、音乐、自由模式和存档属于独立 `@ljwei-stak/dsh-galgame` 插件。导出范围及同 profile 迁移的限制见 [MIGRATION.md](MIGRATION.md)。
+从 0.11.x 合并版迁移时，先备份 profile 并导出希望保留的 GAL 进度。剧情、立绘、音乐、自由模式和存档属于独立 `@ljwei-stak/dsh-galgame` 插件。导出范围及同 profile 迁移的限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 
 ## 工作台的四个页面
 

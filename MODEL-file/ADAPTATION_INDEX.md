@@ -21,7 +21,7 @@
 
 ### 1️⃣ 快速开始（推荐首先阅读）
 
-**[QUICK_START.zh.md](./QUICK_START.zh.md)** - 5分钟快速入门指南
+**[QUICK_START.zh.md](../docs/QUICK_START.zh.md)** - 5分钟快速入门指南
 
 - ✅ 安装步骤（3步）
 - ✅ 基础配置
@@ -77,7 +77,7 @@
 
 ### 4️⃣ 适配总结（快速概览）
 
-**[SUMMARY.md](./SUMMARY.md)** - 适配工作总结
+**[SUMMARY.md](../docs/archive/SUMMARY.md)** - 适配工作总结
 
 - ✅ 已完成工作清单
 - ✅ 核心发现（功能完整度 100%）
@@ -95,7 +95,7 @@
 
 ### 5️⃣ 原有项目文档
 
-**[README.md](./README.md)** / **[README.zh.md](./README.zh.md)** - 项目说明
+**[README.md](../README.md)** / **[README.zh.md](../README.zh.md)** - 项目说明
 
 - 项目功能介绍
 - 数学路由模型
@@ -174,28 +174,25 @@
 ## 📊 文档结构图
 
 ```
-model-router-galgame/
+dsh-model-router/
 │
-├── 📘 ADAPTATION_INDEX.md (本文件)
-│   └─ 文档导航与推荐阅读路径
+├── MODEL-file/
+│   ├── 📘 ADAPTATION_INDEX.md (本文件)
+│   │   └─ 文档导航与推荐阅读路径
+│   ├── 📕 DEEPSEEK_ADAPTATION_REPORT.md
+│   │   └─ 完整技术报告（架构+功能+配置+FAQ）
+│   └── 📙 MODEL_OPTIMIZATION.md
+│       └─ 模型优化建议（性能调优方案）
 │
-├── 📗 QUICK_START.zh.md
-│   └─ 快速入门指南（5分钟上手）
+├── docs/
+│   ├── 📗 QUICK_START.zh.md
+│   │   └─ 快速入门指南（5分钟上手）
+│   └── archive/
+│       └── 📄 SUMMARY.md
+│           └─ 适配工作总结（快速概览）
 │
-├── 📕 DEEPSEEK_ADAPTATION_REPORT.md
-│   └─ 完整技术报告（架构+功能+配置+FAQ）
-│
-├── 📙 MODEL_OPTIMIZATION.md
-│   └─ 模型优化建议（性能调优方案）
-│
-├── 📄 SUMMARY.md
-│   └─ 适配工作总结（快速概览）
-│
-├── 📖 README.md / README.zh.md
-│   └─ 原项目说明文档
-│
-└── 📚 大模型娘人物设定.md
-    └─ 14位模型娘的详细设定
+└── 📖 README.md / README.zh.md
+    └─ 项目说明文档
 ```
 
 ---

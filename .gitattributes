@@ -9,7 +9,7 @@
 /README.md -text
 /README.zh.md -text
 /README.i18n.yaml -text
-/INSTALLATION_GUIDE.zh.md -text
+/docs/INSTALLATION_GUIDE.zh.md -text
 /docs/WORKBENCH_USER_GUIDE.zh.md -text
 /docs/ROUTING_RESEARCH.zh.md -text
 /docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md -text
@@ -19,12 +19,12 @@
 /docs/ROUTING_ADAPTIVE_LEARNING.zh.md -text
 /docs/ROUTING_MATURITY.zh.md -text
 /docs/assets/*.svg -text
-/MIGRATION.md -text
+/docs/archive/MIGRATION.md -text
 /GAL_GAME_CONCEPT.zh.md -text
 /GAL_STORY_V2_OUTLINE.zh.md -text
 /大模型娘人物设定.md -text
 /GAL_GAME_PREVIEW.md -text
-/MODLENS_DEPLOYMENT.md -text
+/MODEL-file/MODLENS_DEPLOYMENT.md -text
 /LICENSE -text
 /docs/ECHO_CITY_STORY.zh.md -text
 /docs/GAL_ART_SOURCES.zh.md -text
