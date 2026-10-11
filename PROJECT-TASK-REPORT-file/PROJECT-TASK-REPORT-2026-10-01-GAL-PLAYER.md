@@ -89,9 +89,9 @@ CLI 安装时 pnpm 对仅有插件依赖的测试 profile 提示 peer 未由该 
 
 最终包追加文档和实拍图后，已核对官方实际加载的客户端与最终客户端同字节。隔离服务已停止，测试页已关闭；用户原有 8080 与桌面 profile 未修改。原本的组件预览页保留给用户查看。
 
-![官方 rc.2 独立 profile 中的标题与插件入口](docs/assets/gal-official-rc2-0.11.0.jpg)
+![官方 rc.2 独立 profile 中的标题与插件入口](../docs/assets/gal-official-rc2-0.11.0.jpg)
 
-![官方 rc.2 中的全屏完整身体与操作栏](docs/assets/gal-official-fullbody-0.11.0.jpg)
+![官方 rc.2 中的全屏完整身体与操作栏](../docs/assets/gal-official-fullbody-0.11.0.jpg)
 
 ## 五、安装包与发布状态
 

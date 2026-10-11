@@ -4,7 +4,7 @@
 
 当前路由正式版为 **0.16.4**。本版修复 PATH 探测丢输出：没有安装日志回调时，`where` 和 `--version` 的 stdout 仍会保留，已安装的 CLI 不再被报成未安装。0.16.3 的命令行参数修复、0.16.2 的更新按钮修复和 0.16.1 的反馈缓存仍然保留。公开数据默认关闭；主观偏好调整不改变公共能力评分或质量门槛。源码开发可使用独立模拟 UI 预览；安装时选择下方精确版本。
 
-[路由 README](README.zh.md) · [迁移说明](MIGRATION.md) · [独立 GAL README](https://github.com/Alice-Marx/deepseek-harness-galgame#readme)
+[路由 README](../README.zh.md) · [迁移说明](archive/MIGRATION.md) · [独立 GAL README](https://github.com/Alice-Marx/deepseek-harness-galgame#readme)
 
 ## 1. 选择需要的插件
 
@@ -93,15 +93,15 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 7. 在**预算与安全**查看每日/月度预算、订阅失败策略及可读/写边界；**持续反馈与本地偏好**可设置学习启停、半衰期、收缩强度和调整上限，**动态公共数据**需自行启用。官方工具终端不经过 Harness 沙箱，继承用户登录环境，需单独确认启动。
 8. 需要 CLI 修改文件时进入官方会话、选择工作区，明确请求 `model_router_tool_run` 或 `model_router_team_execute` 的 `workspace-write` 模式。可编辑托管执行要求干净 Git 仓库、宿主审批和进程沙箱。`model_router_execute` 用于只读路由执行，`model_router_consult` 用于模型 API 意见。
 
-完整教程见[工作台使用指南](docs/WORKBENCH_USER_GUIDE.zh.md)；路线算法、订阅与数据保存说明见[README](README.zh.md)。
+完整教程见[工作台使用指南](WORKBENCH_USER_GUIDE.zh.md)；路线算法、订阅与数据保存说明见[README](../README.zh.md)。
 
 在成功结果上点 👍 / 👎，再次点已选评价可撤回。评价按准确路线和任务类型形成时间衰减、向零收缩的**主观偏好效用**，默认最大幅度 ±0.04，可配置到不超过 ±0.1；不抬高客观能力分或公共质量门槛。模型复核不视作人工评价，模型侧评分工具需要用户审批；本版不发起付费探索。
 
-学习范围是同一个本地 **DSH_HOME** 共享的最近 **200 次运行**，不是多账号隔离或无限长期记忆。“从现在重新学习”只让旧结果不再参与学习，不删除执行记录和费用累计。动态价格只读取用户指定的公开、严格结构化、按官方文档策展的 USD/百万 token 固定费率快照；不是自动抓取所有厂商价目表，复杂阶梯/时段计费不能强行折成该格式。人工单价优先；公开数据默认关闭，详情见[动态数据与持续反馈说明](docs/ROUTING_ADAPTIVE_LEARNING.zh.md)。
+学习范围是同一个本地 **DSH_HOME** 共享的最近 **200 次运行**，不是多账号隔离或无限长期记忆。“从现在重新学习”只让旧结果不再参与学习，不删除执行记录和费用累计。动态价格只读取用户指定的公开、严格结构化、按官方文档策展的 USD/百万 token 固定费率快照；不是自动抓取所有厂商价目表，复杂阶梯/时段计费不能强行折成该格式。人工单价优先；公开数据默认关闭，详情见[动态数据与持续反馈说明](ROUTING_ADAPTIVE_LEARNING.zh.md)。
 
-注册表包含 Kimi、Claude、Codex、MiniMax、MiMo、Grok、Gemini 和 ZCode。Claude、Codex、MiMo、Grok 支持单工具/团队只读或可编辑执行；Kimi、MiniMax、ZCode 仅支持获批的可编辑托管执行。Gemini 有路由无界面适配器，不进入单工具/团队托管执行器。详见[官方工具与托管模式](README.zh.md#官方工具与托管模式)。CLI 模型名可能不同于 Harness 目录；多数 CLI 不提供可核验的实际模型 ID，要看厂商记录与账单。
+注册表包含 Kimi、Claude、Codex、MiniMax、MiMo、Grok、Gemini 和 ZCode。Claude、Codex、MiMo、Grok 支持单工具/团队只读或可编辑执行；Kimi、MiniMax、ZCode 仅支持获批的可编辑托管执行。Gemini 有路由无界面适配器，不进入单工具/团队托管执行器。详见[官方工具与托管模式](../README.zh.md#官方工具与托管模式)。CLI 模型名可能不同于 Harness 目录；多数 CLI 不提供可核验的实际模型 ID，要看厂商记录与账单。
 
-安装使用固定官方 npm 包的 `@latest` 或 ZCode 签名安装器。希望 npm 工具安装在非 C 盘时，先按自己的空间规划配置全局前缀；Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，仅检查大小和基本内容结构后原样执行，**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex/ZCode Windows 入口验证发布者签名，ZCode 内置脚本还有每个签名构建的首次信任摘要检查。具体规则见[执行器](.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](.dsh-plugin/shared/npm-attestation.mjs)。
+安装使用固定官方 npm 包的 `@latest` 或 ZCode 签名安装器。希望 npm 工具安装在非 C 盘时，先按自己的空间规划配置全局前缀；Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，仅检查大小和基本内容结构后原样执行，**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex/ZCode Windows 入口验证发布者签名，ZCode 内置脚本还有每个签名构建的首次信任摘要检查。具体规则见[执行器](../.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](../.dsh-plugin/shared/npm-attestation.mjs)。
 
 ## 6. GAL 第一次使用
 
@@ -125,7 +125,7 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 | 动态公开数据 | 默认关闭；自行启用后核对快照版本、校验时间及失败/过期状态；人工单价仍优先。 |
 | 可编辑执行 | 在干净测试仓库核对审批、隔离工作区、补丁整合、厂商实际模型与计费。 |
 
-历史 0.15.0 的自动测试验证为 220 项通过、3 项 Windows 平台跳过；组件 UI 预览检查使用模拟数据。**0.16.4 的发布验证见[更新记录](CHANGELOG.md)**，不把模拟公开源/模型流和组件预览当作真实付费调用或 Harness Desktop 端到端验收；上表中的实际安装、账号和工作区检查仍需在使用环境中完成。
+历史 0.15.0 的自动测试验证为 220 项通过、3 项 Windows 平台跳过；组件 UI 预览检查使用模拟数据。**0.16.4 的发布验证见[更新记录](../CHANGELOG.md)**，不把模拟公开源/模型流和组件预览当作真实付费调用或 Harness Desktop 端到端验收；上表中的实际安装、账号和工作区检查仍需在使用环境中完成。
 
 ## 8. 开发者从完整源码构建
 
@@ -145,4 +145,4 @@ pnpm 10 没有 `pnpm peers check`；使用严格依赖安装。客户端修改�
 
 ## 历史兼容提醒
 
-合并版 **0.11.1 / 0.11.0** 声明 rc.1 与 rc.2；**0.10.2** 是未发布的本地兼容修复。已发布 **0.10.1** 仅声明 rc.1，rc.2 拒绝安装是 peer 依赖问题，换镜像不能修复；**0.8.0** 使用 0.1.7-rc.2 依赖，不用于当前宿主。历史 Git 标签和安装包保留，详见[更新记录](CHANGELOG.md)和[迁移说明](MIGRATION.md)。
+合并版 **0.11.1 / 0.11.0** 声明 rc.1 与 rc.2；**0.10.2** 是未发布的本地兼容修复。已发布 **0.10.1** 仅声明 rc.1，rc.2 拒绝安装是 peer 依赖问题，换镜像不能修复；**0.8.0** 使用 0.1.7-rc.2 依赖，不用于当前宿主。历史 Git 标签和安装包保留，详见[更新记录](../CHANGELOG.md)和[迁移说明](archive/MIGRATION.md)。

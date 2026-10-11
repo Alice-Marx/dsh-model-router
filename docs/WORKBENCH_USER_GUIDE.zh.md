@@ -1,6 +1,6 @@
 # 模型路由工作台：配置、规划与实际执行
 
-适用版本：正式版 `@ljwei-stak/dsh-model-router@0.16.0`；声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](../MIGRATION.md)。
+适用版本：正式版 `@ljwei-stak/dsh-model-router@0.16.0`；声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
 
 0.15.0 新增四页布局、规划后直接展示路由建议、执行输入变化时丢弃旧预览，以及历史裁剪和重试后的费用累计保留。源码中的独立 UI 预览使用模拟数据，用于组件检查，不代表真实账号调用或桌面端到端验收。
 

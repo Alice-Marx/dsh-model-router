@@ -18,7 +18,7 @@ Current version: **0.16.4** (`@ljwei-stak/dsh-model-router`). Its declared host 
 
 **0.15.0 changes:** a four-tab workbench with routing advice directly below task planning, protection against stale execution previews, preserved spending totals across history pruning and retries, and a standalone mock UI preview for source development.
 
-[简体中文](README.zh.md) · [Workbench guide (Chinese)](docs/WORKBENCH_USER_GUIDE.zh.md) · [Installation guide (Chinese)](INSTALLATION_GUIDE.zh.md) · [Migration](MIGRATION.md) · [Changelog](CHANGELOG.md)
+[简体中文](README.zh.md) · [Workbench guide (Chinese)](docs/WORKBENCH_USER_GUIDE.zh.md) · [Installation guide (Chinese)](docs/INSTALLATION_GUIDE.zh.md) · [Migration](docs/archive/MIGRATION.md) · [Changelog](CHANGELOG.md)
 
 For self-testing, follow the [desktop acceptance and quality–cost experiment steps (Chinese)](docs/ROUTING_SELFTEST_STEPS.zh.md). Start with an 18-question, three-model pilot and an explicit spending limit. Offline helpers do not collect answers or call models; first-stage selection replay is distinct from end-to-end team execution.
 
@@ -57,7 +57,7 @@ You can instead install a local `.tgz` archive or its extracted inner `package` 
 
 The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.16.4`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
-For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](MIGRATION.md).
+For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
 ## Use the workbench
 

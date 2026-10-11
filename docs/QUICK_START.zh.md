@@ -445,9 +445,9 @@ test('my custom routing scenario', () => {
 
 ### 官方文档
 
-- **完整适配报告**: `DEEPSEEK_ADAPTATION_REPORT.md`
-- **人物设定集**: `大模型娘人物设定.md`
-- **项目 README**: `README.md` / `README.zh.md`
+- **完整适配报告**: [DEEPSEEK_ADAPTATION_REPORT.md](../MODEL-file/DEEPSEEK_ADAPTATION_REPORT.md)
+- **人物设定集**: `大模型娘人物设定.md`（本仓库中已无此文件）
+- **项目 README**: [README.md](../README.md) / [README.zh.md](../README.zh.md)
 
 ### 代码导航
 
