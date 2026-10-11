@@ -40,8 +40,16 @@ function packageManagerMethod(id, label, manager, spec, { registryFlag = '--regi
   })
 }
 
-/** Vendor installer script run from a verified local copy. */
-function scriptMethod(id, label, { shell, scriptUrl, verify, installArg = [], env = [], platforms, supportsInstallDir = false }) {
+/**
+ * Vendor installer script run from a verified local copy.
+ * A directory is passed either as `installArg` (`--install-dir`) or as
+ * `installDirEnv` (`MCODE_INSTALL_DIR`, `CODEX_INSTALL_DIR`, …). Scripts that
+ * hardcode their own path set neither and `supportsInstallDir` stays false.
+ */
+function scriptMethod(id, label, {
+  shell, scriptUrl, verify, installArg = [], env = [], platforms,
+  installDirEnv = '', defaultInstallDir = '',
+}) {
   return Object.freeze({
     id,
     label,
@@ -53,9 +61,13 @@ function scriptMethod(id, label, { shell, scriptUrl, verify, installArg = [], en
     installArgs: Object.freeze(installArg),
     /** Environment the vendor script itself documents for this install. */
     env: Object.freeze(env),
+    /** When set, the configured directory is this environment variable, not an argv flag. */
+    installDirEnv,
+    /** Home-relative directory the vendor uses when the user sets none. Slashes only. */
+    defaultInstallDir,
     platforms: Object.freeze(platforms),
     /** Whether the vendor script honours a caller-chosen directory at all. */
-    supportsInstallDir,
+    supportsInstallDir: Boolean(installDirEnv) || installArg.length > 0,
     supportsRegistry: false,
   })
 }
@@ -73,9 +85,36 @@ export const OFFICIAL_TOOLS = Object.freeze([
     probeExecutables: ['kimi'],
     probeNote: 'kimi 与旧 Python 版 kimi-cli 同名；请核对可执行文件来源和版本。',
     providerHints: ['moonshot', 'kimi'],
+    scriptBinaryNames: Object.freeze(['kimi', 'kimi.exe']),
+    scriptBinaryRelatives: Object.freeze(['bin/kimi', 'bin/kimi.exe']),
+    defaultScriptInstallDir: '.kimi-code',
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@moonshot-ai/kimi-code@latest'),
       packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@moonshot-ai/kimi-code@latest'),
+      scriptMethod('script-bash', 'curl | bash', {
+        shell: 'bash',
+        scriptUrl: 'https://code.kimi.com/kimi-code/install.sh',
+        platforms: ['linux', 'darwin'],
+        installDirEnv: 'KIMI_INSTALL_DIR',
+        defaultInstallDir: '.kimi-code',
+        env: ['KIMI_INSTALL_DIR'],
+        verify: Object.freeze({
+          mustInclude: ['code.kimi.com/kimi-code', 'KIMI_INSTALL_DIR'],
+          mustNotInclude: ['downloads.claude.ai/claude-code-releases', '@minimax-ai/code'],
+        }),
+      }),
+      scriptMethod('script-powershell', 'irm | iex', {
+        shell: 'powershell',
+        scriptUrl: 'https://code.kimi.com/kimi-code/install.ps1',
+        platforms: ['win32'],
+        installDirEnv: 'KIMI_INSTALL_DIR',
+        defaultInstallDir: '.kimi-code',
+        env: ['KIMI_INSTALL_DIR'],
+        verify: Object.freeze({
+          mustInclude: ['code.kimi.com/kimi-code', 'KIMI_INSTALL_DIR'],
+          mustNotInclude: ['downloads.claude.ai/claude-code-releases', '@minimax-ai/code'],
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -89,9 +128,32 @@ export const OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ['uninstall', '-g', '@anthropic-ai/claude-code'],
     probeExecutables: ['claude'],
     providerHints: ['anthropic', 'claude'],
+    // The native installer always lands in ~/.local/bin; it has no directory flag.
+    scriptBinaryNames: Object.freeze(['claude', 'claude.exe']),
+    defaultScriptInstallDir: '.local/bin',
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@anthropic-ai/claude-code@latest'),
       packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@anthropic-ai/claude-code@latest'),
+      scriptMethod('script-bash', 'curl | bash', {
+        shell: 'bash',
+        scriptUrl: 'https://claude.ai/install.sh',
+        platforms: ['linux', 'darwin'],
+        defaultInstallDir: '.local/bin',
+        verify: Object.freeze({
+          mustInclude: ['downloads.claude.ai/claude-code-releases', 'claude.ai/install.sh'],
+          mustNotInclude: ['@minimax-ai/code', 'releases.openai.com/codex'],
+        }),
+      }),
+      scriptMethod('script-powershell', 'irm | iex', {
+        shell: 'powershell',
+        scriptUrl: 'https://claude.ai/install.ps1',
+        platforms: ['win32'],
+        defaultInstallDir: '.local/bin',
+        verify: Object.freeze({
+          mustInclude: ['downloads.claude.ai/claude-code-releases'],
+          mustNotInclude: ['@minimax-ai/code', 'releases.openai.com/codex'],
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -106,9 +168,35 @@ export const OFFICIAL_TOOLS = Object.freeze([
     probeExecutables: ['codex'],
     probeNote: 'Codex 版本横幅由适配层宽匹配；安装时取 npm 最新版。',
     providerHints: ['openai', 'gpt', 'codex'],
+    scriptBinaryNames: Object.freeze(['codex', 'codex.exe']),
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@openai/codex@latest'),
       packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@openai/codex@latest'),
+      scriptMethod('script-bash', 'curl | bash', {
+        shell: 'bash',
+        scriptUrl: 'https://chatgpt.com/codex/install.sh',
+        platforms: ['linux', 'darwin'],
+        installDirEnv: 'CODEX_INSTALL_DIR',
+        defaultInstallDir: '.local/bin',
+        env: ['CODEX_INSTALL_DIR'],
+        verify: Object.freeze({
+          mustInclude: ['releases.openai.com/codex', 'CODEX_INSTALL_DIR'],
+          mustNotInclude: ['downloads.claude.ai/claude-code-releases', '@minimax-ai/code'],
+        }),
+      }),
+      scriptMethod('script-powershell', 'irm | iex', {
+        shell: 'powershell',
+        scriptUrl: 'https://chatgpt.com/codex/install.ps1',
+        platforms: ['win32'],
+        installDirEnv: 'CODEX_INSTALL_DIR',
+        // %LOCALAPPDATA%\Programs\OpenAI\Codex\bin under a normal user profile.
+        defaultInstallDir: 'AppData/Local/Programs/OpenAI/Codex/bin',
+        env: ['CODEX_INSTALL_DIR'],
+        verify: Object.freeze({
+          mustInclude: ['releases.openai.com/codex', 'CODEX_INSTALL_DIR'],
+          mustNotInclude: ['downloads.claude.ai/claude-code-releases', '@minimax-ai/code'],
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -122,9 +210,42 @@ export const OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ['uninstall', '-g', '@minimax-ai/code'],
     probeExecutables: ['mcode'],
     providerHints: ['minimax'],
+    scriptBinaryNames: Object.freeze([
+      'mcode', 'mcode.exe', 'mcode.cmd', 'mcode.ps1',
+      'mcode-tools', 'mcode-tools.cmd', 'mcode-tools.ps1',
+    ]),
+    scriptBinaryRelatives: Object.freeze([
+      'mcode.cmd', 'mcode.ps1', 'mcode-tools.cmd', 'mcode-tools.ps1',
+      'bin/mcode', 'bin/mcode-tools',
+    ]),
+    defaultScriptInstallDir: '.minimax-code',
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@minimax-ai/code@latest'),
       packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@minimax-ai/code@latest'),
+      scriptMethod('script-bash', 'curl | bash', {
+        shell: 'bash',
+        scriptUrl: 'https://filecdn.minimax.chat/public/install.sh',
+        platforms: ['linux', 'darwin'],
+        installDirEnv: 'MCODE_INSTALL_DIR',
+        defaultInstallDir: '.minimax-code',
+        env: ['MCODE_INSTALL_DIR', 'MCODE_NPM_REGISTRY'],
+        verify: Object.freeze({
+          mustInclude: ['@minimax-ai/code', 'MCODE_INSTALL_DIR', 'MiniMax Code'],
+          mustNotInclude: ['downloads.claude.ai/claude-code-releases', 'releases.openai.com/codex'],
+        }),
+      }),
+      scriptMethod('script-powershell', 'irm | iex', {
+        shell: 'powershell',
+        scriptUrl: 'https://filecdn.minimax.chat/public/install.ps1',
+        platforms: ['win32'],
+        installDirEnv: 'MCODE_INSTALL_DIR',
+        defaultInstallDir: '.minimax-code',
+        env: ['MCODE_INSTALL_DIR', 'MCODE_NPM_REGISTRY'],
+        verify: Object.freeze({
+          mustInclude: ['@minimax-ai/code', 'MCODE_INSTALL_DIR', 'MiniMax Code'],
+          mustNotInclude: ['downloads.claude.ai/claude-code-releases', 'releases.openai.com/codex'],
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -138,9 +259,34 @@ export const OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ['uninstall', '-g', '@mimo-ai/cli'],
     probeExecutables: ['mimo'],
     providerHints: ['mimo', 'xiaomi'],
+    scriptBinaryNames: Object.freeze(['mimo', 'mimo.exe']),
+    defaultScriptInstallDir: '.mimocode/bin',
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@mimo-ai/cli@latest'),
       packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@mimo-ai/cli@latest'),
+      // The Unix script hardcodes ~/.mimocode/bin and ignores MIMOCODE_INSTALL_DIR.
+      scriptMethod('script-bash', 'curl | bash', {
+        shell: 'bash',
+        scriptUrl: 'https://mimo.xiaomi.com/install',
+        platforms: ['linux', 'darwin'],
+        defaultInstallDir: '.mimocode/bin',
+        verify: Object.freeze({
+          mustInclude: ['MiMoCode', 'mimo.xiaomi.com'],
+          mustNotInclude: ['@minimax-ai/code', 'downloads.claude.ai/claude-code-releases'],
+        }),
+      }),
+      scriptMethod('script-powershell', 'irm | iex', {
+        shell: 'powershell',
+        scriptUrl: 'https://mimo.xiaomi.com/install.ps1',
+        platforms: ['win32'],
+        installDirEnv: 'MIMOCODE_INSTALL_DIR',
+        defaultInstallDir: '.mimocode/bin',
+        env: ['MIMOCODE_INSTALL_DIR'],
+        verify: Object.freeze({
+          mustInclude: ['MiMoCode', 'mimo.xiaomi.com', 'MIMOCODE_INSTALL_DIR'],
+          mustNotInclude: ['@minimax-ai/code', 'downloads.claude.ai/claude-code-releases'],
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -154,9 +300,35 @@ export const OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ['uninstall', '-g', '@xai-official/grok'],
     probeExecutables: ['grok'],
     providerHints: ['xai', 'grok'],
+    scriptBinaryNames: Object.freeze(['grok', 'grok.exe', 'agent', 'agent.exe']),
+    defaultScriptInstallDir: '.grok/bin',
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@xai-official/grok@latest'),
       packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@xai-official/grok@latest'),
+      scriptMethod('script-bash', 'curl | bash', {
+        shell: 'bash',
+        scriptUrl: 'https://x.ai/cli/install.sh',
+        platforms: ['linux', 'darwin'],
+        installDirEnv: 'GROK_BIN_DIR',
+        defaultInstallDir: '.grok/bin',
+        env: ['GROK_BIN_DIR'],
+        verify: Object.freeze({
+          mustInclude: ['x.ai/cli', 'GROK_BIN_DIR'],
+          mustNotInclude: ['@minimax-ai/code', 'downloads.claude.ai/claude-code-releases'],
+        }),
+      }),
+      scriptMethod('script-powershell', 'irm | iex', {
+        shell: 'powershell',
+        scriptUrl: 'https://x.ai/cli/install.ps1',
+        platforms: ['win32'],
+        installDirEnv: 'GROK_BIN_DIR',
+        defaultInstallDir: '.grok/bin',
+        env: ['GROK_BIN_DIR'],
+        verify: Object.freeze({
+          mustInclude: ['x.ai/cli', 'GROK_BIN_DIR'],
+          mustNotInclude: ['@minimax-ai/code', 'downloads.claude.ai/claude-code-releases'],
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -203,9 +375,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
         shell: 'bash',
         scriptUrl: 'https://opencode.ai/install',
         platforms: ['linux', 'darwin'],
-        // The published script hardcodes $HOME/.opencode/bin, so it cannot honour
-        // a custom install directory; the npm/pnpm methods above can.
-        supportsInstallDir: false,
+        defaultInstallDir: '.opencode/bin',
         verify: Object.freeze({
           mustInclude: ['anomalyco/opencode', 'opencode.ai'],
           mustNotInclude: ['static-openapi.stepfun.com'],
@@ -235,7 +405,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
         platforms: ['linux', 'darwin'],
         installArg: ['--install-dir'],
         env: ['STEP_INSTALL_DIR', 'STEP_RELEASE_BASE_URL'],
-        supportsInstallDir: true,
+        defaultInstallDir: '.stepcode/bin',
         verify: Object.freeze({
           mustInclude: ['static-openapi.stepfun.com', 'stepcode installer'],
           mustNotInclude: ['anomalyco/opencode'],
@@ -247,7 +417,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
         platforms: ['win32'],
         installArg: ['-InstallDir'],
         env: ['STEP_INSTALL_DIR', 'STEP_RELEASE_BASE_URL'],
-        supportsInstallDir: true,
+        defaultInstallDir: '.stepcode/bin',
         verify: Object.freeze({
           mustInclude: ['static-openapi.stepfun.com', 'stepcode'],
           mustNotInclude: ['anomalyco/opencode'],

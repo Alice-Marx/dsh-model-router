@@ -141,14 +141,18 @@ export function parseInstallPreferences(config = {}, { tools = [] } = {}) {
 }
 
 /** Where a script install puts the binary: the user's directory, else the vendor default. */
-export function scriptInstallDir(tool, preferences, { home = '' } = {}) {
-  if (!tool?.defaultScriptInstallDir) return ''
-  return preferences?.installDir || vendorScriptDir(tool, { home })
+export function scriptInstallDir(tool, preferences, { home = '', method = null } = {}) {
+  if (!vendorScriptRelative(tool, method)) return ''
+  return preferences?.installDir || vendorScriptDir(tool, { home, method })
+}
+
+function vendorScriptRelative(tool, method) {
+  return String(method?.defaultInstallDir || tool?.defaultScriptInstallDir || '')
 }
 
 /** The location the vendor script uses on its own, ignoring any configured directory. */
-export function vendorScriptDir(tool, { home = '' } = {}) {
-  return joinPath(home, ...String(tool?.defaultScriptInstallDir ?? '').split('/').filter(Boolean))
+export function vendorScriptDir(tool, { home = '', method = null } = {}) {
+  return joinPath(home, ...vendorScriptRelative(tool, method).split('/').filter(Boolean))
 }
 
 /** argv for a package-manager method, honouring the configured registry and prefix. */
@@ -176,7 +180,15 @@ function baseUrlOf(scriptUrl) {
 function pickMethod(tool, methodId, preferences, platform) {
   const requested = methodId ?? preferences?.methods?.[tool.id]
   if (!requested) {
-    return installMethodsFor(tool).find(method => !installMethodBlockReason(method, platform)) ?? defaultInstallMethod(tool)
+    const available = installMethodsFor(tool).filter(method => !installMethodBlockReason(method, platform))
+    // An installed Windows MiniMax lives in the official installer layout.
+    // npm does not move that copy, so the unpinned one-click update is the
+    // vendor PowerShell script. Pinning npm or pnpm still runs that manager.
+    if (platform === 'win32' && tool?.id === 'minimax-code' && preferences?.allowScriptInstall !== false) {
+      const powershell = available.find(method => method.id === 'script-powershell')
+      if (powershell) return powershell
+    }
+    return available[0] ?? defaultInstallMethod(tool)
   }
   // A named method is never silently swapped. If the tool does not declare it,
   // or it does not run here, the caller gets the reason instead of a surprise.
@@ -207,7 +219,14 @@ export function resolveInstallPlan(tool, methodId, preferences = {}, { platform 
   const installDir = preferences?.installDir || ''
   if (method.kind === 'script') {
     const scriptUrl = preferences?.scriptUrls?.[tool.id] || method.scriptUrl
-    const target = methodHonoursInstallDir(method) ? scriptInstallDir(tool, preferences, { home }) : ''
+    const target = methodHonoursInstallDir(method) ? scriptInstallDir(tool, preferences, { home, method }) : ''
+    const notices = []
+    if (!target && installDir) {
+      notices.push(`${method.label} 无法使用自定义安装目录（官方脚本写死了安装路径），将安装到 ${vendorScriptDir(tool, { home, method })}。`)
+    }
+    if (method.env?.includes('MCODE_NPM_REGISTRY') && preferences?.registry && !minimaxScriptRegistry(preferences.registry)) {
+      notices.push('MiniMax 官方脚本只接受 https://registry.npmjs.org/ 或 https://registry.npmmirror.com/，本次不改写它的 npm 源。')
+    }
     return {
       toolId: tool.id,
       method,
@@ -218,11 +237,11 @@ export function resolveInstallPlan(tool, methodId, preferences = {}, { platform 
       scriptUrl,
       verify: method.verify,
       installArg: method.installArgs,
+      installDirEnv: method.installDirEnv || (method.env?.includes('STEP_INSTALL_DIR') ? 'STEP_INSTALL_DIR' : ''),
       installDir: target,
-      env: scriptEnv(method, { installDir: target, scriptUrl }),
-      notices: target ? [] : installDir
-        ? [`${method.label} 无法使用自定义安装目录（官方脚本写死了安装路径），将安装到 ${vendorScriptDir(tool, { home })}。`]
-        : [],
+      relatives: scriptRelatives(tool, method),
+      env: scriptEnv(method, { installDir: target, scriptUrl, registry: preferences?.registry }),
+      notices,
     }
   }
   return {
@@ -267,6 +286,16 @@ export function resolveUninstallPlan(tool, methodId, preferences = {}, options =
   }
 }
 
+/** Paths under the install directory that an uninstall may delete. No `..`. */
+export function scriptRelatives(tool, method) {
+  const listed = method?.binaryRelatives?.length
+    ? method.binaryRelatives
+    : tool?.scriptBinaryRelatives?.length
+      ? tool.scriptBinaryRelatives
+      : tool?.scriptBinaryNames
+  return [...(listed ?? [])]
+}
+
 /** Where the tool's binary lives, so a later uninstall can find it. */
 export function resolveInstallLocation(tool, method, preferences = {}, { home = '' } = {}) {
   if (!method) return null
@@ -274,21 +303,44 @@ export function resolveInstallLocation(tool, method, preferences = {}, { home = 
     // A method that cannot honour the configured directory always lands in the
     // vendor's own location, whatever the user typed.
     const dir = methodHonoursInstallDir(method)
-      ? scriptInstallDir(tool, preferences, { home })
-      : vendorScriptDir(tool, { home })
-    return { kind: 'script', dir, binaries: [...(tool.scriptBinaryNames ?? [])] }
+      ? scriptInstallDir(tool, preferences, { home, method })
+      : vendorScriptDir(tool, { home, method })
+    return {
+      kind: 'script',
+      dir,
+      binaries: [...(tool.scriptBinaryNames ?? [])],
+      relatives: scriptRelatives(tool, method),
+    }
   }
-  return { kind: 'package-manager', dir: preferences?.installDir || '', binaries: [] }
+  return { kind: 'package-manager', dir: preferences?.installDir || '', binaries: [], relatives: [] }
 }
 
-function scriptEnv(method, { installDir, scriptUrl }) {
+/** MiniMax's installer rejects every registry except these two. */
+const MINIMAX_SCRIPT_REGISTRIES = new Set([
+  'https://registry.npmjs.org/',
+  'https://registry.npmmirror.com/',
+])
+
+export function minimaxScriptRegistry(registry) {
+  const value = String(registry ?? '').trim()
+  if (!value) return ''
+  const normalized = value.endsWith('/') ? value : `${value}/`
+  return MINIMAX_SCRIPT_REGISTRIES.has(normalized) ? normalized : ''
+}
+
+function scriptEnv(method, { installDir, scriptUrl, registry }) {
   const env = {}
-  if (installDir && method.env?.includes('STEP_INSTALL_DIR')) env.STEP_INSTALL_DIR = installDir
+  const dirEnv = method.installDirEnv || (method.env?.includes('STEP_INSTALL_DIR') ? 'STEP_INSTALL_DIR' : '')
+  if (installDir && dirEnv) env[dirEnv] = installDir
   // The step installers read their release base from this variable, so a mirror
   // URL also moves the binaries and the checksum manifest, not just the script.
   if (method.env?.includes('STEP_RELEASE_BASE_URL') && scriptUrl) {
     const base = baseUrlOf(scriptUrl)
     if (base) env.STEP_RELEASE_BASE_URL = base
+  }
+  if (method.env?.includes('MCODE_NPM_REGISTRY')) {
+    const allowed = minimaxScriptRegistry(registry)
+    if (allowed) env.MCODE_NPM_REGISTRY = allowed
   }
   return env
 }

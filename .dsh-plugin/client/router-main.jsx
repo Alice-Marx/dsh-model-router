@@ -141,7 +141,7 @@ function probeLabel(probe) {
  */
 const INSTALL_SETTING_FIELDS = [
   { key: 'toolInstallDir', label: '统一安装目录', fallback: '', placeholder: '留空 = 各厂商默认目录',
-    hint: 'npm / pnpm 方式会加 --prefix；脚本方式看厂商是否支持目录参数。', validate: () => null },
+    hint: 'npm / pnpm 会加 --prefix。支持目录的官方脚本把这个路径传给厂商自己的安装目录变量；写死路径的脚本会标明实际落点。更新也使用这里，不会改去别的默认位置。', validate: () => null },
   { key: 'toolNpmRegistry', label: 'npm 源地址', fallback: 'https://registry.npmjs.org/', placeholder: 'https://registry.npmjs.org/',
     hint: '必须以 https:// 开头。换成国内镜像后，所有包管理器方式都从这里下载。',
     validate: raw => (/^https:\/\/\S+$/i.test(raw.trim()) ? null : '需要 https 开头的完整地址，例如 https://registry.npmmirror.com/') },

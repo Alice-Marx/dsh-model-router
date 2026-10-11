@@ -338,7 +338,7 @@ export function RouterSettingsCard(props) {
         <SettingsValueField
           id="model-router-tool-install-dir"
           label="统一安装目录"
-          hint="留空表示使用各厂商默认位置（npm 全局目录 / 厂商脚本目录）。npm 与 pnpm 方式会带上 --prefix；厂商安装脚本是否支持目录参数取决于该厂商。必须是绝对路径。"
+          hint="留空表示使用各厂商默认位置。npm 与 pnpm 会带上 --prefix；支持目录的官方脚本会把这个路径传给厂商自己的安装目录变量（例如 MCODE_INSTALL_DIR）。写死路径的脚本会在工具行标明实际落点。必须是绝对路径。更新使用同一路径。"
           disabled={disabled}
           {...state.toolInstallDir}
           overriddenLabel={FIELD_COPY.overridden}

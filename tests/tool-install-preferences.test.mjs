@@ -9,6 +9,7 @@ import {
 } from '../.dsh-plugin/shared/official-tool-registry.mjs'
 import {
   expandInstallDir,
+  minimaxScriptRegistry,
   normalizeSourceUrl,
   parseInstallPreferences,
   resolveInstallLocation,
@@ -19,6 +20,7 @@ import {
 import {
   checkedRemovableFile,
   resetForTests,
+  scriptBinaryCandidate,
   setInstallPreferences,
   stripPathBlock,
   vendorScriptInvocation,
@@ -181,6 +183,49 @@ test('only a well-formed vendor PATH block is removed from a shell profile', () 
   assert.equal(stripPathBlock('# stepcode is nice\nexport PATH=x', '# stepcode'), null)
   assert.equal(stripPathBlock('nothing here', '# stepcode'), null)
   assert.equal(stripPathBlock(null, '# stepcode'), null)
+})
+
+test('chosen script methods pass the configured directory and nothing else', () => {
+  const preferences = { ...clean, installDir: 'D:/AI/tools', registry: 'https://registry.npmmirror.com/' }
+  const minimax = resolveInstallPlan(getOfficialTool('minimax-code'), 'script-powershell', preferences, { platform: 'win32', home: HOME })
+  assert.equal(minimax.kind, 'script')
+  assert.equal(minimax.installDir, 'D:/AI/tools')
+  assert.equal(minimax.env.MCODE_INSTALL_DIR, 'D:/AI/tools')
+  assert.equal(minimax.env.MCODE_NPM_REGISTRY, 'https://registry.npmmirror.com/')
+  assert.equal(minimax.installArg.length, 0)
+  assert.match(vendorScriptInvocation(minimax, 'C:\\Temp\\install.ps1').args.join(' '), /install\.ps1$/)
+  const unset = resolveInstallPlan(getOfficialTool('minimax-code'), 'script-powershell', clean, { platform: 'win32', home: HOME })
+  assert.equal(unset.installDir, `${HOME}\\.minimax-code`)
+  assert.equal(unset.env.MCODE_INSTALL_DIR, unset.installDir)
+  // Windows one-click update is the official script unless the user pins npm/pnpm.
+  assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, clean, { platform: 'win32', home: HOME }).methodId, 'script-powershell')
+  assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, clean, { platform: 'linux', home: '/home/tester' }).methodId, 'npm')
+  assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), 'npm', clean, { platform: 'win32', home: HOME }).methodId, 'npm')
+  assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, { ...clean, allowScriptInstall: false }, { platform: 'win32', home: HOME }).methodId, 'npm')
+
+  const codex = resolveInstallPlan(getOfficialTool('codex'), 'script-bash', preferences, { platform: 'linux', home: '/home/tester' })
+  assert.equal(codex.env.CODEX_INSTALL_DIR, 'D:/AI/tools')
+  const claude = resolveInstallPlan(getOfficialTool('claude-code'), 'script-bash', preferences, { platform: 'linux', home: '/home/tester' })
+  assert.equal(claude.installDir, '')
+  assert.match(claude.notices.join(''), /写死了安装路径/)
+  assert.equal(resolveInstallLocation(getOfficialTool('claude-code'), claude.method, preferences, { home: '/home/tester' }).dir, '/home/tester/.local/bin')
+
+  const kimi = resolveInstallLocation(getOfficialTool('kimi-code'), installMethodFor(getOfficialTool('kimi-code'), 'script-bash'), preferences, { home: '/home/tester' })
+  assert.deepEqual(kimi.relatives, ['bin/kimi', 'bin/kimi.exe'])
+  assert.equal(minimaxScriptRegistry('https://example.invalid/npm'), '')
+  assert.equal(minimaxScriptRegistry('https://registry.npmjs.org'), 'https://registry.npmjs.org/')
+})
+
+test('a script uninstall stays inside the install directory, including bin/', () => {
+  const home = homedir()
+  const dir = join(home, '.minimax-code')
+  const tool = getOfficialTool('minimax-code')
+  assert.equal(scriptBinaryCandidate(dir, 'bin/mcode'), join(dir, 'bin', 'mcode'))
+  assert.equal(checkedRemovableFile(scriptBinaryCandidate(dir, 'bin/mcode'), {
+    allowedNames: tool.scriptBinaryNames, installDir: dir, home,
+  }), resolve(join(dir, 'bin', 'mcode')))
+  assert.throws(() => scriptBinaryCandidate(dir, '../mcode'), /之外/)
+  assert.throws(() => scriptBinaryCandidate(dir, 'bin/../../mcode'), /之外/)
 })
 
 test('Host preferences reach the runtime and are cleared by the test reset', () => {
