@@ -20,6 +20,7 @@
 /docs/ROUTING_MATURITY.zh.md -text
 /docs/assets/*.svg -text
 /docs/archive/MIGRATION.md -text
+/docs/archive/README.md -text
 /GAL_GAME_CONCEPT.zh.md -text
 /GAL_STORY_V2_OUTLINE.zh.md -text
 /大模型娘人物设定.md -text
