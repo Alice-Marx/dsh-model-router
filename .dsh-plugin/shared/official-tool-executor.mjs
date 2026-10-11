@@ -18,13 +18,14 @@ import { access, readFile, realpath, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { StringDecoder } from 'node:string_decoder'
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { getOfficialTool, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
-import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
+import { getOfficialTool, installMethodFor, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
+import { currentInstallOptions, ensureNpmPrefixOnPath, installPreferences, preferredToolDirectories, usesConfiguredInstallPlan } from './official-tools-runtime.mjs'
+import { resolveInstallPlan } from './tool-install-preferences.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
 import { npmAttestor } from './npm-attestation.mjs'
 import { compareReleaseVersions, isReleaseVersion } from './latest-versions.mjs'
-import { resolveMiMoGrokLaunch, createMiMoGrokParser } from './vendor-mimo-grok-adapter.mjs'
+import { resolveMiMoGrokLaunch, createMiMoGrokParser, installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
 import { emptyOutputError, outputIsEmpty, usageFromEvents, usageFromOutput } from './task-executors.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
@@ -169,6 +170,22 @@ function pathDirectories() {
   return [...new Set(value.split(delimiter).map(part => part.trim().replace(/^"|"$/g, '')).filter(Boolean))]
 }
 
+/** The configured install location is authoritative even if another copy is newer. */
+export function officialToolEntrySelection(toolId, { preferences = installPreferences(), plan: selectedPlan, preferredDirs } = {}) {
+  const tool = getOfficialTool(toolId)
+  if (!tool || tool.manager === 'signed-windows-installer') return { directories: pathDirectories(), plan: null, configured: false }
+  // A saved script choice stays usable after future script installs are
+  // disabled. Automatic selection still follows the same switch as installation.
+  const selectedScript = installMethodFor(tool, preferences.methods?.[toolId])?.kind === 'script'
+  const discoveryPreferences = selectedScript ? { ...preferences, allowScriptInstall: true } : preferences
+  const plan = selectedPlan ?? resolveInstallPlan(tool, undefined, discoveryPreferences, currentInstallOptions())
+  const preferred = preferredDirs ?? (selectedPlan ? (selectedPlan.binDir ? [selectedPlan.binDir] : [])
+    : preferredToolDirectories(toolId, discoveryPreferences))
+  return { directories: Array.isArray(preferredDirs) || preferred.length ? [...preferred] : pathDirectories(), plan,
+    configured: Boolean(selectedPlan) || usesConfiguredInstallPlan(toolId, preferences),
+    preferred: Array.isArray(preferredDirs) || preferred.length > 0, directoryOverride: Array.isArray(preferredDirs) }
+}
+
 function versionAtLeast(value, minimum) {
   const found = /^(\d+)\.(\d+)\.(\d+)(?:$|-)/.exec(String(value ?? ''))
   if (!found) return false
@@ -216,25 +233,33 @@ async function readPackageEntry(packageDirectory, packageName, binName, expected
 }
 
 /** Resolve the package's real `bin` file, never its Windows .cmd shim. */
-async function findGlobalPackageEntries(packageName, binName, expectedBin, workspace) {
-  await ensureNpmPrefixOnPath()
+export async function findGlobalPackageEntries(packageName, binName, expectedBin, workspace, { directories, manager = null, moduleRoots, selection: selectedSelection } = {}) {
+  const tool = OFFICIAL_TOOLS.find(item => item.package === packageName)
+  const selection = selectedSelection ?? (directories || Array.isArray(moduleRoots) ? null : officialToolEntrySelection(tool?.id))
+  const exactRoots = Array.isArray(moduleRoots) ? moduleRoots : selection?.plan?.packageModuleRoots
+  if (!Array.isArray(exactRoots) && !directories && !selection?.preferred) await ensureNpmPrefixOnPath()
+  const targets = directories ?? (selection?.preferred ? selection.directories : pathDirectories())
+  const selectedManager = manager ?? selection?.plan?.manager ?? null
   const packageParts = packageName.split('/')
   const found = []
   const seen = new Set()
-  for (const directory of pathDirectories()) {
-    const moduleParents = [join(directory, 'node_modules')]
-    if (basename(directory).toLowerCase() === '.bin') moduleParents.push(resolve(directory, '..'))
-    if (!IS_WINDOWS) moduleParents.push(resolve(directory, '..', 'lib', 'node_modules'))
-    const candidates = moduleParents.map(modules => join(modules, ...packageParts))
-    // Native installs put the exe in `<package>/bin` and that directory on PATH
-    // (for example D:\Program Files\Claude\node_modules\@anthropic-ai\claude-code\bin).
-    candidates.push(directory, resolve(directory, '..'))
-    for (const packageDirectory of candidates) {
-      const entry = await readPackageEntry(packageDirectory, packageName, binName, expectedBin, workspace, seen)
-      if (entry) found.push(entry)
-    }
+  const roots = Array.isArray(exactRoots) ? exactRoots : await installedModuleRoots(targets, { manager: selectedManager })
+  const candidates = roots.map(modules => join(modules, ...packageParts))
+  // Native npm installs can put their package/bin directory directly on PATH.
+  if (!Array.isArray(exactRoots) && selectedManager !== 'pnpm') candidates.push(...targets.flatMap(directory => [directory, resolve(directory, '..')]))
+  for (const packageDirectory of candidates) {
+    const entry = await readPackageEntry(packageDirectory, packageName, binName, expectedBin, workspace, seen)
+    if (entry) found.push(entry)
   }
   return found
+}
+
+/** Official Windows repairs use a distinct directory key for the same npm version. */
+export function miniMaxReleaseVersion(releaseKey) {
+  const repair = /^(\d{1,6}\.\d{1,6}\.\d{1,6})-repair-[1-9]\d{0,9}-[0-9a-f]{32}$/i.exec(String(releaseKey ?? ''))
+  if (repair) return repair[1]
+  if (String(releaseKey ?? '').includes('-repair-')) return null
+  return isReleaseVersion(releaseKey) ? releaseKey : null
 }
 
 /**
@@ -252,10 +277,13 @@ export async function findManagedMiniMaxEntry(workspace,
       const root = await realpath(directory)
       if (root === workspace || inside(workspace, root)) continue
       if (!(await stat(join(root, 'mcode.cmd'))).isFile()) continue
-      const version = (await readFile(join(root, 'current'), 'utf8')).trim()
-      if (!isReleaseVersion(version)) continue
-      const releaseRoot = await realpath(join(root, 'releases', version))
-      if (!inside(root, releaseRoot)) continue
+      const releaseKey = (await readFile(join(root, 'current'), 'utf8')).trim()
+      const version = miniMaxReleaseVersion(releaseKey)
+      if (!version) continue
+      const releasesRoot = await realpath(join(root, 'releases'))
+      if (!inside(root, releasesRoot)) continue
+      const releaseRoot = await realpath(join(releasesRoot, releaseKey))
+      if (!inside(releasesRoot, releaseRoot)) continue
       const packageRoot = await realpath(join(releaseRoot, 'node_modules', '@minimax-ai', 'code'))
       if (!inside(releaseRoot, packageRoot)) continue
       const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
@@ -268,7 +296,7 @@ export async function findManagedMiniMaxEntry(workspace,
       const native = await realpath(join(packageRoot, 'node_modules', 'better-sqlite3',
         'build', 'Release', 'better_sqlite3.node'))
       if (!inside(packageRoot, native) || !(await stat(native)).isFile()) continue
-      return { entry, packageRoot, version, source: 'official-windows-installer-npm-attested' }
+      return { entry, packageRoot, version, installDir: root, binDir: root, source: 'official-windows-installer-npm-attested' }
     } catch { /* inspect the next PATH directory */ }
   }
   return null
@@ -279,24 +307,25 @@ function newestFirst(entries) {
   return [...entries].sort((left, right) => (compareReleaseVersions(right.version, left.version) ?? 0))
 }
 
-async function findCodexExecutable(workspace) {
-  await ensureNpmPrefixOnPath()
-  const filename = IS_WINDOWS ? 'codex.exe' : 'codex'
-  for (const directory of pathDirectories()) {
+async function findSignedNativeExecutable(toolId, workspace, signer, selection = officialToolEntrySelection(toolId)) {
+  if (!selection.preferred) await ensureNpmPrefixOnPath()
+  const command = toolId === 'claude-code' ? 'claude' : toolId
+  const filename = IS_WINDOWS ? `${command}.exe` : command
+  for (const directory of selection.preferred ? selection.directories : pathDirectories()) {
     try {
       const pathRoot = await realpath(directory)
       if (pathRoot === workspace || inside(workspace, pathRoot)) continue
       const entry = await realpath(join(directory, filename))
       if (inside(workspace, entry) || !(await stat(entry)).isFile()) continue
       await access(entry, IS_WINDOWS ? constants.F_OK : constants.X_OK)
-      if (IS_WINDOWS && !(await hasOfficialWindowsSignature(entry, CODEX_SIGNER))) continue
+      if (IS_WINDOWS && !(await hasOfficialWindowsSignature(entry, signer))) continue
       return { entry, source: IS_WINDOWS ? 'signed-native-executable' : 'path-native-executable' }
     } catch { /* try the next PATH entry */ }
   }
   return null
 }
 
-function nodeVersion(entry) {
+function nodeVersion(entry, pattern = /^v(\d+\.\d+\.\d+)/) {
   return new Promise(resolveVersion => {
     let child
     try { child = spawn(entry, ['--version'], { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }) }
@@ -312,7 +341,7 @@ function nodeVersion(entry) {
     const timer = setTimeout(() => { child.kill('SIGTERM'); finish(null) }, 4_000)
     child.stdout.on('data', bytes => { output = tail(output, String(bytes)) })
     child.on('error', () => finish(null))
-    child.on('close', code => finish(code === 0 ? /^v(\d+\.\d+\.\d+)/.exec(output.trim())?.[1] ?? null : null))
+    child.on('close', code => finish(code === 0 ? pattern.exec(output.trim())?.[1] ?? null : null))
   })
 }
 
@@ -335,17 +364,53 @@ async function findNodeExecutable(workspace, minimum = [22, 19, 0], acceptedVers
 }
 
 /** Resolve the signed native binary carried by the official npm wrapper. */
-async function findSignedPackagedCodex(packageRoot, workspace) {
+export async function findSignedPackagedCodex(packageRoot, workspace, {
+  installDir = '', manager = null, moduleRoots = [], verifySignature = hasOfficialWindowsSignature,
+} = {}) {
   if (!IS_WINDOWS) return null
   const target = process.arch === 'arm64' ? ['codex-win32-arm64', 'aarch64-pc-windows-msvc']
     : process.arch === 'x64' ? ['codex-win32-x64', 'x86_64-pc-windows-msvc'] : null
   if (!target) return null
-  const candidate = join(packageRoot, 'node_modules', '@openai', target[0], 'vendor', target[1], 'bin', 'codex.exe')
   try {
-    const entry = await realpath(candidate)
-    if (!inside(packageRoot, entry) || inside(workspace, entry) || !(await stat(entry)).isFile()) return null
-    if (!(await hasOfficialWindowsSignature(entry, CODEX_SIGNER))) return null
-    return { entry, source: 'signed-official-npm-native' }
+    const wrapperRoot = await realpath(packageRoot)
+    if (wrapperRoot === workspace || inside(workspace, wrapperRoot)) return null
+    const wrapper = JSON.parse(await readFile(join(wrapperRoot, 'package.json'), 'utf8'))
+    const nativeName = `@openai/${target[0]}`
+    const dependency = wrapper.optionalDependencies?.[nativeName]
+    const alias = /^npm:(@openai\/[A-Za-z0-9-]+)@(.+)$/.exec(String(dependency ?? ''))
+    const expectedName = alias ? alias[1] : nativeName
+    const expectedVersion = alias ? alias[2] : dependency
+    if (wrapper.name !== '@openai/codex' || !isReleaseVersion(wrapper.version)
+      || !['@openai/codex', nativeName].includes(expectedName) || !isReleaseVersion(expectedVersion)) return null
+    let virtualStore = null
+    for (let directory = wrapperRoot; directory !== resolve(directory, '..'); directory = resolve(directory, '..')) {
+      if (basename(directory) === '.pnpm') { virtualStore = directory; break }
+    }
+    // pnpm's optional platform package is a sibling symlink in its virtual
+    // store. A configured prefix confines both wrapper and native package to
+    // that prefix's global tree, never another store or arbitrary directory.
+    const boundary = manager === 'pnpm' && installDir
+      ? await realpath(join(installDir, '.pnpm', 'global'))
+      : virtualStore ?? await realpath(resolve(wrapperRoot, '..', '..'))
+    if (!inside(boundary, wrapperRoot)) return null
+    const nativePackages = [
+      join(wrapperRoot, 'node_modules', '@openai', target[0]),
+      resolve(wrapperRoot, '..', target[0]),
+      ...moduleRoots.map(modules => join(modules, '@openai', target[0])),
+    ]
+    for (const nativePackage of nativePackages) {
+      try {
+        const nativeRoot = await realpath(nativePackage)
+        if (!inside(boundary, nativeRoot) || inside(workspace, nativeRoot)) continue
+        const manifest = JSON.parse(await readFile(join(nativeRoot, 'package.json'), 'utf8'))
+        if (manifest.name !== expectedName || manifest.version !== expectedVersion) continue
+        const entry = await realpath(join(nativeRoot, 'vendor', target[1], 'bin', 'codex.exe'))
+        if (!inside(nativeRoot, entry) || inside(workspace, entry) || !(await stat(entry)).isFile()) continue
+        if (!(await verifySignature(entry, CODEX_SIGNER))) continue
+        return { entry, source: 'signed-official-npm-native' }
+      } catch { /* try the wrapper's other official optional-package location */ }
+    }
+    return null
   } catch { return null }
 }
 
@@ -404,13 +469,18 @@ function hasOfficialWindowsSignature(entry, expectedSigner) {
   })
 }
 
-async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readiness.') {
+async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readiness.', selectionOptions = {}) {
   if (toolId === 'claude-code') {
-    const entries = await findGlobalPackageEntries('@anthropic-ai/claude-code', 'claude', 'bin/claude.exe', workspace)
+    const selection = officialToolEntrySelection(toolId, selectionOptions)
+    const native = selection.plan.kind === 'script'
+      ? await findSignedNativeExecutable(toolId, workspace, CLAUDE_SIGNER, selection) : null
+    if (native) native.version = await nodeVersion(native.entry, /(?:^|\s)(\d+\.\d+\.\d+(?:-[\w.-]+)?)/)
+    const entries = selection.plan.kind === 'script' ? (native ? [native] : [])
+      : await findGlobalPackageEntries('@anthropic-ai/claude-code', 'claude', 'bin/claude.exe', workspace, { selection })
     const compatible = entries.filter(entry => versionAtLeast(entry.version, CLAUDE_MIN_RESTRICTED_VERSION))
     let found = null
     for (const entry of compatible) {
-      if (!IS_WINDOWS || await hasOfficialWindowsSignature(entry.entry, CLAUDE_SIGNER)) {
+      if (entry === native || !IS_WINDOWS || await hasOfficialWindowsSignature(entry.entry, CLAUDE_SIGNER)) {
         found = entry
         break
       }
@@ -440,13 +510,20 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
   }
   if (toolId === 'codex') {
     if (!IS_WINDOWS) return { unsupported: CAPABILITIES.codex.reason }
-    const packages = await findGlobalPackageEntries('@openai/codex', 'codex', 'bin/codex.js', workspace)
+    const selection = officialToolEntrySelection(toolId, selectionOptions)
+    const packages = selection.plan.kind === 'script' ? []
+      : await findGlobalPackageEntries('@openai/codex', 'codex', 'bin/codex.js', workspace, { selection })
+    const moduleRoots = selection.plan.packageModuleRoots ?? (packages.length
+      ? await installedModuleRoots(selection.preferred ? selection.directories : pathDirectories(), { manager: selection.plan.manager }) : [])
     let found = null
     for (const entry of packages) {
-      found = await findSignedPackagedCodex(entry.packageRoot, workspace)
+      found = await findSignedPackagedCodex(entry.packageRoot, workspace,
+        { installDir: selection.plan.installDir, manager: selection.plan.manager, moduleRoots })
       if (found) break
     }
-    found ??= await findCodexExecutable(workspace)
+    if (!found && selection.plan.kind === 'script') {
+      found = await findSignedNativeExecutable(toolId, workspace, CODEX_SIGNER, selection)
+    }
     if (!found) return { unsupported: '未找到具有 OpenAI 有效签名的 codex.exe。' }
     return {
       file: found.entry,
@@ -456,8 +533,10 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     }
   }
   if (toolId === 'kimi-code') {
+    const selection = officialToolEntrySelection(toolId, selectionOptions)
+    if (selection.plan.kind === 'script') return { unsupported: '所选 Kimi 原生脚本安装没有可核验的 npm 执行入口；不会改用其他安装目录中的 Kimi。' }
     const tool = getOfficialTool(toolId)
-    const entries = await findGlobalPackageEntries(tool.package, 'kimi', 'dist/main.mjs', workspace)
+    const entries = await findGlobalPackageEntries(tool.package, 'kimi', 'dist/main.mjs', workspace, { selection })
     const found = newestFirst(entries)[0]
     if (!found) return { unsupported: `未找到官方 npm 包 ${tool.package} 的 kimi 入口（dist/main.mjs）。` }
     const nodeExecutable = await findNodeExecutable(workspace)
@@ -474,8 +553,12 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
   }
   if (toolId === 'minimax-code') {
     const tool = getOfficialTool(toolId)
-    const entries = await findGlobalPackageEntries(tool.package, 'mcode', 'cli.js', workspace)
-    const found = newestFirst(entries)[0] ?? await findManagedMiniMaxEntry(workspace)
+    const selection = officialToolEntrySelection(toolId, selectionOptions)
+    const managed = selection.plan.kind === 'script' || selection.directoryOverride
+      ? await findManagedMiniMaxEntry(workspace, selection.directories)
+      : !selection.configured ? await findManagedMiniMaxEntry(workspace) : null
+    const entries = selection.plan.kind === 'script' ? [] : await findGlobalPackageEntries(tool.package, 'mcode', 'cli.js', workspace, { selection })
+    const found = managed ?? newestFirst(entries)[0]
     if (!found) return { unsupported: `未找到官方 npm 包 ${tool.package} 的 mcode 入口（cli.js）。` }
     const nodeExecutable = await findNodeExecutable(workspace, [22, 19, 0], version => {
       const major = Number(String(version).split('.')[0])
@@ -492,7 +575,12 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
   }
   if (toolId === 'mimo-code' || toolId === 'grok-build') {
     try {
-      return await resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, task })
+      const selection = officialToolEntrySelection(toolId, selectionOptions)
+      if (selection.plan.kind === 'script') return { unsupported: `所选 ${getOfficialTool(toolId).label} 原生脚本安装没有可核验的 npm 元数据；不会改用其他安装目录中的工具。` }
+      return await resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, task,
+        directories: selection.preferred ? selection.directories : undefined,
+        moduleRoots: selection.plan.packageModuleRoots,
+        manager: selection.plan.manager })
     } catch (error) {
       return { unsupported: `官方原生入口校验失败：${String(error?.message ?? error).slice(0, 240)}` }
     }
@@ -586,14 +674,14 @@ export function harnessSandboxBlocker(toolId, platform = process.platform) {
 }
 
 /** Check the actual trusted launch entry without starting an account call. */
-export async function officialToolReadiness(toolId, workspace = process.cwd()) {
+export async function officialToolReadiness(toolId, workspace = process.cwd(), selectionOptions = {}) {
   const tool = getOfficialTool(toolId)
   if (!tool) return { id: String(toolId), ready: false, reason: '工具不在固定官方注册表中。' }
   const capability = CAPABILITIES[tool.id]
   if (!capability?.supported) return { id: tool.id, ready: false, reason: capability?.reason ?? '当前平台不支持托管执行。' }
   try {
     const directory = await checkedWorkspace(workspace)
-    const spec = await launchSpec(tool.id, directory, capability.modes[0], null)
+    const spec = await launchSpec(tool.id, directory, capability.modes[0], null, undefined, selectionOptions)
     return spec.unsupported
       ? { id: tool.id, ready: false, reason: spec.unsupported }
       : { id: tool.id, ready: true, source: spec.source, modes: capability.modes }

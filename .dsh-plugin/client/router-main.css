@@ -94,14 +94,15 @@
 .mr-tool-dot.running { background: #e9a640; }
 .mr-tool-command { display: block; margin-top: 6px; padding: 4px 8px; font-size: 12px; background: var(--dsw-alias-markdown-code-block); border-radius: 6px; overflow-wrap: anywhere; }
 .mr-tool-button { flex-shrink: 0; }
-.mr-tool-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.mr-tool-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; flex: 0 1 420px; }
 .mr-tool-detail { margin: 7px 0 0; }
 .mr-tool-error { margin: 8px 0 0; padding: 9px 11px; }
 .mr-tool-log { margin-top: 7px; color: var(--mr-muted); font-size: 11px; }
 .mr-tool-log summary { cursor: pointer; }
 .mr-tool-log pre { max-height: 140px; overflow: auto; padding: 8px; border-radius: 7px; background: var(--dsw-alias-markdown-code-block); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.mr-tool-methods { display: flex; align-items: center; gap: 6px; margin-right: 2px; }
-.mr-tool-methods label { display: flex; align-items: center; gap: 6px; color: var(--mr-muted); font-size: 11px; }
+.mr-tool-methods { display: flex; align-items: center; gap: 6px; width: 100%; }
+.mr-tool-methods label { display: flex; align-items: center; justify-content: flex-end; gap: 6px; width: 100%; color: var(--mr-muted); font-size: 11px; }
+.mr-tool-methods .mr-mini-select { min-width: 0; max-width: calc(100% - 54px); }
 .mr-install-settings { margin-bottom: 14px; padding: 13px 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: var(--mr-card); }
 .mr-install-settings-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .mr-install-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
@@ -110,6 +111,7 @@
 .mr-install-field small { font-size: 11px; line-height: 1.6; }
 .mr-install-error { color: #d95360; }
 .mr-install-toggle-row { display: flex; align-items: center; gap: 7px; }
+.mr-install-save-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .mr-channel-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
 .mr-pill-channel-ok { border-color: var(--dsw-alias-success, #2f9e63); color: var(--dsw-alias-success, #2f9e63); }
 .mr-pill-warn { border-color: var(--dsw-alias-warning, #c27c0e); color: var(--dsw-alias-warning, #c27c0e); }
@@ -122,7 +124,7 @@
 .mr-profile-advanced summary { cursor: pointer; }
 .mr-profile-success { padding: 10px 12px; border-radius: 10px; background: #e5f5eb; color: #175f3a; font-size: 12px; }
 @media (prefers-color-scheme: dark) { .mr-profile-success { background: #193b2b; color: #b4f1cc; } }
-@media (max-width: 560px) { .mr-tool { align-items: stretch; flex-direction: column; gap: 10px; } .mr-tool-button { align-self: flex-start; } }
+@media (max-width: 560px) { .mr-tool { align-items: stretch; flex-direction: column; gap: 10px; } .mr-tool-actions { flex-basis: auto; justify-content: flex-start; } .mr-tool-methods label { justify-content: flex-start; } .mr-tool-button { align-self: flex-start; } }
 
 /* 开箱体检、成本控制、执行记录、安全边界 */
 .mr-onboarding, .mr-cost { margin-bottom: 18px; }

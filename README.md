@@ -1,8 +1,10 @@
 # Model Router · DeepSeek Harness Desktop
 
-Version: **0.16.4**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
+Version: **0.18.0**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe a task, compare your configured models, inspect the plan, and explicitly choose when to execute it.
+
+**0.18.0:** expands official vendor installer choices alongside npm/pnpm, preserves the configured install destination during updates, and verifies the target copy instead of an older PATH copy. MiniMax Windows scripts beginning with PowerShell `<# ... #>` help comments are accepted; HTML error pages remain rejected. Save unified install settings before installing or updating.
 
 **0.16.4:** PATH probes keep command output even when no install log callback is attached. 0.16.3 captured stdout only inside `onOutput?.(...)`, so `where` and `--version` looked empty and every PATH CLI was reported not-installed. MiniMax and ZCode were unaffected because they do not use that probe.
 
@@ -14,7 +16,7 @@ A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe 
 
 **0.16.0:** [dynamic data and adaptive feedback](docs/ROUTING_ADAPTIVE_LEARNING.zh.md) adds opt-in public benchmark/curated fixed-USD pricing refresh and task-specific, time-decayed, shrinkage-regularized subjective utility. Objective proxy quality floors remain separate. Public sources default off; preferences are shared within one local DSH_HOME and limited to the latest 200 runs. This is not a universal vendor-price scraper or evidence of real quality–cost gains.
 
-Current version: **0.16.4** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.18.0** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 **0.15.0 changes:** a four-tab workbench with routing advice directly below task planning, protection against stale execution previews, preserved spending totals across history pruning and retries, and a standalone mock UI preview for source development.
 
@@ -31,7 +33,7 @@ For self-testing, follow the [desktop acceptance and quality–cost experiment s
 | Routing presets | Economy, balanced and quality-first presets; quality floors, estimated token costs and bounded assignment search. Missing prices stay unknown. |
 | Read-only execution | Preview and confirm a routed run from the workbench, or invoke it in an official Harness session. Supported headless CLIs and model-directory API calls return recorded results. |
 | Editable CLI execution | One supported official CLI or a sequential CLI team, using approved isolated Git worktrees and conditional patch integration. |
-| Official tools | Detect, install/update, check launch readiness and inspect login status for eight registry tools; installation jobs have logs and cancellation. |
+| Official tools | Detect, install/update, check launch readiness and inspect login status for ten registry tools; installation jobs have logs and cancellation. |
 | Interactive terminal | PowerShell/system shell and seven CLI targets, including fixed login commands, live output and multiple sessions. |
 | Costs and subscriptions | Daily/monthly budget checks, economy downgrade or pause, subscription-first routing, quota cooldown and explicit handling of other subscription failures. |
 | History and quality | Per-package results, dependency views, failure details, rerun/reassignment, ratings and optional stronger-model review. |
@@ -46,16 +48,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.16.4
+@ljwei-stak/dsh-model-router@0.18.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.16.4** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.18.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.16.4`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.18.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -151,9 +153,16 @@ Installers use fixed official npm packages at each vendor's `@latest`, the vendo
 
 **Unified install settings.** The top of the **官方工具** page (also in the plugin settings form) sets the install address for every tool at once: one install directory (empty means each vendor's default location), an npm source, and per-tool overrides for vendor installer-script mirrors. Directories must be absolute; sources must be https. Each row picks its own install method from `npm`, `pnpm` or the vendor script (`curl | bash` or `irm | iex`); a method that cannot run on this platform says so on the row instead of being silently swapped. The exact command is shown above the buttons before anything runs.
 
-**Script installs never pipe remote content into an interpreter.** The plugin downloads the vendor script, checks it is still that vendor's official installer (vendor markers required, HTML pages and other vendors' scripts refused), and runs the local copy. A mirror may rehost the same script; it may not substitute a different program. Step Code's script accepts an install directory; the OpenCode script hardcodes `~/.opencode/bin`, so a custom directory only applies to it through npm/pnpm's `--prefix`. Script installs can be switched off entirely, leaving only the package managers.
+**Script installs never pipe remote content into an interpreter.** The plugin downloads the vendor script, checks it is still that vendor's official installer (vendor markers required, HTML pages and other vendors' scripts refused), and runs the local copy. A mirror may rehost the same script; it may not substitute a different program. Step Code's script accepts an install directory; the OpenCode script hardcodes `~/.opencode/bin`, so a custom directory only applies to it through the package managers' configured global directories. Script installs can be switched off entirely, leaving only the package managers.
 
-**One-click repair and uninstall.** Repair re-runs the same fixed official command, which is what a broken install needs even when it already reports the latest version. Uninstall removes only the program: a package-manager install goes back through the same manager, and a script install deletes just the executable the vendor installer placed plus that install's own PATH entry in the shell profile. **Configuration, credentials and session history are always kept.**
+
+**Update destination.** Click **保存安装设置** after changing the shared directory or sources. Tool actions wait until saving and command refresh finish. npm uses `--prefix`; pnpm uses its own `global-dir`, `global-bin-dir` and store settings. Install jobs retain the chosen configuration even if another settings page changes it while they are queued. Updates check the selected command directory, so a different current copy on PATH cannot make a missing target look installed. Vendor scripts with fixed paths explain their actual destination; ZCode still requires directory selection in its signed installer window.
+
+The [workbench guide](./docs/WORKBENCH_USER_GUIDE.zh.md#厂商安装渠道) lists each vendor’s actual channels and native-install execution limits.
+
+With no shared directory, ordinary checks discover the selected manager's packages on PATH. An install, update, repair or removal job resolves and locks that manager's default global destination before comparing versions. If that destination cannot be resolved safely, set and save a shared directory first.
+
+**One-click repair and uninstall.** Repair re-runs the same fixed official command, which is what a broken install needs even when it already reports the latest version. Uninstall removes only the program: a package-manager install goes back through the same manager, and a script install removes its registered command entries and supported PATH records; vendor version directories may remain. The Windows Codex native directory junction has no generic delete-based uninstall. The row explains this limitation. **Configuration, credentials and session history are always kept.**
 
 Installation, trusted launch readiness, account login and model entitlement are separate checks. An unknown login status is not proof of logout. On Windows, supported managed launch entries are checked against publisher signatures or official npm-tarball attestations; ZCode also records trust for its bundled script per signed build. See [the registry](.dsh-plugin/shared/official-tool-registry.mjs) and [executor](.dsh-plugin/shared/official-tool-executor.mjs) for the exact platform rules.
 

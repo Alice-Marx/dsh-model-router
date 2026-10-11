@@ -2,7 +2,7 @@
 
 模型路由从 **0.12.0** 起独立发布；GAL 是新的 **0.1.0** 插件。两者均声明支持官方 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**，可分别安装和更新。
 
-当前路由正式版为 **0.16.4**。本版修复 PATH 探测丢输出：没有安装日志回调时，`where` 和 `--version` 的 stdout 仍会保留，已安装的 CLI 不再被报成未安装。0.16.3 的命令行参数修复、0.16.2 的更新按钮修复和 0.16.1 的反馈缓存仍然保留。公开数据默认关闭；主观偏好调整不改变公共能力评分或质量门槛。源码开发可使用独立模拟 UI 预览；安装时选择下方精确版本。
+当前路由正式版为 **0.18.0**。本版补齐厂商官方安装方法，修复 MiniMax PowerShell 帮助注释被误拒绝、pnpm 自定义目录和更新探测旧 PATH 副本的问题。统一安装设置需点击保存，再选择工具的安装方式。公开数据默认关闭；安装时选择下方精确版本。
 
 [路由 README](../README.zh.md) · [迁移说明](archive/MIGRATION.md) · [独立 GAL README](https://github.com/Alice-Marx/deepseek-harness-galgame#readme)
 
@@ -10,7 +10,7 @@
 
 | 需求 | 添加插件输入框 | 安装后的入口 |
 | --- | --- | --- |
-| 分析复杂度、按质量和费用选模型、调用官方工具 | `@ljwei-stak/dsh-model-router@0.16.4` | 模型路由 |
+| 分析复杂度、按质量和费用选模型、调用官方工具 | `@ljwei-stak/dsh-model-router@0.18.0` | 模型路由 |
 | 剧情、立绘、音乐、存档、自由对话 | `@ljwei-stak/dsh-galgame@0.1.0` | Gal 模块 |
 | 两者都要 | 分别安装上面两个包 | 模型路由 + Gal 模块 |
 
@@ -24,7 +24,7 @@
 2. 在“包名、GitHub 仓库地址或本地目录路径”输入框填一个完整包名，例如：
 
    ```text
-   @ljwei-stak/dsh-model-router@0.16.4
+   @ljwei-stak/dsh-model-router@0.18.0
    ```
 
    只想安装 GAL 时填写：
@@ -40,7 +40,7 @@
    ```
 
 4. 核对预览的包名、版本和宿主兼容信息，安装并启用。完全退出 Harness（包括托盘进程）再启动，确保 Host 加载新代码。
-5. 检查插件详情与侧边栏：路由应为 **0.16.4 / 模型路由**；GAL 应为 **0.1.0 / Gal 模块**。仅装路由时没有 GAL 入口是预期行为。
+5. 检查插件详情与侧边栏：路由应为 **0.18.0 / 模型路由**；GAL 应为 **0.1.0 / Gal 模块**。仅装路由时没有 GAL 入口是预期行为。
 
 普通用户无需 `npm install -g`，该命令不会把插件注册到当前 Harness profile。
 
@@ -48,13 +48,13 @@
 
 进入对应 Release 下载 `.tgz`：
 
-- [模型路由 Releases](https://github.com/Alice-Marx/dsh-model-router/releases)（也可运行 `npm pack @ljwei-stak/dsh-model-router@0.16.4` 获取同一安装包）
+- [模型路由 Releases](https://github.com/Alice-Marx/dsh-model-router/releases)（也可运行 `npm pack @ljwei-stak/dsh-model-router@0.18.0` 获取同一安装包）
 - [独立 GAL v0.1.0](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0)
 
 在“添加插件”填写下载文件的**绝对路径**，例如：
 
 ```text
-D:\Plugins\ljwei-stak-dsh-model-router-0.16.4.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.18.0.tgz
 ```
 
 ```text
@@ -64,7 +64,7 @@ D:\Plugins\ljwei-stak-dsh-galgame-0.1.0.tgz
 如附有 `.sha256` 文件，用 PowerShell 计算并比较摘要：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.16.4.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.18.0.tgz'
 Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-galgame-0.1.0.tgz'
 ```
 
@@ -74,7 +74,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-galgame-0
 
 1. 在旧合并插件的 GAL 播放器导出需要保留的剧情进度，并备份整个 Harness profile。每份 JSON 仅保存**当前剧情状态**，不含所有手动槽、设置、已读记录或本地音乐；重要槽位可依次读档再导出。
 2. 在**同一个 profile**安装独立 `@ljwei-stak/dsh-galgame@0.1.0`。
-3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`（旧包名最后版本为 0.13.0，内容相同，之后不再更新）：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.16.4`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
+3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`（旧包名最后版本为 0.13.0，内容相同，之后不再更新）：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.18.0`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
 4. 现在路由与 GAL 各有一个入口。独立 GAL 沿用旧存档 localStorage 键，核对当前进度和三槽；更换 profile 或进度未恢复时，先切换到匹配剧目，再导入 JSON 备份。
 5. 后续分别更新需要的插件；只用路由可以不启用或不安装 GAL。保留 profile 与应用数据，卸载插件时不要清理故事数据。
 
@@ -82,7 +82,7 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 
 ## 5. 模型路由第一次使用
 
-工作台自 0.15.0 起分成**任务与执行、模型配置、官方工具、预算与安全**四页；0.16.4 沿用该布局。切换页面保留安装任务、终端会话和未完成的输入。
+工作台自 0.15.0 起分成**任务与执行、模型配置、官方工具、预算与安全**四页；0.18.0 沿用该布局。切换页面保留安装任务、终端会话和未完成的输入。
 
 1. 在 Harness 官方**模型**页配置供应商、模型与凭据。插件读取准确的 `provider/model` 目录，模型档案不保存 API Key。
 2. 在**模型配置**刷新目录，逐条填写自报质量评分、核对过的输入/输出单价（USD / 百万 token）和擅长方向；缺价留空。可选 `cliModel` 必须是该厂商 CLI 已验证接受的名字。可选 LiveBench 名称须准确对应版本与推理档位；它是用户确认的映射，不自动证明实际执行档位。
@@ -99,9 +99,9 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 
 学习范围是同一个本地 **DSH_HOME** 共享的最近 **200 次运行**，不是多账号隔离或无限长期记忆。“从现在重新学习”只让旧结果不再参与学习，不删除执行记录和费用累计。动态价格只读取用户指定的公开、严格结构化、按官方文档策展的 USD/百万 token 固定费率快照；不是自动抓取所有厂商价目表，复杂阶梯/时段计费不能强行折成该格式。人工单价优先；公开数据默认关闭，详情见[动态数据与持续反馈说明](ROUTING_ADAPTIVE_LEARNING.zh.md)。
 
-注册表包含 Kimi、Claude、Codex、MiniMax、MiMo、Grok、Gemini 和 ZCode。Claude、Codex、MiMo、Grok 支持单工具/团队只读或可编辑执行；Kimi、MiniMax、ZCode 仅支持获批的可编辑托管执行。Gemini 有路由无界面适配器，不进入单工具/团队托管执行器。详见[官方工具与托管模式](../README.zh.md#官方工具与托管模式)。CLI 模型名可能不同于 Harness 目录；多数 CLI 不提供可核验的实际模型 ID，要看厂商记录与账单。
+注册表包含 Kimi、Claude、Codex、MiniMax、MiMo、Grok、Gemini 和 ZCode。Claude、Codex、MiMo、Grok 支持单工具/团队只读或可编辑执行；Kimi、MiniMax、ZCode 仅支持获批的可编辑托管执行。Gemini 有路由无界面适配器，不进入单工具/团队托管执行器。详见[官方工具与托管模式](README.zh.md#官方工具与托管模式)。CLI 模型名可能不同于 Harness 目录；多数 CLI 不提供可核验的实际模型 ID，要看厂商记录与账单。
 
-安装使用固定官方来源：npm/pnpm 的 `@latest`，厂商发布的 `curl | bash` / `irm | iex` 脚本（Claude、Codex、MiniMax、Kimi、MiMo、Grok、OpenCode、Step Code，按平台显示），或 ZCode 签名安装器。在**官方工具**里为每个工具选择方式，并填写统一安装目录；一键安装和更新都使用这一选择。npm/pnpm 会带上 `--prefix`。支持目录的脚本把该路径传给厂商自己的变量（MiniMax 是 `MCODE_INSTALL_DIR`）。写死路径的脚本会在该行写明实际落点。未填写目录时，MiniMax Windows 更新使用已有官方目录，否则使用 `%USERPROFILE%\.minimax-code`，不再改放到 npm 全局前缀。Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，检查大小、UTF-8/UTF-16 文本和厂商标记后原样执行（PowerShell 的 `<#` 说明头不是 HTML），**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex/ZCode Windows 入口验证发布者签名，ZCode 内置脚本还有每个签名构建的首次信任摘要检查。具体规则见[执行器](../.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](../.dsh-plugin/shared/npm-attestation.mjs)。
+安装使用固定官方 npm 包的 `@latest` 或 ZCode 签名安装器。希望 npm 工具安装在非 C 盘时，先按自己的空间规划配置全局前缀；Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，仅检查大小和基本内容结构后原样执行，**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex/ZCode Windows 入口验证发布者签名，ZCode 内置脚本还有每个签名构建的首次信任摘要检查。具体规则见[执行器](.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](.dsh-plugin/shared/npm-attestation.mjs)。
 
 ## 6. GAL 第一次使用
 
@@ -114,7 +114,7 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 | 检查 | 预期 |
 | --- | --- |
 | 宿主版本 | 0.2.0-rc.1 或 0.2.0-rc.2；包括 `rc` 后缀。 |
-| 路由独立安装 | 0.16.4 详情、模型路由入口、目录和模型档案可用；不出现旧合并 GAL 入口。 |
+| 路由独立安装 | 0.18.0 详情、模型路由入口、目录和模型档案可用；不出现旧合并 GAL 入口。 |
 | GAL 独立安装 | 0.1.0 详情、Gal 模块入口、标题与两部核心剧情可用；不要求安装路由。 |
 | 共同安装 | 两个入口各一份，路由工具和 GAL 播放器均能使用。 |
 | 存档迁移 | 同 profile 可读旧键；跨 profile 用匹配剧目 JSON 导入；旧篇目的数据不覆盖。 |
@@ -125,11 +125,11 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 | 动态公开数据 | 默认关闭；自行启用后核对快照版本、校验时间及失败/过期状态；人工单价仍优先。 |
 | 可编辑执行 | 在干净测试仓库核对审批、隔离工作区、补丁整合、厂商实际模型与计费。 |
 
-历史 0.15.0 的自动测试验证为 220 项通过、3 项 Windows 平台跳过；组件 UI 预览检查使用模拟数据。**0.16.4 的发布验证见[更新记录](../CHANGELOG.md)**，不把模拟公开源/模型流和组件预览当作真实付费调用或 Harness Desktop 端到端验收；上表中的实际安装、账号和工作区检查仍需在使用环境中完成。
+历史 0.15.0 的自动测试验证为 220 项通过、3 项 Windows 平台跳过；组件 UI 预览检查使用模拟数据。**0.18.0 的发布验证见[更新记录](CHANGELOG.md)**，不把模拟公开源/模型流和组件预览当作真实付费调用或 Harness Desktop 端到端验收；上表中的实际安装、账号和工作区检查仍需在使用环境中完成。
 
 ## 8. 开发者从完整源码构建
 
-路由需要 Node.js **22.19+** 与 **pnpm 10.34.6**。从完整源码仓库根目录构建；复现正式版 0.16.4 时检出对应发布标签。旧版（如 0.15.0）标签保留其当时内容。运行：
+路由需要 Node.js **22.19+** 与 **pnpm 10.34.6**。从完整源码仓库根目录构建；复现正式版 0.18.0 时检出对应发布标签。旧版（如 0.15.0）标签保留其当时内容。运行：
 
 ```powershell
 pnpm install --frozen-lockfile --strict-peer-dependencies

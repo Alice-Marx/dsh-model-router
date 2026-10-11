@@ -47,7 +47,7 @@ var import_react6 = __toESM(require("react"), 1);
 
 // .dsh-plugin/shared/official-tool-registry.mjs
 var DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org/";
-function packageManagerMethod(id2, label, manager, spec, { registryFlag = "--registry=" } = {}) {
+function packageManagerMethod(id2, label, manager, spec, { registryFlag = "--registry=", command = "install", extraArgs = [] } = {}) {
   return Object.freeze({
     id: id2,
     label,
@@ -55,9 +55,9 @@ function packageManagerMethod(id2, label, manager, spec, { registryFlag = "--reg
     manager,
     spec,
     registryFlag,
-    installArgs: Object.freeze(["install", "-g", spec]),
+    installArgs: Object.freeze([command, "-g", spec, ...extraArgs]),
     uninstallArgs: Object.freeze(["uninstall", "-g", spec.replace(/@latest$/, "")]),
-    /** npm/pnpm both accept --prefix to place a global install off the default. */
+    /** The resolver binds npm prefix or pnpm global-dir/global-bin-dir. */
     supportsInstallDir: true,
     supportsRegistry: true
   });
@@ -69,8 +69,16 @@ function scriptMethod(id2, label, {
   installArg = [],
   env = [],
   platforms,
+  supportsInstallDir = false,
   installDirEnv = "",
-  defaultInstallDir = ""
+  installDirSuffix = "",
+  defaultScriptInstallDir,
+  defaultScriptInstallDirEnv,
+  scriptBinaryNames,
+  registryEnv,
+  installDirSubdir,
+  uninstallUnsupportedReason,
+  scriptFallbackUrls
 }) {
   return Object.freeze({
     id: id2,
@@ -83,14 +91,19 @@ function scriptMethod(id2, label, {
     installArgs: Object.freeze(installArg),
     /** Environment the vendor script itself documents for this install. */
     env: Object.freeze(env),
-    /** When set, the configured directory is this environment variable, not an argv flag. */
-    installDirEnv,
-    /** Home-relative directory the vendor uses when the user sets none. Slashes only. */
-    defaultInstallDir,
     platforms: Object.freeze(platforms),
     /** Whether the vendor script honours a caller-chosen directory at all. */
-    supportsInstallDir: Boolean(installDirEnv) || installArg.length > 0,
-    supportsRegistry: false
+    supportsInstallDir,
+    installDirEnv,
+    installDirSuffix,
+    ...installDirSubdir ? { installDirSubdir } : {},
+    ...uninstallUnsupportedReason ? { uninstallUnsupportedReason } : {},
+    ...defaultScriptInstallDir ? { defaultScriptInstallDir } : {},
+    ...defaultScriptInstallDirEnv ? { defaultScriptInstallDirEnv } : {},
+    ...scriptBinaryNames ? { scriptBinaryNames: Object.freeze(scriptBinaryNames) } : {},
+    ...scriptFallbackUrls ? { scriptFallbackUrls: Object.freeze(scriptFallbackUrls) } : {},
+    ...registryEnv ? { registryEnv } : {},
+    supportsRegistry: Boolean(registryEnv)
   });
 }
 var OFFICIAL_TOOLS = Object.freeze([
@@ -107,8 +120,7 @@ var OFFICIAL_TOOLS = Object.freeze([
     probeNote: "kimi \u4E0E\u65E7 Python \u7248 kimi-cli \u540C\u540D\uFF1B\u8BF7\u6838\u5BF9\u53EF\u6267\u884C\u6587\u4EF6\u6765\u6E90\u548C\u7248\u672C\u3002",
     providerHints: ["moonshot", "kimi"],
     scriptBinaryNames: Object.freeze(["kimi", "kimi.exe"]),
-    scriptBinaryRelatives: Object.freeze(["bin/kimi", "bin/kimi.exe"]),
-    defaultScriptInstallDir: ".kimi-code",
+    defaultScriptInstallDir: ".kimi-code/bin",
     installMethods: Object.freeze([
       packageManagerMethod("npm", "npm", "npm", "@moonshot-ai/kimi-code@latest"),
       packageManagerMethod("pnpm", "pnpm", "pnpm", "@moonshot-ai/kimi-code@latest"),
@@ -116,25 +128,23 @@ var OFFICIAL_TOOLS = Object.freeze([
         shell: "bash",
         scriptUrl: "https://code.kimi.com/kimi-code/install.sh",
         platforms: ["linux", "darwin"],
+        supportsInstallDir: true,
         installDirEnv: "KIMI_INSTALL_DIR",
-        defaultInstallDir: ".kimi-code",
+        installDirSuffix: "bin",
         env: ["KIMI_INSTALL_DIR"],
-        verify: Object.freeze({
-          mustInclude: ["code.kimi.com/kimi-code", "KIMI_INSTALL_DIR"],
-          mustNotInclude: ["downloads.claude.ai/claude-code-releases", "@minimax-ai/code"]
-        })
+        scriptBinaryNames: ["kimi"],
+        verify: Object.freeze({ mustInclude: ["kimi-code", "code.kimi.com/kimi-code"] })
       }),
       scriptMethod("script-powershell", "irm | iex", {
         shell: "powershell",
         scriptUrl: "https://code.kimi.com/kimi-code/install.ps1",
         platforms: ["win32"],
+        supportsInstallDir: true,
         installDirEnv: "KIMI_INSTALL_DIR",
-        defaultInstallDir: ".kimi-code",
+        installDirSuffix: "bin",
         env: ["KIMI_INSTALL_DIR"],
-        verify: Object.freeze({
-          mustInclude: ["code.kimi.com/kimi-code", "KIMI_INSTALL_DIR"],
-          mustNotInclude: ["downloads.claude.ai/claude-code-releases", "@minimax-ai/code"]
-        })
+        scriptBinaryNames: ["kimi.exe"],
+        verify: Object.freeze({ mustInclude: ["kimi-code", "code.kimi.com/kimi-code"] })
       })
     ])
   }),
@@ -149,31 +159,30 @@ var OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ["uninstall", "-g", "@anthropic-ai/claude-code"],
     probeExecutables: ["claude"],
     providerHints: ["anthropic", "claude"],
-    // The native installer always lands in ~/.local/bin; it has no directory flag.
     scriptBinaryNames: Object.freeze(["claude", "claude.exe"]),
     defaultScriptInstallDir: ".local/bin",
     installMethods: Object.freeze([
       packageManagerMethod("npm", "npm", "npm", "@anthropic-ai/claude-code@latest"),
-      packageManagerMethod("pnpm", "pnpm", "pnpm", "@anthropic-ai/claude-code@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@anthropic-ai/claude-code@latest", {
+        command: "add",
+        extraArgs: ["--ignore-scripts=false", "--allow-build=@anthropic-ai/claude-code"]
+      }),
+      // The native installer has no directory argument. npm/pnpm support a prefix.
       scriptMethod("script-bash", "curl | bash", {
         shell: "bash",
         scriptUrl: "https://claude.ai/install.sh",
+        scriptFallbackUrls: ["https://downloads.claude.ai/claude-code-releases/bootstrap.sh"],
         platforms: ["linux", "darwin"],
-        defaultInstallDir: ".local/bin",
-        verify: Object.freeze({
-          mustInclude: ["downloads.claude.ai/claude-code-releases", "claude.ai/install.sh"],
-          mustNotInclude: ["@minimax-ai/code", "releases.openai.com/codex"]
-        })
+        scriptBinaryNames: ["claude"],
+        verify: Object.freeze({ mustInclude: ["downloads.claude.ai/claude-code-releases", "manifest.json"] })
       }),
       scriptMethod("script-powershell", "irm | iex", {
         shell: "powershell",
         scriptUrl: "https://claude.ai/install.ps1",
+        scriptFallbackUrls: ["https://downloads.claude.ai/claude-code-releases/bootstrap.ps1"],
         platforms: ["win32"],
-        defaultInstallDir: ".local/bin",
-        verify: Object.freeze({
-          mustInclude: ["downloads.claude.ai/claude-code-releases"],
-          mustNotInclude: ["@minimax-ai/code", "releases.openai.com/codex"]
-        })
+        scriptBinaryNames: ["claude.exe"],
+        verify: Object.freeze({ mustInclude: ["downloads.claude.ai/claude-code-releases", "manifest.json"] })
       })
     ])
   }),
@@ -190,33 +199,34 @@ var OFFICIAL_TOOLS = Object.freeze([
     probeNote: "Codex \u7248\u672C\u6A2A\u5E45\u7531\u9002\u914D\u5C42\u5BBD\u5339\u914D\uFF1B\u5B89\u88C5\u65F6\u53D6 npm \u6700\u65B0\u7248\u3002",
     providerHints: ["openai", "gpt", "codex"],
     scriptBinaryNames: Object.freeze(["codex", "codex.exe"]),
+    defaultScriptInstallDir: ".local/bin",
     installMethods: Object.freeze([
       packageManagerMethod("npm", "npm", "npm", "@openai/codex@latest"),
       packageManagerMethod("pnpm", "pnpm", "pnpm", "@openai/codex@latest"),
-      scriptMethod("script-bash", "curl | bash", {
-        shell: "bash",
+      scriptMethod("script-sh", "curl | sh", {
+        shell: "sh",
         scriptUrl: "https://chatgpt.com/codex/install.sh",
         platforms: ["linux", "darwin"],
+        supportsInstallDir: true,
         installDirEnv: "CODEX_INSTALL_DIR",
-        defaultInstallDir: ".local/bin",
         env: ["CODEX_INSTALL_DIR"],
-        verify: Object.freeze({
-          mustInclude: ["releases.openai.com/codex", "CODEX_INSTALL_DIR"],
-          mustNotInclude: ["downloads.claude.ai/claude-code-releases", "@minimax-ai/code"]
-        })
+        scriptBinaryNames: ["codex"],
+        verify: Object.freeze({ mustInclude: ["releases.openai.com/codex", "CODEX_INSTALL_DIR"] })
       }),
       scriptMethod("script-powershell", "irm | iex", {
         shell: "powershell",
         scriptUrl: "https://chatgpt.com/codex/install.ps1",
         platforms: ["win32"],
+        supportsInstallDir: true,
         installDirEnv: "CODEX_INSTALL_DIR",
-        // %LOCALAPPDATA%\Programs\OpenAI\Codex\bin under a normal user profile.
-        defaultInstallDir: "AppData/Local/Programs/OpenAI/Codex/bin",
         env: ["CODEX_INSTALL_DIR"],
-        verify: Object.freeze({
-          mustInclude: ["releases.openai.com/codex", "CODEX_INSTALL_DIR"],
-          mustNotInclude: ["downloads.claude.ai/claude-code-releases", "@minimax-ai/code"]
-        })
+        defaultScriptInstallDirEnv: "LOCALAPPDATA",
+        defaultScriptInstallDir: "Programs/OpenAI/Codex/bin",
+        installDirSubdir: "codex/bin",
+        uninstallUnsupportedReason: "Codex \u5B98\u65B9 Windows \u811A\u672C\u4F7F\u7528\u76EE\u5F55\u8054\u63A5\u548C\u7248\u672C\u5316\u8D44\u6E90\uFF1B\u8BF7\u6309\u5B98\u65B9\u5378\u8F7D\u8BF4\u660E\u79FB\u9664\uFF0C\u63D2\u4EF6\u4E0D\u4F1A\u5220\u9664\u8054\u63A5\u76EE\u6807\u3002",
+        // The Windows bin directory is a junction to the versioned payload.
+        scriptBinaryNames: ["codex.exe"],
+        verify: Object.freeze({ mustInclude: ["releases.openai.com/codex", "CODEX_INSTALL_DIR"] })
       })
     ])
   }),
@@ -231,50 +241,39 @@ var OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ["uninstall", "-g", "@minimax-ai/code"],
     probeExecutables: ["mcode"],
     providerHints: ["minimax"],
-    scriptBinaryNames: Object.freeze([
-      "mcode",
-      "mcode.exe",
-      "mcode.cmd",
-      "mcode.ps1",
-      "mcode-tools",
-      "mcode-tools.cmd",
-      "mcode-tools.ps1"
-    ]),
-    scriptBinaryRelatives: Object.freeze([
-      "mcode.cmd",
-      "mcode.ps1",
-      "mcode-tools.cmd",
-      "mcode-tools.ps1",
-      "bin/mcode",
-      "bin/mcode-tools"
-    ]),
-    defaultScriptInstallDir: ".minimax-code",
+    defaultMethodsByPlatform: Object.freeze({ win32: "script-powershell" }),
+    scriptBinaryNames: Object.freeze(["mcode", "mcode-tools"]),
+    defaultScriptInstallDir: ".minimax-code/bin",
     installMethods: Object.freeze([
-      packageManagerMethod("npm", "npm", "npm", "@minimax-ai/code@latest"),
-      packageManagerMethod("pnpm", "pnpm", "pnpm", "@minimax-ai/code@latest"),
+      packageManagerMethod("npm", "npm", "npm", "@minimax-ai/code@latest", {
+        extraArgs: ["--ignore-scripts=false", "--include=optional", "--allow-scripts=@minimax-ai/code,better-sqlite3"]
+      }),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@minimax-ai/code@latest", {
+        command: "add",
+        extraArgs: ["--ignore-scripts=false", "--allow-build=@minimax-ai/code", "--allow-build=better-sqlite3"]
+      }),
       scriptMethod("script-bash", "curl | bash", {
         shell: "bash",
         scriptUrl: "https://filecdn.minimax.chat/public/install.sh",
         platforms: ["linux", "darwin"],
+        supportsInstallDir: true,
         installDirEnv: "MCODE_INSTALL_DIR",
-        defaultInstallDir: ".minimax-code",
+        installDirSuffix: "bin",
+        registryEnv: "MCODE_NPM_REGISTRY",
         env: ["MCODE_INSTALL_DIR", "MCODE_NPM_REGISTRY"],
-        verify: Object.freeze({
-          mustInclude: ["@minimax-ai/code", "MCODE_INSTALL_DIR", "MiniMax Code"],
-          mustNotInclude: ["downloads.claude.ai/claude-code-releases", "releases.openai.com/codex"]
-        })
+        verify: Object.freeze({ mustInclude: ["MiniMax Code CLI", "@minimax-ai/code"] })
       }),
       scriptMethod("script-powershell", "irm | iex", {
         shell: "powershell",
         scriptUrl: "https://filecdn.minimax.chat/public/install.ps1",
         platforms: ["win32"],
+        supportsInstallDir: true,
         installDirEnv: "MCODE_INSTALL_DIR",
-        defaultInstallDir: ".minimax-code",
+        registryEnv: "MCODE_NPM_REGISTRY",
         env: ["MCODE_INSTALL_DIR", "MCODE_NPM_REGISTRY"],
-        verify: Object.freeze({
-          mustInclude: ["@minimax-ai/code", "MCODE_INSTALL_DIR", "MiniMax Code"],
-          mustNotInclude: ["downloads.claude.ai/claude-code-releases", "releases.openai.com/codex"]
-        })
+        defaultScriptInstallDir: ".minimax-code",
+        scriptBinaryNames: ["mcode.cmd", "mcode.ps1", "mcode-tools.cmd", "mcode-tools.ps1"],
+        verify: Object.freeze({ mustInclude: ["MiniMax Code CLI", "@minimax-ai/code"] })
       })
     ])
   }),
@@ -294,28 +293,22 @@ var OFFICIAL_TOOLS = Object.freeze([
     installMethods: Object.freeze([
       packageManagerMethod("npm", "npm", "npm", "@mimo-ai/cli@latest"),
       packageManagerMethod("pnpm", "pnpm", "pnpm", "@mimo-ai/cli@latest"),
-      // The Unix script hardcodes ~/.mimocode/bin and ignores MIMOCODE_INSTALL_DIR.
       scriptMethod("script-bash", "curl | bash", {
         shell: "bash",
         scriptUrl: "https://mimo.xiaomi.com/install",
         platforms: ["linux", "darwin"],
-        defaultInstallDir: ".mimocode/bin",
-        verify: Object.freeze({
-          mustInclude: ["MiMoCode", "mimo.xiaomi.com"],
-          mustNotInclude: ["@minimax-ai/code", "downloads.claude.ai/claude-code-releases"]
-        })
+        scriptBinaryNames: ["mimo"],
+        verify: Object.freeze({ mustInclude: ["mimo.xiaomi.com", ".mimocode"] })
       }),
       scriptMethod("script-powershell", "irm | iex", {
         shell: "powershell",
         scriptUrl: "https://mimo.xiaomi.com/install.ps1",
         platforms: ["win32"],
+        supportsInstallDir: true,
         installDirEnv: "MIMOCODE_INSTALL_DIR",
-        defaultInstallDir: ".mimocode/bin",
         env: ["MIMOCODE_INSTALL_DIR"],
-        verify: Object.freeze({
-          mustInclude: ["MiMoCode", "mimo.xiaomi.com", "MIMOCODE_INSTALL_DIR"],
-          mustNotInclude: ["@minimax-ai/code", "downloads.claude.ai/claude-code-releases"]
-        })
+        scriptBinaryNames: ["mimo.exe"],
+        verify: Object.freeze({ mustInclude: ["mimo.xiaomi.com", ".mimocode"] })
       })
     ])
   }),
@@ -330,8 +323,9 @@ var OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ["uninstall", "-g", "@xai-official/grok"],
     probeExecutables: ["grok"],
     providerHints: ["xai", "grok"],
-    scriptBinaryNames: Object.freeze(["grok", "grok.exe", "agent", "agent.exe"]),
+    scriptBinaryNames: Object.freeze(["grok", "agent", "grok.exe", "agent.exe", "grove.exe", "grove-fsmonitor.exe", "grove-credential.exe"]),
     defaultScriptInstallDir: ".grok/bin",
+    pathProfileMarkers: Object.freeze(["# >>> grok installer >>>", "# <<< grok installer <<<"]),
     installMethods: Object.freeze([
       packageManagerMethod("npm", "npm", "npm", "@xai-official/grok@latest"),
       packageManagerMethod("pnpm", "pnpm", "pnpm", "@xai-official/grok@latest"),
@@ -339,25 +333,21 @@ var OFFICIAL_TOOLS = Object.freeze([
         shell: "bash",
         scriptUrl: "https://x.ai/cli/install.sh",
         platforms: ["linux", "darwin"],
+        supportsInstallDir: true,
         installDirEnv: "GROK_BIN_DIR",
-        defaultInstallDir: ".grok/bin",
         env: ["GROK_BIN_DIR"],
-        verify: Object.freeze({
-          mustInclude: ["x.ai/cli", "GROK_BIN_DIR"],
-          mustNotInclude: ["@minimax-ai/code", "downloads.claude.ai/claude-code-releases"]
-        })
+        scriptBinaryNames: ["grok", "agent"],
+        verify: Object.freeze({ mustInclude: ["Grok CLI installer", "x.ai/cli"] })
       }),
       scriptMethod("script-powershell", "irm | iex", {
         shell: "powershell",
         scriptUrl: "https://x.ai/cli/install.ps1",
         platforms: ["win32"],
+        supportsInstallDir: true,
         installDirEnv: "GROK_BIN_DIR",
-        defaultInstallDir: ".grok/bin",
         env: ["GROK_BIN_DIR"],
-        verify: Object.freeze({
-          mustInclude: ["x.ai/cli", "GROK_BIN_DIR"],
-          mustNotInclude: ["@minimax-ai/code", "downloads.claude.ai/claude-code-releases"]
-        })
+        scriptBinaryNames: ["grok.exe", "agent.exe", "grove.exe", "grove-fsmonitor.exe", "grove-credential.exe"],
+        verify: Object.freeze({ mustInclude: ["Grok CLI installer", "x.ai/cli"] })
       })
     ])
   }),
@@ -405,7 +395,9 @@ var OFFICIAL_TOOLS = Object.freeze([
         shell: "bash",
         scriptUrl: "https://opencode.ai/install",
         platforms: ["linux", "darwin"],
-        defaultInstallDir: ".opencode/bin",
+        // The published script hardcodes $HOME/.opencode/bin, so it cannot honour
+        // a custom install directory; the npm/pnpm methods above can.
+        supportsInstallDir: false,
         verify: Object.freeze({
           mustInclude: ["anomalyco/opencode", "opencode.ai"],
           mustNotInclude: ["static-openapi.stepfun.com"]
@@ -435,7 +427,7 @@ var OFFICIAL_TOOLS = Object.freeze([
         platforms: ["linux", "darwin"],
         installArg: ["--install-dir"],
         env: ["STEP_INSTALL_DIR", "STEP_RELEASE_BASE_URL"],
-        defaultInstallDir: ".stepcode/bin",
+        supportsInstallDir: true,
         verify: Object.freeze({
           mustInclude: ["static-openapi.stepfun.com", "stepcode installer"],
           mustNotInclude: ["anomalyco/opencode"]
@@ -447,7 +439,7 @@ var OFFICIAL_TOOLS = Object.freeze([
         platforms: ["win32"],
         installArg: ["-InstallDir"],
         env: ["STEP_INSTALL_DIR", "STEP_RELEASE_BASE_URL"],
-        defaultInstallDir: ".stepcode/bin",
+        supportsInstallDir: true,
         verify: Object.freeze({
           mustInclude: ["static-openapi.stepfun.com", "stepcode"],
           mustNotInclude: ["anomalyco/opencode"]
@@ -486,7 +478,8 @@ function installMethodsFor(tool) {
 function installMethodFor(tool, methodId) {
   const wanted = String(methodId ?? "").trim();
   if (!wanted) return null;
-  return installMethodsFor(tool).find((method) => method.id === wanted) ?? null;
+  const canonical = tool?.id === "codex" && wanted === "script-bash" ? "script-sh" : wanted;
+  return installMethodsFor(tool).find((method) => method.id === canonical) ?? null;
 }
 function defaultInstallMethod(tool) {
   return installMethodsFor(tool)[0] ?? null;
@@ -500,8 +493,8 @@ function installCommandLineFor(tool, method) {
   if (!tool || tool.unsupported) return null;
   if (!method) return null;
   if (method.kind === "script") {
-    const piped = method.shell === "powershell" ? `irm ${method.scriptUrl} | iex` : `curl -fsSL ${method.scriptUrl} | bash`;
-    return method.installArgs.length ? `${piped} ${method.installArgs[0]} <\u5B89\u88C5\u76EE\u5F55>` : piped;
+    const piped = method.shell === "powershell" ? `irm ${method.scriptUrl} | iex` : `curl -fsSL ${method.scriptUrl} | ${method.shell}`;
+    return piped;
   }
   return `${method.manager} ${method.installArgs.join(" ")}`;
 }
@@ -831,9 +824,9 @@ function keepKnownToolIds(raw, known, subject) {
   }
   return raw;
 }
-function parseInstallPreferences(config = {}, { tools = [] } = {}) {
+function parseInstallPreferences(config = {}, { tools = [], home = "", env = {} } = {}) {
   const known = new Set(tools.map((tool) => tool.id));
-  const installDir = expandInstallDir(valueOf(config, "toolInstallDir", ""));
+  const installDir = expandInstallDir(valueOf(config, "toolInstallDir", ""), { home, env });
   const registry = normalizeSourceUrl(valueOf(config, "toolNpmRegistry", DEFAULT_NPM_REGISTRY), "npm \u6E90") || DEFAULT_NPM_REGISTRY;
   const methodRaw = keepKnownToolIds(
     parseJsonObject(valueOf(config, "toolInstallMethodsJson", "{}"), "\u5B89\u88C5\u65B9\u5F0F\u8986\u76D6"),
@@ -850,9 +843,11 @@ function parseInstallPreferences(config = {}, { tools = [] } = {}) {
   for (const [id2, methodId] of Object.entries(methodRaw)) methods[id2] = methodId.trim();
   for (const [id2, url] of Object.entries(scriptRaw)) scriptUrls[id2] = normalizeSourceUrl(url, `${id2} \u5B89\u88C5\u811A\u672C\u6E90`);
   for (const [id2, methodId] of Object.entries(methods)) {
-    if (!installMethodFor({ id: id2, installMethods: tools.find((tool) => tool.id === id2)?.installMethods }, methodId)) {
+    const selected = installMethodFor({ id: id2, installMethods: tools.find((tool) => tool.id === id2)?.installMethods }, methodId);
+    if (!selected) {
       throw new Error(`${id2} \u4E0D\u652F\u6301\u5B89\u88C5\u65B9\u5F0F ${methodId}\u3002`);
     }
+    methods[id2] = selected.id;
   }
   return {
     installDir,
@@ -2347,6 +2342,23 @@ function compareReleaseVersions(left, right) {
 }
 
 // .dsh-plugin/client/tool-install-state.mjs
+var INSTALL_DEFAULTS = Object.freeze({
+  toolInstallDir: "",
+  toolNpmRegistry: DEFAULT_NPM_REGISTRY,
+  toolScriptUrlsJson: "{}",
+  toolAllowScriptInstall: true
+});
+function validateToolInstallSetting(key, value) {
+  try {
+    parseInstallPreferences({ [key]: value }, { tools: OFFICIAL_TOOLS });
+    return "";
+  } catch (error) {
+    return error?.message || "\u5B89\u88C5\u8BBE\u7F6E\u65E0\u6548\u3002";
+  }
+}
+function retainToolInstallDrafts(drafts, values = {}) {
+  return Object.fromEntries(Object.entries(drafts).filter(([key, value]) => value !== (values[key] ?? INSTALL_DEFAULTS[key])));
+}
 function toolInstallAction({ tool, probe, readiness, job, probeStatus, latestVersion = null }) {
   const running = job?.status === "running";
   const installed = probe?.installed === true;
@@ -2381,7 +2393,7 @@ function toolMaintenanceActions({ tool, probe, job, probeStatus, summary }) {
     }
   };
 }
-function installClickRefusal({ tool, submitting = false, running = false, operation = "install" } = {}) {
+function installClickRefusal({ tool, submitting = false, running = false, operation = "install", pendingSettings = false, installError = "" } = {}) {
   if (!tool) return "\u672A\u77E5\u5B98\u65B9\u5DE5\u5177\uFF0C\u65E0\u6CD5\u5F00\u59CB\u5B89\u88C5\u3002";
   if (tool.unsupported) return String(tool.unsupportedReason ?? "").trim() || "\u6B64\u5DE5\u5177\u6682\u4E0D\u652F\u6301\u4E00\u952E\u5B89\u88C5\u3002";
   if (tool.manager === "signed-windows-installer" && operation !== "install") {
@@ -2390,6 +2402,8 @@ function installClickRefusal({ tool, submitting = false, running = false, operat
   if (submitting || running) {
     return operation === "uninstall" ? "\u8BE5\u5DE5\u5177\u6B63\u5728\u5378\u8F7D\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002" : operation === "repair" ? "\u8BE5\u5DE5\u5177\u6B63\u5728\u4FEE\u590D\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002" : "\u8BE5\u5DE5\u5177\u6B63\u5728\u5B89\u88C5\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u4EFB\u52A1\u7ED3\u675F\u3002";
   }
+  if (pendingSettings) return "\u8BF7\u5148\u4FDD\u5B58\u6216\u653E\u5F03\u5B89\u88C5\u8BBE\u7F6E\u66F4\u6539\uFF0C\u5E76\u7B49\u5F85\u5B89\u88C5\u547D\u4EE4\u5237\u65B0\u3002";
+  if (installError) return installError;
   return "";
 }
 function payloadError(payload, fallback) {
@@ -3204,7 +3218,7 @@ function LaunchPreview({ value, changed, running, confirmRef, onConfirm, onCance
 // .dsh-plugin/client/cli-terminal.jsx
 var import_react4 = __toESM(require("react"), 1);
 
-// node_modules/@xterm/xterm/lib/xterm.mjs
+// node_modules/.pnpm/@xterm+xterm@6.0.0/node_modules/@xterm/xterm/lib/xterm.mjs
 var zs = Object.defineProperty;
 var Rl = Object.getOwnPropertyDescriptor;
 var Ll = (s15, t) => {
@@ -12318,7 +12332,7 @@ var Dl = class extends D {
   }
 };
 
-// node_modules/@xterm/addon-fit/lib/addon-fit.mjs
+// node_modules/.pnpm/@xterm+addon-fit@0.11.0/node_modules/@xterm/addon-fit/lib/addon-fit.mjs
 var h = 2;
 var _ = 1;
 var o = class {
@@ -12342,7 +12356,7 @@ var o = class {
   }
 };
 
-// node_modules/@xterm/xterm/css/xterm.css
+// node_modules/.pnpm/@xterm+xterm@6.0.0/node_modules/@xterm/xterm/css/xterm.css
 var xterm_default = `/**
  * Copyright (c) 2014 The xterm.js authors. All rights reserved.
  * Copyright (c) 2012-2013, Christopher Jeffrey (MIT License)
@@ -12631,7 +12645,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.17.1" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.18.0" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -13223,14 +13237,15 @@ var router_main_default = `.mr-workspace {
 .mr-tool-dot.running { background: #e9a640; }
 .mr-tool-command { display: block; margin-top: 6px; padding: 4px 8px; font-size: 12px; background: var(--dsw-alias-markdown-code-block); border-radius: 6px; overflow-wrap: anywhere; }
 .mr-tool-button { flex-shrink: 0; }
-.mr-tool-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.mr-tool-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; flex: 0 1 420px; }
 .mr-tool-detail { margin: 7px 0 0; }
 .mr-tool-error { margin: 8px 0 0; padding: 9px 11px; }
 .mr-tool-log { margin-top: 7px; color: var(--mr-muted); font-size: 11px; }
 .mr-tool-log summary { cursor: pointer; }
 .mr-tool-log pre { max-height: 140px; overflow: auto; padding: 8px; border-radius: 7px; background: var(--dsw-alias-markdown-code-block); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.mr-tool-methods { display: flex; align-items: center; gap: 6px; margin-right: 2px; }
-.mr-tool-methods label { display: flex; align-items: center; gap: 6px; color: var(--mr-muted); font-size: 11px; }
+.mr-tool-methods { display: flex; align-items: center; gap: 6px; width: 100%; }
+.mr-tool-methods label { display: flex; align-items: center; justify-content: flex-end; gap: 6px; width: 100%; color: var(--mr-muted); font-size: 11px; }
+.mr-tool-methods .mr-mini-select { min-width: 0; max-width: calc(100% - 54px); }
 .mr-install-settings { margin-bottom: 14px; padding: 13px 14px; border: 1px solid var(--mr-line); border-radius: 11px; background: var(--mr-card); }
 .mr-install-settings-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .mr-install-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
@@ -13239,6 +13254,7 @@ var router_main_default = `.mr-workspace {
 .mr-install-field small { font-size: 11px; line-height: 1.6; }
 .mr-install-error { color: #d95360; }
 .mr-install-toggle-row { display: flex; align-items: center; gap: 7px; }
+.mr-install-save-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .mr-channel-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
 .mr-pill-channel-ok { border-color: var(--dsw-alias-success, #2f9e63); color: var(--dsw-alias-success, #2f9e63); }
 .mr-pill-warn { border-color: var(--dsw-alias-warning, #c27c0e); color: var(--dsw-alias-warning, #c27c0e); }
@@ -13251,7 +13267,7 @@ var router_main_default = `.mr-workspace {
 .mr-profile-advanced summary { cursor: pointer; }
 .mr-profile-success { padding: 10px 12px; border-radius: 10px; background: #e5f5eb; color: #175f3a; font-size: 12px; }
 @media (prefers-color-scheme: dark) { .mr-profile-success { background: #193b2b; color: #b4f1cc; } }
-@media (max-width: 560px) { .mr-tool { align-items: stretch; flex-direction: column; gap: 10px; } .mr-tool-button { align-self: flex-start; } }
+@media (max-width: 560px) { .mr-tool { align-items: stretch; flex-direction: column; gap: 10px; } .mr-tool-actions { flex-basis: auto; justify-content: flex-start; } .mr-tool-methods label { justify-content: flex-start; } .mr-tool-button { align-self: flex-start; } }
 
 /* \u5F00\u7BB1\u4F53\u68C0\u3001\u6210\u672C\u63A7\u5236\u3001\u6267\u884C\u8BB0\u5F55\u3001\u5B89\u5168\u8FB9\u754C */
 .mr-onboarding, .mr-cost { margin-bottom: 18px; }
@@ -13465,41 +13481,24 @@ var INSTALL_SETTING_FIELDS = [
     label: "\u7EDF\u4E00\u5B89\u88C5\u76EE\u5F55",
     fallback: "",
     placeholder: "\u7559\u7A7A = \u5404\u5382\u5546\u9ED8\u8BA4\u76EE\u5F55",
-    hint: "npm / pnpm \u4F1A\u52A0 --prefix\u3002\u652F\u6301\u76EE\u5F55\u7684\u5B98\u65B9\u811A\u672C\u628A\u8FD9\u4E2A\u8DEF\u5F84\u4F20\u7ED9\u5382\u5546\u81EA\u5DF1\u7684\u5B89\u88C5\u76EE\u5F55\u53D8\u91CF\uFF1B\u5199\u6B7B\u8DEF\u5F84\u7684\u811A\u672C\u4F1A\u6807\u660E\u5B9E\u9645\u843D\u70B9\u3002\u66F4\u65B0\u4E5F\u4F7F\u7528\u8FD9\u91CC\uFF0C\u4E0D\u4F1A\u6539\u53BB\u522B\u7684\u9ED8\u8BA4\u4F4D\u7F6E\u3002",
-    validate: () => null
+    hint: "\u586B\u5199\u7EDD\u5BF9\u8DEF\u5F84\uFF0C\u4F8B\u5982 D:/AI/tools\u3002\u5404\u65B9\u5F0F\u7684\u5B9E\u9645\u76EE\u5F55\u4F1A\u663E\u793A\u5728\u5DE5\u5177\u547D\u4EE4\u65C1\uFF1B\u4E0D\u652F\u6301\u7EDF\u4E00\u76EE\u5F55\u7684\u65B9\u5F0F\u4F1A\u8BF4\u660E\u539F\u56E0\u3002"
   },
   {
     key: "toolNpmRegistry",
     label: "npm \u6E90\u5730\u5740",
     fallback: "https://registry.npmjs.org/",
     placeholder: "https://registry.npmjs.org/",
-    hint: "\u5FC5\u987B\u4EE5 https:// \u5F00\u5934\u3002\u6362\u6210\u56FD\u5185\u955C\u50CF\u540E\uFF0C\u6240\u6709\u5305\u7BA1\u7406\u5668\u65B9\u5F0F\u90FD\u4ECE\u8FD9\u91CC\u4E0B\u8F7D\u3002",
-    validate: (raw) => /^https:\/\/\S+$/i.test(raw.trim()) ? null : "\u9700\u8981 https \u5F00\u5934\u7684\u5B8C\u6574\u5730\u5740\uFF0C\u4F8B\u5982 https://registry.npmmirror.com/"
+    hint: "\u5FC5\u987B\u4EE5 https:// \u5F00\u5934\u3002\u6240\u6709 npm / pnpm \u65B9\u5F0F\u5171\u7528\u6B64\u4E0B\u8F7D\u6E90\uFF0C\u4F8B\u5982 https://registry.npmmirror.com/\u3002"
   },
   {
     key: "toolScriptUrlsJson",
     label: "\u5B89\u88C5\u811A\u672C\u6E90\u8986\u76D6\uFF08JSON\uFF0C\u53EF\u9009\uFF09",
     fallback: "{}",
     placeholder: '{ "stepcode": "https://mirror/stepcode/install.ps1" }',
-    hint: "\u6309\u5DE5\u5177 ID \u6307\u5B9A\u5382\u5546\u5B89\u88C5\u811A\u672C\u7684\u955C\u50CF\u5730\u5740\u3002\u811A\u672C\u4ECD\u4F1A\u4E0B\u8F7D\u540E\u6821\u9A8C\u5382\u5546\u6807\u8BB0\u518D\u6267\u884C\uFF0C\u955C\u50CF\u4E0D\u80FD\u6362\u6210\u522B\u7684\u7A0B\u5E8F\u3002",
-    validate: (raw) => {
-      if (!raw.trim()) return null;
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        return "JSON \u683C\u5F0F\u65E0\u6548\u3002";
-      }
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return "\u9700\u8981 JSON \u5BF9\u8C61\u3002";
-      for (const [id2, url] of Object.entries(parsed)) {
-        if (!OFFICIAL_TOOLS.some((tool) => tool.id === id2)) return `${id2} \u4E0D\u662F\u5B98\u65B9\u5DE5\u5177 ID\u3002`;
-        if (typeof url !== "string" || !/^https:\/\/\S+$/i.test(url.trim())) return `${id2} \u7684\u5730\u5740\u5FC5\u987B\u662F https \u94FE\u63A5\u3002`;
-      }
-      return null;
-    }
+    hint: "\u6309\u5DE5\u5177 ID \u6307\u5B9A https \u955C\u50CF\u5730\u5740\u3002\u811A\u672C\u4E0B\u8F7D\u540E\u4ECD\u4F1A\u6838\u5BF9\u5382\u5546\u6807\u8BB0\uFF0C\u518D\u6267\u884C\u672C\u5730\u526F\u672C\u3002"
   }
 ];
-function InstallSettings({ settingsScope, install }) {
+function InstallSettings({ settingsScope, install, onPendingChange }) {
   const [snapshot, setSnapshot] = import_react5.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false });
   const [drafts, setDrafts] = import_react5.default.useState({});
   const [saving, setSaving] = import_react5.default.useState(false);
@@ -13507,36 +13506,48 @@ function InstallSettings({ settingsScope, install }) {
   import_react5.default.useEffect(() => {
     if (typeof settingsScope?.subscribe !== "function") return void 0;
     const unsubscribe = settingsScope.subscribe(() => {
-      setSnapshot(settingsScope.getSnapshot());
-      setDrafts({});
+      const next = settingsScope.getSnapshot();
+      setSnapshot(next);
+      setDrafts((previous) => retainToolInstallDrafts(previous, next.value));
     });
     setSnapshot(settingsScope.getSnapshot());
     return unsubscribe;
   }, [settingsScope]);
+  const dirty = Object.keys(drafts).length > 0;
+  import_react5.default.useEffect(() => {
+    onPendingChange?.(saving || dirty);
+  }, [saving, dirty, onPendingChange]);
   if (!settingsScope) return null;
   const writable = snapshot.writable === true && !saving;
   const shown = (field2) => drafts[field2.key] ?? String(snapshot.value?.[field2.key] ?? field2.fallback);
-  const errors = Object.fromEntries(INSTALL_SETTING_FIELDS.map((field2) => [field2.key, field2.validate(shown(field2))]));
-  const apply2 = async (entries, successText) => {
+  const errors = Object.fromEntries(INSTALL_SETTING_FIELDS.map((field2) => [field2.key, validateToolInstallSetting(field2.key, shown(field2))]));
+  const invalid = Object.values(errors).some(Boolean);
+  const edit = (key, value) => {
+    const next = retainToolInstallDrafts({ ...drafts, [key]: value }, snapshot.value);
+    onPendingChange?.(saving || Object.keys(next).length > 0);
+    setNotice("");
+    setDrafts(next);
+  };
+  const apply2 = async () => {
+    if (!writable || !dirty || invalid) return;
     setSaving(true);
+    onPendingChange?.(true);
     setNotice("");
     try {
+      const entries = Object.entries(drafts).map(([key, value]) => ({ op: "set", path: [key], value }));
       const accepted = await settingsScope.mutate(entries, snapshot.revision);
       if (!accepted) throw new Error("\u8BBE\u7F6E\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\uFF1B\u8F93\u5165\u5DF2\u4FDD\u7559\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u3002");
-      setNotice(successText);
+      const next = settingsScope.getSnapshot();
+      setSnapshot(next);
+      setDrafts((previous) => retainToolInstallDrafts(previous, next.value));
+      setNotice("\u5B89\u88C5\u8BBE\u7F6E\u5DF2\u4FDD\u5B58\u3002");
     } catch (error) {
       setNotice(text5(error?.message) || "\u5B89\u88C5\u8BBE\u7F6E\u4FDD\u5B58\u5931\u8D25\u3002");
     } finally {
       setSaving(false);
     }
   };
-  const commit = (field2) => {
-    const saved = String(snapshot.value?.[field2.key] ?? field2.fallback);
-    const raw = shown(field2);
-    if (raw === saved || errors[field2.key]) return;
-    return apply2([{ op: "set", path: [field2.key], value: raw }], `\u5DF2\u4FDD\u5B58${field2.label}\uFF0C\u4E0B\u4E00\u6B21\u5B89\u88C5\u8D77\u751F\u6548\u3002`);
-  };
-  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-settings", "aria-label": "\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-settings-head" }, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, "\u5BF9\u6240\u6709\u5B98\u65B9\u5DE5\u5177\u751F\u6548\uFF0C\u6539\u52A8\u540E\u4E0B\u4E00\u6B21\u4E00\u952E\u5B89\u88C5\u3001\u4FEE\u590D\u6216\u5378\u8F7D\u7ACB\u5373\u4F7F\u7528\u3002\u63D2\u4EF6\u8BBE\u7F6E\u9875\u91CC\u6709\u540C\u6837\u7684\u5B57\u6BB5\u3002")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-grid" }, INSTALL_SETTING_FIELDS.map((field2) => /* @__PURE__ */ import_react5.default.createElement("label", { className: "mr-install-field", key: field2.key }, /* @__PURE__ */ import_react5.default.createElement("span", null, field2.label), /* @__PURE__ */ import_react5.default.createElement(
+  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-settings", "aria-label": "\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-settings-head" }, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, "\u4FDD\u5B58\u540E\u7528\u4E8E\u540E\u7EED\u5B89\u88C5\u4E0E\u66F4\u65B0\u3002\u6BCF\u4E2A\u5DE5\u5177\u4E0B\u65B9\u663E\u793A\u5B9E\u9645\u65B9\u5F0F\u548C\u76EE\u5F55\uFF0C\u63D2\u4EF6\u8BBE\u7F6E\u9875\u91CC\u4E5F\u80FD\u4FEE\u6539\u3002")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-grid" }, INSTALL_SETTING_FIELDS.map((field2) => /* @__PURE__ */ import_react5.default.createElement("label", { className: "mr-install-field", key: field2.key }, /* @__PURE__ */ import_react5.default.createElement("span", null, field2.label), /* @__PURE__ */ import_react5.default.createElement(
     "input",
     {
       className: "mr-input",
@@ -13544,37 +13555,47 @@ function InstallSettings({ settingsScope, install }) {
       placeholder: field2.placeholder,
       disabled: !writable,
       "aria-invalid": Boolean(errors[field2.key]),
-      onChange: (event) => setDrafts((previous) => ({ ...previous, [field2.key]: event.target.value })),
-      onBlur: () => {
-        void commit(field2);
-      }
+      onChange: (event) => edit(field2.key, event.target.value)
     }
   ), errors[field2.key] ? /* @__PURE__ */ import_react5.default.createElement("small", { className: "mr-install-error", role: "alert" }, errors[field2.key]) : /* @__PURE__ */ import_react5.default.createElement("small", null, field2.hint))), /* @__PURE__ */ import_react5.default.createElement("label", { className: "mr-install-field" }, /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5B89\u88C5\u811A\u672C\u65B9\u5F0F"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-install-toggle-row" }, /* @__PURE__ */ import_react5.default.createElement(
     "input",
     {
       type: "checkbox",
-      checked: snapshot.value?.toolAllowScriptInstall !== false,
+      checked: (drafts.toolAllowScriptInstall ?? snapshot.value?.toolAllowScriptInstall) !== false,
       disabled: !writable,
       onChange: (event) => {
-        const allowed = event.target.checked;
-        void apply2(
-          [{ op: "set", path: ["toolAllowScriptInstall"], value: allowed }],
-          allowed ? "\u5DF2\u5141\u8BB8\u811A\u672C\u5B89\u88C5\u65B9\u5F0F\uFF08curl / irm\uFF09\u3002" : "\u5DF2\u5173\u95ED\u811A\u672C\u5B89\u88C5\u65B9\u5F0F\uFF0C\u53EA\u80FD\u4F7F\u7528 npm / pnpm\u3002"
-        );
+        edit("toolAllowScriptInstall", event.target.checked);
       }
     }
-  ), /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5141\u8BB8 curl / irm \u5B89\u88C5\u811A\u672C")), /* @__PURE__ */ import_react5.default.createElement("small", null, "\u5173\u95ED\u540E\u53EA\u80FD\u4F7F\u7528 npm / pnpm \u65B9\u5F0F\uFF1B\u811A\u672C\u65B9\u5F0F\u9700\u8981\u5148\u4E0B\u8F7D\u5E76\u6821\u9A8C\u5382\u5546\u6807\u8BB0\u518D\u6267\u884C\u3002"))), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, "\u5F53\u524D\u751F\u6548\uFF1A\u5B89\u88C5\u76EE\u5F55 ", install?.installDir || "\uFF08\u5404\u5382\u5546\u9ED8\u8BA4\uFF09", " \xB7 npm \u6E90 ", install?.registry || "\uFF08\u9ED8\u8BA4\uFF09", notice ? ` \xB7 ${notice}` : ""));
+  ), /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5141\u8BB8 curl / irm \u5B89\u88C5\u811A\u672C")), /* @__PURE__ */ import_react5.default.createElement("small", null, "\u5173\u95ED\u540E\u53EA\u80FD\u4F7F\u7528 npm / pnpm \u65B9\u5F0F\uFF1B\u811A\u672C\u65B9\u5F0F\u9700\u8981\u5148\u4E0B\u8F7D\u5E76\u6821\u9A8C\u5382\u5546\u6807\u8BB0\u518D\u6267\u884C\u3002"))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-save-row" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || !dirty || invalid, onClick: () => {
+    void apply2();
+  } }, saving ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58\u5B89\u88C5\u8BBE\u7F6E"), dirty && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: saving, onClick: () => {
+    setDrafts({});
+    setNotice("");
+    onPendingChange?.(false);
+  } }, "\u653E\u5F03\u66F4\u6539"), dirty && /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, invalid ? "\u8BF7\u4FEE\u6B63\u8F93\u5165\u540E\u4FDD\u5B58\u3002" : "\u66F4\u6539\u5C1A\u672A\u4FDD\u5B58\uFF0C\u5B89\u88C5\u4E0E\u66F4\u65B0\u6682\u4E0D\u53EF\u7528\u3002")), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, "\u5F53\u524D\u751F\u6548\uFF1A\u5B89\u88C5\u76EE\u5F55 ", install?.installDir || "\uFF08\u5404\u5382\u5546\u9ED8\u8BA4\uFF09", " \xB7 npm \u6E90 ", install?.registry || "\uFF08\u9ED8\u8BA4\uFF09", notice ? ` \xB7 ${notice}` : ""));
 }
 function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
   const healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item]));
   const [probeState, setProbeState] = import_react5.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" });
   const [jobs, setJobs] = import_react5.default.useState({});
   const [rowErrors, setRowErrors] = import_react5.default.useState({});
+  const [settingsPending, setSettingsPending] = import_react5.default.useState(false);
+  const [methodSaving, setMethodSaving] = import_react5.default.useState(null);
+  const [previewPending, setPreviewPending] = import_react5.default.useState(false);
+  const [settingsWritable, setSettingsWritable] = import_react5.default.useState(() => settingsScope?.getSnapshot?.()?.writable === true);
+  const settingsPendingRef = import_react5.default.useRef(false);
+  const methodSavingRef = import_react5.default.useRef(null);
+  const previewPendingRef = import_react5.default.useRef(false);
   const mounted = import_react5.default.useRef(false);
   const request = import_react5.default.useRef(0);
   const submitting = import_react5.default.useRef(/* @__PURE__ */ new Set());
   const polling = import_react5.default.useRef(/* @__PURE__ */ new Set());
   const jobsRef = import_react5.default.useRef({});
+  const handleSettingsPending = import_react5.default.useCallback((value) => {
+    settingsPendingRef.current = value;
+    setSettingsPending(value);
+  }, []);
   const rememberJobs = (updater) => {
     setJobs((previous) => {
       const next = typeof updater === "function" ? updater(previous) : updater;
@@ -13599,6 +13620,8 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : [];
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : [];
       setProbeState({ status: "ready", probes, capabilities, readiness, install: response.value?.install ?? null, error: "" });
+      previewPendingRef.current = false;
+      setPreviewPending(false);
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === "string" ? response.value.hostVersion : null });
     } catch (error) {
       if (!mounted.current || current !== request.current) return;
@@ -13643,6 +13666,29 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
       request.current += 1;
     };
   }, []);
+  const refreshRef = import_react5.default.useRef(refresh);
+  refreshRef.current = refresh;
+  import_react5.default.useEffect(() => {
+    if (typeof settingsScope?.subscribe !== "function") return void 0;
+    const signature2 = (snapshot) => JSON.stringify([
+      snapshot?.value?.toolInstallDir,
+      snapshot?.value?.toolNpmRegistry,
+      snapshot?.value?.toolInstallMethodsJson,
+      snapshot?.value?.toolScriptUrlsJson,
+      snapshot?.value?.toolAllowScriptInstall
+    ]);
+    let previous = signature2(settingsScope.getSnapshot());
+    return settingsScope.subscribe(() => {
+      const snapshot = settingsScope.getSnapshot();
+      setSettingsWritable(snapshot.writable === true);
+      const next = signature2(snapshot);
+      if (next === previous) return;
+      previous = next;
+      previewPendingRef.current = true;
+      setPreviewPending(true);
+      void refreshRef.current();
+    });
+  }, [settingsScope]);
   import_react5.default.useEffect(() => {
     const active = Object.values(jobs).filter((job) => job?.status === "running").map((job) => job.tool);
     if (active.length === 0 || typeof officialToolInstallStatus !== "function") return void 0;
@@ -13683,18 +13729,24 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   }, [jobs, officialToolInstallStatus]);
   const run = async (id2, operation) => {
     const tool = OFFICIAL_TOOLS.find((item) => item.id === id2);
+    const summary = (probeState.install?.tools ?? []).find((item) => item.id === id2);
     const bridge = { install: installOfficialTool, repair: repairOfficialTool, uninstall: uninstallOfficialTool }[operation];
     const refusal = installClickRefusal({
       tool,
       submitting: submitting.current.has(id2),
       running: jobsRef.current[id2]?.status === "running",
-      operation
+      operation,
+      pendingSettings: settingsPendingRef.current || Boolean(methodSavingRef.current) || previewPendingRef.current,
+      installError: operation === "uninstall" ? summary?.uninstallError ?? (summary?.uninstallCommand ? "" : summary?.error ?? "") : summary?.installError ?? summary?.error ?? ""
     });
     if (refusal) {
       setRowErrors((previous) => ({ ...previous, [id2]: refusal }));
       return;
     }
-    if (typeof bridge !== "function") throw new Error("\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002");
+    if (typeof bridge !== "function") {
+      setRowErrors((previous) => ({ ...previous, [id2]: "\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002" }));
+      return;
+    }
     submitting.current.add(id2);
     const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     setRowErrors((previous) => ({ ...previous, [id2]: "" }));
@@ -13731,7 +13783,10 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const uninstall = (id2) => run(id2, "uninstall");
   const setInstallMethod = async (toolId, methodId) => {
     const snapshot = settingsScope?.getSnapshot?.();
-    if (!snapshot) return;
+    if (!snapshot?.writable || methodSavingRef.current || settingsPendingRef.current) return;
+    methodSavingRef.current = toolId;
+    setMethodSaving(toolId);
+    setRowErrors((previous) => ({ ...previous, [toolId]: "" }));
     let map = {};
     try {
       map = JSON.parse(String(snapshot.value?.toolInstallMethodsJson ?? "{}")) || {};
@@ -13744,9 +13799,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
     try {
       const accepted = await settingsScope.mutate([{ op: "set", path: ["toolInstallMethodsJson"], value: JSON.stringify(map) }], snapshot.revision);
       if (!accepted) throw new Error("\u5B89\u88C5\u65B9\u5F0F\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\u3002");
-      void refresh();
+      previewPendingRef.current = true;
+      setPreviewPending(true);
+      await refresh();
     } catch (error) {
       if (mounted.current) setRowErrors((previous) => ({ ...previous, [toolId]: text5(error?.message) || "\u5B89\u88C5\u65B9\u5F0F\u4FDD\u5B58\u5931\u8D25\u3002" }));
+    } finally {
+      methodSavingRef.current = null;
+      if (mounted.current) setMethodSaving(null);
     }
   };
   const cancel = async (id2) => {
@@ -13768,10 +13828,12 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const installById = Object.fromEntries((probeState.install?.tools ?? []).map((item) => [item.id, item]));
   return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u3001\u7248\u672C\u548C\u767B\u5F55\u72B6\u6001\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u5B89\u88C5\u6216\u66F4\u65B0\u5230\u5404\u5382\u5546\u6700\u65B0\u7248\uFF08\u65B0\u7248\u672C\u672A\u7ECF\u63D2\u4EF6\u6D4B\u8BD5\uFF09\u3002\u53EF\u6309\u5DE5\u5177\u9009\u62E9 npm\u3001pnpm \u6216\u5382\u5546\u5B89\u88C5\u811A\u672C\u65B9\u5F0F\uFF0C\u5E76\u7EDF\u4E00\u8BBE\u7F6E\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF1B\u5378\u8F7D\u53EA\u5220\u9664\u7A0B\u5E8F\uFF0C\u914D\u7F6E\u4E0E\u767B\u5F55\u4FDD\u7559\u3002\u672A\u767B\u5F55\u7684\u5DE5\u5177\u70B9\u201C\u53BB\u767B\u5F55\u201D\u67E5\u770B\u767B\u5F55\u547D\u4EE4\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u4F53\u68C0\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     void refresh();
-  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement(InstallSettings, { settingsScope, install: probeState.install }), probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.error && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
+  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement(InstallSettings, { settingsScope, install: probeState.install, onPendingChange: handleSettingsPending }), previewPending && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B89\u88C5\u8BBE\u7F6E\u5DF2\u53D8\u66F4\uFF0C\u6B63\u5728\u5237\u65B0\u5B9E\u9645\u5B89\u88C5\u547D\u4EE4\uFF1B\u5237\u65B0\u5B8C\u6210\u540E\u53EF\u7EE7\u7EED\u5B89\u88C5\u4E0E\u66F4\u65B0\u3002"), probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.error && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
     const summary = installById[tool.id];
-    const command = summary?.command ?? installCommandLine(tool);
+    const command = summary ? summary.command : installCommandLine(tool);
+    const updateCommand = summary?.updateCommand ?? command;
     const methods = summary?.methods ?? installMethodsFor(tool).map((method) => ({ id: method.id, label: method.label }));
+    const settingsBusy = settingsPending || Boolean(methodSaving) || previewPending;
     const probe = byId[tool.id];
     const capability = capabilitiesById[tool.id];
     const readiness = readinessById[tool.id];
@@ -13783,32 +13845,36 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
       probe,
       job,
       probeStatus: probeState.status,
-      summary: { installable: !summary?.error, removable: !summary?.error }
+      summary: {
+        installable: !(summary?.installError ?? summary?.error),
+        removable: !(summary?.uninstallError ?? (summary?.uninstallCommand ? "" : summary?.error))
+      }
     });
     const verified = job?.status === "succeeded" && (job.operation === "uninstall" ? job.postInstallProbe?.installed === false : job.postInstallProbe?.installed === true);
     const operation = job?.operation === "uninstall" ? "\u5378\u8F7D" : job?.operation === "repair" ? "\u4FEE\u590D" : "\u5B89\u88C5";
     const status = running ? job.cancelRequested ? `\u6B63\u5728\u53D6\u6D88${operation}\u2026` : `${operation}\u4E2D\u2026` : job?.status === "installer-opened" ? "\u5B98\u65B9\u5B89\u88C5\u5668\u5DF2\u6253\u5F00\uFF0C\u8BF7\u5B8C\u6210\u5B89\u88C5\u540E\u91CD\u65B0\u68C0\u6D4B" : job?.status === "cancelled" ? `${operation}\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B` : verified ? `${operation}\u6210\u529F\u5E76\u9A8C\u8BC1` : probeLabel(probe);
-    return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` \xB7 ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` \xB7 \u6700\u65B0 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react5.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.headlessAdapter ? "\u5DF2\u53EF\u7531 model_router_execute \u4EE5\u65E0\u754C\u9762\u65B9\u5F0F\u8C03\u7528\u3002\u547D\u4EE4\u7F3A\u5931\u6216\u5931\u8D25\u65F6\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002\u7B7E\u540D\u6C99\u7BB1\u5165\u53E3\u4E0D\u542F\u52A8\u6B64 CLI\u3002" : readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react5.default.createElement("code", { className: "mr-tool-command" }, command) : /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react5.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), command && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-actions" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-methods" }, /* @__PURE__ */ import_react5.default.createElement("label", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5B89\u88C5\u65B9\u5F0F"), /* @__PURE__ */ import_react5.default.createElement(
+    return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` \xB7 ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` \xB7 \u6700\u65B0 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react5.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.headlessAdapter ? "\u5DF2\u53EF\u7531 model_router_execute \u4EE5\u65E0\u754C\u9762\u65B9\u5F0F\u8C03\u7528\u3002\u547D\u4EE4\u7F3A\u5931\u6216\u5931\u8D25\u65F6\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002\u7B7E\u540D\u6C99\u7BB1\u5165\u53E3\u4E0D\u542F\u52A8\u6B64 CLI\u3002" : readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "\u5B89\u88C5\u65B9\u5F0F\uFF1A", methods.find((method) => method.id === summary?.methodId)?.label ?? tool.manager, " \xB7 \u5B9E\u9645\u5B89\u88C5\u76EE\u5F55\uFF1A", summary?.installDir || "\u5404\u5382\u5546\u9ED8\u8BA4\u76EE\u5F55"), /* @__PURE__ */ import_react5.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} \u5B89\u88C5\u547D\u4EE4` }, command), updateCommand !== command && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "\u66F4\u65B0\u6CBF\u7528\u539F\u5B89\u88C5\u4F4D\u7F6E\uFF1A", summary?.updateInstallDir || "\u5404\u5382\u5546\u9ED8\u8BA4\u76EE\u5F55"), /* @__PURE__ */ import_react5.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} \u66F4\u65B0\u547D\u4EE4` }, updateCommand))) : /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react5.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), (command || methods.length > 0) && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-actions" }, methods.length > 0 && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-methods" }, /* @__PURE__ */ import_react5.default.createElement("label", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5B89\u88C5\u65B9\u5F0F"), /* @__PURE__ */ import_react5.default.createElement(
       "select",
       {
         className: "mr-mini-select",
-        value: summary?.savedMethodId ?? summary?.methodId ?? "",
-        disabled: running || methods.length === 0,
+        value: summary?.savedMethodId ?? "",
+        disabled: running || settingsBusy || !settingsWritable,
         onChange: (event) => {
           void setInstallMethod(tool.id, event.target.value);
         }
       },
+      /* @__PURE__ */ import_react5.default.createElement("option", { value: "" }, "\u81EA\u52A8\u9009\u62E9"),
       methods.map((method) => /* @__PURE__ */ import_react5.default.createElement("option", { key: method.id, value: method.id, disabled: Boolean(method.blocked) }, method.label, method.blocked ? `\uFF08${method.blocked}\uFF09` : ""))
-    ))), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: action.disabled, onClick: () => {
+    ))), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: action.disabled || settingsBusy || !command || Boolean(summary?.error), title: summary?.error || (settingsBusy ? "\u8BF7\u5148\u4FDD\u5B58\u6216\u653E\u5F03\u5B89\u88C5\u8BBE\u7F6E\u66F4\u6539\uFF0C\u5E76\u7B49\u5F85\u547D\u4EE4\u5237\u65B0\u3002" : void 0), onClick: () => {
       void install(tool.id);
-    } }, action.label), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.repair.disabled, title: maintenance.repair.title, onClick: () => {
+    } }, methodSaving === tool.id ? "\u4FDD\u5B58\u65B9\u5F0F\u4E2D\u2026" : action.label), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.repair.disabled || settingsBusy, title: maintenance.repair.title, onClick: () => {
       void repair(tool.id);
-    } }, maintenance.repair.label), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.uninstall.disabled, title: maintenance.uninstall.title, onClick: () => {
+    } }, maintenance.repair.label), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.uninstall.disabled || settingsBusy, title: maintenance.uninstall.title, onClick: () => {
       void uninstall(tool.id);
     } }, maintenance.uninstall.label), running && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
       void cancel(tool.id);
     } }, job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u2026" : `\u53D6\u6D88${operation}`)));
-  })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u7531 Host \u6309\u6CE8\u518C\u8868\u56FA\u5B9A\u6765\u6E90\u6267\u884C\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\uFF1B\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u6765\u81EA\u4F60\u81EA\u5DF1\u586B\u5199\u7684\u8BBE\u7F6E\uFF0C\u547D\u4EE4\u4E0A\u65B9\u5B9E\u65F6\u663E\u793A\u5C06\u8981\u6267\u884C\u7684\u5185\u5BB9\u3002\u53EF\u70B9\u201C\u53D6\u6D88\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u5B9E\u9645\u7248\u672C\u3002\u4E00\u952E\u5378\u8F7D\u53EA\u5220\u9664\u7A0B\u5E8F\u672C\u8EAB\uFF08\u811A\u672C\u5B89\u88C5\u4F1A\u987A\u5E26\u6E05\u6389\u5B83\u5728 shell \u914D\u7F6E\u91CC\u5199\u7684 PATH \u8BB0\u5F55\uFF09\uFF0C\u914D\u7F6E\u3001\u767B\u5F55\u4FE1\u606F\u548C\u5386\u53F2\u8BB0\u5F55\u4FDD\u7559\u3002ZCode \u5B89\u88C5\u5668\u542F\u52A8\u540E\u4ECD\u9700\u5728\u539F\u5382\u7A97\u53E3\u9009\u62E9\u76EE\u5F55\u5E76\u5B8C\u6210\u5B89\u88C5\u3002Agent \u4E5F\u53EF\u8C03\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_install"), " / ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_repair"), " / ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_uninstall"), "\uFF0C\u6216\u5728\u4F1A\u8BDD\u4F7F\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "/tools"), "\u3002")));
+  })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u4F7F\u7528\u5DF2\u4FDD\u5B58\u8BBE\u7F6E\uFF0C\u547D\u4EE4\u4E0A\u65B9\u663E\u793A\u5B9E\u9645\u6267\u884C\u65B9\u5F0F\u3002\u53EF\u70B9\u201C\u53D6\u6D88\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u7248\u672C\u3002\u5378\u8F7D\u4FDD\u7559\u914D\u7F6E\u3001\u767B\u5F55\u4FE1\u606F\u548C\u5386\u53F2\u8BB0\u5F55\uFF1B\u811A\u672C\u65B9\u5F0F\u53EA\u79FB\u9664\u767B\u8BB0\u7684\u547D\u4EE4\u5165\u53E3\uFF0C\u53EF\u80FD\u4FDD\u7559\u5382\u5546\u7248\u672C\u76EE\u5F55\u3002\u4E0D\u652F\u6301\u5B89\u5168\u5378\u8F7D\u7684\u65B9\u5F0F\u4F1A\u8BF4\u660E\u539F\u56E0\u3002ZCode \u9700\u5728\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u5B8C\u6210\u5B89\u88C5\u3002\u4F1A\u8BDD\u4E0E Agent \u4E5F\u53EF\u4F7F\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "/tools"), "\u3001", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_install"), "\u3001", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_repair"), " \u548C ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_uninstall"), "\u3002")));
 }
 var HEADLESS_TOOLS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]);
 var WORKSPACE_VIEWS = [
@@ -14670,12 +14736,12 @@ function RouterSettingsCard(props) {
   ), state.quotaPatternsJson.invalid && /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.profileError, role: "alert" }, "\u9700\u8981 JSON \u5BF9\u8C61\uFF0C\u4E14\u6BCF\u6761\u89C4\u5219\u90FD\u662F\u6709\u6548\u7684\u6B63\u5219\u8868\u8FBE\u5F0F\u3002"), /* @__PURE__ */ import_react6.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react6.default.createElement("summary", null, "\u67E5\u770B\u89C4\u5219\u683C\u5F0F"), /* @__PURE__ */ import_react6.default.createElement("pre", null, `{
   "kimi-code": { "quota": ["\u989D\u5EA6\u5DF2\u7528\u5B8C"], "rateLimit": ["\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41"] },
   "my-glm-plan": { "quota": ["Usage limit reached for", "1308"] }
-}`)), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("quotaPatternsJson") }, "\u6062\u590D\u9ED8\u8BA4\u89C4\u5219")), /* @__PURE__ */ import_react6.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react6.default.createElement("span", { style: styles.profileLabel }, "\u5B98\u65B9\u5DE5\u5177\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E"), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u5BF9\u6240\u6709\u5B98\u65B9\u5DE5\u5177\u7684\u4E00\u952E\u5B89\u88C5\u3001\u4FEE\u590D\u548C\u5378\u8F7D\u751F\u6548\u3002\u5DE5\u4F5C\u53F0\u7684\u201C\u5B98\u65B9\u5DE5\u5177\u201D\u9875\u4E5F\u80FD\u6539\u540C\u6837\u7684\u5B57\u6BB5\uFF0C\u5E76\u4F1A\u5B9E\u65F6\u663E\u793A\u6BCF\u4E2A\u5DE5\u5177\u5C06\u8981\u6267\u884C\u7684\u547D\u4EE4\u3002 \u5B89\u88C5\u547D\u4EE4\u59CB\u7EC8\u6765\u81EA\u56FA\u5B9A\u6CE8\u518C\u8868\uFF0C\u8FD9\u91CC\u53EA\u51B3\u5B9A\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\u6216\u4EFB\u610F\u5730\u5740\u3002"), /* @__PURE__ */ import_react6.default.createElement(
+}`)), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("quotaPatternsJson") }, "\u6062\u590D\u9ED8\u8BA4\u89C4\u5219")), /* @__PURE__ */ import_react6.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react6.default.createElement("span", { style: styles.profileLabel }, "\u5B98\u65B9\u5DE5\u5177\u7EDF\u4E00\u5B89\u88C5\u8BBE\u7F6E"), /* @__PURE__ */ import_react6.default.createElement("p", { style: styles.noticeText }, "\u7528\u4E8E\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u4E0E\u66F4\u65B0\u3002\u5DE5\u4F5C\u53F0\u7684\u201C\u5B98\u65B9\u5DE5\u5177\u201D\u9875\u4E5F\u80FD\u4FDD\u5B58\u540C\u6837\u7684\u5B57\u6BB5\uFF0C\u5E76\u4F1A\u663E\u793A\u6BCF\u4E2A\u5DE5\u5177\u7684\u5B9E\u9645\u5B89\u88C5\u65B9\u5F0F\u3001\u76EE\u5F55\u4E0E\u6267\u884C\u547D\u4EE4\u3002 \u5B89\u88C5\u547D\u4EE4\u59CB\u7EC8\u6765\u81EA\u56FA\u5B9A\u6CE8\u518C\u8868\uFF0C\u8FD9\u91CC\u53EA\u51B3\u5B9A\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF0C\u4E0D\u63A5\u53D7\u81EA\u5B9A\u4E49\u5305\u540D\u6216\u4EFB\u610F\u5730\u5740\u3002"), /* @__PURE__ */ import_react6.default.createElement(
     import_dsh_client_ui_primitives.SettingsValueField,
     {
       id: "model-router-tool-install-dir",
       label: "\u7EDF\u4E00\u5B89\u88C5\u76EE\u5F55",
-      hint: "\u7559\u7A7A\u8868\u793A\u4F7F\u7528\u5404\u5382\u5546\u9ED8\u8BA4\u4F4D\u7F6E\u3002npm \u4E0E pnpm \u4F1A\u5E26\u4E0A --prefix\uFF1B\u652F\u6301\u76EE\u5F55\u7684\u5B98\u65B9\u811A\u672C\u4F1A\u628A\u8FD9\u4E2A\u8DEF\u5F84\u4F20\u7ED9\u5382\u5546\u81EA\u5DF1\u7684\u5B89\u88C5\u76EE\u5F55\u53D8\u91CF\uFF08\u4F8B\u5982 MCODE_INSTALL_DIR\uFF09\u3002\u5199\u6B7B\u8DEF\u5F84\u7684\u811A\u672C\u4F1A\u5728\u5DE5\u5177\u884C\u6807\u660E\u5B9E\u9645\u843D\u70B9\u3002\u5FC5\u987B\u662F\u7EDD\u5BF9\u8DEF\u5F84\u3002\u66F4\u65B0\u4F7F\u7528\u540C\u4E00\u8DEF\u5F84\u3002",
+      hint: "\u586B\u5199\u7EDD\u5BF9\u8DEF\u5F84\uFF0C\u7559\u7A7A\u4F7F\u7528\u5382\u5546\u9ED8\u8BA4\u4F4D\u7F6E\u3002npm / pnpm \u4F7F\u7528\u8BE5\u76EE\u5F55\u5B89\u88C5\uFF1B\u5382\u5546\u811A\u672C\u4E0D\u652F\u6301\u81EA\u5B9A\u4E49\u76EE\u5F55\u65F6\uFF0C\u5B98\u65B9\u5DE5\u5177\u9875\u4F1A\u663E\u793A\u5B9E\u9645\u76EE\u5F55\u4E0E\u539F\u56E0\u3002\u66F4\u65B0\u4F7F\u7528\u540C\u4E00\u5B89\u88C5\u65B9\u5F0F\u3001\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u3002",
       disabled,
       ...state.toolInstallDir,
       overriddenLabel: FIELD_COPY.overridden,
@@ -14711,7 +14777,7 @@ function RouterSettingsCard(props) {
     {
       id: "model-router-tool-install-methods",
       label: "\u9ED8\u8BA4\u5B89\u88C5\u65B9\u5F0F\uFF08JSON\uFF0C\u53EF\u9009\uFF09",
-      hint: "\u6309\u5DE5\u5177 ID \u56FA\u5B9A\u4E00\u79CD\u5B89\u88C5\u65B9\u5F0F\uFF0C\u4F8B\u5982\u56FA\u5B9A Step Code \u5728 Windows \u4E0A\u7528 irm | iex\u3002\u7559\u7A7A\u8868\u793A\u4F7F\u7528\u8BE5\u5DE5\u5177\u7684\u9ED8\u8BA4\u65B9\u5F0F\u3002\u53EF\u9009\u503C\uFF1Anpm\u3001pnpm\u3001script-bash\uFF08curl | bash\uFF09\u3001script-powershell\uFF08irm | iex\uFF09\u3002",
+      hint: "\u6309\u5DE5\u5177 ID \u56FA\u5B9A\u4E00\u79CD\u5B89\u88C5\u65B9\u5F0F\uFF0C\u4F8B\u5982\u56FA\u5B9A Step Code \u5728 Windows \u4E0A\u7528 irm | iex\u3002\u7559\u7A7A\u81EA\u52A8\u9009\u62E9\u9002\u5408\u672C\u673A\u7684\u65B9\u5F0F\u3002\u53EF\u9009\u503C\u4EE5\u5DE5\u5177\u4E0B\u62C9\u6846\u4E3A\u51C6\uFF1Anpm\u3001pnpm\u3001script-bash\uFF08curl | bash\uFF09\u3001script-sh\uFF08curl | sh\uFF09\u3001script-powershell\uFF08irm | iex\uFF09\u3002",
       disabled,
       ...state.toolInstallMethodsJson,
       overriddenLabel: FIELD_COPY.overridden,

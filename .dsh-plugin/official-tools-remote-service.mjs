@@ -1,8 +1,8 @@
 /** Host receiver for the official desktop's typed one-click installer RPC. */
 import { readFileSync } from 'node:fs'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { getOfficialTool, installMethodBlockReason, OFFICIAL_TOOLS } from './shared/official-tool-registry.mjs'
-import { resolveInstallPlan, resolveUninstallPlan } from './shared/tool-install-preferences.mjs'
+import { getOfficialTool, installCommandLine, installMethodBlockReason, OFFICIAL_TOOLS } from './shared/official-tool-registry.mjs'
+import { resolveInstallLocation, resolveInstallPlan, resolveUninstallPlan } from './shared/tool-install-preferences.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness } from './shared/official-tool-executor.mjs'
 import {
   cancelInstall,
@@ -41,8 +41,7 @@ const unavailable = () => { throw new Error('模型路由工作台服务尚未�
  * command line that would actually run. The panel shows this before the user
  * clicks, so an install is never a surprise command.
  */
-function installSummary() {
-  const preferences = installPreferences()
+export function installSummary(preferences = installPreferences(), options = currentInstallOptions()) {
   return {
     installDir: preferences.installDir ?? '',
     registry: preferences.registry ?? '',
@@ -56,22 +55,59 @@ function installSummary() {
         command: null,
         uninstallCommand: null,
         methodId: null,
-        // What the user pinned, which may differ from the effective method when
-        // the pinned one does not run on this platform.
+        // A pinned unavailable method stays selected and reports its reason.
         savedMethodId: preferences.methods?.[tool.id] ?? null,
         notices: [],
       }
+      if (tool.manager === 'signed-windows-installer') {
+        entry.methodId = 'signed-windows-installer'
+        if (options.platform === 'win32') {
+          entry.command = installCommandLine(tool)
+          entry.updateCommand = entry.command
+          entry.notices = [preferences.installDir
+            ? `请在官方安装窗口手动选择 ${preferences.installDir}，完成后重新体检。`
+            : '请在官方安装窗口选择目录并完成安装，然后重新体检。']
+        } else entry.installError = entry.error = 'ZCode 签名安装器仅支持 Windows。'
+        entry.uninstallError = 'ZCode 是桌面安装版，请在系统“应用”中卸载它。'
+        return entry
+      }
       for (const method of tool.installMethods ?? []) {
-        entry.methods.push({ id: method.id, label: method.label, kind: method.kind, blocked: installMethodBlockReason(method) })
+        const item = { id: method.id, label: method.label, kind: method.kind,
+          supportsInstallDir: method.supportsInstallDir === true,
+          blocked: installMethodBlockReason(method, options.platform) }
+        try {
+          const plan = resolveInstallPlan(tool, method.id, preferences, options)
+          item.command = planCommandLine(plan)
+          item.installDir = resolveInstallLocation(tool, method, preferences, options)?.dir ?? ''
+          item.notices = plan.notices ?? []
+        } catch (error) {
+          item.blocked = errorText(error).slice(0, 200)
+        }
+        try {
+          const removal = resolveUninstallPlan(tool, method.id, preferences, options)
+          item.uninstallCommand = planCommandLine(removal, 'uninstall')
+        } catch (error) { item.uninstallError = errorText(error).slice(0, 200) }
+        entry.methods.push(item)
       }
       try {
-        const plan = resolveInstallPlan(tool, undefined, preferences, currentInstallOptions())
+        const plan = resolveInstallPlan(tool, undefined, preferences, options)
         entry.methodId = plan.methodId
         entry.command = planCommandLine(plan)
+        entry.installDir = resolveInstallLocation(tool, plan.method, preferences, options)?.dir ?? ''
+        entry.updateMethodId = plan.methodId
+        entry.updateCommand = entry.command
+        entry.updateInstallDir = entry.installDir
         entry.notices = plan.notices ?? []
-        entry.uninstallCommand = planCommandLine(resolveUninstallPlan(tool, plan.methodId, preferences, currentInstallOptions()), 'uninstall')
       } catch (error) {
-        entry.error = errorText(error).slice(0, 200)
+        entry.installError = entry.error = errorText(error).slice(0, 200)
+      }
+      try {
+        const removal = resolveUninstallPlan(tool, undefined, preferences, options)
+        entry.methodId ??= removal.methodId
+        entry.installDir ??= resolveInstallLocation(tool, removal.method, preferences, options)?.dir ?? ''
+        entry.uninstallCommand = planCommandLine(removal, 'uninstall')
+      } catch (error) {
+        entry.uninstallError = errorText(error).slice(0, 200)
       }
       return entry
     }),

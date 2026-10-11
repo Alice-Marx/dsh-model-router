@@ -1,7 +1,7 @@
 import React from 'react'
 import { createWorkspacePlan, routesFromModelCatalog } from './catalog.mjs'
 import { ModelProfileEditor } from './model-profile-editor.jsx'
-import { acceptedInstallJob, installClickRefusal, shouldApplyInstallStatus, toolInstallAction, toolMaintenanceActions } from './tool-install-state.mjs'
+import { acceptedInstallJob, installClickRefusal, retainToolInstallDrafts, shouldApplyInstallStatus, toolInstallAction, toolMaintenanceActions, validateToolInstallSetting } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
@@ -136,32 +136,20 @@ function probeLabel(probe) {
  * The unified install settings the user can change from the workbench itself.
  * They live in volatile plugin config, so a change applies to every later
  * one-click install, repair and uninstall, and to `/tools` and the agent tools
- * as well — one place, not a per-click override. Text is staged locally while
- * typing and committed on blur, so one keystroke is not one config write.
+ * as well. Drafts are saved together so a directory and download source change
+ * cannot leave the install controls showing a partly saved configuration.
  */
 const INSTALL_SETTING_FIELDS = [
   { key: 'toolInstallDir', label: '统一安装目录', fallback: '', placeholder: '留空 = 各厂商默认目录',
-    hint: 'npm / pnpm 会加 --prefix。支持目录的官方脚本把这个路径传给厂商自己的安装目录变量；写死路径的脚本会标明实际落点。更新也使用这里，不会改去别的默认位置。', validate: () => null },
+    hint: '填写绝对路径，例如 D:/AI/tools。各方式的实际目录会显示在工具命令旁；不支持统一目录的方式会说明原因。' },
   { key: 'toolNpmRegistry', label: 'npm 源地址', fallback: 'https://registry.npmjs.org/', placeholder: 'https://registry.npmjs.org/',
-    hint: '必须以 https:// 开头。换成国内镜像后，所有包管理器方式都从这里下载。',
-    validate: raw => (/^https:\/\/\S+$/i.test(raw.trim()) ? null : '需要 https 开头的完整地址，例如 https://registry.npmmirror.com/') },
+    hint: '必须以 https:// 开头。所有 npm / pnpm 方式共用此下载源，例如 https://registry.npmmirror.com/。' },
   { key: 'toolScriptUrlsJson', label: '安装脚本源覆盖（JSON，可选）', fallback: '{}',
     placeholder: '{ "stepcode": "https://mirror/stepcode/install.ps1" }',
-    hint: '按工具 ID 指定厂商安装脚本的镜像地址。脚本仍会下载后校验厂商标记再执行，镜像不能换成别的程序。',
-    validate: raw => {
-      if (!raw.trim()) return null
-      let parsed
-      try { parsed = JSON.parse(raw) } catch { return 'JSON 格式无效。' }
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return '需要 JSON 对象。'
-      for (const [id, url] of Object.entries(parsed)) {
-        if (!OFFICIAL_TOOLS.some(tool => tool.id === id)) return `${id} 不是官方工具 ID。`
-        if (typeof url !== 'string' || !/^https:\/\/\S+$/i.test(url.trim())) return `${id} 的地址必须是 https 链接。`
-      }
-      return null
-    } },
+    hint: '按工具 ID 指定 https 镜像地址。脚本下载后仍会核对厂商标记，再执行本地副本。' },
 ]
 
-function InstallSettings({ settingsScope, install }) {
+function InstallSettings({ settingsScope, install, onPendingChange }) {
   const [snapshot, setSnapshot] = React.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false })
   const [drafts, setDrafts] = React.useState({})
   const [saving, setSaving] = React.useState(false)
@@ -169,23 +157,42 @@ function InstallSettings({ settingsScope, install }) {
 
   React.useEffect(() => {
     if (typeof settingsScope?.subscribe !== 'function') return undefined
-    const unsubscribe = settingsScope.subscribe(() => { setSnapshot(settingsScope.getSnapshot()); setDrafts({}) })
+    const unsubscribe = settingsScope.subscribe(() => {
+      const next = settingsScope.getSnapshot()
+      setSnapshot(next)
+      setDrafts(previous => retainToolInstallDrafts(previous, next.value))
+    })
     setSnapshot(settingsScope.getSnapshot())
     return unsubscribe
   }, [settingsScope])
+  const dirty = Object.keys(drafts).length > 0
+  React.useEffect(() => { onPendingChange?.(saving || dirty) }, [saving, dirty, onPendingChange])
   if (!settingsScope) return null
 
   const writable = snapshot.writable === true && !saving
   const shown = field => drafts[field.key] ?? String(snapshot.value?.[field.key] ?? field.fallback)
-  const errors = Object.fromEntries(INSTALL_SETTING_FIELDS.map(field => [field.key, field.validate(shown(field))]))
+  const errors = Object.fromEntries(INSTALL_SETTING_FIELDS.map(field => [field.key, validateToolInstallSetting(field.key, shown(field))]))
+  const invalid = Object.values(errors).some(Boolean)
+  const edit = (key, value) => {
+    const next = retainToolInstallDrafts({ ...drafts, [key]: value }, snapshot.value)
+    onPendingChange?.(saving || Object.keys(next).length > 0)
+    setNotice('')
+    setDrafts(next)
+  }
 
-  const apply = async (entries, successText) => {
+  const apply = async () => {
+    if (!writable || !dirty || invalid) return
     setSaving(true)
+    onPendingChange?.(true)
     setNotice('')
     try {
+      const entries = Object.entries(drafts).map(([key, value]) => ({ op: 'set', path: [key], value }))
       const accepted = await settingsScope.mutate(entries, snapshot.revision)
       if (!accepted) throw new Error('设置未被保存，可能被其他页面修改；输入已保留，请重新核对。')
-      setNotice(successText)
+      const next = settingsScope.getSnapshot()
+      setSnapshot(next)
+      setDrafts(previous => retainToolInstallDrafts(previous, next.value))
+      setNotice('安装设置已保存。')
     } catch (error) {
       setNotice(text(error?.message) || '安装设置保存失败。')
     } finally {
@@ -193,18 +200,11 @@ function InstallSettings({ settingsScope, install }) {
     }
   }
 
-  const commit = field => {
-    const saved = String(snapshot.value?.[field.key] ?? field.fallback)
-    const raw = shown(field)
-    if (raw === saved || errors[field.key]) return
-    return apply([{ op: 'set', path: [field.key], value: raw }], `已保存${field.label}，下一次安装起生效。`)
-  }
-
   return (
     <div className="mr-install-settings" aria-label="统一安装设置">
       <div className="mr-install-settings-head">
         <strong>统一安装设置</strong>
-        <span className="mr-caption">对所有官方工具生效，改动后下一次一键安装、修复或卸载立即使用。插件设置页里有同样的字段。</span>
+        <span className="mr-caption">保存后用于后续安装与更新。每个工具下方显示实际方式和目录，插件设置页里也能修改。</span>
       </div>
       <div className="mr-install-grid">
         {INSTALL_SETTING_FIELDS.map(field => (
@@ -216,8 +216,7 @@ function InstallSettings({ settingsScope, install }) {
               placeholder={field.placeholder}
               disabled={!writable}
               aria-invalid={Boolean(errors[field.key])}
-              onChange={event => setDrafts(previous => ({ ...previous, [field.key]: event.target.value }))}
-              onBlur={() => { void commit(field) }}
+              onChange={event => edit(field.key, event.target.value)}
             />
             {errors[field.key]
               ? <small className="mr-install-error" role="alert">{errors[field.key]}</small>
@@ -229,20 +228,21 @@ function InstallSettings({ settingsScope, install }) {
           <span className="mr-install-toggle-row">
             <input
               type="checkbox"
-              checked={snapshot.value?.toolAllowScriptInstall !== false}
+              checked={(drafts.toolAllowScriptInstall ?? snapshot.value?.toolAllowScriptInstall) !== false}
               disabled={!writable}
               onChange={event => {
-                const allowed = event.target.checked
-                void apply(
-                  [{ op: 'set', path: ['toolAllowScriptInstall'], value: allowed }],
-                  allowed ? '已允许脚本安装方式（curl / irm）。' : '已关闭脚本安装方式，只能使用 npm / pnpm。',
-                )
+                edit('toolAllowScriptInstall', event.target.checked)
               }}
             />
             <span>允许 curl / irm 安装脚本</span>
           </span>
           <small>关闭后只能使用 npm / pnpm 方式；脚本方式需要先下载并校验厂商标记再执行。</small>
         </label>
+      </div>
+      <div className="mr-install-save-row">
+        <button className="mr-button mr-button-secondary" type="button" disabled={!writable || !dirty || invalid} onClick={() => { void apply() }}>{saving ? '保存中…' : '保存安装设置'}</button>
+        {dirty && <button className="mr-button mr-button-secondary" type="button" disabled={saving} onClick={() => { setDrafts({}); setNotice(''); onPendingChange?.(false) }}>放弃更改</button>}
+        {dirty && <span className="mr-caption">{invalid ? '请修正输入后保存。' : '更改尚未保存，安装与更新暂不可用。'}</span>}
       </div>
       <p className="mr-caption" style={{ marginTop: 8 }} role={notice ? 'status' : undefined}>
         当前生效：安装目录 {install?.installDir || '（各厂商默认）'} · npm 源 {install?.registry || '（默认）'}{notice ? ` · ${notice}` : ''}
@@ -256,11 +256,22 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const [probeState, setProbeState] = React.useState({ status: 'loading', probes: [], capabilities: [], readiness: [], install: null, error: '' })
   const [jobs, setJobs] = React.useState({})
   const [rowErrors, setRowErrors] = React.useState({})
+  const [settingsPending, setSettingsPending] = React.useState(false)
+  const [methodSaving, setMethodSaving] = React.useState(null)
+  const [previewPending, setPreviewPending] = React.useState(false)
+  const [settingsWritable, setSettingsWritable] = React.useState(() => settingsScope?.getSnapshot?.()?.writable === true)
+  const settingsPendingRef = React.useRef(false)
+  const methodSavingRef = React.useRef(null)
+  const previewPendingRef = React.useRef(false)
   const mounted = React.useRef(false)
   const request = React.useRef(0)
   const submitting = React.useRef(new Set())
   const polling = React.useRef(new Set())
   const jobsRef = React.useRef({})
+  const handleSettingsPending = React.useCallback(value => {
+    settingsPendingRef.current = value
+    setSettingsPending(value)
+  }, [])
   const rememberJobs = updater => {
     setJobs(previous => {
       const next = typeof updater === 'function' ? updater(previous) : updater
@@ -286,6 +297,8 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : []
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : []
       setProbeState({ status: 'ready', probes, capabilities, readiness, install: response.value?.install ?? null, error: '' })
+      previewPendingRef.current = false
+      setPreviewPending(false)
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === 'string' ? response.value.hostVersion : null })
     } catch (error) {
       if (!mounted.current || current !== request.current) return
@@ -326,6 +339,28 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
     }
     return () => { mounted.current = false; request.current += 1 }
   }, [])
+
+  const refreshRef = React.useRef(refresh)
+  refreshRef.current = refresh
+  React.useEffect(() => {
+    if (typeof settingsScope?.subscribe !== 'function') return undefined
+    const signature = snapshot => JSON.stringify([
+      snapshot?.value?.toolInstallDir, snapshot?.value?.toolNpmRegistry,
+      snapshot?.value?.toolInstallMethodsJson, snapshot?.value?.toolScriptUrlsJson,
+      snapshot?.value?.toolAllowScriptInstall,
+    ])
+    let previous = signature(settingsScope.getSnapshot())
+    return settingsScope.subscribe(() => {
+      const snapshot = settingsScope.getSnapshot()
+      setSettingsWritable(snapshot.writable === true)
+      const next = signature(snapshot)
+      if (next === previous) return
+      previous = next
+      previewPendingRef.current = true
+      setPreviewPending(true)
+      void refreshRef.current()
+    })
+  }, [settingsScope])
 
   React.useEffect(() => {
     const active = Object.values(jobs).filter(job => job?.status === 'running').map(job => job.tool)
@@ -368,18 +403,26 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
    */
   const run = async (id, operation) => {
     const tool = OFFICIAL_TOOLS.find(item => item.id === id)
+    const summary = (probeState.install?.tools ?? []).find(item => item.id === id)
     const bridge = { install: installOfficialTool, repair: repairOfficialTool, uninstall: uninstallOfficialTool }[operation]
     const refusal = installClickRefusal({
       tool,
       submitting: submitting.current.has(id),
       running: jobsRef.current[id]?.status === 'running',
       operation,
+      pendingSettings: settingsPendingRef.current || Boolean(methodSavingRef.current) || previewPendingRef.current,
+      installError: operation === 'uninstall'
+        ? summary?.uninstallError ?? (summary?.uninstallCommand ? '' : summary?.error ?? '')
+        : summary?.installError ?? summary?.error ?? '',
     })
     if (refusal) {
       setRowErrors(previous => ({ ...previous, [id]: refusal }))
       return
     }
-    if (typeof bridge !== 'function') throw new Error('官方工具安装桥尚未加载。')
+    if (typeof bridge !== 'function') {
+      setRowErrors(previous => ({ ...previous, [id]: '官方工具安装桥尚未加载。' }))
+      return
+    }
     submitting.current.add(id)
     const startedAt = new Date().toISOString()
     setRowErrors(previous => ({ ...previous, [id]: '' }))
@@ -426,7 +469,10 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
    */
   const setInstallMethod = async (toolId, methodId) => {
     const snapshot = settingsScope?.getSnapshot?.()
-    if (!snapshot) return
+    if (!snapshot?.writable || methodSavingRef.current || settingsPendingRef.current) return
+    methodSavingRef.current = toolId
+    setMethodSaving(toolId)
+    setRowErrors(previous => ({ ...previous, [toolId]: '' }))
     let map = {}
     try { map = JSON.parse(String(snapshot.value?.toolInstallMethodsJson ?? '{}')) || {} } catch { map = {} }
     if (typeof map !== 'object' || Array.isArray(map)) map = {}
@@ -435,9 +481,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
     try {
       const accepted = await settingsScope.mutate([{ op: 'set', path: ['toolInstallMethodsJson'], value: JSON.stringify(map) }], snapshot.revision)
       if (!accepted) throw new Error('安装方式未被保存，可能被其他页面修改。')
-      void refresh()
+      previewPendingRef.current = true
+      setPreviewPending(true)
+      await refresh()
     } catch (error) {
       if (mounted.current) setRowErrors(previous => ({ ...previous, [toolId]: text(error?.message) || '安装方式保存失败。' }))
+    } finally {
+      methodSavingRef.current = null
+      if (mounted.current) setMethodSaving(null)
     }
   }
 
@@ -466,7 +517,8 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
         <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm 或厂商安装脚本方式，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode 会打开官方安装窗口供你选择目录；完成后重新体检。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新体检</button></div>
       <div className="mr-card-body">
-        <InstallSettings settingsScope={settingsScope} install={probeState.install} />
+        <InstallSettings settingsScope={settingsScope} install={probeState.install} onPendingChange={handleSettingsPending} />
+        {previewPending && <p className="mr-caption" role="status">安装设置已变更，正在刷新实际安装命令；刷新完成后可继续安装与更新。</p>}
         {probeState.status === 'loading' && <p className="mr-empty" role="status">正在检测本机官方工具…</p>}
         {probeState.error && <p className="mr-error" role="alert">{probeState.error}</p>}
         <div className="mr-tools" role="list" aria-label="官方工具注册表">
@@ -474,8 +526,10 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
             const summary = installById[tool.id]
             // The Host resolves the effective command against the current
             // settings; the registry copy is only the fallback for an older Host.
-            const command = summary?.command ?? installCommandLine(tool)
+            const command = summary ? summary.command : installCommandLine(tool)
+            const updateCommand = summary?.updateCommand ?? command
             const methods = summary?.methods ?? installMethodsFor(tool).map(method => ({ id: method.id, label: method.label }))
+            const settingsBusy = settingsPending || Boolean(methodSaving) || previewPending
             const probe = byId[tool.id]
             const capability = capabilitiesById[tool.id]
             const readiness = readinessById[tool.id]
@@ -484,7 +538,10 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
             const action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status, latestVersion: healthById[tool.id]?.latestVersion ?? null })
             const maintenance = toolMaintenanceActions({
               tool, probe, job, probeStatus: probeState.status,
-              summary: { installable: !summary?.error, removable: !summary?.error },
+              summary: {
+                installable: !(summary?.installError ?? summary?.error),
+                removable: !(summary?.uninstallError ?? (summary?.uninstallCommand ? '' : summary?.error)),
+              },
             })
             const verified = job?.status === 'succeeded' && (job.operation === 'uninstall'
               ? job.postInstallProbe?.installed === false
@@ -507,7 +564,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
                     ? `官方执行入口已核验，可在会话中调用 model_router_tool_run；${capability?.modes?.includes('read-only') ? '支持只读和经审批的可编辑任务' : '仅支持经审批的可编辑隔离工作区任务'}，账号及模型仍需实测。`
                     : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || '执行入口尚未核验。'}`}</p>}
                   {command
-                    ? <code className="mr-tool-command">{command}</code>
+                    ? <>
+                      <p className="mr-caption mr-tool-detail">安装方式：{methods.find(method => method.id === summary?.methodId)?.label ?? tool.manager} · 实际安装目录：{summary?.installDir || '各厂商默认目录'}</p>
+                      <code className="mr-tool-command" aria-label={`${tool.label} 安装命令`}>{command}</code>
+                      {updateCommand !== command && <>
+                        <p className="mr-caption mr-tool-detail">更新沿用原安装位置：{summary?.updateInstallDir || '各厂商默认目录'}</p>
+                        <code className="mr-tool-command" aria-label={`${tool.label} 更新命令`}>{updateCommand}</code>
+                      </>}
+                    </>
                     : <p className="mr-caption" style={{ margin: '6px 0 0' }}>{summary?.error ?? tool.unsupportedReason}</p>}
                   {(summary?.notices ?? []).map(notice => <p className="mr-caption mr-tool-detail" key={notice}>{notice}</p>)}
                   {probe?.detail && <p className="mr-caption mr-tool-detail">{probe.detail}</p>}
@@ -516,17 +580,18 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
                     <details className="mr-tool-log"><summary>安装日志</summary><pre>{job.outputTail.slice(-6).join('\n')}</pre></details>
                   )}
                 </div>
-                {command && (
+                {(command || methods.length > 0) && (
                   <div className="mr-tool-actions">
-                    <div className="mr-tool-methods">
+                    {methods.length > 0 && <div className="mr-tool-methods">
                       <label>
                         <span>安装方式</span>
                         <select
                           className="mr-mini-select"
-                          value={summary?.savedMethodId ?? summary?.methodId ?? ''}
-                          disabled={running || methods.length === 0}
+                          value={summary?.savedMethodId ?? ''}
+                          disabled={running || settingsBusy || !settingsWritable}
                           onChange={event => { void setInstallMethod(tool.id, event.target.value) }}
                         >
+                          <option value="">自动选择</option>
                           {methods.map(method => (
                             <option key={method.id} value={method.id} disabled={Boolean(method.blocked)}>
                               {method.label}{method.blocked ? `（${method.blocked}）` : ''}
@@ -534,14 +599,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
                           ))}
                         </select>
                       </label>
-                    </div>
-                    <button className="mr-button mr-tool-button" type="button" disabled={action.disabled} onClick={() => { void install(tool.id) }}>
-                      {action.label}
+                    </div>}
+                    <button className="mr-button mr-tool-button" type="button" disabled={action.disabled || settingsBusy || !command || Boolean(summary?.error)} title={summary?.error || (settingsBusy ? '请先保存或放弃安装设置更改，并等待命令刷新。' : undefined)} onClick={() => { void install(tool.id) }}>
+                      {methodSaving === tool.id ? '保存方式中…' : action.label}
                     </button>
-                    <button className="mr-button mr-button-secondary mr-tool-button" type="button" disabled={maintenance.repair.disabled} title={maintenance.repair.title} onClick={() => { void repair(tool.id) }}>
+                    <button className="mr-button mr-button-secondary mr-tool-button" type="button" disabled={maintenance.repair.disabled || settingsBusy} title={maintenance.repair.title} onClick={() => { void repair(tool.id) }}>
                       {maintenance.repair.label}
                     </button>
-                    <button className="mr-button mr-button-secondary mr-tool-button" type="button" disabled={maintenance.uninstall.disabled} title={maintenance.uninstall.title} onClick={() => { void uninstall(tool.id) }}>
+                    <button className="mr-button mr-button-secondary mr-tool-button" type="button" disabled={maintenance.uninstall.disabled || settingsBusy} title={maintenance.uninstall.title} onClick={() => { void uninstall(tool.id) }}>
                       {maintenance.uninstall.label}
                     </button>
                     {running && <button className="mr-button mr-button-secondary mr-tool-button" type="button" disabled={job.cancelRequested} onClick={() => { void cancel(tool.id) }}>
@@ -554,7 +619,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
           })}
         </div>
         <p className="mr-caption" style={{ marginTop: 12 }}>
-          安装由 Host 按注册表固定来源执行，不接受自定义包名；安装目录与下载源来自你自己填写的设置，命令上方实时显示将要执行的内容。可点“取消”终止下载任务，随后重新检测实际版本。一键卸载只删除程序本身（脚本安装会顺带清掉它在 shell 配置里写的 PATH 记录），配置、登录信息和历史记录保留。ZCode 安装器启动后仍需在原厂窗口选择目录并完成安装。Agent 也可调用 <code>model_router_tool_install</code> / <code>model_router_tool_repair</code> / <code>model_router_tool_uninstall</code>，或在会话使用 <code>/tools</code>。
+          安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode 需在官方安装窗口完成安装。会话与 Agent 也可使用 <code>/tools</code>、<code>model_router_tool_install</code>、<code>model_router_tool_repair</code> 和 <code>model_router_tool_uninstall</code>。
         </p>
       </div>
     </section>

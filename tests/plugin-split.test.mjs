@@ -2,14 +2,43 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS, OFFICIAL_TOOLS_REMOTE_NAMESPACE } from '../.dsh-plugin/shared/official-tools-remote.mjs'
-import { OfficialToolsRemoteService } from '../.dsh-plugin/official-tools-remote-service.mjs'
+import { installSummary, OfficialToolsRemoteService } from '../.dsh-plugin/official-tools-remote-service.mjs'
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 const manifest = JSON.parse(read('package.json'))
 
+test('install summary uses the host platform and reports the configured update destination', () => {
+  const preferences = { installDir: 'D:/AI/tools', registry: 'https://registry.npmjs.org/',
+    methods: {}, scriptUrls: {}, allowScriptInstall: true }
+  const windows = installSummary(preferences, { platform: 'win32', home: 'C:/Users/tester' })
+  const step = windows.tools.find(tool => tool.id === 'stepcode')
+  assert.match(step.methods.find(method => method.id === 'script-bash').blocked, /仅支持/)
+  assert.equal(step.methods.find(method => method.id === 'script-powershell').blocked, null)
+  assert.equal(step.methodId, 'script-powershell')
+  assert.equal(step.installDir, 'D:/AI/tools')
+  assert.equal(step.updateInstallDir, step.installDir)
+  assert.equal(step.updateCommand, step.command)
+  const zcode = windows.tools.find(tool => tool.id === 'zcode')
+  assert.match(zcode.command, /签名安装器/)
+  assert.equal(zcode.installError, undefined, 'desktop download remains available without a shell method')
+  assert.match(zcode.notices[0], /D:\/AI\/tools/)
+  const linux = installSummary(preferences, { platform: 'linux', home: '/home/tester' })
+  const unixStep = linux.tools.find(tool => tool.id === 'stepcode')
+  assert.equal(unixStep.methods.find(method => method.id === 'script-bash').blocked, null)
+  assert.match(unixStep.methods.find(method => method.id === 'script-powershell').blocked, /仅支持/)
+  const disabled = installSummary({ ...preferences, allowScriptInstall: false }, { platform: 'win32' })
+  assert.match(disabled.tools.find(tool => tool.id === 'stepcode').methods
+    .find(method => method.id === 'script-powershell').blocked, /已在插件设置中关闭/)
+  const disabledStep = disabled.tools.find(tool => tool.id === 'stepcode')
+  assert.match(disabledStep.installError, /已在插件设置中关闭/)
+  assert.equal(disabledStep.methodId, 'script-powershell')
+  assert.match(disabledStep.uninstallCommand, /D:\/AI\/tools/)
+  assert.equal(disabledStep.uninstallError, undefined, 'disabling remote scripts still permits local removal')
+})
+
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.17.0')
+  assert.equal(manifest.version, '0.18.0')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)

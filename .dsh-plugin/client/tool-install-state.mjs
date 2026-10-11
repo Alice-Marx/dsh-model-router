@@ -1,4 +1,29 @@
 import { compareReleaseVersions } from '../shared/version-order.mjs'
+import { DEFAULT_NPM_REGISTRY, OFFICIAL_TOOLS } from '../shared/official-tool-registry.mjs'
+import { parseInstallPreferences } from '../shared/tool-install-preferences.mjs'
+
+const INSTALL_DEFAULTS = Object.freeze({
+  toolInstallDir: '',
+  toolNpmRegistry: DEFAULT_NPM_REGISTRY,
+  toolScriptUrlsJson: '{}',
+  toolAllowScriptInstall: true,
+})
+
+/** Validate drafts with the same boundary used by the Host installer. */
+export function validateToolInstallSetting(key, value) {
+  try {
+    parseInstallPreferences({ [key]: value }, { tools: OFFICIAL_TOOLS })
+    return ''
+  } catch (error) {
+    return error?.message || '安装设置无效。'
+  }
+}
+
+/** An unrelated config update must not erase another field the user is typing. */
+export function retainToolInstallDrafts(drafts, values = {}) {
+  return Object.fromEntries(Object.entries(drafts).filter(([key, value]) =>
+    value !== (values[key] ?? INSTALL_DEFAULTS[key])))
+}
 
 /**
  * Install-button state. Versions are not pinned: the button installs the
@@ -60,7 +85,7 @@ export function toolMaintenanceActions({ tool, probe, job, probeStatus, summary 
 }
 
 /** Non-empty when a click must not start another install. The caller shows this text. */
-export function installClickRefusal({ tool, submitting = false, running = false, operation = 'install' } = {}) {
+export function installClickRefusal({ tool, submitting = false, running = false, operation = 'install', pendingSettings = false, installError = '' } = {}) {
   if (!tool) return '未知官方工具，无法开始安装。'
   if (tool.unsupported) return String(tool.unsupportedReason ?? '').trim() || '此工具暂不支持一键安装。'
   if (tool.manager === 'signed-windows-installer' && operation !== 'install') {
@@ -71,6 +96,8 @@ export function installClickRefusal({ tool, submitting = false, running = false,
       : operation === 'repair' ? '该工具正在修复，请等待当前任务结束。'
         : '该工具正在安装，请等待当前任务结束。'
   }
+  if (pendingSettings) return '请先保存或放弃安装设置更改，并等待安装命令刷新。'
+  if (installError) return installError
   return ''
 }
 

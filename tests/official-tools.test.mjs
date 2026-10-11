@@ -26,9 +26,6 @@ import {
   resetForTests,
   installPreferences,
   officialMiniMaxInstaller,
-  isMarkupDocument,
-  installerScriptText,
-  minimaxOfficialInstallDir,
   stripPathBlock,
   defaultRunner,
   shellSpawnSpec,
@@ -72,38 +69,12 @@ test('MiniMax official Windows installer entry: any release, but its code must m
     assert.equal(await findManagedMiniMaxEntry(process.cwd(), [root], attestor({ ok: true })), null)
   })
 
-const MINIMAX_OFFICIAL_SCRIPT = [
-  '<#',
-  '.SYNOPSIS',
-  '  Zero-dependency MiniMax Code CLI installer for Windows PowerShell 5.1+.',
-  '#>',
-  "$PackageName = '@minimax-ai/code'",
-  "$InstallDir = if ($env:MCODE_INSTALL_DIR) { $env:MCODE_INSTALL_DIR } else { Join-Path $env:USERPROFILE '.minimax-code' }",
-  "Write-Host 'MiniMax Code'",
-].join('\n')
-
-test('MiniMax installer accepts the official PowerShell comment header and rejects HTML', () => {
-  const source = Buffer.from(MINIMAX_OFFICIAL_SCRIPT)
-  assert.equal(isMarkupDocument(MINIMAX_OFFICIAL_SCRIPT), false)
-  assert.equal(isMarkupDocument('<html>404</html>'), true)
-  assert.equal(isMarkupDocument('<!DOCTYPE html><html></html>'), true)
-  assert.equal(officialMiniMaxInstaller(source), MINIMAX_OFFICIAL_SCRIPT)
-  assert.equal(officialMiniMaxInstaller(Buffer.concat([Buffer.from('\uFEFF'), source])), MINIMAX_OFFICIAL_SCRIPT)
-  const utf16 = Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from(MINIMAX_OFFICIAL_SCRIPT, 'utf16le')])
-  assert.equal(installerScriptText(utf16), MINIMAX_OFFICIAL_SCRIPT)
-  assert.equal(officialMiniMaxInstaller(utf16), MINIMAX_OFFICIAL_SCRIPT)
-  assert.throws(() => officialMiniMaxInstaller(Buffer.from('<html>@minimax-ai/code MCODE_INSTALL_DIR MiniMax Code</html>')), /HTML/)
-  assert.throws(() => officialMiniMaxInstaller(Buffer.from('Write-Host "something else"')), /缺少/)
-  assert.throws(() => officialMiniMaxInstaller(Buffer.from('')), /为空/)
-  const method = installMethodFor(getOfficialTool('minimax-code'), 'script-powershell')
-  assert.equal(verifiedVendorScript(source, method.verify), MINIMAX_OFFICIAL_SCRIPT)
-  assert.throws(() => verifiedVendorScript(Buffer.from('<#\nnot the installer\n#>'), method.verify), /官方安装脚本/)
-})
-
-test('MiniMax update directory is the configured path, otherwise the vendor default', () => {
-  assert.equal(minimaxOfficialInstallDir({ installDir: 'D:/AI/tools' }, '/home/tester', 'C:/old'), 'D:/AI/tools')
-  assert.equal(minimaxOfficialInstallDir({ installDir: '' }, '/home/tester', 'C:/Users/tester/.minimax-code'), 'C:/Users/tester/.minimax-code')
-  assert.equal(minimaxOfficialInstallDir({}, '/home/tester', ''), join('/home/tester', '.minimax-code'))
+test('MiniMax installer fallback runs the official script as published (no version patching)', () => {
+  const source = Buffer.from('# MiniMax Code CLI installer\n$InstallDir = $env:MCODE_INSTALL_DIR\n& $Npm install -g "@minimax-ai/code@latest"\n')
+  assert.equal(officialMiniMaxInstaller(source), source.toString())
+  assert.equal(officialMiniMaxInstaller(Buffer.concat([Buffer.from('\uFEFF'), source])), source.toString())
+  assert.throws(() => officialMiniMaxInstaller(Buffer.from('<html>404</html>')), /官方/)
+  assert.throws(() => officialMiniMaxInstaller(Buffer.from('Write-Host "something else"')), /官方/)
 })
 
 test('registry stays fail-closed and internally consistent', () => {
@@ -138,10 +109,10 @@ test('registry stays fail-closed and internally consistent', () => {
       if (method.kind === 'script') {
         assert.match(method.scriptUrl, /^https:\/\//, `${tool.id}/${method.id} script must be https`)
         assert.ok(method.verify?.mustInclude?.length, `${tool.id}/${method.id} needs markers to verify the script`)
-        // A method that claims a custom directory must actually pass one on.
+        // A custom directory must bind to the vendor's argument or environment.
         if (method.supportsInstallDir) {
-          assert.ok(method.installArgs.length || method.installDirEnv,
-            `${tool.id}/${method.id} needs its install-dir argument or environment variable`)
+          assert.ok(method.installArgs.length || method.installDirEnv, `${tool.id}/${method.id} needs its install-dir binding`)
+          if (method.installDirEnv) assert.ok(method.env.includes(method.installDirEnv), `${tool.id}/${method.id} declares its directory environment`)
         }
       } else {
         assert.ok(method.uninstallArgs.length, `${tool.id}/${method.id} needs an uninstall command`)
@@ -152,6 +123,88 @@ test('registry stays fail-closed and internally consistent', () => {
     }
   }
   assert.equal(getOfficialTool('does-not-exist'), null)
+})
+
+test('vendor-native installers supplement npm and pnpm using their actual published commands', () => {
+  const vendors = [
+    ['kimi-code', 'https://code.kimi.com/kimi-code/install.sh', 'https://code.kimi.com/kimi-code/install.ps1', 'bash'],
+    ['claude-code', 'https://claude.ai/install.sh', 'https://claude.ai/install.ps1', 'bash'],
+    ['codex', 'https://chatgpt.com/codex/install.sh', 'https://chatgpt.com/codex/install.ps1', 'sh'],
+    ['minimax-code', 'https://filecdn.minimax.chat/public/install.sh', 'https://filecdn.minimax.chat/public/install.ps1', 'bash'],
+    ['mimo-code', 'https://mimo.xiaomi.com/install', 'https://mimo.xiaomi.com/install.ps1', 'bash'],
+    ['grok-build', 'https://x.ai/cli/install.sh', 'https://x.ai/cli/install.ps1', 'bash'],
+  ]
+  for (const [id, bashUrl, powershellUrl, shell] of vendors) {
+    const tool = getOfficialTool(id)
+    for (const manager of ['npm', 'pnpm']) assert.equal(installMethodFor(tool, manager).manager, manager)
+    const unix = installMethodsFor(tool).find(method => method.shell === shell)
+    const windows = installMethodFor(tool, 'script-powershell')
+    assert.equal(unix.scriptUrl, bashUrl)
+    assert.equal(windows.scriptUrl, powershellUrl)
+    assert.equal(installCommandLineFor(tool, unix), `curl -fsSL ${bashUrl} | ${shell}`)
+    assert.equal(installCommandLineFor(tool, windows), `irm ${powershellUrl} | iex`)
+    assert.ok(installMethodBlockReason(unix, 'win32'))
+    assert.ok(installMethodBlockReason(windows, 'darwin'))
+  }
+  assert.equal(installMethodsFor(getOfficialTool('gemini')).some(method => method.kind === 'script'), false)
+  assert.equal(installMethodFor(getOfficialTool('stepcode'), 'npm'), null)
+})
+
+test('Codex saved script-bash choice upgrades to the official sh method without broad aliases', () => {
+  const codex = getOfficialTool('codex')
+  const current = installMethodFor(codex, 'script-sh')
+  assert.equal(installMethodFor(codex, 'script-bash'), current)
+  const preferences = { ...installPreferences(), methods: { codex: 'script-bash' } }
+  const plan = resolveInstallPlan(codex, undefined, preferences, { platform: 'linux', home: '/home/user' })
+  assert.equal(plan.methodId, 'script-sh')
+  assert.equal(plan.shell, 'sh')
+  assert.equal(installCommandLineFor(codex, plan.method), 'curl -fsSL https://chatgpt.com/codex/install.sh | sh')
+  assert.ok(installMethodBlockReason(plan.method, 'win32'), 'the legacy id still obeys platform gates')
+  assert.equal(installMethodFor(codex, 'script-zsh'), null)
+  assert.equal(installMethodFor(getOfficialTool('gemini'), 'script-bash'), null)
+  assert.equal(installMethodFor(getOfficialTool('claude-code'), 'script-sh'), null)
+  assert.throws(() => resolveInstallPlan(codex, 'script-zsh', preferences, { platform: 'linux' }), /没有名为 script-zsh/)
+})
+
+test('PowerShell comment help is accepted while HTML and another vendor remain rejected', () => {
+  const method = installMethodFor(getOfficialTool('minimax-code'), 'script-powershell')
+  // Current MiniMax and MiMo installers begin with a PowerShell <# help block.
+  const source = '<#\nZero-dependency MiniMax Code CLI installer for Windows PowerShell 5.1+.\n#>\n$InstallDir = $env:MCODE_INSTALL_DIR\n$PackageName = "@minimax-ai/code"\n'
+  assert.equal(verifiedVendorScript(Buffer.from(source), method.verify), source)
+  assert.equal(verifiedVendorScript(Buffer.from(`\uFEFF${source}`), method.verify), source)
+  assert.equal(officialMiniMaxInstaller(Buffer.from(source)), source)
+  assert.throws(() => verifiedVendorScript(Buffer.from('<html>MiniMax Code CLI @minimax-ai/code</html>'), method.verify), /HTML/)
+  assert.throws(() => verifiedVendorScript(Buffer.from('# kimi-code https://code.kimi.com/kimi-code\n'), method.verify), /官方安装脚本/)
+})
+
+test('MiniMax package methods explicitly build the vendor CLI and its SQLite dependency', () => {
+  const tool = getOfficialTool('minimax-code')
+  assert.equal(tool.defaultMethodsByPlatform.win32, 'script-powershell')
+  const npm = installMethodFor(tool, 'npm')
+  assert.ok(npm.installArgs.includes('--ignore-scripts=false'))
+  assert.ok(npm.installArgs.includes('--include=optional'))
+  const pnpm = installMethodFor(tool, 'pnpm')
+  assert.equal(pnpm.installArgs[0], 'add', 'pnpm 10 exposes --allow-build on add')
+  assert.ok(pnpm.installArgs.includes('--allow-build=@minimax-ai/code'))
+  assert.ok(pnpm.installArgs.includes('--allow-build=better-sqlite3'))
+  assert.equal(pnpm.installArgs.some(arg => arg.startsWith('--allow-scripts=')), false)
+  assert.deepEqual(installMethodFor(tool, 'script-powershell').scriptBinaryNames,
+    ['mcode.cmd', 'mcode.ps1', 'mcode-tools.cmd', 'mcode-tools.ps1'])
+})
+
+test('Claude pnpm links its native binary and only official Claude methods have a download fallback', () => {
+  const claude = getOfficialTool('claude-code')
+  const pnpm = installMethodFor(claude, 'pnpm')
+  assert.equal(pnpm.installArgs[0], 'add')
+  assert.ok(pnpm.installArgs.includes('--ignore-scripts=false'))
+  assert.ok(pnpm.installArgs.includes('--allow-build=@anthropic-ai/claude-code'))
+  assert.deepEqual(installMethodFor(claude, 'script-bash').scriptFallbackUrls,
+    ['https://downloads.claude.ai/claude-code-releases/bootstrap.sh'])
+  assert.deepEqual(installMethodFor(claude, 'script-powershell').scriptFallbackUrls,
+    ['https://downloads.claude.ai/claude-code-releases/bootstrap.ps1'])
+  for (const tool of OFFICIAL_TOOLS.filter(tool => tool.id !== 'claude-code')) {
+    assert.ok(installMethodsFor(tool).every(method => method.scriptFallbackUrls === undefined))
+  }
 })
 
 test('every tool can be installed and removed again', () => {
@@ -260,56 +313,44 @@ test('plan annotates selected route and work packages with channels', () => {
   assert.ok(plan.toolNotice.includes('official-cli'))
 })
 
-test('probe classifies not-installed, installed and broken CLIs', async () => {
+test('package probes classify missing entries, installed metadata and inspection failures', async () => {
   resetForTests()
   const tool = getOfficialTool('kimi-code')
   const now = () => Date.now()
-  const locator = process.platform === 'win32' ? 'where' : 'which'
-  const located = process.platform === 'win32' ? 'C:\\cli\\kimi.cmd\n' : '/usr/local/bin/kimi\n'
-  const missingRunner = async (executable) => {
-    if (executable === locator) return { ok: false, code: 1, stdout: '', stderr: 'INFO: Could not find', timedOut: false }
-    throw new Error(`--version must not run before ${executable} is located`)
-  }
-  const missing = await probeToolWith(tool, missingRunner, { cache: new Map(), now })
+  const runner = async () => { throw new Error('package probes must not execute shared command shims') }
+  const missing = await probeToolWith(tool, runner, { cache: new Map(), now, packageEntries: async () => [] })
   assert.equal(missing.status, 'not-installed')
   assert.equal(missing.installed, false)
 
-  const okRunner = async (executable, args) => {
-    if (executable === locator) return { ok: true, code: 0, stdout: located, stderr: '', timedOut: false }
-    if (executable === 'kimi' && args[0] === '--version') return { ok: true, code: 0, stdout: '2.0.2\n', stderr: '', timedOut: false }
-    throw new Error('unexpected invocation')
-  }
-  const installed = await probeToolWith(tool, okRunner, { cache: new Map(), now })
+  const installed = await probeToolWith(tool, runner, { cache: new Map(), now,
+    packageEntries: async () => [{ version: '2.0.2', packageRoot: '/cli/package', entry: '/cli/package/dist/main.mjs', source: 'verified-npm-package' }] })
   assert.equal(installed.status, 'installed')
   assert.equal(installed.version, '2.0.2')
 
-  const brokenRunner = async (executable) => {
-    if (executable === locator) return { ok: true, code: 0, stdout: located, stderr: '', timedOut: false }
-    return { ok: false, code: 1, stdout: '', stderr: 'Cannot find module', timedOut: false }
-  }
-  const broken = await probeToolWith(tool, brokenRunner, { cache: new Map(), now })
+  const broken = await probeToolSafely(tool, runner, { cache: new Map(), now,
+    packageEntries: async () => { throw new Error('Cannot read package metadata') } })
   assert.equal(broken.status, 'probe-failed')
+  assert.match(broken.detail, /Cannot read package metadata/)
 })
 
-test('probe cache prevents duplicate spawns and expires', async () => {
+test('package probe cache prevents duplicate inspections and expires', async () => {
   resetForTests()
   const tool = getOfficialTool('kimi-code')
-  let spawns = 0
+  let inspections = 0
   let clock = 1_000
-  const locator = process.platform === 'win32' ? 'where' : 'which'
-  const runner = async (executable) => {
-    spawns += 1
-    if (executable === locator) return { ok: true, code: 0, stdout: process.platform === 'win32' ? 'C:\\cli\\kimi.cmd\n' : '/usr/local/bin/kimi\n', stderr: '', timedOut: false }
-    return { ok: true, code: 0, stdout: '2.0.2\n', stderr: '', timedOut: false }
+  const runner = async () => { throw new Error('package probes must not execute shared command shims') }
+  const packageEntries = async () => {
+    inspections += 1
+    return [{ version: '2.0.2', packageRoot: '/cli/package', entry: '/cli/package/dist/main.mjs', source: 'verified-npm-package' }]
   }
   const cache = new Map()
   const now = () => clock
-  await probeToolWith(tool, runner, { cache, now })
-  await probeToolWith(tool, runner, { cache, now })
-  assert.equal(spawns, 2, 'locator + one --version, then cache hit')
+  await probeToolWith(tool, runner, { cache, now, packageEntries })
+  await probeToolWith(tool, runner, { cache, now, packageEntries })
+  assert.equal(inspections, 1, 'one package inspection, then cache hit')
   clock += 61_000
-  await probeToolWith(tool, runner, { cache, now })
-  assert.equal(spawns, 4, 'cache expired, probe runs again')
+  await probeToolWith(tool, runner, { cache, now, packageEntries })
+  assert.equal(inspections, 2, 'cache expired, package inspection runs again')
 })
 
 test('package bin lookup accepts ./dist/main.mjs and a moved entry inside the same package', () => {
@@ -348,12 +389,14 @@ test('probe banners decode UTF-16 and a non-zero exit with a version still count
     ? ['D:\\Program Files\\Claude\\claude.exe'] : [])
 
   const claude = getOfficialTool('claude-code')
+  // Exercise the native PATH banner fallback independently of package metadata.
+  const nativePlan = { kind: 'script', methodId: 'synthetic-native', binDir: '' }
   const exe = process.platform === 'win32' ? 'D:\\Program Files\\Claude\\claude.exe' : '/opt/Claude/claude.exe'
   const locator = process.platform === 'win32' ? 'where' : 'which'
   const versionDespiteExit = await probeToolWith(claude, async (executable) => {
     if (executable === locator) return { ok: true, code: 0, stdout: `${exe}\n`, stderr: '', timedOut: false }
     return { ok: false, code: 1, stdout: '2.1.295 (Claude Code)\n', stderr: '', timedOut: false }
-  }, { cache: new Map(), now: () => Date.now() })
+  }, { cache: new Map(), now: () => Date.now(), plan: nativePlan })
   assert.equal(versionDespiteExit.status, 'installed')
   assert.equal(versionDespiteExit.version, '2.1.295')
 
@@ -364,11 +407,11 @@ test('probe banners decode UTF-16 and a non-zero exit with a version still count
     assert.equal(options.useShell, false)
     assert.deepEqual(args, ['--version'])
     return { ok: true, code: 0, stdout: '2.1.295 (Claude Code)\n', stderr: '', timedOut: false }
-  }, { cache: new Map(), now: () => Date.now() })
+  }, { cache: new Map(), now: () => Date.now(), plan: nativePlan })
   assert.equal(direct.status, 'installed')
   assert.equal(direct.version, '2.1.295')
 
-  const isolated = await probeToolSafely(claude, async () => { throw new Error('probe exploded') }, { cache: new Map() })
+  const isolated = await probeToolSafely(claude, async () => { throw new Error('probe exploded') }, { cache: new Map(), plan: nativePlan })
   assert.equal(isolated.status, 'probe-failed')
   assert.match(isolated.detail, /probe exploded/)
 })
@@ -386,9 +429,6 @@ test('installed Claude, Codex and MiniMax choose an updater instead of a silent 
   assert.equal(officialUpdatePlan({ toolId: 'codex', installed: true, order: -1, platform: 'win32' }), 'registry-install')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32' }), 'minimax-official-installer')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: null, platform: 'win32' }), 'minimax-official-installer')
-  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32', methodId: 'npm' }), 'registry-install')
-  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32', methodId: 'pnpm' }), 'registry-install')
-  assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'win32', methodId: 'script-powershell' }), 'minimax-official-installer')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: true, order: -1, platform: 'linux' }), 'registry-install')
   assert.equal(officialUpdatePlan({ toolId: 'minimax-code', installed: false, order: null, platform: 'win32' }), 'registry-install')
   assert.equal(officialUpdatePlan({ toolId: 'kimi-code', installed: true, order: -1, platform: 'darwin' }), 'registry-install')

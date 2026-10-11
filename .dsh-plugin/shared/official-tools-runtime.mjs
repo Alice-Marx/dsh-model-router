@@ -14,8 +14,9 @@
 import { spawn } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import {
+  DEFAULT_NPM_REGISTRY,
   defaultInstallMethod,
   getOfficialTool,
   installMethodFor,
@@ -23,7 +24,7 @@ import {
   OFFICIAL_TOOLS,
 } from './official-tool-registry.mjs'
 import {
-  minimaxScriptRegistry,
+  expandInstallDir,
   resolveInstallLocation,
   resolveInstallPlan,
   resolveUninstallPlan,
@@ -40,9 +41,7 @@ const OUTPUT_LINE_CAP = 120
 const IS_WINDOWS = process.platform === 'win32'
 const CREATE_NO_WINDOW = 0x0800_0000
 const MINIMAX_INSTALLER_URL = 'https://filecdn.minimax.chat/public/install.ps1'
-// Codex's Windows installer is already ~70KB and MiniMax's is ~57KB. 1MiB still
-// rejects an HTML error page or a substituted archive.
-const MAX_INSTALLER_BYTES = 1_048_576
+const MAX_INSTALLER_BYTES = 200_000
 /** Windows ships where.exe in System32; POSIX which is ubiquitous. */
 const LOCATOR = IS_WINDOWS ? 'where' : 'which'
 /** Cached probe results keep plan generation fast; installs invalidate them. */
@@ -64,21 +63,49 @@ let preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, a
 
 export function setInstallPreferences(next) {
   if (next && typeof next === 'object') {
-    const changedDirectory = preferences.installDir !== next.installDir
-    preferences = { ...preferences, ...next }
+    const previous = JSON.stringify(preferences)
+    preferences = { ...preferences, ...next,
+      methods: { ...(next.methods ?? preferences.methods) },
+      scriptUrls: { ...(next.scriptUrls ?? preferences.scriptUrls) },
+    }
     // A new directory needs its own PATH entry before the next probe runs.
-    if (changedDirectory) prefixPromise = null
+    if (previous !== JSON.stringify(preferences)) {
+      prefixPromise = null
+      probeCache.clear()
+    }
   }
   return preferences
 }
 
 export function installPreferences() {
-  return { ...preferences }
+  return { ...preferences, methods: { ...preferences.methods }, scriptUrls: { ...preferences.scriptUrls } }
 }
 
 /** The machine this Host runs on; the plan resolver needs both to be explicit. */
 export function currentInstallOptions() {
-  return { platform: process.platform, home: homedir() }
+  return { platform: process.platform, home: homedir(), env: process.env }
+}
+
+/** The selected tool's command directory, ahead of unrelated copies on PATH. */
+export function preferredToolDirectories(toolId, selectedPreferences = preferences, options = currentInstallOptions()) {
+  const tool = getOfficialTool(toolId)
+  if (!tool || tool.unsupported || tool.manager === 'signed-windows-installer') return []
+  try {
+    const plan = resolveInstallPlan(tool, undefined, {
+      ...selectedPreferences,
+      // Keep a deliberately selected existing script copy visible, while the
+      // automatic method still honors the switch and can select npm instead.
+      allowScriptInstall: installMethodFor(tool, selectedPreferences.methods?.[tool.id])?.kind === 'script' ? true : selectedPreferences.allowScriptInstall,
+    }, options)
+    return plan.binDir ? [plan.binDir] : []
+  } catch { return [] }
+}
+
+/** A deliberate method/source/directory choice must never invoke a different updater. */
+export function usesConfiguredInstallPlan(toolId, selectedPreferences = preferences, methodId) {
+  return Boolean(methodId || selectedPreferences.installDir || selectedPreferences.methods?.[toolId]
+    || selectedPreferences.scriptUrls?.[toolId] || selectedPreferences.allowScriptInstall === false
+    || (selectedPreferences.registry && selectedPreferences.registry !== DEFAULT_NPM_REGISTRY))
 }
 
 /**
@@ -89,10 +116,20 @@ export function currentInstallOptions() {
  * cmd strip the wrong quotes and launch `node` against a missing script:
  * `MODULE_NOT_FOUND` at `executeUserEntryPoint` with an empty requireStack.
  * That failed `npm config get prefix`, `--version`, and `npm install -g` for
- * every official tool. Keep the executable and argv separate.
+ * every official tool. Keep bare tokens separate; quote only a path/value that
+ * cmd would split or interpret as an operator.
  */
 export function shellSpawnSpec(executable, args = [], { useShell = false } = {}) {
-  return { file: String(executable), args: [...(args ?? [])], shell: Boolean(useShell) }
+  const quote = value => {
+    const text = String(value)
+    if (!/[\s&|<>()^!%"]/.test(text)) return text
+    return `"${text.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"`
+  }
+  return {
+    file: useShell && IS_WINDOWS ? quote(executable) : String(executable),
+    args: useShell && IS_WINDOWS ? (args ?? []).map(quote) : [...(args ?? [])],
+    shell: Boolean(useShell),
+  }
 }
 
 /** Decode a CLI banner. Native Windows exes often write UTF-16 to a pipe. */
@@ -131,26 +168,22 @@ export function staleInstallMessage(label, installedVersion, latestVersion) {
  * Which updater to run. `order` is compareReleaseVersions(installed, latest):
  * -1 older, 0 same, 1 newer, null when either version is unknown.
  */
-export function officialUpdatePlan({ toolId, installed, order, platform, methodId }) {
+export function officialUpdatePlan({ toolId, installed, order, platform, configured = false }) {
   if (installed && order === 1) return 'refuse-downgrade'
   if (installed && order === 0) return 'already-current'
+  if (configured) return 'registry-install'
   if (installed && order === -1 && toolId === 'claude-code') return 'claude-update-then-registry'
   if (installed && (order === -1 || order === null) && toolId === 'minimax-code' && platform === 'win32') {
-    // npm/pnpm is the method the user picked, so that command runs first. The
-    // official Windows installer stays the fallback when that copy does not
-    // advance, and it is the direct plan when no package manager was named
-    // (the historical one-click update of an official-layout install).
-    if (methodId === 'npm' || methodId === 'pnpm') return 'registry-install'
     return 'minimax-official-installer'
   }
   return 'registry-install'
 }
 
-async function trustedExecutionReadiness(toolId) {
+async function trustedExecutionReadiness(toolId, options) {
   // Loaded only during an install to avoid coupling fast version probes to
   // the executor. The executor itself uses this runtime for PATH discovery.
   const { officialToolReadiness } = await import('./official-tool-executor.mjs')
-  return officialToolReadiness(toolId)
+  return officialToolReadiness(toolId, process.cwd(), options)
 }
 
 function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, signal, env } = {}) {
@@ -245,121 +278,73 @@ function runCapture(executable, args, { timeoutMs, onOutput, useShell = false, s
   })
 }
 
-/**
- * Decode installer bytes the way a terminal would. The MiniMax CDN serves the
- * PowerShell script as `application/octet-stream` UTF-8; a UTF-16 copy (BOM or
- * null-padded) is the same script and must not be rejected as a mismatch.
- */
 export function installerScriptText(source) {
   return decodeProcessOutput(Buffer.isBuffer(source) ? source : Buffer.from(source ?? '')).replace(/^\uFEFF/, '')
 }
 
-/**
- * An HTML/XML document is not an installer. PowerShell comment-based help
- * starts with `<#`, which is not a tag: the published MiniMax, Kimi and MiMo
- * Windows scripts all open that way. Treating every leading `<` as HTML
- * rejected those official scripts.
- */
 export function isMarkupDocument(text) {
   const head = String(text ?? '').replace(/^\uFEFF/, '').trimStart()
-  if (!head.startsWith('<')) return false
-  if (head.startsWith('<#')) return false
+  if (!head.startsWith('<') || head.startsWith('<#')) return false
   return /^<(?:!|\?|[A-Za-z])/.test(head)
 }
 
-const MINIMAX_INSTALLER_MARKERS = Object.freeze(['@minimax-ai/code', 'MCODE_INSTALL_DIR', 'MiniMax Code'])
-
 /**
  * MiniMax's official Windows installer script is run as published (it installs
- * `@minimax-ai/code@latest`). Structural checks only: the vendor's own markers,
- * and a refusal of HTML/XML. Content-Type is not consulted — the CDN labels
- * the real script `application/octet-stream`.
+ * `@minimax-ai/code@latest`). Only structural sanity is checked: it must be the
+ * MiniMax Code installer, not an HTML error page or another script.
  */
 export function officialMiniMaxInstaller(source) {
   const text = installerScriptText(source)
-  if (!text.trim()) throw new Error('下载内容为空，已拒绝执行。')
-  if (isMarkupDocument(text)) {
-    throw new Error('下载内容不是 MiniMax Code 官方 Windows 安装脚本（收到 HTML 页面），已拒绝执行。')
-  }
-  const missing = MINIMAX_INSTALLER_MARKERS.filter(marker => !text.includes(marker))
-  if (missing.length) {
-    throw new Error(`下载内容不是 MiniMax Code 官方 Windows 安装脚本（缺少 ${missing.join('、')}），已拒绝执行。`)
+  // PowerShell help starts with `<# ... #>`, including the current official
+  // installer. It is a script comment, not an HTML response.
+  if (isMarkupDocument(text) || !['@minimax-ai/code', 'MCODE_INSTALL_DIR', 'MiniMax Code'].every(marker => text.includes(marker))) {
+    throw new Error('下载内容不是 MiniMax Code 官方 Windows 安装脚本，已拒绝执行。')
   }
   return text
 }
 
-/**
- * Directory the Windows installer must use. A configured path wins. Otherwise
- * an already-installed official layout is updated in place. With neither, the
- * vendor default is `%USERPROFILE%\.minimax-code` — not the npm prefix.
- */
-export function minimaxOfficialInstallDir(preferences = {}, home = homedir(), existingRoot = '') {
-  const configured = String(preferences?.installDir ?? '').trim()
-  if (configured) return configured
-  const existing = String(existingRoot ?? '').trim()
-  if (existing) return existing
-  return join(home, '.minimax-code')
-}
-
 async function fetchOfficialMiniMaxInstaller(signal) {
-  const response = await fetch(MINIMAX_INSTALLER_URL, {
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
-  })
-  if (!response.ok || !response.body) throw new Error(`官方脚本下载失败：HTTP ${response.status}`)
-  const chunks = []
-  let length = 0
-  for await (const chunk of response.body) {
-    length += chunk.length
-    if (length > MAX_INSTALLER_BYTES) throw new Error('官方安装脚本超过大小上限。')
-    chunks.push(chunk)
-  }
-  return officialMiniMaxInstaller(Buffer.concat(chunks))
+  return officialMiniMaxInstaller(await fetchVendorScript(MINIMAX_INSTALLER_URL, signal, { verify: { mustInclude: ['@minimax-ai/code', 'MiniMax Code CLI'] } }))
 }
 
-async function existingMiniMaxInstallRoot() {
-  const paths = (process.env.PATH ?? '').split(IS_WINDOWS ? ';' : ':').filter(Boolean)
-  const candidates = []
-  for (const directory of paths) candidates.push(directory, join(directory, '.minimax-code'))
-  candidates.push(join(homedir(), '.minimax-code'))
-  const seen = new Set()
-  for (const directory of candidates) {
-    const key = directory.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    try {
-      if (!(await stat(join(directory, 'mcode.cmd'))).isFile()) continue
-      if (!(await stat(join(directory, 'current'))).isFile()) continue
-      return await realpath(directory)
-    } catch { /* try the next candidate */ }
-  }
-  return ''
+export function minimaxOfficialInstallDir(selectedPreferences = {}, home = homedir(), existingRoot = '') {
+  return selectedPreferences.installDir || existingRoot || join(home, '.minimax-code')
+}
+
+/** Keep a discovered native installation in place when its legacy updater runs. */
+export function miniMaxFallbackPlan(selectedPreferences, beforeProbe, prefix, options = currentInstallOptions()) {
+  const installDir = minimaxOfficialInstallDir(selectedPreferences, options.home,
+    beforeProbe?.installed ? beforeProbe.installDir : '')
+  const executionPreferences = { ...selectedPreferences, installDir,
+    methods: { ...selectedPreferences.methods, 'minimax-code': 'script-powershell' } }
+  return { plan: resolveInstallPlan(getOfficialTool('minimax-code'), 'script-powershell', executionPreferences, options), executionPreferences }
 }
 
 async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
   let staging = null
-  let stagingParent = null
+  let prefixRoot = null
   try {
     job.finishedAt = null
     job.error = null
     job.phase = 'downloading-and-verifying'
     pushLine(job, reason || '— npm 原生依赖未就绪；改用 MiniMax 官方 Windows 安装脚本（安装最新版）—')
-    const existingRoot = preferences.installDir ? '' : await existingMiniMaxInstallRoot()
-    const installDir = minimaxOfficialInstallDir(preferences, homedir(), existingRoot)
-    pushLine(job, preferences.installDir
-      ? `— 使用已配置的安装目录：${installDir} —`
-      : existingRoot
-        ? `— 未配置统一安装目录，沿用已安装的官方目录：${installDir} —`
-        : `— 未配置统一安装目录，使用 MiniMax 官方默认位置：${installDir} —`)
+    const { plan, executionPreferences } = miniMaxFallbackPlan(job.preferences, job.beforeProbe, '')
+    const installDir = plan.installDir
     await mkdir(installDir, { recursive: true })
-    stagingParent = await realpath(installDir)
+    prefixRoot = await realpath(installDir)
     const script = await fetchOfficialMiniMaxInstaller(job.controller.signal)
-    staging = await mkdtemp(join(stagingParent, '.model-router-minimax-installer-'))
+    staging = await mkdtemp(join(prefixRoot, '.model-router-minimax-installer-'))
     const scriptPath = join(staging, 'install.ps1')
     const tempPath = join(staging, 'temp')
     await mkdir(tempPath)
     // Windows PowerShell 5 reads a BOM-less .ps1 using the system ANSI page.
     // The upstream installer contains Unicode art, so write a UTF-8 BOM.
     await writeFile(scriptPath, `\uFEFF${script}`, 'utf8')
+    job.plan = plan
+    job.methodId = plan.methodId
+    job.installDir = installDir
+    job.command = planCommandLine(plan)
+    pushLine(job, `— 本次更新目录：${installDir} —`)
     const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32',
       'WindowsPowerShell', 'v1.0', 'powershell.exe')
     const utilityModule = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32',
@@ -369,17 +354,12 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
       + 'Import-Module -Name $env:MODEL_ROUTER_UTILITY_MODULE -ErrorAction Stop; '
       + '& $env:MODEL_ROUTER_MINIMAX_INSTALL_SCRIPT'
     job.phase = 'installing'
-    const scriptRegistry = minimaxScriptRegistry(preferences.registry || 'https://registry.npmjs.org/')
-    if (!scriptRegistry && preferences.registry) {
-      pushLine(job, '— MiniMax 官方脚本不接受当前 npm 源，本次使用脚本自己的默认源 —')
-    }
     const outcome = await runCapture(powershell,
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], {
         timeoutMs: INSTALL_TIMEOUT_MS, signal: job.controller.signal,
-        env: { ...process.env, MCODE_INSTALL_DIR: installDir,
-          MCODE_NO_MODIFY_PATH: '1',
-          ...(scriptRegistry ? { MCODE_NPM_REGISTRY: scriptRegistry } : {}),
-          npm_config_cache: join(staging, 'npm-cache'),
+        env: { ...process.env, ...plan.env, MCODE_INSTALL_DIR: installDir,
+          MCODE_NO_MODIFY_PATH: '1', MCODE_DOWNLOAD_MIRROR: 'global',
+          npm_config_cache: join(prefixRoot, '.model-router-npm-cache'),
           TEMP: tempPath, TMP: tempPath,
           MODEL_ROUTER_UTILITY_MODULE: utilityModule,
           MODEL_ROUTER_MINIMAX_INSTALL_SCRIPT: scriptPath },
@@ -393,12 +373,12 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
     if (!outcome.ok) throw new Error(outcome.timedOut
       ? '官方安装脚本超时并已终止。'
       : `官方安装脚本退出码 ${outcome.code ?? '信号终止'}。${outcome.stderr.split('\n').find(Boolean)?.slice(0, 180) ?? ''}`)
-    appendToProcessPath(installDir)
+    appendToProcessPath(installDir, { prepend: true })
     job.phase = 'verifying'
     probeCache.delete(job.tool.id)
-    const probe = await probeToolWith(job.tool, defaultRunner)
+    const probe = await probeToolWith(job.tool, defaultRunner, { preferences: executionPreferences, plan, cacheMs: 0 })
     job.postInstallProbe = probe
-    const readiness = await trustedExecutionReadiness(job.tool.id)
+    const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: executionPreferences })
     if (!probe.installed || !readiness.ready) {
       throw new Error(`官方安装器完成，但执行入口未通过 npm registry 摘要核验：${readiness.reason ?? probe.detail}`)
     }
@@ -415,9 +395,9 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
     job.error = `MiniMax 官方安装兜底失败：${String(error?.message ?? error).slice(0, 300)}`
     job.finishedAt = new Date().toISOString()
   } finally {
-    if (staging && stagingParent) {
-      const part = relative(stagingParent, staging)
-      if (part.startsWith('.model-router-minimax-installer-') && !part.includes(sep) && !part.startsWith('..')) {
+    if (staging && prefixRoot) {
+      const part = relative(prefixRoot, staging)
+      if (part.startsWith('.model-router-minimax-installer-') && !part.includes(sep)) {
         await rm(staging, { recursive: true, force: true }).catch(() => {})
       }
     }
@@ -446,19 +426,78 @@ export function verifiedVendorScript(source, verify = {}) {
   return text
 }
 
-async function fetchVendorScript(url, signal) {
-  const response = await fetch(url, {
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
-  })
-  if (!response.ok || !response.body) throw new Error(`官方脚本下载失败：HTTP ${response.status}`)
-  const chunks = []
-  let length = 0
-  for await (const chunk of response.body) {
-    length += chunk.length
-    if (length > MAX_INSTALLER_BYTES) throw new Error('官方安装脚本超过大小上限。')
-    chunks.push(chunk)
+/** Windows WebRequest follows the system proxy, which Node fetch may not use. */
+export const WINDOWS_SCRIPT_DOWNLOAD = [
+  '$ErrorActionPreference="Stop"',
+  '[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12',
+  '$request=[Net.HttpWebRequest]::Create($env:MODEL_ROUTER_DOWNLOAD_URL)',
+  '$request.UserAgent="curl/8.0"',
+  '$request.Timeout=30000',
+  '$request.ReadWriteTimeout=30000',
+  '$response=$request.GetResponse()',
+  `if ($response.ContentLength -gt ${MAX_INSTALLER_BYTES}) { $response.Close(); throw "Installer exceeds size limit" }`,
+  '$stream=$response.GetResponseStream()',
+  '$output=New-Object IO.MemoryStream',
+  '$buffer=New-Object byte[] 8192',
+  'try { while (($count=$stream.Read($buffer,0,$buffer.Length)) -gt 0) { '
+    + `$output.Write($buffer,0,$count); if ($output.Length -gt ${MAX_INSTALLER_BYTES}) { throw "Installer exceeds size limit" } }; `
+    + '[IO.File]::WriteAllBytes($env:MODEL_ROUTER_DOWNLOAD_FILE,$output.ToArray()) '
+    + '} finally { $stream.Close(); $response.Close(); $output.Dispose() }',
+].join('; ')
+
+/** Download bytes only; every transport still checks the same vendor markers. */
+export async function fetchVendorScript(url, signal, {
+  verify = {}, fetcher = globalThis.fetch, platform = process.platform, powershellRunner = runCapture, fallbackUrls = [],
+} = {}) {
+  if (fallbackUrls.length) {
+    let lastError
+    for (const candidate of [...new Set([url, ...fallbackUrls])]) {
+      try { return await fetchVendorScript(candidate, signal, { verify, fetcher, platform, powershellRunner }) }
+      catch (error) { if (signal?.aborted) throw error; lastError = error }
+    }
+    throw lastError
   }
-  return Buffer.concat(chunks)
+  const check = bytes => { verifiedVendorScript(bytes, verify); return bytes }
+  let firstError
+  try {
+    const response = await fetcher(url, {
+      headers: { 'User-Agent': 'curl/8.0', Accept: 'text/plain, application/octet-stream;q=0.9, */*;q=0.8' },
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
+    })
+    if (!response.ok || !response.body) throw new Error(`官方脚本下载失败：HTTP ${response.status}`)
+    const declared = Number(response.headers?.get?.('content-length') ?? 0)
+    if (declared > MAX_INSTALLER_BYTES) throw new Error('官方安装脚本超过大小上限。')
+    const chunks = []
+    let length = 0
+    for await (const chunk of response.body) {
+      length += chunk.length
+      if (length > MAX_INSTALLER_BYTES) throw new Error('官方安装脚本超过大小上限。')
+      chunks.push(chunk)
+    }
+    return check(Buffer.concat(chunks))
+  } catch (error) {
+    if (signal?.aborted || platform !== 'win32') throw error
+    firstError = error
+  }
+  // This fixed PowerShell program only downloads to a private temporary file.
+  // Neither the URL nor response bytes become executable command text.
+  const staging = await mkdtemp(join(tmpdir(), '.model-router-script-download-'))
+  try {
+    const outputPath = join(staging, 'installer.bin')
+    const outcome = await powershellRunner(POWERSHELL, [
+      '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(WINDOWS_SCRIPT_DOWNLOAD, 'utf16le').toString('base64'),
+    ], { timeoutMs: 40_000, signal,
+      env: { ...process.env, MODEL_ROUTER_DOWNLOAD_URL: url, MODEL_ROUTER_DOWNLOAD_FILE: outputPath },
+    })
+    if (!outcome.ok) {
+      throw new Error(`官方脚本下载失败：${String(firstError?.message ?? firstError).slice(0, 150)}；系统下载通道${outcome.cancelled ? '已取消' : outcome.timedOut ? '超时' : `退出码 ${outcome.code ?? '未知'}`}。${String(outcome.stderr ?? '').slice(0, 150)}`)
+    }
+    const size = (await stat(outputPath)).size
+    if (size > MAX_INSTALLER_BYTES) throw new Error('官方安装脚本超过大小上限。')
+    return check(await readFile(outputPath))
+  } finally {
+    await rm(staging, { recursive: true, force: true }).catch(() => {})
+  }
 }
 
 const POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32',
@@ -474,7 +513,7 @@ export function vendorScriptInvocation(plan, scriptPath) {
       args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...directoryArgs],
     }
   }
-  return { file: 'bash', args: [scriptPath, ...directoryArgs] }
+  return { file: plan.shell === 'sh' ? 'sh' : 'bash', args: [scriptPath, ...directoryArgs] }
 }
 
 /**
@@ -484,12 +523,23 @@ export function vendorScriptInvocation(plan, scriptPath) {
  * than an older one that happened to be on PATH first.
  */
 async function runVendorScriptInstallJob(job, plan) {
+  if (job.status !== 'running') return
   let staging = null
   try {
+    job.phase = 'preflight'
+    const before = await probeToolWith(job.tool, defaultRunner, { plan, preferences: job.preferences, cacheMs: 0 })
+    job.beforeProbe = before
+    const latestBefore = before.installed ? await latestVersions.lookup(job.tool, { fresh: true }).catch(() => null) : null
+    if (job.cancelRequested) { markCancelled(job); return }
+    if (latestBefore?.version && compareReleaseVersions(before.version, latestBefore.version) === 1) {
+      throw new Error(`已安装 ${before.version}，高于最新正式版 ${latestBefore.version}；不会自动降级。`)
+    }
     job.phase = 'downloading-and-verifying'
     for (const notice of plan.notices ?? []) pushLine(job, notice)
     pushLine(job, `— 下载官方安装脚本：${plan.scriptUrl}`)
-    const source = verifiedVendorScript(await fetchVendorScript(plan.scriptUrl, job.controller.signal), plan.verify)
+    const source = verifiedVendorScript(await fetchVendorScript(plan.scriptUrl, job.controller.signal, {
+      verify: plan.verify, fallbackUrls: (plan.downloadUrls ?? []).slice(1),
+    }), plan.verify)
     staging = await mkdtemp(join(tmpdir(), '.model-router-tool-install-'))
     const isPowerShell = plan.shell === 'powershell'
     const scriptPath = join(staging, isPowerShell ? 'install.ps1' : 'install.sh')
@@ -502,7 +552,7 @@ async function runVendorScriptInstallJob(job, plan) {
     const outcome = await runCapture(invocation.file, invocation.args, {
       timeoutMs: INSTALL_TIMEOUT_MS,
       signal: job.controller.signal,
-      env: { ...process.env, ...plan.env },
+      env: installEnvironment(plan),
       onOutput: captureLines(job),
     })
     if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
@@ -512,17 +562,10 @@ async function runVendorScriptInstallJob(job, plan) {
       throw new Error(outcome.timedOut ? '官方安装脚本超时并已终止。'
         : `官方安装脚本退出码 ${outcome.code ?? '信号终止'}。${String(outcome.stderr ?? '').split('\n').find(Boolean)?.slice(0, 200) ?? ''}`)
     }
-    const location = resolveInstallLocation(job.tool, plan.method, preferences, currentInstallOptions())
-    if (location?.dir) {
-      appendToProcessPath(location.dir)
-      for (const relative of location.relatives ?? []) {
-        const folder = String(relative).split(/[\\/]/).slice(0, -1).filter(Boolean).join(sep)
-        if (folder) appendToProcessPath(join(location.dir, folder))
-      }
-    }
+    if (plan.binDir) appendToProcessPath(plan.binDir, { prepend: true })
     job.phase = 'verifying'
     probeCache.delete(job.tool.id)
-    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0 })
+    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0, plan, preferences: job.preferences })
     job.postInstallProbe = probe
     if (!probe.installed) {
       throw new Error(`官方安装脚本已完成，但 PATH 上仍找不到 ${job.tool.probeExecutables?.[0] ?? job.tool.label}：${probe.detail}`)
@@ -551,10 +594,10 @@ async function runVendorScriptInstallJob(job, plan) {
  * the file must sit inside that tool's install directory, and it can never be a
  * home directory or a filesystem root.
  */
-/** One relative path under an install directory. `..` never leaves that directory. */
 export function scriptBinaryCandidate(installDir, relative) {
-  const parts = String(relative ?? '').split(/[\\/]/).filter(Boolean)
-  if (parts.length === 0 || parts.some(part => part === '.' || part === '..')) {
+  const raw = String(relative ?? '')
+  const parts = raw.split(/[\\/]/)
+  if (!raw || isAbsolute(raw) || /^[A-Za-z]:/.test(raw) || parts.some(part => !part || part === '.' || part === '..')) {
     throw new Error('拒绝删除安装目录之外的文件。')
   }
   return join(installDir, ...parts)
@@ -585,13 +628,13 @@ function isInsideDirectory(parent, child) {
  * reinstall keeps the user's login.
  */
 async function runVendorScriptUninstallJob(job, plan) {
+  if (job.status !== 'running') return
   try {
     job.phase = 'removing'
-    const location = resolveInstallLocation(job.tool, plan.method, preferences, currentInstallOptions())
+    const location = { dir: plan.dir, binaries: plan.binaries }
     const removed = []
-    const relatives = location?.relatives?.length ? location.relatives : (location?.binaries ?? [])
-    for (const relative of relatives) {
-      const candidate = scriptBinaryCandidate(location.dir, relative)
+    for (const binary of location?.binaries ?? []) {
+      const candidate = scriptBinaryCandidate(location.dir, binary)
       // checkedRemovableFile re-checks the basename, the install directory and
       // the root/home guards even though every part came from the registry.
       const target = checkedRemovableFile(candidate, {
@@ -601,16 +644,16 @@ async function runVendorScriptUninstallJob(job, plan) {
       await rm(target, { force: true })
       removed.push(target)
     }
-    const stripped = await stripPathProfileBlocks(job.tool).catch(error => `（未能清理 PATH 配置：${String(error?.message ?? error).slice(0, 120)}）`)
     if (removed.length === 0) {
       throw new Error(`在 ${location?.dir || '安装目录'} 下没有找到 ${job.tool.label} 的可执行文件；它可能是用包管理器安装的，请改用该方式卸载。`)
     }
+    const stripped = await stripPathProfileBlocks(job.tool).catch(error => [`（未能清理 PATH 配置：${String(error?.message ?? error).slice(0, 120)}）`])
     for (const path of removed) pushLine(job, `已删除 ${path}`)
     if (stripped.length) pushLine(job, `已清理 shell 配置中的 PATH 记录：${stripped.join('、')}`)
     pushLine(job, `已保留 ${job.tool.label} 的配置与登录信息（${homedir()}/${String(job.tool.defaultScriptInstallDir ?? '').split('/')[0]}）。`)
     job.phase = 'verifying'
     probeCache.delete(job.tool.id)
-    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0 })
+    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0, preferences: job.preferences, plan: { ...plan, binDir: plan.dir } })
     job.postInstallProbe = probe
     job.status = 'succeeded'
     job.finishedAt = new Date().toISOString()
@@ -630,23 +673,25 @@ async function runVendorScriptUninstallJob(job, plan) {
  * writes. Only a well-formed `# stepcode … # stepcode end` block is removed; a
  * bare mention is left alone, exactly as the vendor's installer decides.
  */
-export function stripPathBlock(content, marker) {
+export function stripPathBlock(content, marker, closingMarker = `${marker} end`) {
   const text = String(content ?? '')
   if (!text.includes(marker)) return null
-  const lines = text.split(/\r?\n/)
+  const lines = text.match(/[^\r\n]*(?:\r\n|\n|$)/g)?.filter(Boolean) ?? []
   const kept = []
   let removed = 0
-  let inside = false
-  for (const line of lines) {
-    if (!inside && line.trim() === marker) { inside = true; removed += 1; continue }
-    if (inside) {
-      removed += 1
-      if (line.trim() === `${marker} end`) inside = false
-      continue
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index].trim() !== marker) { kept.push(lines[index]); continue }
+    let closing = index + 1
+    while (closing < lines.length && lines[closing].trim() !== closingMarker) {
+      if (lines[closing].trim() === marker) return null
+      closing += 1
     }
-    kept.push(line)
+    // A truncated block never authorizes deleting the rest of the user's file.
+    if (closing === lines.length) return null
+    removed += closing - index + 1
+    index = closing
   }
-  return removed > 0 ? kept.join('\n') : null
+  return removed > 0 ? kept.join('') : null
 }
 
 const SHELL_PROFILES = ['.bashrc', '.bash_profile', '.zshrc', '.profile']
@@ -660,7 +705,11 @@ async function stripPathProfileBlocks(tool) {
     let content
     try { content = await readFile(path, 'utf8') } catch { continue }
     let next = content
-    for (const marker of markers) next = stripPathBlock(next, marker) ?? next
+    if (tool.id === 'grok-build' && markers.length === 2) {
+      next = stripPathBlock(next, markers[0], markers[1]) ?? next
+    } else {
+      for (const marker of markers) next = stripPathBlock(next, marker) ?? next
+    }
     if (next === content) continue
     const temporary = `${path}.model-router-${process.pid}.tmp`
     await writeFile(temporary, next, 'utf8')
@@ -683,17 +732,37 @@ export function versionFromBanner(banner) {
 
 /**
  * Probe one registry tool. `runner` is injectable for offline tests and must
- * return { ok, code, stdout, stderr, timedOut }.
+ * return { ok, code, stdout, stderr, timedOut }. Package-manager probes inspect
+ * their actual package manifest and declared entry; they never execute a shared
+ * npm/pnpm command shim. `packageEntries` keeps those inspections injectable.
  */
-export async function probeToolWith(tool, runner, { cache = probeCache, cacheMs = PROBE_CACHE_MS, now = Date.now } = {}) {
+export async function probeToolWith(tool, runner, {
+  cache = probeCache, cacheMs = PROBE_CACHE_MS, now = Date.now,
+  preferences: selectedPreferences = preferences, plan,
+  fileExists = async path => (await stat(path).catch(() => null))?.isFile() === true,
+  packageEntries = selectedPackageEntries,
+} = {}) {
+  const scope = JSON.stringify([selectedPreferences, plan?.methodId, plan?.binDir, plan?.packageModuleRoots])
   const cached = cache.get(tool.id)
-  if (cached && now() - cached.at < cacheMs) return cached.value
-  const probe = await probeUncached(tool, runner)
-  cache.set(tool.id, { at: now(), value: probe })
+  if (cached && cached.scope === scope && now() - cached.at < cacheMs) return cached.value
+  const probe = await probeUncached(tool, runner, { selectedPreferences, plan, fileExists, packageEntries })
+  cache.set(tool.id, { at: now(), value: probe, scope })
   return probe
 }
 
-async function probeUncached(tool, runner) {
+async function selectedPackageEntries(tool, { plan, preferences: selectedPreferences }) {
+  const { findGlobalPackageEntries, officialToolEntrySelection } = await import('./official-tool-executor.mjs')
+  const selection = officialToolEntrySelection(tool.id, { preferences: selectedPreferences, plan })
+  const entries = []
+  for (const executable of tool.probeExecutables) {
+    entries.push(...await findGlobalPackageEntries(tool.package, executable, '', process.cwd(), {
+      selection, directories: selection.directories, manager: plan.manager, moduleRoots: plan.packageModuleRoots,
+    }))
+  }
+  return entries
+}
+
+async function probeUncached(tool, runner, { selectedPreferences, plan, fileExists, packageEntries }) {
   if (tool.unsupported) {
     return { id: tool.id, installed: false, version: null, status: 'unsupported', detail: tool.unsupportedReason }
   }
@@ -709,23 +778,68 @@ async function probeUncached(tool, runner) {
         ? `检测到已安装的 ZCode ${other.version ?? '（版本未知）'}${other.root ? `（${other.root}）` : ''}，但 ZCode.exe 未通过智谱发布者签名或 GLM 组件检查，因此不通过插件调用；可以继续直接使用 ZCode 桌面版。`
         : '未找到具有智谱有效签名的 ZCode 桌面版。' }
   }
-  if (tool.id === 'minimax-code' && IS_WINDOWS) {
+  let selectedPlan = plan
+  if (!selectedPlan) {
+    try {
+      selectedPlan = resolveInstallPlan(tool, undefined, {
+        ...selectedPreferences,
+        allowScriptInstall: installMethodFor(tool, selectedPreferences.methods?.[tool.id])?.kind === 'script' ? true : selectedPreferences.allowScriptInstall,
+      }, currentInstallOptions())
+    } catch { /* a blocked saved method still allows normal detection */ }
+  }
+  // npm and pnpm can write the same shim into a unified bin directory. Its
+  // banner belongs to whichever manager wrote it last, not the selected copy.
+  // Bind version detection to the selected manager's package tree and declared
+  // bin. Execution readiness independently verifies whether that entry runs.
+  if (selectedPlan?.kind === 'package-manager' && tool.package) {
+    const entries = await packageEntries(tool, { plan: selectedPlan, preferences: selectedPreferences })
+    const selected = [...entries].sort((left, right) => compareReleaseVersions(right.version, left.version) ?? 0)[0]
+    const location = { installDir: selectedPlan.installDir, binDir: selectedPlan.binDir,
+      methodId: selectedPlan.methodId, manager: selectedPlan.manager }
+    if (selected) return { id: tool.id, installed: true, version: selected.version ?? null,
+      status: 'installed', ...location, packageRoot: selected.packageRoot,
+      packageEntry: selected.entry, source: selected.source,
+      detail: `${tool.probeNote ?? ''} ${selectedPlan.manager} 安装包：${selected.packageRoot}`,
+      bannerLine: `${tool.label} ${selected.version ?? '（版本未知）'}` }
+    return { id: tool.id, installed: false, version: null, status: 'not-installed', ...location,
+      detail: `未在所选${selectedPlan.binDir ? `安装目录 ${selectedPlan.binDir}` : '全局安装目录'}中找到 ${selectedPlan.manager} 安装的 ${tool.package} 及其声明的命令入口。` }
+  }
+  // Native script locations are also concrete targets. A different PATH copy
+  // must not satisfy installation or conceal an unsuccessful update.
+  if (selectedPlan?.binDir) {
+    for (const executable of tool.probeExecutables) {
+      const names = IS_WINDOWS
+        ? selectedPlan.kind === 'package-manager'
+          ? [`${executable}.cmd`, executable, `${executable}.exe`]
+          : [`${executable}.exe`, `${executable}.cmd`, executable]
+        : [executable]
+      for (const name of names) {
+        const target = join(selectedPlan.binDir, name)
+        if (!(await fileExists(target))) continue
+        const attempt = await runner(target, ['--version'], { timeoutMs: PROBE_TIMEOUT_MS, useShell: IS_WINDOWS && /\.(cmd|bat)$/i.test(target) })
+        const banner = probeBanner(attempt)
+        const version = versionFromBanner(banner)
+        return { id: tool.id, installed: Boolean(attempt.ok || version), version,
+          status: attempt.timedOut ? 'probe-timeout' : attempt.ok || version ? 'installed' : 'probe-failed',
+          detail: attempt.ok || version ? `${tool.probeNote ?? ''} 安装目录：${selectedPlan.binDir}`
+            : `${target} --version ${attempt.timedOut ? '超时' : `退出码 ${attempt.code ?? '信号终止'}`}。${String(attempt.stderr ?? '').slice(0, 120)}`,
+          executablePath: target, installDir: selectedPlan.installDir, binDir: selectedPlan.binDir,
+          bannerLine: banner.split('\n').find(Boolean)?.slice(0, 200) ?? '' }
+      }
+    }
+    return { id: tool.id, installed: false, version: null, status: 'not-installed',
+      installDir: selectedPlan.installDir, binDir: selectedPlan.binDir,
+      detail: `未在所选安装目录 ${selectedPlan.binDir} 中找到官方命令。` }
+  }
+  if (tool.id === 'minimax-code' && IS_WINDOWS && !usesConfiguredInstallPlan(tool.id, selectedPreferences)) {
     // The official Windows installer keeps mcode under a versioned releases
     // directory. A partial npm install can leave a broken shim earlier on PATH;
-    // prefer the checksum-verified installer release in that case. Also look at
-    // the configured directory and the vendor default, which may not be on PATH
-    // yet when the installer was told not to edit the user PATH.
+    // prefer the checksum-verified installer release in that case.
     const { findManagedMiniMaxEntry } = await import('./official-tool-executor.mjs')
-    const directed = minimaxOfficialInstallDir(preferences, homedir())
-    // The configured directory is the copy updates write, so it wins over an
-    // older install that happens to sit earlier on PATH.
-    let managed = preferences.installDir
-      ? await findManagedMiniMaxEntry(process.cwd(), [directed, join(directed, '.minimax-code')])
-      : null
-    if (!managed) managed = await findManagedMiniMaxEntry(process.cwd())
-    if (!managed) managed = await findManagedMiniMaxEntry(process.cwd(), [directed, join(directed, '.minimax-code')])
+    const managed = await findManagedMiniMaxEntry(process.cwd())
     if (managed) return { id: tool.id, installed: true, version: managed.version,
       status: 'installed', detail: '已按官方 npm registry 摘要核验 MiniMax 官方 Windows 安装器中的 CLI 文件。',
+      installDir: managed.installDir, binDir: managed.installDir,
       bannerLine: `MiniMax Code ${managed.version}` }
   }
   for (const executable of tool.probeExecutables) {
@@ -742,12 +856,12 @@ async function probeUncached(tool, runner) {
     if (attempt.timedOut) {
       return { id: tool.id, installed: false, version: null, status: 'probe-timeout', detail: `${executable} --version 超时（${PROBE_TIMEOUT_MS / 1000}s）` }
     }
-    const attempts = [attempt]
+    const attempts = [{ ...attempt, executablePath: locatorPaths(located.stdout)[0] }]
     if (!versionFromBanner(probeBanner(attempt))) {
       for (const target of locatorPaths(located.stdout)) {
         if (target === executable) continue
         const direct = await runner(target, ['--version'], { timeoutMs: PROBE_TIMEOUT_MS, useShell: false })
-        attempts.push(direct)
+        attempts.push({ ...direct, executablePath: target })
         if (direct.timedOut) break
         if (direct.ok || versionFromBanner(probeBanner(direct))) break
       }
@@ -762,6 +876,7 @@ async function probeUncached(tool, runner) {
         version,
         status: 'installed',
         detail: tool.probeNote ?? '',
+        executablePath: chosen.executablePath,
         bannerLine: banner.split('\n').find(Boolean)?.slice(0, 200) ?? '',
       }
     }
@@ -783,17 +898,16 @@ export const defaultRunner = (executable, args, options = {}) =>
 let prefixPromise = null
 
 /** Add one directory to this process's PATH unless it is already there. */
-function appendToProcessPath(directory, { includeBin = true } = {}) {
+export function appendToProcessPath(directory, { prepend = false, env = process.env, platform = process.platform } = {}) {
   const target = String(directory ?? '').trim()
   if (!target || !isAbsolute(target)) return
-  const separator = IS_WINDOWS ? ';' : ':'
-  const current = process.env.PATH ?? ''
-  if (!current.split(separator).some(entry => entry.toLowerCase() === target.toLowerCase())) {
-    process.env.PATH = current ? `${current}${separator}${target}` : target
-  }
-  // POSIX package managers put global binaries in <prefix>/bin. One level only:
-  // recursing would append bin/bin/bin until the process runs out of memory.
-  if (includeBin && !IS_WINDOWS) appendToProcessPath(join(target, 'bin'), { includeBin: false })
+  const separator = platform === 'win32' ? ';' : ':'
+  const key = Object.keys(env).find(name => name.toUpperCase() === 'PATH') ?? 'PATH'
+  const parts = String(env[key] ?? '').split(separator).filter(Boolean)
+  const equal = entry => platform === 'win32' ? entry.toLowerCase() === target.toLowerCase() : entry === target
+  if (!prepend && parts.some(equal)) return
+  const remaining = parts.filter(entry => !equal(entry))
+  env[key] = (prepend ? [target, ...remaining] : [...remaining, target]).join(separator)
 }
 
 /**
@@ -812,9 +926,9 @@ export function ensureNpmPrefixOnPath() {
           timeoutMs: 5_000,
           useShell: IS_WINDOWS,
         })
-        if (!outcome.ok) return
+        if (!outcome.ok) throw new Error('npm prefix is unavailable')
         let prefix = outcome.stdout.trim()
-        if (!prefix) return
+        if (!prefix) throw new Error('npm prefix is empty')
         if (prefix.startsWith('\\\\?\\')) prefix = prefix.slice(4)
         if (IS_WINDOWS && !process.env.GROK_HOME && /^[D-Z]:[\\/]/i.test(prefix)) {
           // Grok's npm bootstrap otherwise expands its native binary under
@@ -822,18 +936,14 @@ export function ensureNpmPrefixOnPath() {
           // the same non-C drive as this user's npm global prefix.
           process.env.GROK_HOME = join(prefix, '.model-router-grok')
         }
-        appendToProcessPath(prefix)
+        appendToProcessPath(IS_WINDOWS ? prefix : join(prefix, 'bin'))
       } catch { /* environment stays untouched */ }
       // A --prefix install lands outside the npm prefix, so it needs its own
       // PATH entry or every later probe reports the tool as missing.
-      try { appendToProcessPath(preferences.installDir) } catch { /* environment stays untouched */ }
-      // Vendor script defaults, so a one-click install that did not edit the
-      // user PATH is still visible to the next probe in this process.
-      for (const relative of [
-        '.minimax-code', '.local/bin', '.kimi-code/bin', '.grok/bin', '.mimocode/bin',
-        '.opencode/bin', '.stepcode/bin', 'AppData/Local/Programs/OpenAI/Codex/bin',
-      ]) {
-        try { appendToProcessPath(join(homedir(), ...relative.split('/'))) } catch { /* skip */ }
+      for (const tool of OFFICIAL_TOOLS) {
+        for (const directory of preferredToolDirectories(tool.id)) {
+          try { appendToProcessPath(directory, { prepend: Boolean(preferences.installDir || preferences.methods[tool.id]) }) } catch { /* environment stays untouched */ }
+        }
       }
     })()
   }
@@ -910,8 +1020,46 @@ function pushLine(job, line) {
   job.outputTail.push(line)
 }
 
+/** Bind a mutating package-manager job to the directory its command will write. */
+export async function resolvePackageJobPlan(tool, plan, selectedPreferences, {
+  operation = 'install', runner = defaultRunner, options = currentInstallOptions(), signal,
+} = {}) {
+  if (plan?.kind !== 'package-manager' || plan.installDir) return plan
+  const readDirectory = async args => {
+    const outcome = await runner(plan.manager, args, {
+      timeoutMs: PROBE_TIMEOUT_MS, useShell: options.platform === 'win32', signal,
+    })
+    if (!outcome.ok || outcome.timedOut || outcome.cancelled) throw new Error('query failed')
+    const raw = String(outcome.stdout ?? '').trim().replace(/^\\\\\?\\/, '')
+    const directory = expandInstallDir(raw, options)
+    if (!directory || /[\r\n]/.test(directory)) throw new Error('invalid directory')
+    return directory.replace(/[\\/]+$/, '')
+  }
+  if (plan.manager === 'pnpm') {
+    try {
+      const [binDir, moduleRoot] = await Promise.all([readDirectory(['bin', '-g']), readDirectory(['root', '-g'])])
+      const layout = /^(.*)[\\/]\d+[\\/]node_modules$/.exec(moduleRoot)
+      if (!layout || !layout[1]) throw new Error('unsupported global layout')
+      const globalDir = expandInstallDir(layout[1], options)
+      return { ...plan, binDir, installDir: '', globalDir, packageModuleRoots: [moduleRoot],
+        args: [...plan.args, `--config.global-dir=${globalDir}`, `--config.global-bin-dir=${binDir}`] }
+    } catch {
+      throw new Error('无法安全绑定 pnpm 默认全局包目录与命令目录，已停止操作；请检查 pnpm 或在官方工具设置中配置统一安装目录。')
+    }
+  }
+  if (plan.manager !== 'npm') throw new Error('此包管理器的默认安装目录无法安全绑定，请配置统一安装目录。')
+  let prefix
+  try { prefix = await readDirectory(['config', 'get', 'prefix']) } catch {
+    throw new Error('无法读取有效的 npm 默认全局安装目录，已停止操作；请检查 npm 或配置统一安装目录。')
+  }
+  const targetPreferences = { ...selectedPreferences, installDir: prefix }
+  return operation === 'uninstall'
+    ? resolveUninstallPlan(tool, plan.methodId, targetPreferences, options)
+    : resolveInstallPlan(tool, plan.methodId, targetPreferences, options)
+}
+
 /** Reserve the single per-tool job slot and serialise against every other tool. */
-function beginJob(tool, { operation, methodId, command, installDir = '', run }) {
+function beginJob(tool, { operation, methodId, command, installDir = '', plan, configured = false, run }) {
   const existing = installJobs.get(tool.id)
   if (existing?.status === 'running') throw new Error(`${tool.label} 已有${operation === 'uninstall' ? '卸载' : '安装'}任务正在执行。`)
   const job = {
@@ -920,6 +1068,9 @@ function beginJob(tool, { operation, methodId, command, installDir = '', run }) 
     methodId,
     command,
     installDir,
+    plan,
+    preferences: installPreferences(),
+    configured: configured || plan?.kind === 'package-manager',
     status: 'running',
     phase: 'queued',
     cancelRequested: false,
@@ -935,8 +1086,28 @@ function beginJob(tool, { operation, methodId, command, installDir = '', run }) 
   }
   installJobs.set(tool.id, job)
   probeCache.delete(tool.id)
-  installChain = installChain.then(() => run(job)).catch(error => {
+  installChain = installChain.then(async () => {
     if (job.status !== 'running') return
+    if (job.plan?.kind === 'package-manager') {
+      job.phase = 'preflight'
+      const target = await resolvePackageJobPlan(job.tool, job.plan, job.preferences, {
+        operation: job.operation, signal: job.controller.signal,
+      })
+      if (job.cancelRequested) { markCancelled(job); return }
+      job.plan = target
+      job.installDir = target.installDir || target.globalDir || target.binDir
+      const resolvedCommand = planCommandLine(target, job.operation)
+      const command = job.operation === 'repair' ? `修复：${resolvedCommand}` : resolvedCommand
+      if (job.command !== command) {
+        job.command = command
+        pushLine(job, `— 本次操作目录：${job.installDir} —`)
+        pushLine(job, `$ ${job.command}`)
+      }
+    }
+    return run(job)
+  }).catch(error => {
+    if (job.status !== 'running') return
+    if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }
     job.status = 'failed'
     job.finishedAt = new Date().toISOString()
     job.error = `${operation === 'uninstall' ? '卸载' : '安装'}流程失败：${String(error?.message ?? error).slice(0, 200)}`
@@ -947,15 +1118,19 @@ function beginJob(tool, { operation, methodId, command, installDir = '', run }) 
 /** One-line summary of a resolved plan, for the job log and the UI. */
 export function planCommandLine(plan, operation = 'install') {
   if (plan.kind === 'script') {
-    const piped = plan.shell === 'powershell' ? `irm ${plan.scriptUrl} | iex` : `curl -fsSL ${plan.scriptUrl} | bash`
-    if (operation === 'uninstall') {
-      return `删除 ${plan.dir} 下的 ${(plan.binaries ?? []).join('、') || '可执行文件'}`
-    }
-    if (plan.installDir && plan.installArg?.[0]) return `${piped} ${plan.installArg[0]} ${plan.installDir}`
-    if (plan.installDir && plan.installDirEnv) return `${piped}（${plan.installDirEnv}=${plan.installDir}）`
-    return piped
+    const quote = value => `'${String(value).replace(/'/g, plan.shell === 'powershell' ? "''" : "'\\''")}'`
+    const environment = Object.entries(plan.env ?? {}).map(([name, value]) => plan.shell === 'powershell'
+      ? `$env:${name}=${quote(value)}; ` : `${name}=${quote(value)} `).join('')
+    const directoryArgs = plan.installDir && plan.installArg?.length ? ` ${plan.installArg.join(' ')} ${quote(plan.installDir)}` : ''
+    const piped = plan.shell === 'powershell'
+      ? `${environment}irm ${plan.scriptUrl} | iex`
+      : `curl -fsSL ${plan.scriptUrl} | ${environment}${plan.shell === 'sh' ? 'sh' : 'bash'}${directoryArgs ? ` -s --${directoryArgs}` : ''}`
+    return operation === 'uninstall'
+      ? `删除 ${plan.dir} 下的 ${(plan.binaries ?? []).join('、') || '可执行文件'}`
+      : plan.shell === 'powershell' && directoryArgs
+        ? `${environment}& ([scriptblock]::Create((irm ${plan.scriptUrl})))${directoryArgs}` : piped
   }
-  return `${plan.manager} ${plan.args.join(' ')}`
+  return `${plan.manager} ${plan.args.map(arg => /\s/.test(arg) ? JSON.stringify(arg) : arg).join(' ')}`
 }
 
 /**
@@ -979,9 +1154,11 @@ export function startInstall(toolId, { method } = {}) {
     methodId: plan.methodId,
     command: planCommandLine(plan),
     installDir: plan.installDir ?? '',
+    plan,
+    configured: usesConfiguredInstallPlan(tool.id, preferences, method),
     run: job => (plan.kind === 'script'
       ? runVendorScriptInstallJob(job, plan)
-      : runInstallJob(plan.manager, plan.args, job)),
+      : runInstallJob(job.plan, job)),
   })
 }
 
@@ -1001,10 +1178,12 @@ export function startRepair(toolId, { method } = {}) {
     methodId: plan.methodId,
     command: `修复：${planCommandLine(plan)}`,
     installDir: plan.installDir ?? '',
+    plan,
+    configured: usesConfiguredInstallPlan(tool.id, preferences, method),
     run: async job => {
       job.repair = true
       if (plan.kind === 'script') return runVendorScriptInstallJob(job, plan)
-      return runInstallJob(plan.manager, plan.args, job)
+      return runInstallJob(job.plan, job)
     },
   })
 }
@@ -1022,17 +1201,20 @@ export function startUninstall(toolId, { method } = {}) {
     methodId: plan.methodId,
     command: planCommandLine(plan, 'uninstall'),
     installDir: plan.dir ?? plan.installDir ?? '',
+    plan,
+    configured: usesConfiguredInstallPlan(tool.id, preferences, method),
     run: job => (plan.kind === 'script'
       ? runVendorScriptUninstallJob(job, plan)
-      : runPackageManagerUninstallJob(job, plan)),
+      : runPackageManagerUninstallJob(job, job.plan)),
   })
 }
 
 async function runPackageManagerUninstallJob(job, plan) {
+  if (job.status !== 'running') return
   try {
     job.phase = 'preflight'
     await ensureNpmPrefixOnPath()
-    const before = await probeToolWith(job.tool, defaultRunner)
+    const before = await probeToolWith(job.tool, defaultRunner, { plan, preferences: job.preferences, cacheMs: 0 })
     if (job.cancelRequested) { markCancelled(job); return }
     if (!before.installed) {
       job.status = 'succeeded'
@@ -1047,6 +1229,7 @@ async function runPackageManagerUninstallJob(job, plan) {
       useShell: IS_WINDOWS,
       signal: job.controller.signal,
       onOutput: captureLines(job),
+      env: installEnvironment(plan),
     })
     if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
     job.exitCode = outcome.code
@@ -1057,7 +1240,7 @@ async function runPackageManagerUninstallJob(job, plan) {
     }
     job.phase = 'verifying'
     probeCache.delete(job.tool.id)
-    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0 })
+    const probe = await probeToolWith(job.tool, defaultRunner, { cacheMs: 0, preferences: job.preferences, plan })
     job.postInstallProbe = probe
     job.status = 'succeeded'
     job.finishedAt = new Date().toISOString()
@@ -1082,6 +1265,13 @@ function captureLines(job) {
   }
 }
 
+/** pnpm requires its global bin directory on PATH even during installation. */
+export function installEnvironment(plan, base = process.env) {
+  const env = { ...base, ...(plan.env ?? {}) }
+  if (plan.binDir) appendToProcessPath(plan.binDir, { prepend: true, env })
+  return env
+}
+
 /** Mark the job succeeded only when the fresh probe is installed, ready, and not still older. */
 async function finishVerifiedInstall(job, probe) {
   job.postInstallProbe = probe
@@ -1097,10 +1287,10 @@ async function finishVerifiedInstall(job, probe) {
     failBecauseStillOlder(job, probe, latest.version)
     return true
   }
-  const readiness = await trustedExecutionReadiness(job.tool.id)
+  const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan })
   if (job.cancelRequested) { markCancelled(job); return true }
   if (!readiness.ready) {
-    if (IS_WINDOWS && job.tool.id === 'minimax-code') {
+    if (IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
       await runOfficialMiniMaxInstaller(job)
       return true
     }
@@ -1130,7 +1320,7 @@ async function tryClaudeUpdate(job, latestVersion) {
   if (job.cancelRequested) { markCancelled(job); return true }
   pushLine(job, '$ claude update')
   job.phase = 'installing'
-  const outcome = await runCapture('claude', CLAUDE_UPDATE_ARGS, {
+  const outcome = await runCapture(job.beforeProbe?.executablePath || 'claude', CLAUDE_UPDATE_ARGS, {
     timeoutMs: CLAUDE_UPDATE_TIMEOUT_MS,
     useShell: IS_WINDOWS,
     signal: job.controller.signal,
@@ -1144,7 +1334,10 @@ async function tryClaudeUpdate(job, latestVersion) {
   }
   await ensureNpmPrefixOnPath()
   probeCache.delete(job.tool.id)
-  const probe = await probeToolWith(job.tool, defaultRunner)
+  const nativePlan = job.beforeProbe?.executablePath
+    ? { ...job.plan, binDir: dirname(job.beforeProbe.executablePath), installDir: dirname(job.beforeProbe.executablePath) }
+    : job.plan
+  const probe = await probeToolWith(job.tool, defaultRunner, { preferences: job.preferences, plan: nativePlan, cacheMs: 0 })
   if (job.cancelRequested) { markCancelled(job); return true }
   if (latestVersion && versionStillOlder(probe.version, latestVersion)) {
     job.postInstallProbe = probe
@@ -1154,13 +1347,15 @@ async function tryClaudeUpdate(job, latestVersion) {
   return finishVerifiedInstall(job, probe)
 }
 
-async function runInstallJob(manager, args, job) {
+async function runInstallJob(installPlan, job) {
+  const { manager, args } = installPlan
   if (job.status !== 'running') return
   job.phase = 'preflight'
   await ensureNpmPrefixOnPath()
   if (job.cancelRequested) { markCancelled(job); return }
   probeCache.delete(job.tool.id)
-  const before = await probeToolWith(job.tool, defaultRunner)
+  const before = await probeToolWith(job.tool, defaultRunner, { plan: installPlan, preferences: job.preferences, cacheMs: 0 })
+  job.beforeProbe = before
   if (job.cancelRequested) { markCancelled(job); return }
   let latest = null
   let order = null
@@ -1176,7 +1371,7 @@ async function runInstallJob(manager, args, job) {
       return
     }
     if (order === 0) {
-      const readiness = await trustedExecutionReadiness(job.tool.id)
+      const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan })
       if (job.cancelRequested) { markCancelled(job); return }
       // A repair re-runs the same command even when nothing looks stale: a
       // broken install reports the right version, so "already current" is
@@ -1199,7 +1394,7 @@ async function runInstallJob(manager, args, job) {
     installed: before.installed === true,
     order,
     platform: process.platform,
-    methodId: job.methodId,
+    configured: job.configured,
   })
   let triedClaudeUpdate = false
   if (plan === 'claude-update-then-registry') {
@@ -1212,12 +1407,14 @@ async function runInstallJob(manager, args, job) {
     })
     return
   }
+  if (installPlan.binDir) await mkdir(installPlan.binDir, { recursive: true })
   job.phase = 'installing'
   const outcome = await runCapture(manager, args, {
     timeoutMs: INSTALL_TIMEOUT_MS,
     useShell: IS_WINDOWS,
     signal: job.controller.signal,
     onOutput: captureLines(job),
+    env: installEnvironment(installPlan),
   })
   if (job.status !== 'running') return
   if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
@@ -1230,7 +1427,7 @@ async function runInstallJob(manager, args, job) {
     return
   }
   if (!outcome.ok) {
-    if (IS_WINDOWS && job.tool.id === 'minimax-code') {
+    if (IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
       await runOfficialMiniMaxInstaller(job)
       return
     }
@@ -1242,19 +1439,19 @@ async function runInstallJob(manager, args, job) {
   job.phase = 'verifying'
   await ensureNpmPrefixOnPath()
   probeCache.delete(job.tool.id)
-  const probe = await probeToolWith(job.tool, defaultRunner)
+  const probe = await probeToolWith(job.tool, defaultRunner, { plan: installPlan, preferences: job.preferences, cacheMs: 0 })
   if (job.cancelRequested) { markCancelled(job); return }
   job.postInstallProbe = probe
   const latestAfter = (await latestVersions.lookup(job.tool).catch(() => null)) ?? latest
   const stillOlder = Boolean(latestAfter?.version && versionStillOlder(probe.version, latestAfter.version))
-  if (stillOlder && job.tool.id === 'claude-code' && !triedClaudeUpdate) {
+  if (stillOlder && job.tool.id === 'claude-code' && !triedClaudeUpdate && !job.configured) {
     triedClaudeUpdate = true
     const finished = await tryClaudeUpdate(job, latestAfter.version)
     if (finished || job.status !== 'running') return
     failBecauseStillOlder(job, job.postInstallProbe ?? probe, latestAfter.version)
     return
   }
-  if (stillOlder && IS_WINDOWS && job.tool.id === 'minimax-code') {
+  if (stillOlder && IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
     pushLine(job, `— npm 完成后 ${job.tool.label} 仍是 ${probe.version}，低于最新 ${latestAfter.version}；改用官方安装脚本 —`)
     await runOfficialMiniMaxInstaller(job)
     return

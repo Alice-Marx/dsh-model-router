@@ -2,7 +2,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterMainPage } from '../.dsh-plugin/client/router-main.jsx'
 import { createWorkspacePlan, routesFromModelCatalog } from '../.dsh-plugin/client/catalog.mjs'
-import { OFFICIAL_TOOLS, defaultInstallMethod, installCommandLine, installMethodsFor, toolForProvider } from '../.dsh-plugin/shared/official-tool-registry.mjs'
+import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../.dsh-plugin/shared/official-tool-registry.mjs'
+import { parseInstallPreferences, resolveInstallLocation, resolveInstallPlan, resolveUninstallPlan } from '../.dsh-plugin/shared/tool-install-preferences.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from '../.dsh-plugin/shared/model-profiles.mjs'
 import { billingOverview } from '../.dsh-plugin/shared/subscription-billing.mjs'
 import { budgetCheck } from '../.dsh-plugin/shared/run-ledger.mjs'
@@ -36,6 +37,47 @@ const profiles = [
 ]
 const ok = value => ({ ok: true, value })
 const blocked = async () => ({ ok: false, error: { message: '本地 UI 演示不会安装工具、启动终端或运行外部命令。' } })
+
+function demoInstallSummary(settings) {
+  const options = { platform: 'win32', home: 'C:/Users/demo', env: { LOCALAPPDATA: 'C:/Users/demo/AppData/Local' } }
+  const preferences = parseInstallPreferences(settings, { tools: OFFICIAL_TOOLS, ...options })
+  const command = plan => plan.kind === 'script'
+    ? `下载并核验 ${plan.scriptUrl} → ${Object.entries(plan.env ?? {}).map(([name, value]) => `${name}=${JSON.stringify(value)}`).join(' ')} ${plan.shell}${plan.installDir && plan.installArg?.length ? ` ${plan.installArg.join(' ')} "${plan.installDir}"` : ''}`
+    : `${plan.manager} ${plan.args.map(arg => /\s/.test(arg) ? JSON.stringify(arg) : arg).join(' ')}`
+  return { ...preferences, tools: OFFICIAL_TOOLS.map(tool => {
+    const methods = installMethodsFor(tool).map(method => {
+      const item = { id: method.id, label: method.label, kind: method.kind, blocked: null,
+        supportsInstallDir: method.supportsInstallDir === true }
+      try {
+        const plan = resolveInstallPlan(tool, method.id, preferences, options)
+        Object.assign(item, { command: command(plan), notices: plan.notices,
+          installDir: resolveInstallLocation(tool, method, preferences, options)?.dir ?? '' })
+      } catch (error) { item.blocked = error.message }
+      return item
+    })
+    const entry = { id: tool.id, methods, savedMethodId: preferences.methods[tool.id] ?? null,
+      methodId: null, command: null, notices: [] }
+    if (tool.manager === 'signed-windows-installer') {
+      return { ...entry, command: installCommandLine(tool), methodId: 'signed-windows-installer',
+        notices: ['请在官方安装窗口选择目录并完成安装，然后重新体检。'],
+        uninstallError: '请在系统“应用”中卸载。' }
+    }
+    try {
+      const plan = resolveInstallPlan(tool, undefined, preferences, options)
+      Object.assign(entry, { methodId: plan.methodId, command: command(plan), updateCommand: command(plan),
+        installDir: resolveInstallLocation(tool, plan.method, preferences, options)?.dir ?? '',
+        notices: plan.notices })
+      entry.updateInstallDir = entry.installDir
+      entry.updateMethodId = entry.methodId
+    } catch (error) { entry.error = entry.installError = error.message }
+    try {
+      const removal = resolveUninstallPlan(tool, undefined, preferences, options)
+      entry.methodId ??= removal.methodId
+      entry.uninstallCommand = '演示模式不执行命令'
+    } catch (error) { entry.uninstallError = error.message }
+    return entry
+  }) }
+}
 
 function createSettingsScope() {
   let snapshot = { status: 'ready', writable: true, revision: 1, value: {
@@ -153,18 +195,7 @@ function createDemoSession(scenario) {
     listOfficialTools: async () => ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, tools: structuredClone(tools),
       executionCapabilities: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, mode: 'headless', available: installed.has(tool.id) })),
       executionReadiness: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ready: tool.id !== 'gemini' && installed.has(tool.id) })),
-      install: {
-        installDir: '', registry: 'https://registry.npmjs.org/', allowScriptInstall: true, scriptUrls: {}, methods: {},
-        tools: OFFICIAL_TOOLS.map(tool => ({
-          id: tool.id,
-          methods: installMethodsFor(tool).map(method => ({ id: method.id, label: method.label, kind: method.kind, blocked: null })),
-          methodId: defaultInstallMethod(tool)?.id ?? null,
-          savedMethodId: null,
-          command: installCommandLine(tool),
-          uninstallCommand: tool.manager === 'signed-windows-installer' ? null : '演示模式不执行命令',
-          notices: [],
-        })),
-      },
+      install: demoInstallSummary(settingsScope.getSnapshot().value),
     }),
     installOfficialTool: blocked, uninstallOfficialTool: blocked, repairOfficialTool: blocked,
     cancelOfficialToolInstall: blocked,

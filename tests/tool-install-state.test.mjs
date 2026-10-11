@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  acceptedInstallJob, installClickRefusal, shouldApplyInstallStatus, toolInstallAction,
+  acceptedInstallJob, installClickRefusal, retainToolInstallDrafts, shouldApplyInstallStatus, toolInstallAction,
+  toolMaintenanceActions, validateToolInstallSetting,
 } from '../.dsh-plugin/client/tool-install-state.mjs'
 import { versionStillOlder } from '../.dsh-plugin/shared/version-order.mjs'
 
@@ -69,6 +70,37 @@ test('an update click explains a refusal instead of returning silently', () => {
   assert.match(installClickRefusal({ tool, submitting: false, running: true }), /正在安装/)
   assert.match(installClickRefusal({ tool: null }), /未知官方工具/)
   assert.match(installClickRefusal({ tool: { unsupported: true, unsupportedReason: '暂不支持' } }), /暂不支持/)
+  assert.match(installClickRefusal({ tool, pendingSettings: true }), /保存或放弃/)
+  assert.equal(installClickRefusal({ tool, installError: '当前方式仅支持 Linux' }), '当前方式仅支持 Linux')
+})
+
+test('installation drafts validate absolute directories and complete credential-free https sources', () => {
+  assert.equal(validateToolInstallSetting('toolInstallDir', 'D:/AI tools'), '')
+  assert.match(validateToolInstallSetting('toolInstallDir', 'tools'), /绝对路径/)
+  assert.match(validateToolInstallSetting('toolInstallDir', 'D:/'), /根目录/)
+  assert.equal(validateToolInstallSetting('toolNpmRegistry', ''), '')
+  assert.equal(validateToolInstallSetting('toolNpmRegistry', 'https://registry.npmmirror.com/'), '')
+  assert.match(validateToolInstallSetting('toolNpmRegistry', 'https://'), /有效网址/)
+  assert.match(validateToolInstallSetting('toolNpmRegistry', 'https://user:password@example.com'), /账号密码/)
+  assert.match(validateToolInstallSetting('toolScriptUrlsJson', '{ "unknown-tool": "https://example.com/install" }'), /官方工具 ID/)
+  assert.match(validateToolInstallSetting('toolScriptUrlsJson', '{ "stepcode": "http://example.com/install" }'), /https/)
+})
+
+test('a settings notification keeps unrelated drafts and clears only values that were saved', () => {
+  const drafts = { toolInstallDir: 'D:/AI tools', toolNpmRegistry: 'https://registry.npmmirror.com/', toolAllowScriptInstall: false }
+  assert.deepEqual(retainToolInstallDrafts(drafts, { toolInstallMethodsJson: '{"codex":"pnpm"}' }), drafts,
+    'changing another tool method must not discard typed installation settings')
+  assert.deepEqual(retainToolInstallDrafts(drafts, { toolInstallDir: 'D:/AI tools', toolAllowScriptInstall: false }),
+    { toolNpmRegistry: 'https://registry.npmmirror.com/' })
+  assert.deepEqual(retainToolInstallDrafts({ toolInstallDir: '', toolAllowScriptInstall: true }, {}), {},
+    'typing back the current defaults restores usable install controls')
+})
+
+test('turning off new script installations still allows removing an installed program', () => {
+  const actions = toolMaintenanceActions({ tool, probe: { installed: true }, probeStatus: 'ready',
+    summary: { installable: false, removable: true } })
+  assert.equal(actions.repair.disabled, true)
+  assert.equal(actions.uninstall.disabled, false)
 })
 
 test('install responses unwrap one or two envelopes, and a stale status job is ignored', () => {

@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.18.0 — 2026-10-12
+
+Stable minor under the npm latest tag. Fully quit Harness, including the tray or WebUI host process, and restart after upgrading. Existing releases remain unchanged.
+
+- Add verified vendor curl/irm channels for Kimi, Claude, Codex, MiniMax, MiMo and Grok. Gemini retains npm/pnpm, OpenCode adds its Unix script, Step uses vendor scripts, and ZCode opens its signed Windows installer. Fixed vendor paths and unsupported platform methods are explained on each row.
+- Fix MiniMax’s official Windows installer rejection: leading PowerShell `<# ... #>` help is accepted; HTML pages and missing vendor markers are still refused. Legacy MiniMax updates preserve the discovered native install root, including attested repair-release pointers.
+- Correct pnpm global package/bin/store directory options and retain MiniMax native dependency build flags. Updates probe the selected directory, never accept an unrelated newer PATH copy, and refuse known downgrades. Queued jobs keep their selected method, source and directory snapshot.
+- Make shared installation settings an explicit Save/Discard form. Pending edits, saves and summary refreshes block install actions; saved unavailable methods retain their explanation. Removal stays available when future script installations are disabled.
+- Resolve restricted execution entries from the selected installation. Claude/Codex native Windows files require publisher verification. Kimi/MiMo/Grok standalone script installations currently lack npm-file attestation and report this execution limit; npm/pnpm execution remains supported. Do not delete the Windows Codex standalone junction through generic script uninstall.
+- Vendor downloads remain size-limited, staged and marker-checked. Windows retries through the system network/proxy transport when Node cannot retrieve an installer; the downloaded response is never executed during transport.
+- Validation results are recorded in the release notes. Verification uses automated regressions, current official script downloads without execution, and the actual-component mock UI. No real vendor CLI installation or paid model request is part of release acceptance.
 
 ## 0.17.1 — 2026-10-11
 

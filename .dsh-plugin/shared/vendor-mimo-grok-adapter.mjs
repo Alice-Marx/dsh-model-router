@@ -17,11 +17,11 @@ import { createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { npmAttestor } from './npm-attestation.mjs'
 import { isReleaseVersion } from './latest-versions.mjs'
-import { readFile, realpath, stat } from 'node:fs/promises'
+import { readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { createBrotliDecompress } from 'node:zlib'
 import { homedir } from 'node:os'
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { ensureNpmPrefixOnPath } from './official-tools-runtime.mjs'
+import { ensureNpmPrefixOnPath, preferredToolDirectories } from './official-tools-runtime.mjs'
 import { usageFromEvents } from './task-executors.mjs'
 
 const TOOL_IDS = Object.freeze(['mimo-code', 'grok-build'])
@@ -50,16 +50,35 @@ function inside(parent, child) {
 
 function packagePath(modules, name) { return join(modules, ...name.split('/')) }
 
-function moduleRoots() {
-  const path = process.env.PATH ?? process.env.Path ?? ''
+/** npm prefixes and pnpm's versioned global tree share fixed package names. */
+export async function installedModuleRoots(directories, { manager = null } = {}) {
   const roots = new Set()
-  for (const raw of path.split(delimiter)) {
+  for (const raw of directories) {
     const directory = raw.trim().replace(/^"|"$/g, '')
     if (!directory) continue
-    roots.add(join(directory, 'node_modules'))
-    if (basename(directory).toLowerCase() === '.bin') roots.add(resolve(directory, '..'))
+    if (manager !== 'pnpm') {
+      roots.add(join(directory, 'node_modules'))
+      if (basename(directory).toLowerCase() === '.bin') roots.add(resolve(directory, '..'))
+      if (process.platform !== 'win32') roots.add(resolve(directory, '..', 'lib', 'node_modules'))
+    }
+    if (manager !== 'npm') {
+      if (/[\\/]global[\\/]\d+[\\/]node_modules[\\/]\.bin$/i.test(directory)) roots.add(resolve(directory, '..'))
+      const prefix = process.platform !== 'win32' && basename(directory).toLowerCase() === 'bin' ? resolve(directory, '..') : directory
+      for (const globalRoot of [join(prefix, '.pnpm', 'global'), join(prefix, 'global')]) {
+        try {
+          for (const entry of await readdir(globalRoot, { withFileTypes: true })) {
+            if (entry.isDirectory() && /^\d+$/.test(entry.name)) roots.add(join(globalRoot, entry.name, 'node_modules'))
+          }
+        } catch { /* this command directory has no pnpm global tree */ }
+      }
+    }
   }
   return [...roots]
+}
+
+function entryDirectories(toolId) {
+  const preferred = preferredToolDirectories(toolId)
+  return preferred.length ? preferred : (process.env.PATH ?? process.env.Path ?? '').split(delimiter)
 }
 
 async function manifestAt(directory, name, version = null) {
@@ -91,24 +110,29 @@ async function realFileWithin(root, candidate, workspace) {
 }
 
 async function optionalPackage(wrapper, platform, modules, workspace) {
+  const boundary = await realpath(modules).catch(() => null)
+  if (!boundary || !inside(boundary, wrapper.root) || wrapper.root === workspace || inside(workspace, wrapper.root)) return null
   // The wrapper pins its platform package to its own version.
   const version = wrapper.manifest.optionalDependencies?.[platform.package]
   if (version !== wrapper.manifest.version) return null
   const candidates = [
     packagePath(join(wrapper.root, 'node_modules'), platform.package),
+    // pnpm links an optional dependency beside the real wrapper in the
+    // virtual store, rather than inside the wrapper's own node_modules.
+    packagePath(resolve(wrapper.root, '..', '..'), platform.package),
     packagePath(modules, platform.package),
   ]
   for (const candidate of candidates) {
     const optional = await manifestAt(candidate, platform.package, version)
-    if (!optional || optional.root === workspace || inside(workspace, optional.root)) continue
+    if (!optional || !inside(boundary, optional.root) || optional.root === workspace || inside(workspace, optional.root)) continue
     return optional
   }
   return null
 }
 
-async function findMiMoExecutable(workspace, platform, attestor, problems) {
+async function findMiMoExecutable(workspace, platform, attestor, problems, modulesRoots) {
   const wrapperInfo = WRAPPERS['mimo-code']
-  for (const modules of moduleRoots()) {
+  for (const modules of modulesRoots) {
     const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name)
     if (!wrapper || String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//, '') !== wrapperInfo.bin) continue
     const optional = await optionalPackage(wrapper, platform, modules, workspace)
@@ -129,9 +153,9 @@ async function grokHome() {
   catch { return join(homedir(), '.grok') }
 }
 
-async function findGrokExecutable(workspace, platform, attestor, problems) {
+async function findGrokExecutable(workspace, platform, attestor, problems, modulesRoots) {
   const wrapperInfo = WRAPPERS['grok-build']
-  for (const modules of moduleRoots()) {
+  for (const modules of modulesRoots) {
     const wrapper = await manifestAt(packagePath(modules, wrapperInfo.name), wrapperInfo.name)
     if (!wrapper || String(wrapper.manifest.bin?.[wrapperInfo.command]).replace(/^\.\//, '') !== wrapperInfo.bin) continue
     const optional = await optionalPackage(wrapper, platform, modules, workspace)
@@ -167,7 +191,7 @@ async function findGrokExecutable(workspace, platform, attestor, problems) {
  * process runner, or an unsupported reason. The Host retains its own task,
  * workspace, model, approval, timeout, and cancellation validation.
  */
-export async function resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, task, attestor = npmAttestor }) {
+export async function resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, task, attestor = npmAttestor, directories, moduleRoots, manager = null }) {
   if (!TOOL_IDS.includes(toolId)) return { unsupported: '未知的 MiMo/Grok 官方工具 ID。' }
   if (process.platform !== 'win32') return { unsupported: 'MiMo/Grok 原生入口目前仅完成 Windows 适配。' }
   if (!isAbsolute(workspace) || !['read-only', 'workspace-write'].includes(mode)) {
@@ -181,12 +205,13 @@ export async function resolveMiMoGrokLaunch({ toolId, workspace, mode, modelId, 
   }
   const platform = PLATFORMS[toolId][process.arch]
   if (!platform) return { unsupported: '当前 Windows CPU 架构没有核验的官方原生程序。' }
-  await ensureNpmPrefixOnPath()
+  if (!Array.isArray(moduleRoots) && !directories && preferredToolDirectories(toolId).length === 0) await ensureNpmPrefixOnPath()
   const directory = await realpath(workspace)
+  const modulesRoots = Array.isArray(moduleRoots) ? moduleRoots : await installedModuleRoots(directories ?? entryDirectories(toolId), { manager })
   const problems = []
   const found = toolId === 'mimo-code'
-    ? await findMiMoExecutable(directory, platform, attestor, problems)
-    : await findGrokExecutable(directory, platform, attestor, problems)
+    ? await findMiMoExecutable(directory, platform, attestor, problems, modulesRoots)
+    : await findGrokExecutable(directory, platform, attestor, problems, modulesRoots)
   if (!found) {
     return { unsupported: problems.length
       ? `官方原生程序未通过 npm registry 摘要核验：${problems[0]}`

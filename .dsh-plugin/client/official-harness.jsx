@@ -332,13 +332,13 @@ export function RouterSettingsCard(props) {
       <div style={styles.profileEditor}>
         <span style={styles.profileLabel}>官方工具统一安装设置</span>
         <p style={styles.noticeText}>
-          对所有官方工具的一键安装、修复和卸载生效。工作台的“官方工具”页也能改同样的字段，并会实时显示每个工具将要执行的命令。
+          用于官方工具的安装与更新。工作台的“官方工具”页也能保存同样的字段，并会显示每个工具的实际安装方式、目录与执行命令。
           安装命令始终来自固定注册表，这里只决定目录与下载源，不接受自定义包名或任意地址。
         </p>
         <SettingsValueField
           id="model-router-tool-install-dir"
           label="统一安装目录"
-          hint="留空表示使用各厂商默认位置。npm 与 pnpm 会带上 --prefix；支持目录的官方脚本会把这个路径传给厂商自己的安装目录变量（例如 MCODE_INSTALL_DIR）。写死路径的脚本会在工具行标明实际落点。必须是绝对路径。更新使用同一路径。"
+          hint="填写绝对路径，留空使用厂商默认位置。npm / pnpm 使用该目录安装；厂商脚本不支持自定义目录时，官方工具页会显示实际目录与原因。更新使用同一安装方式、目录与下载源。"
           disabled={disabled}
           {...state.toolInstallDir}
           overriddenLabel={FIELD_COPY.overridden}
@@ -362,7 +362,7 @@ export function RouterSettingsCard(props) {
         <SettingsValueField
           id="model-router-tool-install-methods"
           label="默认安装方式（JSON，可选）"
-          hint="按工具 ID 固定一种安装方式，例如固定 Step Code 在 Windows 上用 irm | iex。留空表示使用该工具的默认方式。可选值：npm、pnpm、script-bash（curl | bash）、script-powershell（irm | iex）。"
+          hint="按工具 ID 固定一种安装方式，例如固定 Step Code 在 Windows 上用 irm | iex。留空自动选择适合本机的方式。可选值以工具下拉框为准：npm、pnpm、script-bash（curl | bash）、script-sh（curl | sh）、script-powershell（irm | iex）。"
           disabled={disabled}
           {...state.toolInstallMethodsJson}
           overriddenLabel={FIELD_COPY.overridden}

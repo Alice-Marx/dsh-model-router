@@ -1437,7 +1437,7 @@ export function apply(ctx, config = {}) {
   // live in volatile config, so re-apply picks up whatever the user last saved.
   // A malformed value is reported here rather than at the first click.
   let installPreferenceError = null
-  try { setInstallPreferences(parseInstallPreferences(config, { tools: OFFICIAL_TOOLS })) }
+  try { setInstallPreferences(parseInstallPreferences(config, { tools: OFFICIAL_TOOLS, ...currentInstallOptions() })) }
   catch (error) { installPreferenceError = errorText(error) }
   // The official Host injects typert; direct lightweight uses of apply may
   // supply only the model/command services and do not expose the Desktop RPC.
