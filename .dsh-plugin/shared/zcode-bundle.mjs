@@ -46,6 +46,14 @@ function powershellPath(env) {
   return join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 }
 
+/** PowerShell 7's module path can prevent Windows PowerShell 5.1 loading Security. */
+export function zcodeWindowsPowerShellEnvironment(env = process.env) {
+  return {
+    ...env,
+    PSModulePath: join(env.SystemRoot || env.windir || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'Modules'),
+  }
+}
+
 async function powershellJson(script, env, extraEnv = {}) {
   if (process.platform !== 'win32') return null
   const command = Buffer.from(
@@ -62,7 +70,7 @@ async function powershellJson(script, env, extraEnv = {}) {
       encoding: 'utf8',
       timeout: 10_000,
       maxBuffer: 256_000,
-      env: { ...env, ...extraEnv },
+      env: { ...zcodeWindowsPowerShellEnvironment(env), ...extraEnv },
     })
     const output = stdout.trim().replace(/^\uFEFF/, '')
     return output ? JSON.parse(output) : null
@@ -94,13 +102,21 @@ function rootFromCommand(value) {
   return executable && win32.isAbsolute(executable) ? dirname(executable) : null
 }
 
-function candidateRoots(env, records) {
+/** Explicit selection is authoritative, even when the selected bundle is missing. */
+export function zcodeDiscoveryCandidates({ installDir = '', env = process.env, records = [] } = {}) {
   const candidates = []
   const add = (path, source, registryVersion = null) => {
     if (typeof path !== 'string' || !path.trim()) return
     candidates.push({ path: path.trim().replace(/^"|"$/g, ''), source, registryVersion })
   }
-  add(env[ZCODE_INSTALL_ENV_VAR], 'operator-env')
+  if (installDir != null && String(installDir).trim()) {
+    add(installDir, 'operator-config')
+    return candidates
+  }
+  if (env[ZCODE_INSTALL_ENV_VAR] != null && String(env[ZCODE_INSTALL_ENV_VAR]).trim()) {
+    add(env[ZCODE_INSTALL_ENV_VAR], 'operator-env')
+    return candidates
+  }
   for (const record of records) {
     const version = String(record.displayVersion || '') || null
     add(record.installLocation, 'uninstall-registry', version)
@@ -204,7 +220,7 @@ async function checkedBundle(candidate, env, trustPath) {
   const input = candidate.path
   if (!localWindowsPath(input)) return null
   try {
-    const initial = input.toLowerCase().endsWith('\\zcode.exe') ? dirname(input) : input
+    const initial = /[\\/]zcode\.exe$/i.test(input) ? dirname(input) : input
     const root = await realpath(initial)
     if (!localWindowsPath(root) || !(await stat(root)).isDirectory()) return null
     const executable = await realpath(join(root, 'ZCode.exe'))
@@ -239,18 +255,23 @@ async function checkedBundle(candidate, env, trustPath) {
   }
 }
 
-/** Return the first verified local bundle (any version), or null when none is usable. */
-export async function discoverZCodeBundle({ env = process.env, trustPath = zcodeTrustPath(env), onRejected } = {}) {
+/** A configured desktop location never falls back to a different installation. */
+export async function discoverZCodeBundle({ installDir = '', env = process.env, trustPath = zcodeTrustPath(env), onRejected } = {}) {
   if (process.platform !== 'win32') return null
-  const records = await uninstallRecords(env)
+  const explicit = Boolean(String(installDir || env[ZCODE_INSTALL_ENV_VAR] || '').trim())
+  const records = explicit ? [] : await uninstallRecords(env)
   const seen = new Set()
-  for (const candidate of candidateRoots(env, records)) {
+  for (const candidate of zcodeDiscoveryCandidates({ installDir, env, records })) {
     const key = win32.normalize(candidate.path).toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
     const bundle = await checkedBundle(candidate, env, trustPath)
     if (bundle?.rejected) { onRejected?.(bundle); continue }
     if (bundle) return bundle
+    if (explicit) onRejected?.({
+      root: candidate.path,
+      rejected: `指定的 ZCode 安装位置 ${candidate.path} 不存在，或未通过官方签名、桌面内置 CLI 和目录边界核验；请检查独立安装位置。`,
+    })
   }
   return null
 }

@@ -114,6 +114,20 @@ test('Host summaries preserve the saved home path separately from its resolved d
   assert.match(summary.installDir.replaceAll('\\', '/'), /\/AI\/tools$/)
 })
 
+test('ZCode desktop directory applies live independently of the unified package directory', async t => {
+  const { save, remote } = await mountedRouter(t, { toolInstallDir: 'D:/AI/tools' })
+  await save({ zcodeInstallDir: 'D:/Program Files/ZCode' })
+  assert.equal(installPreferences().installDir, 'D:/AI/tools')
+  assert.equal(installPreferences().zcodeInstallDir, 'D:/Program Files/ZCode')
+  const summary = remote.installSettings().install
+  assert.equal(summary.zcodeInstallDir, 'D:/Program Files/ZCode')
+  assert.equal(summary.tools.find(tool => tool.id === 'zcode').installDir, summary.zcodeInstallDir)
+  assert.match(summary.tools.find(tool => tool.id === 'zcode').notices[0], /TUI.*ZCode/)
+  await save({ zcodeInstallDir: '' })
+  assert.equal(installPreferences().zcodeInstallDir, '')
+  assert.equal(installPreferences().installDir, 'D:/AI/tools')
+})
+
 test('invalid live settings keep verified preferences and block all install command surfaces', async t => {
   const { save, remote, commands, tools } = await mountedRouter(t, {
     toolInstallMethodsJson: '{"codex":"pnpm"}',

@@ -1,8 +1,10 @@
 # Model Router · DeepSeek Harness 模型路由插件
 
-版本：**0.18.2**。选模求解器概览见[路由研究说明](docs/ROUTING_RESEARCH.zh.md)；公式、条件证明与实验见[数学推导与实验记录](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)。[LiveBench 最新证据与验证协议](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)已核查 2026-06-25 聚合评分/费用；最新逐题质量—费用矩阵尚未取得，不声称真实路由收益。
+版本：**0.19.0**。选模求解器概览见[路由研究说明](docs/ROUTING_RESEARCH.zh.md)；公式、条件证明与实验见[数学推导与实验记录](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)。[LiveBench 最新证据与验证协议](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)已核查 2026-06-25 聚合评分/费用；最新逐题质量—费用矩阵尚未取得，不声称真实路由收益。
 
 为 **DeepSeek Harness Desktop** 提供任务规划、成本感知的模型分配和官方工具执行工作台。输入任务，比较已配置模型，审阅计划，再明确选择是否执行。
+
+**0.19.0**：官方工具终端同步完整注册表与保存的安装目录，补齐 OpenCode、Step 和 ZCode 内置 TUI。ZCode 可单独保存桌面目录、检查更新和重新安装；内置 CLI 随桌面版更新。终端刷新重新发现工具并丢弃迟到结果。
 
 **0.18.2**：厂商脚本使用统一根目录下的工具专属子目录，修复 Step 安装替换其他 npm 工具包的问题。Gemini/OpenCode 安装成功与受限执行能力分别显示；Windows Gemini 使用核验后的包入口通过 Node 启动。先升级并重启 Harness，再更新 Step。
 
@@ -20,7 +22,7 @@
 
 **0.16.0 新增**：[动态数据与持续反馈](docs/ROUTING_ADAPTIVE_LEARNING.zh.md)：可选公开价格/LiveBench快照刷新；按任务类型、时间衰减和低样本收缩调整个人偏好，质量门槛独立保留。设置在“预算与安全”，公开源默认关闭；价格源需提供按官方文档核对的固定USD单价JSON，不是通用官网抓价器。本地DSH_HOME共享、最近200运行窗口，暂无真实收益证明。
 
-当前版本为 **0.18.2**，包名为 `@ljwei-stak/dsh-model-router`；声明兼容的宿主为 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**。自 0.12.0 起，路由与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 已拆成两个独立插件。
+当前版本为 **0.19.0**，包名为 `@ljwei-stak/dsh-model-router`；声明兼容的宿主为 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**。自 0.12.0 起，路由与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 已拆成两个独立插件。
 
 **0.15.0 更新**：工作台分为四页，路由建议紧接任务规划展示；执行输入变化时丢弃旧预览；裁剪历史或重试后仍保留费用累计；源码开发新增独立模拟 UI 预览。
 
@@ -38,7 +40,7 @@
 | 只读执行 | 工作台先预览、再确认执行；也可在官方会话调用工具。支持的无界面 CLI 或模型目录 API 返回结果并留存记录。 |
 | 可编辑执行 | 通过官方会话启动单个 CLI 或顺序 CLI 团队，经审批在独立 Git 工作树修改，满足条件后整合补丁。 |
 | 官方工具 | 十个固定注册表工具的检测、安装/更新、可信入口与登录体检；安装有日志和取消操作。 |
-| 交互终端 | 系统终端/PowerShell 与七个 CLI，含固定登录命令、多会话和实时输出。 |
+| 交互终端 | 系统终端/PowerShell 与十个注册表 CLI（ZCode TUI 使用已核验的 Windows 桌面安装），含固定登录命令、多会话和实时输出。 |
 | 成本与订阅 | 每日/月度预算检查、自动尝试省钱方案或暂停、订阅优先、额度冷却，以及其他订阅失败的确认流程。 |
 | 执行与质量记录 | 逐工作包结果、依赖图、失败详情、重跑/改派、用户评价与可选强模型复核。 |
 | 执行边界 | 显示每条路线可读/可写范围，以及是否经过 Harness 进程沙箱。 |
@@ -52,7 +54,7 @@
 打开 **插件 → 添加插件**，填写：
 
 ```text
-@ljwei-stak/dsh-model-router@0.18.2
+@ljwei-stak/dsh-model-router@0.19.0
 ```
 
 镜像缺少该精确版本时使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。安装并启用后，完全退出 Harness（包括托盘进程）再启动。插件详情应显示 **0.18.2**，侧栏出现**模型路由**。仅运行全局 `npm install -g` 不会把插件注册到桌面版 profile。
@@ -61,7 +63,7 @@
 
 ### 从旧包名升级
 
-`@ljwei-stak/model-router-galgame` 的最后版本为 0.13.0。保留 profile 与应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.18.2`。不要同时安装两个包：它们共用内部插件 id `model-router-galgame` 与工具名；id 保留使已有路由设置和执行历史能够延续。
+`@ljwei-stak/model-router-galgame` 的最后版本为 0.13.0。保留 profile 与应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.19.0`。不要同时安装两个包：它们共用内部插件 id `model-router-galgame` 与工具名；id 保留使已有路由设置和执行历史能够延续。
 
 从 0.11.x 合并版迁移时，先备份 profile 并导出希望保留的 GAL 进度。剧情、立绘、音乐、自由模式和存档属于独立 `@ljwei-stak/dsh-galgame` 插件。导出范围及同 profile 迁移的限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 

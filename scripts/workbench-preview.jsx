@@ -59,7 +59,8 @@ function demoInstallSummary(settings) {
       methodId: null, command: null, notices: [] }
     if (tool.manager === 'signed-windows-installer') {
       return { ...entry, command: installCommandLine(tool), methodId: 'signed-windows-installer',
-        notices: ['请在官方安装窗口选择目录并完成安装，然后重新体检。'],
+        installDir: preferences.zcodeInstallDir,
+        notices: ['桌面目录独立配置；内置 CLI 随桌面版更新，TUI 中自行配置登录、模型与插件。'],
         uninstallError: '请在系统“应用”中卸载。' }
     }
     try {
@@ -90,7 +91,7 @@ function createSettingsScope() {
     // The demo mirrors the real install settings so the panel renders exactly
     // as it does against a real Host, which always sends them in config.
     toolInstallDir: '', toolNpmRegistry: 'https://registry.npmjs.org/',
-    toolInstallMethodsJson: '{}', toolScriptUrlsJson: '{}', toolAllowScriptInstall: true,
+    toolInstallMethodsJson: '{}', toolScriptUrlsJson: '{}', toolAllowScriptInstall: true, zcodeInstallDir: '',
   } }
   const listeners = new Set()
   return {
@@ -138,7 +139,7 @@ function createDemoSession(scenario) {
   let toolInspections = 0
   let runs = scenario === 'empty' ? [] : sampleRuns()
   let completedAt = scenario === 'onboarding' ? null : Date.now()
-  const installed = new Set(['claude-code', 'codex', 'gemini'])
+  const installed = new Set(scenario === 'terminal-all' ? OFFICIAL_TOOLS.map(tool => tool.id) : ['claude-code', 'codex', 'gemini'])
   const source = () => scenario === 'empty' ? { groups: [], routableProviders: [], failures: [] } : catalog
   const routes = () => applyModelProfiles(routesFromModelCatalog(source()), parseModelProfilesJson(settingsScope.getSnapshot().value.modelProfilesJson))
   const tools = OFFICIAL_TOOLS.map(tool => ({
@@ -192,6 +193,10 @@ function createDemoSession(scenario) {
   }
   return {
     settingsScope,
+    terminalApi: {
+      terminalInfo: async () => ok({ backend: 'pty', platform: 'win32', tools: structuredClone(tools), limits: { maxSessions: 4 }, history: [] }),
+      terminalStart: blocked, terminalRead: blocked, terminalWrite: blocked, terminalResize: blocked, terminalStop: blocked,
+    },
     loadOfficialInstallSettings: async () => ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, install: demoInstallSummary(settingsScope.getSnapshot().value) }),
     loadCatalog: async () => scenario === 'error' ? { ok: false, error: { message: '演示：模型目录暂时不可用。可切回“完整示例”检查正常布局。' } } : ok(source()),
     listOfficialTools: async () => {
@@ -255,7 +260,7 @@ function createDemoSession(scenario) {
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）']]
+const scenarios = [['populated', '完整示例'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')

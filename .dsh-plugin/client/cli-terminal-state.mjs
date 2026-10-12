@@ -11,6 +11,7 @@ import {
   isAbsoluteDirectoryText,
   isTerminalSessionId,
   terminalCommandPreview,
+  terminalCanLogin,
   terminalTargetLabel,
 } from '../shared/cli-terminal-protocol.mjs'
 
@@ -30,7 +31,9 @@ export function terminalTargets(healthTools = [], platform = 'win32') {
   const installed = new Set((Array.isArray(healthTools) ? healthTools : []).filter(item => item?.installed).map(item => item.id))
   return [
     { id: TERMINAL_SHELL_ID, label: platform === 'win32' ? 'PowerShell（系统终端）' : 'Shell（系统终端）', canLogin: false },
-    ...TERMINAL_TOOL_IDS.filter(id => installed.has(id)).map(id => ({ id, label: terminalTargetLabel(id), canLogin: id !== 'gemini' })),
+    ...TERMINAL_TOOL_IDS.filter(id => installed.has(id)).map(id => ({ id,
+      label: id === 'zcode' ? `${terminalTargetLabel(id)}（桌面版内置 TUI）` : terminalTargetLabel(id),
+      canLogin: terminalCanLogin(id) })),
   ]
 }
 
@@ -104,6 +107,27 @@ export async function loadTerminalInfo(api) {
   const info = unwrap(await api.terminalInfo(), '无法读取终端状态。')
   if (!info || typeof info !== 'object' || !['pty', 'pipe'].includes(info.backend)) throw new Error('终端状态格式无效。')
   return info
+}
+
+/** An older refresh must not overwrite the result for a newer settings scope. */
+export class TerminalInfoRefresher {
+  constructor() { this.generation = 0 }
+  invalidate() { this.generation += 1 }
+  async load(api) {
+    const generation = ++this.generation
+    try {
+      const value = await loadTerminalInfo(api)
+      return generation === this.generation ? { status: 'ready', value, error: '' } : null
+    } catch (error) {
+      return generation === this.generation
+        ? { status: 'error', value: null, error: remoteErrorText(text(error?.message), '无法读取终端状态。') } : null
+    }
+  }
+}
+
+/** Current Host discovery wins over the other card's cached health projection. */
+export function terminalInfoTools(info, healthTools = []) {
+  return Array.isArray(info?.tools) ? info.tools : Array.isArray(healthTools) ? healthTools : []
 }
 
 /** Start one confirmed session; returns the Host's session summary. */

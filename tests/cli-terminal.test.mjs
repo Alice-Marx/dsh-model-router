@@ -4,7 +4,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { EventEmitter } from 'node:events'
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { strictCtx } from './helpers/strict-ctx.mjs'
@@ -23,6 +24,7 @@ import {
 import {
   PIPE_LIMITATION,
   createTerminalManager,
+  findTerminalPackageEntry,
   loadPtyModule,
   pickWindowsExecutable,
   resolveTerminalLaunch,
@@ -32,12 +34,15 @@ import {
 import { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS } from '../.dsh-plugin/shared/official-tools-remote.mjs'
 import {
   TerminalConnection,
+  TerminalInfoRefresher,
   confirmationDetails,
   endDescription,
   startProblem,
   terminalTargets,
+  terminalInfoTools,
 } from '../.dsh-plugin/client/cli-terminal-state.mjs'
 import { LOGIN_GUIDES } from '../.dsh-plugin/shared/tool-health.mjs'
+import { OFFICIAL_TOOLS, getOfficialTool } from '../.dsh-plugin/shared/official-tool-registry.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-terminal-'))
 const host = await import('../.dsh-plugin/index.mjs')
@@ -50,7 +55,8 @@ test('terminal start request: fixed targets only, absolute cwd, explicit confirm
   assert.throws(() => parseTerminalStart(startRequest({ confirmed: false })), /confirmation/)
   assert.throws(() => parseTerminalStart(startRequest({ confirmed: 'yes' })), /confirmation/)
   assert.throws(() => parseTerminalStart(startRequest({ target: 'cmd.exe' })), /target/)
-  assert.throws(() => parseTerminalStart(startRequest({ target: 'zcode' })), /target/, 'ZCode is a desktop app')
+  for (const target of ['opencode', 'stepcode', 'zcode']) assert.equal(parseTerminalStart(startRequest({ target })).target, target)
+  assert.throws(() => parseTerminalStart(startRequest({ target: 'zcode', mode: 'login' })), /no login mode/)
   assert.throws(() => parseTerminalStart(startRequest({ cwd: 'relative/dir' })), /absolute/)
   assert.throws(() => parseTerminalStart(startRequest({ mode: 'login' })), /no login mode/)
   assert.throws(() => parseTerminalStart(startRequest({ cols: 5000 })), /cols/)
@@ -87,7 +93,7 @@ test('terminal remote descriptors validate with the same parsers', () => {
 
 test('login commands match the documented tool login guides', () => {
   for (const id of TERMINAL_TOOL_IDS) {
-    const documented = LOGIN_GUIDES[id].command.split(' ')
+    const documented = (LOGIN_GUIDES[id].command ?? '').split(' ')
     assert.deepEqual([...TERMINAL_LOGIN_ARGS[id]], documented.slice(1), id)
   }
   assert.equal(terminalCommandPreview('codex', 'login'), 'codex login')
@@ -100,18 +106,18 @@ test('Windows launch: native exe first, npm .cmd shims through cmd.exe, ps1 last
   assert.equal(pickWindowsExecutable(['D:\\a\\codex.cmd', 'D:\\b\\codex.exe']), 'D:\\b\\codex.exe')
   assert.equal(pickWindowsExecutable(['D:\\a\\codex']), null)
   const env = { ComSpec: 'C:\\Windows\\system32\\cmd.exe', SystemRoot: 'C:\\Windows' }
-  const exe = await resolveTerminalLaunch('codex', 'login', { platform: 'win32', env, locate: async () => ['D:\\Program Files\\codexcli\\codex.exe'] })
+  const exe = await resolveTerminalLaunch('codex', 'login', { platform: 'win32', env, fileExists: async () => false, locate: async () => ['D:\\Program Files\\codexcli\\codex.exe'] })
   assert.deepEqual(exe, { file: 'D:\\Program Files\\codexcli\\codex.exe', args: ['login'], verbatim: false, display: 'codex login' })
-  const shim = await resolveTerminalLaunch('claude-code', 'login', { platform: 'win32', env, locate: async () => ['D:\\Program Files\\Claude\\claude.ps1', 'D:\\Program Files\\Claude\\claude.cmd'] })
+  const shim = await resolveTerminalLaunch('claude-code', 'login', { platform: 'win32', env, fileExists: async () => false, locate: async () => ['D:\\Program Files\\Claude\\claude.ps1', 'D:\\Program Files\\Claude\\claude.cmd'] })
   assert.equal(shim.file, 'C:\\Windows\\system32\\cmd.exe')
   assert.equal(shim.verbatim, true)
   assert.equal(shim.args, '/d /s /c ""D:\\Program Files\\Claude\\claude.cmd" auth login"')
-  const ps1 = await resolveTerminalLaunch('minimax-code', 'interactive', { platform: 'win32', env, locate: async () => ['D:\\mm\\mcode.ps1'] })
+  const ps1 = await resolveTerminalLaunch('minimax-code', 'interactive', { platform: 'win32', env, fileExists: async () => false, locate: async () => ['D:\\mm\\mcode.ps1'] })
   assert.deepEqual(ps1.args, ['-NoLogo', '-NoProfile', '-File', 'D:\\mm\\mcode.ps1'])
   const shell = await resolveTerminalLaunch('shell', 'interactive', { platform: 'win32', env, locate: async () => { throw new Error('not used') } })
   assert.equal(shell.file, 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
   await assert.rejects(resolveTerminalLaunch('grok-build', 'interactive', { platform: 'win32', env, locate: async () => [] }), /未在 PATH 中找到 grok/)
-  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { platform: 'win32', env, locate: async () => [] }), /固定注册表/)
+  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { platform: 'win32', env, discoverBundle: async () => null }), /通过智谱签名/)
 })
 
 test('POSIX launch uses the absolute path which printed and the login shell', async () => {
@@ -122,6 +128,82 @@ test('POSIX launch uses the absolute path which printed and the login shell', as
   assert.equal(shell.file, '/bin/zsh')
 })
 
+test('terminal targets follow every installed registry tool, including Step, OpenCode and desktop ZCode TUI', () => {
+  const tools = OFFICIAL_TOOLS.map(tool => ({ id: tool.id, installed: true }))
+  assert.deepEqual(terminalTargets(tools).map(item => item.id), ['shell', ...TERMINAL_TOOL_IDS])
+  assert.equal(terminalTargets(tools).find(item => item.id === 'stepcode').canLogin, true)
+  assert.equal(terminalTargets(tools).find(item => item.id === 'opencode').canLogin, true)
+  assert.equal(terminalTargets(tools).find(item => item.id === 'zcode').canLogin, false)
+  assert.match(terminalCommandPreview('zcode'), /桌面版内置 TUI/)
+})
+
+test('configured npm and pnpm terminal launches use their actual package entries instead of a stale shared shim', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'router-terminal-entry-'))
+  const tool = getOfficialTool('gemini')
+  const npmRoot = join(root, 'node_modules', '@google', 'gemini-cli')
+  const pnpmRoot = join(root, '.pnpm', 'global', '5', 'node_modules', '@google', 'gemini-cli')
+  for (const [directory, version] of [[npmRoot, '0.63.0'], [pnpmRoot, '0.64.0']]) {
+    await mkdir(join(directory, 'bundle'), { recursive: true })
+    await writeFile(join(directory, 'package.json'), JSON.stringify({ name: tool.package, version, bin: { gemini: './bundle/gemini.js' } }))
+    await writeFile(join(directory, 'bundle', 'gemini.js'), '// fixture only\n')
+  }
+  await writeFile(join(root, 'gemini.cmd'), '@echo stale pnpm shim')
+  const common = { platform: 'win32', env: {}, preferences: { installDir: root, methods: { gemini: 'npm' } },
+    locate: async () => { throw new Error('configured launch must never consult PATH') }, findNode: async () => process.execPath }
+  const npm = await resolveTerminalLaunch('gemini', 'interactive', common)
+  assert.equal(npm.file, process.execPath)
+  assert.deepEqual(npm.args, [join(npmRoot, 'bundle', 'gemini.js')])
+  const pnpm = await resolveTerminalLaunch('gemini', 'interactive', { ...common,
+    preferences: { installDir: root, methods: { gemini: 'pnpm' } } })
+  assert.deepEqual(pnpm.args, [join(pnpmRoot, 'bundle', 'gemini.js')])
+  await assert.rejects(resolveTerminalLaunch('claude-code', 'interactive', common), /真实命令入口/,
+    'a different PATH copy cannot satisfy a missing selected package')
+})
+
+test('terminal selected package metadata and bin cannot escape the configured installation tree', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'router-terminal-boundary-'))
+  const outside = mkdtempSync(join(tmpdir(), 'router-terminal-outside-'))
+  const tool = getOfficialTool('gemini')
+  await mkdir(join(root, 'node_modules', '@google'), { recursive: true })
+  await mkdir(join(outside, 'bundle'), { recursive: true })
+  await writeFile(join(outside, 'package.json'), JSON.stringify({ name: tool.package, version: '0.63.0', bin: { gemini: 'bundle/gemini.js' } }))
+  await writeFile(join(outside, 'bundle', 'gemini.js'), '// outside fixture\n')
+  await symlink(outside, join(root, 'node_modules', '@google', 'gemini-cli'), process.platform === 'win32' ? 'junction' : 'dir')
+  assert.equal(await findTerminalPackageEntry(tool, { installDir: root, manager: 'npm' }, { platform: 'win32' }), null)
+})
+
+test('Step terminal resolves its private install directory and refuses an old shared PATH copy', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'router-terminal-step-'))
+  await mkdir(join(root, 'stepcode'), { recursive: true })
+  await writeFile(join(root, 'stepcode', 'step.exe'), 'fixture')
+  const options = { platform: 'win32', env: {}, preferences: { installDir: root, methods: { stepcode: 'script-powershell' } },
+    locate: async () => { throw new Error('must use private directory') } }
+  const launch = await resolveTerminalLaunch('stepcode', 'login', options)
+  assert.equal(launch.file, join(root, 'stepcode', 'step.exe'))
+  assert.deepEqual(launch.args, ['login'])
+  await assert.rejects(resolveTerminalLaunch('stepcode', 'interactive', { ...options,
+    fileExists: async () => false, locate: async () => [join(root, 'step.exe')] }), /所选安装目录/)
+})
+
+test('ZCode terminal verifies the configured desktop bundle and can use its bundled Electron runtime', async () => {
+  const bundle = { root: 'D:/Program Files/ZCode', executable: 'D:/Program Files/ZCode/ZCode.exe', cliEntry: 'D:/Program Files/ZCode/resources/glm/zcode.cjs' }
+  const env = { PATH: 'test', ZAI_API_KEY: 'fixture' }
+  const preferences = { zcodeInstallDir: bundle.root }
+  let discovery
+  const options = { platform: 'win32', cwd: CWD, env, preferences,
+    locate: async () => { throw new Error('ZCode PATH shim must not be trusted') },
+    discoverBundle: async request => { discovery = request; return bundle }, findNode: async () => 'D:/node/node.exe' }
+  const node = await resolveTerminalLaunch('zcode', 'interactive', options)
+  assert.deepEqual(discovery, { installDir: bundle.root, env })
+  assert.equal(node.file, 'D:/node/node.exe')
+  assert.deepEqual(node.args, [bundle.cliEntry])
+  assert.equal(node.env, undefined)
+  const electron = await resolveTerminalLaunch('zcode', 'interactive', { ...options, findNode: async () => null })
+  assert.equal(electron.file, bundle.executable)
+  assert.deepEqual(electron.env, { ELECTRON_RUN_AS_NODE: '1' })
+  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { ...options, discoverBundle: async () => null }), /通过智谱签名/)
+})
+
 test('terminal environment is the login environment minus ELECTRON_RUN_AS_NODE', () => {
   const env = terminalEnvironment({ PATH: '/bin', OPENAI_API_KEY: 'sk-test', HTTPS_PROXY: 'http://proxy', ELECTRON_RUN_AS_NODE: '1', electron_run_as_node: '1' })
   assert.equal(env.PATH, '/bin')
@@ -129,6 +211,20 @@ test('terminal environment is the login environment minus ELECTRON_RUN_AS_NODE',
   assert.equal(env.HTTPS_PROXY, 'http://proxy')
   assert.equal('ELECTRON_RUN_AS_NODE' in env || 'electron_run_as_node' in env, false)
   assert.equal(env.TERM, 'xterm-256color')
+})
+
+test('Windows pipe fallback preserves a cmd shim command line in node spawn argument array', () => {
+  const child = new EventEmitter()
+  child.stdout = new EventEmitter()
+  child.stderr = new EventEmitter()
+  child.stdin = { write() {} }
+  let request
+  spawnPipeProcess({ file: 'C:/Windows/System32/cmd.exe', args: '/d /s /c ""D:/Tools Space/mcode.cmd" login"', verbatim: true }, {
+    platform: 'win32', cwd: CWD, env: {}, spawnImpl: (...args) => { request = args; return child },
+  })
+  assert.deepEqual(request[1], ['/d /s /c ""D:/Tools Space/mcode.cmd" login"'])
+  assert.equal(request[2].windowsVerbatimArguments, true)
+  assert.equal(request[2].shell, false)
 })
 
 /** A scriptable stand-in for @lydell/node-pty. */
@@ -169,6 +265,23 @@ function managerWith({ pty = fakePty(), ptyOk = true, clock = { now: 1_000 }, en
   })
   return { manager, pty, clock, ended }
 }
+
+test('terminal manager reads current preferences after prepare and merges only fixed launch environment', async () => {
+  const selections = []
+  let preferences = { installDir: 'D:/AI/tools' }
+  const { manager, pty } = managerWith({
+    prepare: async () => { preferences = { installDir: 'D:/AI/new-tools' } },
+    preferences: () => preferences, launchOptions: () => ({ home: 'C:/Users/test' }),
+    resolveLaunch: async (target, mode, options) => { selections.push(options); return { file: '/signed/ZCode.exe', args: ['/verified/zcode.cjs'], display: 'ZCode TUI', env: { ELECTRON_RUN_AS_NODE: '1' } } },
+  })
+  await manager.start(startRequest({ target: 'zcode' }))
+  assert.deepEqual(selections[0].preferences, { installDir: 'D:/AI/new-tools' })
+  assert.equal(selections[0].home, 'C:/Users/test')
+  assert.equal(selections[0].cwd, CWD)
+  assert.equal(pty.spawned[0].options.env.ELECTRON_RUN_AS_NODE, '1')
+  assert.equal(pty.spawned[0].options.env.SECRET_TOKEN, 'abc')
+  manager.disposeAll()
+})
 
 test('manager: PTY session streams output by cursor, forwards input and resize, records metadata only', async () => {
   const { manager, pty, ended } = managerWith()
@@ -355,7 +468,7 @@ test('apply registers the terminal manager under the plugin fiber and disposes i
 
 test('client: launch choices come from the health check; confirmation states the sandbox boundary', () => {
   const targets = terminalTargets([{ id: 'codex', installed: true }, { id: 'claude-code', installed: false }, { id: 'zcode', installed: true }, { id: 'gemini', installed: true }], 'win32')
-  assert.deepEqual(targets.map(item => item.id), ['shell', 'codex', 'gemini'])
+  assert.deepEqual(targets.map(item => item.id), ['shell', ...OFFICIAL_TOOLS.filter(item => ['codex', 'gemini', 'zcode'].includes(item.id)).map(item => item.id)])
   assert.equal(targets.find(item => item.id === 'gemini').canLogin, false)
   assert.equal(startProblem({ target: 'codex', cwd: 'demo', targets }), '工作目录必须是绝对路径，例如 D:\\projects\\demo 或 /home/me/project。')
   assert.equal(startProblem({ target: 'claude-code', cwd: 'D:\\x', targets }), '请选择要启动的终端。')
@@ -366,6 +479,25 @@ test('client: launch choices come from the health check; confirmation states the
   assert.match(details.points.join('\n'), /自己的 CLI 登录/)
   assert.match(details.points.join('\n'), /不会被记录/)
   assert.match(endDescription({ endReason: 'exit', exitCode: 2 }), /退出码 2/)
+})
+
+test('terminal refresh ignores an earlier directory response arriving after a newer refresh', async () => {
+  const refresher = new TerminalInfoRefresher()
+  let resolveEarlier
+  const earlier = refresher.load({ terminalInfo: () => new Promise(resolve => { resolveEarlier = resolve }) })
+  const currentTools = [{ id: 'zcode', installed: true }, { id: 'stepcode', installed: true }]
+  const newer = await refresher.load({ terminalInfo: async () => ({ ok: true, value: { backend: 'pty', tools: currentTools } }) })
+  resolveEarlier({ ok: true, value: { backend: 'pty', tools: [{ id: 'codex', installed: true }] } })
+  assert.equal(await earlier, null)
+  assert.deepEqual(terminalInfoTools(newer.value), currentTools)
+  assert.deepEqual(terminalInfoTools({ tools: [] }, [{ id: 'codex', installed: true }]), [],
+    'an empty fresh Host list also wins over stale cached health')
+  let rejectEarlier
+  const invalidated = refresher.load({ terminalInfo: () => new Promise((resolve, reject) => { rejectEarlier = reject }) })
+  refresher.invalidate()
+  rejectEarlier(new Error('stale settings failure'))
+  assert.equal(await invalidated, null)
+  assert.deepEqual(terminalInfoTools({}, currentTools), currentTools, 'old Hosts without a tools projection retain health compatibility')
 })
 
 test('client transport: ordered coalesced input, long-poll output, single stop', async () => {

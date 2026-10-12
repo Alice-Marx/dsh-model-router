@@ -95,6 +95,7 @@ export const Config = z.object({
   toolInstallMethodsJson: z.string().max(8_000).default('{}').volatile(),
   toolScriptUrlsJson: z.string().max(8_000).default('{}').volatile(),
   toolAllowScriptInstall: z.boolean().default(true).volatile(),
+  zcodeInstallDir: z.string().max(4_096).default('').volatile(),
 })
 
 const JSON_OUTPUT = {
@@ -1387,6 +1388,8 @@ export async function startWorkbenchRun(ctx, config, request = {}, options = {})
 export function createRouterTerminals(options = {}) {
   return createTerminalManager({
     prepare: () => ensureNpmPrefixOnPath(),
+    preferences: () => installPreferences(),
+    launchOptions: () => currentInstallOptions(),
     onSessionEnd: record => { void routerStateStore().appendTerminalSession(record).catch(() => {}) },
     ...options,
   })
@@ -1397,11 +1400,14 @@ async function terminalHistory(limit = 20) {
   return (saved.terminalSessions ?? []).slice(-limit).reverse()
 }
 
-function terminalServices(terminals) {
+function terminalServices(terminals, assertPreferences = () => {}) {
   if (!terminals) return {}
   return {
-    terminalInfo: async () => ({ ...terminals.info(), history: await terminalHistory() }),
-    terminalStart: async request => terminals.start(parseTerminalStart(request)),
+    terminalInfo: async () => {
+      const tools = await probeAllTools({ fresh: true })
+      return { ...terminals.info(), tools, toolsCheckedAt: Date.now(), history: await terminalHistory() }
+    },
+    terminalStart: async request => { assertPreferences(); return terminals.start(parseTerminalStart(request)) },
     terminalRead: async request => terminals.read(parseTerminalRead(request)),
     terminalWrite: async request => terminals.write(parseTerminalWrite(request)),
     terminalResize: async request => terminals.resize(parseTerminalResize(request)),
@@ -1409,9 +1415,9 @@ function terminalServices(terminals) {
   }
 }
 
-export function routerRemoteServices(ctx, config, { terminals = null } = {}) {
+export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences } = {}) {
   return {
-    ...terminalServices(terminals),
+    ...terminalServices(terminals, assertPreferences),
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })
       const saved = await savedState()
@@ -1444,7 +1450,7 @@ export function apply(ctx, config = {}) {
       installPreferenceError = null
     } catch (error) { installPreferenceError = errorText(error) }
   }
-  const installFields = new Set(['toolInstallDir', 'toolNpmRegistry', 'toolInstallMethodsJson', 'toolScriptUrlsJson', 'toolAllowScriptInstall'])
+  const installFields = new Set(['toolInstallDir', 'toolNpmRegistry', 'toolInstallMethodsJson', 'toolScriptUrlsJson', 'toolAllowScriptInstall', 'zcodeInstallDir'])
   syncInstallPreferences()
   // Loader scopes this event to the fiber whose refs were committed.
   ctx.on('loader/volatile-update', paths => {
@@ -1464,9 +1470,10 @@ export function apply(ctx, config = {}) {
       return () => { process.off('exit', onExit); terminals.disposeAll('dispose') }
     }, 'model-router-galgame: interactive terminals')
     registerOfficialToolsRemote(ctx, {
-      ...routerRemoteServices(ctx, config, { terminals }),
+      ...routerRemoteServices(ctx, config, { terminals, assertPreferences: assertInstallPreferences }),
       installSettingsError: () => installPreferenceError,
       installRequestedDirectory: () => valueOf(config, 'toolInstallDir', ''),
+      zcodeRequestedDirectory: () => valueOf(config, 'zcodeInstallDir', ''),
     })
   }
   ctx.on('tools/pre-execute', async (exec, next) => {

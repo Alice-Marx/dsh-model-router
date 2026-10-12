@@ -1,8 +1,10 @@
 # Model Router · DeepSeek Harness Desktop
 
-Version: **0.18.2**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
+Version: **0.19.0**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe a task, compare your configured models, inspect the plan, and explicitly choose when to execute it.
+
+**0.19.0:** interactive terminals follow the full registry and saved installation, including OpenCode, Step and the ZCode desktop-bundled TUI. ZCode has independent desktop-directory configuration and desktop update/reinstall controls; its bundled CLI follows desktop updates. Fresh terminal discovery discards stale responses.
 
 **0.18.2:** isolates configurable vendor scripts beneath the shared install root, preventing Step from replacing other tools’ npm packages. Gemini/OpenCode installation success is separate from restricted execution support; Windows Gemini uses its verified package entry through Node. Upgrade and restart Harness before updating Step.
 
@@ -20,7 +22,7 @@ A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe 
 
 **0.16.0:** [dynamic data and adaptive feedback](docs/ROUTING_ADAPTIVE_LEARNING.zh.md) adds opt-in public benchmark/curated fixed-USD pricing refresh and task-specific, time-decayed, shrinkage-regularized subjective utility. Objective proxy quality floors remain separate. Public sources default off; preferences are shared within one local DSH_HOME and limited to the latest 200 runs. This is not a universal vendor-price scraper or evidence of real quality–cost gains.
 
-Current version: **0.18.2** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.19.0** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 **0.15.0 changes:** a four-tab workbench with routing advice directly below task planning, protection against stale execution previews, preserved spending totals across history pruning and retries, and a standalone mock UI preview for source development.
 
@@ -38,7 +40,7 @@ For self-testing, follow the [desktop acceptance and quality–cost experiment s
 | Read-only execution | Preview and confirm a routed run from the workbench, or invoke it in an official Harness session. Supported headless CLIs and model-directory API calls return recorded results. |
 | Editable CLI execution | One supported official CLI or a sequential CLI team, using approved isolated Git worktrees and conditional patch integration. |
 | Official tools | Detect, install/update, check launch readiness and inspect login status for ten registry tools; installation jobs have logs and cancellation. |
-| Interactive terminal | PowerShell/system shell and seven CLI targets, including fixed login commands, live output and multiple sessions. |
+| Interactive terminal | PowerShell/system shell and all ten registry CLI targets (ZCode TUI on verified Windows desktop installs), including fixed login commands, live output and multiple sessions. |
 | Costs and subscriptions | Daily/monthly budget checks, economy downgrade or pause, subscription-first routing, quota cooldown and explicit handling of other subscription failures. |
 | History and quality | Per-package results, dependency views, failure details, rerun/reassignment, ratings and optional stronger-model review. |
 | Execution boundaries | Shows what each route can read/write and whether its process uses the Harness sandbox. |
@@ -52,16 +54,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.18.2
+@ljwei-stak/dsh-model-router@0.19.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.18.2** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.19.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.18.2`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.19.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 

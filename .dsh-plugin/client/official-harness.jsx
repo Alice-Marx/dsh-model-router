@@ -118,6 +118,15 @@ function installDirField() {
   }
 }
 
+function zcodeInstallDirField() {
+  const field = settingsTextField('zcodeInstallDir')
+  return { ...field, parse: text => {
+    try { parseInstallPreferences({ zcodeInstallDir: text }, { tools: OFFICIAL_TOOLS }) }
+    catch { return undefined }
+    return field.parse(text)
+  } }
+}
+
 function npmRegistryField() {
   const field = settingsTextField('toolNpmRegistry')
   return {
@@ -181,6 +190,7 @@ export class RouterSettingsCardController {
       modelProfilesField(),
       quotaPatternsField(),
       installDirField(),
+      zcodeInstallDirField(),
       npmRegistryField(),
       installMethodsField(),
       scriptUrlsField(),
@@ -196,6 +206,7 @@ export class RouterSettingsCardController {
       modelProfilesJson: this.form.field('modelProfilesJson'),
       quotaPatternsJson: this.form.field('quotaPatternsJson'),
       toolInstallDir: this.form.field('toolInstallDir'),
+      zcodeInstallDir: this.form.field('zcodeInstallDir'),
       toolNpmRegistry: this.form.field('toolNpmRegistry'),
       toolInstallMethodsJson: this.form.field('toolInstallMethodsJson'),
       toolScriptUrlsJson: this.form.field('toolScriptUrlsJson'),
@@ -358,6 +369,18 @@ export function RouterSettingsCard(props) {
           invalidLabel="需要 https 开头的完整地址。"
           onEdit={value => { props.edit('toolNpmRegistry', value) }}
           onReset={() => { props.resetField('toolNpmRegistry') }}
+        />
+        <SettingsValueField
+          id="model-router-zcode-install-dir"
+          label="ZCode 桌面目录与 TUI"
+          hint="Windows 已安装 ZCode 桌面版即可使用内置 TUI。填写其独立目录（例如 D:/Program Files/ZCode），留空自动检测。保存后体检与官方工具终端共用此入口；内置 CLI 随桌面版更新，登录与模型在 TUI 中配置。"
+          disabled={disabled}
+          {...state.zcodeInstallDir}
+          overriddenLabel={FIELD_COPY.overridden}
+          resetLabel={FIELD_COPY.reset}
+          invalidLabel="请输入 Windows 本地绝对桌面目录，或留空自动检测。"
+          onEdit={value => { props.edit('zcodeInstallDir', value) }}
+          onReset={() => { props.resetField('zcodeInstallDir') }}
         />
         <SettingsValueField
           id="model-router-tool-install-methods"

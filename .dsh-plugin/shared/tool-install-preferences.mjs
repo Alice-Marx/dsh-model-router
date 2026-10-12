@@ -70,6 +70,26 @@ export function expandInstallDir(value, { home = '', env = {} } = {}) {
   return expanded
 }
 
+/** ZCode's existing desktop bundle is selected independently of npm's prefix. */
+export function normalizeZCodeInstallDir(value, options = {}) {
+  const input = String(value ?? '')
+  if (/[\x00-\x1f]/.test(input)) throw new Error('ZCode 安装位置包含无效字符。')
+  const raw = input.trim().replace(/^"(.*)"$/, '$1')
+  if (!raw) return ''
+  let path
+  try { path = expandInstallDir(raw, options) } catch (error) {
+    throw new Error(`ZCode 安装位置无效：${error.message}`)
+  }
+  // Discovery and Authenticode verification operate on local Windows files.
+  if (!/^[A-Za-z]:[\\/]/.test(path)) {
+    throw new Error('ZCode 安装位置必须是 Windows 本地绝对目录或 ZCode.exe 路径。')
+  }
+  if (/\.exe[\\/]*$/i.test(path) && !/[\\/]ZCode\.exe[\\/]*$/i.test(path)) {
+    throw new Error('ZCode 程序路径必须指向官方 ZCode.exe。')
+  }
+  return path.replace(/[\\/]+$/, '')
+}
+
 /** Only https mirrors are accepted; a plain-http script source can be tampered with in transit. */
 export function normalizeSourceUrl(value, subject) {
   const raw = String(value ?? '').trim()
@@ -116,6 +136,7 @@ function keepKnownToolIds(raw, known, subject) {
 export function parseInstallPreferences(config = {}, { tools = [], home = '', env = {} } = {}) {
   const known = new Set(tools.map(tool => tool.id))
   const installDir = expandInstallDir(valueOf(config, 'toolInstallDir', ''), { home, env })
+  const zcodeInstallDir = normalizeZCodeInstallDir(valueOf(config, 'zcodeInstallDir', ''), { home, env })
   const registry = normalizeSourceUrl(valueOf(config, 'toolNpmRegistry', DEFAULT_NPM_REGISTRY), 'npm 源') || DEFAULT_NPM_REGISTRY
   const methodRaw = keepKnownToolIds(
     parseJsonObject(valueOf(config, 'toolInstallMethodsJson', '{}'), '安装方式覆盖'), known, '安装方式覆盖')
@@ -134,6 +155,7 @@ export function parseInstallPreferences(config = {}, { tools = [], home = '', en
   }
   return {
     installDir,
+    zcodeInstallDir,
     registry,
     methods,
     scriptUrls,

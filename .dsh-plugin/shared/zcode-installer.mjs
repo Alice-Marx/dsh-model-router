@@ -19,7 +19,7 @@ import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
-import { ZCODE_SIGNER } from './zcode-bundle.mjs'
+import { ZCODE_SIGNER, zcodeWindowsPowerShellEnvironment } from './zcode-bundle.mjs'
 import { getOfficialTool } from './official-tool-registry.mjs'
 import { latestVersions } from './latest-versions.mjs'
 
@@ -118,7 +118,7 @@ async function verifyInstallerSignature(path, env) {
       encoding: 'utf8',
       timeout: 120_000,
       maxBuffer: 16_384,
-      env: { ...env, MODEL_ROUTER_ZCODE_INSTALLER_PATH: path },
+      env: { ...zcodeWindowsPowerShellEnvironment(env), MODEL_ROUTER_ZCODE_INSTALLER_PATH: path },
     })
     const signature = JSON.parse(stdout.trim().replace(/^\uFEFF/, ''))
     return signature.status === 'Valid'

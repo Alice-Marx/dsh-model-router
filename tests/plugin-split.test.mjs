@@ -41,7 +41,8 @@ test('install summary uses the host platform and reports the configured update d
   const zcode = windows.tools.find(tool => tool.id === 'zcode')
   assert.match(zcode.command, /签名安装器/)
   assert.equal(zcode.installError, undefined, 'desktop download remains available without a shell method')
-  assert.match(zcode.notices[0], /D:\/AI\/tools/)
+  assert.match(zcode.notices[0], /单独配置 ZCode/)
+  assert.match(zcode.notices[1], /独立于统一 npm/)
   const linux = installSummary(preferences, { platform: 'linux', home: '/home/tester' })
   const unixStep = linux.tools.find(tool => tool.id === 'stepcode')
   assert.equal(unixStep.methods.find(method => method.id === 'script-bash').blocked, null)
@@ -71,7 +72,7 @@ test('invalid Host install settings reject previews and actions before any CLI i
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.18.2')
+  assert.equal(manifest.version, '0.19.0')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)

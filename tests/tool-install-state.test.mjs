@@ -37,7 +37,7 @@ test('a newer-than-latest install is not downgraded; unknown latest still offers
   { label: '一键安装最新版', disabled: false })
   assert.deepEqual(toolInstallAction({ tool: { manager: 'signed-windows-installer' }, probe: { installed: true, version: '3.14.4' },
     latestVersion: '3.14.4', readiness: { ready: false }, probeStatus: 'ready' }),
-  { label: '已是最新版本', disabled: true })
+  { label: '检查并更新桌面版', disabled: false })
   assert.deepEqual(toolInstallAction({ tool: { manager: 'npm', headlessAdapter: true }, probe: { installed: true, version: '0.62.0' },
     latestVersion: '0.62.0', readiness: { ready: false }, probeStatus: 'ready' }),
   { label: '已是最新版本', disabled: true }, 'Gemini has no signed runner to repair')
@@ -101,6 +101,18 @@ test('turning off new script installations still allows removing an installed pr
     summary: { installable: false, removable: true } })
   assert.equal(actions.repair.disabled, true)
   assert.equal(actions.uninstall.disabled, false)
+})
+
+test('ZCode desktop update and reinstall are independent of its TUI configuration', () => {
+  const desktop = { id: 'zcode', label: 'ZCode', manager: 'signed-windows-installer' }
+  const actions = toolMaintenanceActions({ tool: desktop, probe: { installed: true }, probeStatus: 'ready', summary: { installable: true } })
+  assert.equal(actions.repair.label, '重新安装桌面版')
+  assert.equal(actions.repair.disabled, false)
+  assert.equal(actions.uninstall.disabled, true)
+  assert.equal(installClickRefusal({ tool: desktop, operation: 'repair' }), '')
+  assert.match(installClickRefusal({ tool: desktop, operation: 'uninstall' }), /系统/)
+  assert.equal(validateToolInstallSetting('zcodeInstallDir', 'D:/Program Files/ZCode'), '')
+  assert.ok(validateToolInstallSetting('zcodeInstallDir', 'zcode'))
 })
 
 test('install responses unwrap one or two envelopes, and a stale status job is ignored', () => {

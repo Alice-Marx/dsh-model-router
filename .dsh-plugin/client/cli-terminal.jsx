@@ -1,6 +1,6 @@
 /**
  * "官方工具终端" card: interactive sessions of the user's shell or a fixed
- * official CLI (codex, claude, kimi, mcode, mimo, grok, gemini), rendered
+ * official registry CLI or ZCode's bundled TUI, rendered
  * with xterm.js. The Host owns the process (PTY, or pipes as a fallback);
  * this card only shows output and forwards keystrokes.
  */
@@ -10,14 +10,15 @@ import { FitAddon } from '@xterm/addon-fit'
 import xtermCss from '@xterm/xterm/css/xterm.css'
 import {
   TerminalConnection,
+  TerminalInfoRefresher,
   clientPlatform,
   confirmationDetails,
   endDescription,
   formatDuration,
-  loadTerminalInfo,
   startProblem,
   startTerminal,
   terminalTargets,
+  terminalInfoTools,
 } from './cli-terminal-state.mjs'
 import { remoteErrorText } from './host-version.mjs'
 
@@ -97,7 +98,7 @@ function TerminalPane({ api, session, active, onEnded }) {
   )
 }
 
-export function CliTerminalCard({ api, health }) {
+export function CliTerminalCard({ api, health, settingsSignature = '' }) {
   const [info, setInfo] = React.useState({ status: 'loading', value: null, error: '' })
   const [target, setTarget] = React.useState('shell')
   const [mode, setMode] = React.useState('interactive')
@@ -107,28 +108,39 @@ export function CliTerminalCard({ api, health }) {
   const [startError, setStartError] = React.useState('')
   const [sessions, setSessions] = React.useState([])
   const [activeId, setActiveId] = React.useState('')
+  const [tools, setTools] = React.useState(health?.tools ?? [])
   const mounted = React.useRef(true)
+  const refresher = React.useRef(null)
+  if (!refresher.current) refresher.current = new TerminalInfoRefresher()
+  const healthTools = React.useRef(health?.tools)
+  healthTools.current = health?.tools
+  const settingsScope = React.useRef({ tools: health?.tools, signature: settingsSignature })
 
   const loadInfo = React.useCallback(async () => {
-    try {
-      const value = await loadTerminalInfo(api)
-      if (!mounted.current) return
-      setInfo({ status: 'ready', value, error: '' })
-    } catch (error) {
-      if (mounted.current) setInfo({ status: 'error', value: null, error: errorText(error, '无法读取终端状态。') })
-    }
+    const result = await refresher.current.load(api)
+    if (!mounted.current || !result) return
+    setInfo(result)
+    if (result.status === 'ready') setTools(terminalInfoTools(result.value, healthTools.current))
   }, [api])
 
   React.useEffect(() => {
     mounted.current = true
     void loadInfo()
-    return () => { mounted.current = false }
+    return () => { mounted.current = false; refresher.current.invalidate() }
   }, [loadInfo])
 
+  React.useEffect(() => {
+    if (settingsScope.current.tools === health?.tools && settingsScope.current.signature === settingsSignature) return
+    settingsScope.current = { tools: health?.tools, signature: settingsSignature }
+    // Health may have finished an older cached check. Ask the current Host for
+    // its selected entries instead of replacing fresh terminal choices with it.
+    void loadInfo()
+  }, [health?.tools, settingsSignature, loadInfo])
+
   const platform = info.value?.platform ?? clientPlatform()
-  const targets = terminalTargets(health?.tools ?? [], platform)
+  const targets = terminalTargets(tools, platform)
   const selected = targets.find(item => item.id === target) ?? targets[0]
-  React.useEffect(() => { if (!targets.some(item => item.id === target)) setTarget('shell') }, [targets.length])
+  React.useEffect(() => { if (!targets.some(item => item.id === target)) setTarget('shell') }, [tools, target])
   React.useEffect(() => { if (!selected?.canLogin && mode === 'login') setMode('interactive') }, [selected?.id])
   const problem = startProblem({ target: selected?.id, cwd, targets })
   const details = confirmationDetails({ target: selected?.id, mode, cwd, platform })
@@ -175,7 +187,7 @@ export function CliTerminalCard({ api, health }) {
       <style>{xtermCss}</style>
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">官方工具终端</h2>
-        <p className="mr-card-copy">在工作台里交互式运行 PowerShell 或已安装的官方 CLI（多轮对话、实时输出，可用于 <code>codex login</code> 等登录）。终端不经过 Harness 沙箱，使用你自己的 CLI 登录和环境变量。</p>
+        <p className="mr-card-copy">在工作台里交互式运行 PowerShell、已安装的官方 CLI 或 ZCode 桌面版内置 TUI（多轮对话、实时输出，可用于 <code>codex login</code> 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。</p>
       </div><button className="mr-button mr-button-secondary" type="button" onClick={() => { void loadInfo() }}>刷新</button></div>
       <div className="mr-card-body">
         {info.status === 'error' && <div className="mr-error" role="alert">{info.error}</div>}
@@ -195,7 +207,7 @@ export function CliTerminalCard({ api, health }) {
             <input className="mr-input" id="mr-term-cwd" value={cwd} spellCheck={false} placeholder={platform === 'win32' ? 'D:\\projects\\demo' : '/home/me/project'}
               onChange={event => { setCwd(event.target.value); setConfirming(false) }} /></div>
         </div>
-        {targets.length === 1 && <p className="mr-caption">体检尚未发现已安装的官方 CLI；安装后点“官方工具 · 体检”的“重新体检”，这里会出现对应选项。</p>}
+        {targets.length === 1 && <p className="mr-caption">尚未发现已安装的官方 CLI；安装或配置目录后点本卡片“刷新”或“官方工具 · 体检”的“重新体检”，这里会出现对应选项。</p>}
         {!confirming && <div className="mr-actions">
           <button className="mr-button" type="button" disabled={Boolean(problem) || live >= maxSessions || info.status !== 'ready'} onClick={() => { setStartError(''); setConfirming(true) }}>开始</button>
           <span className="mr-caption">{problem || (live >= maxSessions ? `最多同时运行 ${maxSessions} 个会话。` : `将运行：${details.command}`)}</span>

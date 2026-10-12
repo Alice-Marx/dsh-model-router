@@ -44,6 +44,7 @@ const unavailable = () => { throw new Error('模型路由工作台服务尚未�
 export function installSummary(preferences = installPreferences(), options = currentInstallOptions()) {
   return {
     installDir: preferences.installDir ?? '',
+    zcodeInstallDir: preferences.zcodeInstallDir ?? '',
     registry: preferences.registry ?? '',
     allowScriptInstall: preferences.allowScriptInstall !== false,
     scriptUrls: { ...(preferences.scriptUrls ?? {}) },
@@ -61,12 +62,14 @@ export function installSummary(preferences = installPreferences(), options = cur
       }
       if (tool.manager === 'signed-windows-installer') {
         entry.methodId = 'signed-windows-installer'
+        entry.installDir = preferences.zcodeInstallDir ?? ''
         if (options.platform === 'win32') {
           entry.command = installCommandLine(tool)
           entry.updateCommand = entry.command
-          entry.notices = [preferences.installDir
-            ? `请在官方安装窗口手动选择 ${preferences.installDir}，完成后重新体检。`
-            : '请在官方安装窗口选择目录并完成安装，然后重新体检。']
+          entry.notices = [preferences.zcodeInstallDir
+            ? `TUI 使用已保存的 ZCode 桌面目录 ${preferences.zcodeInstallDir}。更新时请在官方安装窗口选择同一目录，完成后重新体检。`
+            : '请在下方单独配置 ZCode 桌面目录，或留空自动检测。内置 CLI 随桌面版更新，TUI 的登录、模型和插件在终端中自行配置。']
+          entry.notices.push('ZCode 桌面目录独立于统一 npm 安装根；不会把桌面资源放进其他工具的共享目录。')
         } else entry.installError = entry.error = 'ZCode 签名安装器仅支持 Windows。'
         entry.uninstallError = 'ZCode 是桌面安装版，请在系统“应用”中卸载它。'
         return entry
@@ -191,6 +194,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
     // The saved input can contain Host-only home/environment expansions. Keep
     // it separate from the resolved directory used by the actual command.
     install.requestedInstallDir = this.services?.installRequestedDirectory?.() ?? install.installDir
+    install.requestedZCodeInstallDir = this.services?.zcodeRequestedDirectory?.() ?? install.zcodeInstallDir
     return { install, hostVersion: HOST_PLUGIN_VERSION }
   }
 

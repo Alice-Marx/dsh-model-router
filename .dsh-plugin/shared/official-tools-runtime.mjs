@@ -60,7 +60,7 @@ export const CLAUDE_UPDATE_ARGS = Object.freeze(['update'])
  * and script source). Refreshed on apply and live config updates, so a client
  * can only ever pick a method id — these addresses never arrive over the wire.
  */
-let preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true }
+let preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true, zcodeInstallDir: '' }
 
 export function setInstallPreferences(next) {
   if (next && typeof next === 'object') {
@@ -868,10 +868,13 @@ async function probeUncached(tool, runner, { selectedPreferences, plan, fileExis
   }
   if (tool.manager === 'signed-windows-installer') {
     let rejected = null
-    const bundle = await discoverZCodeBundle({ onRejected: value => { rejected ??= value } })
+    const bundle = await discoverZCodeBundle({ installDir: (selectedPreferences ?? preferences).zcodeInstallDir,
+      onRejected: value => { rejected ??= value } })
     if (bundle) return { id: tool.id, installed: true, version: bundle.version, status: 'installed',
-      detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} ${bundle.buildVersion}` }
-    if (rejected) return { id: tool.id, installed: false, version: null, status: 'not-installed', detail: `检测到已安装的 ZCode ${rejected.version}（${rejected.root}）：${rejected.rejected}` }
+      detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} 桌面版 ${bundle.buildVersion}`,
+      installDir: bundle.root, cliEntry: bundle.cliEntry, source: bundle.source }
+    if (rejected) return { id: tool.id, installed: false, version: null, status: 'not-installed',
+      detail: rejected.version ? `检测到 ZCode ${rejected.version}（${rejected.root}）：${rejected.rejected}` : rejected.rejected }
     const other = (await unverifiedZCodeInstalls().catch(() => []))[0]
     return { id: tool.id, installed: false, version: null, status: 'not-installed',
       detail: other
@@ -1589,30 +1592,43 @@ async function runInstallJob(installPlan, job) {
   await finishVerifiedInstall(job, probe)
 }
 
-async function runZCodeInstallJob(job) {
+export async function runZCodeInstallJob(job, {
+  probe = probeToolWith, lookup = (...args) => latestVersions.lookup(...args),
+  openInstaller = openZCodeInstaller, capture = runCapture,
+} = {}) {
   if (job.status !== 'running') return
   job.phase = 'preflight'
   probeCache.delete(job.tool.id)
-  const before = await probeToolWith(job.tool, defaultRunner)
+  const before = await probe(job.tool, defaultRunner, { preferences: job.preferences, cacheMs: 0 })
   if (job.cancelRequested) { markCancelled(job); return }
-  const latest = await latestVersions.lookup(job.tool, { fresh: true }).catch(() => null)
+  const latest = await lookup(job.tool, { fresh: true }).catch(() => null)
   if (job.cancelRequested) { markCancelled(job); return }
-  if (before.installed && latest?.version && (compareReleaseVersions(before.version, latest.version) ?? -1) >= 0) {
+  const desktopOrder = before.installed && latest?.version ? compareReleaseVersions(before.version, latest.version) : null
+  if (before.installed && desktopOrder === null) {
+    job.status = 'failed'
+    job.phase = 'done'
+    job.finishedAt = new Date().toISOString()
+    job.error = '无法核实 ZCode 最新桌面版本；保留当前安装，网络恢复后重试检查更新。'
+    return
+  }
+  if (desktopOrder === 1 || (job.operation !== 'repair' && desktopOrder === 0)) {
     job.status = 'succeeded'
     job.phase = 'done'
     job.finishedAt = new Date().toISOString()
     job.postInstallProbe = before
-    pushLine(job, `— 已找到 ZCode ${before.version}（最新 ${latest.version}），无需重复打开安装器 —`)
+    pushLine(job, desktopOrder === 1
+      ? `— ZCode ${before.version} 高于下载页的 ${latest.version}，不会打开旧版安装器降级；TUI 使用当前桌面内置入口 —`
+      : `— 已找到 ZCode ${before.version}（最新 ${latest.version}），无需重复打开安装器；TUI 使用当前桌面内置入口 —`)
     return
   }
-  const prefix = await runCapture('npm', ['config', 'get', 'prefix'], {
+  const prefix = await capture('npm', ['config', 'get', 'prefix'], {
     timeoutMs: 5_000, useShell: IS_WINDOWS, signal: job.controller.signal,
   })
   if (job.cancelRequested) { markCancelled(job); return }
   job.phase = 'downloading-and-verifying'
   let lastProgress = 0
   try {
-    const opened = await openZCodeInstaller({
+    const opened = await openInstaller({
       latest,
       npmPrefix: prefix.ok ? prefix.stdout.trim() : undefined,
       signal: job.controller.signal,
@@ -1629,7 +1645,11 @@ async function runZCodeInstallJob(job) {
     job.finishedAt = new Date().toISOString()
     probeCache.delete(job.tool.id)
     pushLine(job, `已验证发布者签名并打开 ZCode ${opened.version} 官方安装器：${opened.installerPath}`)
-    pushLine(job, '请在原厂安装界面选择非 C 盘目录；完成后点击“重新检测”。')
+    const desktopDirectory = before.installDir || (/[\\/]ZCode\.exe$/i.test(job.preferences.zcodeInstallDir ?? '')
+      ? dirname(job.preferences.zcodeInstallDir) : job.preferences.zcodeInstallDir)
+    pushLine(job, desktopDirectory
+      ? `请在原厂安装界面选择原桌面安装目录 ${desktopDirectory}；完成后重新体检，内置 TUI 随桌面版更新。`
+      : '请在原厂安装界面选择独立的 ZCode 桌面目录；完成后保存该目录并重新体检，内置 TUI 随桌面版更新。')
   } catch (error) {
     if (job.cancelRequested || job.controller.signal.aborted) { markCancelled(job); return }
     job.status = 'failed'
@@ -1700,5 +1720,5 @@ export function resetForTests() {
   installJobs.clear()
   installChain = Promise.resolve()
   prefixPromise = null
-  preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true }
+  preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true, zcodeInstallDir: '' }
 }

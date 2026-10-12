@@ -9,10 +9,12 @@
  * into that interactive process, exactly as in their own terminal, so a
  * session starts only after an explicit confirmation.
  */
-import { getOfficialTool } from './official-tool-registry.mjs'
+import { getOfficialTool, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
 
-/** Registry CLIs that have an interactive terminal UI (ZCode is a desktop app). */
-export const TERMINAL_TOOL_IDS = Object.freeze(['codex', 'claude-code', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build', 'gemini'])
+/** Follow the tool registry, including the TUI bundled with ZCode desktop. */
+export const TERMINAL_TOOL_IDS = Object.freeze(OFFICIAL_TOOLS
+  .filter(tool => !tool.unsupported && (tool.probeExecutables?.length || tool.manager === 'signed-windows-installer'))
+  .map(tool => tool.id))
 export const TERMINAL_SHELL_ID = 'shell'
 export const TERMINAL_TARGETS = Object.freeze([TERMINAL_SHELL_ID, ...TERMINAL_TOOL_IDS])
 export const TERMINAL_MODES = Object.freeze(['interactive', 'login'])
@@ -46,7 +48,15 @@ export const TERMINAL_LOGIN_ARGS = Object.freeze({
   'mimo-code': Object.freeze(['auth', 'login']),
   'grok-build': Object.freeze(['login']),
   gemini: Object.freeze([]),
+  opencode: Object.freeze(['auth', 'login']),
+  stepcode: Object.freeze(['login']),
+  zcode: Object.freeze([]),
 })
+
+/** Tools without a separate login command authenticate from their TUI. */
+export function terminalCanLogin(target) {
+  return Boolean(TERMINAL_LOGIN_ARGS[target]?.length)
+}
 
 const SESSION_ID = /^term-[a-z0-9]{6,40}$/
 
@@ -82,7 +92,7 @@ export function terminalTargetLabel(target) {
 export function terminalCommandPreview(target, mode = 'interactive', platform = 'win32') {
   if (target === TERMINAL_SHELL_ID) return platform === 'win32' ? 'powershell.exe -NoLogo' : '$SHELL -l'
   const tool = getOfficialTool(target)
-  const executable = tool?.probeExecutables?.[0] ?? String(target)
+  const executable = target === 'zcode' ? 'ZCode 桌面版内置 TUI' : tool?.probeExecutables?.[0] ?? String(target)
   const args = mode === 'login' ? TERMINAL_LOGIN_ARGS[target] ?? [] : []
   return [executable, ...args].join(' ')
 }
@@ -92,7 +102,7 @@ export function parseTerminalStart(value) {
   if (!TERMINAL_TARGETS.includes(request.target)) throw new TypeError('target must be the shell or a fixed official CLI')
   const mode = request.mode === undefined ? 'interactive' : request.mode
   if (!TERMINAL_MODES.includes(mode)) throw new TypeError('mode must be interactive or login')
-  if (mode === 'login' && request.target === TERMINAL_SHELL_ID) throw new TypeError('the shell has no login mode')
+  if (mode === 'login' && !terminalCanLogin(request.target)) throw new TypeError('this target has no login mode')
   if (!isAbsoluteDirectoryText(request.cwd)) throw new TypeError('cwd must be an absolute directory path')
   if (request.confirmed !== true) throw new TypeError('starting a terminal requires the user\'s confirmation')
   return {

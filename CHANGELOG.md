@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.19.0 — 2026-10-12
+
+Stable minor under the npm latest tag. Fully quit Harness (including its tray or WebUI Host process) and restart after upgrading.
+
+- Synchronize interactive terminal targets with the complete official-tool registry, adding OpenCode, Step Code and the verified Windows ZCode desktop-bundled TUI. Terminal refresh discovers current installations; older requests and health snapshots cannot restore stale target lists.
+- Resolve terminals from the saved package manager, package entry or private script directory. Refuse to launch a different PATH copy when the selected installation is missing. Fix Windows pipe fallback argument handling for command shims.
+- Add independent ZCode desktop-directory configuration in its tool card and plugin settings. Explicit selection is authoritative; missing, unsigned or modified bundles cannot silently fall back to another desktop. The built-in CLI follows desktop updates, while users configure login, models and plugins in TUI.
+- Offer separate desktop update checks and reinstall controls, preserve reviewed queued-job settings and refuse known downgrades or an unverified latest version. Opening an installer remains distinct from completed installation.
+- Fix ZCode discovery/installer signature checks under inherited PowerShell 7 module paths by using the Windows PowerShell system module directory. Prefer signed external Node 24 for TUI; a verified desktop Electron runtime can run the same bundled entry when Node is unavailable.
+- Add directory, refresh-race, desktop lifecycle and terminal launch regressions. Release notes record full validation and version-only probes of all ten installed CLI entries; no model requests were made.
+
 ## 0.18.2 — 2026-10-12
 
 Stable patch under the npm latest tag. Upgrade and fully restart Harness before using Step install, repair or update.

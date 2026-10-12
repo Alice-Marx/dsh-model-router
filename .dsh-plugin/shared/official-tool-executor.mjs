@@ -586,7 +586,7 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     }
   }
   if (toolId === 'zcode') {
-    const found = await discoverZCodeBundle()
+    const found = await discoverZCodeBundle({ installDir: (selectionOptions?.preferences ?? installPreferences()).zcodeInstallDir })
     if (!found) return { unsupported: '未找到具有智谱有效签名、且 CLI 脚本与首次核验记录一致的 ZCode 桌面版。' }
     const nodeExecutable = await findNodeExecutable(workspace, [24, 14, 0], version =>
       Number(String(version).split('.')[0]) === 24)

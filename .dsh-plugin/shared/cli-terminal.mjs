@@ -13,11 +13,14 @@
  */
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { stat } from 'node:fs/promises'
+import { readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { StringDecoder } from 'node:string_decoder'
-import { extname } from 'node:path'
-import { getOfficialTool } from './official-tool-registry.mjs'
+import { homedir } from 'node:os'
+import { extname, isAbsolute, join, relative, sep } from 'node:path'
+import { getOfficialTool, installMethodFor } from './official-tool-registry.mjs'
+import { resolveInstallPlan } from './tool-install-preferences.mjs'
+import { discoverZCodeBundle } from './zcode-bundle.mjs'
 import {
   TERMINAL_LIMITS,
   TERMINAL_LOGIN_ARGS,
@@ -84,6 +87,75 @@ export function pickWindowsExecutable(candidates) {
 
 const quoteWindows = path => `"${String(path).replace(/"/g, '')}"`
 
+function within(root, child) {
+  const part = relative(root, child)
+  return Boolean(part) && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
+}
+
+/** Bind a configured npm/pnpm tool to its declared package entry, not a shared shim. */
+export async function findTerminalPackageEntry(tool, plan, { platform = process.platform } = {}) {
+  let roots = plan.packageModuleRoots
+  let boundary
+  if (!Array.isArray(roots)) {
+    if (!plan.installDir) return null
+    if (plan.manager === 'pnpm') {
+      const global = join(plan.installDir, '.pnpm', 'global')
+      boundary = await realpath(global).catch(() => null)
+      const versions = await readdir(global, { withFileTypes: true }).catch(() => [])
+      roots = versions.filter(item => item.isDirectory() && /^\d+$/.test(item.name))
+        .sort((left, right) => Number(left.name) - Number(right.name))
+        .map(item => join(global, item.name, 'node_modules'))
+    } else {
+      const modules = platform === 'win32' ? join(plan.installDir, 'node_modules') : join(plan.installDir, 'lib', 'node_modules')
+      boundary = await realpath(modules).catch(() => null)
+      roots = [modules]
+    }
+  } else {
+    boundary = await realpath(plan.globalDir || plan.installDir || roots[0]).catch(() => null)
+  }
+  if (!boundary) return null
+  const entries = []
+  for (const modules of roots) {
+    try {
+      const packageRoot = await realpath(join(modules, ...tool.package.split('/')))
+      if (!within(boundary, packageRoot)) continue
+      const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
+      if (manifest.name !== tool.package) continue
+      for (const executable of tool.probeExecutables) {
+        const raw = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin?.[executable]
+        const bin = typeof raw === 'string' ? raw.replace(/\\/g, '/').replace(/^\.\//, '') : ''
+        if (!bin || bin.split('/').some(part => !part || part === '..') || isAbsolute(bin)) continue
+        const entry = await realpath(join(packageRoot, ...bin.split('/')))
+        if (!within(packageRoot, entry) || !(await stat(entry)).isFile()) continue
+        entries.push({ entry, packageRoot, version: String(manifest.version ?? '') })
+      }
+    } catch { /* not the selected tool's usable package */ }
+  }
+  // pnpm normally has one active global tree. Prefer the highest numbered
+  // layout when multiple layouts survive an upgrade, following its directories.
+  return entries.at(-1) ?? null
+}
+
+async function terminalNode(workspace, minimum, acceptedVersion) {
+  const { findNodeExecutable } = await import('./official-tool-executor.mjs')
+  return findNodeExecutable(workspace, minimum, acceptedVersion)
+}
+
+function executableLaunch(file, args, display, { platform, env }) {
+  if (platform !== 'win32') return { file, args, verbatim: false, display }
+  const extension = extname(file).toLowerCase()
+  if (extension === '.cmd' || extension === '.bat') {
+    const comspec = env.ComSpec || env.COMSPEC || 'cmd.exe'
+    const tail = `/d /s /c "${[quoteWindows(file), ...args].join(' ')}"`
+    return { file: comspec, args: tail, verbatim: true, display }
+  }
+  if (extension === '.ps1') {
+    const root = env.SystemRoot || env.SYSTEMROOT || 'C:\\Windows'
+    return { file: `${root}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`, args: ['-NoLogo', '-NoProfile', '-File', file, ...args], verbatim: false, display }
+  }
+  return { file, args, verbatim: false, display }
+}
+
 /**
  * Build the fixed launch for one target. `locate(executable)` returns the
  * candidate paths `where`/`which` printed. Returns
@@ -92,6 +164,9 @@ const quoteWindows = path => `"${String(path).replace(/"/g, '')}"`
  */
 export async function resolveTerminalLaunch(target, mode = 'interactive', {
   platform = process.platform, env = process.env, locate = defaultLocate,
+  preferences = {}, home = homedir(), cwd = process.cwd(),
+  packageEntry = findTerminalPackageEntry, fileExists = async path => (await stat(path).catch(() => null))?.isFile() === true,
+  discoverBundle = discoverZCodeBundle, findNode = terminalNode,
 } = {}) {
   if (target === TERMINAL_SHELL_ID) {
     if (platform === 'win32') {
@@ -104,9 +179,47 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
   }
   if (!TERMINAL_TOOL_IDS.includes(target)) throw new Error('只能启动系统终端或固定注册表中的官方 CLI。')
   const tool = getOfficialTool(target)
+  if (target === 'zcode') {
+    if (platform !== 'win32') throw new Error('当前仅支持 Windows ZCode 桌面版内置 TUI。')
+    const bundle = await discoverBundle({ installDir: preferences.zcodeInstallDir, env })
+    if (!bundle) throw new Error('未找到通过智谱签名与组件核验的 ZCode 桌面版；请先配置 ZCode 独立安装目录并重新体检。')
+    const node = await findNode(cwd, [24, 14, 0], version => Number(String(version).split('.')[0]) === 24)
+    // The verified desktop's electron-node entry is usable independently of
+    // its GUI. It supplies its own runtime when external Node 24 is absent.
+    return { file: node || bundle.executable, args: [bundle.cliEntry], verbatim: false,
+      display: `ZCode TUI · ${bundle.cliEntry}`, ...(!node ? { env: { ELECTRON_RUN_AS_NODE: '1' } } : {}) }
+  }
   const executable = tool.probeExecutables[0]
   const args = mode === 'login' ? [...(TERMINAL_LOGIN_ARGS[target] ?? [])] : []
   const display = [executable, ...args].join(' ')
+  const selectedScript = installMethodFor(tool, preferences.methods?.[target])?.kind === 'script'
+  const selectedPreferences = selectedScript ? { ...preferences, allowScriptInstall: true } : preferences
+  const plan = resolveInstallPlan(tool, undefined, selectedPreferences, { platform, env, home })
+  const configured = Boolean(preferences.installDir || preferences.methods?.[target])
+  if (plan.kind === 'package-manager' && configured) {
+    const boundPlan = plan.installDir ? plan : await (await import('./official-tools-runtime.mjs')).resolvePackageJobPlan(tool, plan, selectedPreferences, { options: { platform, env, home } })
+    const found = await packageEntry(tool, boundPlan, { platform })
+    if (!found) throw new Error(`未在所选 ${boundPlan.manager} 安装目录中找到 ${tool.label} 的真实命令入口；请重新体检或修复。`)
+    const extension = extname(found.entry).toLowerCase()
+    if (['.js', '.mjs', '.cjs'].includes(extension) || (platform === 'win32' && !extension)) {
+      const node = await findNode(cwd)
+      if (!node) throw new Error(`未找到可核验的 Node.js 运行时，无法启动 ${tool.label}。`)
+      return { file: node, args: [found.entry, ...args], verbatim: false, display }
+    }
+    return executableLaunch(found.entry, args, display, { platform, env })
+  }
+  if (plan.kind === 'script' && plan.binDir) {
+    for (const name of tool.probeExecutables) {
+      const filenames = platform === 'win32' ? WINDOWS_PREFERENCE.map(extension => `${name}${extension}`) : [name]
+      for (const filename of filenames) {
+        const file = join(plan.binDir, filename)
+        if (await fileExists(file)) return executableLaunch(file, args, display, { platform, env })
+      }
+    }
+    // A saved method or directory is authoritative: an older PATH copy cannot
+    // satisfy a missing install in the user's selected tool directory.
+    if (configured || tool.manager === 'script-installer') throw new Error(`未在所选安装目录 ${plan.binDir} 中找到 ${tool.label}；请重新体检或安装。`)
+  }
   const candidates = await locate(executable, { platform, env })
   if (platform !== 'win32') {
     const file = candidates.map(item => String(item).trim()).find(item => item.startsWith('/'))
@@ -115,18 +228,7 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
   }
   const file = pickWindowsExecutable(candidates)
   if (!file) throw new Error(`未在 PATH 中找到 ${executable}；请先在“官方工具 · 体检”中安装 ${tool.label}。`)
-  const extension = extname(file).toLowerCase()
-  if (extension === '.cmd' || extension === '.bat') {
-    // npm shims only run under cmd.exe. Every token is fixed by the registry.
-    const comspec = env.ComSpec || env.COMSPEC || 'cmd.exe'
-    const tail = `/d /s /c "${[quoteWindows(file), ...args].join(' ')}"`
-    return { file: comspec, args: tail, verbatim: true, display }
-  }
-  if (extension === '.ps1') {
-    const root = env.SystemRoot || env.SYSTEMROOT || 'C:\\Windows'
-    return { file: `${root}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`, args: ['-NoLogo', '-NoProfile', '-File', file, ...args], verbatim: false, display }
-  }
-  return { file, args, verbatim: false, display }
+  return executableLaunch(file, args, display, { platform, env })
 }
 
 /** Locate an executable with where.exe / which (fixed registry names only). */
@@ -161,7 +263,10 @@ function spawnPtyProcess(pty, launch, { cwd, cols, rows, env }) {
 
 /** Pipe fallback: no TTY; the Host echoes input and maps Enter/Ctrl+C. */
 export function spawnPipeProcess(launch, { cwd, env, platform = process.platform, spawnImpl = spawn }) {
-  const child = spawnImpl(launch.file, launch.args, {
+  // node-pty accepts a Windows command-line string; node:child_process needs
+  // an array even with windowsVerbatimArguments. Keep the prepared tail intact.
+  const args = typeof launch.args === 'string' ? [launch.args] : launch.args
+  const child = spawnImpl(launch.file, args, {
     cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: false,
     windowsVerbatimArguments: launch.verbatim === true,
   })
@@ -220,6 +325,8 @@ export function createTerminalManager({
   statPath = stat,
   prepare = async () => {},
   environment = () => terminalEnvironment(process.env),
+  preferences = () => ({}),
+  launchOptions = () => ({}),
   onSessionEnd = () => {},
   now = Date.now,
   platform = process.platform,
@@ -329,10 +436,11 @@ export function createTerminalManager({
       try { info = await statPath(request.cwd) } catch { info = null }
       if (!info?.isDirectory?.()) throw new Error(`工作目录不存在或不是目录：${request.cwd}`)
       await prepare()
-      const launch = await resolveLaunch(request.target, request.mode, { platform })
       const env = environment()
+      const launch = await resolveLaunch(request.target, request.mode, { ...launchOptions(), platform, env,
+        preferences: preferences(), cwd: request.cwd })
       const backend = backendInfo()
-      const options = { cwd: request.cwd, cols: request.cols, rows: request.rows, env, platform }
+      const options = { cwd: request.cwd, cols: request.cols, rows: request.rows, env: { ...env, ...launch.env }, platform }
       let proc
       try {
         proc = backend.backend === 'pty'
