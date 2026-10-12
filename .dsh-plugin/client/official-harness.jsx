@@ -429,6 +429,7 @@ function registerUi(ctx) {
       loadCatalog: () => ctx.remote.session.modelCatalog(),
       settingsScope,
       listOfficialTools: () => officialToolsRemote.list(),
+      loadOfficialInstallSettings: () => officialToolsRemote.installSettings(),
       installOfficialTool: request => officialToolsRemote.installTool(request),
       uninstallOfficialTool: request => officialToolsRemote.uninstallTool(request),
       repairOfficialTool: request => officialToolsRemote.repairTool(request),

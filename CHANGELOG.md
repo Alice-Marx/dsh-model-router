@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.1 — 2026-10-12
+
+Stable patch under the npm latest tag. Fully quit Harness, including the tray or WebUI host process, and restart after upgrading.
+
+- Fix official-tool method selection stuck on saving: configuration persistence no longer waits for CLI inspection, and selectors reflect the acknowledged settings snapshot.
+- Refresh install commands through a lightweight Host endpoint; delayed tool inspections cannot overwrite a newer install preview. Install actions wait for confirmed settings while method selection remains available.
+- Synchronize volatile install settings into Host preferences without requiring plugin reload. Invalid configuration is reported and cannot start an operation with older settings.
+- Add regression coverage using the real settings controller and Loader, plus a mock UI scenario with a hanging tool inspection. Release validation is recorded in the release notes.
+
 ## 0.18.0 — 2026-10-12
 
 Stable minor under the npm latest tag. Fully quit Harness, including the tray or WebUI host process, and restart after upgrading. Existing releases remain unchanged.

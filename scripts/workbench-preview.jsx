@@ -135,6 +135,7 @@ function sampleRuns() {
 
 function createDemoSession(scenario) {
   const settingsScope = createSettingsScope()
+  let toolInspections = 0
   let runs = scenario === 'empty' ? [] : sampleRuns()
   let completedAt = scenario === 'onboarding' ? null : Date.now()
   const installed = new Set(['claude-code', 'codex', 'gemini'])
@@ -191,12 +192,18 @@ function createDemoSession(scenario) {
   }
   return {
     settingsScope,
+    loadOfficialInstallSettings: async () => ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, install: demoInstallSummary(settingsScope.getSnapshot().value) }),
     loadCatalog: async () => scenario === 'error' ? { ok: false, error: { message: '演示：模型目录暂时不可用。可切回“完整示例”检查正常布局。' } } : ok(source()),
-    listOfficialTools: async () => ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, tools: structuredClone(tools),
+    listOfficialTools: async () => {
+      // Leave subsequent inspections pending to reproduce a slow CLI without
+      // delaying config persistence or the independent install summary.
+      if (++toolInspections > 1 && scenario === 'tools-hanging') await new Promise(() => {})
+      return ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, tools: structuredClone(tools),
       executionCapabilities: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, mode: 'headless', available: installed.has(tool.id) })),
       executionReadiness: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ready: tool.id !== 'gemini' && installed.has(tool.id) })),
       install: demoInstallSummary(settingsScope.getSnapshot().value),
-    }),
+      })
+    },
     installOfficialTool: blocked, uninstallOfficialTool: blocked, repairOfficialTool: blocked,
     cancelOfficialToolInstall: blocked,
     officialToolInstallStatus: async () => ok({ job: null }),
@@ -248,7 +255,7 @@ function createDemoSession(scenario) {
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）']]
+const scenarios = [['populated', '完整示例'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')

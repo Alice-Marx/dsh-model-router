@@ -193,6 +193,7 @@ const jsonParameter = (name, codec) => Object.freeze({ name, wire: name, source:
 
 export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('list', [], listResultCodec),
+  descriptor('installSettings', [], anyObjectCodec('OfficialInstallSettings')),
   descriptor('installTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
   descriptor('uninstallTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
   descriptor('repairTool', [jsonParameter('request', toolActionCodec)], installResultCodec),

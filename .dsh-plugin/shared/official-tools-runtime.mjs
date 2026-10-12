@@ -56,7 +56,7 @@ export const CLAUDE_UPDATE_ARGS = Object.freeze(['update'])
 
 /**
  * Host-side install preferences (install directory, npm source, per-tool method
- * and script source). Refreshed from plugin config on every apply, so a client
+ * and script source). Refreshed on apply and live config updates, so a client
  * can only ever pick a method id — these addresses never arrive over the wire.
  */
 let preferences = { installDir: '', registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true }

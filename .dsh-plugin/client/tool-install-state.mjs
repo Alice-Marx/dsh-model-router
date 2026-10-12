@@ -9,6 +9,50 @@ const INSTALL_DEFAULTS = Object.freeze({
   toolAllowScriptInstall: true,
 })
 
+/** Compare the settings a command preview describes, independent of JSON order. */
+export function toolInstallSettingsSignature(value = {}) {
+  try {
+    const preferences = parseInstallPreferences({ ...value, toolInstallDir: '' }, { tools: OFFICIAL_TOOLS })
+    const sorted = map => Object.entries(map).sort(([left], [right]) => left.localeCompare(right))
+    return JSON.stringify([String(value.toolInstallDir ?? '').trim(), preferences.registry, sorted(preferences.methods),
+      sorted(preferences.scriptUrls), preferences.allowScriptInstall])
+  } catch { return JSON.stringify(['invalid', value.toolInstallDir, value.toolNpmRegistry,
+    value.toolInstallMethodsJson, value.toolScriptUrlsJson, value.toolAllowScriptInstall]) }
+}
+
+export function installSummaryMatchesSettings(summary, value) {
+  if (!summary) return false
+  return toolInstallSettingsSignature(value) === toolInstallSettingsSignature({
+    toolInstallDir: summary.requestedInstallDir ?? summary.installDir ?? '', toolNpmRegistry: summary.registry || DEFAULT_NPM_REGISTRY,
+    toolInstallMethodsJson: JSON.stringify(summary.methods ?? {}),
+    toolScriptUrlsJson: JSON.stringify(summary.scriptUrls ?? {}),
+    toolAllowScriptInstall: summary.allowScriptInstall !== false,
+  })
+}
+
+export function savedToolInstallMethods(value = {}) {
+  try { return parseInstallPreferences({ toolInstallMethodsJson: value.toolInstallMethodsJson }, { tools: OFFICIAL_TOOLS }).methods }
+  catch { return {} }
+}
+
+/** Bound a broken settings transport without treating a late answer as a new save. */
+export async function mutateToolInstallSettings(scope, operations, revision, { timeoutMs = 15_000, onSettled } = {}) {
+  let timer
+  try {
+    const writing = Promise.resolve().then(() => scope.mutate(operations, revision)).then(accepted => {
+      onSettled?.({ accepted })
+      return accepted
+    }, error => {
+      onSettled?.({ accepted: false, error })
+      throw error
+    })
+    return await Promise.race([
+      writing,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('安装设置保存未收到确认，请在连接恢复后重试；迟到结果会按实际已保存设置显示。')), timeoutMs) }),
+    ])
+  } finally { clearTimeout(timer) }
+}
+
 /** Validate drafts with the same boundary used by the Host installer. */
 export function validateToolInstallSetting(key, value) {
   try {

@@ -3,9 +3,29 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS, OFFICIAL_TOOLS_REMOTE_NAMESPACE } from '../.dsh-plugin/shared/official-tools-remote.mjs'
 import { installSummary, OfficialToolsRemoteService } from '../.dsh-plugin/official-tools-remote-service.mjs'
+import { installPreferences, setInstallPreferences } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 const manifest = JSON.parse(read('package.json'))
+
+test('install settings return current saved commands synchronously without tool inspection', () => {
+  const original = installPreferences()
+  try {
+    const receiver = { list() { throw new Error('full inspection must not run') } }
+    setInstallPreferences({ ...original, installDir: 'D:/AI/tools', methods: { codex: 'npm' } })
+    const initial = OfficialToolsRemoteService.prototype.installSettings.call(receiver)
+    assert.equal(initial.then, undefined, 'settings summary is independent of asynchronous probes')
+    assert.equal(initial.install.tools.find(tool => tool.id === 'codex').savedMethodId, 'npm')
+    setInstallPreferences({ ...original, installDir: 'D:/AI/tools', methods: { codex: 'pnpm' } })
+    const updated = OfficialToolsRemoteService.prototype.installSettings.call(receiver)
+    const codex = updated.install.tools.find(tool => tool.id === 'codex')
+    assert.equal(codex.savedMethodId, 'pnpm')
+    assert.equal(codex.methodId, 'pnpm')
+    assert.match(codex.command, /^pnpm /)
+    assert.equal(codex.installDir, 'D:/AI/tools')
+    assert.equal(updated.hostVersion, manifest.version)
+  } finally { setInstallPreferences(original) }
+})
 
 test('install summary uses the host platform and reports the configured update destination', () => {
   const preferences = { installDir: 'D:/AI/tools', registry: 'https://registry.npmjs.org/',
@@ -36,9 +56,22 @@ test('install summary uses the host platform and reports the configured update d
   assert.equal(disabledStep.uninstallError, undefined, 'disabling remote scripts still permits local removal')
 })
 
+test('invalid Host install settings reject previews and actions before any CLI is touched', async () => {
+  const receiver = {
+    services: { installSettingsError: () => 'invalid install directory' },
+    installSettings: OfficialToolsRemoteService.prototype.installSettings,
+  }
+  assert.throws(() => receiver.installSettings(), /invalid install directory/)
+  for (const method of ['installTool', 'repairTool', 'uninstallTool']) {
+    const result = await OfficialToolsRemoteService.prototype[method].call(receiver, { tool: 'codex', method: 'npm' })
+    assert.equal(result.ok, false)
+    assert.match(result.error, /invalid install directory/)
+  }
+})
+
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.18.0')
+  assert.equal(manifest.version, '0.18.1')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)
@@ -67,7 +100,7 @@ test('0.13.0 package rename: the loader imports the new name, the profile entry 
 test('router remote retains installer methods and owns no GAL endpoints', () => {
   assert.equal(OFFICIAL_TOOLS_REMOTE_NAMESPACE, 'modelRouterOfficialTools')
   assert.deepEqual(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.map(item => item.method), [
-    'list', 'installTool', 'uninstallTool', 'repairTool', 'cancel', 'status',
+    'list', 'installSettings', 'installTool', 'uninstallTool', 'repairTool', 'cancel', 'status',
     'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'boundaries', 'previewRun', 'startRun',
     'terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop',
   ])

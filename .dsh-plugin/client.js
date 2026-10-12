@@ -2348,6 +2348,65 @@ var INSTALL_DEFAULTS = Object.freeze({
   toolScriptUrlsJson: "{}",
   toolAllowScriptInstall: true
 });
+function toolInstallSettingsSignature(value = {}) {
+  try {
+    const preferences = parseInstallPreferences({ ...value, toolInstallDir: "" }, { tools: OFFICIAL_TOOLS });
+    const sorted = (map) => Object.entries(map).sort(([left], [right]) => left.localeCompare(right));
+    return JSON.stringify([
+      String(value.toolInstallDir ?? "").trim(),
+      preferences.registry,
+      sorted(preferences.methods),
+      sorted(preferences.scriptUrls),
+      preferences.allowScriptInstall
+    ]);
+  } catch {
+    return JSON.stringify([
+      "invalid",
+      value.toolInstallDir,
+      value.toolNpmRegistry,
+      value.toolInstallMethodsJson,
+      value.toolScriptUrlsJson,
+      value.toolAllowScriptInstall
+    ]);
+  }
+}
+function installSummaryMatchesSettings(summary, value) {
+  if (!summary) return false;
+  return toolInstallSettingsSignature(value) === toolInstallSettingsSignature({
+    toolInstallDir: summary.requestedInstallDir ?? summary.installDir ?? "",
+    toolNpmRegistry: summary.registry || DEFAULT_NPM_REGISTRY,
+    toolInstallMethodsJson: JSON.stringify(summary.methods ?? {}),
+    toolScriptUrlsJson: JSON.stringify(summary.scriptUrls ?? {}),
+    toolAllowScriptInstall: summary.allowScriptInstall !== false
+  });
+}
+function savedToolInstallMethods(value = {}) {
+  try {
+    return parseInstallPreferences({ toolInstallMethodsJson: value.toolInstallMethodsJson }, { tools: OFFICIAL_TOOLS }).methods;
+  } catch {
+    return {};
+  }
+}
+async function mutateToolInstallSettings(scope, operations, revision, { timeoutMs = 15e3, onSettled } = {}) {
+  let timer;
+  try {
+    const writing = Promise.resolve().then(() => scope.mutate(operations, revision)).then((accepted) => {
+      onSettled?.({ accepted });
+      return accepted;
+    }, (error) => {
+      onSettled?.({ accepted: false, error });
+      throw error;
+    });
+    return await Promise.race([
+      writing,
+      new Promise((_2, reject) => {
+        timer = setTimeout(() => reject(new Error("\u5B89\u88C5\u8BBE\u7F6E\u4FDD\u5B58\u672A\u6536\u5230\u786E\u8BA4\uFF0C\u8BF7\u5728\u8FDE\u63A5\u6062\u590D\u540E\u91CD\u8BD5\uFF1B\u8FDF\u5230\u7ED3\u679C\u4F1A\u6309\u5B9E\u9645\u5DF2\u4FDD\u5B58\u8BBE\u7F6E\u663E\u793A\u3002")), timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 function validateToolInstallSetting(key, value) {
   try {
     parseInstallPreferences({ [key]: value }, { tools: OFFICIAL_TOOLS });
@@ -12645,7 +12704,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.18.0" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.18.1" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -13498,7 +13557,7 @@ var INSTALL_SETTING_FIELDS = [
     hint: "\u6309\u5DE5\u5177 ID \u6307\u5B9A https \u955C\u50CF\u5730\u5740\u3002\u811A\u672C\u4E0B\u8F7D\u540E\u4ECD\u4F1A\u6838\u5BF9\u5382\u5546\u6807\u8BB0\uFF0C\u518D\u6267\u884C\u672C\u5730\u526F\u672C\u3002"
   }
 ];
-function InstallSettings({ settingsScope, install, onPendingChange }) {
+function InstallSettings({ settingsScope, install, onPendingChange, onMutationStart }) {
   const [snapshot, setSnapshot] = import_react5.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false });
   const [drafts, setDrafts] = import_react5.default.useState({});
   const [saving, setSaving] = import_react5.default.useState(false);
@@ -13535,7 +13594,12 @@ function InstallSettings({ settingsScope, install, onPendingChange }) {
     setNotice("");
     try {
       const entries = Object.entries(drafts).map(([key, value]) => ({ op: "set", path: [key], value }));
-      const accepted = await settingsScope.mutate(entries, snapshot.revision);
+      const finishMutation = onMutationStart?.(entries);
+      const onSettled = (outcome) => {
+        const current = finishMutation?.(outcome);
+        if (current && outcome.accepted) setNotice("\u5B89\u88C5\u8BBE\u7F6E\u5DF2\u4FDD\u5B58\u3002");
+      };
+      const accepted = await mutateToolInstallSettings(settingsScope, entries, snapshot.revision, { onSettled });
       if (!accepted) throw new Error("\u8BBE\u7F6E\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\uFF1B\u8F93\u5165\u5DF2\u4FDD\u7559\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u3002");
       const next = settingsScope.getSnapshot();
       setSnapshot(next);
@@ -13575,7 +13639,7 @@ function InstallSettings({ settingsScope, install, onPendingChange }) {
     onPendingChange?.(false);
   } }, "\u653E\u5F03\u66F4\u6539"), dirty && /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, invalid ? "\u8BF7\u4FEE\u6B63\u8F93\u5165\u540E\u4FDD\u5B58\u3002" : "\u66F4\u6539\u5C1A\u672A\u4FDD\u5B58\uFF0C\u5B89\u88C5\u4E0E\u66F4\u65B0\u6682\u4E0D\u53EF\u7528\u3002")), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, "\u5F53\u524D\u751F\u6548\uFF1A\u5B89\u88C5\u76EE\u5F55 ", install?.installDir || "\uFF08\u5404\u5382\u5546\u9ED8\u8BA4\uFF09", " \xB7 npm \u6E90 ", install?.registry || "\uFF08\u9ED8\u8BA4\uFF09", notice ? ` \xB7 ${notice}` : ""));
 }
-function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
+function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
   const healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item]));
   const [probeState, setProbeState] = import_react5.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" });
   const [jobs, setJobs] = import_react5.default.useState({});
@@ -13583,12 +13647,17 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const [settingsPending, setSettingsPending] = import_react5.default.useState(false);
   const [methodSaving, setMethodSaving] = import_react5.default.useState(null);
   const [previewPending, setPreviewPending] = import_react5.default.useState(false);
-  const [settingsWritable, setSettingsWritable] = import_react5.default.useState(() => settingsScope?.getSnapshot?.()?.writable === true);
+  const [settingsSnapshot, setSettingsSnapshot] = import_react5.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false });
+  const [previewError, setPreviewError] = import_react5.default.useState("");
+  const [probeSettingsStale, setProbeSettingsStale] = import_react5.default.useState(false);
   const settingsPendingRef = import_react5.default.useRef(false);
   const methodSavingRef = import_react5.default.useRef(null);
   const previewPendingRef = import_react5.default.useRef(false);
   const mounted = import_react5.default.useRef(false);
   const request = import_react5.default.useRef(0);
+  const previewRequest = import_react5.default.useRef(0);
+  const mutationGeneration = import_react5.default.useRef(0);
+  const mutationPendingRef = import_react5.default.useRef(null);
   const submitting = import_react5.default.useRef(/* @__PURE__ */ new Set());
   const polling = import_react5.default.useRef(/* @__PURE__ */ new Set());
   const jobsRef = import_react5.default.useRef({});
@@ -13606,29 +13675,46 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const refresh = async () => {
     onRefreshHealth?.();
     const current = ++request.current;
+    const settingsSignature = toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value);
     setProbeState((previous) => ({
       ...previous,
-      status: previous.probes.length > 0 ? "refreshing" : "loading",
+      status: previous.probes.length > 0 || previous.install ? "refreshing" : "loading",
       error: ""
     }));
     try {
       if (typeof listOfficialTools !== "function") throw new Error("\u5B98\u65B9\u5DE5\u5177\u5B89\u88C5\u6865\u5C1A\u672A\u52A0\u8F7D\u3002");
       const response = await listOfficialTools();
       if (!mounted.current || current !== request.current) return;
+      if (settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return;
       if (!response?.ok) throw new Error(remoteError(response, "\u65E0\u6CD5\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u3002"));
       const probes = Array.isArray(response.value?.tools) ? response.value.tools : [];
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : [];
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : [];
-      setProbeState({ status: "ready", probes, capabilities, readiness, install: response.value?.install ?? null, error: "" });
-      previewPendingRef.current = false;
-      setPreviewPending(false);
+      const install2 = response.value?.install;
+      const matches = settingsSignature === toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value) && installSummaryMatchesSettings(install2, settingsScope?.getSnapshot?.()?.value);
+      if (!matches) return;
+      setProbeState((previous) => ({
+        status: "ready",
+        probes,
+        capabilities,
+        readiness,
+        install: matches ? install2 : previous.install,
+        error: ""
+      }));
+      setProbeSettingsStale(false);
+      if (matches && !mutationPendingRef.current) {
+        previewPendingRef.current = false;
+        setPreviewPending(false);
+        setPreviewError("");
+      }
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === "string" ? response.value.hostVersion : null });
     } catch (error) {
       if (!mounted.current || current !== request.current) return;
+      if (settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return;
       const message = remoteErrorText(text5(error?.message), "\u65E0\u6CD5\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u3002");
       let kept = false;
       setProbeState((previous) => {
-        if (previous.probes.length > 0) {
+        if (previous.probes.length > 0 || previous.install) {
           kept = true;
           return { ...previous, status: "ready", error: message };
         }
@@ -13637,9 +13723,38 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
       if (!kept) onProbes({ probes: [], capabilities: [], readiness: [] });
     }
   };
+  const refreshInstallSettings = async () => {
+    const current = ++previewRequest.current;
+    const snapshot = settingsScope?.getSnapshot?.();
+    const signature2 = toolInstallSettingsSignature(snapshot?.value);
+    previewPendingRef.current = true;
+    setPreviewPending(true);
+    setPreviewError("");
+    try {
+      if (typeof loadOfficialInstallSettings !== "function") throw new Error("\u5B89\u88C5\u8BBE\u7F6E\u6865\u5C1A\u672A\u52A0\u8F7D\uFF0C\u8BF7\u66F4\u65B0 Host \u540E\u91CD\u65B0\u6253\u5F00\u5DE5\u4F5C\u53F0\u3002");
+      const response = await loadOfficialInstallSettings();
+      if (!mounted.current || current !== previewRequest.current || signature2 !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return;
+      if (!response?.ok) throw new Error(remoteError(response, "\u65E0\u6CD5\u8BFB\u53D6\u5B89\u88C5\u8BBE\u7F6E\u3002"));
+      if (!installSummaryMatchesSettings(response.value?.install, settingsScope?.getSnapshot?.()?.value)) {
+        throw new Error("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58\uFF0C\u4F46 Host \u5B89\u88C5\u914D\u7F6E\u5C1A\u672A\u540C\u6B65\uFF1B\u8BF7\u5237\u65B0\u5B89\u88C5\u547D\u4EE4\u540E\u518D\u5B89\u88C5\u3002");
+      }
+      setProbeState((previous) => ({
+        ...previous,
+        status: previous.status === "loading" || previous.status === "error" ? "ready" : previous.status,
+        install: response.value.install
+      }));
+      if (!mutationPendingRef.current) {
+        previewPendingRef.current = false;
+        setPreviewPending(false);
+      }
+    } catch (error) {
+      if (mounted.current && current === previewRequest.current) setPreviewError(text5(error?.message) || "\u5B89\u88C5\u547D\u4EE4\u5237\u65B0\u5931\u8D25\u3002");
+    }
+  };
   import_react5.default.useEffect(() => {
     mounted.current = true;
     void refresh();
+    void refreshInstallSettings();
     if (typeof officialToolInstallStatus === "function") {
       void Promise.all(OFFICIAL_TOOLS.map(async (tool) => {
         try {
@@ -13664,29 +13779,40 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
     return () => {
       mounted.current = false;
       request.current += 1;
+      previewRequest.current += 1;
     };
   }, []);
-  const refreshRef = import_react5.default.useRef(refresh);
-  refreshRef.current = refresh;
+  const refreshInstallSettingsRef = import_react5.default.useRef(refreshInstallSettings);
+  refreshInstallSettingsRef.current = refreshInstallSettings;
+  const beginSettingsMutation = import_react5.default.useCallback((operations) => {
+    const generation = ++mutationGeneration.current;
+    mutationPendingRef.current = { generation, operations };
+    previewPendingRef.current = true;
+    setPreviewPending(true);
+    return () => {
+      if (!mounted.current || mutationPendingRef.current?.generation !== generation) return false;
+      mutationPendingRef.current = null;
+      void refreshInstallSettingsRef.current();
+      return true;
+    };
+  }, []);
   import_react5.default.useEffect(() => {
     if (typeof settingsScope?.subscribe !== "function") return void 0;
-    const signature2 = (snapshot) => JSON.stringify([
-      snapshot?.value?.toolInstallDir,
-      snapshot?.value?.toolNpmRegistry,
-      snapshot?.value?.toolInstallMethodsJson,
-      snapshot?.value?.toolScriptUrlsJson,
-      snapshot?.value?.toolAllowScriptInstall
-    ]);
+    const signature2 = (snapshot) => toolInstallSettingsSignature(snapshot?.value);
     let previous = signature2(settingsScope.getSnapshot());
     return settingsScope.subscribe(() => {
       const snapshot = settingsScope.getSnapshot();
-      setSettingsWritable(snapshot.writable === true);
+      setSettingsSnapshot(snapshot);
       const next = signature2(snapshot);
       if (next === previous) return;
       previous = next;
+      request.current += 1;
+      setProbeSettingsStale(true);
+      setProbeState((previous2) => ({ ...previous2, status: "ready", probes: [], readiness: [], error: "" }));
+      onProbes({ probes: [], capabilities: [], readiness: [] });
       previewPendingRef.current = true;
       setPreviewPending(true);
-      void refreshRef.current();
+      void refreshInstallSettingsRef.current();
     });
   }, [settingsScope]);
   import_react5.default.useEffect(() => {
@@ -13797,11 +13923,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
     if (methodId) map[toolId] = methodId;
     else delete map[toolId];
     try {
-      const accepted = await settingsScope.mutate([{ op: "set", path: ["toolInstallMethodsJson"], value: JSON.stringify(map) }], snapshot.revision);
+      const operations = [{ op: "set", path: ["toolInstallMethodsJson"], value: JSON.stringify(map) }];
+      const finishMutation = beginSettingsMutation(operations);
+      const onSettled = (outcome) => {
+        if (finishMutation(outcome) && outcome.accepted) setRowErrors((previous) => ({ ...previous, [toolId]: "" }));
+      };
+      const accepted = await mutateToolInstallSettings(settingsScope, operations, snapshot.revision, { onSettled });
       if (!accepted) throw new Error("\u5B89\u88C5\u65B9\u5F0F\u672A\u88AB\u4FDD\u5B58\uFF0C\u53EF\u80FD\u88AB\u5176\u4ED6\u9875\u9762\u4FEE\u6539\u3002");
-      previewPendingRef.current = true;
-      setPreviewPending(true);
-      await refresh();
+      setSettingsSnapshot(settingsScope.getSnapshot());
     } catch (error) {
       if (mounted.current) setRowErrors((previous) => ({ ...previous, [toolId]: text5(error?.message) || "\u5B89\u88C5\u65B9\u5F0F\u4FDD\u5B58\u5931\u8D25\u3002" }));
     } finally {
@@ -13826,9 +13955,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const capabilitiesById = Object.fromEntries(probeState.capabilities.map((item) => [item.id, item]));
   const readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item]));
   const installById = Object.fromEntries((probeState.install?.tools ?? []).map((item) => [item.id, item]));
+  const savedMethods = savedToolInstallMethods(settingsSnapshot.value);
   return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u3001\u7248\u672C\u548C\u767B\u5F55\u72B6\u6001\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u5B89\u88C5\u6216\u66F4\u65B0\u5230\u5404\u5382\u5546\u6700\u65B0\u7248\uFF08\u65B0\u7248\u672C\u672A\u7ECF\u63D2\u4EF6\u6D4B\u8BD5\uFF09\u3002\u53EF\u6309\u5DE5\u5177\u9009\u62E9 npm\u3001pnpm \u6216\u5382\u5546\u5B89\u88C5\u811A\u672C\u65B9\u5F0F\uFF0C\u5E76\u7EDF\u4E00\u8BBE\u7F6E\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF1B\u5378\u8F7D\u53EA\u5220\u9664\u7A0B\u5E8F\uFF0C\u914D\u7F6E\u4E0E\u767B\u5F55\u4FDD\u7559\u3002\u672A\u767B\u5F55\u7684\u5DE5\u5177\u70B9\u201C\u53BB\u767B\u5F55\u201D\u67E5\u770B\u767B\u5F55\u547D\u4EE4\u3002ZCode \u4F1A\u6253\u5F00\u5B98\u65B9\u5B89\u88C5\u7A97\u53E3\u4F9B\u4F60\u9009\u62E9\u76EE\u5F55\uFF1B\u5B8C\u6210\u540E\u91CD\u65B0\u4F53\u68C0\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     void refresh();
-  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement(InstallSettings, { settingsScope, install: probeState.install, onPendingChange: handleSettingsPending }), previewPending && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B89\u88C5\u8BBE\u7F6E\u5DF2\u53D8\u66F4\uFF0C\u6B63\u5728\u5237\u65B0\u5B9E\u9645\u5B89\u88C5\u547D\u4EE4\uFF1B\u5237\u65B0\u5B8C\u6210\u540E\u53EF\u7EE7\u7EED\u5B89\u88C5\u4E0E\u66F4\u65B0\u3002"), probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.error && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
+  } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement(InstallSettings, { settingsScope, install: probeState.install, onPendingChange: handleSettingsPending, onMutationStart: beginSettingsMutation }), previewPending && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B89\u88C5\u8BBE\u7F6E\u5DF2\u53D8\u66F4\uFF0C\u6B63\u5728\u5237\u65B0\u5B9E\u9645\u5B89\u88C5\u547D\u4EE4\uFF1B\u4ECD\u53EF\u5207\u6362\u65B9\u5F0F\uFF0C\u5237\u65B0\u5B8C\u6210\u540E\u53EF\u5B89\u88C5\u4E0E\u66F4\u65B0\u3002", !previewError && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
+    void refreshInstallSettings();
+  } }, "\u5237\u65B0\u5B89\u88C5\u547D\u4EE4")), previewError && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, previewError, " ", /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
+    void refreshInstallSettings();
+  } }, "\u5237\u65B0\u5B89\u88C5\u547D\u4EE4")), probeSettingsStale && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B89\u88C5\u8BBE\u7F6E\u5DF2\u66F4\u6539\uFF0C\u65E7\u76EE\u6807\u7684\u7248\u672C\u4E0E\u5B89\u88C5\u72B6\u6001\u5DF2\u8FC7\u671F\u3002\u53EF\u5B89\u88C5\u6240\u9009\u76EE\u6807\uFF1B\u5378\u8F7D\u524D\u8BF7\u91CD\u65B0\u4F53\u68C0\u3002"), probeState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u2026"), probeState.error && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "\u5B98\u65B9\u5DE5\u5177\u6CE8\u518C\u8868" }, OFFICIAL_TOOLS.map((tool) => {
     const summary = installById[tool.id];
     const command = summary ? summary.command : installCommandLine(tool);
     const updateCommand = summary?.updateCommand ?? command;
@@ -13850,15 +13984,15 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
         removable: !(summary?.uninstallError ?? (summary?.uninstallCommand ? "" : summary?.error))
       }
     });
-    const verified = job?.status === "succeeded" && (job.operation === "uninstall" ? job.postInstallProbe?.installed === false : job.postInstallProbe?.installed === true);
+    const verified = Boolean(probe) && job?.status === "succeeded" && (job.operation === "uninstall" ? job.postInstallProbe?.installed === false : job.postInstallProbe?.installed === true);
     const operation = job?.operation === "uninstall" ? "\u5378\u8F7D" : job?.operation === "repair" ? "\u4FEE\u590D" : "\u5B89\u88C5";
-    const status = running ? job.cancelRequested ? `\u6B63\u5728\u53D6\u6D88${operation}\u2026` : `${operation}\u4E2D\u2026` : job?.status === "installer-opened" ? "\u5B98\u65B9\u5B89\u88C5\u5668\u5DF2\u6253\u5F00\uFF0C\u8BF7\u5B8C\u6210\u5B89\u88C5\u540E\u91CD\u65B0\u68C0\u6D4B" : job?.status === "cancelled" ? `${operation}\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B` : verified ? `${operation}\u6210\u529F\u5E76\u9A8C\u8BC1` : probeLabel(probe);
+    const status = running ? job.cancelRequested ? `\u6B63\u5728\u53D6\u6D88${operation}\u2026` : `${operation}\u4E2D\u2026` : job?.status === "installer-opened" ? "\u5B98\u65B9\u5B89\u88C5\u5668\u5DF2\u6253\u5F00\uFF0C\u8BF7\u5B8C\u6210\u5B89\u88C5\u540E\u91CD\u65B0\u68C0\u6D4B" : job?.status === "cancelled" ? `${operation}\u5DF2\u53D6\u6D88\uFF0C\u8BF7\u91CD\u65B0\u68C0\u6D4B` : verified ? `${operation}\u6210\u529F\u5E76\u9A8C\u8BC1` : probe ? probeLabel(probe) : "\u6240\u9009\u5B89\u88C5\u76EE\u6807\u5C1A\u672A\u4F53\u68C0";
     return /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " \xB7 ", tool.id), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` \xB7 ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` \xB7 \u6700\u65B0 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react5.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.headlessAdapter ? "\u5DF2\u53EF\u7531 model_router_execute \u4EE5\u65E0\u754C\u9762\u65B9\u5F0F\u8C03\u7528\u3002\u547D\u4EE4\u7F3A\u5931\u6216\u5931\u8D25\u65F6\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002\u7B7E\u540D\u6C99\u7BB1\u5165\u53E3\u4E0D\u542F\u52A8\u6B64 CLI\u3002" : readiness?.ready ? `\u5B98\u65B9\u6267\u884C\u5165\u53E3\u5DF2\u6838\u9A8C\uFF0C\u53EF\u5728\u4F1A\u8BDD\u4E2D\u8C03\u7528 model_router_tool_run\uFF1B${capability?.modes?.includes("read-only") ? "\u652F\u6301\u53EA\u8BFB\u548C\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u4EFB\u52A1" : "\u4EC5\u652F\u6301\u7ECF\u5BA1\u6279\u7684\u53EF\u7F16\u8F91\u9694\u79BB\u5DE5\u4F5C\u533A\u4EFB\u52A1"}\uFF0C\u8D26\u53F7\u53CA\u6A21\u578B\u4ECD\u9700\u5B9E\u6D4B\u3002` : `\u5DF2\u5B89\u88C5\uFF0C\u4F46\u5F53\u524D\u4E0D\u53EF\u6258\u7BA1\u6267\u884C\uFF1A${readiness?.reason || capability?.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u6838\u9A8C\u3002"}`), command ? /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "\u5B89\u88C5\u65B9\u5F0F\uFF1A", methods.find((method) => method.id === summary?.methodId)?.label ?? tool.manager, " \xB7 \u5B9E\u9645\u5B89\u88C5\u76EE\u5F55\uFF1A", summary?.installDir || "\u5404\u5382\u5546\u9ED8\u8BA4\u76EE\u5F55"), /* @__PURE__ */ import_react5.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} \u5B89\u88C5\u547D\u4EE4` }, command), updateCommand !== command && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "\u66F4\u65B0\u6CBF\u7528\u539F\u5B89\u88C5\u4F4D\u7F6E\uFF1A", summary?.updateInstallDir || "\u5404\u5382\u5546\u9ED8\u8BA4\u76EE\u5F55"), /* @__PURE__ */ import_react5.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} \u66F4\u65B0\u547D\u4EE4` }, updateCommand))) : /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u5B89\u88C5\u65E5\u5FD7"), /* @__PURE__ */ import_react5.default.createElement("pre", null, job.outputTail.slice(-6).join("\n")))), (command || methods.length > 0) && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-actions" }, methods.length > 0 && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-tool-methods" }, /* @__PURE__ */ import_react5.default.createElement("label", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5B89\u88C5\u65B9\u5F0F"), /* @__PURE__ */ import_react5.default.createElement(
       "select",
       {
         className: "mr-mini-select",
-        value: summary?.savedMethodId ?? "",
-        disabled: running || settingsBusy || !settingsWritable,
+        value: savedMethods[tool.id] ?? "",
+        disabled: running || settingsPending || Boolean(methodSaving) || settingsSnapshot.writable !== true,
         onChange: (event) => {
           void setInstallMethod(tool.id, event.target.value);
         }
@@ -14001,7 +14135,7 @@ ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join("\n")}
   }, []);
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun };
 }
-function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
+function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries });
   const [catalogState, setCatalogState] = import_react5.default.useState({ status: "loading", catalog: null, error: "" });
   const [task, setTask] = import_react5.default.useState("");
@@ -14223,6 +14357,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, install
     OfficialToolsCard,
     {
       listOfficialTools,
+      loadOfficialInstallSettings,
       installOfficialTool,
       uninstallOfficialTool,
       repairOfficialTool,
@@ -14413,6 +14548,7 @@ var toolIdParameter = Object.freeze({
 var jsonParameter = (name, codec) => Object.freeze({ name, wire: name, source: "json", codec });
 var OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor("list", [], listResultCodec),
+  descriptor("installSettings", [], anyObjectCodec("OfficialInstallSettings")),
   descriptor("installTool", [jsonParameter("request", toolActionCodec)], installResultCodec),
   descriptor("uninstallTool", [jsonParameter("request", toolActionCodec)], installResultCodec),
   descriptor("repairTool", [jsonParameter("request", toolActionCodec)], installResultCodec),
@@ -14836,6 +14972,7 @@ function registerUi(ctx) {
       loadCatalog: () => ctx.remote.session.modelCatalog(),
       settingsScope,
       listOfficialTools: () => officialToolsRemote.list(),
+      loadOfficialInstallSettings: () => officialToolsRemote.installSettings(),
       installOfficialTool: (request) => officialToolsRemote.installTool(request),
       uninstallOfficialTool: (request) => officialToolsRemote.uninstallTool(request),
       repairOfficialTool: (request) => officialToolsRemote.repairTool(request),

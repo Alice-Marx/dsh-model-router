@@ -1,7 +1,7 @@
 import React from 'react'
 import { createWorkspacePlan, routesFromModelCatalog } from './catalog.mjs'
 import { ModelProfileEditor } from './model-profile-editor.jsx'
-import { acceptedInstallJob, installClickRefusal, retainToolInstallDrafts, shouldApplyInstallStatus, toolInstallAction, toolMaintenanceActions, validateToolInstallSetting } from './tool-install-state.mjs'
+import { acceptedInstallJob, installClickRefusal, installSummaryMatchesSettings, mutateToolInstallSettings, retainToolInstallDrafts, savedToolInstallMethods, shouldApplyInstallStatus, toolInstallAction, toolInstallSettingsSignature, toolMaintenanceActions, validateToolInstallSetting } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
@@ -149,7 +149,7 @@ const INSTALL_SETTING_FIELDS = [
     hint: '按工具 ID 指定 https 镜像地址。脚本下载后仍会核对厂商标记，再执行本地副本。' },
 ]
 
-function InstallSettings({ settingsScope, install, onPendingChange }) {
+function InstallSettings({ settingsScope, install, onPendingChange, onMutationStart }) {
   const [snapshot, setSnapshot] = React.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false })
   const [drafts, setDrafts] = React.useState({})
   const [saving, setSaving] = React.useState(false)
@@ -187,7 +187,12 @@ function InstallSettings({ settingsScope, install, onPendingChange }) {
     setNotice('')
     try {
       const entries = Object.entries(drafts).map(([key, value]) => ({ op: 'set', path: [key], value }))
-      const accepted = await settingsScope.mutate(entries, snapshot.revision)
+      const finishMutation = onMutationStart?.(entries)
+      const onSettled = outcome => {
+        const current = finishMutation?.(outcome)
+        if (current && outcome.accepted) setNotice('安装设置已保存。')
+      }
+      const accepted = await mutateToolInstallSettings(settingsScope, entries, snapshot.revision, { onSettled })
       if (!accepted) throw new Error('设置未被保存，可能被其他页面修改；输入已保留，请重新核对。')
       const next = settingsScope.getSnapshot()
       setSnapshot(next)
@@ -251,7 +256,7 @@ function InstallSettings({ settingsScope, install, onPendingChange }) {
   )
 }
 
-function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
+export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
   const healthById = Object.fromEntries((health?.tools ?? []).map(item => [item.id, item]))
   const [probeState, setProbeState] = React.useState({ status: 'loading', probes: [], capabilities: [], readiness: [], install: null, error: '' })
   const [jobs, setJobs] = React.useState({})
@@ -259,12 +264,17 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const [settingsPending, setSettingsPending] = React.useState(false)
   const [methodSaving, setMethodSaving] = React.useState(null)
   const [previewPending, setPreviewPending] = React.useState(false)
-  const [settingsWritable, setSettingsWritable] = React.useState(() => settingsScope?.getSnapshot?.()?.writable === true)
+  const [settingsSnapshot, setSettingsSnapshot] = React.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false })
+  const [previewError, setPreviewError] = React.useState('')
+  const [probeSettingsStale, setProbeSettingsStale] = React.useState(false)
   const settingsPendingRef = React.useRef(false)
   const methodSavingRef = React.useRef(null)
   const previewPendingRef = React.useRef(false)
   const mounted = React.useRef(false)
   const request = React.useRef(0)
+  const previewRequest = React.useRef(0)
+  const mutationGeneration = React.useRef(0)
+  const mutationPendingRef = React.useRef(null)
   const submitting = React.useRef(new Set())
   const polling = React.useRef(new Set())
   const jobsRef = React.useRef({})
@@ -283,29 +293,43 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const refresh = async () => {
     onRefreshHealth?.()
     const current = ++request.current
+    const settingsSignature = toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)
     setProbeState(previous => ({
       ...previous,
-      status: previous.probes.length > 0 ? 'refreshing' : 'loading',
+      status: previous.probes.length > 0 || previous.install ? 'refreshing' : 'loading',
       error: '',
     }))
     try {
       if (typeof listOfficialTools !== 'function') throw new Error('官方工具安装桥尚未加载。')
       const response = await listOfficialTools()
       if (!mounted.current || current !== request.current) return
+      if (settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return
       if (!response?.ok) throw new Error(remoteError(response, '无法检测官方工具。'))
       const probes = Array.isArray(response.value?.tools) ? response.value.tools : []
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : []
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : []
-      setProbeState({ status: 'ready', probes, capabilities, readiness, install: response.value?.install ?? null, error: '' })
-      previewPendingRef.current = false
-      setPreviewPending(false)
+      // Full probes can finish after a settings write or a quicker command
+      // preview. They must not replace a newer saved method with an old one.
+      const install = response.value?.install
+      const matches = settingsSignature === toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)
+        && installSummaryMatchesSettings(install, settingsScope?.getSnapshot?.()?.value)
+      if (!matches) return
+      setProbeState(previous => ({ status: 'ready', probes, capabilities, readiness,
+        install: matches ? install : previous.install, error: '' }))
+      setProbeSettingsStale(false)
+      if (matches && !mutationPendingRef.current) {
+        previewPendingRef.current = false
+        setPreviewPending(false)
+        setPreviewError('')
+      }
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === 'string' ? response.value.hostVersion : null })
     } catch (error) {
       if (!mounted.current || current !== request.current) return
+      if (settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return
       const message = remoteErrorText(text(error?.message), '无法检测官方工具。')
       let kept = false
       setProbeState(previous => {
-        if (previous.probes.length > 0) {
+        if (previous.probes.length > 0 || previous.install) {
           kept = true
           return { ...previous, status: 'ready', error: message }
         }
@@ -315,9 +339,37 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
     }
   }
 
+  const refreshInstallSettings = async () => {
+    const current = ++previewRequest.current
+    const snapshot = settingsScope?.getSnapshot?.()
+    const signature = toolInstallSettingsSignature(snapshot?.value)
+    previewPendingRef.current = true
+    setPreviewPending(true)
+    setPreviewError('')
+    try {
+      if (typeof loadOfficialInstallSettings !== 'function') throw new Error('安装设置桥尚未加载，请更新 Host 后重新打开工作台。')
+      const response = await loadOfficialInstallSettings()
+      if (!mounted.current || current !== previewRequest.current
+        || signature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return
+      if (!response?.ok) throw new Error(remoteError(response, '无法读取安装设置。'))
+      if (!installSummaryMatchesSettings(response.value?.install, settingsScope?.getSnapshot?.()?.value)) {
+        throw new Error('设置已保存，但 Host 安装配置尚未同步；请刷新安装命令后再安装。')
+      }
+      setProbeState(previous => ({ ...previous, status: previous.status === 'loading' || previous.status === 'error' ? 'ready' : previous.status,
+        install: response.value.install }))
+      if (!mutationPendingRef.current) {
+        previewPendingRef.current = false
+        setPreviewPending(false)
+      }
+    } catch (error) {
+      if (mounted.current && current === previewRequest.current) setPreviewError(text(error?.message) || '安装命令刷新失败。')
+    }
+  }
+
   React.useEffect(() => {
     mounted.current = true
     void refresh()
+    void refreshInstallSettings()
     if (typeof officialToolInstallStatus === 'function') {
       void Promise.all(OFFICIAL_TOOLS.map(async tool => {
         try {
@@ -337,28 +389,42 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
         })
       })
     }
-    return () => { mounted.current = false; request.current += 1 }
+    return () => { mounted.current = false; request.current += 1; previewRequest.current += 1 }
   }, [])
 
-  const refreshRef = React.useRef(refresh)
-  refreshRef.current = refresh
+  const refreshInstallSettingsRef = React.useRef(refreshInstallSettings)
+  refreshInstallSettingsRef.current = refreshInstallSettings
+  const beginSettingsMutation = React.useCallback(operations => {
+    const generation = ++mutationGeneration.current
+    mutationPendingRef.current = { generation, operations }
+    previewPendingRef.current = true
+    setPreviewPending(true)
+    return () => {
+      if (!mounted.current || mutationPendingRef.current?.generation !== generation) return false
+      mutationPendingRef.current = null
+      // A late SDK answer is reflected by its real snapshot. It never applies
+      // the originally requested value or settles a newer operation's state.
+      void refreshInstallSettingsRef.current()
+      return true
+    }
+  }, [])
   React.useEffect(() => {
     if (typeof settingsScope?.subscribe !== 'function') return undefined
-    const signature = snapshot => JSON.stringify([
-      snapshot?.value?.toolInstallDir, snapshot?.value?.toolNpmRegistry,
-      snapshot?.value?.toolInstallMethodsJson, snapshot?.value?.toolScriptUrlsJson,
-      snapshot?.value?.toolAllowScriptInstall,
-    ])
+    const signature = snapshot => toolInstallSettingsSignature(snapshot?.value)
     let previous = signature(settingsScope.getSnapshot())
     return settingsScope.subscribe(() => {
       const snapshot = settingsScope.getSnapshot()
-      setSettingsWritable(snapshot.writable === true)
+      setSettingsSnapshot(snapshot)
       const next = signature(snapshot)
       if (next === previous) return
       previous = next
+      request.current += 1
+      setProbeSettingsStale(true)
+      setProbeState(previous => ({ ...previous, status: 'ready', probes: [], readiness: [], error: '' }))
+      onProbes({ probes: [], capabilities: [], readiness: [] })
       previewPendingRef.current = true
       setPreviewPending(true)
-      void refreshRef.current()
+      void refreshInstallSettingsRef.current()
     })
   }, [settingsScope])
 
@@ -479,11 +545,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
     if (methodId) map[toolId] = methodId
     else delete map[toolId]
     try {
-      const accepted = await settingsScope.mutate([{ op: 'set', path: ['toolInstallMethodsJson'], value: JSON.stringify(map) }], snapshot.revision)
+      const operations = [{ op: 'set', path: ['toolInstallMethodsJson'], value: JSON.stringify(map) }]
+      const finishMutation = beginSettingsMutation(operations)
+      const onSettled = outcome => {
+        if (finishMutation(outcome) && outcome.accepted) setRowErrors(previous => ({ ...previous, [toolId]: '' }))
+      }
+      const accepted = await mutateToolInstallSettings(settingsScope, operations, snapshot.revision, { onSettled })
       if (!accepted) throw new Error('安装方式未被保存，可能被其他页面修改。')
-      previewPendingRef.current = true
-      setPreviewPending(true)
-      await refresh()
+      setSettingsSnapshot(settingsScope.getSnapshot())
     } catch (error) {
       if (mounted.current) setRowErrors(previous => ({ ...previous, [toolId]: text(error?.message) || '安装方式保存失败。' }))
     } finally {
@@ -510,6 +579,7 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
   const capabilitiesById = Object.fromEntries(probeState.capabilities.map(item => [item.id, item]))
   const readinessById = Object.fromEntries(probeState.readiness.map(item => [item.id, item]))
   const installById = Object.fromEntries((probeState.install?.tools ?? []).map(item => [item.id, item]))
+  const savedMethods = savedToolInstallMethods(settingsSnapshot.value)
   return (
     <section className="mr-card" aria-label="官方工具">
       <div className="mr-card-head"><div>
@@ -517,8 +587,10 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
         <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm 或厂商安装脚本方式，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode 会打开官方安装窗口供你选择目录；完成后重新体检。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新体检</button></div>
       <div className="mr-card-body">
-        <InstallSettings settingsScope={settingsScope} install={probeState.install} onPendingChange={handleSettingsPending} />
-        {previewPending && <p className="mr-caption" role="status">安装设置已变更，正在刷新实际安装命令；刷新完成后可继续安装与更新。</p>}
+        <InstallSettings settingsScope={settingsScope} install={probeState.install} onPendingChange={handleSettingsPending} onMutationStart={beginSettingsMutation} />
+        {previewPending && <p className="mr-caption" role="status">安装设置已变更，正在刷新实际安装命令；仍可切换方式，刷新完成后可安装与更新。{!previewError && <button className="mr-button mr-button-secondary" type="button" onClick={() => { void refreshInstallSettings() }}>刷新安装命令</button>}</p>}
+        {previewError && <p className="mr-error" role="alert">{previewError} <button className="mr-button mr-button-secondary" type="button" onClick={() => { void refreshInstallSettings() }}>刷新安装命令</button></p>}
+        {probeSettingsStale && <p className="mr-caption" role="status">安装设置已更改，旧目标的版本与安装状态已过期。可安装所选目标；卸载前请重新体检。</p>}
         {probeState.status === 'loading' && <p className="mr-empty" role="status">正在检测本机官方工具…</p>}
         {probeState.error && <p className="mr-error" role="alert">{probeState.error}</p>}
         <div className="mr-tools" role="list" aria-label="官方工具注册表">
@@ -543,14 +615,14 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
                 removable: !(summary?.uninstallError ?? (summary?.uninstallCommand ? '' : summary?.error)),
               },
             })
-            const verified = job?.status === 'succeeded' && (job.operation === 'uninstall'
+            const verified = Boolean(probe) && job?.status === 'succeeded' && (job.operation === 'uninstall'
               ? job.postInstallProbe?.installed === false
               : job.postInstallProbe?.installed === true)
             const operation = job?.operation === 'uninstall' ? '卸载' : job?.operation === 'repair' ? '修复' : '安装'
             const status = running ? job.cancelRequested ? `正在取消${operation}…` : `${operation}中…`
               : job?.status === 'installer-opened' ? '官方安装器已打开，请完成安装后重新检测'
                 : job?.status === 'cancelled' ? `${operation}已取消，请重新检测`
-                  : verified ? `${operation}成功并验证` : probeLabel(probe)
+                  : verified ? `${operation}成功并验证` : probe ? probeLabel(probe) : '所选安装目标尚未体检'
             return (
               <div className="mr-tool" role="listitem" key={tool.id}>
                 <div className="mr-tool-info">
@@ -587,8 +659,8 @@ function OfficialToolsCard({ listOfficialTools, installOfficialTool, uninstallOf
                         <span>安装方式</span>
                         <select
                           className="mr-mini-select"
-                          value={summary?.savedMethodId ?? ''}
-                          disabled={running || settingsBusy || !settingsWritable}
+                          value={savedMethods[tool.id] ?? ''}
+                          disabled={running || settingsPending || Boolean(methodSaving) || settingsSnapshot.writable !== true}
                           onChange={event => { void setInstallMethod(tool.id, event.target.value) }}
                         >
                           <option value="">自动选择</option>
@@ -737,7 +809,7 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun }
 }
 
-export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')
@@ -976,7 +1048,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           <OnboardingBanner health={workbench.health.report} error={workbench.health.error} refreshing={workbench.health.refreshing}
             onRefresh={() => { void workbench.refreshHealth(true) }} onDone={() => { void workbench.finishOnboarding() }} />
         )}
-        <OfficialToolsCard listOfficialTools={listOfficialTools} installOfficialTool={installOfficialTool} uninstallOfficialTool={uninstallOfficialTool} repairOfficialTool={repairOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} settingsScope={settingsScope}
+        <OfficialToolsCard listOfficialTools={listOfficialTools} loadOfficialInstallSettings={loadOfficialInstallSettings} installOfficialTool={installOfficialTool} uninstallOfficialTool={uninstallOfficialTool} repairOfficialTool={repairOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} settingsScope={settingsScope}
           health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
         {terminalApi && <CliTerminalCard api={terminalApi} health={workbench.health.report} />}
         </div>

@@ -179,13 +179,25 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
       executionCapabilities: officialToolExecutionCapabilities(),
       executionReadiness,
       hostVersion: HOST_PLUGIN_VERSION,
-      install: installSummary(),
+      install: this.installSettings().install,
     }
+  }
+
+  /** Refresh saved methods and commands without spawning CLIs or checking downloads. */
+  installSettings() {
+    const error = this.services?.installSettingsError?.()
+    if (error) throw new Error(`官方工具安装设置无效：${error}`)
+    const install = installSummary()
+    // The saved input can contain Host-only home/environment expansions. Keep
+    // it separate from the resolved directory used by the actual command.
+    install.requestedInstallDir = this.services?.installRequestedDirectory?.() ?? install.installDir
+    return { install, hostVersion: HOST_PLUGIN_VERSION }
   }
 
   /** Start one serialized fixed-registry install; return immediately for UI polling. */
   async installTool(request) {
     return settled(async () => {
+      this.installSettings()
       await ensureNpmPrefixOnPath()
       return { accepted: true, job: startInstall(request.tool, { method: request.method }) }
     })
@@ -197,6 +209,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
    */
   async uninstallTool(request) {
     return settled(async () => {
+      this.installSettings()
       await ensureNpmPrefixOnPath()
       return { accepted: true, job: startUninstall(request.tool, { method: request.method }) }
     })
@@ -205,6 +218,7 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** Reinstall the tool even when it already reports the latest version. */
   async repairTool(request) {
     return settled(async () => {
+      this.installSettings()
       await ensureNpmPrefixOnPath()
       return { accepted: true, job: startRepair(request.tool, { method: request.method }) }
     })

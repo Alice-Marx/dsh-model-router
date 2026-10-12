@@ -1434,11 +1434,25 @@ export function routerRemoteServices(ctx, config, { terminals = null } = {}) {
 /** Register model-facing tools and the human /router command. */
 export function apply(ctx, config = {}) {
   // Install addresses (directory, npm source, per-tool method and script source)
-  // live in volatile config, so re-apply picks up whatever the user last saved.
-  // A malformed value is reported here rather than at the first click.
+  // are volatile refs: Loader changes them without re-applying the plugin.
+  // Read them after the owning fiber's live update, before a saved view is sent.
   let installPreferenceError = null
-  try { setInstallPreferences(parseInstallPreferences(config, { tools: OFFICIAL_TOOLS, ...currentInstallOptions() })) }
-  catch (error) { installPreferenceError = errorText(error) }
+  const syncInstallPreferences = () => {
+    try {
+      const next = parseInstallPreferences(config, { tools: OFFICIAL_TOOLS, ...currentInstallOptions() })
+      setInstallPreferences(next)
+      installPreferenceError = null
+    } catch (error) { installPreferenceError = errorText(error) }
+  }
+  const installFields = new Set(['toolInstallDir', 'toolNpmRegistry', 'toolInstallMethodsJson', 'toolScriptUrlsJson', 'toolAllowScriptInstall'])
+  syncInstallPreferences()
+  // Loader scopes this event to the fiber whose refs were committed.
+  ctx.on('loader/volatile-update', paths => {
+    if (Array.isArray(paths) && paths.some(path => installFields.has(path?.[0]))) syncInstallPreferences()
+  })
+  const assertInstallPreferences = () => {
+    if (installPreferenceError) throw new Error(`官方工具安装设置无效：${installPreferenceError}`)
+  }
   // The official Host injects typert; direct lightweight uses of apply may
   // supply only the model/command services and do not expose the Desktop RPC.
   if (ctx.typert) {
@@ -1449,7 +1463,11 @@ export function apply(ctx, config = {}) {
       process.once('exit', onExit)
       return () => { process.off('exit', onExit); terminals.disposeAll('dispose') }
     }, 'model-router-galgame: interactive terminals')
-    registerOfficialToolsRemote(ctx, routerRemoteServices(ctx, config, { terminals }))
+    registerOfficialToolsRemote(ctx, {
+      ...routerRemoteServices(ctx, config, { terminals }),
+      installSettingsError: () => installPreferenceError,
+      installRequestedDirectory: () => valueOf(config, 'toolInstallDir', ''),
+    })
   }
   ctx.on('tools/pre-execute', async (exec, next) => {
     const decision = await next()
@@ -1498,7 +1516,7 @@ export function apply(ctx, config = {}) {
     if (reasons.length) return combinedAsk(reasons)
     return decision
   })
-  registerOfficialToolModels(ctx, config)
+  registerOfficialToolModels(ctx, config, assertInstallPreferences)
   ctx.tools.register(defineTool({
     name: 'model_router_routes',
     description: 'List provider/model routes registered in the official DeepSeek Harness model directory. Credential and network availability are not verified. No API keys or endpoints are returned.',
@@ -1611,6 +1629,7 @@ export function apply(ctx, config = {}) {
       const toolId = matched[2]
       const method = matched[3]
       try {
+        assertInstallPreferences()
         const job = action === 'uninstall' ? startUninstall(toolId, { method })
           : action === 'repair' ? startRepair(toolId, { method })
             : startInstall(toolId, { method })
@@ -1649,7 +1668,7 @@ async function waitForInstall(toolId, signal) {
 }
 
 /** Register the model-facing official-tool probes and installer. */
-function registerOfficialToolModels(ctx, config) {
+function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   ctx.tools.register(defineTool({
     name: 'model_router_tools',
     description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini CLI, OpenCode, Step Code, ZCode) and report which are installed with their versions, plus each tool\'s available install methods and the effective install directory and npm source. Never reads credentials.',
@@ -1680,6 +1699,7 @@ function registerOfficialToolModels(ctx, config) {
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
+      assertInstallPreferences()
       const job = startInstall(args.tool, { method: text(args.method) || undefined })
       const settled = await waitForInstall(job.tool, exec.signal)
       const tool = getOfficialTool(args.tool)
@@ -1704,6 +1724,7 @@ function registerOfficialToolModels(ctx, config) {
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
+      assertInstallPreferences()
       const job = startRepair(args.tool, { method: text(args.method) || undefined })
       const settled = await waitForInstall(job.tool, exec.signal)
       const tool = getOfficialTool(args.tool)
@@ -1726,6 +1747,7 @@ function registerOfficialToolModels(ctx, config) {
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
+      assertInstallPreferences()
       const job = startUninstall(args.tool, { method: text(args.method) || undefined })
       const settled = await waitForInstall(job.tool, exec.signal)
       const tool = getOfficialTool(args.tool)
