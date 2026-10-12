@@ -140,8 +140,8 @@ function probeLabel(probe) {
  * cannot leave the install controls showing a partly saved configuration.
  */
 const INSTALL_SETTING_FIELDS = [
-  { key: 'toolInstallDir', label: '统一安装目录', fallback: '', placeholder: '留空 = 各厂商默认目录',
-    hint: '填写绝对路径，例如 D:/AI/tools。各方式的实际目录会显示在工具命令旁；不支持统一目录的方式会说明原因。' },
+  { key: 'toolInstallDir', label: '统一安装根目录', fallback: '', placeholder: '留空 = 各厂商默认目录',
+    hint: '例如 D:/AI/tools。npm / pnpm 使用该根；厂商脚本使用工具专属子目录，实际地址见工具行。固定厂商地址的方式会说明原因。' },
   { key: 'toolNpmRegistry', label: 'npm 源地址', fallback: 'https://registry.npmjs.org/', placeholder: 'https://registry.npmjs.org/',
     hint: '必须以 https:// 开头。所有 npm / pnpm 方式共用此下载源，例如 https://registry.npmmirror.com/。' },
   { key: 'toolScriptUrlsJson', label: '安装脚本源覆盖（JSON，可选）', fallback: '{}',

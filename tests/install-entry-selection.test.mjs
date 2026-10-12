@@ -205,7 +205,7 @@ test('MiniMax automatic launch follows the Windows installation default and scri
   const preferences = { installDir: root, registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true }
   const enabled = officialToolEntrySelection(tool.id, { preferences })
   assert.equal(enabled.plan.methodId, 'script-powershell')
-  assert.deepEqual(enabled.directories, [root])
+  assert.deepEqual(enabled.directories, [join(root, 'minimax-code')])
 
   const disabled = { ...preferences, allowScriptInstall: false }
   const installation = resolveInstallPlan(tool, undefined, disabled, currentInstallOptions())

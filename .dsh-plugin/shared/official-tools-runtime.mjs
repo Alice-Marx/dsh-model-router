@@ -26,6 +26,7 @@ import {
 import {
   expandInstallDir,
   resolveInstallLocation,
+  resolveLegacyScriptLocation,
   resolveInstallPlan,
   resolveUninstallPlan,
 } from './tool-install-preferences.mjs'
@@ -308,16 +309,22 @@ async function fetchOfficialMiniMaxInstaller(signal) {
 }
 
 export function minimaxOfficialInstallDir(selectedPreferences = {}, home = homedir(), existingRoot = '') {
-  return selectedPreferences.installDir || existingRoot || join(home, '.minimax-code')
+  return selectedPreferences.installDir
+    ? resolveInstallPlan(getOfficialTool('minimax-code'), 'script-powershell', selectedPreferences, { platform: 'win32', home }).installDir
+    : existingRoot || join(home, '.minimax-code')
 }
 
 /** Keep a discovered native installation in place when its legacy updater runs. */
 export function miniMaxFallbackPlan(selectedPreferences, beforeProbe, prefix, options = currentInstallOptions()) {
   const installDir = minimaxOfficialInstallDir(selectedPreferences, options.home,
     beforeProbe?.installed ? beforeProbe.installDir : '')
-  const executionPreferences = { ...selectedPreferences, installDir,
+  const executionPreferences = { ...selectedPreferences,
     methods: { ...selectedPreferences.methods, 'minimax-code': 'script-powershell' } }
-  return { plan: resolveInstallPlan(getOfficialTool('minimax-code'), 'script-powershell', executionPreferences, options), executionPreferences }
+  const plan = resolveInstallPlan(getOfficialTool('minimax-code'), 'script-powershell', selectedPreferences, options)
+  // installDir is already the discovered exclusive native root or the resolved
+  // child of the configured base. Never reinterpret it as another shared base.
+  return { plan: { ...plan, installDir, binDir: installDir,
+    env: { ...plan.env, MCODE_INSTALL_DIR: installDir } }, executionPreferences }
 }
 
 async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
@@ -330,6 +337,7 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
     pushLine(job, reason || '— npm 原生依赖未就绪；改用 MiniMax 官方 Windows 安装脚本（安装最新版）—')
     const { plan, executionPreferences } = miniMaxFallbackPlan(job.preferences, job.beforeProbe, '')
     const installDir = plan.installDir
+    await assertVendorInstallDirectory(job.tool, plan, job.preferences)
     await mkdir(installDir, { recursive: true })
     prefixRoot = await realpath(installDir)
     const script = await fetchOfficialMiniMaxInstaller(job.controller.signal)
@@ -354,6 +362,7 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
       + 'Import-Module -Name $env:MODEL_ROUTER_UTILITY_MODULE -ErrorAction Stop; '
       + '& $env:MODEL_ROUTER_MINIMAX_INSTALL_SCRIPT'
     job.phase = 'installing'
+    await assertVendorInstallDirectory(job.tool, plan, job.preferences)
     const outcome = await runCapture(powershell,
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], {
         timeoutMs: INSTALL_TIMEOUT_MS, signal: job.controller.signal,
@@ -378,7 +387,7 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
     probeCache.delete(job.tool.id)
     const probe = await probeToolWith(job.tool, defaultRunner, { preferences: executionPreferences, plan, cacheMs: 0 })
     job.postInstallProbe = probe
-    const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: executionPreferences })
+    const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: executionPreferences, plan })
     if (!probe.installed || !readiness.ready) {
       throw new Error(`官方安装器完成，但执行入口未通过 npm registry 摘要核验：${readiness.reason ?? probe.detail}`)
     }
@@ -516,6 +525,95 @@ export function vendorScriptInvocation(plan, scriptPath) {
   return { file: plan.shell === 'sh' ? 'sh' : 'bash', args: [scriptPath, ...directoryArgs] }
 }
 
+/** Resolve an existing ancestor too, so a missing child under a junction is checked. */
+async function canonicalInstallPath(path) {
+  let current = resolve(path)
+  const suffix = []
+  for (;;) {
+    try { return join(await realpath(current), ...suffix) }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw error
+      const parent = dirname(current)
+      if (parent === current) throw error
+      suffix.unshift(current.slice(parent.length).replace(/^[\\/]+/, ''))
+      current = parent
+    }
+  }
+}
+
+/** A vendor owns its target; its cleanup must never touch a shared npm prefix. */
+export async function assertVendorInstallDirectory(tool, plan, selectedPreferences = {}, options = currentInstallOptions()) {
+  const directory = plan.installDir || plan.binDir
+  if (!directory) throw new Error('官方脚本安装目录无法确定，已停止安装。')
+  const canonical = await canonicalInstallPath(directory)
+  if (canonical.split(/[\\/]+/).some(part => ['node_modules', '.pnpm'].includes(part.toLowerCase()))) {
+    throw new Error('官方脚本不能写入 npm/pnpm 的包目录或共享存储目录。')
+  }
+  if (canonical === dirname(canonical) || canonical === await canonicalInstallPath(homedir())) {
+    throw new Error('官方脚本不能在磁盘根目录或用户主目录中执行。')
+  }
+  let codexOwnedRelease = false
+  if (tool.id === 'codex' && plan.shell === 'powershell') {
+    // The official Windows script keeps releases under the user's existing
+    // CODEX_HOME. CODEX_INSTALL_DIR selects only the visible bin junction.
+    // Respect that documented layout without redirecting the user's config.
+    const codexHome = options.env?.CODEX_HOME || join(options.home || homedir(), '.codex')
+    const homeRoot = await canonicalInstallPath(codexHome)
+    const releases = join(homeRoot, 'packages', 'standalone', 'releases')
+    const member = relative(releases, canonical)
+    const expectedVisible = !selectedPreferences.installDir || resolve(directory) === resolve(join(selectedPreferences.installDir, plan.method.installDirSubdir))
+    codexOwnedRelease = Boolean(expectedVisible && member && member !== '..' && !member.startsWith(`..${sep}`) && !isAbsolute(member))
+  }
+  if (selectedPreferences.installDir && plan.method?.supportsInstallDir) {
+    const base = await canonicalInstallPath(selectedPreferences.installDir)
+    const child = relative(base, canonical)
+    if (!codexOwnedRelease && (!child || child === '..' || child.startsWith(`..${sep}`) || isAbsolute(child))) {
+      throw new Error('官方脚本必须使用统一安装根目录下的工具专属子目录；已拒绝覆盖共享目录。')
+    }
+    const owner = plan.method.installDirSubdir?.split(/[\\/]+/)[0]
+    const ownedRoot = owner ? join(base, owner) : null
+    const ownedChild = ownedRoot ? relative(ownedRoot, canonical) : '..'
+    if (!codexOwnedRelease && (ownedChild === '..' || ownedChild.startsWith(`..${sep}`) || isAbsolute(ownedChild))) {
+      throw new Error('官方脚本的目录联接必须留在本工具专属目录中，不能指向其他工具。')
+    }
+  }
+  // These fixed/default bin installers replace only their own launcher, not
+  // another CLI's runtime directory. Sharing ~/.local/bin is intentional.
+  if (plan.method?.sharedDefaultBin && (!selectedPreferences.installDir || !plan.method.supportsInstallDir)) return
+  const targetStat = await stat(directory).catch(error => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+  if (targetStat && !targetStat.isDirectory()) throw new Error('官方脚本安装目标不是目录。')
+  const packageText = await readFile(join(directory, 'package.json'), 'utf8').catch(error => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+  if (packageText) {
+    let name
+    try { name = JSON.parse(packageText).name } catch { throw new Error('安装目录已有无法核验归属的 package.json，已停止运行官方脚本。') }
+    const ownPackage = tool.package || (tool.id === 'stepcode' ? '@step-harness/coding-agent' : '')
+    if (!name || name !== ownPackage) throw new Error('安装目录已有其他工具或项目的 package.json，已停止运行官方脚本。')
+  }
+  for (const other of OFFICIAL_TOOLS) {
+    if (other.id === tool.id) continue
+    const commandDirectories = [...new Set([directory, plan.binDir].filter(Boolean))]
+    const candidates = commandDirectories.flatMap(dir => (other.probeExecutables ?? []).flatMap(name =>
+      [name, `${name}.exe`, `${name}.cmd`, `${name}.ps1`].map(file => join(dir, file))))
+    if (other.package) {
+      candidates.push(join(directory, 'node_modules', ...other.package.split('/'), 'package.json'))
+      candidates.push(join(directory, 'lib', 'node_modules', ...other.package.split('/'), 'package.json'))
+    }
+    for (const path of candidates) {
+      const found = await stat(path).catch(error => {
+        if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null
+        throw error
+      })
+      if (found?.isFile()) throw new Error(`安装目录中已有 ${other.label} 的文件，已拒绝运行可能替换其资源的官方脚本。请使用独立目录。`)
+    }
+  }
+}
+
 /**
  * Install one tool from its vendor script: download, verify, stage, run the
  * staged copy. The binary lands in a directory the plugin appends to its own
@@ -527,6 +625,7 @@ async function runVendorScriptInstallJob(job, plan) {
   let staging = null
   try {
     job.phase = 'preflight'
+    await assertVendorInstallDirectory(job.tool, plan, job.preferences)
     const before = await probeToolWith(job.tool, defaultRunner, { plan, preferences: job.preferences, cacheMs: 0 })
     job.beforeProbe = before
     const latestBefore = before.installed ? await latestVersions.lookup(job.tool, { fresh: true }).catch(() => null) : null
@@ -548,6 +647,7 @@ async function runVendorScriptInstallJob(job, plan) {
     await writeFile(scriptPath, isPowerShell ? `\uFEFF${source}` : source, 'utf8')
     const invocation = vendorScriptInvocation(plan, scriptPath)
     job.phase = 'installing'
+    await assertVendorInstallDirectory(job.tool, plan, job.preferences)
     pushLine(job, `$ ${plan.label}${invocation.args.length > 1 ? ` ${invocation.args.slice(1).join(' ')}` : ''}`)
     const outcome = await runCapture(invocation.file, invocation.args, {
       timeoutMs: INSTALL_TIMEOUT_MS,
@@ -827,6 +927,22 @@ async function probeUncached(tool, runner, { selectedPreferences, plan, fileExis
           bannerLine: banner.split('\n').find(Boolean)?.slice(0, 200) ?? '' }
       }
     }
+    const legacy = resolveLegacyScriptLocation(tool, selectedPlan.method, selectedPreferences, currentInstallOptions())
+    if (legacy) {
+      for (const executable of tool.probeExecutables) {
+        const names = IS_WINDOWS ? [`${executable}.exe`, `${executable}.cmd`, executable] : [executable]
+        for (const name of names) {
+          const target = join(legacy.dir, name)
+          if (!(await fileExists(target))) continue
+          // Discovery is read-only. The old root can never satisfy a new job's
+          // target probe or become a script update/uninstall destination.
+          return { id: tool.id, installed: false, version: null, status: 'legacy-install',
+            installDir: selectedPlan.installDir, binDir: selectedPlan.binDir,
+            legacyExecutablePath: target,
+            detail: `发现旧共享目录中的 ${tool.label}：${target}。请安装到独立目录 ${selectedPlan.installDir}；旧文件会保留，不能用旧目录覆盖其他工具。` }
+        }
+      }
+    }
     return { id: tool.id, installed: false, version: null, status: 'not-installed',
       installDir: selectedPlan.installDir, binDir: selectedPlan.binDir,
       detail: `未在所选安装目录 ${selectedPlan.binDir} 中找到官方命令。` }
@@ -1006,6 +1122,7 @@ function jobView(job) {
     exitCode: job.exitCode,
     timedOut: job.timedOut,
     error: job.error,
+    executionReadiness: job.executionReadiness ?? null,
     outputTail: [...job.outputTail],
     outputTruncated: job.outputTruncated,
     postInstallProbe: job.postInstallProbe,
@@ -1272,8 +1389,10 @@ export function installEnvironment(plan, base = process.env) {
   return env
 }
 
-/** Mark the job succeeded only when the fresh probe is installed, ready, and not still older. */
-async function finishVerifiedInstall(job, probe) {
+/** Installation and version must pass; verify execution only where an adapter supports it. */
+export async function finishVerifiedInstall(job, probe, {
+  lookupLatest = tool => latestVersions.lookup(tool), readinessFor = trustedExecutionReadiness,
+} = {}) {
   job.postInstallProbe = probe
   if (job.cancelRequested) { markCancelled(job); return true }
   if (!probe.installed) {
@@ -1282,14 +1401,15 @@ async function finishVerifiedInstall(job, probe) {
     job.error = `安装命令已完成，但重探测失败：${probe.detail}`
     return true
   }
-  const latest = await latestVersions.lookup(job.tool).catch(() => null)
+  const latest = await lookupLatest(job.tool).catch(() => null)
   if (latest?.version && versionStillOlder(probe.version, latest.version)) {
     failBecauseStillOlder(job, probe, latest.version)
     return true
   }
-  const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan })
+  const readiness = await readinessFor(job.tool.id, { preferences: job.preferences, plan: job.plan })
+  job.executionReadiness = readiness
   if (job.cancelRequested) { markCancelled(job); return true }
-  if (!readiness.ready) {
+  if (!readiness.ready && readiness.supported !== false) {
     if (IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
       await runOfficialMiniMaxInstaller(job)
       return true
@@ -1300,8 +1420,11 @@ async function finishVerifiedInstall(job, probe) {
     return true
   }
   job.status = 'succeeded'
+  job.error = null
   job.finishedAt = new Date().toISOString()
-  pushLine(job, `— 已安装 ${job.tool.label} ${probe.version ?? ''}，官方执行入口已核验（新版本未经插件测试）—`)
+  pushLine(job, readiness.supported === false
+    ? `— 已安装 ${job.tool.label} ${probe.version ?? ''}，版本探测已通过；受限执行未启用：${readiness.reason} —`
+    : `— 已安装 ${job.tool.label} ${probe.version ?? ''}，官方执行入口已核验（新版本未经插件测试）—`)
   return true
 }
 
@@ -1378,11 +1501,13 @@ async function runInstallJob(installPlan, job) {
       // exactly the case the user pressed 修复 for.
       if (job.repair) {
         pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，按修复流程重新安装 —`)
-      } else if (readiness.ready || !CAPABILITY_REPAIRABLE.has(job.tool.id)) {
+      } else if (readiness.ready || readiness.supported === false || !CAPABILITY_REPAIRABLE.has(job.tool.id)) {
         job.status = 'succeeded'
         job.finishedAt = new Date().toISOString()
         job.postInstallProbe = before
+        job.executionReadiness = readiness
         pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，无需重复安装 —`)
+        if (readiness.supported === false) pushLine(job, `— 受限执行未启用：${readiness.reason} —`)
         return
       } else {
         pushLine(job, `— 已是最新版本 ${before.version}，但执行入口未就绪：${readiness.reason}；重新安装修复 —`)

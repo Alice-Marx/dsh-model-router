@@ -345,7 +345,7 @@ function nodeVersion(entry, pattern = /^v(\d+\.\d+\.\d+)/) {
   })
 }
 
-async function findNodeExecutable(workspace, minimum = [22, 19, 0], acceptedVersion = () => true) {
+export async function findNodeExecutable(workspace, minimum = [22, 19, 0], acceptedVersion = () => true) {
   await ensureNpmPrefixOnPath()
   const candidates = [process.execPath, ...pathDirectories().map(directory => join(directory, IS_WINDOWS ? 'node.exe' : 'node'))]
   for (const candidate of candidates) {
@@ -676,17 +676,17 @@ export function harnessSandboxBlocker(toolId, platform = process.platform) {
 /** Check the actual trusted launch entry without starting an account call. */
 export async function officialToolReadiness(toolId, workspace = process.cwd(), selectionOptions = {}) {
   const tool = getOfficialTool(toolId)
-  if (!tool) return { id: String(toolId), ready: false, reason: '工具不在固定官方注册表中。' }
+  if (!tool) return { id: String(toolId), supported: false, ready: false, reason: '工具不在固定官方注册表中。' }
   const capability = CAPABILITIES[tool.id]
-  if (!capability?.supported) return { id: tool.id, ready: false, reason: capability?.reason ?? '当前平台不支持托管执行。' }
+  if (!capability?.supported) return { id: tool.id, supported: false, ready: false, reason: capability?.reason ?? '当前平台不支持托管执行。' }
   try {
     const directory = await checkedWorkspace(workspace)
     const spec = await launchSpec(tool.id, directory, capability.modes[0], null, undefined, selectionOptions)
     return spec.unsupported
-      ? { id: tool.id, ready: false, reason: spec.unsupported }
-      : { id: tool.id, ready: true, source: spec.source, modes: capability.modes }
+      ? { id: tool.id, supported: true, ready: false, reason: spec.unsupported }
+      : { id: tool.id, supported: true, ready: true, source: spec.source, modes: capability.modes }
   } catch (error) {
-    return { id: tool.id, ready: false, reason: String(error?.message ?? error).slice(0, 300) }
+    return { id: tool.id, supported: true, ready: false, reason: String(error?.message ?? error).slice(0, 300) }
   }
 }
 

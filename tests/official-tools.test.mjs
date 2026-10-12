@@ -37,10 +37,57 @@ import {
   vendorScriptInvocation,
   verifiedVendorScript,
   CLAUDE_UPDATE_ARGS,
+  finishVerifiedInstall,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
-import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, packageBinCandidates, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, officialToolReadiness, packageBinCandidates, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { emptyOutputError, outputIsEmpty, usageFromOutput, verifiedDiagnostic } from '../.dsh-plugin/shared/task-executors.mjs'
+
+function verificationJob(toolId, preferences = {}) {
+  return {
+    tool: getOfficialTool(toolId), preferences, configured: true,
+    status: 'running', cancelRequested: false, error: null, outputTail: [],
+  }
+}
+
+test('installed Gemini and OpenCode succeed without pretending a restricted runner is ready', async () => {
+  for (const toolId of ['gemini', 'opencode', 'stepcode']) {
+    const job = verificationJob(toolId)
+    const probe = { id: toolId, installed: true, version: '1.0.0' }
+    await finishVerifiedInstall(job, probe, { lookupLatest: async () => ({ version: '1.0.0' }) })
+    assert.equal(job.status, 'succeeded', toolId)
+    assert.equal(job.error, null)
+    assert.equal(job.postInstallProbe, probe)
+    assert.equal(job.executionReadiness.supported, false)
+    assert.equal(job.executionReadiness.ready, false, 'successful installation cannot authorize restricted execution')
+    assert.match(job.outputTail.at(-1), /版本探测已通过；受限执行未启用/)
+    assert.equal((await officialToolReadiness(toolId)).ready, false)
+  }
+})
+
+test('an installed version still fails when a supported Kimi execution entry is missing', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'router-install-readiness-'))
+  t.after(async () => {
+    if (resolve(root).startsWith(`${resolve(tmpdir())}${sep}`)) await rm(root, { recursive: true, force: true })
+  })
+  const preferences = { installDir: root, methods: { 'kimi-code': 'npm' }, scriptUrls: {}, allowScriptInstall: true }
+  const job = verificationJob('kimi-code', preferences)
+  await finishVerifiedInstall(job, { installed: true, version: '1.0.0' }, { lookupLatest: async () => ({ version: '1.0.0' }) })
+  assert.equal(job.status, 'failed')
+  assert.equal(job.executionReadiness.supported, true)
+  assert.equal(job.executionReadiness.ready, false)
+  assert.match(job.error, /官方执行入口未就绪.*未找到官方 npm 包/)
+})
+
+test('unsupported execution never hides a failed installation probe or stale Gemini version', async () => {
+  for (const probe of [{ installed: false, detail: 'selected package is absent' }, { installed: true, version: '0.9.0' }]) {
+    const job = verificationJob('gemini')
+    await finishVerifiedInstall(job, probe, { lookupLatest: async () => ({ version: '1.0.0' }) })
+    assert.equal(job.status, 'failed')
+    assert.equal(job.executionReadiness, undefined, 'installation checks must fail before capability handling')
+    assert.match(job.error, /重探测失败|版本仍是/)
+  }
+})
 
 test('MiniMax official Windows installer entry: any release, but its code must match the npm registry',
   { skip: process.platform !== 'win32' }, async t => {

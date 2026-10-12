@@ -35,7 +35,7 @@ test('install summary uses the host platform and reports the configured update d
   assert.match(step.methods.find(method => method.id === 'script-bash').blocked, /仅支持/)
   assert.equal(step.methods.find(method => method.id === 'script-powershell').blocked, null)
   assert.equal(step.methodId, 'script-powershell')
-  assert.equal(step.installDir, 'D:/AI/tools')
+  assert.equal(step.installDir, 'D:/AI/tools/stepcode')
   assert.equal(step.updateInstallDir, step.installDir)
   assert.equal(step.updateCommand, step.command)
   const zcode = windows.tools.find(tool => tool.id === 'zcode')
@@ -71,7 +71,7 @@ test('invalid Host install settings reject previews and actions before any CLI i
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.18.1')
+  assert.equal(manifest.version, '0.18.2')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)

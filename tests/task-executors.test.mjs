@@ -1,11 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { Readable } from 'node:stream'
+import { gzipSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join, resolve, sep } from 'node:path'
 import { createPlanFromRoutes } from '../.dsh-plugin/shared/harness-plan.mjs'
-import { executeAssignedTask, executeAssignmentPlan } from '../.dsh-plugin/shared/task-executors.mjs'
+import { adapterForToolId, executeAssignedTask, executeAssignmentPlan, resolvePortableToolLaunch } from '../.dsh-plugin/shared/task-executors.mjs'
+import { officialToolEntrySelection } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+import { createNpmAttestor } from '../.dsh-plugin/shared/npm-attestation.mjs'
 
 function fakeSpawn(handler) {
   const calls = []
@@ -35,11 +40,195 @@ function fakeSpawn(handler) {
   return { spawnImpl, calls }
 }
 
+const fakePortableLaunch = async adapter => ({ file: adapter.executable, args: [] })
+
 async function workspace(t) {
   const root = await mkdtemp(join(tmpdir(), 'model-router-exec-'))
-  t.after(async () => { await rm(root, { recursive: true, force: true }) })
+  t.after(async () => {
+    if (resolve(root).startsWith(`${resolve(tmpdir())}${sep}`)) await rm(root, { recursive: true, force: true })
+  })
   return root
 }
+
+const geminiManifest = version => JSON.stringify({ name: '@google/gemini-cli', version, bin: { gemini: './dist/index.js' } })
+
+function geminiAttestor(versions) {
+  const tarEntry = (name, source) => {
+    const body = Buffer.from(source)
+    const header = Buffer.alloc(512)
+    header.write(`package/${name}`, 0, 100)
+    header.write('0000644\0', 100)
+    header.write(`${body.length.toString(8).padStart(11, '0')}\0`, 124)
+    header.write('        ', 148)
+    header.write('0', 156)
+    header.write('ustar\0', 257)
+    let sum = 0
+    for (const byte of header) sum += byte
+    header.write(`${sum.toString(8).padStart(6, '0')}\0 `, 148)
+    return Buffer.concat([header, body, Buffer.alloc((512 - body.length % 512) % 512)])
+  }
+  const packages = Object.fromEntries(Object.entries(versions).map(([version, source]) => {
+    const tgz = gzipSync(Buffer.concat([tarEntry('package.json', geminiManifest(version)), tarEntry('dist/index.js', source), Buffer.alloc(1024)]))
+    return [version, { tgz, integrity: `sha512-${createHash('sha512').update(tgz).digest('base64')}` }]
+  }))
+  return createNpmAttestor({ persist: false, npmCacheDirectory: async () => null, fetchImpl: async raw => {
+    const url = new URL(raw)
+    const version = url.pathname.split('/').at(-1).replace(/\.tgz$/, '')
+    const pkg = packages[version]
+    if (!pkg) return { ok: false, status: 404 }
+    return url.pathname.endsWith('.tgz')
+      ? { ok: true, body: Readable.toWeb(Readable.from([pkg.tgz])) }
+      : { ok: true, json: async () => ({ name: '@google/gemini-cli', version,
+        dist: { integrity: pkg.integrity, tarball: `https://registry.npmjs.org/@google/gemini-cli/-/${version}.tgz` } }) }
+  } })
+}
+
+async function geminiPackage(modules, version, entrySource = 'fixture') {
+  const packageRoot = join(modules, '@google', 'gemini-cli')
+  await mkdir(join(packageRoot, 'dist'), { recursive: true })
+  await writeFile(join(packageRoot, 'package.json'), geminiManifest(version))
+  await writeFile(join(packageRoot, 'dist', 'index.js'), entrySource)
+  return await realpath(join(packageRoot, 'dist', 'index.js'))
+}
+
+test('Gemini headless launch selects npm or pnpm package bins and never a shared command shim', async t => {
+  const cwd = await workspace(t)
+  const root = await workspace(t)
+  const prefix = join(root, 'AI tools with spaces')
+  const npmEntry = await geminiPackage(process.platform === 'win32' ? join(prefix, 'node_modules') : join(prefix, 'lib', 'node_modules'), '1.0.0')
+  const pnpmModules = join(prefix, '.pnpm', 'global', '5', 'node_modules')
+  const pnpmEntry = await geminiPackage(join(pnpmModules, '.pnpm', '@google+gemini-cli@2.0.0', 'node_modules'), '2.0.0')
+  await mkdir(join(pnpmModules, '@google'), { recursive: true })
+  await symlink(resolve(pnpmEntry, '..', '..'), join(pnpmModules, '@google', 'gemini-cli'), process.platform === 'win32' ? 'junction' : 'dir')
+  const attestor = geminiAttestor({ '1.0.0': 'fixture', '2.0.0': 'fixture' })
+  // A shim with the same name exists beside both stores, and must never be used.
+  await writeFile(join(prefix, 'gemini.cmd'), 'this shim must not execute')
+  const beforePath = process.env.PATH
+  process.env.PATH = [prefix, beforePath].filter(Boolean).join(delimiter)
+  t.after(() => { if (beforePath === undefined) delete process.env.PATH; else process.env.PATH = beforePath })
+  for (const [method, entry] of [['npm', npmEntry], ['pnpm', pnpmEntry]]) {
+    const preferences = { installDir: prefix, methods: { gemini: method }, scriptUrls: {}, allowScriptInstall: true }
+    const selection = officialToolEntrySelection('gemini', { preferences })
+    const { spawnImpl, calls } = fakeSpawn((file, args) => {
+      assert.equal(file, process.execPath)
+      assert.equal(args[0], entry)
+      if (args[1] === '--version') return { code: 0, stdout: '1.0.0\n' }
+      assert.ok(args.includes('-p'))
+      assert.deepEqual(args.slice(-2), ['-m', 'gemini-test'])
+      return { code: 0, stdout: JSON.stringify({ response: method }) }
+    })
+    const result = await executeAssignedTask({
+      route: { provider: 'google-ai', model: 'gemini-test', execution: 'official' }, task: '回答问题', workspace: cwd, spawnImpl,
+      resolvePortableLaunch: (adapter, workspace) => resolvePortableToolLaunch(adapter, workspace, { selection,
+        attestor, findNode: async (directory, minimum) => { assert.deepEqual(minimum, [20, 0, 0]); return process.execPath } }),
+      apiFallback: () => { throw new Error('selected Gemini fixture should run') },
+    })
+    assert.equal(result.ok, true)
+    assert.equal(result.answer, method)
+    assert.equal(calls.length, 2)
+    assert.equal(calls.at(-1).options.shell, false)
+  }
+})
+
+test('a missing selected Gemini copy falls back without spawning another PATH installation', async t => {
+  const cwd = await workspace(t)
+  const root = await workspace(t)
+  await geminiPackage(join(root, 'other', 'node_modules'), '99.0.0')
+  const selection = officialToolEntrySelection('gemini', { preferences: {
+    installDir: join(root, 'missing'), methods: { gemini: 'npm' }, scriptUrls: {}, allowScriptInstall: true,
+  } })
+  const result = await executeAssignedTask({
+    route: { provider: 'google', model: 'gemini-test', execution: 'official' }, task: '回答问题', workspace: cwd,
+    spawnImpl: () => { throw new Error('a missing selected package cannot spawn') },
+    resolvePortableLaunch: (adapter, workspace) => resolvePortableToolLaunch(adapter, workspace, { selection,
+      findNode: async () => { throw new Error('do not look for Node when the selected package is absent') } }),
+    apiFallback: async () => ({ ok: true, answer: 'api fallback' }),
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.channel, 'harness-llm')
+  assert.match(result.fallback.reason, /所选安装目录.*gemini.*入口/)
+})
+
+test('a real Node child runs a Gemini package bin with spaces and stdin without a Windows shell', async t => {
+  const cwd = await workspace(t)
+  const root = await workspace(t)
+  const prefix = join(root, 'AI tools with spaces')
+  const source = `
+    if (process.argv.includes('--version')) { process.stdout.write('1.0.0\\n') }
+    else { let task = ''; process.stdin.on('data', chunk => { task += chunk }); process.stdin.on('end', () => {
+      process.stdout.write(JSON.stringify({ response: task, args: process.argv.slice(2) }));
+    }) }
+  `
+  const entry = await geminiPackage(process.platform === 'win32' ? join(prefix, 'node_modules') : join(prefix, 'lib', 'node_modules'), '1.0.0', source)
+  const selection = officialToolEntrySelection('gemini', { preferences: {
+    installDir: prefix, methods: { gemini: 'npm' }, scriptUrls: {}, allowScriptInstall: true,
+  } })
+  const launch = await resolvePortableToolLaunch(adapterForToolId('gemini'), cwd, { selection,
+    attestor: geminiAttestor({ '1.0.0': source }), findNode: async () => process.execPath })
+  assert.deepEqual(launch.args, [entry])
+  const result = await executeAssignedTask({
+    route: { provider: 'google-ai', model: 'gemini-test', execution: 'official' }, task: '中文 fixture prompt', workspace: cwd,
+    resolvePortableLaunch: async () => launch, apiFallback: () => { throw new Error('fixture should execute without a shell') },
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.answer, '中文 fixture prompt')
+  assert.equal(result.version, '1.0.0')
+})
+
+test('Gemini refuses tampered or unattested package code before starting a child', async t => {
+  const cwd = await workspace(t)
+  const prefix = await workspace(t)
+  const modules = process.platform === 'win32' ? join(prefix, 'node_modules') : join(prefix, 'lib', 'node_modules')
+  const entry = await geminiPackage(modules, '1.0.0', 'official fixture code')
+  const selection = officialToolEntrySelection('gemini', { preferences: {
+    installDir: prefix, methods: { gemini: 'npm' }, scriptUrls: {}, allowScriptInstall: true,
+  } })
+  const cases = [
+    { source: 'tampered fixture code', attestor: geminiAttestor({ '1.0.0': 'official fixture code' }), error: /发行文件不符/ },
+    { source: 'official fixture code', attestor: geminiAttestor({}), error: /404/ },
+    { source: 'official fixture code', attestor: createNpmAttestor({ persist: false, npmCacheDirectory: async () => null,
+      fetchImpl: async () => { throw new Error('registry unavailable') } }), error: /registry unavailable/ },
+  ]
+  for (const item of cases) {
+    await writeFile(entry, item.source)
+    let nodeLookups = 0
+    let spawns = 0
+    const result = await executeAssignedTask({
+      route: { provider: 'google-ai', model: 'gemini-test', execution: 'official' }, task: '回答问题', workspace: cwd,
+      spawnImpl: () => { spawns += 1; throw new Error('unattested code must not start') },
+      resolvePortableLaunch: (adapter, workspace) => resolvePortableToolLaunch(adapter, workspace, { selection,
+        attestor: item.attestor, findNode: async () => { nodeLookups += 1; return process.execPath } }),
+      apiFallback: async () => ({ ok: true, answer: 'api fallback' }),
+    })
+    assert.equal(result.channel, 'harness-llm')
+    assert.match(result.fallback.reason, /npm 摘要核验/)
+    assert.match(result.fallback.reason, item.error)
+    assert.equal(nodeLookups, 0)
+    assert.equal(spawns, 0)
+  }
+})
+
+test('Gemini refuses package links outside the selected npm or pnpm tree before attestation', async t => {
+  const cwd = await workspace(t)
+  const root = await workspace(t)
+  const outsideEntry = await geminiPackage(join(root, 'outside'), '1.0.0')
+  for (const method of ['npm', 'pnpm']) {
+    const prefix = join(root, method)
+    const modules = method === 'pnpm' ? join(prefix, '.pnpm', 'global', '5', 'node_modules')
+      : process.platform === 'win32' ? join(prefix, 'node_modules') : join(prefix, 'lib', 'node_modules')
+    await mkdir(join(modules, '@google'), { recursive: true })
+    await symlink(resolve(outsideEntry, '..', '..'), join(modules, '@google', 'gemini-cli'), process.platform === 'win32' ? 'junction' : 'dir')
+    const selection = officialToolEntrySelection('gemini', { preferences: {
+      installDir: prefix, methods: { gemini: method }, scriptUrls: {}, allowScriptInstall: true,
+    } })
+    const launch = await resolvePortableToolLaunch(adapterForToolId('gemini'), cwd, { selection,
+      attestor: { matchesPackage() { throw new Error('escaped package must fail before attestation') } },
+      findNode: async () => { throw new Error('escaped package must not look up Node') },
+    })
+    assert.equal(launch.file, undefined)
+    assert.match(launch.reason, /离开了所选安装目录的包存储树/)
+  }
+})
 
 test('direct mode keeps the chosen model and skips comparison', () => {
   const routes = [
@@ -96,6 +285,7 @@ test('claude, codex, and gemini adapters use fixed headless arguments and the co
       workspace: cwd,
       credentials: { apiKey: secret },
       spawnImpl,
+      resolvePortableLaunch: fakePortableLaunch,
       onChunk: chunk => chunks.push(chunk),
       apiFallback: () => { throw new Error('api should not run') },
     })
@@ -230,6 +420,7 @@ test('official CLI timeout falls back and a dependency failure does not run late
     workspace: cwd,
     timeoutMs: 1_000,
     spawnImpl: hanging.spawnImpl,
+    resolvePortableLaunch: fakePortableLaunch,
     apiFallback: async () => ({ ok: true, answer: 'timed fallback' }),
   })
   assert.equal(timed.timedOut, true)

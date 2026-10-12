@@ -14,8 +14,11 @@
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute, win32 } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep, win32 } from 'node:path'
 import { toolForProvider } from './official-tool-registry.mjs'
+import { findGlobalPackageEntries, findNodeExecutable, officialToolEntrySelection } from './official-tool-executor.mjs'
+import { installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
+import { CODE_FILE, npmAttestor } from './npm-attestation.mjs'
 import { normalizeExecutionPreference } from './model-profiles.mjs'
 import { BILLING_MODE_LABEL, billingPlan, detectQuotaExhaustion, vendorKey } from './subscription-billing.mjs'
 
@@ -666,6 +669,45 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
   }
 }
 
+/** Gemini's Windows npm shim cannot be spawned without a shell; use its selected package bin. */
+export async function resolvePortableToolLaunch(adapter, workspace, {
+  selection = adapter?.id === 'gemini' ? officialToolEntrySelection('gemini') : null,
+  findEntries = findGlobalPackageEntries, findNode = findNodeExecutable, attestor = npmAttestor,
+} = {}) {
+  if (adapter?.id !== 'gemini') return { file: adapter.executable, args: [] }
+  const entries = await findEntries('@google/gemini-cli', 'gemini', 'dist/index.js', workspace, { selection })
+  const found = entries[0]
+  if (!found) return { reason: '未在所选安装目录中找到 @google/gemini-cli 的 gemini 入口；已回退模型目录 API。' }
+  const inside = (root, entry) => {
+    const part = relative(root, entry)
+    return part !== '' && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
+  }
+  const roots = Array.isArray(selection?.plan?.packageModuleRoots) ? selection.plan.packageModuleRoots
+    : await installedModuleRoots(selection?.directories ?? [], { manager: selection?.plan?.manager })
+  const prefix = selection?.plan?.installDir ? await realpath(selection.plan.installDir).catch(() => null) : null
+  if (selection?.plan?.installDir && !prefix) return { reason: 'Gemini 所选安装根无法确认，已拒绝启动并回退模型目录 API。' }
+  let contained = false
+  for (const declared of roots) {
+    const boundary = await realpath(declared).catch(() => null)
+    const parent = await realpath(dirname(declared)).catch(() => null)
+    if (!boundary || !parent || !inside(parent, boundary) || (prefix && !inside(prefix, boundary))) continue
+    if (inside(boundary, found.packageRoot) && inside(found.packageRoot, found.entry)
+      && !inside(workspace, found.packageRoot) && found.packageRoot !== workspace) { contained = true; break }
+  }
+  if (!contained) return { reason: 'Gemini 包或入口离开了所选安装目录的包存储树，已拒绝启动并回退模型目录 API。' }
+  // The manifest controls bin/import resolution, so attest it as well as all
+  // package code. Checking name/version or a signed Node alone is insufficient.
+  const include = new RegExp(`${CODE_FILE.source}|(?:^|/)package\\.json$`, 'i')
+  const checked = await attestor.matchesPackage(found.packageRoot, '@google/gemini-cli', found.version, include)
+  if (!checked.ok) return { reason: `Gemini 安装文件未通过官方 npm 摘要核验：${checked.reason}；已回退模型目录 API。` }
+  const member = relative(found.packageRoot, found.entry).split(sep).join('/')
+  const entryChecked = await attestor.matches(found.entry, '@google/gemini-cli', found.version, member)
+  if (!entryChecked.ok) return { reason: `Gemini 入口未通过官方 npm 摘要核验：${entryChecked.reason}；已回退模型目录 API。` }
+  const node = await findNode(workspace, [20, 0, 0])
+  if (!node) return { reason: '未找到工作区外的 Node.js 20+ 可执行文件；已回退模型目录 API。' }
+  return { file: node, args: [found.entry], version: found.version, source: 'official-npm-registry-attested' }
+}
+
 /**
  * Run one assigned model task. `auto` and `official` try the vendor CLI first.
  * `api` skips the CLI. A missing tool or a failed process uses `apiFallback`.
@@ -673,6 +715,7 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
 export async function executeAssignedTask({
   route, task, workspace, timeoutMs, signal, credentials = null, spawnImpl = spawn,
   apiFallback, runVerified = null, onChunk = null, skipOfficial = null, stopGraceMs, credentialMode = 'default',
+  resolvePortableLaunch = resolvePortableToolLaunch,
 } = {}) {
   const prompt = checkedTask(task)
   const preference = executionPreference(route)
@@ -734,7 +777,13 @@ export async function executeAssignedTask({
     })
   }
   const { env, secret, credentialSource } = childEnvironment(adapter, credentials, credentialMode)
-  const probe = await captureProcess(spawnImpl, adapter.executable, ['--version'], {
+  let launch
+  try { launch = await resolvePortableLaunch(adapter, cwd) } catch (error) {
+    launch = { reason: `${adapter.label} 的安装入口无法读取：${String(error?.message ?? error).slice(0, 200)}；已回退模型目录 API。` }
+  }
+  if (!launch?.file) return useApi(apiFallback, { route, task: prompt, signal, adapter, preference,
+    reason: launch?.reason ?? `${adapter.label} 未安装或无法启动，已回退模型目录 API。` })
+  const probe = await captureProcess(spawnImpl, launch.file, [...launch.args, '--version'], {
     cwd, env, stdin: '', timeoutMs: Math.min(PROBE_TIMEOUT_MS, timeout), signal, secret,
   })
   if (probe.spawnError || probe.cancelled || probe.timedOut || probe.exitCode !== 0) {
@@ -748,7 +797,7 @@ export async function executeAssignedTask({
     return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, reason })
   }
   const args = adapter.buildArgs(modelId)
-  const run = await captureProcess(spawnImpl, adapter.executable, args, {
+  const run = await captureProcess(spawnImpl, launch.file, [...launch.args, ...args], {
     cwd, env, stdin: prompt, timeoutMs: timeout, signal, onChunk, secret,
     ...(Number.isSafeInteger(stopGraceMs) && stopGraceMs >= 10 && stopGraceMs <= STOP_GRACE_MS ? { stopGraceMs } : {}),
   })

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join, resolve, sep } from 'node:path'
 import {
@@ -14,6 +14,7 @@ import {
   normalizeSourceUrl,
   parseInstallPreferences,
   resolveInstallLocation,
+  resolveLegacyScriptLocation,
   resolveInstallPlan,
   resolveUninstallPlan,
   scriptInstallDir,
@@ -143,20 +144,98 @@ test('Step Code honours the configured directory and a script mirror', () => {
   const plan = resolveInstallPlan(stepcode, 'script-powershell', preferences, { platform: 'win32', home: HOME })
   assert.equal(plan.kind, 'script')
   assert.equal(plan.scriptUrl, 'https://mirror.example.com/stepcode/install.ps1')
-  assert.equal(plan.installDir, 'D:/AI/tools')
+  assert.equal(plan.installDir, 'D:/AI/tools/stepcode')
   assert.deepEqual(plan.env, {
-    STEP_INSTALL_DIR: 'D:/AI/tools',
+    STEP_INSTALL_DIR: 'D:/AI/tools/stepcode',
     // The mirror must also move the binaries and their checksums, not the script alone.
     STEP_RELEASE_BASE_URL: 'https://mirror.example.com/stepcode',
   })
-  assert.deepEqual(plan.notices, [])
+  assert.match(plan.notices.join(''), /专属子目录/)
   const invocation = vendorScriptInvocation(plan, 'C:\\Temp\\install.ps1')
-  assert.deepEqual(invocation.args.slice(-2), ['-InstallDir', 'D:/AI/tools'])
+  assert.deepEqual(invocation.args.slice(-2), ['-InstallDir', 'D:/AI/tools/stepcode'])
   assert.equal(invocation.file.endsWith('powershell.exe'), true)
 
   const bash = resolveInstallPlan(stepcode, 'script-bash', clean, { platform: 'linux', home: '/home/tester' })
   assert.deepEqual(vendorScriptInvocation(bash, '/tmp/install.sh').args, ['/tmp/install.sh', '--install-dir', '/home/tester/.stepcode/bin'])
   assert.equal(scriptInstallDir(stepcode, clean, { home: '/home/tester' }), '/home/tester/.stepcode/bin')
+})
+
+test('every configurable vendor script owns a tool directory while npm keeps the shared prefix', () => {
+  const preferences = { ...clean, installDir: 'D:/AI/tools' }
+  for (const tool of OFFICIAL_TOOLS) {
+    for (const method of tool.installMethods ?? []) {
+      if (method.kind !== 'script' || !method.supportsInstallDir) continue
+      const platform = method.platforms[0]
+      const plan = resolveInstallPlan(tool, method.id, preferences, { platform, home: HOME })
+      assert.ok(plan.installDir.startsWith('D:/AI/tools/'), `${tool.id}/${method.id} must never write directly to the shared prefix`)
+      assert.ok(method.installDirSubdir, `${tool.id}/${method.id} declares its owned directory`)
+      assert.equal(resolveInstallLocation(tool, method, preferences, { platform, home: HOME }).dir, plan.binDir)
+      if (method.uninstallUnsupportedReason) {
+        assert.throws(() => resolveUninstallPlan(tool, method.id, preferences, { platform, home: HOME }), /目录联接/)
+      } else {
+        assert.equal(resolveUninstallPlan(tool, method.id, preferences, { platform, home: HOME }).dir, plan.binDir)
+      }
+    }
+    if (tool.package) {
+      const npm = resolveInstallPlan(tool, 'npm', preferences, { platform: 'win32' })
+      assert.equal(npm.installDir, 'D:/AI/tools', `${tool.id} retains its existing npm prefix`)
+    }
+  }
+})
+
+test('legacy shared script locations are read-only candidates and never change new operation targets', () => {
+  const preferences = { ...clean, installDir: 'D:/AI/tools' }
+  const step = getOfficialTool('stepcode')
+  const method = installMethodFor(step, 'script-powershell')
+  const legacy = resolveLegacyScriptLocation(step, method, preferences, { platform: 'win32', home: HOME })
+  assert.deepEqual(legacy, {
+    kind: 'script', dir: 'D:/AI/tools', installDir: 'D:/AI/tools',
+    binaries: ['step', 'step.exe'], legacySharedInstallDir: true,
+  })
+  assert.equal(resolveInstallPlan(step, method.id, preferences, { platform: 'win32', home: HOME }).installDir, 'D:/AI/tools/stepcode')
+  assert.equal(resolveUninstallPlan(step, method.id, preferences, { platform: 'win32', home: HOME }).dir, 'D:/AI/tools/stepcode')
+  assert.equal(resolveLegacyScriptLocation(step, method, clean, { home: HOME }), null, 'vendor defaults do not need a shared-root fallback')
+  const kimi = getOfficialTool('kimi-code')
+  assert.equal(resolveLegacyScriptLocation(kimi, installMethodFor(kimi, 'script-bash'), preferences, { home: HOME }).dir, 'D:/AI/tools/bin')
+  const codex = getOfficialTool('codex')
+  assert.equal(resolveLegacyScriptLocation(codex, installMethodFor(codex, 'script-powershell'), preferences), null,
+    'Codex Windows already had its dedicated directory before this change')
+  assert.equal(resolveLegacyScriptLocation(codex, installMethodFor(codex, 'npm'), preferences), null)
+})
+
+test('Step runtime directory replacement preserves earlier npm packages and sibling script resources', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'router-step-isolation-'))
+  t.after(async () => {
+    if (resolve(root).startsWith(`${resolve(tmpdir())}${sep}`)) await rm(root, { recursive: true, force: true })
+  })
+  const npmPackage = join(root, 'node_modules', '@openai', 'codex', 'package.json')
+  const siblingResource = join(root, 'minimax-code', 'node_modules', 'keep.txt')
+  const sharedShim = join(root, 'codex.cmd')
+  await mkdir(join(root, 'node_modules', '@openai', 'codex'), { recursive: true })
+  await mkdir(join(root, 'minimax-code', 'node_modules'), { recursive: true })
+  await writeFile(npmPackage, '{"name":"@openai/codex","version":"1.0.0"}')
+  await writeFile(siblingResource, 'sibling-runtime')
+  await writeFile(sharedShim, 'shared-command')
+  const step = getOfficialTool('stepcode')
+  for (const [methodId, platform] of [['script-powershell', 'win32'], ['script-bash', 'linux']]) {
+    const plan = resolveInstallPlan(step, methodId, { ...clean, installDir: root }, { platform, home: HOME })
+    assert.equal(plan.env.STEP_INSTALL_DIR, join(root, 'stepcode'))
+    assert.equal(vendorScriptInvocation(plan, 'staged-installer').args.at(-1), join(root, 'stepcode'))
+    // Reproduce the vendor installer's whole-resource-directory replacement.
+    // All removal paths are checked before the fixture mutates the filesystem.
+    for (const resource of ['node_modules', 'native', 'theme', 'docs']) {
+      const target = resolve(plan.env.STEP_INSTALL_DIR, resource)
+      assert.equal(target, resolve(root, 'stepcode', resource))
+      await mkdir(target, { recursive: true })
+      await writeFile(join(target, 'previous-release.txt'), 'old')
+      await rm(target, { recursive: true, force: true })
+      await mkdir(target, { recursive: true })
+      await writeFile(join(target, 'current-release.txt'), 'new')
+    }
+    assert.equal(await readFile(npmPackage, 'utf8'), '{"name":"@openai/codex","version":"1.0.0"}')
+    assert.equal(await readFile(siblingResource, 'utf8'), 'sibling-runtime')
+    assert.equal(await readFile(sharedShim, 'utf8'), 'shared-command')
+  }
 })
 
 test('a pinned method is never silently swapped for one that runs here', () => {
@@ -187,7 +266,7 @@ test('removal mirrors how the tool was installed', () => {
 
   const stepcode = resolveUninstallPlan(getOfficialTool('stepcode'), undefined, { ...preferences, installDir: 'D:/AI/tools' }, { platform: 'win32' })
   assert.equal(stepcode.kind, 'script')
-  assert.equal(stepcode.dir, 'D:/AI/tools')
+  assert.equal(stepcode.dir, 'D:/AI/tools/stepcode')
   assert.deepEqual(stepcode.binaries, ['step', 'step.exe'])
 
   // The desktop installer is not this plugin's to remove.
@@ -226,8 +305,8 @@ test('chosen script methods pass the configured directory and nothing else', () 
   const preferences = { ...clean, installDir: 'D:/AI/tools', registry: 'https://registry.npmmirror.com/' }
   const minimax = resolveInstallPlan(getOfficialTool('minimax-code'), 'script-powershell', preferences, { platform: 'win32', home: HOME })
   assert.equal(minimax.kind, 'script')
-  assert.equal(minimax.installDir, 'D:/AI/tools')
-  assert.equal(minimax.env.MCODE_INSTALL_DIR, 'D:/AI/tools')
+  assert.equal(minimax.installDir, 'D:/AI/tools/minimax-code')
+  assert.equal(minimax.env.MCODE_INSTALL_DIR, 'D:/AI/tools/minimax-code')
   assert.equal(minimax.env.MCODE_NPM_REGISTRY, 'https://registry.npmmirror.com/')
   assert.equal(minimax.installArg.length, 0)
   assert.match(vendorScriptInvocation(minimax, 'C:\\Temp\\install.ps1').args.join(' '), /install\.ps1$/)
@@ -241,14 +320,14 @@ test('chosen script methods pass the configured directory and nothing else', () 
   assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, { ...clean, allowScriptInstall: false }, { platform: 'win32', home: HOME }).methodId, 'npm')
 
   const codex = resolveInstallPlan(getOfficialTool('codex'), 'script-sh', preferences, { platform: 'linux', home: '/home/tester' })
-  assert.equal(codex.env.CODEX_INSTALL_DIR, 'D:/AI/tools')
+  assert.equal(codex.env.CODEX_INSTALL_DIR, 'D:/AI/tools/codex/bin')
   const claude = resolveInstallPlan(getOfficialTool('claude-code'), 'script-bash', preferences, { platform: 'linux', home: '/home/tester' })
   assert.equal(claude.installDir, '')
   assert.match(claude.notices.join(''), /写死了安装路径/)
   assert.equal(resolveInstallLocation(getOfficialTool('claude-code'), claude.method, preferences, { home: '/home/tester' }).dir, '/home/tester/.local/bin')
 
   const kimi = resolveInstallLocation(getOfficialTool('kimi-code'), installMethodFor(getOfficialTool('kimi-code'), 'script-bash'), preferences, { home: '/home/tester' })
-  assert.equal(kimi.dir, 'D:/AI/tools/bin')
+  assert.equal(kimi.dir, 'D:/AI/tools/kimi-code/bin')
   assert.deepEqual(kimi.binaries, ['kimi'])
   assert.equal(minimaxScriptRegistry('https://example.invalid/npm'), '')
   assert.equal(minimaxScriptRegistry('https://registry.npmjs.org'), 'https://registry.npmjs.org/')
@@ -283,17 +362,17 @@ test('Host preferences reach the runtime and are cleared by the test reset', () 
 test('environment-only native installers map root directories to actual binary directories', () => {
   const preferences = { ...clean, installDir: 'D:/AI/tools' }
   const kimi = resolveInstallPlan(getOfficialTool('kimi-code'), 'script-powershell', preferences, { platform: 'win32', home: HOME })
-  assert.equal(kimi.installDir, 'D:/AI/tools')
-  assert.equal(kimi.binDir, 'D:/AI/tools/bin')
-  assert.equal(kimi.env.KIMI_INSTALL_DIR, 'D:/AI/tools')
+  assert.equal(kimi.installDir, 'D:/AI/tools/kimi-code')
+  assert.equal(kimi.binDir, 'D:/AI/tools/kimi-code/bin')
+  assert.equal(kimi.env.KIMI_INSTALL_DIR, 'D:/AI/tools/kimi-code')
   assert.equal(resolveInstallLocation(getOfficialTool('kimi-code'), kimi.method, preferences, { platform: 'win32', home: HOME }).dir, kimi.binDir)
   assert.deepEqual(vendorScriptInvocation(kimi, 'C:/Temp/install.ps1').args.slice(-1), ['C:/Temp/install.ps1'], 'environment-only installers get no invented positional arguments')
-  assert.match(planCommandLine(kimi), /\$env:KIMI_INSTALL_DIR='D:\/AI\/tools'; irm/)
+  assert.match(planCommandLine(kimi), /\$env:KIMI_INSTALL_DIR='D:\/AI\/tools\/kimi-code'; irm/)
 
   const minimax = getOfficialTool('minimax-code')
   const nativeWindows = resolveInstallPlan(minimax, 'script-powershell', preferences, { platform: 'win32', home: HOME })
-  assert.equal(nativeWindows.binDir, 'D:/AI/tools')
-  assert.equal(nativeWindows.env.MCODE_INSTALL_DIR, 'D:/AI/tools')
+  assert.equal(nativeWindows.binDir, 'D:/AI/tools/minimax-code')
+  assert.equal(nativeWindows.env.MCODE_INSTALL_DIR, 'D:/AI/tools/minimax-code')
   assert.equal(nativeWindows.env.MCODE_NPM_REGISTRY, clean.registry)
   assert.deepEqual(resolveInstallLocation(minimax, nativeWindows.method, preferences, { platform: 'win32', home: HOME }).binaries, ['mcode.cmd', 'mcode.ps1', 'mcode-tools.cmd', 'mcode-tools.ps1'])
   const nativeUnix = resolveInstallPlan(minimax, 'script-bash', clean, { platform: 'linux', home: '/home/tester' })
@@ -658,7 +737,7 @@ test('the upstream installer decoder keeps BOM and bare UTF-16 script bytes equi
   assert.equal(installerScriptText(Buffer.from(script, 'utf16le')), script)
   assert.equal(isMarkupDocument(script), false)
   for (const markup of ['<html>error</html>', '<!DOCTYPE html>', '<?xml version="1.0"?>']) assert.equal(isMarkupDocument(markup), true)
-  assert.equal(minimaxOfficialInstallDir({ installDir: 'D:/AI/tools' }, HOME, 'C:/Old'), 'D:/AI/tools')
+  assert.equal(minimaxOfficialInstallDir({ installDir: 'D:/AI/tools' }, HOME, 'C:/Old'), 'D:/AI/tools/minimax-code')
   assert.equal(minimaxOfficialInstallDir({}, HOME, 'D:/Old/MiniMax'), 'D:/Old/MiniMax')
   assert.equal(minimaxOfficialInstallDir({}, HOME), join(HOME, '.minimax-code'))
 })

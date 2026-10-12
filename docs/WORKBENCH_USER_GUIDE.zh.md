@@ -1,6 +1,6 @@
 # 模型路由工作台：配置、规划与实际执行
 
-适用版本：正式版 `@ljwei-stak/dsh-model-router@0.18.1`；声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
+适用版本：正式版 `@ljwei-stak/dsh-model-router@0.18.2`；声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
 
 0.15.0 新增四页布局、规划后直接展示路由建议、执行输入变化时丢弃旧预览，以及历史裁剪和重试后的费用累计保留。源码中的独立 UI 预览使用模拟数据，用于组件检查，不代表真实账号调用或桌面端到端验收。
 
@@ -113,10 +113,12 @@
 
 | 设置 | 作用 | 限制 |
 | --- | --- | --- |
-| 统一安装目录 | 所有一键安装的目标目录 | 必须是绝对路径，不能是磁盘或共享根目录；留空=各厂商默认位置 |
+| 统一安装根目录 | npm/pnpm 使用该根；可配置厂商脚本使用各工具子目录 | 必须是绝对路径，不能是磁盘或共享根目录；留空=各厂商默认位置 |
 | npm 源地址 | npm / pnpm 方式的下载源 | 必须 https，可填国内镜像 |
 | 安装脚本源覆盖 | 按工具 ID 指定厂商安装脚本的镜像 | JSON，键是官方工具 ID，值是 https 链接 |
 | 允许 curl / irm 安装脚本 | 是否允许执行厂商安装脚本 | 关闭后只剩 npm / pnpm |
+
+0.18.2 起，以 `D:/AI/tools` 为根时，Step 脚本安装到 `D:/AI/tools/stepcode`，MiniMax 脚本安装到 `D:/AI/tools/minimax-code`，其他可配置脚本同样使用专属子目录。厂商脚本可能替换整个运行资源目录，不能直接交给共享 npm 根。旧共享目录中的文件仅供识别并保留，不用于新脚本更新；可重新安装到独立目录。升级并重启 Host 后再操作 Step。
 
 几个容易踩的点：
 
@@ -132,20 +134,20 @@ MiniMax 官方 Windows 脚本的 `<# ... #>` 是 PowerShell 帮助注释。0.18.
 
 | 工具 | npm / pnpm | curl（Linux / macOS） | irm（Windows） | 统一目录支持 |
 | --- | --- | --- | --- | --- |
-| Kimi Code | ✓ | bash | PowerShell | 支持；脚本命令在目录的 bin 子目录 |
+| Kimi Code | ✓ | bash | PowerShell | 脚本使用根目录/kimi-code/bin |
 | Claude Code | ✓ | bash | PowerShell | 包管理器支持；脚本固定在 ~/.local/bin |
 | Codex | ✓ | sh | PowerShell | 支持；Windows 脚本使用统一目录/codex/bin，避免把共享目录变成目录联接 |
-| MiniMax Code | ✓ | bash | PowerShell | 支持 |
+| MiniMax Code | ✓ | bash | PowerShell | 脚本使用根目录/minimax-code |
 | MiMo Code | ✓ | bash | PowerShell | 包管理器与 Windows 脚本支持；Unix 脚本固定 ~/.mimocode/bin |
-| Grok Build | ✓ | bash | PowerShell | 支持 |
+| Grok Build | ✓ | bash | PowerShell | 脚本使用根目录/grok-build |
 | Gemini CLI | ✓ | — | — | 支持 |
 | OpenCode | ✓ | bash | — | 包管理器支持；脚本固定 ~/.opencode/bin |
-| Step Code | — | bash | PowerShell | 支持 |
+| Step Code | — | bash | PowerShell | 脚本使用根目录/stepcode |
 | ZCode | — | — | — | 官方 Windows 桌面安装窗口中选择 |
 
 “—”表示当前厂商未提供相应渠道。每个工具的安装方式下拉框保留所有声明方式，并说明本机不适用的原因。MiniMax 官方脚本只接受官方 npm 源或 npmmirror；其他 npm 镜像请选 npm/pnpm 方式。
 
-脚本安装成功只表示命令和版本已确认。Kimi、MiMo、Grok 的独立原生脚本安装目前没有插件需要的 npm 文件摘要证明，自动任务会显示执行入口未就绪并回退到 API；npm/pnpm 安装保留可核验的执行路径。Windows Codex 脚本使用目录联接，插件不提供通用文件删除卸载；请按官方方式移除原生安装。
+安装成功只表示所选目录的命令入口和版本已确认，不代表工具支持受限执行。Gemini 使用核验后的 npm/pnpm 包入口无界面执行；OpenCode、Step 当前可安装和在终端中使用，尚不支持受限任务。缺少这类能力不再报安装失败。Kimi、MiMo、Grok 的独立原生脚本安装目前没有插件需要的 npm 文件摘要证明，自动任务会显示执行入口未就绪并回退到 API；npm/pnpm 安装保留可核验的执行路径。Windows Codex 脚本使用目录联接，插件不提供通用文件删除卸载；请按官方方式移除原生安装。
 
 ### 安装方式的会话与 Agent 等价物
 

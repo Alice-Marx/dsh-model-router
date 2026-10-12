@@ -211,6 +211,7 @@ test('CLI subscription success runs without API keys and is billed as subscripti
     const { spawnImpl, calls } = fakeSpawn((file, args) => args[0] === '--version' ? { code: 0, stdout: '1.0.0\n' } : { code: 0, stdout: item.ok })
     const result = await executeRouteWithBilling({
       route: item.route, task: '回答问题', workspace: cwd, credentials: { apiKey: 'sk-secret-value' }, spawnImpl,
+      resolvePortableLaunch: async adapter => ({ file: adapter.executable, args: [] }),
       billing: billingContext({ routes: [item.route] }),
       apiFallback: () => { throw new Error('api must not run') },
     })
@@ -231,6 +232,7 @@ test('CLI quota exhaustion switches the same step to the API key and records why
     const apiCalls = []
     const result = await executeRouteWithBilling({
       route: item.route, task: '回答问题', workspace: cwd, spawnImpl, billing,
+      resolvePortableLaunch: async adapter => ({ file: adapter.executable, args: [] }),
       apiFallback: request => { apiCalls.push(request); return { ok: true, answer: 'api answer' } },
     })
     assert.equal(result.ok, true, item.toolId)

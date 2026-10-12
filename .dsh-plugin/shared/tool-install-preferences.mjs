@@ -249,11 +249,16 @@ export function resolveInstallPlan(tool, methodId, preferences = {}, { platform 
     const binDir = target
       ? (method.installDirSuffix ? joinPath(target, method.installDirSuffix) : target)
       : vendorScriptDir(tool, { home, env, method })
-    const notices = target ? [] : installDir
+    const notices = target && installDir && method.installDirSubdir
+      ? [`官方脚本在工具专属子目录 ${target} 维护资源，保护统一安装根中的其他工具。`]
+      : target ? [] : installDir
       ? [`${method.label} 无法使用自定义安装目录（官方脚本写死了安装路径），将安装到 ${vendorScriptDir(tool, { home, env, method })}。`]
       : []
     if (method.registryEnv === 'MCODE_NPM_REGISTRY' && preferences.registry && !minimaxScriptRegistry(preferences.registry)) {
       notices.push('MiniMax 官方脚本只接受 https://registry.npmjs.org/ 或 https://registry.npmmirror.com/，本次不改写它的 npm 源。')
+    }
+    if (tool.id === 'codex' && method.id === 'script-powershell') {
+      notices.push('Codex Windows 脚本将命令目录联接到用户 Codex 资源目录；统一根控制命令位置，运行资源仍由厂商保存在用户目录。需要所有文件位于统一根时请选 npm/pnpm。')
     }
     return {
       toolId: tool.id,
@@ -330,6 +335,20 @@ export function resolveInstallLocation(tool, method, preferences = {}, { home = 
     return { kind: 'script', dir: binDir, installDir: dir, binaries: [...(method.scriptBinaryNames ?? tool.scriptBinaryNames ?? [])] }
   }
   return { kind: 'package-manager', dir: packageManagerBinDir(preferences?.installDir || '', { platform }), installDir: preferences?.installDir || '', binaries: [] }
+}
+
+/**
+ * Read-only compatibility location for scripts installed directly into a
+ * configured shared root before dedicated script directories were introduced.
+ * Never use this result as an install/update target: those installers can
+ * replace a whole runtime tree belonging to another tool.
+ */
+export function resolveLegacyScriptLocation(tool, method, preferences = {}, options = {}) {
+  if (!preferences.installDir || !method?.legacySharedInstallDir || !methodHonoursInstallDir(method)) return null
+  return {
+    ...resolveInstallLocation(tool, { ...method, installDirSubdir: undefined }, preferences, options),
+    legacySharedInstallDir: true,
+  }
 }
 
 function scriptEnv(method, { installDir, scriptUrl, registry }) {

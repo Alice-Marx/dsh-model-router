@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.2 — 2026-10-12
+
+Stable patch under the npm latest tag. Upgrade and fully restart Harness before using Step install, repair or update.
+
+- Treat the configured install directory as a shared base. Configurable vendor scripts use dedicated tool subdirectories; npm/pnpm retain their existing shared prefix. Step's official installer replaces its entire runtime directories, so passing the shared root could delete every other npm package there.
+- Check script targets before download or execution: refuse shared roots, other tool/project manifests and commands, package stores, and junctions into another tool's tree. Codex's junction within its own release tree and intentional shared default launcher directories remain supported. Legacy script roots are discovered read-only and cannot satisfy or redirect new install jobs.
+- Separate successful version/install verification from unsupported restricted execution capabilities. Gemini, OpenCode and Step can be installed successfully while retaining explicit execution limitations; supported tools still require their original trusted-entry checks.
+- Resolve Windows Gemini through its selected npm/pnpm package bin and a verified Node executable. Check package-tree containment and official registry file digests before launch, and preserve API fallback when the selected copy is missing or fails verification.
+- Add regressions for destructive vendor runtime replacement, shared-prefix sentinels, junctions, legacy discovery, install capability status and Windows Gemini entry selection. Release notes record validation and the original-version recovery performed on the reported machine.
+
 ## 0.18.1 — 2026-10-12
 
 Stable patch under the npm latest tag. Fully quit Harness, including the tray or WebUI host process, and restart after upgrading.

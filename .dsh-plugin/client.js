@@ -77,6 +77,8 @@ function scriptMethod(id2, label, {
   scriptBinaryNames,
   registryEnv,
   installDirSubdir,
+  legacySharedInstallDir = false,
+  sharedDefaultBin = false,
   uninstallUnsupportedReason,
   scriptFallbackUrls
 }) {
@@ -97,6 +99,8 @@ function scriptMethod(id2, label, {
     installDirEnv,
     installDirSuffix,
     ...installDirSubdir ? { installDirSubdir } : {},
+    ...legacySharedInstallDir ? { legacySharedInstallDir: true } : {},
+    ...sharedDefaultBin ? { sharedDefaultBin: true } : {},
     ...uninstallUnsupportedReason ? { uninstallUnsupportedReason } : {},
     ...defaultScriptInstallDir ? { defaultScriptInstallDir } : {},
     ...defaultScriptInstallDirEnv ? { defaultScriptInstallDirEnv } : {},
@@ -131,6 +135,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         supportsInstallDir: true,
         installDirEnv: "KIMI_INSTALL_DIR",
         installDirSuffix: "bin",
+        installDirSubdir: "kimi-code",
+        legacySharedInstallDir: true,
         env: ["KIMI_INSTALL_DIR"],
         scriptBinaryNames: ["kimi"],
         verify: Object.freeze({ mustInclude: ["kimi-code", "code.kimi.com/kimi-code"] })
@@ -142,6 +148,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         supportsInstallDir: true,
         installDirEnv: "KIMI_INSTALL_DIR",
         installDirSuffix: "bin",
+        installDirSubdir: "kimi-code",
+        legacySharedInstallDir: true,
         env: ["KIMI_INSTALL_DIR"],
         scriptBinaryNames: ["kimi.exe"],
         verify: Object.freeze({ mustInclude: ["kimi-code", "code.kimi.com/kimi-code"] })
@@ -174,6 +182,7 @@ var OFFICIAL_TOOLS = Object.freeze([
         scriptFallbackUrls: ["https://downloads.claude.ai/claude-code-releases/bootstrap.sh"],
         platforms: ["linux", "darwin"],
         scriptBinaryNames: ["claude"],
+        sharedDefaultBin: true,
         verify: Object.freeze({ mustInclude: ["downloads.claude.ai/claude-code-releases", "manifest.json"] })
       }),
       scriptMethod("script-powershell", "irm | iex", {
@@ -182,6 +191,7 @@ var OFFICIAL_TOOLS = Object.freeze([
         scriptFallbackUrls: ["https://downloads.claude.ai/claude-code-releases/bootstrap.ps1"],
         platforms: ["win32"],
         scriptBinaryNames: ["claude.exe"],
+        sharedDefaultBin: true,
         verify: Object.freeze({ mustInclude: ["downloads.claude.ai/claude-code-releases", "manifest.json"] })
       })
     ])
@@ -210,6 +220,9 @@ var OFFICIAL_TOOLS = Object.freeze([
         supportsInstallDir: true,
         installDirEnv: "CODEX_INSTALL_DIR",
         env: ["CODEX_INSTALL_DIR"],
+        installDirSubdir: "codex/bin",
+        legacySharedInstallDir: true,
+        sharedDefaultBin: true,
         scriptBinaryNames: ["codex"],
         verify: Object.freeze({ mustInclude: ["releases.openai.com/codex", "CODEX_INSTALL_DIR"] })
       }),
@@ -259,6 +272,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         supportsInstallDir: true,
         installDirEnv: "MCODE_INSTALL_DIR",
         installDirSuffix: "bin",
+        installDirSubdir: "minimax-code",
+        legacySharedInstallDir: true,
         registryEnv: "MCODE_NPM_REGISTRY",
         env: ["MCODE_INSTALL_DIR", "MCODE_NPM_REGISTRY"],
         verify: Object.freeze({ mustInclude: ["MiniMax Code CLI", "@minimax-ai/code"] })
@@ -269,6 +284,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         platforms: ["win32"],
         supportsInstallDir: true,
         installDirEnv: "MCODE_INSTALL_DIR",
+        installDirSubdir: "minimax-code",
+        legacySharedInstallDir: true,
         registryEnv: "MCODE_NPM_REGISTRY",
         env: ["MCODE_INSTALL_DIR", "MCODE_NPM_REGISTRY"],
         defaultScriptInstallDir: ".minimax-code",
@@ -307,6 +324,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         supportsInstallDir: true,
         installDirEnv: "MIMOCODE_INSTALL_DIR",
         env: ["MIMOCODE_INSTALL_DIR"],
+        installDirSubdir: "mimo-code",
+        legacySharedInstallDir: true,
         scriptBinaryNames: ["mimo.exe"],
         verify: Object.freeze({ mustInclude: ["mimo.xiaomi.com", ".mimocode"] })
       })
@@ -336,6 +355,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         supportsInstallDir: true,
         installDirEnv: "GROK_BIN_DIR",
         env: ["GROK_BIN_DIR"],
+        installDirSubdir: "grok-build",
+        legacySharedInstallDir: true,
         scriptBinaryNames: ["grok", "agent"],
         verify: Object.freeze({ mustInclude: ["Grok CLI installer", "x.ai/cli"] })
       }),
@@ -346,6 +367,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         supportsInstallDir: true,
         installDirEnv: "GROK_BIN_DIR",
         env: ["GROK_BIN_DIR"],
+        installDirSubdir: "grok-build",
+        legacySharedInstallDir: true,
         scriptBinaryNames: ["grok.exe", "agent.exe", "grove.exe", "grove-fsmonitor.exe", "grove-credential.exe"],
         verify: Object.freeze({ mustInclude: ["Grok CLI installer", "x.ai/cli"] })
       })
@@ -428,6 +451,10 @@ var OFFICIAL_TOOLS = Object.freeze([
         installArg: ["--install-dir"],
         env: ["STEP_INSTALL_DIR", "STEP_RELEASE_BASE_URL"],
         supportsInstallDir: true,
+        // The installer replaces its runtime directories, including the entire
+        // node_modules tree on Windows. It must own a dedicated directory.
+        installDirSubdir: "stepcode",
+        legacySharedInstallDir: true,
         verify: Object.freeze({
           mustInclude: ["static-openapi.stepfun.com", "stepcode installer"],
           mustNotInclude: ["anomalyco/opencode"]
@@ -440,6 +467,8 @@ var OFFICIAL_TOOLS = Object.freeze([
         installArg: ["-InstallDir"],
         env: ["STEP_INSTALL_DIR", "STEP_RELEASE_BASE_URL"],
         supportsInstallDir: true,
+        installDirSubdir: "stepcode",
+        legacySharedInstallDir: true,
         verify: Object.freeze({
           mustInclude: ["static-openapi.stepfun.com", "stepcode"],
           mustNotInclude: ["anomalyco/opencode"]
@@ -12704,7 +12733,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.18.1" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.18.2" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -13537,10 +13566,10 @@ function probeLabel(probe) {
 var INSTALL_SETTING_FIELDS = [
   {
     key: "toolInstallDir",
-    label: "\u7EDF\u4E00\u5B89\u88C5\u76EE\u5F55",
+    label: "\u7EDF\u4E00\u5B89\u88C5\u6839\u76EE\u5F55",
     fallback: "",
     placeholder: "\u7559\u7A7A = \u5404\u5382\u5546\u9ED8\u8BA4\u76EE\u5F55",
-    hint: "\u586B\u5199\u7EDD\u5BF9\u8DEF\u5F84\uFF0C\u4F8B\u5982 D:/AI/tools\u3002\u5404\u65B9\u5F0F\u7684\u5B9E\u9645\u76EE\u5F55\u4F1A\u663E\u793A\u5728\u5DE5\u5177\u547D\u4EE4\u65C1\uFF1B\u4E0D\u652F\u6301\u7EDF\u4E00\u76EE\u5F55\u7684\u65B9\u5F0F\u4F1A\u8BF4\u660E\u539F\u56E0\u3002"
+    hint: "\u4F8B\u5982 D:/AI/tools\u3002npm / pnpm \u4F7F\u7528\u8BE5\u6839\uFF1B\u5382\u5546\u811A\u672C\u4F7F\u7528\u5DE5\u5177\u4E13\u5C5E\u5B50\u76EE\u5F55\uFF0C\u5B9E\u9645\u5730\u5740\u89C1\u5DE5\u5177\u884C\u3002\u56FA\u5B9A\u5382\u5546\u5730\u5740\u7684\u65B9\u5F0F\u4F1A\u8BF4\u660E\u539F\u56E0\u3002"
   },
   {
     key: "toolNpmRegistry",
@@ -14876,8 +14905,8 @@ function RouterSettingsCard(props) {
     import_dsh_client_ui_primitives.SettingsValueField,
     {
       id: "model-router-tool-install-dir",
-      label: "\u7EDF\u4E00\u5B89\u88C5\u76EE\u5F55",
-      hint: "\u586B\u5199\u7EDD\u5BF9\u8DEF\u5F84\uFF0C\u7559\u7A7A\u4F7F\u7528\u5382\u5546\u9ED8\u8BA4\u4F4D\u7F6E\u3002npm / pnpm \u4F7F\u7528\u8BE5\u76EE\u5F55\u5B89\u88C5\uFF1B\u5382\u5546\u811A\u672C\u4E0D\u652F\u6301\u81EA\u5B9A\u4E49\u76EE\u5F55\u65F6\uFF0C\u5B98\u65B9\u5DE5\u5177\u9875\u4F1A\u663E\u793A\u5B9E\u9645\u76EE\u5F55\u4E0E\u539F\u56E0\u3002\u66F4\u65B0\u4F7F\u7528\u540C\u4E00\u5B89\u88C5\u65B9\u5F0F\u3001\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u3002",
+      label: "\u7EDF\u4E00\u5B89\u88C5\u6839\u76EE\u5F55",
+      hint: "\u586B\u5199\u7EDD\u5BF9\u8DEF\u5F84\uFF0C\u7559\u7A7A\u4F7F\u7528\u5382\u5546\u9ED8\u8BA4\u4F4D\u7F6E\u3002npm / pnpm \u5171\u7528\u8BE5\u6839\uFF1B\u53EF\u914D\u7F6E\u5382\u5546\u811A\u672C\u4F7F\u7528\u5DE5\u5177\u4E13\u5C5E\u5B50\u76EE\u5F55\uFF0C\u5B9E\u9645\u4F4D\u7F6E\u89C1\u5B98\u65B9\u5DE5\u5177\u9875\u3002\u66F4\u65B0\u590D\u7528\u6240\u9009\u65B9\u5F0F\u3001\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u3002",
       disabled,
       ...state.toolInstallDir,
       overriddenLabel: FIELD_COPY.overridden,
