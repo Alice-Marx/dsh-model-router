@@ -4,13 +4,43 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'router-native-test-'))
-const { approvalReasonCodes, confirmationReasons, previewWorkbenchRun, startWorkbenchRun } = await import('../.dsh-plugin/index.mjs')
+const { approvalReasonCodes, confirmationReasons, previewWorkbenchRun, startWorkbenchRun, routerRemoteServices, routerStateStore } = await import('../.dsh-plugin/index.mjs')
 const { parseRunRequest } = await import('../.dsh-plugin/shared/official-tools-remote.mjs')
 const { launchRequest, rerunConfirmations } = await import('../.dsh-plugin/client/insights-state.mjs')
 const { officialToolExecutionCapabilities, runOfficialTool } = await import('../.dsh-plugin/shared/official-tool-executor.mjs')
 const { runOfficialTeam } = await import('../.dsh-plugin/shared/official-team-runtime.mjs')
 const { execFileSync } = await import('node:child_process')
 const { writeFile, readFile } = await import('node:fs/promises')
+const { OfficialToolsRemoteService } = await import('../.dsh-plugin/official-tools-remote-service.mjs')
+const { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS, OFFICIAL_TOOLS_REMOTE_NAMESPACE } = await import('../.dsh-plugin/shared/official-tools-remote.mjs')
+const { gatewayClient } = await import('./helpers/typert-gateway.mjs')
+const { unwrapRemote } = await import('../.dsh-plugin/client/insights-state.mjs')
+
+test('workbench retry carries explicit native consent through the gateway and Host dispatcher', async () => {
+  // A deliberately absent source makes the next preflight fail before discovery
+  // or execution. Accepted consent must reach it; missing consent must pause first.
+  const absent = join(process.env.DSH_HOME, 'absent-source')
+  const run = { id: 'native-retry-dispatch', createdAt: Date.now(), task: 'fixture',
+    kind: 'team', status: 'incomplete', executionMode: 'workspace-write', executionEnvironment: 'cli-native',
+    workspace: absent, isolatedWorkspace: join(process.env.DSH_HOME, 'retained-worktree'), baseCommit: 'a'.repeat(40),
+    packages: [{ id: 'failed', status: 'failed', ok: false, recommendedProvider: 'anthropic', recommendedModel: 'fixture' }] }
+  await routerStateStore().appendRun(run)
+  const ctx = { llm: { listProviders: () => [{ id: 'anthropic' }], listModels: async () => [{ id: 'fixture' }], resolveModelInfo: async () => ({}) } }
+  const service = Object.create(OfficialToolsRemoteService.prototype)
+  service.services = routerRemoteServices(ctx, { confirmUnsandboxedCli: false })
+  const api = gatewayClient(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS, service, OFFICIAL_TOOLS_REMOTE_NAMESPACE)
+  const request = { runId: run.id, packageId: 'failed', confirmWrite: true }
+  for (const confirmUnsandboxed of [undefined, false, 'true']) {
+    const result = unwrapRemote(await api.rerunStep({ ...request, confirmUnsandboxed }), 'fixture failure')
+    assert.equal(result.paused, true)
+    assert.deepEqual(result.needsConfirmation, ['unsandboxed'])
+  }
+  const noWrite = unwrapRemote(await api.rerunStep({ ...request, confirmWrite: false, confirmUnsandboxed: true }), 'fixture failure')
+  assert.deepEqual(noWrite.needsConfirmation, ['workspace-write'])
+  const accepted = await api.rerunStep({ ...request, confirmUnsandboxed: true })
+  assert.throws(() => unwrapRemote(accepted, 'fixture failure'), /原运行的工作区.*不可用/,
+    'explicit consent must pass the native gate and reach workspace preflight')
+})
 
 test('native environment is explicit, editable-only, and needs approval even when legacy confirmation is disabled', () => {
   const request = { task: 'fixture', executor: 'official-team', planMode: 'team', executionMode: 'workspace-write', executionEnvironment: 'cli-native' }

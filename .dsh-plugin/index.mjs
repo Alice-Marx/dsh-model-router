@@ -1613,6 +1613,7 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
     rerun: request => rerunRecordedStep(ctx, config, {
       runId: request?.runId, packageId: request?.packageId, provider: request?.provider, model: request?.model,
       confirmOverBudget: request?.confirmOverBudget === true, confirmWrite: request?.confirmWrite === true,
+      confirmUnsandboxed: request?.confirmUnsandboxed === true,
       ...(request?.subscriptionChoice ? { subscriptionChoice: request.subscriptionChoice } : {}),
     }),
     boundaries: () => securityBoundaries(ctx, config),

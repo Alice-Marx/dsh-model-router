@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.1 — 2026-10-16
+
+- Expand the English and Simplified Chinese READMEs together: architecture and execution contracts, workbench/session request examples, platform capabilities and executable trust, sequential team lifecycle, model identity, worktree integration/retry, accounting formulas, routing weights/floors/search limits, persistence and verification layers. Add matching navigation anchors and record the reviewed translation pair in `README.i18n.yaml`.
+- Correct stale claims about Windows Codex editable support and the Harness/native permission boundary. Distinguish registry-file consistency from npm provenance and clarify installer-marker and ZCode first-seen script trust.
+- Forward explicit unsandboxed confirmation through the workbench retry dispatcher, allowing an approved native CLI team retry to reach the existing execution gate. Missing confirmation remains blocked. Add focused regression coverage; no new model calls or billing claims. The dated 0.20.0 real-execution report remains unchanged.
+
+Validation: strict frozen pnpm 10.34.6 install, real client build and generated-client consistency passed; 834 tests, 831 passed, 3 conditional skips, no failures. The new gateway/Host retry regression fails before the forwarding fix and passes afterward. Bilingual checks cover section anchors, table shape, local links and protocol/formula/command examples.
+
 ## 0.20.0 — 2026-10-15
 
 Fully quit Harness, including its tray or WebUI Host process, and restart after upgrading.
