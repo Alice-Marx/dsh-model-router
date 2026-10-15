@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-gaps-'))
-for (const name of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY', 'KIMI_API_KEY', 'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY']) delete process.env[name]
+for (const name of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY', 'KIMI_API_KEY', 'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY']) delete process.env[name]
 
 const { checkLogin, credentialFileFor, createHealthCache, LOGIN_GUIDES, minimaxAuthStateFiles, subscriptionLoginOf } = await import('../.dsh-plugin/shared/tool-health.mjs')
 const { createQuotaTracker } = await import('../.dsh-plugin/shared/subscription-billing.mjs')
@@ -256,6 +256,12 @@ test('workbench run: single model, workspace validation and request codec', asyn
   assert.throws(() => parseRunRequest({ task: '' }))
   assert.throws(() => parseRunRequest({ task: 'x', provider: 'openai' }))
   assert.throws(() => parseRunRequest({ task: 'x', confirmedReasons: ['rm -rf'] }))
+  assert.throws(() => parseRunRequest({ task: 'x', executor: 'arbitrary-command' }), /executor/)
+  assert.throws(() => parseRunRequest({ task: 'x', executionMode: 'workspace-write' }), /official-team/)
+  assert.throws(() => parseRunRequest({ task: 'x', executor: 'official-team', planMode: 'single' }), /team plan/)
+  assert.throws(() => parseRunRequest({ task: 'x', executor: 'official-team', planMode: 'team', provider: 'p', model: 'm' }), /team plan/)
+  assert.deepEqual(parseRunRequest({ task: 'x', executor: 'official-team', planMode: 'team' }),
+    { task: 'x', executor: 'official-team', executionMode: 'read-only', planMode: 'team', confirmedReasons: [] })
   assert.deepEqual(parseRunRequest({ task: 'x', preset: 'weird', planMode: 'team', budgetUsd: 1 }), { task: 'x', planMode: 'team', budgetUsd: 1, confirmedReasons: [] })
   assert.ok(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.some(item => item.method === 'previewRun'))
   assert.deepEqual(launchRequest({ task: 't', mode: 'direct', directRoute: { provider: 'a', model: 'b' }, budgetUsd: '0.5', workspace: ' /w ' }),

@@ -8,7 +8,21 @@ import { gzipSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve, sep } from 'node:path'
 import { createPlanFromRoutes } from '../.dsh-plugin/shared/harness-plan.mjs'
-import { adapterForToolId, executeAssignedTask, executeAssignmentPlan, resolvePortableToolLaunch } from '../.dsh-plugin/shared/task-executors.mjs'
+import { adapterForToolId, executeAssignedTask, executeAssignmentPlan, resolvePortableToolLaunch, usageFromOutput, usageFromEvents } from '../.dsh-plugin/shared/task-executors.mjs'
+
+test('vendor cost evidence preserves explicit zero, refuses missing or partial totals and accepts only a single reported Claude model', () => {
+  const result = { usage: { input_tokens: 1, output_tokens: 2 }, total_cost_usd: 0, modelUsage: { 'claude-reported': {} } }
+  assert.equal(usageFromOutput('claude-json', JSON.stringify(result)).reportedCostUsd, 0)
+  assert.equal(usageFromOutput('claude-json', JSON.stringify(result)).reportedModel, 'claude-reported')
+    assert.equal(usageFromOutput('claude-json', JSON.stringify({ ...result, modelUsage: { 'claude-reported[1M]': {} } })).reportedModel, 'claude-reported[1M]')
+    assert.equal(usageFromOutput('claude-json', JSON.stringify({ ...result, modelUsage: { a: {}, 'invalid name': {} } })).reportedModel, undefined)
+  assert.equal(usageFromOutput('claude-json', JSON.stringify({ ...result, total_cost_usd: null })).reportedCostUsd, undefined)
+  assert.equal(usageFromOutput('claude-json', JSON.stringify({ ...result, modelUsage: { a: {}, b: {} } })).reportedModel, undefined)
+  assert.equal(usageFromEvents('grok-end', { usage: {}, total_cost_usd: 0 }).reportedCostUsd, 0)
+  assert.equal(usageFromEvents('grok-end', { usage: {}, total_cost_usd: null }).reportedCostUsd, undefined)
+  assert.equal(usageFromEvents('mimo-steps', [{ tokens: {}, cost: 0 }]).reportedCostUsd, 0)
+  assert.equal(usageFromEvents('mimo-steps', [{ tokens: {}, cost: 0.1 }, { tokens: {} }]).reportedCostUsd, undefined)
+})
 import { officialToolEntrySelection } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { createNpmAttestor } from '../.dsh-plugin/shared/npm-attestation.mjs'
 
@@ -118,7 +132,7 @@ test('Gemini headless launch selects npm or pnpm package bins and never a shared
       return { code: 0, stdout: JSON.stringify({ response: method }) }
     })
     const result = await executeAssignedTask({
-      route: { provider: 'google-ai', model: 'gemini-test', execution: 'official' }, task: '回答问题', workspace: cwd, spawnImpl,
+      route: { provider: 'google-ai', model: 'gemini-test', cliModel: 'gemini-test', execution: 'official' }, task: '回答问题', workspace: cwd, spawnImpl,
       resolvePortableLaunch: (adapter, workspace) => resolvePortableToolLaunch(adapter, workspace, { selection,
         attestor, findNode: async (directory, minimum) => { assert.deepEqual(minimum, [20, 0, 0]); return process.execPath } }),
       apiFallback: () => { throw new Error('selected Gemini fixture should run') },
@@ -291,6 +305,11 @@ test('claude, codex, and gemini adapters use fixed headless arguments and the co
     })
     assert.equal(result.ok, true)
     assert.equal(result.channel, 'official-cli')
+    assert.equal(result.recommendedModel, item.route.model)
+    assert.equal(result.requestedCliModel, null, 'catalog IDs must not override the CLI default')
+    assert.equal(result.actualModel, null, 'a routing recommendation is not actual-model evidence')
+    assert.equal(calls.at(-1).args.includes('--model'), false)
+    assert.equal(calls.at(-1).args.includes('-m'), false)
     assert.equal(result.credentialSource, 'configured-api-key')
     assert.equal(JSON.stringify(result).includes(secret), false)
     assert.equal(calls.at(-1).options.shell, false)
@@ -298,6 +317,97 @@ test('claude, codex, and gemini adapters use fixed headless arguments and the co
     assert.equal(calls.at(-1).options.cwd, cwd)
     if (item.file === 'claude') assert.equal(chunks.join('').includes(secret), false)
   }
+})
+
+test('portable CLIs receive only explicitly bound CLI model names', async t => {
+  const cwd = await workspace(t)
+  const cases = [
+    { provider: 'anthropic', cliModel: 'sonnet', flag: '--model',
+      stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'done' }) },
+    { provider: 'openai', cliModel: 'gpt-cli-alias', flag: '--model',
+      stdout: '{"type":"item.completed","item":{"type":"agent_message","text":"done"}}\n{"type":"turn.completed"}\n' },
+    { provider: 'google-ai', cliModel: 'gemini-cli-alias', flag: '-m',
+      stdout: JSON.stringify({ response: 'done' }) },
+  ]
+  for (const item of cases) {
+    const { spawnImpl, calls } = fakeSpawn((file, args) => args[0] === '--version'
+      ? { code: 0, stdout: '1.2.3\n' } : { code: 0, stdout: item.stdout })
+    const result = await executeAssignedTask({
+      route: { provider: item.provider, model: 'catalog-only-id', cliModel: item.cliModel },
+      task: 'Read the fixture', workspace: cwd, spawnImpl, resolvePortableLaunch: fakePortableLaunch,
+      apiFallback: () => { throw new Error('API must not run') },
+    })
+    const args = calls.at(-1).args
+    assert.equal(args[args.indexOf(item.flag) + 1], item.cliModel)
+    assert.equal(args.includes('catalog-only-id'), false)
+    assert.equal(result.model, 'catalog-only-id')
+    assert.equal(result.requestedCliModel, item.cliModel)
+    assert.equal(result.actualModel, null)
+  }
+})
+
+test('invalid explicit CLI bindings fail before a process or API request', async t => {
+  const cwd = await workspace(t)
+  for (const cliModel of ['alias; echo unsafe', ' alias', {}, 42]) {
+    await assert.rejects(executeAssignedTask({
+      route: { provider: 'anthropic', model: 'catalog-id', cliModel },
+      task: 'Read the fixture', workspace: cwd,
+      runVerified: () => { throw new Error('verified runner must not run') },
+      spawnImpl: () => { throw new Error('process must not start') },
+      apiFallback: () => { throw new Error('API must not run') },
+    }), /cliModel/)
+  }
+  for (const provider of ['minimax', 'mimo']) {
+    await assert.rejects(executeAssignedTask({
+      route: { provider, model: 'catalog-id', cliModel: 'unqualified-model' },
+      task: 'Read the fixture', workspace: cwd,
+      runVerified: () => { throw new Error('verified runner must not run') },
+    }), /provider\/model/)
+  }
+})
+
+test('verified CLI success retains usage, reported cost and model evidence without assigning billing', async t => {
+  const cwd = await workspace(t)
+  const usage = { inputTokens: 139, outputTokens: 262, cacheReadTokens: 0, cacheWriteTokens: 0 }
+  for (const reportedCostUsd of [0, 0.25]) {
+    const result = await executeAssignedTask({
+      route: { provider: 'minimax', model: 'catalog-only-id', cliModel: 'minimax/cli-alias' },
+      task: 'Read the fixture', workspace: cwd,
+      spawnImpl: () => { throw new Error('portable process must not start') },
+      apiFallback: () => { throw new Error('API must not run') },
+      runVerified: async options => {
+        assert.equal(options.modelId, 'minimax/cli-alias')
+        return { status: 'succeeded', finalText: 'done', requestedModel: options.modelId,
+          reportedModel: { providerId: 'minimax', modelId: 'cli-alias' },
+          modelNotice: 'vendor supplied identity', usage, reportedCostUsd, usageIncomplete: true,
+          source: 'verified-fixture', sandboxEnforcement: 'full' }
+      },
+    })
+    assert.deepEqual(result.usage, usage)
+    assert.equal(result.reportedCostUsd, reportedCostUsd, 'reported zero is still cost evidence')
+    assert.equal(result.usageIncomplete, true)
+    assert.equal(result.recommendedModel, 'catalog-only-id')
+    assert.equal(result.requestedCliModel, 'minimax/cli-alias')
+    assert.deepEqual(result.reportedModel, { providerId: 'minimax', modelId: 'cli-alias' })
+    assert.equal(result.actualModel, 'minimax/cli-alias')
+    assert.equal(result.modelNotice, 'vendor supplied identity')
+    assert.equal(result.source, 'verified-fixture')
+    assert.equal(result.sandboxEnforcement, 'full')
+    assert.equal(Object.hasOwn(result, 'billing'), false)
+    assert.equal(Object.hasOwn(result, 'costUsd'), false)
+  }
+  const unknown = await executeAssignedTask({
+    route: { provider: 'anthropic', model: 'catalog-only-id' },
+    task: 'Read the fixture', workspace: cwd,
+    runVerified: async options => {
+      assert.equal(options.modelId, null)
+      return { status: 'succeeded', finalText: 'done' }
+    },
+  })
+  assert.equal(unknown.requestedCliModel, null)
+  assert.equal(unknown.actualModel, null)
+  assert.equal(Object.hasOwn(unknown, 'usage'), false)
+  assert.equal(Object.hasOwn(unknown, 'reportedCostUsd'), false)
 })
 
 test('claude keeps its instruction positional when no CLI model id is passed', async t => {

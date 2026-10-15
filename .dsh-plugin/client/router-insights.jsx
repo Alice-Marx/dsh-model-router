@@ -24,7 +24,7 @@ export function OnboardingBanner({ health, onDone, onRefresh, refreshing, error 
     <section className="mr-card mr-onboarding" aria-label="开箱体检">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">开箱体检</h2>
-        <p className="mr-card-copy">首次打开时检测每个官方工具是否已安装、当前版本（以及能查到时的最新版本）、是否已登录。未登录的工具会被路由直接跳过，改走模型目录 API，不必等待 CLI 失败。</p>
+        <p className="mr-card-copy">首次打开时检测官方工具的安装、版本与登录状态。未登录时按计费设置暂停或使用模型目录 API；任务模式的执行支持见各工具说明。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={refreshing} onClick={onRefresh}>{refreshing ? '检测中…' : '重新体检'}</button></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
@@ -33,7 +33,7 @@ export function OnboardingBanner({ health, onDone, onRefresh, refreshing, error 
           <>
             <div className="mr-result-grid">
               <div className="mr-metric"><div className="mr-metric-label">已安装</div><div className="mr-metric-value">{summary.installed} / {summary.total}</div></div>
-              <div className="mr-metric"><div className="mr-metric-label">已登录可用</div><div className="mr-metric-value">{summary.ready}</div></div>
+              <div className="mr-metric"><div className="mr-metric-label">已登录</div><div className="mr-metric-value">{summary.ready}</div></div>
               <div className="mr-metric"><div className="mr-metric-label">未登录</div><div className="mr-metric-value">{summary.loggedOut}</div></div>
               <div className="mr-metric"><div className="mr-metric-label">登录状态未知</div><div className="mr-metric-value">{summary.unknown}</div></div>
             </div>
@@ -386,6 +386,7 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
       {item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && <p className="mr-package-copy">回退原因：{item.fallback.reason}</p>}
       {item.fallback?.error && <p className="mr-package-copy mr-fallback-error">CLI 原始错误：<code>{item.fallback.error}</code></p>}
       {!item.ok && item.error && <p className="mr-package-copy mr-fallback-error">{item.error}</p>}
+      {!item.ok && item.diagnostic && <details className="mr-tool-log"><summary>CLI 诊断{Number.isInteger(item.exitCode) ? `（退出码 ${item.exitCode}）` : ''}</summary><pre>{item.diagnostic}</pre></details>}
       {item.review && <p className="mr-package-copy">强模型抽查（{item.review.provider}/{item.review.model}）：{item.review.score ? `${item.review.score}/5` : '未评分'} {item.review.summary}</p>}
       {item.answer && <details className="mr-tool-log"><summary>查看结果</summary><pre>{item.answer}{item.answerTruncated ? '\n…（已截断）' : ''}</pre></details>}
       <div className="mr-node-actions">
@@ -465,6 +466,9 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
                 {totals.subscription && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：{formatUsd(totals.referenceUsd)}</p>}
                 {unknownCalls > 0 && <p className="mr-caption">另有 {unknownCalls} 次调用费用未知，未计入上方金额。</p>}
                 {(prior.budgetUsd > 0 || prior.subscriptionRuns > 0 || prior.unknownCalls > 0) && <p className="mr-caption">累计包含此前重跑尝试：API {formatUsd(prior.budgetUsd)} · 订阅参考 {formatUsd(prior.referenceUsd)}{prior.unknownCalls > 0 ? ` · 费用未知 ${prior.unknownCalls} 次` : ''}。下方节点显示最近一次结果。</p>}
+                {current.kind === 'team' && <p className="mr-caption">执行环境：{current.executionEnvironment === 'cli-native'
+                  ? '厂商 CLI 正常环境 · 当前用户权限 · 无 Harness 进程沙箱'
+                  : current.executionEnvironment === 'harness' ? 'Harness 受限环境' : '历史记录未记录执行环境'}</p>}
                 {current.isolatedWorkspace && <p className="mr-caption">独立工作区：<code>{current.isolatedWorkspace}</code></p>}
                 {current.rerunOf && <p className="mr-caption">重新执行自运行 {current.rerunOf.slice(0, 8)}。</p>}
                 {current.decision?.reason && <p className="mr-caption">路由原因：{current.decision.reason}</p>}

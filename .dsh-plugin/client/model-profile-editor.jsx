@@ -102,8 +102,8 @@ export function ModelProfileEditor({ routes, settingsScope, onSaved }) {
               <label className="mr-profile-field"><span>LiveBench 准确模型名称（可选）</span><input className="mr-input" type="text" value={draft.benchmarkModel ?? ''} disabled={!writable} onChange={event => edit('benchmarkModel', event.target.value)} placeholder="确认版本与推理档位一致；不自动猜测别名" /></label>
               <label className="mr-profile-field"><span>执行方式</span>
                 <select className="mr-input" value={draft.execution || 'auto'} disabled={!writable} onChange={event => edit('execution', event.target.value)}>
-                  <option value="auto">自动：已安装则用官方工具，失败回退 API</option>
-                  <option value="official">官方工具：失败或未安装时回退 API</option>
+                  <option value="auto">自动：优先尝试支持当前模式的官方工具</option>
+                  <option value="official">优先官方工具：API 回退依计费与失败设置</option>
                   <option value="api">仅模型目录 API</option>
                 </select>
               </label>
@@ -139,7 +139,7 @@ export function ModelProfileEditor({ routes, settingsScope, onSaved }) {
               {saved && <button className="mr-button mr-button-secondary" type="button" disabled={!writable} onClick={() => { void write(true) }}>删除此模型配置</button>}
             </div>
             {notice && <p className={notice.tone === 'error' ? 'mr-error' : 'mr-profile-success'} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
-            <p className="mr-caption">质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算只影响本地规划，不限制实际账单。CLI 模型名须与厂商工具核对。执行方式决定该模型收到任务时走官方无界面工具还是模型目录 API；官方工具失败时仍会回退 API。计费方式默认订阅优先：先用 CLI 账号登录或编程套餐 Key 路线，订阅额度用尽或限流时同一步骤自动改用 API Key，并记入运行历史。</p>
+            <p className="mr-caption">质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算估算不能限制实际账单。CLI 模型名须与厂商工具核对。官方工具须支持当前任务模式；失败后的 API 回退依计费与失败处理设置执行。订阅优先会先尝试 CLI 账号或编程套餐 Key；额度用尽或限流时按设置切换 API，其他故障默认暂停询问。只用订阅不会切换 API。</p>
           </>}
       </div>
     </section>

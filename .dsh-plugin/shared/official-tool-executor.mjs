@@ -18,15 +18,16 @@ import { access, readFile, realpath, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { StringDecoder } from 'node:string_decoder'
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { homedir } from 'node:os'
 import { getOfficialTool, installMethodFor, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
 import { currentInstallOptions, ensureNpmPrefixOnPath, installPreferences, preferredToolDirectories, usesConfiguredInstallPlan } from './official-tools-runtime.mjs'
 import { resolveInstallPlan } from './tool-install-preferences.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
-import { npmAttestor } from './npm-attestation.mjs'
+import { CODE_FILE, npmAttestor } from './npm-attestation.mjs'
 import { compareReleaseVersions, isReleaseVersion } from './latest-versions.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser, installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
-import { emptyOutputError, outputIsEmpty, usageFromEvents, usageFromOutput } from './task-executors.mjs'
+import { emptyOutputError, outputIsEmpty, redactDiagnostic, usageFromEvents, usageFromOutput } from './task-executors.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -38,12 +39,13 @@ const STOP_GRACE_MS = 5_000
 const CLAUDE_MIN_RESTRICTED_VERSION = [2, 1, 259]
 const CLAUDE_SIGNER = 'Anthropic, PBC'
 const CODEX_SIGNER = 'OpenAI OpCo, LLC'
+const CODEX_WRITE_UNSUPPORTED = 'Codex 当前仅支持只读任务：原 CODEX_HOME 需要保持可写以使用现有登录与配置；当前沙箱契约无法同时只授权独立 Git 工作区和该状态目录。可编辑团队步骤请改用已支持的其他官方工具。'
 const WINDOWS_SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 const ENVIRONMENT_KEYS = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec',
   'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
   'PROGRAMDATA', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM',
-  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
   'SSL_CERT_FILE', 'NODE_EXTRA_CA_CERTS',
 ])
 
@@ -52,7 +54,7 @@ const CAPABILITIES = Object.freeze({
     ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
     : { supported: false, reason: 'Claude 的受限原生入口目前仅在 Windows 完成适配。' }),
   codex: Object.freeze(IS_WINDOWS
-    ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
+    ? { supported: true, modes: Object.freeze(['read-only']) }
     : { supported: false, reason: 'Codex 的签名原生入口目前仅在 Windows 完成适配。' }),
   'kimi-code': Object.freeze({
     supported: true, modes: Object.freeze(['workspace-write']),
@@ -82,8 +84,10 @@ const CAPABILITIES = Object.freeze({
 })
 
 /** A UI/Host can show this without implying that installation means execution readiness. */
-export function officialToolExecutionCapabilities() {
-  return OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ...CAPABILITIES[tool.id] }))
+export function officialToolExecutionCapabilities({ executionEnvironment = 'harness' } = {}) {
+  return OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ...CAPABILITIES[tool.id],
+    ...(executionEnvironment === 'cli-native' && IS_WINDOWS && tool.id === 'codex'
+      ? { modes: ['read-only', 'workspace-write'] } : {}) }))
 }
 
 function inside(parent, child) {
@@ -143,12 +147,14 @@ function checkedTimeout(timeoutMs) {
 }
 
 /** API-key variables removed when a run must use the CLI's own subscription login. */
-const API_KEY_VARIABLES = Object.freeze(['ANTHROPIC_API_KEY', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'KIMI_API_KEY',
+const API_KEY_VARIABLES = Object.freeze(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'KIMI_API_KEY',
   'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'])
 
-function executionEnvironment(toolId, { sessionOnly = false } = {}) {
+export function executionEnvironment(toolId, { sessionOnly = false, env: source = process.env } = {}) {
   const vendorKeys = {
-    'claude-code': ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR'],
+    'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL',
+      'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL',
+      'ANTHROPIC_SMALL_FAST_MODEL', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR'],
     codex: ['CODEX_API_KEY', 'OPENAI_API_KEY', 'CODEX_HOME'],
     'kimi-code': ['KIMI_CODE_HOME', 'KIMI_API_KEY', 'MOONSHOT_API_KEY'],
     'minimax-code': ['MINIMAX_API_KEY', 'MINIMAX_BASE_URL'],
@@ -160,7 +166,7 @@ function executionEnvironment(toolId, { sessionOnly = false } = {}) {
     .filter(key => !sessionOnly || !API_KEY_VARIABLES.includes(key))
   const env = {}
   for (const key of keys) {
-    if (process.env[key] !== undefined) env[key] = process.env[key]
+    if (source[key] !== undefined) env[key] = source[key]
   }
   return env
 }
@@ -305,6 +311,23 @@ export async function findManagedMiniMaxEntry(workspace,
 /** Newest installed copy first; versions are not pinned. */
 function newestFirst(entries) {
   return [...entries].sort((left, right) => (compareReleaseVersions(right.version, left.version) ?? 0))
+}
+
+/** Native launches cannot trust unsigned npm code or a locally changed bin map. */
+async function attestNativeNpmEntry(found, tool, selectionOptions) {
+  if (selectionOptions.executionEnvironment !== 'cli-native') return found
+  const attestor = selectionOptions.attestor ?? npmAttestor
+  try {
+    const include = new RegExp(`${CODE_FILE.source}|(?:^|/)package\\.json$`, 'i')
+    const checked = await attestor.matchesPackage(found.packageRoot, tool.package, found.version, include)
+    if (!checked.ok) return { unsupported: `${tool.label} 安装文件未通过官方 npm 摘要核验：${redactDiagnostic(checked.reason)}；拒绝启动所选副本，不改用其他安装位置。` }
+    const member = relative(found.packageRoot, found.entry).split(sep).join('/')
+    const entry = await attestor.matches(found.entry, tool.package, found.version, member)
+    if (!entry.ok) return { unsupported: `${tool.label} 入口未通过官方 npm 摘要核验：${redactDiagnostic(entry.reason)}；拒绝启动所选副本，不改用其他安装位置。` }
+    return { ...found, source: 'official-npm-registry-attested' }
+  } catch (error) {
+    return { unsupported: `${tool.label} 官方 npm 摘要核验不可用：${redactDiagnostic(error?.message ?? error)}；拒绝启动所选副本，不改用其他安装位置。` }
+  }
 }
 
 async function findSignedNativeExecutable(toolId, workspace, signer, selection = officialToolEntrySelection(toolId)) {
@@ -537,8 +560,10 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     if (selection.plan.kind === 'script') return { unsupported: '所选 Kimi 原生脚本安装没有可核验的 npm 执行入口；不会改用其他安装目录中的 Kimi。' }
     const tool = getOfficialTool(toolId)
     const entries = await findGlobalPackageEntries(tool.package, 'kimi', 'dist/main.mjs', workspace, { selection })
-    const found = newestFirst(entries)[0]
+    let found = newestFirst(entries)[0]
     if (!found) return { unsupported: `未找到官方 npm 包 ${tool.package} 的 kimi 入口（dist/main.mjs）。` }
+    found = await attestNativeNpmEntry(found, tool, selectionOptions)
+    if (found.unsupported) return found
     const nodeExecutable = await findNodeExecutable(workspace)
     if (!nodeExecutable) return { unsupported: '未找到工作区外的 Node.js 可执行文件。' }
     if (Buffer.byteLength(task, 'utf8') > 16_000) {
@@ -558,8 +583,11 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
       ? await findManagedMiniMaxEntry(workspace, selection.directories)
       : !selection.configured ? await findManagedMiniMaxEntry(workspace) : null
     const entries = selection.plan.kind === 'script' ? [] : await findGlobalPackageEntries(tool.package, 'mcode', 'cli.js', workspace, { selection })
-    const found = managed ?? newestFirst(entries)[0]
+    let found = managed ?? newestFirst(entries)[0]
     if (!found) return { unsupported: `未找到官方 npm 包 ${tool.package} 的 mcode 入口（cli.js）。` }
+    // Managed Windows releases were already attested while resolving them.
+    if (!managed) found = await attestNativeNpmEntry(found, tool, selectionOptions)
+    if (found.unsupported) return found
     const nodeExecutable = await findNodeExecutable(workspace, [22, 19, 0], version => {
       const major = Number(String(version).split('.')[0])
       return major === 22 || (major >= 24 && major < 27)
@@ -657,36 +685,69 @@ export function runnerEnvironment(argv0, { execPath = process.execPath, electron
 }
 
 /**
- * CLIs that cannot start inside the Harness Windows ACL process sandbox.
- * Codex 0.157 must write CODEX_HOME (~/.codex: app-server state, sessions,
- * temp aliases) before its first turn; the ACL runner denies every write in
- * read-only mode and every write outside the workspace in workspace-write, so
- * Codex exits with "failed to initialize in-process app-server client: Access
- * is denied (os error 5)". Returning "unsupported" lets a read-only step use
- * the direct `codex exec --sandbox read-only` launch the user approves as
- * "unsandboxed CLI", instead of failing every time.
+ * Codex's native read-only mode still needs its own state writable. Keep its
+ * existing home (auth, config, skills, MCP and token refresh) under the outer
+ * ACL boundary, while giving the project no write SID. No credential cloning
+ * or home relocation is needed. The current one-root SDK cannot also grant
+ * an independent Git worktree, so editable Codex runs fail closed.
  */
-export function harnessSandboxBlocker(toolId, platform = process.platform) {
-  if (toolId === 'codex' && platform === 'win32') {
-    return 'Codex 启动时必须写入 CODEX_HOME（~/.codex），Harness 的 Windows 进程沙箱会拒绝这些写入（os error 5）；改用 Codex 自带的只读沙箱直接启动。'
-  }
+export function harnessSandboxBlocker(toolId, platform = process.platform, mode = 'read-only') {
+  if (toolId === 'codex' && platform === 'win32' && mode !== 'read-only') return CODEX_WRITE_UNSUPPORTED
   return null
+}
+
+/** The only outer writable root is the user's exact, existing Codex home. */
+export async function codexReadOnlyPolicy(workspace, home = process.env.CODEX_HOME ?? join(homedir(), '.codex')) {
+  const project = await checkedWorkspace(workspace)
+  const stateHome = await checkedWorkspace(home)
+  if (project === stateHome || inside(project, stateHome) || inside(stateHome, project)) {
+    throw new TypeError('Codex 的 CODEX_HOME 与项目工作区必须互不包含；拒绝向只读项目授予写权限。')
+  }
+  return { mode: 'workspace-write', workspaceRoot: stateHome }
+}
+
+/** Require the reviewed Windows ACL runner to preserve the exact argv/policy. */
+export function codexStateSandboxContract(confined, requestedArgv, policy) {
+  const argv = confined?.argv
+  if (!Array.isArray(argv) || !argv.every(value => typeof value === 'string')) return false
+  const boundary = argv.indexOf('--')
+  if (boundary < 2 || argv.length - boundary - 1 !== requestedArgv.length
+    || requestedArgv.some((value, index) => argv[boundary + 1 + index] !== value)) return false
+  const runnerIndex = argv.findIndex(value => /(?:^|[\\/])@deepseek-ai[\\/]dsh-sandbox-windows-acl[\\/]lib[\\/]runner\.js$/i.test(value))
+  if (runnerIndex < 1 || runnerIndex >= boundary) return false
+  const flags = new Map()
+  for (let index = runnerIndex + 1; index < boundary; index += 2) {
+    const key = argv[index]
+    if (!['--workspace', '--temp', '--mode', '--write-sid', '--temp-write-sid'].includes(key)
+      || flags.has(key) || index + 1 >= boundary) return false
+    flags.set(key, argv[index + 1])
+  }
+  return policy.mode === 'workspace-write' && flags.get('--mode') === policy.mode
+    && flags.get('--workspace') === policy.workspaceRoot && isAbsolute(flags.get('--temp') ?? '')
+    && flags.has('--write-sid') === flags.has('--temp-write-sid')
 }
 
 /** Check the actual trusted launch entry without starting an account call. */
 export async function officialToolReadiness(toolId, workspace = process.cwd(), selectionOptions = {}) {
   const tool = getOfficialTool(toolId)
-  if (!tool) return { id: String(toolId), supported: false, ready: false, reason: '工具不在固定官方注册表中。' }
-  const capability = CAPABILITIES[tool.id]
-  if (!capability?.supported) return { id: tool.id, supported: false, ready: false, reason: capability?.reason ?? '当前平台不支持托管执行。' }
+  if (!tool) return { id: String(toolId), supported: false, ready: false, readyModes: [], reason: '工具不在固定官方注册表中。' }
+  const environment = selectionOptions.executionEnvironment ?? 'harness'
+  if (!['harness', 'cli-native'].includes(environment)) throw new TypeError('unknown CLI execution environment')
+  const capability = officialToolExecutionCapabilities({ executionEnvironment: environment }).find(item => item.id === tool.id)
+  if (!capability?.supported) return { id: tool.id, supported: false, ready: false, readyModes: [], reason: capability?.reason ?? '当前平台不支持托管执行。' }
   try {
     const directory = await checkedWorkspace(workspace)
+    if (tool.id === 'codex' && environment === 'harness') await codexReadOnlyPolicy(directory)
     const spec = await launchSpec(tool.id, directory, capability.modes[0], null, undefined, selectionOptions)
     return spec.unsupported
-      ? { id: tool.id, supported: true, ready: false, reason: spec.unsupported }
-      : { id: tool.id, supported: true, ready: true, source: spec.source, modes: capability.modes }
+      ? { id: tool.id, supported: true, ready: false, readyModes: [], reason: spec.unsupported }
+      : { id: tool.id, supported: true, ready: true, source: spec.source, modes: capability.modes,
+        readyModes: capability.modes,
+        ...(tool.id === 'codex' && environment === 'harness' ? { runtimeState: 'existing-codex-home',
+          executionRequirements: ['harness-windows-acl', 'codex-home-state-write'],
+          modeReasons: { 'workspace-write': CODEX_WRITE_UNSUPPORTED } } : {}) }
   } catch (error) {
-    return { id: tool.id, supported: true, ready: false, reason: String(error?.message ?? error).slice(0, 300) }
+    return { id: tool.id, supported: true, ready: false, readyModes: [], reason: String(error?.message ?? error).slice(0, 300) }
   }
 }
 
@@ -717,9 +778,193 @@ function stopProcessTree(child) {
   }
 }
 
+/** Parse the complete Claude terminal JSON even when its process exits nonzero. */
+export function parseClaudeProcessOutput(stdout, exitCode, { secrets = [] } = {}) {
+  let result
+  try { result = JSON.parse(stdout) } catch {
+    return { status: 'failed', exitCode, error: 'Claude 未返回有效的结果 JSON。' }
+  }
+  const validResult = result && typeof result === 'object' && !Array.isArray(result)
+    && result.type === 'result'
+    && (result.is_error === undefined || typeof result.is_error === 'boolean')
+  const succeeded = validResult && result.subtype === 'success' && result.is_error !== true
+    && typeof result.result === 'string' && result.result.trim().length > 0
+  const failed = validResult && (result.is_error === true
+    || (typeof result.subtype === 'string' && /^error(?:_|$)/.test(result.subtype)))
+  const evidence = {}
+  // A parsed object or a partial usage map does not establish zero usage. Only
+  // a recognizable terminal result with both required counters can report it.
+  if (succeeded || failed) {
+    const usage = result.usage
+    const validCount = value => Number.isSafeInteger(value) && value >= 0
+    if (usage && typeof usage === 'object' && !Array.isArray(usage)
+      && validCount(usage.input_tokens) && validCount(usage.output_tokens)
+      && ['cache_read_input_tokens', 'cache_creation_input_tokens']
+        .every(key => usage[key] === undefined || validCount(usage[key]))) {
+      const reported = usageFromOutput('claude-json', stdout)
+      if (reported?.usage) evidence.usage = reported.usage
+      if (reported?.reportedModel) evidence.reportedModel = reported.reportedModel
+    }
+    if (Number.isFinite(result.total_cost_usd) && result.total_cost_usd >= 0) {
+      evidence.reportedCostUsd = result.total_cost_usd
+    }
+  }
+  if (exitCode === 0 && succeeded) {
+    return { status: 'succeeded', exitCode, terminalEvent: 'completed', finalText: result.result, ...evidence }
+  }
+  const message = value => typeof value === 'string' ? value
+    : typeof value?.message === 'string' ? value.message
+      : typeof value?.error === 'string' ? value.error
+        : typeof value?.error?.message === 'string' ? value.error.message : ''
+  const details = validResult ? [
+    ...(Array.isArray(result.errors) ? result.errors.slice(0, 32).map(message) : []),
+    message(result.error),
+    typeof result.result === 'string' ? result.result : '',
+  ].filter(value => value.trim()) : []
+  let detail = [...new Set(details)].join(' | ')
+  for (const secret of Array.isArray(secrets) ? secrets : []) {
+    if (typeof secret === 'string' && secret) detail = detail.split(secret).join('[redacted]')
+  }
+  detail = redactDiagnostic(detail, '', 2_000)
+  const error = exitCode !== 0 ? '官方 CLI 退出码非零。' : 'Claude 未返回成功终态。'
+  return { status: 'failed', exitCode, ...(failed ? { terminalEvent: 'failed' } : {}),
+    error: detail ? `${error}${detail}` : error, ...(detail ? { detail } : {}), ...evidence }
+}
+
+const tokenCount = value => Number.isSafeInteger(value) && value >= 0
+const usageObject = value => value && typeof value === 'object' && !Array.isArray(value)
+const validCounts = (value, required, optional = []) => usageObject(value)
+  && required.every(key => tokenCount(value[key]))
+  && optional.every(key => value[key] === undefined || tokenCount(value[key]))
+
+/** Accept accounting only from a complete terminal event, never a partial map. */
+export function officialToolTerminalEvidence(format, value) {
+  if (!usageObject(value)) return {}
+  if (format === 'codex-jsonl') {
+    if (value.type !== 'turn.completed' || !validCounts(value.usage,
+      ['input_tokens', 'output_tokens'], ['cached_input_tokens'])
+      || (value.usage.cached_input_tokens ?? 0) > value.usage.input_tokens) return {}
+    return usageFromOutput('codex-jsonl', JSON.stringify(value)) ?? {}
+  }
+  if (format === 'grok-jsonl') {
+    if (value.type !== 'end' || typeof value.sessionId !== 'string' || !value.sessionId
+      || typeof value.stopReason !== 'string' || !value.stopReason
+      || (value.cost_is_partial !== undefined && typeof value.cost_is_partial !== 'boolean')) return {}
+    const evidence = {}
+    if (validCounts(value.usage, ['input_tokens', 'output_tokens'],
+      ['cache_read_input_tokens', 'cache_creation_input_tokens'])) {
+      evidence.usage = usageFromEvents('grok-end', value)?.usage
+    }
+    if (value.cost_is_partial !== true && Number.isFinite(value.total_cost_usd) && value.total_cost_usd >= 0) {
+      evidence.reportedCostUsd = value.total_cost_usd
+    }
+    return evidence
+  }
+  if (format === 'mimo-jsonl') {
+    const part = value.part
+    if (value.type !== 'step_finish' || typeof value.sessionID !== 'string' || !value.sessionID
+      || part?.type !== 'step-finish' || typeof part.reason !== 'string' || !part.reason
+      || !validCounts(part.tokens, ['input', 'output'], ['reasoning'])
+      || (part.tokens.cache !== undefined && !validCounts(part.tokens.cache, [], ['read', 'write']))) return {}
+    return usageFromEvents('mimo-steps', [part]) ?? {}
+  }
+  if (format === 'minimax-stream-json') {
+    // `value` is produced only by the schema/sequence/session-validating parser.
+    if (!['turn.completed', 'turn.failed'].includes(value.terminalEvent)
+      || !['succeeded', 'failed', 'timeout', 'cancelled', 'limit_exceeded'].includes(value.vendorStatus)
+      || ['runId', 'sessionId', 'turnId'].some(key => typeof value[key] !== 'string' || !value[key])
+      || value.usageSource === 'unavailable'
+      || !validCounts(value.usage, ['inputTokens', 'outputTokens'],
+        ['cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens'])) return {}
+    return usageFromEvents('minimax-result', value) ?? {}
+  }
+  return {}
+}
+
+/** Keep verified completed-turn accounting independently of process success. */
+export function createOfficialToolEvidenceCollector(format) {
+  let evidence = {}
+  let pending = false
+  let incomplete = false
+  let terminalSeen = false
+  let sessionId = null
+  let rejected = false
+  const add = next => {
+    if (next.usage) {
+      const previous = evidence.usage
+      evidence.usage = Object.fromEntries(Object.entries(next.usage)
+        .map(([key, value]) => [key, (previous?.[key] ?? 0) + value]))
+    }
+    if (!terminalSeen) evidence.reportedCostUsd = next.reportedCostUsd
+    else if (Number.isFinite(evidence.reportedCostUsd) && Number.isFinite(next.reportedCostUsd)) {
+      evidence.reportedCostUsd = Number((evidence.reportedCostUsd + next.reportedCostUsd).toFixed(8))
+    } else delete evidence.reportedCostUsd
+  }
+  return {
+    push(event) {
+      if (rejected || !usageObject(event)) return
+      if (format === 'codex-jsonl') {
+        if (event.type === 'turn.started') pending = true
+        else if (event.type === 'turn.failed') { pending = true; incomplete = true }
+        else if (event.type === 'turn.completed') {
+          const next = officialToolTerminalEvidence(format, event)
+          if (!next.usage) { incomplete = true; return }
+          if (terminalSeen && !pending) { incomplete = true; return }
+          add(next)
+          terminalSeen = true
+          pending = false
+        }
+      } else if (format === 'grok-jsonl') {
+        if (event.type !== 'end') return
+        if (terminalSeen) { rejected = true; return }
+        evidence = officialToolTerminalEvidence(format, event)
+        terminalSeen = true
+      } else if (format === 'mimo-jsonl') {
+        if (typeof event.sessionID !== 'string' || !event.sessionID
+          || (sessionId && sessionId !== event.sessionID)) { rejected = true; return }
+        sessionId = event.sessionID
+        if (event.type === 'step_start') pending = true
+        else if (event.type === 'error') { pending = true; incomplete = true }
+        else if (event.type === 'step_finish') {
+          const next = officialToolTerminalEvidence(format, event)
+          if (!next.usage) { incomplete = true; return }
+          if (terminalSeen && !pending) { incomplete = true; return }
+          add(next)
+          terminalSeen = true
+          pending = event.part.reason !== 'stop'
+        }
+      }
+    },
+    snapshot() {
+      if (rejected) return {}
+      const result = { ...evidence }
+      if (pending || incomplete) {
+        delete result.reportedCostUsd
+        if (result.usage) result.usageIncomplete = true
+      }
+      return result
+    },
+  }
+}
+
+/** Accounting cannot change a failed, cancelled or timed-out process outcome. */
+export function finalizeOfficialProcessResult(result, evidence = {}) {
+  const { usage: discardedUsage, reportedCostUsd: discardedCost, usageIncomplete: discardedIncomplete, ...outcome } = result
+  const usage = evidence?.usage
+  if (validCounts(usage, ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'])) {
+    outcome.usage = usage
+    if (evidence.usageIncomplete === true) outcome.usageIncomplete = true
+  }
+  if (Number.isFinite(evidence?.reportedCostUsd) && evidence.reportedCostUsd >= 0) {
+    outcome.reportedCostUsd = evidence.reportedCostUsd
+  }
+  return outcome
+}
+
 function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessionOnly = false, extraEnv = {}) {
   return new Promise(resolveResult => {
     let child
+    const childEnvironment = { ...executionEnvironment(toolId, { sessionOnly }), ...extraEnv }
     try {
       child = spawn(spec.file, spec.args, {
         cwd: workspace,
@@ -727,7 +972,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         windowsHide: true,
         detached: !IS_WINDOWS,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...executionEnvironment(toolId, { sessionOnly }), ...extraEnv },
+        env: childEnvironment,
       })
     } catch (error) {
       resolveResult({ status: 'failed', error: String(error?.message ?? error), exitCode: null })
@@ -741,9 +986,8 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
     let stderrTail = ''
     let outputBytes = 0
     let jsonlBuffer = ''
-    let codexUsageLine = ''
     let codexEvents = 0
-    let reportedUsage = null
+    const accounting = createOfficialToolEvidenceCollector(spec.format)
     let terminal = null
     let failedEvent = false
     let finalText = ''
@@ -761,9 +1005,11 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
 
     const readJsonlLine = line => {
       if (!line.trim()) return
-      if (nativeParser) { nativeParser.push(line); return }
+      if (nativeParser) nativeParser.push(line)
       try {
         const event = JSON.parse(line)
+        accounting.push(event)
+        if (nativeParser) return
         if (spec.format === 'zcode-stream-json') {
           if (!event || typeof event !== 'object' || Array.isArray(event)
             || typeof event.type !== 'string' || typeof event.sessionId !== 'string'
@@ -807,7 +1053,6 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
           return
         }
         codexEvents += 1
-        if (event.type === 'turn.completed' && event.usage) codexUsageLine = line
         if (event.type === 'turn.completed' && !failedEvent) terminal = 'completed'
         // Top-level `error` events include transient reconnect notices; only turn.failed is terminal.
         if (event.type === 'turn.failed') {
@@ -840,7 +1085,20 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
       clearTimeout(graceTimer)
       clearTimeout(escalationTimer)
       signal?.removeEventListener('abort', onAbort)
-      resolveResult({ stdoutTail, stderrTail, terminalEvent: terminal, finalText, ...result })
+      if (jsonlBuffer.trim()) {
+        readJsonlLine(jsonlBuffer)
+        jsonlBuffer = ''
+      }
+      let evidence = accounting.snapshot()
+      if (spec.format === 'claude-json') {
+        evidence = parseClaudeProcessOutput(stdout, result.exitCode, {
+          secrets: [...API_KEY_VARIABLES, 'CLAUDE_CODE_OAUTH_TOKEN'].map(key => childEnvironment[key]),
+        })
+      } else if (miniMaxParser) {
+        evidence = officialToolTerminalEvidence(spec.format, miniMaxParser.finish(result.exitCode))
+      }
+      resolveResult({ stdoutTail, stderrTail, terminalEvent: terminal, finalText,
+        ...finalizeOfficialProcessResult(result, evidence) })
     }
     function requestStop(reason) {
       if (finished || stopReason) return
@@ -878,7 +1136,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         else readJsonl(finalStdout)
       }
       stderrTail = tail(stderrTail, stderrDecoder.end())
-      if (jsonlBuffer.trim()) readJsonlLine(jsonlBuffer)
+      if (jsonlBuffer.trim()) { readJsonlLine(jsonlBuffer); jsonlBuffer = '' }
       if (stopReason) {
         settle({ status: stopReason, exitCode: code, exitSignal })
         return
@@ -890,34 +1148,24 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
       }
       if (miniMaxParser) {
         const outcome = miniMaxParser.finish(code)
-        const reported = usageFromEvents('minimax-result', outcome)
-        settle({ ...outcome, usage: reported?.usage ?? null })
+        settle(outcome)
         return
       }
       if (nativeParser) {
         settle({ exitCode: code, ...nativeParser.finish(code) })
         return
       }
+      if (spec.format === 'claude-json') {
+        settle({ ...parseClaudeProcessOutput(stdout, code, {
+          secrets: [...API_KEY_VARIABLES, 'CLAUDE_CODE_OAUTH_TOKEN'].map(key => childEnvironment[key]),
+        }), exitSignal })
+        return
+      }
       if (code !== 0) {
         settle({ status: 'failed', exitCode: code, exitSignal, error: '官方 CLI 退出码非零。' })
         return
       }
-      if (spec.format === 'claude-json') {
-        try {
-          const result = JSON.parse(stdout)
-          if (result.type !== 'result' || result.is_error === true || result.subtype !== 'success'
-            || typeof result.result !== 'string') {
-            settle({ status: 'failed', exitCode: code, error: 'Claude 未返回成功终态。' })
-            return
-          }
-          terminal = 'completed'
-          finalText = result.result
-          reportedUsage = usageFromOutput('claude-json', stdout)
-        } catch {
-          settle({ status: 'failed', exitCode: code, error: 'Claude 未返回有效的结果 JSON。' })
-          return
-        }
-      } else if (spec.format === 'zcode-stream-json') {
+      if (spec.format === 'zcode-stream-json') {
         const turnId = zcodeResult?.turnId
         if (protocolError || failedEvent || !zcodeResult || typeof turnId !== 'string'
           || !turnId || !zcodeStarted.has(turnId) || !zcodeCompleted.has(turnId)
@@ -939,10 +1187,7 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
         settle({ status: 'failed', exitCode: code, error: protocolError ?? codexIncompleteError(codexEvents, stderrTail) })
         return
       }
-      if (!reportedUsage && codexUsageLine) reportedUsage = usageFromOutput('codex-jsonl', codexUsageLine)
-      settle({ status: 'succeeded', exitCode: code,
-        ...(reportedUsage?.usage ? { usage: reportedUsage.usage } : {}),
-        ...(reportedUsage?.reportedCostUsd ? { reportedCostUsd: reportedUsage.reportedCostUsd } : {}) })
+      settle({ status: 'succeeded', exitCode: code })
     })
 
     timeoutTimer = setTimeout(() => requestStop('timed-out'), timeoutMs)
@@ -960,51 +1205,79 @@ function captureProcess(spec, task, workspace, signal, timeoutMs, toolId, sessio
  */
 export async function runOfficialTool({
   toolId, task, workspace, mode = 'read-only', isolatedRoot, modelId, signal, sandbox, timeoutMs = DEFAULT_TIMEOUT_MS,
-  sessionOnly = false,
+  sessionOnly = false, executionEnvironment: environment = 'harness',
 }) {
   const tool = getOfficialTool(toolId)
   if (!tool) return { toolId, status: 'unsupported', reason: '未知的官方工具注册表 ID。' }
-  const capability = CAPABILITIES[tool.id]
+  if (!['harness', 'cli-native'].includes(environment)) throw new TypeError('unknown CLI execution environment')
+  const capability = officialToolExecutionCapabilities({ executionEnvironment: environment }).find(item => item.id === tool.id)
   if (!capability?.supported) return { toolId: tool.id, status: 'unsupported', reason: capability?.reason ?? '尚无执行适配器。' }
   const prompt = checkedTask(task)
   const requestedModel = checkedModel(modelId)
   const cwd = await checkedWorkspace(workspace)
   const executionMode = checkedMode(mode)
+  if (environment === 'cli-native' && executionMode !== 'workspace-write') {
+    return { toolId: tool.id, status: 'unsupported', reason: '厂商 CLI 正常环境仅用于明确确认的隔离工作树编辑任务。' }
+  }
   if (!capability.modes.includes(executionMode)) {
-    return { toolId: tool.id, status: 'unsupported', reason: `${tool.label} 的无界面模式会自动执行工具；当前仅允许经审批的独立 Git 工作区可编辑执行。` }
+    return { toolId: tool.id, status: 'unsupported', reason: tool.id === 'codex' ? CODEX_WRITE_UNSUPPORTED
+      : `${tool.label} 的无界面模式会自动执行工具；当前仅允许经审批的独立 Git 工作区可编辑执行。` }
   }
   if (executionMode === 'workspace-write') await checkedWriteWorkspace(cwd, isolatedRoot)
   const timeout = checkedTimeout(timeoutMs)
   if (signal?.aborted) return { toolId: tool.id, status: 'cancelled', workspace: cwd }
-  const blocker = harnessSandboxBlocker(tool.id)
+  if (environment === 'cli-native') {
+    // Explicit Host-authorized environment, never an automatic retry. Keep
+    // entry attestation, bounded argv, process-tree cancellation and Git gates.
+    const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel, prompt, { executionEnvironment: environment })
+    if (spec.unsupported) return { toolId: tool.id, status: 'unsupported', reason: spec.unsupported }
+    const startedAt = Date.now()
+    const outcome = await captureProcess(spec, prompt, cwd, signal, timeout, tool.id, sessionOnly === true)
+    return { toolId: tool.id, mode: executionMode, executionEnvironment: environment,
+      requestedModel: spec.requestedModel === undefined ? requestedModel : spec.requestedModel,
+      ...(spec.modelNotice ? { modelNotice: spec.modelNotice } : {}), workspace: cwd,
+      source: spec.source, sandboxEnforcement: 'none', startedAt, finishedAt: Date.now(), ...outcome }
+  }
+  const blocker = harnessSandboxBlocker(tool.id, process.platform, executionMode)
   if (blocker) return { toolId: tool.id, status: 'unsupported', reason: blocker }
-  const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel, prompt)
-  if (spec.unsupported) return { toolId: tool.id, status: 'unsupported', reason: spec.unsupported }
   if (typeof sandbox?.confine !== 'function') {
     return { toolId: tool.id, status: 'unsupported', reason: '官方 Harness 进程沙箱不可用，拒绝直接启动 CLI。' }
   }
+  let policy
+  try {
+    policy = tool.id === 'codex' ? await codexReadOnlyPolicy(cwd)
+      : { mode: executionMode, workspaceRoot: cwd }
+  } catch (error) {
+    return { toolId: tool.id, status: 'unsupported', reason: String(error?.message ?? error).slice(0, 300) }
+  }
+  const spec = await launchSpec(tool.id, cwd, executionMode, requestedModel, prompt)
+  if (spec.unsupported) return { toolId: tool.id, status: 'unsupported', reason: spec.unsupported }
   let confined
   try {
-    confined = await sandbox.confine([spec.file, ...spec.args], {
-      mode: executionMode, workspaceRoot: cwd,
-    }, signal)
+    confined = await sandbox.confine([spec.file, ...spec.args], policy, signal)
   } catch (error) {
     return { toolId: tool.id, status: 'unsupported', reason: `官方进程沙箱拒绝启动：${String(error?.message ?? error).slice(0, 300)}` }
   }
   if (!Array.isArray(confined?.argv) || confined.argv.length < 2 || !['full', 'partial'].includes(confined.enforcement)) {
     return { toolId: tool.id, status: 'unsupported', reason: '官方进程沙箱未返回有效的受限启动参数。' }
   }
+  if (tool.id === 'codex' && !codexStateSandboxContract(confined, [spec.file, ...spec.args], policy)) {
+    return { toolId: tool.id, status: 'unsupported', reason: 'Codex 的只读任务需要已核验的 Harness Windows ACL 状态目录沙箱；当前 runner 契约不匹配，拒绝直接或不受限启动。' }
+  }
   const startedAt = Date.now()
   const outcome = await captureProcess({ ...spec, file: confined.argv[0], args: confined.argv.slice(1) },
-    prompt, cwd, signal, timeout, tool.id, sessionOnly === true, runnerEnvironment(confined.argv[0]))
+    prompt, cwd, signal, timeout, tool.id, sessionOnly === true,
+    { ...runnerEnvironment(confined.argv[0]), ...(tool.id === 'codex' ? { CODEX_HOME: policy.workspaceRoot } : {}) })
   return {
     toolId: tool.id,
     mode: executionMode,
+    executionEnvironment: environment,
     requestedModel: spec.requestedModel === undefined ? requestedModel : spec.requestedModel,
     ...(spec.modelNotice ? { modelNotice: spec.modelNotice } : {}),
     workspace: cwd,
     source: spec.source,
     sandboxEnforcement: confined.enforcement,
+    ...(tool.id === 'codex' ? { runtimeState: 'existing-codex-home' } : {}),
     startedAt,
     finishedAt: Date.now(),
     ...outcome,

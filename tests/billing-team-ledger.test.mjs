@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-billing-'))
-for (const name of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY']) delete process.env[name]
+for (const name of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CODEX_API_KEY']) delete process.env[name]
 
 const {
   billingOf, billedCost, spending, budgetCheck, archiveSpending, mergeRerun, MAX_SPENDING_DAYS, MAX_SPENDING_MONTHS,
@@ -78,6 +78,7 @@ test('health check reports whether a CLI login bills an API key or a subscriptio
   assert.equal((await checkLogin('claude-code', { runner: runner('{"loggedIn":true,"authMethod":"claude.ai"}'), env: {} })).billing, 'subscription')
   assert.equal((await checkLogin('claude-code', { runner: runner('{"loggedIn":true,"authMethod":"api_key"}'), env: {} })).billing, 'api-key')
   assert.equal((await checkLogin('claude-code', { runner: runner('{"loggedIn":true,"authMethod":"claude.ai"}'), env: { ANTHROPIC_API_KEY: 'x' } })).billing, 'api-key')
+  assert.equal((await checkLogin('claude-code', { runner: runner('{"loggedIn":true,"authMethod":"claude.ai"}'), env: { ANTHROPIC_AUTH_TOKEN: 'x' } })).billing, 'api-key')
   assert.equal((await checkLogin('codex', { runner: runner('Logged in using ChatGPT'), env: {} })).billing, 'subscription')
   assert.equal((await checkLogin('codex', { runner: runner('Logged in using an API key - sk-***'), env: {} })).billing, 'api-key')
   assert.equal((await checkLogin('claude-code', { runner: runner('{"loggedIn":false}'), env: { CLAUDE_CODE_OAUTH_TOKEN: 't' } })).billing, 'subscription')
@@ -95,10 +96,13 @@ function teamPlan() {
 test('team runs map runner results to steps; unreached steps are blocked', () => {
   const converted = teamExecutionResults(teamPlan(), { status: 'incomplete', results: [
     { id: 'a', status: 'succeeded', provider: 'anthropic', recommendedModel: 'claude-x', toolId: 'claude-code', finalText: '分析', usage: { inputTokens: 10, outputTokens: 5 } },
-    { id: 'b', status: 'timed-out', provider: 'openai', recommendedModel: 'gpt-x', toolId: 'codex', finalText: '', error: null, outputTail: 'stderr…' },
+    { id: 'b', status: 'timed-out', provider: 'openai', recommendedModel: 'gpt-x', toolId: 'codex', finalText: '', error: null, outputTail: 'stderr…', exitCode: 1 },
   ] })
   assert.deepEqual(converted.packages.map(item => [item.id, item.ok, item.blocked === true]), [['a', true, false], ['b', false, false], ['c', false, true]])
   assert.equal(converted.packages[1].error, 'timed-out')
+  const diagnosticRecord = buildRunRecord({ id: 'diag', task: 'test', plan: teamPlan(), execution: converted })
+  assert.equal(diagnosticRecord.packages[1].diagnostic, 'stderr…')
+  assert.equal(diagnosticRecord.packages[1].exitCode, 1)
   const record = buildTeamRunRecord({ id: 't1', createdAt: 1, task: '团队', plan: teamPlan(), execution: { status: 'incomplete', results: [] }, mode: 'read-only' })
   assert.equal(record.kind, 'team')
   assert.equal(record.executionMode, 'read-only')
@@ -106,6 +110,78 @@ test('team runs map runner results to steps; unreached steps are blocked', () =>
   assert.equal(record.packages[0].purpose, 'execution')
   const blocked = teamExecutionResults(teamPlan(), { status: 'blocked', blocking: [{ reason: '沙箱不可用' }], results: [] })
   assert.match(blocked.packages[0].error, /沙箱不可用/)
+})
+
+test('CLI ledger separates requested, recommended and reported models and preserves usage evidence', () => {
+  const usage = { inputTokens: 1_000_000, outputTokens: 0 }
+  const evidence = { requestedModel: 'minimax/request-alias', reportedModel: { providerId: 'minimax', modelId: 'actual' },
+    modelNotice: 'vendor evidence', source: 'verified-fixture', sandboxEnforcement: 'full', usageIncomplete: true,
+    usage, reportedCostUsd: 0 }
+  const record = buildToolRunRecord({ id: 'evidence', createdAt: 1, task: 'read fixture', toolId: 'minimax-code',
+    provider: 'minimax', model: 'catalog-recommendation', cliModel: 'minimax/request-alias',
+    result: { status: 'succeeded', finalText: 'done', ...evidence },
+    pricingFor: () => ({ input: 10, output: 20 }) })
+  const pkg = record.packages[0]
+  assert.equal(pkg.recommendedModel, 'catalog-recommendation')
+  assert.equal(pkg.model, 'catalog-recommendation')
+  assert.equal(pkg.requestedCliModel, 'minimax/request-alias')
+  assert.equal(pkg.actualModel, 'minimax/actual')
+  assert.deepEqual(pkg.reportedModel, evidence.reportedModel)
+  assert.equal(pkg.modelNotice, evidence.modelNotice)
+  assert.equal(pkg.source, evidence.source)
+  assert.equal(pkg.sandboxEnforcement, evidence.sandboxEnforcement)
+  assert.equal(pkg.usageIncomplete, true)
+  assert.deepEqual(pkg.usage, usage)
+  assert.equal(pkg.reportedCostUsd, 0)
+  assert.equal(pkg.referenceCostUsd, 0)
+  assert.equal(pkg.costSource, 'cli-reported', 'reported zero remains stronger than incomplete usage')
+
+  const team = buildTeamRunRecord({ id: 'team-evidence', createdAt: 1, task: 'team', plan: teamPlan(),
+    execution: { status: 'incomplete', results: [{ id: 'a', status: 'succeeded', provider: 'anthropic',
+      recommendedModel: 'claude-x', toolId: 'claude-code', requestedCliModel: 'request-alias',
+      actualModel: 'actual-alias', ...evidence }] } })
+  assert.equal(team.packages[0].requestedCliModel, 'request-alias')
+  assert.equal(team.packages[0].actualModel, 'actual-alias')
+  assert.equal(team.packages[0].modelNotice, evidence.modelNotice)
+  assert.deepEqual(team.packages[0].usage, usage)
+  assert.equal(team.packages[0].usageIncomplete, true)
+})
+
+test('CLI usage never applies the recommended price without matching actual-model evidence', () => {
+  const plan = { routingBypassed: true, directRoute: { provider: 'openai', model: 'catalog-model' } }
+  const usage = { inputTokens: 1_000_000, outputTokens: 0 }
+  const make = extra => buildRunRecord({ id: 'cost', createdAt: 1, task: 't', plan,
+    pricingFor: () => ({ input: 2, output: 4 }),
+    execution: { packages: [{ id: 'direct', ok: true, provider: 'openai', model: 'catalog-model',
+      channel: 'official-cli', billing: 'api', usage, ...extra }] } }).packages[0]
+  const unknown = make({ requestedCliModel: 'catalog-model' })
+  assert.deepEqual(unknown.usage, usage)
+  assert.equal(unknown.costUsd, null)
+  assert.equal(unknown.costSource, 'model-unknown')
+  const different = make({ actualModel: 'another-model' })
+  assert.equal(different.costUsd, null)
+  assert.equal(different.costSource, 'model-price-unverified')
+  assert.equal(make({ actualModel: 'catalog-model' }).costUsd, 2)
+  const incomplete = make({ actualModel: 'catalog-model', usageIncomplete: true })
+  assert.equal(incomplete.costUsd, null)
+  assert.equal(incomplete.costSource, 'usage-incomplete')
+})
+
+test('Host CLI pricing uses the reported model or saved exact alias instead of the recommendation', async () => {
+  const routes = [
+    { provider: 'openai', model: 'catalog-model', pricing: { input: 10, output: 20 } },
+    { provider: 'openai', model: 'actual-model', cliModel: 'actual-alias', pricing: { input: 2, output: 4 } },
+  ]
+  for (const actualModel of [null, 'actual-model', 'actual-alias', 'unknown-model']) {
+    const run = await host.recordToolRun({ toolId: 'codex', provider: 'openai', model: 'catalog-model',
+      task: 'fixture', routes, startedAt: Date.now(),
+      result: { status: 'succeeded', finalText: 'done', reportedModel: actualModel,
+        usage: { inputTokens: 1_000_000, outputTokens: 0 } } })
+    const pkg = run.packages[0]
+    assert.equal(pkg.recommendedModel, 'catalog-model')
+    assert.equal(pkg.referenceCostUsd, actualModel === 'actual-model' || actualModel === 'actual-alias' ? 2 : null)
+    assert.equal(pkg.pricingSnapshot?.model ?? null, actualModel === 'actual-model' || actualModel === 'actual-alias' ? 'actual-model' : null)
+  }
 })
 
 test('tool runs are recorded as one step; a failed one can be re-run, editable teams only when continuable', () => {
@@ -161,7 +237,7 @@ test('read-only team runs are recorded and one failed step re-runs with its down
     runTeam: async options => {
       calls.push(options)
       return { status: 'cli-completed', results: [
-        { id: 'b', status: 'succeeded', provider: 'openai', recommendedModel: 'gpt-x', toolId: 'codex', finalText: '实现', usage: { inputTokens: 1_000_000, outputTokens: 0 } },
+        { id: 'b', status: 'succeeded', provider: 'openai', recommendedModel: 'gpt-x', actualModel: 'gpt-x', toolId: 'codex', finalText: '实现', usage: { inputTokens: 1_000_000, outputTokens: 0 } },
         { id: 'c', status: 'succeeded', provider: 'openai', recommendedModel: 'gpt-x', toolId: 'codex', finalText: '复核' },
       ] }
     },
@@ -186,6 +262,31 @@ test('read-only team runs are recorded and one failed step re-runs with its down
   assert.deepEqual(stored.priorAttemptSpending, result.run.priorAttemptSpending, 'the public ledger preserves the retry aggregates')
   assert.equal(ledger.spent.month, 0)
   assert.ok(ledger.spent.subscriptionMonth >= 1.7)
+})
+
+test('team reassignment uses and persists the new route CLI model mapping', async t => {
+  const cwd = await workspace(t)
+  const config = { modelProfilesJson: JSON.stringify([
+    { provider: 'anthropic', model: 'claude-x', cliModel: 'new-vendor-alias', quality: 80 },
+  ]) }
+  const run = await host.recordTeamRun({ task: '团队任务', plan: teamPlan(), mode: 'read-only', workspace: cwd,
+    routes: [], startedAt: Date.now(), cliModels: { b: 'old-codex-alias' },
+    execution: { status: 'incomplete', workspace: cwd, results: [
+      { id: 'a', status: 'succeeded', provider: 'anthropic', recommendedModel: 'claude-x', toolId: 'claude-code', finalText: '前置' },
+      { id: 'b', status: 'failed', provider: 'openai', recommendedModel: 'gpt-x', toolId: 'codex', error: 'failed' },
+    ] } })
+  let received
+  const result = await host.rerunRecordedStep(teamCtx(), config, {
+    runId: run.id, packageId: 'b', provider: 'anthropic', model: 'claude-x',
+    installedToolIds: ['claude-code', 'codex'], runTeam: async request => {
+      received = request
+      return { status: 'incomplete', results: [{ id: 'b', provider: 'anthropic', recommendedModel: 'claude-x',
+        toolId: 'claude-code', status: 'failed', requestedCliModel: request.cliModels.b, error: 'fixture' }] }
+    },
+  })
+  assert.equal(received.cliModels.b, 'new-vendor-alias')
+  assert.equal(result.run.cliModels.b, 'new-vendor-alias')
+  assert.equal(result.run.packages.find(item => item.id === 'b').requestedCliModel, 'new-vendor-alias')
 })
 
 test('old editable team records without a base commit refuse rerun; failed tool runs rerun as a linked run', async t => {

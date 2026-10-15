@@ -84,7 +84,7 @@ function PlanResults({ plan, ledger, headingRef }) {
         </div>
         {budget?.exceeded && <p className="mr-error" role="alert">执行前预算检查：{budget.message} 实际执行时将按设置自动降级或暂停询问。</p>}
         {budget?.limited && !budget.exceeded && budget.estimateKnown && <p className="mr-caption">执行前预算检查：本次预估 {money(plan.estimatedCost)}，剩余额度 {money(budget.remainingUsd)}。</p>}
-        {plan.loginRequired && <p className="mr-caption">推荐模型的官方 CLI 未登录，执行时直接走模型目录 API；可在“官方工具”卡片点“去登录”。</p>}
+        {plan.loginRequired && <p className="mr-caption">推荐模型的官方 CLI 未登录，执行时按计费设置暂停或使用模型目录 API；可在“官方工具”卡片点“去登录”。</p>}
         <div className="mr-channel-line">
           <span className="mr-control-label">执行渠道</span>
           <ChannelBadge item={plan} />
@@ -94,7 +94,7 @@ function PlanResults({ plan, ledger, headingRef }) {
         {plan.mode === 'team' && (
           <>
             <h3 className="mr-section-title">团队工作包</h3>
-            <p className="mr-caption">下方模型是规划建议；托管执行会按厂商 CLI 的模型名规则选用，未核验映射时使用该 CLI 的默认模型。</p>
+            <p className="mr-caption">下方模型是工作包的规划建议。模型路由按只读方式执行，每步可使用官方 CLI 或模型目录 API；如需编辑文件，可在下方执行区选择“官方工具协作”和“编辑文件”权限。CLI 请求模型名需符合厂商规则，实际模型以运行记录为准。</p>
             {plan.team.workPackages.length > 1 && <DagView packages={plan.team.workPackages} label="工作包依赖图" renderNode={item => <p className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</p>} />}
             {plan.team.workPackages.length === 0
               ? <div className="mr-empty">当前目录没有可分配的模型路线。</div>
@@ -625,6 +625,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
             const probe = byId[tool.id]
             const capability = capabilitiesById[tool.id]
             const readiness = readinessById[tool.id]
+            const readyModes = readiness?.readyModes ?? readiness?.modes ?? capability?.modes ?? []
             const job = jobs[tool.id]
             const running = job?.status === 'running'
             const action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status, latestVersion: healthById[tool.id]?.latestVersion ?? null })
@@ -653,9 +654,9 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
                   {tool.id === 'zcode' && <InstallSettings zcode settingsScope={settingsScope} install={probeState.install}
                     onPendingChange={handleZCodeSettingsPending} onMutationStart={beginSettingsMutation} />}
                   {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.headlessAdapter
-                    ? '已可由 model_router_execute 以无界面方式调用。命令缺失或失败时回退模型目录 API。签名沙箱入口不启动此 CLI。'
+                    ? '只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。'
                     : readiness?.ready
-                    ? `官方执行入口已核验，可在会话中调用 model_router_tool_run；${capability?.modes?.includes('read-only') ? '支持只读和经审批的可编辑任务' : '仅支持经审批的可编辑隔离工作区任务'}，账号及模型仍需实测。`
+                    ? `执行入口已核验：${readyModes.includes('read-only') ? '支持只读任务' : '不支持只读任务'}；${readyModes.includes('workspace-write') ? '支持可编辑隔离工作区任务（需审批）' : '不支持可编辑任务'}。实际调用还需当前会话权限、账号与模型可用。`
                     : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || '执行入口尚未核验。'}`}</p>}
                   {command
                     ? <>
@@ -808,7 +809,8 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     setBusy(true)
     try {
       const request = { runId, packageId, ...(override ? { provider: override.provider, model: override.model } : {}), ...(choice ? { subscriptionChoice: choice } : {}),
-        ...(codes.has('over-budget') ? { confirmOverBudget: true } : {}), ...(codes.has('workspace-write') ? { confirmWrite: true } : {}) }
+        ...(codes.has('over-budget') ? { confirmOverBudget: true } : {}), ...(codes.has('workspace-write') ? { confirmWrite: true } : {}),
+        ...(run?.executionEnvironment === 'cli-native' && codes.has('unsandboxed') ? { confirmUnsandboxed: true } : {}) }
       let result = await call(() => rerunStep(request), '重跑失败。')
       if (result?.paused && result.budget?.exceeded && !request.confirmOverBudget) {
         // The local estimate missed it (for example a reassigned route): ask once more for the budget only.
@@ -1031,7 +1033,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
             <p className="mr-eyebrow">工作流程</p>
             <ol className="mr-workflow"><li><span>01</span><div><strong>描述任务</strong><p>选择单任务、团队分工或指定模型。</p></div></li><li><span>02</span><div><strong>核对路由建议</strong><p>检查模型、工作包依赖和估算费用。</p></div></li><li><span>03</span><div><strong>预览并确认执行</strong><p>确认后调用模型，结果写入执行记录。</p></div></li></ol>
             <div className="mr-guide-links"><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('models')}>配置模型价格与能力 →</button><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('tools')}>检查官方工具与登录 →</button></div>
-            <p className="mr-caption">缺少价格时会提示“价格待配置”。只读执行可在此完成；修改文件的任务需在官方会话中审批。</p>
+            <p className="mr-caption">缺少价格时会提示“价格待配置”。只读检查可直接预览；修改文件时，先选“团队分工”，再在执行区选择“官方工具协作”和“编辑文件”权限，核对预览后确认执行。</p>
           </aside>
         </div>
 

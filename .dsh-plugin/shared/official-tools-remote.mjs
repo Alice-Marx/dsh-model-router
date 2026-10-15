@@ -127,6 +127,7 @@ const rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunReq
     ...(provider ? { provider, model } : {}),
     confirmOverBudget: request.confirmOverBudget === true,
     confirmWrite: request.confirmWrite === true,
+    ...(request.confirmUnsandboxed === undefined ? {} : { confirmUnsandboxed: request.confirmUnsandboxed === true }),
     ...(['api', 'subscription', 'cancel'].includes(request.subscriptionChoice) ? { subscriptionChoice: request.subscriptionChoice } : {}),
   }
 })
@@ -152,11 +153,22 @@ export function parseRunRequest(value) {
     throw new TypeError('budgetUsd must be a non-negative number')
   }
   const confirmed = Array.isArray(request.confirmedReasons) ? request.confirmedReasons : []
+  if (request.executor !== undefined && !['routed', 'official-team'].includes(request.executor)) throw new TypeError('executor is invalid')
+  if (request.executionMode !== undefined && !['read-only', 'workspace-write'].includes(request.executionMode)) throw new TypeError('executionMode is invalid')
+  if (request.executionEnvironment !== undefined && !['harness', 'cli-native'].includes(request.executionEnvironment)) throw new TypeError('executionEnvironment is invalid')
+  const officialTeam = request.executor === 'official-team'
+  if (officialTeam && (request.planMode !== 'team' || provider || model)) throw new TypeError('official-team requires a team plan without an explicit route')
+  if (!officialTeam && request.executionMode === 'workspace-write') throw new TypeError('workspace-write requires official-team')
+  if (request.executionEnvironment === 'cli-native' && (!officialTeam || request.executionMode !== 'workspace-write')) {
+    throw new TypeError('cli-native requires official-team with workspace-write')
+  }
   if (confirmed.length > RUN_CONFIRMATION_CODES.length || confirmed.some(code => !RUN_CONFIRMATION_CODES.includes(code))) {
     throw new TypeError('confirmedReasons contains an unknown reason')
   }
   return {
     task: request.task,
+    ...(officialTeam ? { executor: 'official-team', executionMode: request.executionMode ?? 'read-only',
+      ...(request.executionEnvironment === undefined ? {} : { executionEnvironment: request.executionEnvironment }) } : {}),
     ...(provider ? { provider, model } : {}),
     ...(['single', 'team'].includes(request.planMode) ? { planMode: request.planMode } : {}),
     ...(['economy', 'balanced', 'quality'].includes(request.preset) ? { preset: request.preset } : {}),

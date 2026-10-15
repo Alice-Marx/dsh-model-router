@@ -36,7 +36,7 @@ const BASE_ENV_KEYS = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec',
   'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
   'PROGRAMDATA', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM',
-  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
   'SSL_CERT_FILE', 'NODE_EXTRA_CA_CERTS',
 ])
 
@@ -50,7 +50,9 @@ export const TASK_ADAPTERS = Object.freeze([
     executable: 'claude',
     portable: true,
     apiKeyEnv: 'ANTHROPIC_API_KEY',
-    sessionEnv: Object.freeze(['CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR']),
+    sessionEnv: Object.freeze(['CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR', 'ANTHROPIC_AUTH_TOKEN',
+      'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL',
+      'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL']),
     format: 'claude-json',
     buildArgs(modelId) {
       return [
@@ -193,17 +195,22 @@ async function checkedWorkspace(workspace) {
 }
 
 function cliModelFor(route, adapter) {
-  const explicit = checkedModel(route?.cliModel)
-  if (explicit) return explicit
-  if (adapter?.id === 'claude-code' || adapter?.id === 'codex' || adapter?.id === 'gemini') {
-    return checkedModel(route?.model)
+  // Catalog IDs are routing recommendations, not vendor CLI aliases. Omit
+  // the model argument unless the route explicitly binds a CLI model.
+  const value = route?.cliModel
+  if (value === undefined || value === null || value === '') return null
+  const explicit = checkedModel(value)
+  if (!explicit) throw new TypeError('cliModel must be a bounded model identifier')
+  if ((adapter?.id === 'minimax-code' || adapter?.id === 'mimo-code') && !explicit.includes('/')) {
+    throw new TypeError(`${adapter.id} cliModel requires provider/model`)
   }
-  return null
+  if (adapter?.id === 'zcode') throw new TypeError('ZCode CLI does not support a per-call cliModel')
+  return explicit
 }
 
 /** Variables that switch a CLI from its account login to API-key billing. */
 const API_KEY_VARIABLES = Object.freeze({
-  'claude-code': ['ANTHROPIC_API_KEY'],
+  'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
 })
@@ -324,7 +331,7 @@ function parseAdapterOutput(format, stdout) {
 const DIAGNOSTIC_CHARS = 400
 
 /** Shorten and scrub a CLI diagnostic before it reaches the user or the run ledger. */
-export function redactDiagnostic(value, secret = '') {
+export function redactDiagnostic(value, secret = '', maxChars = DIAGNOSTIC_CHARS) {
   const scrubbed = redact(String(value ?? ''), secret)
     .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-[redacted]')
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1[redacted]')
@@ -332,7 +339,10 @@ export function redactDiagnostic(value, secret = '') {
     .replace(/\b(api[_-]?key|token|secret|password)(["'\s:=]+)[^\s"',}]{6,}/gi, '$1$2[redacted]')
     .replace(/\s+/g, ' ')
     .trim()
-  return scrubbed.length > DIAGNOSTIC_CHARS ? `${scrubbed.slice(0, DIAGNOSTIC_CHARS)}…` : scrubbed
+  const limit = Number.isInteger(maxChars) ? Math.max(100, Math.min(4_000, maxChars)) : DIAGNOSTIC_CHARS
+  if (scrubbed.length <= limit) return scrubbed
+  const head = Math.floor(limit / 3)
+  return `${scrubbed.slice(0, head)}…${scrubbed.slice(-(limit - head - 1))}`
 }
 
 function jsonLines(stdout) {
@@ -389,7 +399,9 @@ export function usageFromOutput(format, stdout = '') {
       const result = JSON.parse(stdout)
       const usage = result?.usage
       if (!usage || typeof usage !== 'object') return null
-      const reported = Number(result.total_cost_usd)
+      const reported = result.total_cost_usd
+      const models = result.modelUsage && typeof result.modelUsage === 'object' && !Array.isArray(result.modelUsage)
+        ? Object.keys(result.modelUsage) : []
       return {
         usage: {
           inputTokens: count(usage.input_tokens),
@@ -397,7 +409,8 @@ export function usageFromOutput(format, stdout = '') {
           cacheReadTokens: count(usage.cache_read_input_tokens),
           cacheWriteTokens: count(usage.cache_creation_input_tokens),
         },
-        ...(Number.isFinite(reported) && reported > 0 ? { reportedCostUsd: reported } : {}),
+        ...(Number.isFinite(reported) && reported >= 0 ? { reportedCostUsd: reported } : {}),
+        ...(models.length === 1 && /^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,199}$/.test(models[0]) ? { reportedModel: models[0] } : {}),
       }
     }
     if (format === 'codex-jsonl') {
@@ -442,26 +455,27 @@ export function usageFromEvents(format, value) {
   if (format === 'grok-end') {
     const usage = value?.usage
     if (!usage || typeof usage !== 'object') return null
-    const reported = Number(value.total_cost_usd)
+    const reported = value.total_cost_usd
     return {
       usage: {
         inputTokens: count(usage.input_tokens), outputTokens: count(usage.output_tokens),
         cacheReadTokens: count(usage.cache_read_input_tokens), cacheWriteTokens: count(usage.cache_creation_input_tokens),
       },
-      ...(value.cost_is_partial !== true && Number.isFinite(reported) && reported > 0 ? { reportedCostUsd: reported } : {}),
+      ...(value.cost_is_partial !== true && Number.isFinite(reported) && reported >= 0 ? { reportedCostUsd: reported } : {}),
     }
   }
   if (format === 'mimo-steps') {
     const parts = (Array.isArray(value) ? value : []).filter(part => part?.tokens && typeof part.tokens === 'object')
     if (!parts.length) return null
     const sum = pick => parts.reduce((total, part) => total + count(pick(part)), 0)
-    const cost = parts.reduce((total, part) => total + (Number.isFinite(part.cost) && part.cost > 0 ? part.cost : 0), 0)
+    const costKnown = parts.every(part => Number.isFinite(part.cost) && part.cost >= 0)
+    const cost = costKnown ? parts.reduce((total, part) => total + part.cost, 0) : null
     return {
       usage: {
         inputTokens: sum(part => part.tokens.input), outputTokens: sum(part => part.tokens.output) + sum(part => part.tokens.reasoning),
         cacheReadTokens: sum(part => part.tokens.cache?.read), cacheWriteTokens: sum(part => part.tokens.cache?.write),
       },
-      ...(cost > 0 ? { reportedCostUsd: Number(cost.toFixed(8)) } : {}),
+      ...(costKnown ? { reportedCostUsd: Number(cost.toFixed(8)) } : {}),
     }
   }
   if (format === 'minimax-result') {
@@ -648,11 +662,30 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
   }
 }
 
-function officialSuccess({ route, adapter, preference, answer, exitCode, version, credentialSource, usage = null }) {
+function reportedCliModel(value) {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (value && typeof value === 'object' && !Array.isArray(value)
+    && typeof value.providerId === 'string' && value.providerId
+    && typeof value.modelId === 'string' && value.modelId) {
+    return `${value.providerId}/${value.modelId}`
+  }
+  return null
+}
+
+function officialSuccess({ route, adapter, preference, answer, exitCode, version, credentialSource, usage = null,
+  requestedCliModel = null, reportedModel = null, modelNotice = null, source, sandboxEnforcement }) {
+  const actualModel = reportedCliModel(reportedModel)
   return {
     ok: true,
     provider: route.provider,
     model: route.model,
+    recommendedModel: route.model,
+    requestedCliModel,
+    actualModel,
+    ...(reportedModel !== null && reportedModel !== undefined ? { reportedModel } : {}),
+    modelNotice: modelNotice ?? (!requestedCliModel
+      ? '本次使用厂商 CLI 已配置的默认模型；Harness 推荐模型 ID 未作为 CLI 模型参数。'
+      : actualModel ? null : '该 CLI 未返回可核验的实际模型 ID；请以厂商运行记录核对。'),
     preference,
     channel: 'official-cli',
     toolId: adapter.id,
@@ -664,8 +697,11 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
     exitCode,
     version: version ?? null,
     credentialSource,
+    ...(typeof source === 'string' ? { source } : {}),
+    ...(typeof sandboxEnforcement === 'string' ? { sandboxEnforcement } : {}),
     ...(usage?.usage ? { usage: usage.usage } : {}),
-    ...(usage?.reportedCostUsd ? { reportedCostUsd: usage.reportedCostUsd } : {}),
+    ...(Number.isFinite(usage?.reportedCostUsd) && usage.reportedCostUsd >= 0 ? { reportedCostUsd: usage.reportedCostUsd } : {}),
+    ...(usage?.usageIncomplete === true ? { usageIncomplete: true } : {}),
   }
 }
 
@@ -758,6 +794,13 @@ export async function executeAssignedTask({
       return officialSuccess({
         route, adapter, preference, answer: redact(verified.finalText, secret),
         exitCode: verified.exitCode ?? 0, version: null, credentialSource,
+        requestedCliModel: Object.hasOwn(verified, 'requestedModel') ? verified.requestedModel : modelId,
+        reportedModel: verified.reportedModel,
+        modelNotice: verified.modelNotice,
+        source: verified.source,
+        sandboxEnforcement: verified.sandboxEnforcement,
+        usage: { usage: verified.usage, reportedCostUsd: verified.reportedCostUsd,
+          usageIncomplete: verified.usageIncomplete },
       })
     }
     if (verified && verified.status !== 'unsupported') {
@@ -833,6 +876,7 @@ export async function executeAssignedTask({
     route, adapter, preference, answer, exitCode: run.exitCode,
     version: versionFromBanner(`${probe.stdout}\n${probe.stderr}`),
     credentialSource,
+    requestedCliModel: modelId,
     usage: usageFromOutput(adapter.format, run.stdout),
   })
 }

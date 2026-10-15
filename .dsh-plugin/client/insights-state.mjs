@@ -238,11 +238,19 @@ export function billingSwitchText(item) {
   return note.reason
 }
 
-/** Workbench run request from the planning inputs; `mode` 'direct' sends the one chosen model. */
-export function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace } = {}) {
+/** Workbench request: routed runs keep their original shape; official teams require a team plan. */
+export function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, executor = 'routed', executionMode = 'read-only', executionEnvironment = 'harness' } = {}) {
+  if (!['routed', 'official-team'].includes(executor)) throw new Error('不支持的执行方式。')
+  if (!['read-only', 'workspace-write'].includes(executionMode)) throw new Error('不支持的任务权限。')
+  if (executor === 'official-team' && mode !== 'team') throw new Error('官方工具协作需要先在上方选择“团队分工”。')
+  if (executor === 'routed' && executionMode !== 'read-only') throw new Error('模型路由只支持只读任务；编辑文件请使用官方工具协作。')
+  if (!['harness', 'cli-native'].includes(executionEnvironment)
+    || executionEnvironment === 'cli-native' && (executor !== 'official-team' || executionMode !== 'workspace-write')) throw new Error('厂商 CLI 正常环境需要官方工具协作与编辑文件权限。')
   const budget = Number(budgetUsd)
   return {
     task: typeof task === 'string' ? task : '',
+    ...(executor === 'official-team' ? { executor, executionMode } : {}),
+    ...(executionEnvironment === 'cli-native' ? { executionEnvironment } : {}),
     ...(mode === 'direct' && directRoute ? { provider: directRoute.provider, model: directRoute.model } : { planMode: mode === 'team' ? 'team' : 'single', preset }),
     ...(Number.isFinite(budget) && budget >= 0 ? { budgetUsd: budget } : {}),
     ...(typeof workspace === 'string' && workspace.trim() ? { workspace: workspace.trim() } : {}),
@@ -258,6 +266,8 @@ export function rerunConfirmations({ run, item, override = null, choice = null, 
   const reasons = []
   const support = rerunSupport(run)
   if (support.writes) reasons.push({ code: 'workspace-write', text: support.confirm })
+  if (run?.kind === 'team' && run.executionEnvironment === 'cli-native') reasons.push({ code: 'unsandboxed',
+    text: '厂商 CLI 正常环境：以当前用户权限使用原登录、配置、技能及 MCP，不经 Harness 沙箱；Git 工作树仅用于改动回收，不限制工作树外资源访问。' })
   if (choice === 'api') reasons.push({ code: 'subscription-api', text: '改用 API Key 重试：会按 API 计费并计入预算。' })
   const tool = toolFor(override?.provider ?? item?.provider)
   const entry = (health?.tools ?? []).find(candidate => candidate.id === tool?.id)

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.20.0 — 2026-10-15
+
+Fully quit Harness, including its tray or WebUI Host process, and restart after upgrading.
+
+- Add **官方工具协作** to the workbench launcher for **团队分工**. Choose read-only checks or approved editing in an isolated Git worktree. Preview and the session tool share `planOfficialTeam` / `executeOfficialTeamPlan`, filter CLI readiness for the selected mode, execute dependency packages sequentially and record results. This executor has no automatic model-directory API fallback; editable integration retains the existing clean-source and matching-baseline checks.
+- Preserve every vendor CLI's configured model by default. Catalog recommendation IDs are no longer passed as implicit CLI model arguments. Only explicit `cliModel`, saved route mappings or team `cliModelsJson` select a CLI model; package bindings take precedence over tool bindings and saved mappings. ZCode keeps its per-call model limitation.
+- Retain verified CLI model, entry, sandbox, usage and reported-cost evidence through routed, single-tool and team records. Separate recommended, requested and actual reported model identities. Preserve a valid reported zero cost; incomplete usage or unknown/unmatched actual CLI model identity cannot be costed using a recommended catalog price.
+- Bind installation/version and CLI login-status checks to the actual selected npm, pnpm or native copy. Refuse silent PATH substitution when the saved installation cannot be resolved or its concrete entry is unavailable.
+- Keep Windows Codex's original `CODEX_HOME` under the reviewed Harness ACL state-directory contract for read-only tasks. Explicitly selected native editable teams can use Codex's own workspace-write policy. Real Codex network checks failed in this batch; they are not reported as accepted execution.
+- Store Windows isolated Git worktrees in Host-derived per-source private temporary storage. Real use exposed source drives with Modify permission but no WRITE_OWNER, where the SDK could not initialize its ACL boundary. Keep source authorization and patch checks, reject redirected storage, and preserve failed worktrees for retry. A no-model SDK confined-write and cross-drive integration probe passed.
+- Add an explicit **厂商 CLI 正常环境** option for editable official teams. It retains normal vendor state, shell, skills and MCP under current user permissions, outside Harness's process sandbox. Git worktrees collect changes rather than restrict OS access. Startup and retry require separate confirmation even when legacy direct-CLI confirmation is disabled; restricted runs never switch automatically. Native Kimi and ordinary npm MiniMax entries additionally require registry package/manifest/entry attestation.
+- Preserve bounded, scrubbed failure diagnostics and exit codes, including Claude result errors. Keep verified usage and reported costs after failures, cancellation and timeouts, mark partial usage incomplete, and retain earlier team results if a later adapter throws. Reassignment applies the new route's saved CLI model mapping.
+- Clear obsolete failure details after a successful rerun and display the stored execution mode accurately. Update the English/Chinese README and workbench guide, including the existing Windows ZCode bundled TUI terminal support.
+
+Real Windows validation: authenticated workbench RPC executed one Claude package; the installed production runtime then executed Claude analysis → MiniMax delivery with dependency context and source patch integration. Independent JSON readback passed. Successful calls report $0.253848 known API cost in total; earlier unknown amounts and unpriced subscription reference usage remain separate. File/shell tools passed; every MCP service and vendor are not claimed tested. See [validation evidence and limits](docs/releases/0.20.0-validation.md). Automated checks and exact totals are included in the GitHub release notes.
+
+Engineering checks: frozen-lockfile strict-peer install passed; 833 tests, 830 passed, 3 conditional skips, no failures; client build and generated-client consistency passed. Skipped process/PTY checks are not counted as real execution acceptance.
+
 ## 0.19.0 — 2026-10-12
 
 Stable minor under the npm latest tag. Fully quit Harness (including its tray or WebUI Host process) and restart after upgrading.

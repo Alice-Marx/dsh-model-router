@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
@@ -40,8 +40,24 @@ import {
   finishVerifiedInstall,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { createPlanFromRoutes, channelForProvider } from '../.dsh-plugin/shared/harness-plan.mjs'
-import { codexExecArgs, codexIncompleteError, findManagedMiniMaxEntry, harnessSandboxBlocker, officialToolReadiness, packageBinCandidates, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
+import { codexExecArgs, codexIncompleteError, codexReadOnlyPolicy, codexStateSandboxContract, executionEnvironment, findManagedMiniMaxEntry, harnessSandboxBlocker, officialToolExecutionCapabilities, officialToolReadiness, packageBinCandidates, runOfficialTool, runnerEnvironment } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { emptyOutputError, outputIsEmpty, usageFromOutput, verifiedDiagnostic } from '../.dsh-plugin/shared/task-executors.mjs'
+
+test('managed CLI retains vendor connection settings and proxies without unrelated secrets or agent injection variables', () => {
+  const env = { PATH: 'path', ANTHROPIC_AUTH_TOKEN: 'private', ANTHROPIC_BASE_URL: 'https://example.test',
+    ANTHROPIC_MODEL: 'configured-model', ALL_PROXY: 'http://127.0.0.1:7897', OPENAI_API_KEY: 'other-vendor',
+    NODE_OPTIONS: '--import=untrusted', UNRELATED_SECRET: 'private' }
+  const actual = executionEnvironment('claude-code', { env })
+  assert.equal(actual.ANTHROPIC_AUTH_TOKEN, 'private')
+  assert.equal(actual.ANTHROPIC_BASE_URL, 'https://example.test')
+  assert.equal(actual.ANTHROPIC_MODEL, 'configured-model')
+  assert.equal(actual.ALL_PROXY, env.ALL_PROXY)
+  assert.equal(actual.OPENAI_API_KEY, undefined)
+  assert.equal(actual.NODE_OPTIONS, undefined)
+  assert.equal(actual.UNRELATED_SECRET, undefined)
+  assert.equal(executionEnvironment('claude-code', { env, sessionOnly: true }).ANTHROPIC_AUTH_TOKEN, undefined)
+  assert.equal(executionEnvironment('codex', { env }).ANTHROPIC_AUTH_TOKEN, undefined)
+})
 
 function verificationJob(toolId, preferences = {}) {
   return {
@@ -557,18 +573,84 @@ test('the Harness runner prefix gets ELECTRON_RUN_AS_NODE when it is the Electro
   assert.deepEqual(runnerEnvironment('/opt/harness/harness', { execPath: '/opt/harness/harness', electron: '44.0.0', platform: 'linux' }), { ELECTRON_RUN_AS_NODE: '1' })
 })
 
-test('Codex is not started inside the Harness Windows ACL sandbox (it must write CODEX_HOME)', async t => {
-  assert.match(harnessSandboxBlocker('codex', 'win32'), /CODEX_HOME.*os error 5/)
+test('Windows Codex supports read-only with existing state and explicitly refuses editable execution', async t => {
+  assert.equal(harnessSandboxBlocker('codex', 'win32'), null)
+  assert.match(harnessSandboxBlocker('codex', 'win32', 'workspace-write'), /CODEX_HOME.*独立 Git/)
   assert.equal(harnessSandboxBlocker('codex', 'linux'), null)
   assert.equal(harnessSandboxBlocker('claude-code', 'win32'), null)
   if (process.platform === 'win32') {
+    assert.deepEqual(officialToolExecutionCapabilities().find(item => item.id === 'codex').modes, ['read-only'])
     const cwd = await mkdtemp(join(tmpdir(), 'model-router-codex-blocker-'))
     t.after(() => rm(cwd, { recursive: true, force: true }))
     let confined = false
-    const result = await runOfficialTool({ toolId: 'codex', task: 'OK', workspace: cwd, sandbox: { confine: async () => { confined = true; return {} } } })
+    const result = await runOfficialTool({ toolId: 'codex', task: 'OK', workspace: cwd,
+      mode: 'workspace-write', sandbox: { confine: async () => { confined = true; return {} } } })
     assert.equal(result.status, 'unsupported')
-    assert.equal(confined, false, 'the sandbox runner is never asked to wrap Codex')
+    assert.match(result.reason, /仅支持只读任务/)
+    assert.equal(confined, false, 'an unsupported edit is rejected before creating any write grant')
+    const noSandbox = await runOfficialTool({ toolId: 'codex', task: 'OK', workspace: cwd })
+    assert.equal(noSandbox.status, 'unsupported')
+    assert.match(noSandbox.reason, /沙箱不可用.*拒绝直接启动/)
   }
+})
+
+test('Codex read-only policy grants the exact existing state home and preserves its files', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'router-codex-home-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const workspace = join(root, 'project')
+  const home = join(root, 'existing-state')
+  await Promise.all([mkdir(workspace), mkdir(home)])
+  await writeFile(join(home, 'auth.json'), 'synthetic login fixture')
+  await writeFile(join(home, 'config.toml'), 'synthetic config fixture')
+  const policy = await codexReadOnlyPolicy(workspace, home)
+  assert.deepEqual(policy, { mode: 'workspace-write', workspaceRoot: await realpath(home) })
+  assert.notEqual(policy.workspaceRoot, await realpath(workspace), 'the project receives no outer write capability')
+  assert.equal(await readFile(join(home, 'auth.json'), 'utf8'), 'synthetic login fixture')
+  assert.equal(await readFile(join(home, 'config.toml'), 'utf8'), 'synthetic config fixture')
+  assert.equal(codexExecArgs('read-only').at(-3), 'read-only', 'the CLI retains its own read-only policy')
+  await assert.rejects(codexReadOnlyPolicy(workspace, join(root, 'missing-state')), /ENOENT/)
+  await assert.rejects(codexReadOnlyPolicy(workspace, 'relative-state'), /absolute directory/)
+})
+
+test('Codex rejects overlapping project/state roots and does not advertise them as ready', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'router-codex-overlap-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const nested = join(root, 'nested')
+  await mkdir(nested)
+  for (const [workspace, home] of [[root, root], [root, nested], [nested, root]]) {
+    await assert.rejects(codexReadOnlyPolicy(workspace, home), /必须互不包含/)
+  }
+  if (process.platform === 'win32') {
+    const previous = process.env.CODEX_HOME
+    process.env.CODEX_HOME = root
+    try {
+      const readiness = await officialToolReadiness('codex', nested)
+      assert.equal(readiness.ready, false)
+      assert.deepEqual(readiness.readyModes, [])
+      assert.match(readiness.reason, /必须互不包含/)
+    } finally {
+      if (previous === undefined) delete process.env.CODEX_HOME
+      else process.env.CODEX_HOME = previous
+    }
+  }
+})
+
+test('Codex requires the reviewed Windows ACL state-root profile and exact CLI argv', () => {
+  const home = resolve(tmpdir(), 'existing-codex-home')
+  const policy = { mode: 'workspace-write', workspaceRoot: home }
+  const command = ['signed-codex.exe', ...codexExecArgs('read-only')]
+  const runner = join(resolve(tmpdir()), 'node_modules', '@deepseek-ai', 'dsh-sandbox-windows-acl', 'lib', 'runner.js')
+  const prefix = ['node', runner, '--workspace', home, '--temp', resolve(tmpdir()), '--mode', 'workspace-write']
+  const argv = [...prefix, '--', ...command]
+  assert.equal(codexStateSandboxContract({ argv }, command, policy), true)
+  const managed = [...prefix, '--write-sid', 'state-sid', '--temp-write-sid', 'temp-sid', '--', ...command]
+  assert.equal(codexStateSandboxContract({ argv: managed }, command, policy), true)
+  assert.equal(codexStateSandboxContract({ argv: ['unknown-runner', '--', ...command] }, command, policy), false)
+  assert.equal(codexStateSandboxContract({ argv: [...prefix, '--', ...command.slice(0, -1), 'injected'] }, command, policy), false)
+  assert.equal(codexStateSandboxContract({ argv }, command, { ...policy, workspaceRoot: resolve(tmpdir(), 'project') }), false)
+  assert.equal(codexStateSandboxContract({ argv }, command, { ...policy, mode: 'read-only' }), false)
+  assert.equal(codexStateSandboxContract({ argv: [...prefix, '--workspace', home, '--', ...command] }, command, policy), false)
+  assert.equal(codexStateSandboxContract({ argv: [...prefix, '--write-sid', 'state-sid', '--', ...command] }, command, policy), false)
 })
 
 test('empty CLI output is named explicitly with the exit code', () => {

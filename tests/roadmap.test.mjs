@@ -85,9 +85,10 @@ test('login checks use fixed status commands and never read credential values', 
 
 test('health report covers every registry tool with version status and a login guide', async () => {
   const probes = [{ id: 'codex', installed: true, version: '0.160.0', status: 'installed' }, { id: 'claude-code', installed: true, version: '2.1.200', status: 'installed' }]
-  const runner = async file => file === 'codex' ? { ok: true, code: 0, stdout: 'Logged in using ChatGPT\n', stderr: '' } : { ok: false, code: 1, stdout: '{"loggedIn":false}', stderr: '' }
+  const runner = async file => file.endsWith('codex.exe') ? { ok: true, code: 0, stdout: 'Logged in using ChatGPT\n', stderr: '' } : { ok: false, code: 1, stdout: '{"loggedIn":false}', stderr: '' }
+  const resolveLoginLaunch = async probe => ({ file: join(tmpdir(), probe.id === 'codex' ? 'codex.exe' : 'claude.exe'), args: [], useShell: false })
   const latest = { codex: { version: '0.160.0', checkedAt: 40, source: 'npm' }, 'claude-code': { version: '2.1.288', checkedAt: 40, source: 'npm' } }
-  const report = await runHealthCheck(probes, { runner, env: {}, now: () => 42, latest })
+  const report = await runHealthCheck(probes, { runner, resolveLoginLaunch, env: {}, now: () => 42, latest })
   assert.equal(report.checkedAt, 42)
   assert.equal(report.tools.length, OFFICIAL_TOOLS.length)
   const codex = report.tools.find(item => item.id === 'codex')
@@ -107,7 +108,7 @@ test('health report covers every registry tool with version status and a login g
   assert.equal(versionStatus('0.157.1', null), 'unknown')
   assert.equal(versionStatus(null, '0.160.0'), 'unknown')
   assert.equal(versionStatus('0.161.0', '0.160.0'), 'latest')
-  const offline = await runHealthCheck(probes, { runner, env: {} })
+  const offline = await runHealthCheck(probes, { runner, resolveLoginLaunch, env: {} })
   assert.equal(offline.tools.find(item => item.id === 'codex').versionStatus, 'unknown', 'no lookup: no verdict')
   assert.equal((await checkToolHealth({ id: 'zcode', installed: false })).login.state, 'unknown')
 })

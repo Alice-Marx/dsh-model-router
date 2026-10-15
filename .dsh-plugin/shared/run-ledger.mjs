@@ -12,12 +12,30 @@ export const MAX_QUALITY_BIAS = 0.04
 const finite = value => typeof value === 'number' && Number.isFinite(value)
 const routeKey = (provider, model) => `${String(provider ?? '')}\u0000${String(model ?? '')}`
 
+function modelIdentity(value) {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (value && typeof value === 'object' && !Array.isArray(value)
+    && typeof value.providerId === 'string' && value.providerId
+    && typeof value.modelId === 'string' && value.modelId) return `${value.providerId}/${value.modelId}`
+  return null
+}
+
 /** USD cost of one package. Prefers a CLI-reported cost, else usage × configured price. */
 export function actualCost(result, pricing) {
   if (result && Object.hasOwn(result, 'reportedCostUsd') && finite(result.reportedCostUsd) && result.reportedCostUsd >= 0) {
     return { costUsd: result.reportedCostUsd, costSource: 'cli-reported' }
   }
   const usage = result && Object.hasOwn(result, 'usage') ? result.usage : null
+  if (usage && result.usageIncomplete === true) return { costUsd: null, costSource: 'usage-incomplete' }
+  if (usage && result.channel === 'official-cli') {
+    const actualModel = modelIdentity(result.actualModel) ?? modelIdentity(result.reportedModel)
+    if (!actualModel) return { costUsd: null, costSource: 'model-unknown' }
+    const pricedModel = pricing?.model ?? result.model
+    const provider = pricing?.provider ?? result.provider
+    const matches = [pricedModel, pricing?.cliModel, provider && pricedModel ? `${provider}/${pricedModel}` : null]
+      .some(value => typeof value === 'string' && value === actualModel)
+    if (!matches) return { costUsd: null, costSource: 'model-price-unverified' }
+  }
   if (!usage || !pricing || !Object.hasOwn(pricing, 'input') || !Object.hasOwn(pricing, 'output')
     || pricing.input === undefined || pricing.input === null || pricing.output === undefined || pricing.output === null) {
     return { costUsd: null, costSource: usage ? 'price-missing' : 'usage-missing' }
@@ -268,12 +286,25 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     channel: result?.channel ?? null,
     toolId: result?.toolId ?? null,
     credentialSource: result?.credentialSource ?? null,
-    ...(result?.actualModel ? { actualModel: String(result.actualModel) } : {}),
+    ...(result?.channel === 'official-cli' ? {
+      requestedCliModel: result.requestedCliModel ?? null,
+      actualModel: modelIdentity(result.actualModel) ?? modelIdentity(result.reportedModel),
+      modelNotice: result.modelNotice ?? null,
+    } : {}),
+    ...(result?.channel !== 'official-cli' && result?.actualModel ? { actualModel: String(result.actualModel) } : {}),
+    ...(result?.reportedModel !== undefined ? { reportedModel: result.reportedModel } : {}),
+    ...(typeof result?.source === 'string' ? { source: result.source } : {}),
+    ...(typeof result?.sandboxEnforcement === 'string' ? { sandboxEnforcement: result.sandboxEnforcement } : {}),
+    ...(result?.usageIncomplete === true ? { usageIncomplete: true } : {}),
+    ...(typeof result?.executionEnvironment === 'string' ? { executionEnvironment: result.executionEnvironment } : {}),
+    ...(finite(result?.reportedCostUsd) && result.reportedCostUsd >= 0 ? { reportedCostUsd: result.reportedCostUsd } : {}),
     fallback: result?.fallback ?? null,
     ...(result?.billingMode ? { billingMode: String(result.billingMode) } : {}),
     ...(result?.billingSwitch ? { billingSwitch: { ...result.billingSwitch } } : {}),
     ...(result?.subscriptionRoute ? { subscriptionRoute: { provider: String(result.subscriptionRoute.provider ?? ''), model: String(result.subscriptionRoute.model ?? '') } } : {}),
     error: result?.ok ? null : (result?.error ?? null),
+    ...(!result?.ok && result?.diagnostic ? { diagnostic: String(result.diagnostic).slice(0, 2_000) } : {}),
+    ...(Number.isInteger(result?.exitCode) ? { exitCode: result.exitCode } : {}),
     answer: String(result?.answer ?? '').slice(0, MAX_STORED_ANSWER),
     answerTruncated: String(result?.answer ?? '').length > MAX_STORED_ANSWER,
     usage: result?.usage ?? null,
@@ -375,12 +406,21 @@ export function teamExecutionResults(plan, execution) {
     cancelled: result.status === 'cancelled',
     provider: result.provider,
     model: result.recommendedModel,
+    requestedCliModel: result.requestedCliModel ?? null,
     actualModel: result.actualModel ?? null,
+    ...(result.reportedModel !== undefined ? { reportedModel: result.reportedModel } : {}),
+    modelNotice: result.modelNotice ?? null,
+    ...(typeof result.source === 'string' ? { source: result.source } : {}),
+    ...(typeof result.sandboxEnforcement === 'string' ? { sandboxEnforcement: result.sandboxEnforcement } : {}),
+    ...(result.usageIncomplete === true ? { usageIncomplete: true } : {}),
+    ...(typeof result.executionEnvironment === 'string' ? { executionEnvironment: result.executionEnvironment } : {}),
     channel: 'official-cli',
     toolId: result.toolId ?? null,
     answer: String(result.finalText ?? ''),
     error: result.status === 'succeeded' ? null : String(result.error ?? (TEAM_FAILURE.has(result.status) ? result.status : '官方 CLI 未成功完成。')),
     stderrTail: result.outputTail ?? null,
+    diagnostic: result.outputTail ?? null,
+    exitCode: result.exitCode ?? null,
     ...(result.usage ? { usage: result.usage } : {}),
     ...(finite(result.reportedCostUsd) ? { reportedCostUsd: result.reportedCostUsd } : {}),
   }))
@@ -421,9 +461,18 @@ export function buildToolRunRecord({ toolId, toolLabel, provider, model, cliMode
       id: packageId, ok: succeeded, cancelled: result?.status === 'cancelled',
       provider: plan.directRoute.provider, model: plan.directRoute.model,
       channel: 'official-cli', toolId,
-      actualModel: result?.reportedModel && typeof result.reportedModel === 'string' ? result.reportedModel : null,
+      requestedCliModel: Object.hasOwn(result ?? {}, 'requestedModel') ? result.requestedModel : cliModel,
+      actualModel: modelIdentity(result?.actualModel) ?? modelIdentity(result?.reportedModel),
+      ...(result?.reportedModel !== undefined ? { reportedModel: result.reportedModel } : {}),
+      modelNotice: result?.modelNotice ?? null,
+      ...(typeof result?.source === 'string' ? { source: result.source } : {}),
+      ...(typeof result?.sandboxEnforcement === 'string' ? { sandboxEnforcement: result.sandboxEnforcement } : {}),
+      ...(result?.usageIncomplete === true ? { usageIncomplete: true } : {}),
       answer: String(result?.finalText ?? ''),
       error: succeeded ? null : String(result?.error ?? result?.reason ?? result?.status ?? '官方 CLI 未成功完成。'),
+      ...(!succeeded && typeof result?.diagnostic === 'string' && result.diagnostic.trim()
+        ? { diagnostic: result.diagnostic } : {}),
+      ...(Number.isInteger(result?.exitCode) ? { exitCode: result.exitCode } : {}),
       ...(result?.usage ? { usage: result.usage } : {}),
       ...(finite(result?.reportedCostUsd) ? { reportedCostUsd: result.reportedCostUsd } : {}),
     }],

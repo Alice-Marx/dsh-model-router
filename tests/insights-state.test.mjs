@@ -2,10 +2,29 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   packageStatus, dagLayers, healthSummary, versionLine, UNTESTED_VERSION_NOTE, budgetMeter, planBudget, biasForRoute, unwrapRemote, formatUsd,
-  priorAttemptTotals, runTotals,
+  priorAttemptTotals, runTotals, launchRequest,
 } from '../.dsh-plugin/client/insights-state.mjs'
 import { createWorkspacePlan } from '../.dsh-plugin/client/catalog.mjs'
 import { archiveSpending, mergeRerun, spending } from '../.dsh-plugin/shared/run-ledger.mjs'
+
+test('launchRequest preserves routed compatibility and carries validated official-team permissions', () => {
+  const input = { task: '检查构建', mode: 'team', preset: 'balanced', budgetUsd: '0.5', workspace: ' D:/repo ' }
+  const routed = { task: '检查构建', planMode: 'team', preset: 'balanced', budgetUsd: 0.5, workspace: 'D:/repo' }
+  assert.deepEqual(launchRequest(input), routed, 'old callers receive no new executor or permission fields')
+  assert.deepEqual(launchRequest({ ...input, executor: 'routed', executionMode: 'read-only' }), routed)
+  for (const executionMode of ['read-only', 'workspace-write']) {
+    assert.deepEqual(launchRequest({ ...input, executor: 'official-team', executionMode }), {
+      ...routed, executor: 'official-team', executionMode,
+    })
+  }
+  assert.equal(launchRequest({ ...input, executor: 'official-team' }).executionMode, 'read-only')
+  for (const mode of ['single', 'direct', undefined]) {
+    assert.throws(() => launchRequest({ ...input, mode, executor: 'official-team', directRoute: { provider: 'p', model: 'm' } }), /团队分工/)
+  }
+  assert.throws(() => launchRequest({ ...input, executor: 'other' }), /执行方式/)
+  assert.throws(() => launchRequest({ ...input, executor: 'official-team', executionMode: 'unsafe' }), /任务权限/)
+  assert.throws(() => launchRequest({ ...input, executionMode: 'workspace-write' }), /只读/)
+})
 
 test('dagLayers orders packages by dependency depth and tolerates cycles and unknown ids', () => {
   const layers = dagLayers([

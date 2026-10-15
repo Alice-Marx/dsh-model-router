@@ -23,6 +23,7 @@ import { routeBoundaries } from './shared/security-boundaries.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
 import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
+import { parseRunRequest } from './shared/official-tools-remote.mjs'
 import { createTerminalManager } from './shared/cli-terminal.mjs'
 import {
   parseTerminalRead,
@@ -42,7 +43,7 @@ import {
 } from './shared/official-tool-registry.mjs'
 import { parseInstallPreferences, resolveInstallPlan } from './shared/tool-install-preferences.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness, runOfficialTool } from './shared/official-tool-executor.mjs'
-import { runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
+import { preflightOfficialWorkspace, runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
 import { downstreamPackageIds, executeAssignmentPlan, rerunAssignmentPackage, taskTextProblem } from './shared/task-executors.mjs'
 import {
   probeAllTools,
@@ -387,9 +388,21 @@ export function billingForResult(result) {
   })
 }
 
-function routePricing(routes, item) {
-  const route = routes.find(route => route.provider === item?.provider && route.model === item?.model)
-  return route?.pricing ? { ...route.pricing, source: route.pricingSource ?? 'route', version: route.pricingVersion ?? null, asOf: route.snapshotAsOf ?? null } : null
+export function routePricing(routes, item) {
+  const matches = routes.filter(route => {
+    if (route.provider !== item?.provider) return false
+    if (item?.channel !== 'official-cli') return route.model === item?.model
+    // A routing recommendation cannot establish which model the CLI billed.
+    return typeof item.actualModel === 'string' && [route.model, route.cliModel, `${route.provider}/${route.model}`].includes(item.actualModel)
+  })
+  // Different catalog routes can share a CLI alias. Conflicting prices are
+  // not evidence of what the CLI actually billed.
+  const prices = new Set(matches.map(route => JSON.stringify(route.pricing ?? null)))
+  if (prices.size > 1) return null
+  const route = matches[0]
+  return route?.pricing ? { ...route.pricing, provider: route.provider, model: route.model,
+    ...(route.cliModel ? { cliModel: route.cliModel } : {}),
+    source: route.pricingSource ?? 'route', version: route.pricingVersion ?? null, asOf: route.snapshotAsOf ?? null } : null
 }
 
 function feedbackOptions(config) {
@@ -463,7 +476,7 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
   const readiness = options.skipToolProbe === true ? []
     : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
   const executable = new Set(Array.isArray(options.runnableToolIds)
-    ? options.runnableToolIds : readiness.filter(item => item.ready).map(item => item.id))
+    ? options.runnableToolIds : readiness.filter(item => item.ready && (item.readyModes ?? item.modes ?? []).includes('read-only')).map(item => item.id))
   const loggedOut = options.skipToolProbe === true
     ? (Array.isArray(options.loggedOutToolIds) ? options.loggedOutToolIds : [])
     : loggedOutIds(await currentHealth())
@@ -699,7 +712,7 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
     : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
   const runnableToolIds = Array.isArray(options.runnableToolIds)
     ? options.runnableToolIds
-    : readiness.filter(item => item.ready).map(item => item.id)
+    : readiness.filter(item => item.ready && (item.readyModes ?? item.modes ?? []).includes('read-only')).map(item => item.id)
   const loggedOut = options.skipToolProbe === true
     ? (Array.isArray(options.loggedOutToolIds) ? options.loggedOutToolIds : [])
     : loggedOutIds(await currentHealth())
@@ -823,7 +836,7 @@ export function rerunSupport(run) {
   return { ok: true, kind: run.kind === 'team' ? 'team' : 'assign', writes: false }
 }
 
-export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, confirmWrite = false, subscriptionChoice = null, workspace, root, signal, ...options } = {}) {
+export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, confirmWrite = false, confirmUnsandboxed = false, subscriptionChoice = null, workspace, root, signal, ...options } = {}) {
   const { run, saved } = await storedRun(runId)
   const target = run.packages.find(item => item.id === text(packageId))
   if (!target) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
@@ -854,9 +867,12 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   if (support.kind === 'team-write' && target.ok) {
     throw new Error('可编辑团队运行只能续跑失败或未完成的步骤：已成功步骤的改动已在原独立工作区中，重跑会重复套用。如需重做请重新调用 model_router_team_execute。')
   }
-  if (support.writes && confirmWrite !== true) {
-    return { paused: true, needsConfirmation: ['workspace-write'], run,
-      budget: null, message: '续跑可编辑团队步骤会在新的独立 Git 工作树中套用之前的改动并修改文件，需要先确认。' }
+  const missingConfirmations = []
+  if (support.writes && confirmWrite !== true) missingConfirmations.push('workspace-write')
+  if (run.kind === 'team' && run.executionEnvironment === 'cli-native' && confirmUnsandboxed !== true) missingConfirmations.push('unsandboxed')
+  if (missingConfirmations.length) {
+    return { paused: true, needsConfirmation: missingConfirmations, run,
+      budget: null, message: '请确认续跑所需的文件修改与执行环境权限后继续；厂商 CLI 正常环境以当前用户权限运行，独立 Git 工作树不是操作系统读写边界。' }
   }
   const sameRoute = !override || (override.provider === target.recommendedProvider && override.model === target.recommendedModel)
   const budget = budgetFor(config, saved, sameRoute ? target.estimatedCost : null)
@@ -930,16 +946,21 @@ function teamPlanFromRun(run, ids, override, targetId) {
  */
 async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, root, signal, options, config = {} }) {
   const mode = run.executionMode === 'workspace-write' ? 'workspace-write' : 'read-only'
+  const executionEnvironment = teamExecutionEnvironment(run.executionEnvironment, mode)
   const downstream = downstreamPackageIds(run.packages, target.id)
     .filter(id => !run.packages.find(item => item.id === id)?.ok)
   const ids = [target.id, ...downstream]
   const plan = teamPlanFromRun(run, ids, override, target.id)
   const cliModels = Object.fromEntries(Object.entries(run.cliModels ?? {}).filter(([key]) => ids.includes(key) && !(override && key === target.id)))
+  if (override) {
+    const reassignedPlan = { team: { workPackages: plan.team.workPackages.filter(item => item.id === target.id) } }
+    Object.assign(cliModels, resolveTeamCliModelBindings(reassignedPlan, routes))
+  }
   const previous = run.packages.filter(item => item.ok && !ids.includes(item.id))
     .map(item => ({ id: item.id, name: item.name, finalText: item.answer }))
   const runTeam = options.runTeam ?? runOfficialTeam
   const installed = Array.isArray(options.installedToolIds) ? options.installedToolIds : await installedToolIds()
-  const execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: root ?? cwd, mode,
+  const execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: root ?? cwd, mode, executionEnvironment,
     installedIds: installed, cliModels, signal, sandbox: ctx.sandbox, previous, onlyIds: ids,
     ...(mode === 'workspace-write' ? { seedFrom: { workspace: run.isolatedWorkspace, baseCommit: run.baseCommit } } : {}),
     ...(options.runtime ? { runtime: options.runtime } : {}) })
@@ -961,6 +982,7 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, 
       if (stored) stored.billingSwitch = note
     }
     current.status = execution?.status ?? current.status
+    current.executionEnvironment = executionEnvironment
     if (mode === 'workspace-write' && execution?.workspace && execution.status !== 'blocked') {
       current.isolatedWorkspace = String(execution.workspace)
       if (typeof execution.baseCommit === 'string') current.baseCommit = execution.baseCommit
@@ -969,6 +991,10 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, 
     if (override) {
       const stored = current.packages.find(item => item.id === target.id)
       if (stored) { stored.recommendedProvider = override.provider; stored.recommendedModel = override.model }
+      const bindings = { ...(current.cliModels ?? {}) }
+      delete bindings[target.id]
+      if (cliModels[target.id]) bindings[target.id] = cliModels[target.id]
+      current.cliModels = bindings
     }
   })
   return { run: updated, execution: { ...converted, ranIds: ids, raw: execution }, budget }
@@ -1011,13 +1037,14 @@ async function annotateCliQuota(run, config, failures) {
   }
 }
 
-export async function recordTeamRun({ task, plan, execution, mode, workspace, routes, cliModels, budget, startedAt, preset, config = {} }) {
+export async function recordTeamRun({ task, plan, execution, mode, executionEnvironment = 'harness', workspace, routes, cliModels, budget, startedAt, preset, config = {} }) {
   const run = buildTeamRunRecord({
     id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task, plan, execution, mode, workspace,
     preset: plan?.preset ?? preset ?? DEFAULT_ROUTING_PRESET,
     pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
     budget: budget ? { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: false, confirmed: budget.exceeded ? true : undefined } : null,
   })
+  run.executionEnvironment = teamExecutionEnvironment(executionEnvironment, mode ?? 'read-only')
   const bindings = Object.fromEntries(Object.entries(cliModels ?? {}).filter(([, value]) => typeof value === 'string' && value))
   if (Object.keys(bindings).length) run.cliModels = bindings
   await annotateCliQuota(run, config, (Array.isArray(execution?.results) ? execution.results : [])
@@ -1049,9 +1076,7 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
     routes = await routesWithLearning(ctx, config, signal, refreshed.runs, refreshed.dynamicData, refreshed.routingLearning)
     route = routes.find(item => item.provider === text(args.provider) && item.model === text(args.model)) ?? null
     if (!route) throw new Error('所选 provider/model 不在官方模型目录中')
-    modelId = route.cliModel && toolId !== 'zcode'
-      ? route.cliModel
-      : toolId === 'claude-code' || toolId === 'codex' ? route.model : null
+    modelId = route.cliModel && toolId !== 'zcode' ? route.cliModel : null
   }
   if (text(args.cliModel)) {
     if (!route) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
@@ -1061,7 +1086,7 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
   const estimate = route ? createPlanFromRoutes(taskText, routes, { mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost : null
   const budget = budgetFor(config, await savedState(), Number.isFinite(estimate) ? estimate : null)
   return { toolId, tool, taskText, mode, modelId, route, routes, estimate: Number.isFinite(estimate) ? estimate : null, budget,
-    provider: route?.provider ?? '', model: route?.model ?? '', cliModel: text(args.cliModel) || null }
+    provider: route?.provider ?? '', model: route?.model ?? '', cliModel: modelId }
 }
 
 /** Run a planned tool call and record it; `rerunOf` links a rerun to the original run. */
@@ -1200,6 +1225,103 @@ export function resolveTeamCliModelBindings(plan, routes, requested = {}) {
     .filter(([key]) => !Object.hasOwn(bindings, key))) }
 }
 
+/** Only plan team packages on an installed CLI that is ready in this mode. */
+export function executableTeamRoutes(routes, installed, readiness, mode, capabilities = officialToolExecutionCapabilities()) {
+  const available = new Set(installed)
+  const ready = new Map(readiness.map(item => [item.id, item]))
+  const supported = new Map(capabilities.map(item => [item.id, item]))
+  return routes.filter(route => {
+    const id = toolForProvider(route.provider)?.id
+    const state = ready.get(id)
+    const capability = supported.get(id)
+    const readyModes = state?.readyModes ?? state?.modes ?? capability?.modes ?? []
+    return available.has(id) && state?.ready === true && capability?.modes?.includes(mode)
+      && readyModes.includes(mode)
+  })
+}
+
+function teamExecutionEnvironment(value = 'harness', mode = 'read-only') {
+  if (!['harness', 'cli-native'].includes(value)) throw new Error('团队执行环境必须是 harness 或 cli-native')
+  if (value === 'cli-native' && mode !== 'workspace-write') throw new Error('厂商 CLI 正常环境仅支持官方团队的 workspace-write 模式')
+  return value
+}
+
+/** Plan a CLI-only team without starting a provider request or changing files. */
+export async function planOfficialTeam(ctx, config = {}, args = {}, options = {}) {
+  const taskText = text(args.task)
+  const problem = taskTextProblem(taskText)
+  if (problem) throw new Error(problem)
+  const mode = args.mode ?? args.executionMode ?? 'read-only'
+  if (!['read-only', 'workspace-write'].includes(mode)) throw new Error('团队执行模式必须是 read-only 或 workspace-write')
+  const executionEnvironment = teamExecutionEnvironment(args.executionEnvironment, mode)
+  const workspace = options.workspace ?? process.cwd()
+  throwIfAborted(options.signal)
+  const saved = await routingSavedState(config)
+  const [routes, installed] = await Promise.all([
+    routesWithLearning(ctx, config, options.signal, saved.runs, saved.dynamicData, saved.routingLearning),
+    Array.isArray(options.installedToolIds) ? options.installedToolIds : installedToolIds(),
+  ])
+  const readiness = Array.isArray(options.readiness) ? options.readiness
+    : await Promise.all(installed.map(id => (options.readinessFor ?? officialToolReadiness)(id, workspace, { executionEnvironment })))
+  const capabilities = options.executionCapabilities ?? (options.capabilitiesFor ?? officialToolExecutionCapabilities)({ executionEnvironment })
+  const executableRoutes = executableTeamRoutes(routes, installed, readiness, mode, capabilities)
+  const base = { taskText, workspace, mode, executionEnvironment, plan: null, routes: executableRoutes, installed, readiness,
+    executionCapabilities: capabilities, executionReadiness: readiness, cliModels: {}, budget: null }
+  if (executionEnvironment === 'harness' && typeof ctx.sandbox?.confine !== 'function') {
+    return { ...base, status: 'blocked', reason: '官方 Harness 进程沙箱不可用，不能执行官方 CLI 团队。' }
+  }
+  if (executableRoutes.length === 0) return { ...base, status: 'blocked',
+    reason: `官方模型目录中没有同时满足已配置路线、已安装 CLI、托管执行适配器与 ${mode} 模式的供应商。请检查该模式下的 CLI 执行就绪状态。` }
+  const supported = new Set(executableRoutes.map(route => toolForProvider(route.provider).id))
+  const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
+  const budgetUsd = Math.max(0, finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)))
+  const plan = createPlanFromRoutes(taskText, executableRoutes, {
+    ...planDataOptions(saved, config), mode: 'team', budgetUsd, installedToolIds: installed,
+    runnableToolIds: installed.filter(id => supported.has(id)), preset: routingPresetOf(config, args.preset),
+  })
+  const bindingsText = text(args.cliModelsJson)
+  if (bindingsText.length > 4_000) throw new Error('cliModelsJson 超过 4000 字符上限')
+  let requestedModels = {}
+  if (bindingsText) {
+    try { requestedModels = JSON.parse(bindingsText) }
+    catch { throw new Error('cliModelsJson 不是有效的 JSON 对象') }
+  }
+  const cliModels = resolveTeamCliModelBindings(plan, executableRoutes, requestedModels)
+  const budget = budgetFor(config, await savedState(), plan.estimatedCost)
+  return { ...base, status: 'planned', plan, cliModels, budget }
+}
+
+/** Execute and record a planned team through official CLIs only. */
+export async function executeOfficialTeamPlan(ctx, config = {}, planned, options = {}) {
+  if (planned?.status === 'blocked') return { ...planned }
+  if (!planned?.plan || !['read-only', 'workspace-write'].includes(planned.mode)) throw new Error('缺少有效的官方 CLI 团队计划')
+  const executionEnvironment = teamExecutionEnvironment(planned.executionEnvironment, planned.mode)
+  const workspace = options.workspace ?? planned.workspace
+  const budget = budgetFor(config, await savedState(), planned.plan.estimatedCost)
+  const common = { plan: planned.plan, workspace, mode: planned.mode, executionEnvironment, budget }
+  if (budget.exceeded && options.confirmOverBudget !== true) return { ...common, status: 'paused-budget',
+    notice: `${budget.message} 已暂停团队执行。请向用户确认后再执行。` }
+  if (executionEnvironment === 'cli-native' && options.confirmUnsandboxed !== true) return { ...common,
+    status: 'needs-confirmation', missing: ['unsandboxed'],
+    reasons: confirmationReasons(['unsandboxed'], { executionEnvironment }),
+    notice: '厂商 CLI 正常环境必须明确确认后才会启动。' }
+  if (executionEnvironment === 'harness' && typeof ctx.sandbox?.confine !== 'function') return { ...common, status: 'blocked',
+    reason: '官方 Harness 进程沙箱不可用，不能执行官方 CLI 团队。' }
+  throwIfAborted(options.signal)
+  const startedAt = Date.now()
+  const execution = await (options.runTeam ?? runOfficialTeam)({ plan: planned.plan, task: planned.taskText, workspace,
+    allowedRoot: options.root ?? workspace, mode: planned.mode, executionEnvironment, installedIds: planned.installed,
+    cliModels: planned.cliModels, signal: options.signal, sandbox: ctx.sandbox })
+  const run = await recordTeamRun({ task: planned.taskText, plan: planned.plan, execution, mode: planned.mode, executionEnvironment, workspace,
+    routes: planned.routes, cliModels: planned.cliModels, budget, startedAt, config })
+  return { ...common, status: execution.status, execution, run, runId: run?.id ?? null,
+    rerunNotice: planned.mode === 'read-only'
+      ? '失败的工作包可用 model_router_rerun_step 单步重跑（只重跑该步及其未完成的下游）。'
+      : '若在某个步骤失败而停止，可用 model_router_rerun_step 在新的独立工作树中套用之前的改动后续跑（需审批）；已整合或待人工整合的运行不能单步重跑。',
+    modelNotice: '已配置 cliModel 的路线按工作包传给官方 CLI；所有厂商无映射时使用 CLI 默认模型。请求模型、Harness 推荐模型与 CLI 回报的实际模型分别记录；未核验实际模型时不按推荐路线价格计算实际费用。',
+    billingNotice: 'budgetUsd 仅影响估算与路由，无法限制官方 CLI 账号实际费用。' }
+}
+
 /** What was assigned and why, per package: route, difficulty, estimated cost, channel. */
 export function decisionSummary(plan) {
   const packages = plan?.routingBypassed
@@ -1292,12 +1414,28 @@ export function approvalReasonCodes(name, args = {}, config = {}, { rerunRun = n
   if (name === 'model_router_rerun_step' && args.subscriptionChoice === 'api') codes.push('subscription-api')
   if (args.confirmOverBudget === true) codes.push('over-budget')
   const directRun = name === 'model_router_execute' || (name === 'model_router_rerun_step' && (!rerunRun || rerunSupport(rerunRun).kind === 'assign'))
+  if ((name === 'model_router_team_execute' && args.executionEnvironment === 'cli-native')
+    || (name === 'model_router_rerun_step' && rerunRun?.executionEnvironment === 'cli-native')) codes.push('unsandboxed')
   if (directRun && valueOf(config, 'confirmUnsandboxedCli', true) !== false && mayLaunchDirectCli(args)) codes.push('unsandboxed')
   return codes
 }
 
+function executionApprovalText(code, sandboxAvailable, executionEnvironment) {
+  if (executionEnvironment === 'cli-native' && ['workspace-write', 'unsandboxed'].includes(code)) {
+    return { reason: 'Run verified official CLIs with the current user permissions, outside the Harness process sandbox',
+      zh: code === 'workspace-write'
+        ? '修改文件：CLI 在独立 Git 工作树执行，成功后核对并整合补丁。工作树用于改动回收，不构成操作系统读写边界。'
+        : '厂商 CLI 正常环境：使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。工具可能访问工作树外当前用户可访问的资源；不会自动切换执行环境。',
+      en: code === 'workspace-write'
+        ? 'Edit in an isolated Git worktree and integrate the verified patch. The worktree collects changes; it is not an OS file-access boundary.'
+        : 'Run the verified vendor CLI with its original login, configuration, skills and MCP under the current user permissions, outside the Harness process sandbox. Tools can access resources outside the worktree. This environment is never selected automatically.' }
+  }
+  return APPROVAL_TEXT[code](sandboxAvailable)
+}
+
 function approvalReasons(name, args, config, { sandboxAvailable = false, rerunRun = null } = {}) {
-  return approvalReasonCodes(name, args, config, { rerunRun }).map(code => ({ code, ...APPROVAL_TEXT[code](sandboxAvailable) }))
+  return approvalReasonCodes(name, args, config, { rerunRun }).map(code => ({ code,
+    ...executionApprovalText(code, sandboxAvailable, rerunRun?.executionEnvironment ?? args.executionEnvironment) }))
 }
 
 /** One approval prompt listing every reason, so the user is asked once. */
@@ -1318,8 +1456,8 @@ export function combinedAsk(reasons) {
 }
 
 /** Reasons in the workbench's shape: code plus the Chinese and English text. */
-export function confirmationReasons(codes, { sandboxAvailable = false } = {}) {
-  return codes.map(code => ({ code, zh: APPROVAL_TEXT[code](sandboxAvailable).zh, en: APPROVAL_TEXT[code](sandboxAvailable).en }))
+export function confirmationReasons(codes, { sandboxAvailable = false, executionEnvironment = 'harness' } = {}) {
+  return codes.map(code => ({ code, ...executionApprovalText(code, sandboxAvailable, executionEnvironment) }))
 }
 
 /**
@@ -1337,10 +1475,39 @@ export async function workbenchWorkspace(requested, runs = []) {
   return chosen
 }
 
-/** Plan preview for the workbench: decision, estimate, budget and what needs confirming. */
-export async function previewWorkbenchRun(ctx, config, request = {}, options = {}) {
+/** Resolve one fresh preview and retain its exact CLI plan for the confirmed run. */
+async function prepareWorkbenchPreview(ctx, config, supplied = {}, options = {}) {
+  const request = parseRunRequest(supplied)
   const saved = await savedState()
   const workspace = await workbenchWorkspace(request.workspace, saved.runs)
+  if (request.executor === 'official-team') {
+    const mode = request.executionMode
+    let planned
+    try {
+      await (options.preflightWorkspace ?? preflightOfficialWorkspace)(workspace, mode, options.signal)
+      planned = await planOfficialTeam(ctx, config, { ...request, mode }, {
+        workspace, signal: options.signal, ...options.planOptions,
+      })
+    } catch (error) {
+      return { request, preview: { executor: 'official-team', executionMode: mode, executionEnvironment: request.executionEnvironment ?? 'harness', workspace,
+        status: 'blocked', reason: errorText(error), decision: { packages: [] }, selected: null,
+        estimatedCost: null, budget: null, reasons: [], readOnly: mode === 'read-only' } }
+    }
+    const decision = decisionSummary(planned.plan)
+    decision.packages = decision.packages.map(item => ({ ...item, channel: 'official-cli',
+      channelDetail: `官方 CLI；${mode === 'workspace-write' ? '在隔离 Git 工作树中使用自己的工具' : '只读检查工程，工具集按各 CLI 只读适配限制；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置'}；未配置映射时使用 CLI 默认模型；失败停止，不自动转 API。` }))
+    const codes = planned.status === 'blocked' ? [] : approvalReasonCodes('model_router_team_execute', {
+      mode, executionEnvironment: planned.executionEnvironment, confirmOverBudget: Boolean(planned.budget?.exceeded),
+    }, config)
+    return { request, planned, preview: {
+      executor: 'official-team', executionMode: mode, executionEnvironment: planned.executionEnvironment, workspace, status: planned.status,
+      ...(planned.reason ? { reason: planned.reason } : {}),
+      decision, selected: planned.plan?.selected ?? null, routingBypassed: false,
+      estimatedCost: planned.plan?.estimatedCost ?? null, budget: planned.budget,
+      reasons: confirmationReasons(codes, { sandboxAvailable: typeof ctx.sandbox?.confine === 'function', executionEnvironment: planned.executionEnvironment }),
+      readOnly: mode === 'read-only',
+    } }
+  }
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const planned = await planAssignment(ctx, request.task, config, {
     provider: request.provider, model: request.model, planMode: request.planMode, preset: request.preset,
@@ -1348,7 +1515,7 @@ export async function previewWorkbenchRun(ctx, config, request = {}, options = {
   })
   await hydrateHealth()
   const codes = approvalReasonCodes('model_router_execute', { provider: request.provider, confirmOverBudget: Boolean(planned.budget.exceeded) }, config)
-  return {
+  return { request, preview: {
     workspace,
     decision: decisionSummary(planned.plan),
     selected: planned.plan.selected ?? null,
@@ -1357,15 +1524,32 @@ export async function previewWorkbenchRun(ctx, config, request = {}, options = {
     budget: planned.budget,
     reasons: confirmationReasons(codes, { sandboxAvailable: typeof ctx.sandbox?.confine === 'function' }),
     readOnly: true,
-  }
+  } }
+}
+
+/** Plan preview: no model calls, workspace changes or worktree creation. */
+export async function previewWorkbenchRun(ctx, config, request = {}, options = {}) {
+  return (await prepareWorkbenchPreview(ctx, config, request, options)).preview
 }
 
 /** Execute from the workbench; refuses until every current reason is in confirmedReasons. */
-export async function startWorkbenchRun(ctx, config, request = {}, options = {}) {
-  const preview = await previewWorkbenchRun(ctx, config, request, options)
+export async function startWorkbenchRun(ctx, config, supplied = {}, options = {}) {
+  const prepared = await prepareWorkbenchPreview(ctx, config, supplied, options)
+  const { preview, request } = prepared
+  if (preview.status === 'blocked') return preview
   const confirmed = new Set(Array.isArray(request.confirmedReasons) ? request.confirmedReasons : [])
   const missing = preview.reasons.filter(item => !confirmed.has(item.code))
-  if (missing.length) return { status: 'needs-confirmation', ...preview, reasons: preview.reasons, missing: missing.map(item => item.code) }
+  if (missing.length) return { ...preview, status: 'needs-confirmation', reasons: preview.reasons, missing: missing.map(item => item.code) }
+  if (request.executor === 'official-team') {
+    const result = await (options.executeOfficialTeam ?? executeOfficialTeamPlan)(ctx, config, prepared.planned, {
+      workspace: preview.workspace, root: preview.workspace, signal: options.signal,
+      confirmOverBudget: confirmed.has('over-budget'), confirmUnsandboxed: confirmed.has('unsandboxed'), ...(options.teamOptions ?? {}),
+    })
+    return { status: result.status, runId: result.runId ?? null, workspace: preview.workspace,
+      executor: 'official-team', executionMode: request.executionMode, executionEnvironment: preview.executionEnvironment, decision: preview.decision,
+      budget: result.budget ?? preview.budget, ...(result.reason ? { reason: result.reason } : {}),
+      ...(result.notice ? { notice: result.notice } : {}) }
+  }
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const result = await (options.execute ?? executeConfiguredAssignment)(ctx, request.task, config, {
     provider: request.provider, model: request.model, planMode: request.planMode, preset: request.preset,
@@ -1766,7 +1950,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_tool_run',
-    description: 'Run one supported official model CLI in the current Harness session workspace. Claude, Codex, MiMo and Grok support read-only; Kimi, MiniMax and ZCode require workspace-write. Write mode needs approval and a clean Git repository. Optional provider/model must match a configured Harness route and selected vendor; cliModel can specify that vendor CLI’s own configured model name. Without cliModel, Kimi, MiniMax, MiMo, Grok and ZCode use the CLI default.',
+    description: 'Run one supported official model CLI in the current Harness session workspace. Claude, Codex, MiMo and Grok support read-only; Kimi, MiniMax and ZCode require workspace-write. Write mode needs approval and a clean Git repository. Optional provider/model must match a configured Harness route and selected vendor; cliModel can specify that vendor CLI’s own configured model name. Every CLI uses its own default unless an explicit cliModel or saved route mapping is configured.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Fixed registry tool id, e.g. claude-code or codex.' },
       task: { type: 'string', required: true, description: 'Concrete task for the official CLI model.' },
@@ -1867,7 +2051,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       // The pre-execute hook already asked the user about file edits for editable reruns.
       const result = await rerunRecordedStep(ctx, config, {
         runId: args.runId, packageId: args.packageId, provider: args.provider, model: args.model,
-        confirmOverBudget: args.confirmOverBudget === true, confirmWrite: true, workspace: cwd, root, signal: exec.signal,
+        confirmOverBudget: args.confirmOverBudget === true, confirmWrite: true, confirmUnsandboxed: stored?.executionEnvironment === 'cli-native', workspace: cwd, root, signal: exec.signal,
         ...(text(args.subscriptionChoice) ? { subscriptionChoice: text(args.subscriptionChoice) } : {}),
       })
       return jsonValue({
@@ -1894,10 +2078,11 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_team_execute',
-    description: 'Plan a complex task into dependent work packages, route among configured providers with ready official CLIs, and run each package sequentially. Claude/Codex request the planned model ID; other CLIs use their configured default unless cliModelsJson supplies exact CLI names. Editable runs use one isolated Git worktree and integrate source changes after CLI success. Confirm the actual model from vendor records.',
+    description: 'Plan a complex task into dependent work packages, route among configured providers with ready official CLIs, and run each package sequentially. Every CLI uses its own default unless a saved cliModel mapping or cliModelsJson supplies exact CLI names. Editable runs use one isolated Git worktree and integrate source changes after CLI success. Confirm the actual model from vendor records.',
     parameters: {
       task: { type: 'string', required: true, description: 'Full task to plan, distribute and execute.' },
       mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default read-only; workspace-write needs a clean Git repository and approval.' },
+      executionEnvironment: { type: 'string', enum: ['harness', 'cli-native'], description: 'Default harness. cli-native requires workspace-write and separate approval: normal vendor tools run with current user permissions outside Harness sandbox; Git isolation only collects changes.' },
       budgetUsd: { type: 'number', description: 'Estimated planning ceiling only, not a vendor billing limit.' },
       cliModelsJson: { type: 'string', description: 'Optional JSON object mapping official tool IDs or work package IDs to exact model names configured in those CLIs. MiniMax/MiMo require provider/model; ZCode cannot switch per call.' },
       confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
@@ -1907,51 +2092,11 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
       const mode = args.mode === 'workspace-write' ? 'workspace-write' : 'read-only'
       if (mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑团队执行')
-      const saved = await routingSavedState(config)
-      const [routes, installed] = await Promise.all([routesWithLearning(ctx, config, exec.signal, saved.runs, saved.dynamicData, saved.routingLearning), installedToolIds()])
-      const readiness = await Promise.all(installed.map(id => officialToolReadiness(id, cwd)))
-      const supported = new Set(readiness.filter(item => item.ready).map(item => item.id))
-      const capabilities = new Map(officialToolExecutionCapabilities().map(item => [item.id, item]))
-      const executableRoutes = routes.filter(route => {
-        const tool = toolForProvider(route.provider)
-        return tool && installed.includes(tool.id) && supported.has(tool.id)
-          && capabilities.get(tool.id)?.modes?.includes(mode)
-      })
-      if (executableRoutes.length === 0) return jsonValue({ status: 'blocked',
-        reason: `官方模型目录中没有同时满足已配置路线、已安装 CLI、托管执行适配器与 ${mode} 模式的供应商；Kimi、MiniMax、ZCode 仅支持经审批的 workspace-write。`,
-        installed, executionCapabilities: officialToolExecutionCapabilities(), executionReadiness: readiness })
-      const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
-      const budgetUsd = Math.max(0, finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)))
-      const plan = createPlanFromRoutes(args.task, executableRoutes, {
-        ...planDataOptions(saved, config),
-        mode: 'team', budgetUsd, installedToolIds: installed,
-        runnableToolIds: installed.filter(id => supported.has(id)),
-        preset: routingPresetOf(config),
-      })
-      const budget = budgetFor(config, await savedState(), plan.estimatedCost)
-      if (budget.exceeded && args.confirmOverBudget !== true) {
-        return jsonValue({ status: 'paused-budget', budget, plan,
-          notice: `${budget.message} 已暂停团队执行。请向用户确认后以 confirmOverBudget: true 重新调用。` })
-      }
-      const bindingsText = text(args.cliModelsJson)
-      if (bindingsText.length > 4_000) throw new Error('cliModelsJson 超过 4000 字符上限')
-      let cliModels = null
-      if (bindingsText) {
-        try { cliModels = JSON.parse(bindingsText) }
-        catch { throw new Error('cliModelsJson 不是有效的 JSON 对象') }
-      }
-      cliModels = resolveTeamCliModelBindings(plan, executableRoutes, cliModels ?? {})
-      const startedAt = Date.now()
-      const execution = await runOfficialTeam({ plan, task: args.task, workspace: cwd,
-        allowedRoot: root, mode, installedIds: installed, cliModels, signal: exec.signal, sandbox: ctx.sandbox })
-      const recorded = await recordTeamRun({ task: args.task, plan, execution, mode, workspace: cwd,
-        routes: executableRoutes, cliModels, budget, startedAt, config })
-      return jsonValue({ plan, execution, runId: recorded?.id ?? null,
-        rerunNotice: mode === 'read-only'
-          ? '失败的工作包可用 model_router_rerun_step 单步重跑（只重跑该步及其未完成的下游）。'
-          : '若在某个步骤失败而停止，可用 model_router_rerun_step 在新的独立工作树中套用之前的改动后续跑（需审批）；已整合或待人工整合的运行不能单步重跑。',
-        modelNotice: '已配置 cliModel 的路线按工作包传给官方 CLI；Claude/Codex 在未配置映射时请求 Harness 模型 ID。其他厂商无映射时使用 CLI 默认模型。多数 CLI 尚不返回可核验的实际模型 ID，须以厂商运行记录核对。',
-        billingNotice: 'budgetUsd 仅影响估算与路由，无法限制官方 CLI 账号实际费用。' })
+      const planned = await planOfficialTeam(ctx, config, { ...args, mode }, { workspace: cwd, signal: exec.signal })
+      return jsonValue(await executeOfficialTeamPlan(ctx, config, planned, {
+        workspace: cwd, root, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true,
+        confirmUnsandboxed: args.executionEnvironment === 'cli-native',
+      }))
     },
   }))
 }

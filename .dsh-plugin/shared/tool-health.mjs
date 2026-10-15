@@ -14,6 +14,7 @@
  */
 import { OFFICIAL_TOOLS, getOfficialTool } from './official-tool-registry.mjs'
 import { compareReleaseVersions } from './latest-versions.mjs'
+import { loginLaunchForProbe } from './official-tools-runtime.mjs'
 
 export const LOGIN_CHECK_TIMEOUT_MS = 5_000
 export const HEALTH_CACHE_MS = 10 * 60_000
@@ -34,7 +35,7 @@ export const LOGIN_GUIDES = Object.freeze({
 
 /** Environment variable names whose presence means a CLI can authenticate without a session. */
 const KEY_ENV = Object.freeze({
-  'claude-code': ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'],
+  'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
   'kimi-code': ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
@@ -92,7 +93,7 @@ function grokHomeHint(env) {
 
 /** Variables that make the CLI bill an API account rather than a subscription login. */
 const API_KEY_ENV = Object.freeze({
-  'claude-code': ['ANTHROPIC_API_KEY'],
+  'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
   'kimi-code': ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
@@ -151,14 +152,30 @@ function guide(toolId) {
  * Login state for one installed tool: 'logged-in', 'logged-out', or 'unknown'.
  * `runner(executable, args, { timeoutMs })` resolves { ok, code, stdout, stderr, timedOut }.
  */
-export async function checkLogin(toolId, { runner, env = process.env, exists = async () => false, home = '', readAuthState = async () => null } = {}) {
+export async function checkLogin(toolId, {
+  runner, env = process.env, exists = async () => false, home = '', readAuthState = async () => null,
+  probe, resolveLoginLaunch = loginLaunchForProbe,
+} = {}) {
   const keyNames = (KEY_ENV[toolId] ?? []).filter(name => typeof env?.[name] === 'string' && env[name].trim())
   const viaKey = keyNames.length > 0 ? { state: 'logged-in', detail: `检测到环境变量 ${keyNames.join('、')}（未验证有效性）。`, source: 'environment',
     billing: apiKeyEnvPresent(toolId, env) ? 'api-key' : 'subscription',
     accountLogin: keyNames.some(name => !(API_KEY_ENV[toolId] ?? []).includes(name)) } : null
   const keyBilling = apiKeyEnvPresent(toolId, env) ? 'api-key' : null
+  // A health report must inspect the same npm/pnpm/native copy whose version
+  // was shown. Never replace a missing selected entry with a bare PATH command.
+  const statusCommand = async (command, args) => {
+    const launch = probe === undefined
+      ? { file: command, args: [] }
+      : await resolveLoginLaunch(probe)
+    if (!launch) return null
+    return runner(launch.file, [...launch.args, ...args], {
+      timeoutMs: LOGIN_CHECK_TIMEOUT_MS, env: sessionEnvironment(toolId, env),
+      ...(launch.useShell === undefined ? {} : { useShell: launch.useShell }),
+    })
+  }
   if (toolId === 'claude-code' && typeof runner === 'function') {
-    const outcome = await runner('claude', ['auth', 'status', '--json'], { timeoutMs: LOGIN_CHECK_TIMEOUT_MS, env: sessionEnvironment(toolId, env) })
+    const outcome = await statusCommand('claude', ['auth', 'status', '--json'])
+    if (!outcome) return viaKey ?? { state: 'unknown', detail: '所选安装副本的登录检测入口不可用；未使用 PATH 中的其他 Claude Code。' }
     if (outcome.timedOut) return viaKey ?? { state: 'unknown', detail: '登录状态检测超时。' }
     try {
       const status = JSON.parse(outcome.stdout)
@@ -170,7 +187,8 @@ export async function checkLogin(toolId, { runner, env = process.env, exists = a
     return viaKey ?? { state: 'unknown', detail: '无法解析 claude auth status 输出。' }
   }
   if (toolId === 'codex' && typeof runner === 'function') {
-    const outcome = await runner('codex', ['login', 'status'], { timeoutMs: LOGIN_CHECK_TIMEOUT_MS, env: sessionEnvironment(toolId, env) })
+    const outcome = await statusCommand('codex', ['login', 'status'])
+    if (!outcome) return viaKey ?? { state: 'unknown', detail: '所选安装副本的登录检测入口不可用；未使用 PATH 中的其他 Codex。' }
     if (outcome.timedOut) return viaKey ?? { state: 'unknown', detail: '登录状态检测超时。' }
     const output = `${outcome.stdout}\n${outcome.stderr}`
     if (/not logged in/i.test(output)) return viaKey ?? { state: 'logged-out', detail: 'codex login status 报告未登录。', source: 'cli' }
@@ -234,7 +252,7 @@ export async function checkToolHealth(probe, options = {}) {
   const tool = getOfficialTool(probe?.id)
   if (!tool) throw new TypeError('unknown official tool')
   const installed = probe.installed === true
-  const login = installed ? await checkLogin(tool.id, options) : { state: 'unknown', detail: probe.status === 'not-installed' && /检测到已安装/.test(String(probe.detail ?? '')) ? String(probe.detail) : '尚未安装。' }
+  const login = installed ? await checkLogin(tool.id, { ...options, probe }) : { state: 'unknown', detail: probe.status === 'not-installed' && /检测到已安装/.test(String(probe.detail ?? '')) ? String(probe.detail) : '尚未安装。' }
   const { command, steps } = guide(tool.id)
   return {
     id: tool.id,

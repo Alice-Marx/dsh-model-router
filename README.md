@@ -1,8 +1,10 @@
 # Model Router · DeepSeek Harness Desktop
 
-Version: **0.19.0**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
+Current release: **0.20.0**. See [routing research](docs/ROUTING_RESEARCH.zh.md), [mathematical derivation and experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and the [LiveBench evidence audit and validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md). The latest public 2026-06-25 score/cost tables are aggregates; its paired question-quality/cost matrix has not been obtained, and no real routing gain is claimed.
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe a task, compare your configured models, inspect the plan, and explicitly choose when to execute it.
+
+**0.20.0:** **官方工具协作** runs dependent team packages with official CLIs and no automatic API fallback. For editable tasks, explicitly choose **Harness 受限环境** or **厂商 CLI 正常环境**. The latter retains normal vendor login, configuration, skills and MCP under current user permissions, requires a separate confirmation, and uses a Git worktree to collect changes rather than restrict OS access. CLIs keep their configured model unless explicitly mapped. Real Windows Claude execution and a Claude → MiniMax dependency handoff with file integration passed; see [validation and limits](docs/releases/0.20.0-validation.md).
 
 **0.19.0:** interactive terminals follow the full registry and saved installation, including OpenCode, Step and the ZCode desktop-bundled TUI. ZCode has independent desktop-directory configuration and desktop update/reinstall controls; its bundled CLI follows desktop updates. Fresh terminal discovery discards stale responses.
 
@@ -22,7 +24,7 @@ A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Describe 
 
 **0.16.0:** [dynamic data and adaptive feedback](docs/ROUTING_ADAPTIVE_LEARNING.zh.md) adds opt-in public benchmark/curated fixed-USD pricing refresh and task-specific, time-decayed, shrinkage-regularized subjective utility. Objective proxy quality floors remain separate. Public sources default off; preferences are shared within one local DSH_HOME and limited to the latest 200 runs. This is not a universal vendor-price scraper or evidence of real quality–cost gains.
 
-Current version: **0.19.0** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.20.0** (`@ljwei-stak/dsh-model-router`). Its declared host compatibility is **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 **0.15.0 changes:** a four-tab workbench with routing advice directly below task planning, protection against stale execution previews, preserved spending totals across history pruning and retries, and a standalone mock UI preview for source development.
 
@@ -38,7 +40,7 @@ For self-testing, follow the [desktop acceptance and quality–cost experiment s
 | Model configuration | Reads exact `provider/model` routes from Harness; optional user-supplied quality, USD prices, specialties, CLI model names, execution and billing preferences. |
 | Routing presets | Economy, balanced and quality-first presets; quality floors, estimated token costs and bounded assignment search. Missing prices stay unknown. |
 | Read-only execution | Preview and confirm a routed run from the workbench, or invoke it in an official Harness session. Supported headless CLIs and model-directory API calls return recorded results. |
-| Editable CLI execution | One supported official CLI or a sequential CLI team, using approved isolated Git worktrees and conditional patch integration. |
+| Editable CLI execution | A sequential CLI team from the workbench, or one supported CLI from a session, using approved isolated Git worktrees and conditional patch integration. |
 | Official tools | Detect, install/update, check launch readiness and inspect login status for ten registry tools; installation jobs have logs and cancellation. |
 | Interactive terminal | PowerShell/system shell and all ten registry CLI targets (ZCode TUI on verified Windows desktop installs), including fixed login commands, live output and multiple sessions. |
 | Costs and subscriptions | Daily/monthly budget checks, economy downgrade or pause, subscription-first routing, quota cooldown and explicit handling of other subscription failures. |
@@ -54,16 +56,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.19.0
+@ljwei-stak/dsh-model-router@0.20.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.19.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.20.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.19.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.20.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -73,7 +75,7 @@ The 0.15.0 workbench groups the workflow into four navigation tabs. Its header s
 
 | Tab | What you do there |
 | --- | --- |
-| **任务与执行** — Task and execution | Describe the task, select a planning mode, generate advice, preview a read-only run and inspect run history. |
+| **任务与执行** — Task and execution | Describe the task, generate advice, choose routed read-only execution or official CLI teamwork, preview and confirm, then inspect history. |
 | **模型配置** — Model configuration | Refresh/search the model directory and edit exact-route profiles. |
 | **官方工具** — Official tools | Complete onboarding checks, inspect/install tools and use the interactive terminal. |
 | **预算与安全** — Budget and security | Set routing/cost/review policies and inspect subscription status and execution boundaries. |
@@ -88,8 +90,8 @@ Switching tabs keeps the panels mounted, preserving in-progress installation and
 2. Optionally enter quality and prices for the routes you want compared. Prices are **USD per million tokens**; quality is a user-supplied **0–100** estimate. Leave unknown prices blank rather than entering zero.
 3. In **任务与执行**, describe concrete deliverables, constraints and acceptance criteria. Select **单任务** (single recommendation), **团队分工** (dependent packages for sufficiently complex requests), or **指定模型** (one exact route, without comparing others). Team mode alone does not start any team.
 4. Set the per-run estimate target; `0` removes that planning constraint. Click **生成路由建议**. The result appears directly below planning. Check the route, complexity, cost, execution channel and each package's dependencies/checklist.
-5. For a real read-only run, use **在工作台执行**. Enter an existing absolute workspace path, or reuse the last run's path. Click **预览执行计划**, review the current route and all required confirmations, then explicitly confirm execution. The Host rechecks the plan before starting; changed conditions can require confirmation again.
-6. Inspect **执行记录与子任务** for the actual channel, response, failures, cost and ratings. Editable CLI tasks start from an official Harness session using the tools below.
+5. In **在工作台执行**, choose **模型路由（只读）** for the existing routed executor, or first select **团队分工** and choose **官方工具协作**. For official teamwork, select **只读检查** or **编辑文件**. Enter an existing absolute workspace path, or reuse the last run's path. Click **预览执行计划**, review each package, its permissions and required confirmations, then explicitly confirm execution. The Host rechecks the plan before starting; changed conditions can require confirmation again.
+6. Inspect **执行记录与子任务** for the actual channel, response, failures, cost and ratings. Official teamwork replans using only installed CLIs ready for the selected permission mode. Edits require approval and a clean Git repository; successful worktree changes are conditionally integrated. An unavailable or failed CLI never silently becomes an API call in this mode.
 
 Changing task text, planning mode, profiles, directory or relevant settings invalidates the prior recommendation. Changing execution inputs also discards the pending or completed preview, so execution requires a new preview of the current request. Previewing execution uses current Host state and can differ from a previous local plan.
 
@@ -136,7 +138,7 @@ A read-only single-tool request:
 {"tool":"codex","task":"Inspect the repository and list UI layout issues; do not edit files","mode":"read-only"}
 ```
 
-Supply `provider` and `model` together when selecting an exact catalog route. A vendor's CLI model name may differ from its Harness id; use `cliModel` or team `cliModelsJson` only for names verified with that CLI. ZCode uses its own default and cannot switch model per call. Most CLIs do not report a verifiable actual model id; check the vendor run record.
+Supply `provider` and `model` together when selecting an exact catalog route. All CLIs retain their own configured model by default; a catalog recommendation is never automatically passed as a CLI model argument. To switch explicitly, save a verified **官方 CLI 模型名** in the route profile, pass `cliModel` for one tool call, or use team `cliModelsJson`. Team bindings prefer a package id, then a tool id, then the saved route mapping. ZCode uses its own default and cannot switch model per call. History records the recommendation, requested CLI name and reported actual model separately; a request is not proof of the model used. Check vendor records when no actual model is reported.
 
 The CLI team runner is the plugin's own sequential dependency executor. It does not control the model selection or lifecycle of Harness's built-in Agent Teams.
 
@@ -146,7 +148,7 @@ The CLI team runner is the plugin's own sequential dependency executor. It does 
 | --- | --- | --- |
 | `kimi-code` | Kimi Code | Approved `workspace-write` |
 | `claude-code` | Claude Code | `read-only`, approved `workspace-write` |
-| `codex` | Codex CLI | `read-only`, approved `workspace-write` |
+| `codex` | Codex CLI | Windows managed `read-only`; editable execution is currently unsupported |
 | `minimax-code` | MiniMax Code | Approved `workspace-write` |
 | `mimo-code` | MiMo Code | `read-only`, approved `workspace-write` |
 | `grok-build` | Grok Build | `read-only`, approved `workspace-write` |
@@ -172,15 +174,19 @@ With no shared directory, ordinary checks discover the selected manager's packag
 
 Installation, trusted launch readiness, account login and model entitlement are separate checks. An unknown login status is not proof of logout. On Windows, supported managed launch entries are checked against publisher signatures or official npm-tarball attestations; ZCode also records trust for its bundled script per signed build. See [the registry](.dsh-plugin/shared/official-tool-registry.mjs) and [executor](.dsh-plugin/shared/official-tool-executor.mjs) for the exact platform rules.
 
+Version and CLI login-status checks use the selected installation's concrete entry. A missing selected copy cannot be replaced by a different command on PATH; its login status remains unknown when that entry cannot be checked.
+
 In a session, `/tools install|uninstall|repair|method <tool-id> [method]` does the same; agents can call `model_router_tool_install`, `model_router_tool_repair` and `model_router_tool_uninstall`. The install directory and download sources always come from the user's own plugin settings and never travel over the RPC, so no call can redirect an install at an arbitrary package or URL.
 
 `model_router_execute` has fixed headless adapters for Claude, Codex and Gemini. Other suppliers use the model-directory API unless a supported subscription route applies. Missing/unusable CLIs can fall back to that API; subscription failures follow the policy below.
 
 Editable execution needs a clean Git repository, Host approval and the Harness process sandbox. Changes are made in an isolated worktree and applied back only after successful execution and a matching clean source workspace. Failed or conflicting integration is reported. Git-ignored outputs need separate review. Read-only CLI flags do not necessarily limit file reads to the workspace; check **安全边界**, especially Codex's broader readable scope.
 
+For Windows Codex tasks in the Harness environment, only read-only is available: the outer ACL sandbox grants the original `CODEX_HOME` state and a private temporary directory, while Codex retains `--sandbox read-only`. Explicitly confirmed native editable teams can use Codex with its own workspace-write policy. Codex network readiness remains account/environment dependent and did not pass the real connection checks in this batch.
+
 ### Interactive terminal
 
-In **官方工具 → 官方工具终端**, select the shell or an installed CLI, choose interactive/login mode where available, enter an existing absolute directory, and review the startup confirmation. ZCode is a desktop app and is not a terminal target.
+In **官方工具 → 官方工具终端**, select the shell or an installed CLI, choose interactive/login mode where available, enter an existing absolute directory, and review the startup confirmation. Verified Windows ZCode desktop installations provide their bundled TUI as a terminal target.
 
 These sessions run **outside the Harness sandbox**, with the Host user's login environment, proxies and API-key variables. Commands typed there can read/write files with that user's permissions. Terminal launches are separate from routed execution and its approval/billing policy.
 
@@ -193,7 +199,7 @@ The plugin does not persist terminal input/output. It stores session metadata on
 - **Budgets:** per-run planning target plus daily/monthly checks. Over-budget routing can try the economy preset or pause for confirmation. Unknown prices remain unknown. These are local accounting/estimation controls, not a hard provider billing cap.
 - **Subscription-first:** the default is to prefer a detected CLI account subscription or a configured coding-plan route. API-key environment variables are removed for CLI subscription attempts. `billing` can be `subscription-first`, `api-only` or `subscription-only`; `subscription` can be `cli-login`, `plan-key` or `none`.
 - **Fallback:** detected quota exhaustion/rate limits mark a subscription in cooldown and can retry the routed step on its configured API route, subject to policy and availability. Other attempted subscription failures pause by default (`onSubscriptionFailure: "ask"`): choose API retry, subscription retry or cancel in history. Managed editable/single-tool/team runs do not automatically retry on the API.
-- **Accounting:** API costs count toward budgets. Subscription runs display an API-price reference cost separately. Actual usage is taken from CLI-reported amounts or token usage and supplied prices when available; provider bills remain authoritative. Version 0.15.0 retains spending from evicted detailed runs and replaced retry results, so trimming history or retrying a step does not erase earlier charges. Costs already discarded by older versions cannot be reconstructed.
+- **Accounting:** API costs count toward budgets. Subscription runs display a reference cost separately. A valid CLI-reported amount, including zero, takes precedence. Token-based CLI cost requires complete usage and an actual reported model matching a configured model or its explicit CLI mapping; unknown or mismatched identity keeps cost unknown. The recommendation's price alone cannot establish actual CLI cost. Provider bills remain authoritative. Version 0.15.0 retains spending from evicted detailed runs and replaced retry results, so trimming history or retrying a step does not erase earlier charges. Costs already discarded by older versions cannot be reconstructed.
 - **Quality and preference:** optional `off`/`sample`/`always` stronger-model review can add paid calls; it is not treated as human feedback. Explicit ratings adjust separate subjective utility for the exact route and task type, using time decay and low-sample shrinkage (default limit ±0.04, configurable up to ±0.1). They do not change objective quality scores or their hard floors; learning can be disabled, ratings withdrawn, or its starting point reset.
 
 Coding-plan keys and endpoints stay in Harness provider settings. A `plan-key` profile may name an exact configured `apiRoute` as its fallback; the profile editor does not accept credentials or arbitrary commands. Vendor plan eligibility and terms must be checked with the vendor.

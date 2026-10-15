@@ -850,6 +850,22 @@ export async function probeToolWith(tool, runner, {
   return probe
 }
 
+/** Reuse the concrete entry discovered by the installation probe for login checks. */
+export async function loginLaunchForProbe(probe, {
+  workspace = process.cwd(),
+  fileExists = async path => (await stat(path).catch(() => null))?.isFile() === true,
+  findNode = async cwd => (await import('./official-tool-executor.mjs')).findNodeExecutable(cwd),
+} = {}) {
+  if (probe?.installed !== true || !getOfficialTool(probe.id)) return null
+  const entry = probe.packageEntry || probe.executablePath
+  if (typeof entry !== 'string' || !isAbsolute(entry) || !(await fileExists(entry))) return null
+  if (/\.(?:mjs|cjs|js)$/i.test(entry)) {
+    const node = await findNode(workspace)
+    return node ? { file: node, args: [entry], useShell: false } : null
+  }
+  return { file: entry, args: [], useShell: IS_WINDOWS && /\.(?:cmd|bat)$/i.test(entry) }
+}
+
 async function selectedPackageEntries(tool, { plan, preferences: selectedPreferences }) {
   const { findGlobalPackageEntries, officialToolEntrySelection } = await import('./official-tool-executor.mjs')
   const selection = officialToolEntrySelection(tool.id, { preferences: selectedPreferences, plan })
@@ -888,7 +904,12 @@ async function probeUncached(tool, runner, { selectedPreferences, plan, fileExis
         ...selectedPreferences,
         allowScriptInstall: installMethodFor(tool, selectedPreferences.methods?.[tool.id])?.kind === 'script' ? true : selectedPreferences.allowScriptInstall,
       }, currentInstallOptions())
-    } catch { /* a blocked saved method still allows normal detection */ }
+    } catch (error) {
+      if (usesConfiguredInstallPlan(tool.id, selectedPreferences)) {
+        return { id: tool.id, installed: false, version: null, status: 'probe-failed',
+          detail: `无法检查所选安装方式或目录：${String(error?.message ?? error).slice(0, 200)}` }
+      }
+    }
   }
   // npm and pnpm can write the same shim into a unified bin directory. Its
   // banner belongs to whichever manager wrote it last, not the selected copy.

@@ -8,8 +8,9 @@ import {
   findGlobalPackageEntries, findManagedMiniMaxEntry, findSignedPackagedCodex, miniMaxReleaseVersion, officialToolEntrySelection, officialToolReadiness,
 } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import {
-  currentInstallOptions, installPreferences, probeToolWith, setInstallPreferences,
+  currentInstallOptions, installPreferences, loginLaunchForProbe, probeToolWith, setInstallPreferences,
 } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
+import { checkToolHealth } from '../.dsh-plugin/shared/tool-health.mjs'
 import { getOfficialTool } from '../.dsh-plugin/shared/official-tool-registry.mjs'
 import { resolveInstallPlan } from '../.dsh-plugin/shared/tool-install-preferences.mjs'
 import { resolveMiMoGrokLaunch } from '../.dsh-plugin/shared/vendor-mimo-grok-adapter.mjs'
@@ -21,6 +22,73 @@ async function fixtureRoot(t) {
   })
   return root
 }
+
+for (const method of ['npm', 'pnpm']) {
+  test(`login status uses the selected ${method} package entry instead of another PATH copy`, async t => {
+    const root = await fixtureRoot(t)
+    const selected = join(root, 'selected')
+    const modules = method === 'pnpm' ? join(selected, '.pnpm', 'global', '5', 'node_modules')
+      : process.platform === 'win32' ? join(selected, 'node_modules') : join(selected, 'lib', 'node_modules')
+    const packageRoot = await packageFixture(modules, '@openai/codex', '1.0.0', 'codex', 'bin/codex.js')
+    const other = join(root, 'other')
+    await packageFixture(join(other, 'node_modules'), '@openai/codex', '9.0.0', 'codex', 'bin/codex.js')
+    const priorPath = process.env.PATH
+    process.env.PATH = [other, priorPath].filter(Boolean).join(delimiter)
+    t.after(() => { if (priorPath === undefined) delete process.env.PATH; else process.env.PATH = priorPath })
+    const preferences = { installDir: selected, methods: { codex: method }, allowScriptInstall: true }
+    const probe = await probeToolWith(getOfficialTool('codex'), async () => { throw new Error('installation probe must use package metadata') },
+      { preferences, cache: new Map() })
+    assert.equal(probe.packageRoot, await realpath(packageRoot))
+    const seen = []
+    const resolveLoginLaunch = selectedProbe => loginLaunchForProbe(selectedProbe, { findNode: async () => process.execPath })
+    const runner = async (file, args, options) => {
+      seen.push({ file, args, options })
+      return { ok: false, stdout: 'Not logged in', stderr: '', code: 1 }
+    }
+    const health = await checkToolHealth(probe, { runner, resolveLoginLaunch, env: { OPENAI_API_KEY: 'unprinted-key' } })
+    assert.equal(health.login.source, 'environment')
+    assert.equal(health.login.accountLogin, false)
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0].file, process.execPath)
+    assert.deepEqual(seen[0].args, [probe.packageEntry, 'login', 'status'])
+    assert.equal(seen[0].options.useShell, false)
+    assert.equal(seen[0].options.env.OPENAI_API_KEY, undefined)
+
+    const account = await checkToolHealth(probe, { runner, resolveLoginLaunch, env: {} })
+    assert.equal(account.login.state, 'logged-out', 'a logged-in PATH copy cannot change the selected copy status')
+    await unlink(probe.packageEntry)
+    const callsBeforeMissing = seen.length
+    const missing = await checkToolHealth(probe, { runner, resolveLoginLaunch, env: {} })
+    assert.equal(missing.login.state, 'unknown')
+    assert.match(missing.login.detail, /所选安装副本.*PATH/)
+    assert.equal(seen.length, callsBeforeMissing, 'a vanished selected entry never falls back to PATH')
+  })
+}
+
+test('native login checks keep the probed executable and do not substitute a PATH command', async t => {
+  const root = await fixtureRoot(t)
+  const entry = join(root, 'native', 'claude.exe')
+  await mkdir(join(root, 'native'))
+  await writeFile(entry, 'selected-native-fixture')
+  const probe = { id: 'claude-code', installed: true, version: '2.1.259', executablePath: entry }
+  const seen = []
+  const health = await checkToolHealth(probe, { env: {}, runner: async (file, args, options) => {
+    seen.push({ file, args, options })
+    return { ok: true, stdout: '{"loggedIn":true,"authMethod":"claude.ai"}', stderr: '', code: 0 }
+  } })
+  assert.equal(health.login.state, 'logged-in')
+  assert.equal(seen[0].file, entry)
+  assert.deepEqual(seen[0].args, ['auth', 'status', '--json'])
+  assert.equal(seen[0].options.useShell, false)
+})
+
+test('an installed probe without a selected entry cannot run a bare login-status command', async () => {
+  const health = await checkToolHealth({ id: 'codex', installed: true, version: '1.0.0' }, {
+    env: {}, runner: async () => { throw new Error('bare PATH login check must not run') },
+  })
+  assert.equal(health.login.state, 'unknown')
+  assert.match(health.login.detail, /所选安装副本/)
+})
 
 async function packageFixture(modules, name, version, binName, binPath, extra = {}) {
   const root = join(modules, ...name.split('/'))

@@ -11,6 +11,7 @@
 /README.i18n.yaml -text
 /docs/INSTALLATION_GUIDE.zh.md -text
 /docs/WORKBENCH_USER_GUIDE.zh.md -text
+/docs/releases/0.20.0-validation.md -text
 /docs/ROUTING_RESEARCH.zh.md -text
 /docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md -text
 /docs/ROUTING_LIVEBENCH_VALIDATION.zh.md -text

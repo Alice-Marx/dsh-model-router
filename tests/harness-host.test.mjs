@@ -12,6 +12,13 @@ import {
   consultConfiguredModel,
   createRoutePlan,
   discoverConfiguredRoutes,
+  executableTeamRoutes,
+  executeOfficialTeamPlan,
+  planOfficialTeam,
+  planToolRun,
+  previewWorkbenchRun,
+  startWorkbenchRun,
+  routePricing,
   resolveTeamCliModelBindings,
 } from '../.dsh-plugin/index.mjs'
 
@@ -238,4 +245,140 @@ test('manual CLI mapping overrides saved route mapping in package then tool orde
   assert.equal(bindings['task-b'], 'manual-package')
   assert.equal(bindings['kimi-code'], 'manual-tool')
   assert.throws(() => resolveTeamCliModelBindings(plan, routes, []), /JSON 对象/)
+})
+
+test('Host tool planning leaves catalog model IDs out of CLI arguments and retains saved bindings for reruns', async () => {
+  const { ctx } = createHarnessContext()
+  const args = { tool: 'codex', provider: 'openai', model: 'gpt-5.6-sol', task: 'Read the fixture' }
+  const defaults = await planToolRun(ctx, routerConfig(), args, { signal })
+  assert.equal(defaults.model, 'gpt-5.6-sol')
+  assert.equal(defaults.modelId, null)
+  assert.equal(defaults.cliModel, null)
+  const config = routerConfig({ modelProfilesJson: JSON.stringify([
+    { provider: 'openai', model: 'gpt-5.6-sol', cliModel: 'saved-cli-alias' },
+  ]) })
+  const saved = await planToolRun(ctx, config, args, { signal })
+  assert.equal(saved.modelId, 'saved-cli-alias')
+  assert.equal(saved.cliModel, 'saved-cli-alias', 'reruns retain the effective mapping')
+  const manual = await planToolRun(ctx, config, { ...args, cliModel: 'manual-cli-alias' }, { signal })
+  assert.equal(manual.modelId, 'manual-cli-alias')
+  assert.equal(manual.cliModel, 'manual-cli-alias')
+  const plan = { team: { workPackages: [{ id: 'step', recommendedProvider: 'openai', recommendedModel: 'gpt-5.6-sol' }] } }
+  assert.deepEqual(resolveTeamCliModelBindings(plan, [{ provider: 'openai', model: 'gpt-5.6-sol' }]), {})
+})
+
+test('Host team planning filters readiness for the requested execution mode', () => {
+  const routes = [{ provider: 'openai', model: 'catalog-codex' }, { provider: 'anthropic', model: 'catalog-claude' }]
+  const installed = ['codex', 'claude-code']
+  const capabilities = installed.map(id => ({ id, modes: ['read-only', 'workspace-write'] }))
+  const readiness = [
+    { id: 'codex', ready: true, modes: ['read-only', 'workspace-write'], readyModes: ['read-only'] },
+    { id: 'claude-code', ready: true, modes: ['read-only', 'workspace-write'], readyModes: ['workspace-write'] },
+  ]
+  assert.deepEqual(executableTeamRoutes(routes, installed, readiness, 'read-only', capabilities), [routes[0]])
+  assert.deepEqual(executableTeamRoutes(routes, installed, readiness, 'workspace-write', capabilities), [routes[1]])
+  assert.deepEqual(executableTeamRoutes(routes, ['codex'], readiness, 'workspace-write', capabilities), [])
+  assert.deepEqual(executableTeamRoutes(routes, installed, [{ id: 'codex', ready: true, readyModes: [] }], 'read-only', capabilities), [])
+  assert.deepEqual(executableTeamRoutes(routes, installed, [{ id: 'codex', ready: true, modes: ['read-only'] }], 'read-only', capabilities), [routes[0]], 'legacy readiness modes remain supported')
+})
+
+test('official team helpers share mode planning, CLI bindings and execution recording without an API fallback', async () => {
+  const { ctx, streamCalls } = createHarnessContext()
+  ctx.sandbox = { confine() { throw new Error('the injected team runner does not spawn') } }
+  const config = routerConfig({ modelProfilesJson: JSON.stringify([
+    { provider: 'openai', model: 'gpt-5.6-sol', cliModel: 'cli-alias', quality: 90, pricing: { input: 1, output: 2 } },
+  ]) })
+  const options = { workspace: process.cwd(), installedToolIds: ['codex'],
+    readiness: [{ id: 'codex', ready: true, readyModes: ['read-only'] }],
+    executionCapabilities: [{ id: 'codex', modes: ['read-only', 'workspace-write'] }] }
+  const task = '请设计复杂工程方案，拆分模块并给出测试和部署验证步骤。'
+  const blocked = await planOfficialTeam(ctx, config, { task, mode: 'workspace-write' }, options)
+  assert.equal(blocked.status, 'blocked')
+  assert.equal(blocked.plan, null)
+  assert.deepEqual(blocked.routes, [])
+  assert.match(blocked.reason, /workspace-write/)
+  const planned = await planOfficialTeam(ctx, config, { task, mode: 'read-only' }, options)
+  assert.equal(planned.status, 'planned')
+  assert.ok(planned.plan.team.workPackages.length > 1)
+  assert.ok(planned.plan.team.workPackages.every(pkg => pkg.recommendedProvider === 'openai'))
+  assert.ok(Object.values(planned.cliModels).every(value => value === 'cli-alias'))
+  const calls = []
+  const result = await executeOfficialTeamPlan(ctx, config, planned, { root: process.cwd(), runTeam: async request => {
+    calls.push(request)
+    return { status: 'cli-completed', results: request.plan.team.workPackages.map(pkg => ({ id: pkg.id,
+      status: 'succeeded', provider: pkg.recommendedProvider, recommendedModel: pkg.recommendedModel,
+      toolId: 'codex', requestedCliModel: request.cliModels[pkg.id], actualModel: null, finalText: 'fixture result' })) }
+  } })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].mode, 'read-only')
+  assert.equal(calls[0].sandbox, ctx.sandbox)
+  assert.equal(calls[0].allowedRoot, process.cwd())
+  assert.equal(result.status, 'cli-completed')
+  assert.ok(result.runId)
+  assert.equal(result.run.kind, 'team')
+  assert.ok(result.run.packages.every(pkg => pkg.channel === 'official-cli'))
+  assert.equal(streamCalls.length, 0)
+  const budgetConfig = { ...config, dailyBudgetUsd: 0.000001 }
+  const paused = await executeOfficialTeamPlan(ctx, budgetConfig, planned, {
+    runTeam() { throw new Error('over-budget teams must not start') },
+  })
+  assert.equal(paused.status, 'paused-budget')
+  const noSandbox = await planOfficialTeam({ ...ctx, sandbox: null }, config, { task }, options)
+  assert.equal(noSandbox.status, 'blocked')
+  assert.match(noSandbox.reason, /沙箱/)
+})
+
+test('official workbench teams recheck permissions, execute the confirmed CLI plan and never use the routed fallback', async () => {
+  const { ctx, streamCalls } = createHarnessContext()
+  ctx.sandbox = { confine() { throw new Error('inert test') } }
+  ctx.llm.listProviders = () => [{ id: 'anthropic', name: 'Claude' }]
+  ctx.llm.listModels = async () => [{ id: 'catalog-claude' }]
+  const config = routerConfig({ modelProfilesJson: JSON.stringify([
+    { provider: 'anthropic', model: 'catalog-claude', quality: 95, pricing: { input: 1, output: 2 } },
+  ]) })
+  const request = { executor: 'official-team', executionMode: 'workspace-write', planMode: 'team',
+    task: '1. 分析需求；2. 实现模块；3. 验证结果并汇总。', workspace: process.cwd() }
+  let executed = 0
+  const options = { preflightWorkspace: async () => process.cwd(),
+    planOptions: { installedToolIds: ['claude-code'],
+      readiness: [{ id: 'claude-code', ready: true, readyModes: ['read-only', 'workspace-write'] }],
+      executionCapabilities: [{ id: 'claude-code', modes: ['read-only', 'workspace-write'] }] },
+    execute() { throw new Error('official teams must never use routed API fallback') },
+    executeOfficialTeam: async (_ctx, _config, planned, args) => {
+      executed += 1
+      assert.equal(planned.mode, 'workspace-write')
+      assert.equal(args.root, request.workspace)
+      assert.ok(planned.plan.team.workPackages.length > 1)
+      return { status: 'cli-completed', runId: 'official-cli-team', budget: planned.budget }
+    } }
+  const preview = await previewWorkbenchRun(ctx, config, request, options)
+  assert.equal(preview.readOnly, false)
+  assert.ok(preview.decision.packages.every(item => item.channel === 'official-cli'))
+  assert.deepEqual(preview.reasons.map(item => item.code), ['workspace-write'])
+  const refused = await startWorkbenchRun(ctx, config, request, options)
+  assert.equal(refused.status, 'needs-confirmation')
+  assert.equal(executed, 0)
+  const result = await startWorkbenchRun(ctx, config, { ...request, confirmedReasons: ['workspace-write'] }, options)
+  assert.equal(result.status, 'cli-completed')
+  assert.equal(result.runId, 'official-cli-team')
+  assert.equal(executed, 1)
+  assert.equal(streamCalls.length, 0)
+  const blocked = await startWorkbenchRun(ctx, config, { ...request, confirmedReasons: ['workspace-write'] }, {
+    ...options, preflightWorkspace: async () => { throw new Error('原工作区有未提交改动') },
+  })
+  assert.equal(blocked.status, 'blocked')
+  assert.match(blocked.reason, /未提交/)
+  assert.equal(executed, 1, 'invalid workspaces are blocked before starting any CLI')
+})
+
+test('CLI price matching refuses conflicting catalog aliases and unknown actual models', () => {
+  const routes = [
+    { provider: 'anthropic', model: 'catalog-a', cliModel: 'same-alias', pricing: { input: 1, output: 2 } },
+    { provider: 'anthropic', model: 'catalog-b', cliModel: 'same-alias', pricing: { input: 3, output: 4 } },
+  ]
+  const result = { provider: 'anthropic', model: 'catalog-a', actualModel: 'same-alias', channel: 'official-cli' }
+  assert.equal(routePricing(routes, result), null)
+  assert.equal(routePricing(routes, { ...result, actualModel: null }), null)
+  assert.equal(routePricing(routes.slice(0, 1), result).input, 1)
+  assert.equal(routePricing(routes, { ...result, channel: 'harness-llm' }).input, 1)
 })
