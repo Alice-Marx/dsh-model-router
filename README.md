@@ -4,7 +4,7 @@
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
 
-Current release: **0.20.1** (`@ljwei-stak/dsh-model-router`). This patch expands both technical READMEs and fixes forwarding of the extra confirmation for native CLI retries in the workbench. Real execution evidence remains tied to **0.20.0**; this patch adds no new model experiments. Declared Host compatibility: **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.20.2** (`@ljwei-stak/dsh-model-router`). This patch adds compatibility with **DeepSeek Harness Desktop 0.2.1-rc.2**, while retaining **0.2.0-rc.1 / 0.2.0-rc.2**. It uses the updated official SDK for development and regression checks. Real vendor execution evidence remains tied to **0.20.0**; this patch adds no new model experiments. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
 
@@ -40,16 +40,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.20.1
+@ljwei-stak/dsh-model-router@0.20.2
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.20.1** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.20.2** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.20.1`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.20.2`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 

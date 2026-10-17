@@ -4,7 +4,7 @@
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
-当前版本：**0.20.1**（`@ljwei-stak/dsh-model-router`）。本版补齐双语技术文档，并修复工作台正常环境 CLI 续跑时未转发额外确认的问题。真实厂商执行证据仍见 **0.20.0** 报告；本版未新增模型实测。声明兼容的 Host 版本：**DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2**。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
+当前版本：**0.20.2**（`@ljwei-stak/dsh-model-router`）。本版增加 **DeepSeek Harness Desktop 0.2.1-rc.2** 兼容支持，并保留 **0.2.0-rc.1 / 0.2.0-rc.2**；开发与回归检查使用更新后的官方 SDK。真实厂商执行证据仍见 **0.20.0** 报告；本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
 
 官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
 
@@ -40,16 +40,16 @@
 打开 **插件 → 添加插件**，输入：
 
 ```text
-@ljwei-stak/dsh-model-router@0.20.1
+@ljwei-stak/dsh-model-router@0.20.2
 ```
 
-镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.20.1**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
+镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.20.2**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
 
 也可以通过插件管理器安装本地 `.tgz` 压缩包，或解压后的内部 `package` 目录。两者都必须包含 `package.json` 和 `.dsh-plugin`。历史构建见 [Releases](https://github.com/Alice-Marx/dsh-model-router/releases)，也可按下文从源码构建。
 
 ### 从旧包名升级
 
-旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.20.1`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
+旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.20.2`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
 
 从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 

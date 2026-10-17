@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.2 — 2026-10-17
+
+- Add explicit compatibility with official DeepSeek Harness Desktop 0.2.1-rc.2, retaining the two supported 0.2.0 release candidates. Older router versions are rejected by the updated Host before plugin code loads. No exact-version exemption or Host modification is needed.
+- Pin development dependencies to the updated official SDK and cover the new compatibility gate's structured `requirements` result. Keep rejection checks for unverified versions and add the packaged client loader test to the standard test command.
+- Retain the existing plugin id, saved configuration and run ledger. This compatibility patch adds no vendor model calls or new execution-quality claims.
+
 ## 0.20.1 — 2026-10-16
 
 - Expand the English and Simplified Chinese READMEs together: architecture and execution contracts, workbench/session request examples, platform capabilities and executable trust, sequential team lifecycle, model identity, worktree integration/retry, accounting formulas, routing weights/floors/search limits, persistence and verification layers. Add matching navigation anchors and record the reviewed translation pair in `README.i18n.yaml`.

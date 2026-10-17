@@ -19,5 +19,7 @@ test('client bundle registers under the scoped npm package name', () => {
   assert.equal(registration?.id, packageJson.name)
   assert.match(registration.id, /^@[^/]+\//)
   assert.equal(typeof registration.factory, 'function')
-  assert.match(bundle, new RegExp(`PLUGIN_VERSION = ${JSON.stringify(packageJson.version).replaceAll('.', '\\.')}[;]`))
+  const versionDeclaration = bundle.match(/^var ROUTER_CLIENT_VERSION = (.+);$/m)
+  assert.ok(versionDeclaration, 'the bundle declares its Host/client version check')
+  assert.equal(vm.runInNewContext(versionDeclaration[1], {}, { timeout: 1000 }), packageJson.version)
 })
