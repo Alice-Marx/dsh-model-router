@@ -31,6 +31,8 @@ export const LOGIN_GUIDES = Object.freeze({
   zcode: Object.freeze({ command: null, steps: '打开 ZCode 桌面版，在欢迎页选择“连接 BigModel 继续使用”或“连接 Z.ai 继续使用”完成授权；已订阅 GLM Coding Plan 时在“模型设置 → BigModel”右上角选择“编程套餐”绑定。改用 API Key 时 OpenAI 地址须填 Coding 专用端点 https://open.bigmodel.cn/api/coding/paas/v4。ZCode 没有可调用的登录状态命令。' }),
   opencode: Object.freeze({ command: 'opencode auth login', steps: '在终端运行 opencode auth login，按提示完成登录；OpenCode 支持多家供应商，用 /connect 在会话内选择并保存凭据。也可在 opencode.json 中配置 provider 的 API Key。' }),
   stepcode: Object.freeze({ command: 'step login', steps: '在终端运行 step login（step login status --json 可查看状态），按提示完成阶跃账号登录；登录信息保存在 ~/.stepcode/auth.json。卸载本工具不会删除该文件。' }),
+  hermes: Object.freeze({ command: 'hermes auth', steps: '在终端运行 hermes auth，选择模型供应商并完成 OAuth 或 API Key 配置。插件暂未核验自动登录检测，不读取 Hermes 凭据，以 CLI 实际结果为准。' }),
+  pi: Object.freeze({ command: 'pi', steps: '启动 pi 后输入 /login，选择模型供应商完成登录。Pi 的认证状态按供应商区分，插件不读取凭据或自动刷新令牌。' }),
 })
 
 /** Environment variable names whose presence means a CLI can authenticate without a session. */
@@ -229,6 +231,8 @@ export async function checkLogin(toolId, {
     if (states.length) return { state: 'unknown', source: 'file', detail: `MiniMax Code 账号未登录（auth-state.json 为 ${states.map(item => `${item.region}: ${item.status}`).join('、')}）；如果用 mcode set-minimax-key 保存了 API Key 仍可使用，否则请运行 mcode login。` }
     return { state: 'unknown', detail: '未找到 MiniMax Code 登录状态文件（~/.minimax/auth/prod/<cn|global>/mcode-public/auth-state.json），登录状态未知；如未登录请运行 mcode login。' }
   }
+  if (toolId === 'hermes') return { state: 'unknown', detail: '插件暂未核验 Hermes 自动登录检测；请在终端运行 hermes auth，并以 CLI 实际结果为准。' }
+  if (toolId === 'pi') return { state: 'unknown', detail: 'Pi 认证按供应商区分；启动 pi 后输入 /login 查看或配置，插件不读取凭据。' }
   if (toolId === 'zcode') return viaKey ?? { state: 'unknown', detail: 'ZCode 是桌面应用，没有可调用的登录状态命令；登录与 GLM Coding Plan 状态请在 ZCode 内查看。' }
   return viaKey ?? { state: 'unknown', detail: '该 CLI 没有可安全调用的登录状态命令；首次运行时以实际结果为准。' }
 }

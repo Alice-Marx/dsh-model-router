@@ -4,7 +4,7 @@
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
 
-Current version: **0.20.2** (`@ljwei-stak/dsh-model-router`). This patch adds compatibility with **DeepSeek Harness Desktop 0.2.1-rc.2**, while retaining **0.2.0-rc.1 / 0.2.0-rc.2**. It uses the updated official SDK for development and regression checks. Real vendor execution evidence remains tied to **0.20.0**; this patch adds no new model experiments. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.21.0** (`@ljwei-stak/dsh-model-router`). This release adds Hermes Agent and Pi installation, updates, discovery and interactive terminals, and switches OpenCode npm/pnpm installs to the official V2 package. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**. Hermes and Pi do not yet have verified managed runners; real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
 
@@ -23,8 +23,8 @@ Both README versions describe the same interfaces, formulas, defaults and limits
 | Routing presets | Economy, balanced and quality-first presets; quality floors, estimated token costs and bounded assignment search. Missing prices stay unknown. |
 | Read-only execution | Preview and confirm a routed run from the workbench, or invoke it in an official Harness session. Supported headless CLIs and model-directory API calls return recorded results. |
 | Editable CLI execution | A sequential CLI team from the workbench, or one supported CLI from a session, using approved isolated Git worktrees and conditional patch integration. |
-| Official tools | Detect, install/update, check launch readiness and inspect login status for ten registry tools; installation jobs have logs and cancellation. |
-| Interactive terminal | PowerShell/system shell and all ten registry CLI targets (ZCode TUI on verified Windows desktop installs), including fixed login commands, live output and multiple sessions. |
+| Official tools | Detect, install/update, check launch readiness and inspect login status for twelve registry tools; installation jobs have logs and cancellation. |
+| Interactive terminal | PowerShell/system shell and all twelve registry CLI targets (ZCode TUI on verified Windows desktop installs), including fixed login commands, live output and multiple sessions. |
 | Costs and subscriptions | Daily/monthly budget checks, economy downgrade or pause, subscription-first routing, quota cooldown and explicit handling of other subscription failures. |
 | History and quality | Per-package results, dependency views, failure details, rerun/reassignment, ratings and optional stronger-model review. |
 | Execution boundaries | Shows what each route can read/write and whether its process uses the Harness sandbox. |
@@ -40,16 +40,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.20.2
+@ljwei-stak/dsh-model-router@0.21.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.20.2** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.21.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.20.2`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.21.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -216,7 +216,11 @@ The CLI team runner is the plugin's own sequential dependency executor. It does 
 | `gemini` | Gemini CLI | Routed headless adapter; not the managed single-tool/team runner |
 | `opencode` | OpenCode | Install, probe and login check; no verified restricted execution entry yet |
 | `stepcode` | Step Code | Install, probe and login check; no verified restricted execution entry yet |
+| `hermes` | Hermes Agent | Official Windows/POSIX installer, version checks and interactive terminal; authenticate with `hermes auth`; no verified managed runner |
+| `pi` | Pi | Official npm/pnpm package and interactive terminal; enter `/login` inside Pi; no verified managed runner |
 | `zcode` | ZCode | Windows; approved `workspace-write` |
+
+Hermes uses its [official source installer](https://hermes-agent.nousresearch.com/docs/getting-started/installation) in non-interactive mode, then you run `hermes auth`. Its launcher and user data have separate vendor-managed locations; the shared install directory does not relocate them. Uninstall source installs through `hermes uninstall`. Pi uses [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) through npm/pnpm with `--ignore-scripts` and requires Node.js 22.19 or later. Start `pi`, then enter `/login`. Both tools keep login status unknown until confirmed in their own interface; the plugin does not read their credentials.
 
 Installers use fixed official npm packages at each vendor's `@latest`, the vendor's own installer script, or the official publisher-signed Windows ZCode installer. An installation newer than the reported latest is not downgraded. Latest-version lookups are cached for about 12 hours; unavailable lookups leave the version unknown. New vendor releases are not automatically validated by this project. ZCode's installation window still requires you to choose a directory and finish installation.
 

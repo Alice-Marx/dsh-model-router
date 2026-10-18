@@ -81,6 +81,8 @@ const CAPABILITIES = Object.freeze({
     supported: false,
     reason: 'Step Code 尚未完成受限执行入口核验；插件负责安装、检测与登录体检，执行仍需在终端中直接使用。',
   }),
+  hermes: Object.freeze({ supported: false, modes: Object.freeze([]), reason: 'Hermes 尚未核验托管受限执行；请在官方工具终端中交互使用。' }),
+  pi: Object.freeze({ supported: false, modes: Object.freeze([]), reason: 'Pi 尚未核验托管受限执行；请在官方工具终端中交互使用。' }),
 })
 
 /** A UI/Host can show this without implying that installation means execution readiness. */

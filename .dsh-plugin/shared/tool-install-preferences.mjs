@@ -176,6 +176,15 @@ export function scriptInstallDir(tool, preferences, { home = '', env = {}, metho
 
 /** The location the vendor script uses on its own, ignoring any configured directory. */
 export function vendorScriptDir(tool, { home = '', env = {}, method } = {}) {
+  if (tool?.id === 'hermes') {
+    const value = name => typeof env?.[name] === 'string' ? env[name].trim() : ''
+    if (method?.shell === 'powershell') {
+      if (value('HERMES_HOME')) return joinPath(value('HERMES_HOME'), 'bin')
+      if (value('LOCALAPPDATA')) return joinPath(value('LOCALAPPDATA'), 'hermes', 'bin')
+      return home ? joinPath(home, 'AppData', 'Local', 'hermes', 'bin') : ''
+    }
+    return home ? joinPath(home, '.local', 'bin') : ''
+  }
   const value = method?.defaultScriptInstallDir ?? tool?.defaultScriptInstallDir
   const root = method?.defaultScriptInstallDirEnv ? env[method.defaultScriptInstallDirEnv] || home : home
   return value ? joinPath(root, ...String(value).split('/').filter(Boolean)) : ''
@@ -293,6 +302,7 @@ export function resolveInstallPlan(tool, methodId, preferences = {}, { platform 
       downloadUrls: preferences?.scriptUrls?.[tool.id] ? [scriptUrl] : [...new Set([scriptUrl, ...(method.scriptFallbackUrls ?? [])])],
       verify: method.verify,
       installArg: method.installArgs,
+      ...(method.extraArgs?.length ? { extraArgs: method.extraArgs } : {}),
       installDir: target,
       binDir,
       env: scriptEnv(method, { installDir: target, scriptUrl, registry: preferences.registry }),

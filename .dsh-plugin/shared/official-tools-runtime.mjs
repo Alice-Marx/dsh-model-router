@@ -516,13 +516,14 @@ const POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32',
 export function vendorScriptInvocation(plan, scriptPath) {
   // `installArg` is the vendor's own single flag (`--install-dir` / `-InstallDir`).
   const directoryArgs = plan.installArg?.[0] && plan.installDir ? [plan.installArg[0], plan.installDir] : []
+  const extraArgs = Array.isArray(plan.extraArgs) ? plan.extraArgs : []
   if (plan.shell === 'powershell') {
     return {
       file: POWERSHELL,
-      args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...directoryArgs],
+      args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...directoryArgs, ...extraArgs],
     }
   }
-  return { file: plan.shell === 'sh' ? 'sh' : 'bash', args: [scriptPath, ...directoryArgs] }
+  return { file: plan.shell === 'sh' ? 'sh' : 'bash', args: [scriptPath, ...directoryArgs, ...extraArgs] }
 }
 
 /** Resolve an existing ancestor too, so a missing child under a junction is checked. */
@@ -821,7 +822,7 @@ async function stripPathProfileBlocks(tool) {
 
 /** Tools whose ready-check failure can be repaired by reinstalling the same version. */
 const CAPABILITY_REPAIRABLE = new Set([
-  'claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build', 'opencode', 'stepcode',
+  'claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build', 'opencode', 'stepcode', 'hermes', 'pi',
 ])
 
 /** Extract the first version-looking token from a CLI banner. */
@@ -1263,13 +1264,15 @@ export function planCommandLine(plan, operation = 'install') {
     const environment = Object.entries(plan.env ?? {}).map(([name, value]) => plan.shell === 'powershell'
       ? `$env:${name}=${quote(value)}; ` : `${name}=${quote(value)} `).join('')
     const directoryArgs = plan.installDir && plan.installArg?.length ? ` ${plan.installArg.join(' ')} ${quote(plan.installDir)}` : ''
+    const extraArgs = plan.extraArgs?.length ? ` ${plan.extraArgs.map(arg => /^-{1,2}[A-Za-z][\w-]*$/.test(arg) ? arg : quote(arg)).join(' ')}` : ''
+    const scriptArgs = directoryArgs + extraArgs
     const piped = plan.shell === 'powershell'
       ? `${environment}irm ${plan.scriptUrl} | iex`
-      : `curl -fsSL ${plan.scriptUrl} | ${environment}${plan.shell === 'sh' ? 'sh' : 'bash'}${directoryArgs ? ` -s --${directoryArgs}` : ''}`
+      : `curl -fsSL ${plan.scriptUrl} | ${environment}${plan.shell === 'sh' ? 'sh' : 'bash'}${scriptArgs ? ` -s --${scriptArgs}` : ''}`
     return operation === 'uninstall'
       ? `删除 ${plan.dir} 下的 ${(plan.binaries ?? []).join('、') || '可执行文件'}`
-      : plan.shell === 'powershell' && directoryArgs
-        ? `${environment}& ([scriptblock]::Create((irm ${plan.scriptUrl})))${directoryArgs}` : piped
+      : plan.shell === 'powershell' && scriptArgs
+        ? `${environment}& ([scriptblock]::Create((irm ${plan.scriptUrl})))${scriptArgs}` : piped
   }
   return `${plan.manager} ${plan.args.map(arg => /\s/.test(arg) ? JSON.stringify(arg) : arg).join(' ')}`
 }

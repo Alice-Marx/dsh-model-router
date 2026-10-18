@@ -45,7 +45,7 @@ function scriptMethod(id, label, {
   shell, scriptUrl, verify, installArg = [], env = [], platforms,
   supportsInstallDir = false, installDirEnv = '', installDirSuffix = '',
   defaultScriptInstallDir, defaultScriptInstallDirEnv, scriptBinaryNames,
-  registryEnv, installDirSubdir, legacySharedInstallDir = false, sharedDefaultBin = false, uninstallUnsupportedReason, scriptFallbackUrls,
+  registryEnv, installDirSubdir, legacySharedInstallDir = false, sharedDefaultBin = false, uninstallUnsupportedReason, scriptFallbackUrls, extraArgs = [],
 }) {
   return Object.freeze({
     id,
@@ -72,6 +72,7 @@ function scriptMethod(id, label, {
     ...(scriptBinaryNames ? { scriptBinaryNames: Object.freeze(scriptBinaryNames) } : {}),
     ...(scriptFallbackUrls ? { scriptFallbackUrls: Object.freeze(scriptFallbackUrls) } : {}),
     ...(registryEnv ? { registryEnv } : {}),
+    ...(extraArgs.length ? { extraArgs: Object.freeze(extraArgs) } : {}),
     supportsRegistry: Boolean(registryEnv),
   })
 }
@@ -324,24 +325,24 @@ export const OFFICIAL_TOOLS = Object.freeze([
     id: 'opencode',
     label: 'OpenCode',
     vendor: 'anomalyco / SST',
-    purpose: '开源终端编程代理，提供 opencode 命令；可用 npm/pnpm 或官方安装脚本获取。',
-    package: 'opencode-ai',
+    purpose: '开源终端编程代理，提供 opencode 命令；npm/pnpm 安装 OpenCode 2，旧版脚本安装 OpenCode 1。',
+    package: '@opencode/cli',
     manager: 'npm',
-    installArgs: ['install', '-g', 'opencode-ai@latest', '--registry=https://registry.npmjs.org/'],
-    uninstallArgs: ['uninstall', '-g', 'opencode-ai'],
+    installArgs: ['install', '-g', '@opencode/cli@latest', '--registry=https://registry.npmjs.org/'],
+    uninstallArgs: ['uninstall', '-g', '@opencode/cli'],
     probeExecutables: ['opencode'],
-    probeNote: 'opencode 命令由 npm 全局包或官方脚本安装的二进制提供；脚本安装固定落在 ~/.opencode/bin。',
+    probeNote: 'npm/pnpm 使用 OpenCode 2 官方包 @opencode/cli；旧版 V1 脚本固定安装到 ~/.opencode/bin，不能读取已迁移的 V2 数据库。',
     providerHints: ['opencode', 'anomalyco'],
     /** File an uninstall may delete, when the copy came from a script install. */
     scriptBinaryNames: Object.freeze(['opencode', 'opencode.exe']),
     /** Where the vendor script puts the binary when the user sets no directory. */
     defaultScriptInstallDir: '.opencode/bin',
     installMethods: Object.freeze([
-      packageManagerMethod('npm', 'npm', 'npm', 'opencode-ai@latest'),
-      packageManagerMethod('pnpm', 'pnpm', 'pnpm', 'opencode-ai@latest'),
+      packageManagerMethod('npm', 'npm', 'npm', '@opencode/cli@latest'),
+      packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@opencode/cli@latest'),
       // The published script hardcodes $HOME/.opencode/bin, so it cannot honour
       // a custom install directory; the npm/pnpm methods above can.
-      scriptMethod('script-bash', 'curl | bash', {
+      scriptMethod('script-bash', 'curl | bash（OpenCode 1）', {
         shell: 'bash',
         scriptUrl: 'https://opencode.ai/install',
         platforms: ['linux', 'darwin'],
@@ -398,6 +399,52 @@ export const OFFICIAL_TOOLS = Object.freeze([
           mustInclude: ['static-openapi.stepfun.com', 'stepcode'],
           mustNotInclude: ['anomalyco/opencode'],
         }),
+      }),
+    ]),
+  }),
+  Object.freeze({
+    id: 'pi',
+    label: 'Pi',
+    vendor: 'Earendil Works',
+    purpose: 'Pi 编程代理，提供 pi 命令；支持 npm/pnpm 安装，要求 Node.js 22.19 及以上。',
+    manager: 'npm',
+    package: '@earendil-works/pi-coding-agent',
+    installArgs: ['install', '-g', '@earendil-works/pi-coding-agent@latest', '--ignore-scripts', '--registry=https://registry.npmjs.org/'],
+    uninstallArgs: ['uninstall', '-g', '@earendil-works/pi-coding-agent'],
+    probeExecutables: ['pi'],
+    probeNote: '使用官方 Pi 包及其声明的命令入口；普通安装无需生命周期脚本，登录请在 Pi 中输入 /login。',
+    providerHints: ['earendil-works', 'pi-coding-agent'],
+    installMethods: Object.freeze([
+      packageManagerMethod('npm', 'npm', 'npm', '@earendil-works/pi-coding-agent@latest', { extraArgs: ['--ignore-scripts'] }),
+      packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@earendil-works/pi-coding-agent@latest', { extraArgs: ['--ignore-scripts'] }),
+    ]),
+  }),
+  Object.freeze({
+    id: 'hermes',
+    label: 'Hermes Agent',
+    vendor: 'Nous Research',
+    purpose: 'Nous Research 的 Hermes Agent；支持 Windows 与 POSIX 官方源码安装器和交互终端。',
+    manager: 'script-installer',
+    installArgs: [],
+    uninstallArgs: [],
+    probeExecutables: ['hermes'],
+    probeNote: '支持官方源码脚本安装；命令入口、源码和用户数据分别由厂商管理，统一目录不迁移这些位置。桌面/MSIX 别名暂不用于此入口。登录使用 hermes auth。',
+    providerHints: ['hermes', 'nousresearch'],
+    scriptBinaryNames: Object.freeze(['hermes', 'hermes.exe']),
+    installMethods: Object.freeze([
+      scriptMethod('script-bash', 'curl | bash', {
+        shell: 'bash', scriptUrl: 'https://hermes-agent.nousresearch.com/install.sh',
+        platforms: ['linux', 'darwin'], supportsInstallDir: false, sharedDefaultBin: true,
+        extraArgs: ['--non-interactive'],
+        verify: Object.freeze({ mustInclude: ['https://github.com/NousResearch/hermes-agent.git', 'hermes_cli/source_completion.py'] }),
+        uninstallUnsupportedReason: '请在官方工具终端运行 hermes uninstall 卸载源码安装；保留配置与历史时按向导选择。桌面/MSIX 安装请使用系统应用管理。',
+      }),
+      scriptMethod('script-powershell', 'irm | iex', {
+        shell: 'powershell', scriptUrl: 'https://hermes-agent.nousresearch.com/install.ps1',
+        platforms: ['win32'], supportsInstallDir: false,
+        extraArgs: ['-NonInteractive'],
+        verify: Object.freeze({ mustInclude: ['https://github.com/NousResearch/hermes-agent.git', 'hermes_cli/source_completion.py'] }),
+        uninstallUnsupportedReason: '请在官方工具终端运行 hermes uninstall 卸载源码安装；保留配置与历史时按向导选择。桌面/MSIX 安装请使用系统应用管理。',
       }),
     ]),
   }),
@@ -478,6 +525,12 @@ export function installCommandLineFor(tool, method) {
   if (!tool || tool.unsupported) return null
   if (!method) return null
   if (method.kind === 'script') {
+    if (method.extraArgs?.length) {
+      const args = method.extraArgs.join(' ')
+      return method.shell === 'powershell'
+        ? `& ([scriptblock]::Create((irm ${method.scriptUrl}))) ${args}`
+        : `curl -fsSL ${method.scriptUrl} | ${method.shell} -s -- ${args}`
+    }
     const piped = method.shell === 'powershell' ? `irm ${method.scriptUrl} | iex` : `curl -fsSL ${method.scriptUrl} | ${method.shell}`
     return piped
   }

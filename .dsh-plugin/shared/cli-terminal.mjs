@@ -196,14 +196,16 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
   const selectedPreferences = selectedScript ? { ...preferences, allowScriptInstall: true } : preferences
   const plan = resolveInstallPlan(tool, undefined, selectedPreferences, { platform, env, home })
   const configured = Boolean(preferences.installDir || preferences.methods?.[target])
-  if (plan.kind === 'package-manager' && configured) {
+  if (plan.kind === 'package-manager' && (configured || target === 'pi')) {
     const boundPlan = plan.installDir ? plan : await (await import('./official-tools-runtime.mjs')).resolvePackageJobPlan(tool, plan, selectedPreferences, { options: { platform, env, home } })
     const found = await packageEntry(tool, boundPlan, { platform })
     if (!found) throw new Error(`未在所选 ${boundPlan.manager} 安装目录中找到 ${tool.label} 的真实命令入口；请重新体检或修复。`)
     const extension = extname(found.entry).toLowerCase()
     if (['.js', '.mjs', '.cjs'].includes(extension) || (platform === 'win32' && !extension)) {
-      const node = await findNode(cwd)
-      if (!node) throw new Error(`未找到可核验的 Node.js 运行时，无法启动 ${tool.label}。`)
+      const node = target === 'pi' ? await findNode(cwd, [22, 19, 0]) : await findNode(cwd)
+      if (!node) throw new Error(target === 'pi'
+        ? 'Pi 需要 Node.js 22.19.0 及以上；未找到符合要求的运行时。'
+        : `未找到可核验的 Node.js 运行时，无法启动 ${tool.label}。`)
       return { file: node, args: [found.entry, ...args], verbatim: false, display }
     }
     return executableLaunch(found.entry, args, display, { platform, env })

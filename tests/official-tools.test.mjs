@@ -67,7 +67,7 @@ function verificationJob(toolId, preferences = {}) {
 }
 
 test('installed Gemini and OpenCode succeed without pretending a restricted runner is ready', async () => {
-  for (const toolId of ['gemini', 'opencode', 'stepcode']) {
+  for (const toolId of ['gemini', 'opencode', 'stepcode', 'hermes', 'pi']) {
     const job = verificationJob(toolId)
     const probe = { id: toolId, installed: true, version: '1.0.0' }
     await finishVerifiedInstall(job, probe, { lookupLatest: async () => ({ version: '1.0.0' }) })
@@ -270,7 +270,7 @@ test('Claude pnpm links its native binary and only official Claude methods have 
   }
 })
 
-test('every tool can be installed and removed again', () => {
+test('every tool declares installation and a safe removal strategy', () => {
   for (const tool of OFFICIAL_TOOLS) {
     const methods = installMethodsFor(tool)
     if (tool.manager === 'signed-windows-installer') {
@@ -279,7 +279,12 @@ test('every tool can be installed and removed again', () => {
     }
     const plan = resolveInstallPlan(tool, methods[0].id, installPreferences(), { platform: methods[0].platforms?.[0] ?? 'linux' })
     assert.ok(plan.methodId, `${tool.id} resolves an install plan`)
-    const removal = resolveUninstallPlan(tool, plan.methodId, installPreferences(), { platform: plan.method.platforms?.[0] ?? 'linux' })
+    const remove = () => resolveUninstallPlan(tool, plan.methodId, installPreferences(), { platform: plan.method.platforms?.[0] ?? 'linux' })
+    if (plan.method.uninstallUnsupportedReason) {
+      assert.throws(remove, { message: plan.method.uninstallUnsupportedReason }, `${tool.id} keeps vendor-managed data outside automatic deletion`)
+      continue
+    }
+    const removal = remove()
     assert.ok(removal.methodId, `${tool.id} resolves an uninstall plan`)
     if (removal.kind === 'script') {
       assert.ok(removal.binaries.length, `${tool.id} names the files it may delete`)

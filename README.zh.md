@@ -4,7 +4,7 @@
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
-当前版本：**0.20.2**（`@ljwei-stak/dsh-model-router`）。本版增加 **DeepSeek Harness Desktop 0.2.1-rc.2** 兼容支持，并保留 **0.2.0-rc.1 / 0.2.0-rc.2**；开发与回归检查使用更新后的官方 SDK。真实厂商执行证据仍见 **0.20.0** 报告；本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
+当前版本：**0.21.0**（`@ljwei-stak/dsh-model-router`）。本版增加 Hermes Agent 与 Pi 的安装、更新、检测和交互终端，并将 OpenCode npm/pnpm 安装切换至官方 V2 包。继续兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**。Hermes 与 Pi 暂无经过验证的托管执行器；真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
 
 官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
 
@@ -23,8 +23,8 @@
 | 路由预设 | 省钱优先、均衡和效果优先；结合质量下限、估计 token 费用和有界分配搜索。缺失价格保持未知。 |
 | 只读执行 | 在工作台预览并确认路由执行，或在 Harness 官方会话中调用。支持的无头 CLI 与模型目录 API 调用均记录结果。 |
 | 可编辑 CLI 执行 | 从工作台执行顺序 CLI 团队，或在会话中调用单个受支持 CLI；使用获批的隔离 Git worktree，并有条件地合入补丁。 |
-| 官方工具 | 对注册表中的十种工具检测、安装/更新、检查启动就绪和登录状态；安装任务提供日志和取消功能。 |
-| 交互终端 | PowerShell/系统 shell 与十种注册表 CLI 目标（经过验证的 Windows 桌面安装支持 ZCode TUI）；包含固定登录命令、实时输出和多会话。 |
+| 官方工具 | 对注册表中的十二种工具检测、安装/更新、检查启动就绪和登录状态；安装任务提供日志和取消功能。 |
+| 交互终端 | PowerShell/系统 shell 与十二种注册表 CLI 目标（经过验证的 Windows 桌面安装支持 ZCode TUI）；包含固定登录命令、实时输出和多会话。 |
 | 费用与订阅 | 日/月预算检查、降级为省钱预设或暂停、订阅优先路由、额度冷却，以及对其他订阅失败的显式处理。 |
 | 历史与质量 | 逐包结果、依赖视图、失败详情、重跑/改派、评分与可选的更强模型复核。 |
 | 执行边界 | 显示每条路线可读写的范围，以及进程是否使用 Harness 沙箱。 |
@@ -40,16 +40,16 @@
 打开 **插件 → 添加插件**，输入：
 
 ```text
-@ljwei-stak/dsh-model-router@0.20.2
+@ljwei-stak/dsh-model-router@0.21.0
 ```
 
-镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.20.2**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
+镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.21.0**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
 
 也可以通过插件管理器安装本地 `.tgz` 压缩包，或解压后的内部 `package` 目录。两者都必须包含 `package.json` 和 `.dsh-plugin`。历史构建见 [Releases](https://github.com/Alice-Marx/dsh-model-router/releases)，也可按下文从源码构建。
 
 ### 从旧包名升级
 
-旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.20.2`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
+旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.21.0`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
 
 从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 
@@ -216,7 +216,11 @@ CLI 团队运行器是插件自身的顺序依赖执行器，不控制 Harness �
 | `gemini` | Gemini CLI | 路由无头适配器；不属于托管单工具/团队运行器 |
 | `opencode` | OpenCode | 安装、探测和登录检查；尚无经过验证的受限执行入口 |
 | `stepcode` | Step Code | 安装、探测和登录检查；尚无经过验证的受限执行入口 |
+| `hermes` | Hermes Agent | Windows/POSIX 官方安装脚本、版本检测、交互终端；使用 `hermes auth` 登录；尚无经过验证的托管执行器 |
+| `pi` | Pi | 官方 npm/pnpm 安装、版本检测、交互终端；启动后输入 `/login`；尚无经过验证的托管执行器 |
 | `zcode` | ZCode | Windows；获批的 `workspace-write` |
+
+Hermes 使用[官方源码安装器](https://hermes-agent.nousresearch.com/docs/getting-started/installation)的非交互模式，安装后运行 `hermes auth`。它的命令入口、源码和数据目录分别由厂商管理，统一安装目录不会迁移这些目录或凭据；源码安装请通过 `hermes uninstall` 卸载。Pi 使用 [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)，npm/pnpm 安装带 `--ignore-scripts`，要求 Node.js 22.19 及以上。启动 `pi` 后输入 `/login`。这两种工具的登录状态显示为未知，以各自界面为准；插件不会读取它们的凭据。
 
 安装器使用各厂商 `@latest` 对应的固定官方 npm 包、厂商自有安装脚本，或带官方发行者签名的 Windows ZCode 安装器。已安装版本高于查询到的最新版本时不降级。最新版本查询约缓存 12 小时；查询不可用时版本保持未知。厂商新版本不会自动获得本项目的验证。ZCode 安装窗口仍需用户选择目录并完成安装。
 

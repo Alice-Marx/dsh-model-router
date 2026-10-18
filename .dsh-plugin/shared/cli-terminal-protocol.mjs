@@ -50,6 +50,8 @@ export const TERMINAL_LOGIN_ARGS = Object.freeze({
   gemini: Object.freeze([]),
   opencode: Object.freeze(['auth', 'login']),
   stepcode: Object.freeze(['login']),
+  hermes: Object.freeze(['auth']),
+  pi: Object.freeze([]),
   zcode: Object.freeze([]),
 })
 

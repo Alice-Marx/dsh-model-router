@@ -79,6 +79,7 @@ export function latestSourceFor(tool) {
   if (tool.manager === 'npm' && typeof tool.package === 'string') return { kind: 'npm', package: tool.package }
   if (tool.id === 'zcode') return { kind: 'zcode-download-page' }
   if (tool.id === 'stepcode') return { kind: 'stepcode-release-manifest' }
+  if (tool.id === 'hermes') return { kind: 'hermes-github-release', url: 'https://api.github.com/repos/NousResearch/hermes-agent/releases/latest' }
   return null
 }
 
@@ -96,6 +97,13 @@ async function lookupSource(source, { fetchImpl, timeoutMs }) {
   if (source.kind === 'stepcode-release-manifest') {
     const found = parseStepCodeManifest(await boundedText(fetchImpl, `${STEPCODE_RELEASE_BASE}/latest.json`, timeoutMs, 'application/json'))
     return { ...found, source: 'stepcode-release-manifest' }
+  }
+  if (source.kind === 'hermes-github-release') {
+    const body = JSON.parse(await boundedText(fetchImpl, source.url, timeoutMs, 'application/json'))
+    if (body?.draft === true || body?.prerelease === true) throw new Error('Hermes 发布不是正式版本')
+    const version = String(body?.tag_name ?? '').replace(/^v/, '')
+    if (!isReleaseVersion(version)) throw new Error('Hermes 发布标签不是有效版本号')
+    return { version, source: 'hermes-github-release' }
   }
   throw new Error('不支持的版本来源')
 }

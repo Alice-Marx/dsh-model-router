@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.0 — 2026-10-18
+
+- Added support for Hermes Agent (NousResearch source installer): includes native Windows PowerShell and POSIX Bash non-interactive flags, vendor-specific launcher and data paths, `hermes auth` authentication flow, and manual uninstall via `hermes uninstall`.
+- Added support for Pi coding agent (official `@earendil-works/pi-coding-agent` npm package): supports installation via npm/pnpm with `--ignore-scripts`, requires Node >=22.19.0, and uses `pi` followed by `/login` for credential setup. Discovery, version checks, install/update/repair, and interactive terminal functionality are integrated for both new tools; login status is unknown without credential reads, and no verified managed restricted execution is available for either tool.
+- Updated OpenCode dependency from legacy V1 `opencode-ai` to official V2 `@opencode/cli`; legacy V1 scripts are clearly labeled as OpenCode 1, and existing V2 databases are preserved for compatibility.
+- Added official GitHub release lookup for Hermes and official npm version lookup for Pi. Installation and login checks remain separate from managed execution readiness.
+
+Automated validation: 844 tests, 841 passed, 3 conditional skips, no failures; strict frozen pnpm install and real client build/check passed. UI checks used mock fixtures. Hermes/Pi installation, authentication and model execution were not performed.
+
+To upgrade, fully quit Harness including its tray icon and Host background process, update the dsh-model-router plugin, then restart Harness.
+
 ## 0.20.2 — 2026-10-17
 
 - Add explicit compatibility with official DeepSeek Harness Desktop 0.2.1-rc.2, retaining the two supported 0.2.0 release candidates. Older router versions are rejected by the updated Host before plugin code loads. No exact-version exemption or Host modification is needed.

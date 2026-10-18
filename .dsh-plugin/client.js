@@ -80,7 +80,8 @@ function scriptMethod(id2, label, {
   legacySharedInstallDir = false,
   sharedDefaultBin = false,
   uninstallUnsupportedReason,
-  scriptFallbackUrls
+  scriptFallbackUrls,
+  extraArgs = []
 }) {
   return Object.freeze({
     id: id2,
@@ -107,6 +108,7 @@ function scriptMethod(id2, label, {
     ...scriptBinaryNames ? { scriptBinaryNames: Object.freeze(scriptBinaryNames) } : {},
     ...scriptFallbackUrls ? { scriptFallbackUrls: Object.freeze(scriptFallbackUrls) } : {},
     ...registryEnv ? { registryEnv } : {},
+    ...extraArgs.length ? { extraArgs: Object.freeze(extraArgs) } : {},
     supportsRegistry: Boolean(registryEnv)
   });
 }
@@ -397,24 +399,24 @@ var OFFICIAL_TOOLS = Object.freeze([
     id: "opencode",
     label: "OpenCode",
     vendor: "anomalyco / SST",
-    purpose: "\u5F00\u6E90\u7EC8\u7AEF\u7F16\u7A0B\u4EE3\u7406\uFF0C\u63D0\u4F9B opencode \u547D\u4EE4\uFF1B\u53EF\u7528 npm/pnpm \u6216\u5B98\u65B9\u5B89\u88C5\u811A\u672C\u83B7\u53D6\u3002",
-    package: "opencode-ai",
+    purpose: "\u5F00\u6E90\u7EC8\u7AEF\u7F16\u7A0B\u4EE3\u7406\uFF0C\u63D0\u4F9B opencode \u547D\u4EE4\uFF1Bnpm/pnpm \u5B89\u88C5 OpenCode 2\uFF0C\u65E7\u7248\u811A\u672C\u5B89\u88C5 OpenCode 1\u3002",
+    package: "@opencode/cli",
     manager: "npm",
-    installArgs: ["install", "-g", "opencode-ai@latest", "--registry=https://registry.npmjs.org/"],
-    uninstallArgs: ["uninstall", "-g", "opencode-ai"],
+    installArgs: ["install", "-g", "@opencode/cli@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@opencode/cli"],
     probeExecutables: ["opencode"],
-    probeNote: "opencode \u547D\u4EE4\u7531 npm \u5168\u5C40\u5305\u6216\u5B98\u65B9\u811A\u672C\u5B89\u88C5\u7684\u4E8C\u8FDB\u5236\u63D0\u4F9B\uFF1B\u811A\u672C\u5B89\u88C5\u56FA\u5B9A\u843D\u5728 ~/.opencode/bin\u3002",
+    probeNote: "npm/pnpm \u4F7F\u7528 OpenCode 2 \u5B98\u65B9\u5305 @opencode/cli\uFF1B\u65E7\u7248 V1 \u811A\u672C\u56FA\u5B9A\u5B89\u88C5\u5230 ~/.opencode/bin\uFF0C\u4E0D\u80FD\u8BFB\u53D6\u5DF2\u8FC1\u79FB\u7684 V2 \u6570\u636E\u5E93\u3002",
     providerHints: ["opencode", "anomalyco"],
     /** File an uninstall may delete, when the copy came from a script install. */
     scriptBinaryNames: Object.freeze(["opencode", "opencode.exe"]),
     /** Where the vendor script puts the binary when the user sets no directory. */
     defaultScriptInstallDir: ".opencode/bin",
     installMethods: Object.freeze([
-      packageManagerMethod("npm", "npm", "npm", "opencode-ai@latest"),
-      packageManagerMethod("pnpm", "pnpm", "pnpm", "opencode-ai@latest"),
+      packageManagerMethod("npm", "npm", "npm", "@opencode/cli@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@opencode/cli@latest"),
       // The published script hardcodes $HOME/.opencode/bin, so it cannot honour
       // a custom install directory; the npm/pnpm methods above can.
-      scriptMethod("script-bash", "curl | bash", {
+      scriptMethod("script-bash", "curl | bash\uFF08OpenCode 1\uFF09", {
         shell: "bash",
         scriptUrl: "https://opencode.ai/install",
         platforms: ["linux", "darwin"],
@@ -477,6 +479,57 @@ var OFFICIAL_TOOLS = Object.freeze([
     ])
   }),
   Object.freeze({
+    id: "pi",
+    label: "Pi",
+    vendor: "Earendil Works",
+    purpose: "Pi \u7F16\u7A0B\u4EE3\u7406\uFF0C\u63D0\u4F9B pi \u547D\u4EE4\uFF1B\u652F\u6301 npm/pnpm \u5B89\u88C5\uFF0C\u8981\u6C42 Node.js 22.19 \u53CA\u4EE5\u4E0A\u3002",
+    manager: "npm",
+    package: "@earendil-works/pi-coding-agent",
+    installArgs: ["install", "-g", "@earendil-works/pi-coding-agent@latest", "--ignore-scripts", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@earendil-works/pi-coding-agent"],
+    probeExecutables: ["pi"],
+    probeNote: "\u4F7F\u7528\u5B98\u65B9 Pi \u5305\u53CA\u5176\u58F0\u660E\u7684\u547D\u4EE4\u5165\u53E3\uFF1B\u666E\u901A\u5B89\u88C5\u65E0\u9700\u751F\u547D\u5468\u671F\u811A\u672C\uFF0C\u767B\u5F55\u8BF7\u5728 Pi \u4E2D\u8F93\u5165 /login\u3002",
+    providerHints: ["earendil-works", "pi-coding-agent"],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@earendil-works/pi-coding-agent@latest", { extraArgs: ["--ignore-scripts"] }),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@earendil-works/pi-coding-agent@latest", { extraArgs: ["--ignore-scripts"] })
+    ])
+  }),
+  Object.freeze({
+    id: "hermes",
+    label: "Hermes Agent",
+    vendor: "Nous Research",
+    purpose: "Nous Research \u7684 Hermes Agent\uFF1B\u652F\u6301 Windows \u4E0E POSIX \u5B98\u65B9\u6E90\u7801\u5B89\u88C5\u5668\u548C\u4EA4\u4E92\u7EC8\u7AEF\u3002",
+    manager: "script-installer",
+    installArgs: [],
+    uninstallArgs: [],
+    probeExecutables: ["hermes"],
+    probeNote: "\u652F\u6301\u5B98\u65B9\u6E90\u7801\u811A\u672C\u5B89\u88C5\uFF1B\u547D\u4EE4\u5165\u53E3\u3001\u6E90\u7801\u548C\u7528\u6237\u6570\u636E\u5206\u522B\u7531\u5382\u5546\u7BA1\u7406\uFF0C\u7EDF\u4E00\u76EE\u5F55\u4E0D\u8FC1\u79FB\u8FD9\u4E9B\u4F4D\u7F6E\u3002\u684C\u9762/MSIX \u522B\u540D\u6682\u4E0D\u7528\u4E8E\u6B64\u5165\u53E3\u3002\u767B\u5F55\u4F7F\u7528 hermes auth\u3002",
+    providerHints: ["hermes", "nousresearch"],
+    scriptBinaryNames: Object.freeze(["hermes", "hermes.exe"]),
+    installMethods: Object.freeze([
+      scriptMethod("script-bash", "curl | bash", {
+        shell: "bash",
+        scriptUrl: "https://hermes-agent.nousresearch.com/install.sh",
+        platforms: ["linux", "darwin"],
+        supportsInstallDir: false,
+        sharedDefaultBin: true,
+        extraArgs: ["--non-interactive"],
+        verify: Object.freeze({ mustInclude: ["https://github.com/NousResearch/hermes-agent.git", "hermes_cli/source_completion.py"] }),
+        uninstallUnsupportedReason: "\u8BF7\u5728\u5B98\u65B9\u5DE5\u5177\u7EC8\u7AEF\u8FD0\u884C hermes uninstall \u5378\u8F7D\u6E90\u7801\u5B89\u88C5\uFF1B\u4FDD\u7559\u914D\u7F6E\u4E0E\u5386\u53F2\u65F6\u6309\u5411\u5BFC\u9009\u62E9\u3002\u684C\u9762/MSIX \u5B89\u88C5\u8BF7\u4F7F\u7528\u7CFB\u7EDF\u5E94\u7528\u7BA1\u7406\u3002"
+      }),
+      scriptMethod("script-powershell", "irm | iex", {
+        shell: "powershell",
+        scriptUrl: "https://hermes-agent.nousresearch.com/install.ps1",
+        platforms: ["win32"],
+        supportsInstallDir: false,
+        extraArgs: ["-NonInteractive"],
+        verify: Object.freeze({ mustInclude: ["https://github.com/NousResearch/hermes-agent.git", "hermes_cli/source_completion.py"] }),
+        uninstallUnsupportedReason: "\u8BF7\u5728\u5B98\u65B9\u5DE5\u5177\u7EC8\u7AEF\u8FD0\u884C hermes uninstall \u5378\u8F7D\u6E90\u7801\u5B89\u88C5\uFF1B\u4FDD\u7559\u914D\u7F6E\u4E0E\u5386\u53F2\u65F6\u6309\u5411\u5BFC\u9009\u62E9\u3002\u684C\u9762/MSIX \u5B89\u88C5\u8BF7\u4F7F\u7528\u7CFB\u7EDF\u5E94\u7528\u7BA1\u7406\u3002"
+      })
+    ])
+  }),
+  Object.freeze({
     id: "zcode",
     label: "ZCode",
     vendor: "Z.ai",
@@ -522,6 +575,10 @@ function installCommandLineFor(tool, method) {
   if (!tool || tool.unsupported) return null;
   if (!method) return null;
   if (method.kind === "script") {
+    if (method.extraArgs?.length) {
+      const args = method.extraArgs.join(" ");
+      return method.shell === "powershell" ? `& ([scriptblock]::Create((irm ${method.scriptUrl}))) ${args}` : `curl -fsSL ${method.scriptUrl} | ${method.shell} -s -- ${args}`;
+    }
     const piped = method.shell === "powershell" ? `irm ${method.scriptUrl} | iex` : `curl -fsSL ${method.scriptUrl} | ${method.shell}`;
     return piped;
   }
@@ -12807,7 +12864,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.20.2" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.21.0" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -12858,6 +12915,8 @@ var TERMINAL_LOGIN_ARGS = Object.freeze({
   gemini: Object.freeze([]),
   opencode: Object.freeze(["auth", "login"]),
   stepcode: Object.freeze(["login"]),
+  hermes: Object.freeze(["auth"]),
+  pi: Object.freeze([]),
   zcode: Object.freeze([])
 });
 function terminalCanLogin(target) {

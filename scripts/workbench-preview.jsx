@@ -42,7 +42,7 @@ function demoInstallSummary(settings) {
   const options = { platform: 'win32', home: 'C:/Users/demo', env: { LOCALAPPDATA: 'C:/Users/demo/AppData/Local' } }
   const preferences = parseInstallPreferences(settings, { tools: OFFICIAL_TOOLS, ...options })
   const command = plan => plan.kind === 'script'
-    ? `下载并核验 ${plan.scriptUrl} → ${Object.entries(plan.env ?? {}).map(([name, value]) => `${name}=${JSON.stringify(value)}`).join(' ')} ${plan.shell}${plan.installDir && plan.installArg?.length ? ` ${plan.installArg.join(' ')} "${plan.installDir}"` : ''}`
+    ? `下载并核验 ${plan.scriptUrl} → ${Object.entries(plan.env ?? {}).map(([name, value]) => `${name}=${JSON.stringify(value)}`).join(' ')} ${plan.shell}${plan.installDir && plan.installArg?.length ? ` ${plan.installArg.join(' ')} "${plan.installDir}"` : ''}${plan.extraArgs?.length ? ` ${plan.extraArgs.join(' ')}` : ''}`
     : `${plan.manager} ${plan.args.map(arg => /\s/.test(arg) ? JSON.stringify(arg) : arg).join(' ')}`
   return { ...preferences, tools: OFFICIAL_TOOLS.map(tool => {
     const methods = installMethodsFor(tool).map(method => {

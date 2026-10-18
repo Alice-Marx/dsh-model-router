@@ -120,6 +120,27 @@ test('Windows launch: native exe first, npm .cmd shims through cmd.exe, ps1 last
   await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { platform: 'win32', env, discoverBundle: async () => null }), /通过智谱签名/)
 })
 
+test('OpenCode uses the V2 package in the selected directory when a legacy V1 copy also exists', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'model-router-opencode-v2-'))
+  const entries = {}
+  for (const [name, version] of [['opencode-ai', '1.19.3'], ['@opencode/cli', '2.0.32']]) {
+    const packageRoot = join(root, 'node_modules', ...name.split('/'))
+    await mkdir(join(packageRoot, 'bin'), { recursive: true })
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name, version, bin: { opencode: './bin/opencode.exe' } }))
+    entries[name] = join(packageRoot, 'bin', 'opencode.exe')
+    await writeFile(entries[name], 'fixture-only')
+  }
+  const options = { platform: 'win32', env: {}, cwd: root,
+    preferences: { installDir: root, methods: { opencode: 'npm' } },
+    locate: async () => { throw new Error('selected installation must not use PATH') } }
+  const interactive = await resolveTerminalLaunch('opencode', 'interactive', options)
+  assert.equal(interactive.file, entries['@opencode/cli'])
+  assert.deepEqual(interactive.args, [])
+  const login = await resolveTerminalLaunch('opencode', 'login', options)
+  assert.equal(login.file, entries['@opencode/cli'])
+  assert.deepEqual(login.args, ['auth', 'login'])
+})
+
 test('POSIX launch uses the absolute path which printed and the login shell', async () => {
   const launch = await resolveTerminalLaunch('kimi-code', 'login', { platform: 'linux', env: {}, locate: async () => ['/usr/local/bin/kimi'] })
   assert.deepEqual(launch, { file: '/usr/local/bin/kimi', args: ['login'], verbatim: false, display: 'kimi login' })
