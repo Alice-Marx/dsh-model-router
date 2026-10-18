@@ -1068,14 +1068,14 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
         <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-tools" aria-labelledby="mr-tab-tools" hidden={view !== 'tools'}>
         <div className="mr-view-heading"><h2>官方工具</h2><p>管理本机 CLI、检查登录状态，或打开交互式终端。</p></div>
+        {terminalApi && <CliTerminalCard api={terminalApi} health={workbench.health.report}
+          settingsSignature={toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)} />}
         {workbench.health.report && !workbench.health.report.onboarding?.completedAt && (
           <OnboardingBanner health={workbench.health.report} error={workbench.health.error} refreshing={workbench.health.refreshing}
             onRefresh={() => { void workbench.refreshHealth(true) }} onDone={() => { void workbench.finishOnboarding() }} />
         )}
         <OfficialToolsCard listOfficialTools={listOfficialTools} loadOfficialInstallSettings={loadOfficialInstallSettings} installOfficialTool={installOfficialTool} uninstallOfficialTool={uninstallOfficialTool} repairOfficialTool={repairOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} settingsScope={settingsScope}
           health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
-        {terminalApi && <CliTerminalCard api={terminalApi} health={workbench.health.report}
-          settingsSignature={toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)} />}
         </div>
 
         <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-controls" aria-labelledby="mr-tab-controls" hidden={view !== 'controls'}>

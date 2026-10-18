@@ -504,7 +504,7 @@ var OFFICIAL_TOOLS = Object.freeze([
     installArgs: [],
     uninstallArgs: [],
     probeExecutables: ["hermes"],
-    probeNote: "\u652F\u6301\u5B98\u65B9\u6E90\u7801\u811A\u672C\u5B89\u88C5\uFF1B\u547D\u4EE4\u5165\u53E3\u3001\u6E90\u7801\u548C\u7528\u6237\u6570\u636E\u5206\u522B\u7531\u5382\u5546\u7BA1\u7406\uFF0C\u7EDF\u4E00\u76EE\u5F55\u4E0D\u8FC1\u79FB\u8FD9\u4E9B\u4F4D\u7F6E\u3002\u684C\u9762/MSIX \u522B\u540D\u6682\u4E0D\u7528\u4E8E\u6B64\u5165\u53E3\u3002\u767B\u5F55\u4F7F\u7528 hermes auth\u3002",
+    probeNote: "\u652F\u6301\u5B98\u65B9\u6E90\u7801\u811A\u672C\u5B89\u88C5\uFF1B\u81EA\u5B9A\u4E49\u6E90\u7801\u5B89\u88C5\u5230\u7EDF\u4E00\u6839/hermes-agent\uFF0C\u63D2\u4EF6\u4F7F\u7528\u8BE5\u6E90\u7801\u7684 .hermes/bin \u5165\u53E3\u3002\u914D\u7F6E\u3001\u767B\u5F55\u548C\u5386\u53F2\u4FDD\u7559\u539F\u4F4D\u7F6E\u3002\u684C\u9762/MSIX \u522B\u540D\u6682\u4E0D\u7528\u4E8E\u6B64\u5165\u53E3\u3002\u767B\u5F55\u4F7F\u7528 hermes auth\u3002",
     providerHints: ["hermes", "nousresearch"],
     scriptBinaryNames: Object.freeze(["hermes", "hermes.exe"]),
     installMethods: Object.freeze([
@@ -512,8 +512,11 @@ var OFFICIAL_TOOLS = Object.freeze([
         shell: "bash",
         scriptUrl: "https://hermes-agent.nousresearch.com/install.sh",
         platforms: ["linux", "darwin"],
-        supportsInstallDir: false,
+        supportsInstallDir: true,
         sharedDefaultBin: true,
+        installDirSubdir: "hermes-agent",
+        installDirSuffix: ".hermes/bin",
+        installArg: ["--dir"],
         extraArgs: ["--non-interactive"],
         verify: Object.freeze({ mustInclude: ["https://github.com/NousResearch/hermes-agent.git", "hermes_cli/source_completion.py"] }),
         uninstallUnsupportedReason: "\u8BF7\u5728\u5B98\u65B9\u5DE5\u5177\u7EC8\u7AEF\u8FD0\u884C hermes uninstall \u5378\u8F7D\u6E90\u7801\u5B89\u88C5\uFF1B\u4FDD\u7559\u914D\u7F6E\u4E0E\u5386\u53F2\u65F6\u6309\u5411\u5BFC\u9009\u62E9\u3002\u684C\u9762/MSIX \u5B89\u88C5\u8BF7\u4F7F\u7528\u7CFB\u7EDF\u5E94\u7528\u7BA1\u7406\u3002"
@@ -522,7 +525,10 @@ var OFFICIAL_TOOLS = Object.freeze([
         shell: "powershell",
         scriptUrl: "https://hermes-agent.nousresearch.com/install.ps1",
         platforms: ["win32"],
-        supportsInstallDir: false,
+        supportsInstallDir: true,
+        installDirSubdir: "hermes-agent",
+        installDirSuffix: ".hermes/bin",
+        installArg: ["-InstallDir"],
         extraArgs: ["-NonInteractive"],
         verify: Object.freeze({ mustInclude: ["https://github.com/NousResearch/hermes-agent.git", "hermes_cli/source_completion.py"] }),
         uninstallUnsupportedReason: "\u8BF7\u5728\u5B98\u65B9\u5DE5\u5177\u7EC8\u7AEF\u8FD0\u884C hermes uninstall \u5378\u8F7D\u6E90\u7801\u5B89\u88C5\uFF1B\u4FDD\u7559\u914D\u7F6E\u4E0E\u5386\u53F2\u65F6\u6309\u5411\u5BFC\u9009\u62E9\u3002\u684C\u9762/MSIX \u5B89\u88C5\u8BF7\u4F7F\u7528\u7CFB\u7EDF\u5E94\u7528\u7BA1\u7406\u3002"
@@ -12864,7 +12870,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.21.0" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.21.1" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -14575,7 +14581,14 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         void workbench.rerun(runId, packageId, override, choice);
       }
     }
-  )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view", role: "tabpanel", id: "mr-panel-models", "aria-labelledby": "mr-tab-models", hidden: view !== "models" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react5.default.createElement("h2", null, "\u6A21\u578B\u914D\u7F6E"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u4ECE\u5B98\u65B9\u76EE\u5F55\u9009\u62E9\u8DEF\u7EBF\uFF0C\u8865\u9F50\u6BD4\u8F83\u6240\u9700\u7684\u4EF7\u683C\u3001\u80FD\u529B\u4E0E\u6267\u884C\u65B9\u5F0F\u3002")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-grid mr-model-grid" }, /* @__PURE__ */ import_react5.default.createElement(ModelProfileEditor, { routes, settingsScope, onSaved: invalidatePlan }), /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u6A21\u578B\u76EE\u5F55" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u6A21\u578B\u76EE\u5F55"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, routes.length, " \u6761\u8DEF\u7EBF \xB7 \u53EA\u8BFB\u53D6\u5B98\u65B9\u76EE\u5F55\uFF0C\u4E0D\u8BFB\u53D6 API Key\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: catalogState.status === "loading", onClick: refresh }, "\u5237\u65B0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u52A0\u8F7D\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026"), catalogState.status === "ready" && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "\u641C\u7D22\u8DEF\u7EBF"), /* @__PURE__ */ import_react5.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "\u6A21\u578B\u6216\u4F9B\u5E94\u5546" }), /* @__PURE__ */ import_react5.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " \u4E2A\u4F9B\u5E94\u5546\u7684\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u9875\u68C0\u67E5\u914D\u7F6E\u3002")), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "\u76EE\u5F55\u767B\u8BB0\u4E0D\u4EE3\u8868\u51ED\u636E\u6216\u7F51\u7EDC\u5F53\u524D\u53EF\u7528\uFF1B\u56FE\u50CF\u80FD\u529B\u9700\u8981\u5728\u5B9E\u9645\u4F7F\u7528\u524D\u6838\u5BF9\u3002"))))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-tools", "aria-labelledby": "mr-tab-tools", hidden: view !== "tools" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react5.default.createElement("h2", null, "\u5B98\u65B9\u5DE5\u5177"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u7BA1\u7406\u672C\u673A CLI\u3001\u68C0\u67E5\u767B\u5F55\u72B6\u6001\uFF0C\u6216\u6253\u5F00\u4EA4\u4E92\u5F0F\u7EC8\u7AEF\u3002")), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react5.default.createElement(
+  )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view", role: "tabpanel", id: "mr-panel-models", "aria-labelledby": "mr-tab-models", hidden: view !== "models" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react5.default.createElement("h2", null, "\u6A21\u578B\u914D\u7F6E"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u4ECE\u5B98\u65B9\u76EE\u5F55\u9009\u62E9\u8DEF\u7EBF\uFF0C\u8865\u9F50\u6BD4\u8F83\u6240\u9700\u7684\u4EF7\u683C\u3001\u80FD\u529B\u4E0E\u6267\u884C\u65B9\u5F0F\u3002")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-grid mr-model-grid" }, /* @__PURE__ */ import_react5.default.createElement(ModelProfileEditor, { routes, settingsScope, onSaved: invalidatePlan }), /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u6A21\u578B\u76EE\u5F55" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u6A21\u578B\u76EE\u5F55"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, routes.length, " \u6761\u8DEF\u7EBF \xB7 \u53EA\u8BFB\u53D6\u5B98\u65B9\u76EE\u5F55\uFF0C\u4E0D\u8BFB\u53D6 API Key\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: catalogState.status === "loading", onClick: refresh }, "\u5237\u65B0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-empty" }, "\u6B63\u5728\u52A0\u8F7D\u5B98\u65B9\u6A21\u578B\u76EE\u5F55\u2026"), catalogState.status === "ready" && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "\u641C\u7D22\u8DEF\u7EBF"), /* @__PURE__ */ import_react5.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "\u6A21\u578B\u6216\u4F9B\u5E94\u5546" }), /* @__PURE__ */ import_react5.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " \u4E2A\u4F9B\u5E94\u5546\u7684\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u5B98\u65B9\u6A21\u578B\u9875\u68C0\u67E5\u914D\u7F6E\u3002")), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "\u76EE\u5F55\u767B\u8BB0\u4E0D\u4EE3\u8868\u51ED\u636E\u6216\u7F51\u7EDC\u5F53\u524D\u53EF\u7528\uFF1B\u56FE\u50CF\u80FD\u529B\u9700\u8981\u5728\u5B9E\u9645\u4F7F\u7528\u524D\u6838\u5BF9\u3002"))))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-tools", "aria-labelledby": "mr-tab-tools", hidden: view !== "tools" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react5.default.createElement("h2", null, "\u5B98\u65B9\u5DE5\u5177"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u7BA1\u7406\u672C\u673A CLI\u3001\u68C0\u67E5\u767B\u5F55\u72B6\u6001\uFF0C\u6216\u6253\u5F00\u4EA4\u4E92\u5F0F\u7EC8\u7AEF\u3002")), terminalApi && /* @__PURE__ */ import_react5.default.createElement(
+    CliTerminalCard,
+    {
+      api: terminalApi,
+      health: workbench.health.report,
+      settingsSignature: toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)
+    }
+  ), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react5.default.createElement(
     OnboardingBanner,
     {
       health: workbench.health.report,
@@ -14604,13 +14617,6 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       onRefreshHealth: () => {
         void workbench.refreshHealth(true);
       }
-    }
-  ), terminalApi && /* @__PURE__ */ import_react5.default.createElement(
-    CliTerminalCard,
-    {
-      api: terminalApi,
-      health: workbench.health.report,
-      settingsSignature: toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)
     }
   )), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-controls", "aria-labelledby": "mr-tab-controls", hidden: view !== "controls" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react5.default.createElement("h2", null, "\u9884\u7B97\u4E0E\u5B89\u5168"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u8BBE\u7F6E\u6210\u672C\u4E0E\u8D28\u91CF\u7B56\u7565\uFF0C\u6838\u5BF9\u8BA2\u9605\u8BA1\u8D39\u548C\u6267\u884C\u8FB9\u754C\u3002")), /* @__PURE__ */ import_react5.default.createElement(
     CostControlCard,

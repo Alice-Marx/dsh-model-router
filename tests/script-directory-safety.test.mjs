@@ -2,19 +2,44 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { getOfficialTool } from '../.dsh-plugin/shared/official-tool-registry.mjs'
 import { resolveInstallPlan } from '../.dsh-plugin/shared/tool-install-preferences.mjs'
 import { assertVendorInstallDirectory, miniMaxFallbackPlan, probeToolWith } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'router-script-safety-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
+  t.after(() => {
+    assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep))
+    return rm(root, { recursive: true, force: true })
+  })
   return root
 }
 const preferences = root => ({ installDir: root, registry: '', methods: {}, scriptUrls: {}, allowScriptInstall: true })
 const options = root => ({ platform: process.platform, home: root })
 const stepMethod = process.platform === 'win32' ? 'script-powershell' : 'script-bash'
+
+test('Hermes updates accept its source workspace while protecting other packages and launchers', async t => {
+  const root = await fixture(t)
+  const prefs = preferences(root)
+  const tool = getOfficialTool('hermes')
+  const plan = resolveInstallPlan(tool, stepMethod, prefs, options(root))
+  await mkdir(plan.binDir, { recursive: true })
+  const manifest = join(plan.installDir, 'package.json')
+  const sentinel = join(root, 'codex.cmd')
+  await writeFile(sentinel, 'keep shared command')
+  await writeFile(manifest, '{"name":"hermes-agent","private":true}')
+  await assertVendorInstallDirectory(tool, plan, prefs)
+  await assert.rejects(assertVendorInstallDirectory(tool, { ...plan, installDir: root }, prefs), /专属子目录/)
+  await writeFile(manifest, '{"name":"other-project"}')
+  await assert.rejects(assertVendorInstallDirectory(tool, plan, prefs), /其他工具或项目/)
+  await writeFile(manifest, '{"name":"hermes-agent","private":true}')
+  const foreign = join(plan.binDir, 'gemini.cmd')
+  await writeFile(foreign, 'keep foreign launcher')
+  await assert.rejects(assertVendorInstallDirectory(tool, plan, prefs), /Gemini/)
+  assert.equal(await readFile(sentinel, 'utf8'), 'keep shared command')
+  assert.equal(await readFile(foreign, 'utf8'), 'keep foreign launcher')
+})
 
 test('script preflight refuses a shared prefix and leaves other npm files untouched', async t => {
   const root = await fixture(t)

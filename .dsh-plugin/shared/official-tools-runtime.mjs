@@ -594,6 +594,7 @@ export async function assertVendorInstallDirectory(tool, plan, selectedPreferenc
     let name
     try { name = JSON.parse(packageText).name } catch { throw new Error('安装目录已有无法核验归属的 package.json，已停止运行官方脚本。') }
     const ownPackage = tool.package || (tool.id === 'stepcode' ? '@step-harness/coding-agent' : '')
+      || (tool.id === 'hermes' ? 'hermes-agent' : '')
     if (!name || name !== ownPackage) throw new Error('安装目录已有其他工具或项目的 package.json，已停止运行官方脚本。')
   }
   for (const other of OFFICIAL_TOOLS) {

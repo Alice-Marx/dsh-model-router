@@ -171,7 +171,8 @@ test('every configurable vendor script owns a tool directory while npm keeps the
       assert.ok(method.installDirSubdir, `${tool.id}/${method.id} declares its owned directory`)
       assert.equal(resolveInstallLocation(tool, method, preferences, { platform, home: HOME }).dir, plan.binDir)
       if (method.uninstallUnsupportedReason) {
-        assert.throws(() => resolveUninstallPlan(tool, method.id, preferences, { platform, home: HOME }), /目录联接/)
+        assert.throws(() => resolveUninstallPlan(tool, method.id, preferences, { platform, home: HOME }),
+          error => error.message === method.uninstallUnsupportedReason)
       } else {
         assert.equal(resolveUninstallPlan(tool, method.id, preferences, { platform, home: HOME }).dir, plan.binDir)
       }

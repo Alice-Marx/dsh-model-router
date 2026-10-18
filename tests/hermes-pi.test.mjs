@@ -4,8 +4,8 @@ import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { getOfficialTool, installMethodFor, toolForProvider } from '../.dsh-plugin/shared/official-tool-registry.mjs'
-import { resolveInstallPlan, resolveUninstallPlan } from '../.dsh-plugin/shared/tool-install-preferences.mjs'
-import { vendorScriptInvocation, planCommandLine, verifiedVendorScript } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
+import { resolveInstallLocation, resolveInstallPlan, resolveUninstallPlan } from '../.dsh-plugin/shared/tool-install-preferences.mjs'
+import { vendorScriptInvocation, planCommandLine, verifiedVendorScript, probeToolWith } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 import { resolveTerminalLaunch } from '../.dsh-plugin/shared/cli-terminal.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { checkLogin, LOGIN_GUIDES } from '../.dsh-plugin/shared/tool-health.mjs'
@@ -65,9 +65,10 @@ test('hermes binary locations and uninstall rejection', () => {
   }
 
   const custom = resolveInstallPlan(hermes, undefined, { installDir: 'D:/AI/tools' }, { platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/test' })
-  assert.equal(normalize(custom.binDir), 'C:/data/hermes/bin')
+  assert.equal(normalize(custom.installDir), 'D:/AI/tools/hermes-agent')
+  assert.equal(normalize(custom.binDir), 'D:/AI/tools/hermes-agent/.hermes/bin')
   assert.equal('HERMES_HOME' in custom.env, false)
-  assert.ok(custom.notices.length > 0)
+  assert.ok(custom.notices.some(note => note.includes('源码安装目录') && note.includes('插件启动器目录') && note.includes('不迁移')))
 
   assert.throws(() => resolveUninstallPlan(hermes, undefined, { installDir: 'D:/AI/tools' }, { platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/test' }), /hermes uninstall/)
 })
@@ -105,11 +106,80 @@ test('windows hermes terminal launch uses injected file checks', async () => {
     env: { HERMES_HOME: 'C:/data/hermes' },
     home: 'C:/Users/test',
     preferences: { installDir: 'D:/AI/tools' },
-    fileExists: async path => normalize(path) === 'C:/data/hermes/bin/hermes.exe',
+    fileExists: async path => normalize(path) === 'D:/AI/tools/hermes-agent/.hermes/bin/hermes.exe',
     locate: throwFn,
   })
   assert.deepEqual(launch.args, ['auth'])
+  assert.equal(normalize(launch.file), 'D:/AI/tools/hermes-agent/.hermes/bin/hermes.exe')
+})
+
+test('hermes installer argv and locations keep custom source separate from existing data', () => {
+  const hermes = getOfficialTool('hermes')
+  const source = 'D:/AI tools/hermes-agent'
+  for (const [methodId, platform, stage, flag] of [
+    ['script-powershell', 'win32', 'C:/temp/install.ps1', '-InstallDir'],
+    ['script-bash', 'linux', '/tmp/install.sh', '--dir'],
+  ]) {
+    const options = { platform, home: '', env: {} }
+    const prefs = { installDir: 'D:/AI tools' }
+    const plan = resolveInstallPlan(hermes, methodId, prefs, options)
+    assert.equal(plan.installDir, source, 'source selection does not depend on a user-home path')
+    assert.deepEqual(plan.env, {}, 'do not relocate or override the data home')
+    const invocation = vendorScriptInvocation(plan, stage)
+    assert.deepEqual(invocation.args.slice(invocation.args.indexOf(stage) + 1), [flag, source, ...plan.extraArgs])
+    assert.ok(planCommandLine(plan).includes(`${flag} '${source}'`))
+    assert.ok(planCommandLine(plan).includes(plan.extraArgs[0]))
+    const location = resolveInstallLocation(hermes, plan.method, prefs, options)
+    assert.equal(location.installDir, source)
+    assert.equal(location.dir, `${source}/.hermes/bin`)
+  }
+})
+
+test('hermes default installation preserves its original global launcher and omits source flags', async () => {
+  const options = { platform: 'win32', home: 'C:/Users/test', env: { HERMES_HOME: 'C:/data/hermes' } }
+  const plan = resolveInstallPlan(getOfficialTool('hermes'), undefined, {}, options)
+  assert.equal(plan.installDir, '')
+  assert.equal(plan.binDir, 'C:/data/hermes/bin')
+  assert.deepEqual(vendorScriptInvocation(plan, 'staged.ps1').args.slice(-2), ['staged.ps1', '-NonInteractive'])
+  assert.equal(resolveInstallLocation(getOfficialTool('hermes'), plan.method, {}, options).dir, plan.binDir)
+  const launch = await resolveTerminalLaunch('hermes', 'login', {
+    ...options, preferences: {}, locate: throwFn,
+    fileExists: async path => normalize(path) === 'C:/data/hermes/bin/hermes.exe',
+  })
   assert.equal(normalize(launch.file), 'C:/data/hermes/bin/hermes.exe')
+  assert.deepEqual(launch.args, ['auth'])
+})
+
+test('hermes custom terminal refuses the old global copy when the selected launcher is absent', async () => {
+  await assert.rejects(resolveTerminalLaunch('hermes', 'interactive', {
+    platform: 'win32', home: 'C:/Users/test', env: { HERMES_HOME: 'C:/data/hermes' },
+    preferences: { installDir: 'D:/AI/tools' }, locate: throwFn,
+    fileExists: async path => normalize(path) === 'C:/data/hermes/bin/hermes.exe',
+  }), /hermes-agent.*重新体检或安装/)
+})
+
+test('hermes custom version probe only runs the source-bound launcher', async () => {
+  const hermes = getOfficialTool('hermes')
+  const preferences = { installDir: 'D:/AI/tools' }
+  const plan = resolveInstallPlan(hermes, undefined, preferences, { platform: process.platform, home: '/test', env: {} })
+  const expected = `${normalize(plan.binDir)}/hermes${process.platform === 'win32' ? '.exe' : ''}`
+  let calls = 0
+  const runner = async (target, args) => {
+    calls++
+    assert.equal(normalize(target), expected)
+    assert.deepEqual(args, ['--version'])
+    return { ok: true, stdout: 'hermes 0.22.2', stderr: '', code: 0 }
+  }
+  const result = await probeToolWith(hermes, runner, {
+    plan, preferences, cache: new Map(), fileExists: async path => normalize(path) === expected,
+  })
+  assert.equal(result.installed, true)
+  assert.equal(result.version, '0.22.2')
+  assert.equal(calls, 1)
+  const oldOnly = await probeToolWith(hermes, throwFn, {
+    plan, preferences, cache: new Map(), fileExists: async path => normalize(path) === 'C:/data/hermes/bin/hermes.exe',
+  })
+  assert.equal(oldOnly.installed, false)
 })
 
 test('pi manifest fixture launch', async t => {

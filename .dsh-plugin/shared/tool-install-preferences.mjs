@@ -166,6 +166,10 @@ export function parseInstallPreferences(config = {}, { tools = [], home = '', en
 
 /** Where a script install puts the binary: the user's directory, else the vendor default. */
 export function scriptInstallDir(tool, preferences, { home = '', env = {}, method } = {}) {
+  // Only a chosen root overrides Hermes' source location. Its user home and
+  // default global command directory remain owned by the vendor installer.
+  if (tool?.id === 'hermes') return preferences?.installDir
+    ? joinPath(preferences.installDir, method?.installDirSubdir || 'hermes-agent') : ''
   const binaryDir = vendorScriptDir(tool, { home, env, method })
   if (!binaryDir) return ''
   if (preferences?.installDir) return method?.installDirSubdir ? joinPath(preferences.installDir, method.installDirSubdir) : preferences.installDir
@@ -285,6 +289,9 @@ export function resolveInstallPlan(tool, methodId, preferences = {}, { platform 
       : target ? [] : installDir
       ? [`${method.label} 无法使用自定义安装目录（官方脚本写死了安装路径），将安装到 ${vendorScriptDir(tool, { home, env, method })}。`]
       : []
+    if (tool.id === 'hermes' && target) {
+      notices.push(`Hermes 源码安装目录：${target}；插件启动器目录：${binDir}。配置、登录和历史保留原位置，不迁移现有数据；官方安装器可能更新全局命令使其指向所选源码。`)
+    }
     if (method.registryEnv === 'MCODE_NPM_REGISTRY' && preferences.registry && !minimaxScriptRegistry(preferences.registry)) {
       notices.push('MiniMax 官方脚本只接受 https://registry.npmjs.org/ 或 https://registry.npmmirror.com/，本次不改写它的 npm 源。')
     }
@@ -360,10 +367,11 @@ export function resolveInstallLocation(tool, method, preferences = {}, { home = 
   if (method.kind === 'script') {
     // A method that cannot honour the configured directory always lands in the
     // vendor's own location, whatever the user typed.
-    const dir = methodHonoursInstallDir(method)
+    const target = methodHonoursInstallDir(method)
       ? scriptInstallDir(tool, preferences, { home, env, method })
-      : vendorScriptDir(tool, { home, env, method })
-    const binDir = methodHonoursInstallDir(method) && method.installDirSuffix ? joinPath(dir, method.installDirSuffix) : dir
+      : ''
+    const dir = target || vendorScriptDir(tool, { home, env, method })
+    const binDir = target && method.installDirSuffix ? joinPath(target, method.installDirSuffix) : dir
     return { kind: 'script', dir: binDir, installDir: dir, binaries: [...(method.scriptBinaryNames ?? tool.scriptBinaryNames ?? [])] }
   }
   return { kind: 'package-manager', dir: packageManagerBinDir(preferences?.installDir || '', { platform }), installDir: preferences?.installDir || '', binaries: [] }

@@ -4,7 +4,7 @@
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
 
-Current version: **0.21.0** (`@ljwei-stak/dsh-model-router`). This release adds Hermes Agent and Pi installation, updates, discovery and interactive terminals, and switches OpenCode npm/pnpm installs to the official V2 package. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**. Hermes and Pi do not yet have verified managed runners; real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.21.1** (`@ljwei-stak/dsh-model-router`). Hermes source installs now honor the shared install root without relocating existing user data, and the interactive terminal appears first on the official-tools page. This follows the Hermes/Pi integration and OpenCode V2 package update in 0.21.0. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**. Hermes and Pi do not yet have verified managed runners; real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
 
@@ -40,16 +40,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.21.0
+@ljwei-stak/dsh-model-router@0.21.1
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.21.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.21.1** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.21.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.21.1`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -220,7 +220,7 @@ The CLI team runner is the plugin's own sequential dependency executor. It does 
 | `pi` | Pi | Official npm/pnpm package and interactive terminal; enter `/login` inside Pi; no verified managed runner |
 | `zcode` | ZCode | Windows; approved `workspace-write` |
 
-Hermes uses its [official source installer](https://hermes-agent.nousresearch.com/docs/getting-started/installation) in non-interactive mode, then you run `hermes auth`. Its launcher and user data have separate vendor-managed locations; the shared install directory does not relocate them. Uninstall source installs through `hermes uninstall`. Pi uses [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) through npm/pnpm with `--ignore-scripts` and requires Node.js 22.19 or later. Start `pi`, then enter `/login`. Both tools keep login status unknown until confirmed in their own interface; the plugin does not read their credentials.
+Hermes uses its [official source installer](https://hermes-agent.nousresearch.com/docs/getting-started/installation) in non-interactive mode, then you run `hermes auth`. A configured shared root places its source in `<root>/hermes-agent`; the plugin binds that checkout's `.hermes/bin` launcher and refuses a different old global copy. Existing configuration, login and history stay in their original Hermes home. Without a shared root, vendor defaults remain in use. The installer may refresh its global convenience command to the selected checkout. Uninstall source installs through `hermes uninstall`. Pi uses [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) through npm/pnpm with `--ignore-scripts` and requires Node.js 22.19 or later. Start `pi`, then enter `/login`. Both tools keep login status unknown until confirmed in their own interface; the plugin does not read their credentials.
 
 Installers use fixed official npm packages at each vendor's `@latest`, the vendor's own installer script, or the official publisher-signed Windows ZCode installer. An installation newer than the reported latest is not downgraded. Latest-version lookups are cached for about 12 hours; unavailable lookups leave the version unknown. New vendor releases are not automatically validated by this project. ZCode's installation window still requires you to choose a directory and finish installation.
 

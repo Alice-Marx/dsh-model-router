@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.1 — 2026-10-18
+
+- Honor Hermes custom program directories on Windows and POSIX through the official `-InstallDir` / `--dir` parameter. Place the checkout in the shared root's `hermes-agent` child and bind probes and terminals to its source-local `.hermes/bin` launcher; an old global command cannot satisfy a missing selected installation.
+- Retain existing Hermes configuration, login and history locations. Keep vendor-default discovery when the shared root is empty, preserve old source trees and explain the separate program/data locations. Installation does not migrate user data; the official installer may refresh its global convenience command.
+- Move the official-tools interactive terminal above onboarding and tool maintenance, preserving the existing component and tab/session lifecycle.
+- Add offline directory, installer-argument and selected-entry regressions. Vendor installation and model calls are not part of this release's acceptance.
+
 ## 0.21.0 — 2026-10-18
 
 - Added support for Hermes Agent (NousResearch source installer): includes native Windows PowerShell and POSIX Bash non-interactive flags, vendor-specific launcher and data paths, `hermes auth` authentication flow, and manual uninstall via `hermes uninstall`.

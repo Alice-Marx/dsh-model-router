@@ -1,6 +1,8 @@
 # 模型路由工作台：配置、规划与实际执行
 
-适用版本：`@ljwei-stak/dsh-model-router@0.21.0`。声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
+适用版本：`@ljwei-stak/dsh-model-router@0.21.1`。声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
+
+0.21.1 支持在统一根目录的 `hermes-agent` 子目录安装 Hermes 源码，插件使用该源码内的独立命令入口；保留现有配置、登录及历史数据的位置。官方工具终端移到本页顶部。
 
 0.21.0 新增 Hermes Agent 与 Pi 的安装更新、版本检测及交互终端，OpenCode npm/pnpm 切换至官方 V2 包。Hermes 与 Pi 的登录由各自 CLI 完成，暂不提供经过验证的托管执行器。
 
@@ -164,7 +166,7 @@ MiniMax 官方 Windows 脚本的 `<# ... #>` 是 PowerShell 帮助注释。0.18.
 | Gemini CLI | ✓ | — | — | 支持 |
 | OpenCode | ✓ | bash | — | 包管理器支持；脚本固定 ~/.opencode/bin |
 | Step Code | — | bash | PowerShell | 脚本使用根目录/stepcode |
-| Hermes Agent | — | bash | PowerShell | 厂商管理独立的源码、命令与数据位置；统一目录不迁移这些位置 |
+| Hermes Agent | — | bash | PowerShell | 源码放统一根/hermes-agent；配置和数据仍保留原位置 |
 | Pi | npm/pnpm | — | — | `@earendil-works/pi-coding-agent`；Node.js ≥22.19，安装带 `--ignore-scripts` |
 | ZCode | — | — | — | 官方 Windows 桌面安装窗口中选择 |
 
@@ -199,7 +201,7 @@ MiniMax 官方 Windows 脚本的 `<# ... #>` 是 PowerShell 帮助注释。0.18.
 
 终端清单现覆盖全部十二个注册表工具，包含 Hermes Agent、Pi、OpenCode、Step Code 和 Windows ZCode 内置 TUI。“刷新”重新检测安装状态；启动沿用已保存的安装方式与目录，选定副本不存在时会提示，不改用 PATH 上的其他副本。
 
-Hermes 安装后运行 `hermes auth`；Pi 启动后输入 `/login`，没有独立的 `pi login` 命令。两者的登录状态显示为未知，插件不读取凭据。Hermes 的 Windows 命令目录默认为 `%LOCALAPPDATA%/hermes/bin`（配置 `HERMES_HOME` 时使用其 `bin` 子目录），POSIX 使用 `~/.local/bin`；这些路径由厂商管理。卸载 Hermes 源码安装请在终端使用 `hermes uninstall`，桌面/MSIX 版使用系统应用管理。
+Hermes 安装后运行 `hermes auth`；Pi 启动后输入 `/login`，没有独立的 `pi login` 命令。两者的登录状态显示为未知，插件不读取凭据。Hermes 的 Windows 命令目录默认为 `%LOCALAPPDATA%/hermes/bin`（配置 `HERMES_HOME` 时使用其 `bin` 子目录），POSIX 使用 `~/.local/bin`；未设置统一目录时沿用这些厂商命令目录；设置后，源码安装到统一根/hermes-agent，插件绑定其中的 `.hermes/bin` 入口，不迁移现有配置与历史。卸载 Hermes 源码安装请在终端使用 `hermes uninstall`，桌面/MSIX 版使用系统应用管理。
 
 已安装 **ZCode 桌面版**时，在 ZCode 工具行的“ZCode TUI 独立配置”填写其桌面目录，例如 `D:/Program Files/ZCode`，点击“保存并刷新 TUI 入口”；留空恢复自动检测。核验成功后在官方工具终端选择 **ZCode TUI（桌面版内置）**，使用现有登录环境自行配置模型和插件。无需额外独立 CLI 安装包。内置 CLI 随桌面版更新；ZCode 行可单独“检查并更新桌面版”或“重新安装桌面版”，在官方窗口完成后重新体检。桌面版本与内置 CLI 版本不同，工具行显示桌面版本。
 
