@@ -3,6 +3,8 @@
  * run DAG). Kept free of React so the test suite can import them directly.
  */
 import { budgetCheck, formatUsd as sharedFormatUsd, sanitizeArchivedSpending } from '../shared/run-ledger.mjs'
+import { OFFICIAL_TOOLS } from '../shared/official-tool-registry.mjs'
+import { parsePackageAssignments } from '../shared/package-assignments.mjs'
 
 export const PACKAGE_STATUS = Object.freeze({
   pending: Object.freeze({ label: '待执行', tone: 'pending' }),
@@ -238,8 +240,61 @@ export function billingSwitchText(item) {
   return note.reason
 }
 
-/** Workbench request: routed runs keep their original shape; official teams require a team plan. */
-export function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, executor = 'routed', executionMode = 'read-only', executionEnvironment = 'harness' } = {}) {
+/** Fresh editable targets; the original algorithm plan is never changed. */
+export function initialPackageAssignments(plan) {
+  if (plan?.routingBypassed || plan?.mode === 'direct') return {}
+  const packages = plan?.team?.workPackages ?? []
+  if (!packages.length) return {}
+  return parsePackageAssignments(Object.fromEntries(packages.map(item => [item.id,
+    { kind: 'api', provider: item.recommendedProvider, model: item.recommendedModel }])))
+}
+
+/** Installation and known execution limits are public evidence, not a readiness guarantee. */
+export function manualAssignmentOptions(routes = [], toolSnapshot = null, health = null) {
+  const options = []
+  const seen = new Set()
+  for (const route of routes) {
+    if (!route?.provider || !route?.model) continue
+    const binding = { kind: 'api', provider: route.provider, model: route.model }
+    const value = JSON.stringify(binding)
+    if (seen.has(value)) continue
+    seen.add(value)
+    options.push({ value, binding, label: `${route.provider}/${route.model} · 模型 API`, disabled: false, reason: '' })
+  }
+  for (const tool of OFFICIAL_TOOLS) {
+    const probe = toolSnapshot?.probes?.find(item => item.id === tool.id)
+    const report = health?.tools?.find(item => item.id === tool.id)
+    const ready = toolSnapshot?.readiness?.find(item => item.id === tool.id)
+    const capability = toolSnapshot?.capabilities?.find(item => item.id === tool.id)
+    const installed = probe ? probe.installed === true : report?.installed === true
+    const modes = ready?.readyModes ?? ready?.modes ?? capability?.modes
+    const reason = !installed ? '未安装或安装状态未知'
+      : capability?.supported === false ? capability.reason || '不支持托管执行'
+        : ready?.ready === false ? ready.reason || '执行入口尚未就绪'
+          : Array.isArray(modes) && !modes.includes('read-only') ? '不支持只读任务'
+            : report?.login?.state === 'logged-out' ? '尚未登录' : ''
+    const pending = !reason && ready?.ready !== true ? ' · 待执行预览核验' : ''
+    const binding = { kind: 'tool', toolId: tool.id }
+    options.push({ value: JSON.stringify(binding), binding, disabled: Boolean(reason), reason,
+      label: `${tool.label} · 官方工具默认模型${reason ? `（${reason}）` : pending}` })
+  }
+  return options
+}
+
+/** Workbench request: algorithm callers keep their original request shape. */
+export function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, executor = 'routed', executionMode = 'read-only', executionEnvironment = 'harness', assignmentMode = 'algorithm', packageAssignments, packagePlanKey } = {}) {
+  if (!['algorithm', 'manual'].includes(assignmentMode)) throw new Error('不支持的分配方式。')
+  let manual = null
+  if (assignmentMode === 'manual') {
+    if (mode === 'direct') throw new Error('指定单一模型模式不支持手动工作包分配。')
+    if (typeof packagePlanKey !== 'string' || !packagePlanKey.trim() || packagePlanKey.length > 200) throw new Error('请重新生成工作包后再手动分配。')
+    const assignments = parsePackageAssignments(packageAssignments)
+    if (!assignments) throw new Error('请选择工作包执行目标。')
+    manual = { assignmentMode: 'manual', packagePlanKey, packageAssignments: assignments }
+    executor = 'routed'
+    executionMode = 'read-only'
+    executionEnvironment = 'harness'
+  }
   if (!['routed', 'official-team'].includes(executor)) throw new Error('不支持的执行方式。')
   if (!['read-only', 'workspace-write'].includes(executionMode)) throw new Error('不支持的任务权限。')
   if (executor === 'official-team' && mode !== 'team') throw new Error('官方工具协作需要先在上方选择“团队分工”。')
@@ -254,6 +309,7 @@ export function launchRequest({ task, mode, directRoute, budgetUsd, preset, work
     ...(mode === 'direct' && directRoute ? { provider: directRoute.provider, model: directRoute.model } : { planMode: mode === 'team' ? 'team' : 'single', preset }),
     ...(Number.isFinite(budget) && budget >= 0 ? { budgetUsd: budget } : {}),
     ...(typeof workspace === 'string' && workspace.trim() ? { workspace: workspace.trim() } : {}),
+    ...(manual ?? {}),
   }
 }
 

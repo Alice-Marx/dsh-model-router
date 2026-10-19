@@ -378,6 +378,10 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
   return (
     <>
       <p className="mr-package-route">{item.provider}/{item.model}{item.reassigned ? '（已改派）' : ''}</p>
+      {item.manualAssignment && <p className="mr-caption">手动分配 · {item.manualAssignment.kind === 'tool'
+        ? `官方工具 ${item.manualAssignment.toolId}（厂商默认模型）`
+        : `模型 API ${item.manualAssignment.provider}/${item.manualAssignment.model}`}
+        {item.algorithmRecommendation?.provider ? ` · 原推荐 ${item.algorithmRecommendation.provider}/${item.algorithmRecommendation.model}` : ''}</p>}
       <div className="mr-channel-line"><ChannelText item={item} /><span className="mr-caption">预估 {formatUsd(item.estimatedCost)} · 实际 {cost.budget}{item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : ''}</span></div>
       {cost.reference && <p className="mr-package-copy">{cost.reference}</p>}
       {item.actualModel && <p className="mr-package-copy">CLI 回报模型：{item.actualModel}</p>}

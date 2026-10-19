@@ -6,6 +6,7 @@
  * accepts a command, package name, URL, argument vector, or executable path.
  */
 import { getOfficialTool, installMethodsFor } from './official-tool-registry.mjs'
+import { parsePackageAssignments } from './package-assignments.mjs'
 import {
   parseTerminalRead,
   parseTerminalResize,
@@ -157,6 +158,14 @@ export function parseRunRequest(value) {
   if (request.executionMode !== undefined && !['read-only', 'workspace-write'].includes(request.executionMode)) throw new TypeError('executionMode is invalid')
   if (request.executionEnvironment !== undefined && !['harness', 'cli-native'].includes(request.executionEnvironment)) throw new TypeError('executionEnvironment is invalid')
   const officialTeam = request.executor === 'official-team'
+  if (request.assignmentMode !== undefined && !['algorithm', 'manual'].includes(request.assignmentMode)) throw new TypeError('assignmentMode is invalid')
+  const manual = request.assignmentMode === 'manual'
+  if (manual && (officialTeam || provider || model)) throw new TypeError('manual assignments require routed work packages without an explicit global route')
+  if (!manual && (request.packageAssignments !== undefined || request.packagePlanKey !== undefined)) throw new TypeError('package assignments require manual assignmentMode')
+  const packageAssignments = manual ? parsePackageAssignments(request.packageAssignments) : undefined
+  if (manual && (!packageAssignments || typeof request.packagePlanKey !== 'string' || request.packagePlanKey.length > 200 || !request.packagePlanKey)) {
+    throw new TypeError('manual assignments require packageAssignments and a current packagePlanKey')
+  }
   if (officialTeam && (request.planMode !== 'team' || provider || model)) throw new TypeError('official-team requires a team plan without an explicit route')
   if (!officialTeam && request.executionMode === 'workspace-write') throw new TypeError('workspace-write requires official-team')
   if (request.executionEnvironment === 'cli-native' && (!officialTeam || request.executionMode !== 'workspace-write')) {
@@ -170,6 +179,7 @@ export function parseRunRequest(value) {
     ...(officialTeam ? { executor: 'official-team', executionMode: request.executionMode ?? 'read-only',
       ...(request.executionEnvironment === undefined ? {} : { executionEnvironment: request.executionEnvironment }) } : {}),
     ...(provider ? { provider, model } : {}),
+    ...(manual ? { assignmentMode: 'manual', packageAssignments, packagePlanKey: request.packagePlanKey } : {}),
     ...(['single', 'team'].includes(request.planMode) ? { planMode: request.planMode } : {}),
     ...(['economy', 'balanced', 'quality'].includes(request.preset) ? { preset: request.preset } : {}),
     ...(request.budgetUsd !== undefined ? { budgetUsd: request.budgetUsd } : {}),

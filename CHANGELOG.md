@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.22.0 — 2026-10-19
+
+- Add an explicit algorithm/manual assignment choice after task decomposition. Manually select an exact model API or registered official tool for every package, retain the original recommendation and dependencies, restore recommendations, and invalidate stale execution previews after edits.
+- Validate the entire assignment before the first paid request, recompute per-package API estimates, check tool readiness, and execute the prepared plan. Manual APIs use adapter-default effort and stay pinned through budget checks and JSON validation; manual tools use their own default model and never silently fall back to API. Mixed execution is read-only; editable official teams retain their existing isolated-worktree lifecycle.
+- Persist manual intent and original recommendations with actual channels, model evidence and costs. Retries retain selected targets, preserve completed upstream results even when their model leaves the catalog, and revalidate image capabilities after reassignment.
+- Import explicit objective training evidence for task-related quality estimates and compare model/effort actions only with enough matching evidence. Learn empirical P90 token and duration resources from complete successful records, retaining conservative cold-start and missing-price fallbacks.
+- Improve bounded DAG assignment search using future dependency boundaries, safe prefix dominance and optimistic handoff ranking. Beam search remains approximate, and synthetic/oracle tests do not establish production answer-quality or cost gains.
+- Carry exact supported API effort IDs into execution, distinguish requested controls from unverified backend effort, and prevent cross-model effort leakage. Optional JSON-structure validation and one API upgrade default to off and respect subscription and budget restrictions.
+- Retain earlier paid attempts when an upgrade fails or never starts; preserve unknown spending separately. Fix short dependency answers being replaced by truncation markers while keeping the total UTF-8 prompt limit.
+
+Validation: 966 automated tests, 963 passed and 3 platform-dependent skips; 12 real Chromium interactions against offline UI fixtures passed. Frozen pnpm installation, client build/check and package verification passed. No new real provider or vendor CLI model calls were made. An existing Windows multi-process lock test had one transient EPERM during development; isolated rechecks and the final full suite passed, without a lock implementation change. See [release acceptance and limits](docs/releases/0.22.0-validation.md).
+
+Fully quit Harness, including its tray and Host background processes, update the plugin to 0.22.0, and restart.
+
 ## 0.21.1 — 2026-10-18
 
 - Honor Hermes custom program directories on Windows and POSIX through the official `-InstallDir` / `--dir` parameter. Place the checkout in the shared root's `hermes-agent` child and bind probes and terminals to its source-local `.hermes/bin` launcher; an old global command cannot satisfy a missing selected installation.

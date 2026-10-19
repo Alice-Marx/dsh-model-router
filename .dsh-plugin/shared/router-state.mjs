@@ -82,7 +82,8 @@ function invalidRunSpending(run) {
     if (!Array.isArray(run[field])) return true
     for (const item of run[field]) {
       if (!record(item) || (item.ran !== undefined && typeof item.ran !== 'boolean')) return true
-      if (['costUsd', 'referenceCostUsd'].some(name => item[name] !== undefined && item[name] !== null && !nonnegative(item[name]))) return true
+      if (['costUsd', 'referenceCostUsd', 'knownCostUsd'].some(name => item[name] !== undefined && item[name] !== null && !nonnegative(item[name]))) return true
+      if (item.unknownAttemptCount !== undefined && (!Number.isInteger(item.unknownAttemptCount) || item.unknownAttemptCount < 1 || item.unknownAttemptCount > 2)) return true
       if (item.ran === true || nonnegative(item.costUsd)) {
         const at = item.finishedAt ?? run.createdAt
         if (!nonnegative(at) || !Number.isFinite(new Date(at).getTime())) return true

@@ -4,7 +4,7 @@
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
-当前版本：**0.21.1**（`@ljwei-stak/dsh-model-router`）。本版修复 Hermes 源码安装无法使用统一根目录的问题，保留现有用户数据位置，并将官方工具终端放到工具页顶部。沿用 0.21.0 的 Hermes/Pi 接入和 OpenCode V2 包更新。继续兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**。Hermes 与 Pi 暂无经过验证的托管执行器；真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
+当前版本：**0.22.0**（`@ljwei-stak/dsh-model-router`）。新增“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。继续兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
 
 官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
 
@@ -40,16 +40,16 @@
 打开 **插件 → 添加插件**，输入：
 
 ```text
-@ljwei-stak/dsh-model-router@0.21.1
+@ljwei-stak/dsh-model-router@0.22.0
 ```
 
-镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.21.1**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
+镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.22.0**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
 
 也可以通过插件管理器安装本地 `.tgz` 压缩包，或解压后的内部 `package` 目录。两者都必须包含 `package.json` 和 `.dsh-plugin`。历史构建见 [Releases](https://github.com/Alice-Marx/dsh-model-router/releases)，也可按下文从源码构建。
 
 ### 从旧包名升级
 
-旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.21.1`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
+旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.22.0`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
 
 从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 
@@ -331,11 +331,13 @@ actualUsd = (inputTokens × inputPrice + outputTokens × outputPrice
 
 ## 路由算法
 
+手动分配：生成任务建议后，可选择按算法推荐执行，或逐包指定模型 API / 官方工具。参见[手动分配使用说明](docs/MANUAL_TASK_ASSIGNMENT.zh.md)。
+
 规划器是确定性的本地启发式算法，不是训练得到的成功率预测器。它对文本分类、估计复杂度、创建适当的分析/执行/验证/汇总工作包，发现精确的已配置路线，叠加路线配置，并应用能力/质量约束。显式指定路线会跳过与其他路线的比较。目录质量/延迟/风险提示是实验性先验，不是实测成功概率或厂商实时报价。执行当前以文本为主；vision 标签不能证明已有端到端多模态流水线。
 
 ### Token 与价格估计
 
-基础输入 token 为 `max(80, ceil(text.length / 3.7))`，再乘以工作包阶段系数。基础输出为 900，按阶段/推理强度调整，最少 220。这是按文本长度估算，不是厂商 tokenizer。令 `I` 为估计输入总数，`R/W` 为缓存读取/写入部分，`O` 为输出，价格单位为美元/百万 token：
+没有匹配资源证据时，基础输入 token 为 `max(80, ceil(text.length / 3.7))`，再乘以工作包阶段系数。基础输出为 900，按阶段/推理强度调整，最少 220。这是按文本长度估算，不是厂商 tokenizer。匹配的完整历史记录达到样本门槛后，改用经验 P90 资源估计，不再重复乘档位和阶段系数。令 `I` 为估计输入总数，`R/W` 为缓存读取/写入部分，`O` 为输出，价格单位为美元/百万 token：
 
 ```text
 C = ((I − R − W) × p_in + R × p_cache_read
@@ -359,7 +361,7 @@ u = wq × q + wc × costUtility
 assignmentScore = sum(package utility) − 0.015 × crossRouteDependencyEdges
 ```
 
-质量优先使用对应任务类别的 LiveBench 分数，其次整体 LiveBench，最后才是路线配置/目录估值。公共数据刷新默认关闭，需主动启用。人工评分仅影响有界的 `preferenceAdjustment`，不能提高客观质量或满足质量下限。
+质量优先使用足量且匹配的任务客观证据，再回退对应任务类别的 LiveBench 分数、整体 LiveBench、路线配置/目录估值。至少两个 API 档位各有可用任务证据时，才联合比较模型与档位；经验耗时可替换延迟代理项。公共数据刷新默认关闭，需主动启用。人工评分仅影响有界的 `preferenceAdjustment`，不能提高客观质量或满足质量下限。
 
 | 工作包基础类型 | 质量 | 费用 | 延迟 | 领域 | 推理 | 风险 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -374,13 +376,15 @@ assignmentScore = sum(package utility) − 0.015 × crossRouteDependencyEdges
 
 1. 优先保留达到各工作包质量下限的候选。若没有合格候选，保留质量最高的至多三个回退候选，并报告约束放宽。
 2. 每包最多保留 **12 个候选**，包含最低已知费用、最大效用与最高质量的锚点。存在依赖时禁用局部 Pareto 裁剪，因为路线身份会影响交接。
-3. 验证工作包 ID 唯一且依赖按拓扑排序。保留候选的笛卡尔空间大小不超过 **4,096** 时精确搜索；否则采用 **beam width 256**。剩余最小费用用于裁剪不可行前缀；有限预算时，beam 会保护最便宜的可行前缀。
+3. 验证工作包 ID 唯一且依赖按拓扑排序。保留候选的笛卡尔空间大小不超过 **4,096** 时精确搜索；否则采用 **beam width 256**。搜索按未来依赖的模型边界压缩被支配前缀，并用未来交接的乐观估计排序。剩余最小费用用于裁剪不可行前缀；有限预算时，beam 会保护最便宜的可行前缀。
 4. 按字典序比较分配：更少放宽包、更小质量缺口、更高效用、更低费用、更少路线切换，最后稳定的路线顺序。最小费用模式先比较费用，再比较效用。每条跨越 `provider/model` 路线的依赖边从效用中扣除 .015。
 5. 报告搜索元数据与可行性。正预算下若不存在可行分配，仍可返回最小费用备选，但标记 `budgetFeasible: false`。显示了计划不代表预算已满足。
 
 “精确”仅适用于保留下来的候选空间与代理目标。候选上限和 beam 裁剪意味着不能声称在所有已配置模型上全局最优。单元/合成测试验证机制，不证明真实回答质量提升。研究审查使用的公开 2026-06-25 LiveBench 分数/费用表属于汇总数据；未取得逐题配对的质量/费用矩阵，因此不主张真实路由收益。参见[研究](docs/ROUTING_RESEARCH.zh.md)、[推导/实验](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)与[验证规程](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)。
 
-实现：[router.mjs](.dsh-plugin/shared/router.mjs)、[assignment-solver.mjs](.dsh-plugin/shared/assignment-solver.mjs)、[routing-presets.mjs](.dsh-plugin/shared/routing-presets.mjs)、[harness-plan.mjs](.dsh-plugin/shared/harness-plan.mjs) 与 [adaptive-feedback.mjs](.dsh-plugin/shared/adaptive-feedback.mjs)。
+证据导入、回退条件、推理档位与可选 JSON 验收升级的设置参见[算法优化使用说明](docs/ROUTING_ALGORITHM_OPTIMIZATION.zh.md)。验收升级默认关闭，启用后仍需通过计费与预算检查，最多增加一次普通 API 调用。
+
+实现：[router.mjs](.dsh-plugin/shared/router.mjs)、[assignment-solver.mjs](.dsh-plugin/shared/assignment-solver.mjs)、[routing-evidence.mjs](.dsh-plugin/shared/routing-evidence.mjs)、[harness-plan.mjs](.dsh-plugin/shared/harness-plan.mjs) 与 [quality-gates.mjs](.dsh-plugin/shared/quality-gates.mjs)。
 
 <a id="data"></a>
 

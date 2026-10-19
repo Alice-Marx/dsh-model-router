@@ -21,6 +21,8 @@ import { installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
 import { CODE_FILE, npmAttestor } from './npm-attestation.mjs'
 import { normalizeExecutionPreference } from './model-profiles.mjs'
 import { BILLING_MODE_LABEL, billingPlan, detectQuotaExhaustion, vendorKey } from './subscription-billing.mjs'
+import { reasoningExecutionFields, reasoningRouteForAssignment, routeForReasoningSwitch, unsupportedCliReasoning } from './reasoning-execution.mjs'
+import { parsePackageAssignments, packageSelectionFields } from './package-assignments.mjs'
 
 export const MAX_TASK_BYTES = 64_000
 const MAX_ANSWER_CHARS = 48_000
@@ -41,6 +43,17 @@ const BASE_ENV_KEYS = Object.freeze([
 ])
 
 const READ_ONLY_INSTRUCTION = 'Read the task supplied on standard input. Answer in the task language. Do not modify files.'
+
+function additionalApiFields(value) {
+  if (!value || typeof value !== 'object') return {}
+  return {
+    ...(value.notStarted === true ? { notStarted: true } : {}),
+    ...(value.usageIncomplete === true ? { usageIncomplete: true } : {}),
+    ...(value.qualityValidation ? { qualityValidation: value.qualityValidation } : {}),
+    ...(Array.isArray(value.qualityAttempts) ? { qualityAttempts: value.qualityAttempts,
+      ...(typeof value.provider === 'string' && typeof value.model === 'string' ? { provider: value.provider, model: value.model } : {}) } : {}),
+  }
+}
 
 /** Portable headless adapters. Registry tools without an entry here use the verified runner. */
 export const TASK_ADAPTERS = Object.freeze([
@@ -167,8 +180,13 @@ const TRUNCATED = '…（已截断）'
 
 function truncatedTo(value, maxBytes) {
   const textValue = String(value ?? '')
-  if (Buffer.byteLength(textValue, 'utf8') <= maxBytes) return textValue
-  return `${sliceUtf8(textValue, Math.max(0, maxBytes - Buffer.byteLength(TRUNCATED, 'utf8')))}${TRUNCATED}`
+  const limit = Math.max(0, Math.floor(maxBytes) || 0)
+  if (Buffer.byteLength(textValue, 'utf8') <= limit) return textValue
+  const markerBytes = Buffer.byteLength(TRUNCATED, 'utf8')
+  // A marker must not consume more than the whole allocation. Very small
+  // shares keep useful content rather than an oversized or partial marker.
+  if (limit < markerBytes) return sliceUtf8(textValue, limit)
+  return `${sliceUtf8(textValue, limit - markerBytes)}${TRUNCATED}`
 }
 
 function checkedModel(modelId) {
@@ -626,6 +644,8 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
         ok: false, provider, model, preference, channel: 'official-cli', toolId: adapter?.id ?? null, answer: '',
         fallback: null, timedOut, exitCode, paused: true,
         pause: { ...api.pause, ...(detail ? { detail } : {}), ...(fallback.loginRequired ? { loginRequired: true } : {}) },
+        ...reasoningExecutionFields(api),
+        ...additionalApiFields(api),
         error: api.error,
       }
     }
@@ -635,6 +655,8 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
         ok: false, provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
         answer: '', fallback, timedOut, exitCode, error: '执行已取消。', cancelled: true,
         ...(api?.usage ? { usage: api.usage } : {}),
+        ...reasoningExecutionFields(api),
+        ...additionalApiFields(api),
       }
     }
     // A billing-aware fallback can refuse (subscription-only) or explain a switch.
@@ -644,6 +666,9 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
       provider, model, preference, channel: api?.refused ? 'official-cli' : 'harness-llm', toolId: adapter?.id ?? null,
       answer, fallback: note?.reason ? { ...fallback, reason: note.reason } : api?.refused ? { ...fallback, reason: api.error } : fallback, timedOut, exitCode,
       ...(api?.usage ? { usage: api.usage } : {}),
+      ...reasoningExecutionFields(api),
+      ...additionalApiFields(api),
+      ...(api?.notStarted === true ? { notStarted: true } : {}),
       ...(note ? { billingSwitch: note } : {}),
       ...(api?.billing ? { billing: api.billing } : {}),
       error: api?.ok === true && answer.trim() ? undefined : (api?.error || reason),
@@ -676,6 +701,7 @@ function officialSuccess({ route, adapter, preference, answer, exitCode, version
   requestedCliModel = null, reportedModel = null, modelNotice = null, source, sandboxEnforcement }) {
   const actualModel = reportedCliModel(reportedModel)
   return {
+    ...unsupportedCliReasoning(route),
     ok: true,
     provider: route.provider,
     model: route.model,
@@ -952,10 +978,15 @@ async function routeWithBilling(plan, { route, billing = null, apiFallback, ...o
     if (!apiRoute || (sub?.kind === 'plan-key' && apiRoute.provider === sub.route.provider && apiRoute.model === sub.route.model)) {
       return refuse(`${reason.replace(/，?已切换 API Key。$/u, '。')}没有配置可回退的 API 路线（apiRoute）。`, note ? { billingSwitch: { ...note, to: null } } : {})
     }
-    const result = await useApiRoute(apiFallback, { route: apiRoute, task: options.task, signal: options.signal, reason, skipped })
+    const reasoningRoute = routeForReasoningSwitch(route, apiRoute)
+    const originalEffort = typeof route?.reasoningEffort === 'string' && route.reasoningEffort ? route.reasoningEffort : null
+    const result = await useApiRoute(apiFallback, { route: reasoningRoute, task: options.task, signal: options.signal, reason, skipped })
+    const droppedEffort = originalEffort && reasoningRoute.reasoningEffort !== originalEffort ? originalEffort : null
     // Keep the API route that actually ran (pricing); the plan route is recorded separately.
     return {
-      ...base, ...result, billingMode: plan.mode, billing: 'api',
+      ...base, ...result,
+      ...(droppedEffort ? { plannedReasoningEffort: droppedEffort, reasoningEffortStatus: 'unapplied' } : {}),
+      billingMode: plan.mode, billing: 'api',
       ...(note ? { billingSwitch: { ...note, to: 'api' } } : {}),
       ...(sub?.kind === 'plan-key' ? { subscriptionRoute: { ...sub.route } } : {}),
     }
@@ -985,13 +1016,19 @@ async function routeWithBilling(plan, { route, billing = null, apiFallback, ...o
   }
 
   if (sub.kind === 'plan-key') {
+    const reasoningRoute = routeForReasoningSwitch(route, sub.route)
+    const originalEffort = typeof route?.reasoningEffort === 'string' && route.reasoningEffort ? route.reasoningEffort : null
     let attempt
-    try { attempt = await apiFallback({ route: sub.route, task: options.task, signal: options.signal, reason: '编程套餐（订阅）', subscription: true }) }
+    try { attempt = await apiFallback({ route: reasoningRoute, task: options.task, signal: options.signal, reason: '编程套餐（订阅）', subscription: true }) }
     catch (error) { attempt = { ok: false, error: String(error?.message ?? error) } }
+    const droppedEffort = originalEffort && reasoningRoute.reasoningEffort !== originalEffort ? originalEffort : null
     if (attempt?.ok === true && String(attempt.answer ?? '').trim()) {
       return {
         ok: true, ...base, preference: executionPreference(route), channel: 'harness-llm', toolId: null,
         answer: String(attempt.answer).slice(0, MAX_ANSWER_CHARS), fallback: null,
+        ...reasoningExecutionFields(attempt),
+        ...additionalApiFields(attempt),
+        ...(droppedEffort ? { plannedReasoningEffort: droppedEffort, reasoningEffortStatus: 'unapplied' } : {}),
         billing: 'subscription', subscriptionRoute: { ...sub.route },
         ...(attempt.usage ? { usage: attempt.usage } : {}),
       }
@@ -1058,8 +1095,13 @@ ${args?.raw ?? ''}`, vendor)
       if (plan.mode === 'subscription-only') {
         return { ok: false, refused: true, error: reason.replace('已切换 API Key。', '按设置只用订阅，未使用 API Key。'), billingNote: { ...note, to: null } }
       }
-      const api = await apiFallback({ ...args, route: apiRoute ?? args.route })
-      return { ...api, billing: 'api', billingNote: { ...note, to: 'api' } }
+      const reasoningRoute = routeForReasoningSwitch(args.route, apiRoute ?? args.route)
+      const api = await apiFallback({ ...args, route: reasoningRoute })
+      const droppedEffort = typeof args.route?.reasoningEffort === 'string' && args.route.reasoningEffort
+        && reasoningRoute.reasoningEffort !== args.route.reasoningEffort ? args.route.reasoningEffort : null
+      return { ...api,
+        ...(droppedEffort ? { plannedReasoningEffort: droppedEffort, reasoningEffortStatus: 'unapplied' } : {}),
+        billing: 'api', billingNote: { ...note, to: 'api' } }
     }
     if (plan.mode === 'subscription-only') return { ok: false, refused: true, error: `${args?.reason ?? '官方 CLI 执行失败。'}（按设置只用订阅，未回退 API）` }
     // The subscription really ran and failed for another reason: do not spend API money silently.
@@ -1100,7 +1142,7 @@ const DEPENDENCY_ANSWER_BYTES = 7_500
  * The prompt for one work package, always within MAX_TASK_BYTES: the objective
  * is capped first, dependency answers share what the task leaves (each at most
  * DEPENDENCY_ANSWER_BYTES, the remainder split evenly), and the total task is
- * truncated last. Truncated parts end with “（已截断）”.
+ * truncated last. Truncated parts include a marker when their share permits it.
  */
 export function packagePrompt(task, item, completed, maxBytes = MAX_TASK_BYTES) {
   const dependencies = (item.dependsOn ?? []).map(id => completed.find(result => result.id === id)).filter(Boolean)
@@ -1114,13 +1156,17 @@ export function packagePrompt(task, item, completed, maxBytes = MAX_TASK_BYTES) 
   const taskBytes = bytes(String(task))
   const free = Math.max(0, budget - fixed)
   // Dependencies get what they need up to their cap, but never squeeze the task below its share.
-  const wantDeps = dependencies.reduce((sum, dep) => sum + Math.min(bytes(String(dep.answer ?? '')), DEPENDENCY_ANSWER_BYTES), 0)
+  const wanted = dependencies.map(dep => Math.min(bytes(String(dep.answer ?? '')), DEPENDENCY_ANSWER_BYTES))
+  const wantDeps = wanted.reduce((sum, value) => sum + value, 0)
   const depBudget = Math.max(0, Math.min(wantDeps, free - Math.min(taskBytes, MIN_TASK_SHARE_BYTES)))
   let remaining = depBudget
+  let remainingWanted = wantDeps
   const depTexts = dependencies.map((dep, index) => {
-    const share = Math.floor(remaining / (dependencies.length - index))
-    const answer = truncatedTo(String(dep.answer ?? ''), Math.min(DEPENDENCY_ANSWER_BYTES, share))
+    const share = remaining >= remainingWanted ? wanted[index]
+      : Math.min(wanted[index], Math.floor(remaining / (dependencies.length - index)))
+    const answer = truncatedTo(String(dep.answer ?? ''), share)
     remaining -= bytes(answer)
+    remainingWanted -= wanted[index]
     return `${truncatedTo(dep.name, 200)}:\n${answer}`
   })
   const taskText = truncatedTo(String(task), Math.max(0, free - (depBudget - remaining)))
@@ -1146,6 +1192,7 @@ export function assignmentPackages(plan, task) {
       dependsOn: [],
       recommendedProvider: route.provider,
       recommendedModel: route.model,
+      ...(typeof route.reasoningEffort === 'string' && route.reasoningEffort ? { recommendedReasoningEffort: route.reasoningEffort } : {}),
     }]
   }
   const packages = plan?.team?.workPackages
@@ -1157,6 +1204,10 @@ export function assignmentPackages(plan, task) {
     dependsOn: [...(item.dependsOn ?? [])],
     recommendedProvider: item.recommendedProvider,
     recommendedModel: item.recommendedModel,
+    ...(item.type ? { type: item.type } : {}),
+    ...(item.purpose ? { purpose: item.purpose } : {}),
+    ...packageSelectionFields(item),
+    ...(typeof item.recommendedReasoningEffort === 'string' && item.recommendedReasoningEffort ? { recommendedReasoningEffort: item.recommendedReasoningEffort } : {}),
   }))
 }
 
@@ -1172,6 +1223,75 @@ function aggregateOf(results) {
   return { status, packages: results, aggregate }
 }
 
+function checkedPackageSelections(packages, routes, overrides, runVerified, targets) {
+  const preceding = new Set()
+  const selected = {}
+  const effective = packages.map(item => {
+    if (typeof item?.id !== 'string' || item.id !== item.id.trim() || !item.id || item.id.length > 128
+      || /[\u0000-\u001f\u007f]/u.test(item.id) || ['__proto__', 'constructor', 'prototype'].includes(item.id)
+      || preceding.has(item.id) || !Array.isArray(item.dependsOn ?? [])
+      || (item.dependsOn ?? []).some(id => !preceding.has(id))) {
+      throw new TypeError('Work packages require unique ids and topological dependencies')
+    }
+    preceding.add(item.id)
+    const override = Object.hasOwn(overrides, item.id) ? overrides[item.id] : null
+    const next = item.manualAssignment && override?.provider && override?.model
+      ? { ...item, manualAssignment: { kind: 'api', provider: override.provider, model: override.model } } : item
+    if (next.manualAssignment !== undefined) selected[next.id] = next.manualAssignment
+    return next
+  })
+  const normalized = Object.keys(selected).length ? parsePackageAssignments(selected) : undefined
+  for (const [id, target] of Object.entries(normalized ?? {})) {
+    // Retained successful receipts are context, not new execution requests.
+    // Their exact intent still validates above; a removed catalog entry or
+    // unavailable runner must not prevent a different target from retrying.
+    if (targets && !targets.has(id)) continue
+    if (target.kind === 'api' && !routes.some(route => route.provider === target.provider && route.model === target.model)) {
+      throw new TypeError(`Manual API route is not configured for work package ${id}`)
+    }
+    if (target.kind === 'tool' && typeof runVerified !== 'function') {
+      throw new TypeError('Manual official tool assignments require runVerified')
+    }
+  }
+  return effective.map(item => normalized?.[item.id]
+    ? { ...item, ...packageSelectionFields({ ...item, manualAssignment: normalized[item.id] }) } : item)
+}
+
+async function runManualTool(target, prompt, options) {
+  const base = { provider: 'official-tool', model: target.toolId, toolId: target.toolId,
+    channel: 'official-cli', preference: 'official', requestedCliModel: null,
+    modelNotice: '使用所选官方工具配置的默认模型。', fallback: null }
+  try {
+    const raw = await options.runVerified({ toolId: target.toolId, task: prompt, workspace: options.workspace,
+      mode: 'read-only', signal: options.signal })
+    if (!raw || typeof raw.status !== 'string') throw new TypeError('官方工具未返回有效执行状态。')
+    const answer = typeof raw.finalText === 'string' ? raw.finalText : ''
+    const ok = raw.status === 'succeeded' && answer.trim().length > 0
+    const executionEvidence = Number.isFinite(raw.startedAt) || raw.usage != null
+      || (Number.isFinite(raw.reportedCostUsd) && raw.reportedCostUsd > 0)
+    const notStarted = !executionEvidence && (raw.status === 'unsupported' || raw.notStarted === true || raw.blocked === true)
+    return { ...base, ok, answer: answer.slice(0, MAX_ANSWER_CHARS),
+      actualModel: reportedCliModel(raw.actualModel ?? raw.reportedModel),
+      ...(raw.reportedModel !== undefined ? { reportedModel: raw.reportedModel } : {}),
+      ...(raw.usage != null ? { usage: raw.usage } : {}),
+      ...(raw.usageIncomplete === true ? { usageIncomplete: true } : {}),
+      ...(Number.isFinite(raw.reportedCostUsd) && raw.reportedCostUsd >= 0 ? { reportedCostUsd: raw.reportedCostUsd } : {}),
+      ...Object.fromEntries(['credentialSource', 'source', 'sandboxEnforcement', 'executionEnvironment']
+        .filter(key => typeof raw[key] === 'string').map(key => [key, raw[key]])),
+      ...(Number.isInteger(raw.exitCode) ? { exitCode: raw.exitCode } : {}),
+      ...(notStarted ? { notStarted: true } : {}),
+      ...(raw.status === 'cancelled' || options.signal?.aborted ? { cancelled: true } : {}),
+      ...(raw.status === 'timed-out' ? { timedOut: true } : {}),
+      ...(raw.status === 'output-limit' || answer.length > MAX_ANSWER_CHARS ? { truncated: true } : {}),
+      ...(!ok && (raw.diagnostic || raw.outputTail) ? { diagnostic: redactDiagnostic(raw.diagnostic ?? raw.outputTail) } : {}),
+      error: ok ? undefined : redactDiagnostic(raw.error ?? raw.reason ?? (answer.trim() ? '官方工具执行失败。' : '官方工具未返回有效文本。')) }
+  } catch (error) {
+    return { ...base, ok: false, answer: '', actualModel: null, usageIncomplete: true,
+      ...(options.signal?.aborted || error?.name === 'AbortError' ? { cancelled: true } : {}),
+      error: redactDiagnostic(error?.message ?? error) }
+  }
+}
+
 /**
  * Run `targets` (all packages when null) in plan order. Packages outside the
  * target set keep their previous results, so a single failed step can be
@@ -1180,20 +1300,26 @@ function aggregateOf(results) {
 async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, choices = {}, options }) {
   const routeList = Array.isArray(routes) ? routes : []
   const { credentialsFor, onPackage, billing, ...runOptions } = options
+  const effectivePackages = checkedPackageSelections(packages, routeList, overrides, runOptions.runVerified, targets)
   const results = []
   const ranIds = []
-  for (const item of packages) {
+  for (const item of effectivePackages) {
     const kept = previous.find(result => result.id === item.id)
     if (targets && !targets.has(item.id) && kept) {
       results.push(kept)
       continue
     }
-    const override = overrides[item.id]
-    const provider = override?.provider ?? item.recommendedProvider
-    const model = override?.model ?? item.recommendedModel
+    const override = Object.hasOwn(overrides, item.id) ? overrides[item.id] : undefined
+    const selection = packageSelectionFields(item)
+    const target = selection.manualAssignment
+    const provider = target?.kind === 'tool' ? 'official-tool' : target?.provider ?? override?.provider ?? item.recommendedProvider
+    const model = target?.kind === 'tool' ? target.toolId : target?.model ?? override?.model ?? item.recommendedModel
+    const identity = { ...selection, ...(item.type ? { type: item.type } : {}), ...(item.purpose ? { purpose: item.purpose } : {}) }
     if (runOptions.signal?.aborted) {
       // Cancelled: later packages are not started (no CLI process, no API spend).
-      const cancelled = { id: item.id, name: item.name, ok: false, provider, model, channel: 'harness-llm', answer: '', fallback: null, cancelled: true, notStarted: true, error: '执行已取消，此步骤未开始。' }
+      const cancelled = { id: item.id, name: item.name, ok: false, provider, model,
+        channel: target?.kind === 'tool' ? 'official-cli' : 'harness-llm', ...(target?.kind === 'tool' ? { toolId: target.toolId } : {}),
+        ...identity, answer: '', fallback: null, cancelled: true, notStarted: true, error: '执行已取消，此步骤未开始。' }
       results.push(cancelled)
       ranIds.push(item.id)
       if (typeof onPackage === 'function') await onPackage(cancelled)
@@ -1205,7 +1331,8 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
       const waitingOn = unmet.filter(id => { const dep = results.find(result => result.id === id); return dep?.paused || dep?.waiting })
       const blocked = {
         id: item.id, name: item.name, ok: false, provider, model,
-        channel: 'harness-llm', answer: '', fallback: null, blocked: true,
+        channel: target?.kind === 'tool' ? 'official-cli' : 'harness-llm', ...(target?.kind === 'tool' ? { toolId: target.toolId } : {}),
+        ...identity, answer: '', fallback: null, blocked: true,
         ...(waitingOn.length ? { waiting: true } : {}),
         error: waitingOn.length ? `等待上游步骤确认：${waitingOn.join('、')}` : `依赖未完成：${unmet.join('、')}`,
       }
@@ -1214,17 +1341,45 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
       if (typeof onPackage === 'function') await onPackage(blocked)
       continue
     }
-    const route = routeList.find(candidate => candidate.provider === provider && candidate.model === model)
+    const plannedRoute = routeList.find(candidate => candidate.provider === provider && candidate.model === model)
       ?? { provider, model }
-    const credentials = typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null
-    const result = await executeRouteWithBilling({
-      ...runOptions,
-      billing: billing ? { ...billing, routes: billing.routes ?? routeList, ...(choices[item.id] ? { choice: choices[item.id] } : {}) } : null,
-      credentials,
-      route,
-      task: routingBypassed ? checkedTask(task) : packagePrompt(task, item, results),
-    })
-    const entry = { id: item.id, name: item.name, ...(override ? { reassigned: true } : {}), ...result }
+    const route = target?.kind === 'api' ? { ...plannedRoute, execution: 'api', manualPinned: true }
+      : target?.kind === 'tool' ? { provider, model } : reasoningRouteForAssignment(plannedRoute, item, override)
+    if (target?.kind === 'api') delete route.reasoningEffort
+    const promptText = routingBypassed ? checkedTask(task) : packagePrompt(task, item, results)
+    const startedAt = Date.now()
+    let result
+    if (target?.kind === 'tool') result = await runManualTool(target, promptText, runOptions)
+    else if (target?.kind === 'api') result = { ...await useApi(runOptions.apiFallback, { route, task: promptText,
+      signal: runOptions.signal, preference: 'api', reason: '按工作包手动选择模型目录 API。' }), fallback: null }
+    else {
+      const credentials = typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null
+      result = await executeRouteWithBilling({
+        ...runOptions,
+        billing: billing ? { ...billing, routes: billing.routes ?? routeList, ...(choices[item.id] ? { choice: choices[item.id] } : {}) } : null,
+        credentials, route, task: promptText,
+      })
+    }
+    const durationMs = Date.now() - startedAt
+    const plannedEffort = typeof item.recommendedReasoningEffort === 'string' && item.recommendedReasoningEffort
+      ? item.recommendedReasoningEffort
+      : null
+    const effortFields = {
+      ...reasoningExecutionFields(result),
+      ...(plannedEffort && route.reasoningEffort !== plannedEffort
+        ? { plannedReasoningEffort: plannedEffort, reasoningEffortStatus: target?.kind === 'tool' ? 'unsupported' : 'unapplied' }
+        : {}),
+    }
+    const entry = {
+      id: item.id,
+      name: item.name,
+      ...(override ? { reassigned: true } : {}),
+      ...result,
+      ...identity,
+      ...effortFields,
+      ...(Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
+      inputChars: promptText.length,
+    }
     results.push(entry)
     ranIds.push(item.id)
     if (typeof onPackage === 'function') await onPackage(entry)

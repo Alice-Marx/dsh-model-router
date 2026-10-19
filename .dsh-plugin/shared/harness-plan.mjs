@@ -73,8 +73,8 @@ function annotate(channel) {
  */
 export function createPlanFromRoutes(task, availableRoutes, {
   mode = 'single', budgetUsd = 0, installedToolIds = [], runnableToolIds = [],
-  pricing = {}, liveBench = null, liveBenchError = '', dataVersions = null, learning = null, cacheReadRatio = 0, cacheWriteRatio = 0,
-  directProvider = '', directModel = '', preset = 'balanced', loggedOutToolIds = [],
+  pricing = {}, liveBench = null, liveBenchError = '', dataVersions = null, learning = null, routingEvidence = null, cacheReadRatio = 0, cacheWriteRatio = 0,
+  directProvider = '', directModel = '', preset = 'balanced', loggedOutToolIds = [], forceOfficialCli = false,
 } = {}) {
   const taskText = clean(task)
   if (!taskText) throw new Error('task must contain text')
@@ -96,13 +96,23 @@ export function createPlanFromRoutes(task, availableRoutes, {
   const channelOf = (provider, model) => {
     const route = routes.find(item => item.provider === provider && item.model === model)
     const key = `${String(provider ?? '')}\0${String(model ?? '')}\0${route?.execution ?? ''}`
-    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(provider, installedIds, runnableToolIds, route, loggedOutToolIds))
+    if (!channelCache.has(key)) {
+      const tool = forceOfficialCli ? toolForProvider(provider) : null
+      channelCache.set(key, tool ? {
+        kind: 'official-cli', tool: tool.id, label: tool.label,
+        detail: '官方 CLI 团队计划仅通过已核验的官方 CLI 执行；使用厂商默认推理档位。',
+      } : channelForProvider(provider, installedIds, runnableToolIds, route, loggedOutToolIds))
+    }
     return channelCache.get(key)
   }
   const needsImage = detectTaskTypes(taskText).includes('vision')
   const plan = buildPlan({
     text: taskText,
-    available: routes,
+    available: routes.map(route => {
+      const channel = channelOf(route.provider, route.model)
+      return { ...route, executionChannel: channel.kind,
+        reasoningExecution: directRoute ? 'default' : channel.kind === 'harness-llm' ? 'api' : 'unsupported-cli' }
+    }),
     mode: directRoute ? 'single' : selectedMode,
     budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0),
     pricing,
@@ -110,6 +120,7 @@ export function createPlanFromRoutes(task, availableRoutes, {
     liveBenchError,
     dataVersions,
     learning,
+    routingEvidence,
     cacheReadRatio,
     cacheWriteRatio,
     preset,
@@ -157,6 +168,7 @@ export function createPlanFromRoutes(task, availableRoutes, {
         recommendedModel: item.recommended,
         estimatedCost: plan.costBreakdown[index]?.estimatedCost ?? null,
         ...item.recommendedReasoningEffort ? { recommendedReasoningEffort: item.recommendedReasoningEffort } : {},
+        ...item.reasoningExecutionNotice ? { reasoningExecutionNotice: item.reasoningExecutionNotice } : {},
         ...annotate(channelOf(item.recommendedProvider, item.recommended)),
         verificationChecklist: item.purpose === 'synthesis'
           ? ['核对各工作包交付物与依赖', '记录冲突、未解决事项和最终验收结果']

@@ -74,7 +74,16 @@ test('three actual generated seed fixtures aggregate raw counts and preserve nul
     assert.equal(adversarial.notIndependentSamples, true)
     assert.match(adversarial.interpretation, /not independent samples/)
     assert.equal(adversarial.byMethod['beam-256'].comparableFeasibleCases, 6)
-    assert.equal(adversarial.byMethod['beam-256'].optimalFeasibleCases, 0)
+    assert.equal(adversarial.byMethod['beam-256'].optimalFeasibleCases, 6)
+    assert.equal(adversarial.byMethod['beam-256'].feasibleOptimalityRate, 1)
+    assert.equal(adversarial.byMethod['beam-256'].meanFeasibleUtilityGap, 0)
+    assert.equal(adversarial.byMethod['beam-256'].maxFeasibleUtilityGap, 0)
+    // Preserve the remaining width-one tight-budget loss in the raw-count
+    // aggregate; successful wider beams must not hide approximation errors.
+    assert.equal(adversarial.byMethod['beam-1'].comparableFeasibleCases, 6)
+    assert.equal(adversarial.byMethod['beam-1'].optimalFeasibleCases, 3)
+    assert.equal(adversarial.byMethod['beam-1'].feasibleOptimalityRate, 0.5)
+    assert.ok(adversarial.byMethod['beam-1'].meanFeasibleUtilityGap > 0)
     for (const input of INPUTS) {
       assert.equal(first.perSeed[input.seed].seeded.byMethod['auto-exact-4096'].cases, 6)
     }

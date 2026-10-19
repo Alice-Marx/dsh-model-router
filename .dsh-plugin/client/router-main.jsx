@@ -5,7 +5,8 @@ import { acceptedInstallJob, installClickRefusal, installSummaryMatchesSettings,
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
-import { healthSummary, planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
+import { healthSummary, initialPackageAssignments, manualAssignmentOptions, planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
+import { packagePlanKey } from '../shared/package-assignments.mjs'
 import { RunLauncher } from './run-launcher.jsx'
 import { CliTerminalCard } from './cli-terminal.jsx'
 import { remoteErrorText, staleHostNotice } from './host-version.mjs'
@@ -15,7 +16,7 @@ import stylesheet from './router-main.css'
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
 const text = value => typeof value === 'string' ? value.trim() : ''
 const routingSettingsSignature = value => JSON.stringify([
-  value.modelProfilesJson, value.routingPreset,
+  value.modelProfilesJson, value.routingPreset, value.allowManualReassign,
   ...Object.keys(ADAPTIVE_DEFAULTS).map(key => value[key] ?? ADAPTIVE_DEFAULTS[key]),
 ])
 
@@ -62,7 +63,7 @@ function ChannelBadge({ item }) {
   )
 }
 
-function PlanResults({ plan, ledger, headingRef }) {
+export function PlanResults({ plan, ledger, headingRef, assignmentMode = 'algorithm', packageAssignments = {}, assignmentOptions = [], manualAllowed = true, onAssignmentModeChange, onPackageAssignmentChange, onRestoreAssignments }) {
   const selected = plan.selected
   const budget = planBudget(ledger, plan.estimatedCost)
   const packageNames = new Map((plan.team?.workPackages ?? []).map(item => [item.id, item.name]))
@@ -77,42 +78,60 @@ function PlanResults({ plan, ledger, headingRef }) {
       </div>
       <div className="mr-card-body">
         <div className="mr-result-grid">
-          <div className="mr-metric"><div className="mr-metric-label">推荐路线</div><div className="mr-metric-value">{selected ? `${selected.provider}/${selected.model}` : '暂无路线'}</div></div>
+          <div className="mr-metric"><div className="mr-metric-label">{assignmentMode === 'manual' ? '算法原推荐路线' : '推荐路线'}</div><div className="mr-metric-value">{selected ? `${selected.provider}/${selected.model}` : '暂无路线'}</div></div>
           <div className="mr-metric"><div className="mr-metric-label">任务复杂度 · 分值（0–1）</div><div className="mr-metric-value">{{ simple: '简单', balanced: '中等', complex: '复杂' }[plan.complexity.band] || plan.complexity.band} · {plan.complexity.value}</div></div>
-          <div className="mr-metric"><div className="mr-metric-label">估算总成本</div><div className="mr-metric-value">{money(plan.estimatedCost)}</div></div>
+          <div className="mr-metric"><div className="mr-metric-label">{assignmentMode === 'manual' ? '调整前算法方案估算' : '估算总成本'}</div><div className="mr-metric-value">{money(plan.estimatedCost)}</div></div>
           <div className="mr-metric"><div className="mr-metric-label">路由方案</div><div className="mr-metric-value">{ROUTING_PRESETS[plan.preset]?.label ?? '均衡'}</div></div>
         </div>
-        {budget?.exceeded && <p className="mr-error" role="alert">执行前预算检查：{budget.message} 实际执行时将按设置自动降级或暂停询问。</p>}
-        {budget?.limited && !budget.exceeded && budget.estimateKnown && <p className="mr-caption">执行前预算检查：本次预估 {money(plan.estimatedCost)}，剩余额度 {money(budget.remainingUsd)}。</p>}
+        {budget?.exceeded && <p className="mr-error" role="alert">{assignmentMode === 'manual' ? '算法原方案预算提示：' : '执行前预算检查：'}{budget.message} {assignmentMode === 'manual' ? '手动方案将重新预览费用，超预算时暂停确认，不自动替换目标。' : '实际执行时将按设置自动降级或暂停询问。'}</p>}
+        {budget?.limited && !budget.exceeded && budget.estimateKnown && <p className="mr-caption">{assignmentMode === 'manual' ? '算法原方案：' : '执行前预算检查：本次预估 '}{money(plan.estimatedCost)}，剩余额度 {money(budget.remainingUsd)}。</p>}
         {plan.loginRequired && <p className="mr-caption">推荐模型的官方 CLI 未登录，执行时按计费设置暂停或使用模型目录 API；可在“官方工具”卡片点“去登录”。</p>}
         <div className="mr-channel-line">
-          <span className="mr-control-label">执行渠道</span>
+          <span className="mr-control-label">{assignmentMode === 'manual' ? '算法原推荐渠道' : '执行渠道'}</span>
           <ChannelBadge item={plan} />
         </div>
         <details className="mr-plan-explanation"><summary>查看规划依据与估算说明</summary><p className="mr-caption">{plan.reason}</p><p className="mr-caption">{plan.pricingNotice} {plan.qualityNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</p></details>
         {plan.optimization.budgetExceeded && <p className="mr-error">按已提供单价估算，任务可能超过本次预算。预算只影响建议，不会阻止实际扣费。</p>}
-        {plan.mode === 'team' && (
+        {!plan.routingBypassed && plan.team && (
           <>
-            <h3 className="mr-section-title">团队工作包</h3>
-            <p className="mr-caption">下方模型是工作包的规划建议。模型路由按只读方式执行，每步可使用官方 CLI 或模型目录 API；如需编辑文件，可在下方执行区选择“官方工具协作”和“编辑文件”权限。CLI 请求模型名需符合厂商规则，实际模型以运行记录为准。</p>
-            {plan.team.workPackages.length > 1 && <DagView packages={plan.team.workPackages} label="工作包依赖图" renderNode={item => <p className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</p>} />}
+            <h3 className="mr-section-title">{plan.mode === 'team' ? '团队工作包' : '任务工作包'}</h3>
+            <div className="mr-assignment-controls">
+              <div className="mr-segment" role="group" aria-label="工作包分配方式">
+                <button type="button" aria-pressed={assignmentMode === 'algorithm'} onClick={() => onAssignmentModeChange?.('algorithm')}>按算法推荐分配</button>
+                <button type="button" aria-pressed={assignmentMode === 'manual'} disabled={!manualAllowed || !plan.team.workPackages.length} title={!manualAllowed ? '设置中已关闭手动改派' : '为每个工作包选择模型 API 或官方工具'} onClick={() => onAssignmentModeChange?.('manual')}>手动调整分配</button>
+              </div>
+              {assignmentMode === 'manual' && <button className="mr-button mr-button-secondary" type="button" onClick={onRestoreAssignments}>恢复推荐分配</button>}
+            </div>
+            {!manualAllowed && <p className="mr-caption">设置中已关闭手动改派。</p>}
+            <p className="mr-caption">{assignmentMode === 'manual'
+              ? '手动分配可混合模型 API 与官方工具，按依赖执行只读任务；工具使用默认模型。上方费用仍是算法建议估算，手动目标与费用以执行预览为准，预览会核验套餐计费与工具就绪状态。'
+              : '下方模型是工作包的规划建议。模型路由按只读方式执行，每步可使用官方 CLI 或模型目录 API；如需编辑文件，可在下方执行区选择“官方工具协作”和“编辑文件”权限。CLI 请求模型名需符合厂商规则，实际模型以运行记录为准。'}</p>
+            {plan.team.workPackages.length > 1 && <DagView packages={plan.team.workPackages} label="工作包依赖图" renderNode={item => <p className="mr-package-route">算法推荐：{item.recommendedProvider}/{item.recommendedModel}</p>} />}
             {plan.team.workPackages.length === 0
               ? <div className="mr-empty">当前目录没有可分配的模型路线。</div>
               : plan.team.workPackages.map((item, index) => (
-                <details className="mr-package mr-package-details" key={item.id}>
-                  <summary><span className="mr-package-name">{index + 1}. {item.name}</span><span className="mr-package-route">{item.recommendedProvider}/{item.recommendedModel}</span></summary>
+                <details className="mr-package mr-package-details" key={item.id} open={assignmentMode === 'manual' ? true : undefined}>
+                  <summary><span className="mr-package-name">{index + 1}. {item.name}</span><span className="mr-package-route">算法推荐：{item.recommendedProvider}/{item.recommendedModel}</span></summary>
+                  {assignmentMode === 'manual' && <div className="mr-assignment-target">
+                    <label htmlFor={`mr-assignment-${item.id}`}>{item.name} 执行目标</label>
+                    <select className="mr-input" id={`mr-assignment-${item.id}`} value={JSON.stringify(packageAssignments[item.id] ?? {})}
+                      onChange={event => { const option = assignmentOptions.find(candidate => candidate.value === event.target.value && !candidate.disabled); if (option) onPackageAssignmentChange?.(item.id, { ...option.binding }) }}>
+                      <optgroup label="模型目录 API">{assignmentOptions.filter(option => option.binding.kind === 'api').map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}</optgroup>
+                      <optgroup label="官方工具（默认模型）">{assignmentOptions.filter(option => option.binding.kind === 'tool').map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}</optgroup>
+                    </select>
+                  </div>}
                   {item.objective && <p className="mr-package-copy">具体目标：{item.objective}</p>}
                   <p className="mr-package-copy">{purposeLabel[item.purpose] ?? item.purpose}{item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.map(id => packageNames.get(id) ?? id).join('、')}` : ''}</p>
-                  <p className="mr-package-copy">难度：{{ simple: '简单', balanced: '中等', complex: '困难' }[item.difficulty] || item.difficulty || '待评估'} · 费用：{money(item.estimatedCost)}</p>
+                  <p className="mr-package-copy">难度：{{ simple: '简单', balanced: '中等', complex: '困难' }[item.difficulty] || item.difficulty || '待评估'} · {assignmentMode === 'manual' ? '原推荐费用' : '费用'}：{money(item.estimatedCost)}</p>
                   <p className="mr-package-copy">验收：{item.verificationChecklist.join('；')}</p>
-                  <div className="mr-channel-line"><ChannelBadge item={item} />{item.loginRequired && <span className="mr-pill">CLI 未登录</span>}</div>
+                  <div className="mr-channel-line">{assignmentMode === 'manual' && <span className="mr-caption">原推荐渠道：</span>}<ChannelBadge item={item} />{item.loginRequired && <span className="mr-pill">CLI 未登录</span>}</div>
                   {item.channelDetail && <p className="mr-package-copy">渠道说明：{item.channelDetail}</p>}
                 </details>
               ))}
           </>
         )}
         {plan.routingBypassed && <p className="mr-caption">已指定单一模型，未与其他路线比较。在官方会话中调用 <code>model_router_execute</code> 并传入该 provider 与 model 即可直接执行；若该模型允许官方工具，会优先使用对应 CLI。</p>}
-        {plan.mode === 'team' && <p className="mr-caption">{plan.team.handoff}</p>}
+        {plan.mode === 'team' && assignmentMode !== 'manual' && <p className="mr-caption">{plan.team.handoff}</p>}
       </div>
     </section>
   )
@@ -842,6 +861,8 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const [budget, setBudget] = React.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0))
   const [query, setQuery] = React.useState('')
   const [plan, setPlan] = React.useState(null)
+  const [assignmentMode, setAssignmentMode] = React.useState('algorithm')
+  const [packageAssignments, setPackageAssignments] = React.useState({})
   const [planError, setPlanError] = React.useState('')
   const [toolProbes, setToolProbes] = React.useState(null)
   const [routingSettings, setRoutingSettings] = React.useState(() => {
@@ -900,9 +921,16 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   React.useEffect(() => { setPlan(null); setPlanError('') }, [routingSettings])
   const dataRevision = workbench.ledger.value?.dynamicData?.revision ?? ''
   const feedbackRevision = workbench.ledger.value?.learning?.revision ?? ''
+  const evidenceRevision = workbench.ledger.value?.routingEvidence?.revision ?? ''
+  const manualAllowed = workbench.ledger.value?.settings?.allowManualReassign !== false
+    && settingsScope.getSnapshot().value?.allowManualReassign !== false
   React.useEffect(() => {
-    if (plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}`) { setPlan(null); setPlanError('') }
-  }, [dataRevision, feedbackRevision, plan])
+    setAssignmentMode('algorithm')
+    setPackageAssignments({})
+  }, [plan, task, mode, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools, manualAllowed])
+  React.useEffect(() => {
+    if (plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}/${evidenceRevision}`) { setPlan(null); setPlanError('') }
+  }, [dataRevision, feedbackRevision, evidenceRevision, plan])
 
   React.useEffect(() => {
     mounted.current = true
@@ -918,6 +946,23 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   }, [])
 
   const routes = routesFromModelCatalog(catalogState.catalog)
+  const assignmentOptions = manualAssignmentOptions(routes, toolProbes, workbench.health.report)
+  const currentPackagePlanKey = packagePlanKey(plan, task)
+  const effectiveAssignmentMode = assignmentMode === 'manual' && currentPackagePlanKey && manualAllowed && mode !== 'direct' ? 'manual' : 'algorithm'
+  const changeAssignmentMode = next => {
+    if (next === 'manual') {
+      if (!manualAllowed || !currentPackagePlanKey) return
+      setPackageAssignments(initialPackageAssignments(plan))
+      setAssignmentMode('manual')
+    } else {
+      setAssignmentMode('algorithm')
+      setPackageAssignments({})
+    }
+  }
+  const changePackageAssignment = (id, binding) => {
+    if (!manualAllowed || effectiveAssignmentMode !== 'manual' || !plan.team.workPackages.some(item => item.id === id)) return
+    setPackageAssignments(previous => ({ ...previous, [id]: binding }))
+  }
   const providerCount = new Set(routes.map(route => route.provider)).size
   const refresh = async () => {
     const request = ++catalogRequest.current
@@ -966,6 +1011,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
       const next = createWorkspacePlan(task, catalogState.catalog, {
         ...ledger.routingData,
         learning: ledger.learning,
+        routingEvidence: ledger.routingEvidence,
         mode,
         ...(direct ? { directProvider: direct.provider, directModel: direct.model } : {}),
         budgetUsd: parsedBudget,
@@ -975,7 +1021,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         preset: settingsScope.getSnapshot().value?.routingPreset ?? 'balanced',
         loggedOutToolIds: (workbench.health.report?.tools ?? []).filter(item => item.installed && item.login?.state === 'logged-out').map(item => item.id),
       })
-      setPlan({ ...next, workbenchRevision: `${ledger.dynamicData?.revision ?? ''}/${ledger.learning?.revision ?? ''}` })
+      setPlan({ ...next, workbenchRevision: `${ledger.dynamicData?.revision ?? ''}/${ledger.learning?.revision ?? ''}/${ledger.routingEvidence?.revision ?? ''}` })
     } catch (error) {
       if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return
       setPlan(null)
@@ -1037,9 +1083,13 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           </aside>
         </div>
 
-        {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} headingRef={resultHeading} />}
+        {plan && <PlanResults plan={plan} ledger={workbench.ledger.value} headingRef={resultHeading}
+          assignmentMode={effectiveAssignmentMode} packageAssignments={packageAssignments} assignmentOptions={assignmentOptions} manualAllowed={manualAllowed}
+          onAssignmentModeChange={changeAssignmentMode} onPackageAssignmentChange={changePackageAssignment}
+          onRestoreAssignments={() => { if (manualAllowed && currentPackagePlanKey) setPackageAssignments(initialPackageAssignments(plan)) }} />}
         <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun}
-          planningRevision={`${routingSettings}/${dataRevision}/${feedbackRevision}`}
+          planningRevision={`${routingSettings}/${dataRevision}/${feedbackRevision}/${evidenceRevision}`}
+          assignmentMode={effectiveAssignmentMode} packageAssignments={effectiveAssignmentMode === 'manual' ? packageAssignments : {}} packagePlanKey={currentPackagePlanKey}
           directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}
           defaultPreset={settingsScope.getSnapshot().value?.routingPreset ?? 'balanced'}
           disabledReason={catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '模型目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在官方“模型”页配置至少一条模型路线。' : ''}

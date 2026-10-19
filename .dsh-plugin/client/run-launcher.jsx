@@ -16,29 +16,34 @@ const STATUS_TEXT = Object.freeze({
  * Routed runs are read-only; official teams can use an isolated editable
  * worktree. Nothing starts before the user presses the confirm button.
  */
-export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason, planningRevision }) {
+export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason, planningRevision, assignmentMode = 'algorithm', packageAssignments = {}, packagePlanKey }) {
   const [preset, setPreset] = React.useState(defaultPreset || 'balanced')
   const [executor, setExecutor] = React.useState('routed')
   const [executionMode, setExecutionMode] = React.useState('read-only')
   const [executionEnvironment, setExecutionEnvironment] = React.useState('harness')
+  const manual = assignmentMode === 'manual' && mode !== 'direct'
+  const runExecutor = manual ? 'routed' : executor
+  const runMode = manual ? 'read-only' : executionMode
+  const runEnvironment = manual ? 'harness' : executionEnvironment
+  const runPreset = manual ? defaultPreset || 'balanced' : preset
   const lastWorkspace = [...(ledger?.runs ?? [])].map(run => run.workspace).find(Boolean) ?? ''
   const [workspace, setWorkspace] = React.useState('')
   const [phase, setPhase] = React.useState({ kind: 'idle' })
   const mounted = React.useRef(true)
   const confirmRef = React.useRef(null)
   const pendingRequest = React.useRef(0)
-  const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, preset, workspace, lastWorkspace, planningRevision, disabledReason, executor, executionMode, executionEnvironment])
+  const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey, packageAssignments])
   const latestSignature = React.useRef(inputSignature)
   latestSignature.current = inputSignature
   React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; pendingRequest.current += 1 } }, [])
   React.useEffect(() => { setPreset(defaultPreset || 'balanced') }, [defaultPreset])
   React.useEffect(() => {
-    if (mode !== 'team') {
+    if (mode !== 'team' || manual) {
       setExecutor('routed')
       setExecutionMode('read-only')
       setExecutionEnvironment('harness')
     }
-  }, [mode])
+  }, [mode, manual])
   // Any change to the inputs invalidates a shown preview.
   React.useEffect(() => {
     pendingRequest.current += 1
@@ -46,9 +51,11 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   }, [inputSignature])
   React.useEffect(() => { if (phase.kind === 'preview') confirmRef.current?.focus() }, [phase.kind])
 
-  const request = () => launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace: text(workspace) || lastWorkspace, executor, executionMode, executionEnvironment })
+  const request = () => launchRequest({ task, mode, directRoute, budgetUsd, preset: runPreset, workspace: text(workspace) || lastWorkspace,
+    executor: runExecutor, executionMode: runMode, executionEnvironment: runEnvironment,
+    assignmentMode: manual ? 'manual' : 'algorithm', packageAssignments, packagePlanKey })
   const unavailable = typeof previewRun !== 'function' || typeof startRun !== 'function'
-  const blocked = disabledReason || (unavailable ? '工作台执行服务尚未加载，请更新插件后重试。' : !text(task) ? '先在上方“任务规划”中描述任务。' : executor === 'official-team' && mode !== 'team' ? '官方工具协作需要先在上方选择“团队分工”。' : '')
+  const blocked = disabledReason || (unavailable ? '工作台执行服务尚未加载，请更新插件后重试。' : !text(task) ? '先在上方“任务规划”中描述任务。' : manual && !packagePlanKey ? '请重新生成工作包后再手动分配。' : runExecutor === 'official-team' && mode !== 'team' ? '官方工具协作需要先在上方选择“团队分工”。' : '')
   const busy = phase.kind === 'previewing' || phase.kind === 'running'
   // Reruns update the ledger separately from the original startRun response.
   // Only the launcher's own run may replace its displayed terminal status.
@@ -59,7 +66,8 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   const preview = async () => {
     if (blocked || busy) return
     const current = ++pendingRequest.current
-    const snapshot = request()
+    let snapshot
+    try { snapshot = request() } catch (error) { setPhase({ kind: 'error', message: text(error?.message) || '分配设置无效。' }); return }
     const signature = inputSignature
     setPhase({ kind: 'previewing' })
     try {
@@ -99,17 +107,17 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
         <div className="mr-controls">
           <div className="mr-control-group"><span className="mr-control-label" id="mr-launch-executor">执行方式</span>
             <div className="mr-segment" role="group" aria-labelledby="mr-launch-executor">
-              <button type="button" aria-pressed={executor === 'routed'} disabled={busy} onClick={() => { setExecutor('routed'); setExecutionMode('read-only'); setExecutionEnvironment('harness') }}>模型路由（只读）</button>
-              <button type="button" aria-pressed={executor === 'official-team'} disabled={busy || mode !== 'team'} title={mode !== 'team' ? '先在上方选择“团队分工”' : '由官方 CLI 协作执行工作包'} onClick={() => { if (mode === 'team') setExecutor('official-team') }}>官方工具协作</button>
+              <button type="button" aria-pressed={runExecutor === 'routed'} disabled={busy} onClick={() => { setExecutor('routed'); setExecutionMode('read-only'); setExecutionEnvironment('harness') }}>{manual ? '手动分配（只读）' : '模型路由（只读）'}</button>
+              <button type="button" aria-pressed={runExecutor === 'official-team'} disabled={busy || mode !== 'team' || manual} title={manual ? '手动分配按包执行只读任务' : mode !== 'team' ? '先在上方选择“团队分工”' : '由官方 CLI 协作执行工作包'} onClick={() => { if (mode === 'team' && !manual) setExecutor('official-team') }}>官方工具协作</button>
             </div>
           </div>
-          {executor === 'official-team' && <div className="mr-control-group"><span className="mr-control-label" id="mr-launch-permission">任务权限</span>
+          {runExecutor === 'official-team' && <div className="mr-control-group"><span className="mr-control-label" id="mr-launch-permission">任务权限</span>
             <div className="mr-segment" role="group" aria-labelledby="mr-launch-permission">
               <button type="button" aria-pressed={executionMode === 'read-only'} disabled={busy} onClick={() => { setExecutionMode('read-only'); setExecutionEnvironment('harness') }}>只读检查</button>
               <button type="button" aria-pressed={executionMode === 'workspace-write'} disabled={busy} onClick={() => setExecutionMode('workspace-write')}>编辑文件</button>
             </div>
           </div>}
-          {executor === 'official-team' && executionMode === 'workspace-write' && <div className="mr-control-group"><span className="mr-control-label" id="mr-launch-environment">执行环境</span>
+          {runExecutor === 'official-team' && executionMode === 'workspace-write' && <div className="mr-control-group"><span className="mr-control-label" id="mr-launch-environment">执行环境</span>
             <div className="mr-segment" role="group" aria-labelledby="mr-launch-environment">
               <button type="button" aria-pressed={executionEnvironment === 'harness'} disabled={busy} onClick={() => setExecutionEnvironment('harness')}>Harness 受限环境</button>
               <button type="button" aria-pressed={executionEnvironment === 'cli-native'} disabled={busy} onClick={() => setExecutionEnvironment('cli-native')}>厂商 CLI 正常环境</button>
@@ -117,18 +125,18 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
           </div>}
           <div className="mr-control-group"><span className="mr-control-label" id="mr-launch-preset">路由方案</span>
             <div className="mr-segment" role="group" aria-labelledby="mr-launch-preset">
-              {Object.values(ROUTING_PRESETS).map(item => <button key={item.id} type="button" title={item.description} aria-pressed={preset === item.id} disabled={busy || mode === 'direct'} onClick={() => setPreset(item.id)}>{item.label}</button>)}
+              {Object.values(ROUTING_PRESETS).map(item => <button key={item.id} type="button" title={manual ? '手动分配沿用当前建议的方案；更改方案后请重新生成建议。' : item.description} aria-pressed={runPreset === item.id} disabled={busy || mode === 'direct' || manual} onClick={() => setPreset(item.id)}>{item.label}</button>)}
             </div>
           </div>
           <div className="mr-control-group mr-launch-workspace"><label className="mr-control-label" htmlFor="mr-launch-workspace">工作区（绝对路径）</label>
             <input className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '例如 D:\\projects\\demo 或 /home/me/demo'} onChange={event => setWorkspace(event.target.value)} />
           </div>
         </div>
-        <p className="mr-caption">{executor === 'official-team'
+        <p className="mr-caption">{manual ? '手动分配按包执行只读任务，可混合模型 API 与官方工具；工具使用默认模型。所选目标、就绪状态和费用以执行预览为准。' : executor === 'official-team'
           ? `${executionMode === 'workspace-write' ? '编辑文件：各工作包在独立 Git 工作树中使用 CLI 正常工具，完成后整合回所选工作区。' : '只读检查：各工作包使用受限工具集，不修改工作区文件；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。'}失败时不会自动替换为模型目录 API。已登录不代表当前任务权限已就绪，预览会检查可用工具。`
           : mode === 'direct' ? `指定模型：${directRoute ? `${directRoute.provider}/${directRoute.model}` : '未选择'}（跳过路由，方案不生效）` : mode === 'team' ? '团队分工：按依赖执行只读工作包，每步使用可用的官方 CLI 或模型目录 API。' : '单任务：按方案选择一条路线。'}</p>
-        {mode !== 'team' && <p className="mr-caption">使用官方工具协作前，先在上方选择“团队分工”。</p>}
-        {executionEnvironment === 'cli-native' && <p className="mr-caption">厂商 CLI 使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。独立 Git 工作树用于收集改动，不是操作系统读写边界；不会自动切换到此环境。</p>}
+        {mode !== 'team' && !manual && <p className="mr-caption">使用官方工具协作前，先在上方选择“团队分工”。</p>}
+        {runEnvironment === 'cli-native' && <p className="mr-caption">厂商 CLI 使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。独立 Git 工作树用于收集改动，不是操作系统读写边界；不会自动切换到此环境。</p>}
         <div className="mr-actions">
           <button className="mr-button" type="button" disabled={Boolean(blocked) || busy} onClick={() => { void preview() }}>{phase.kind === 'previewing' ? '正在生成预览…' : '预览执行计划'}</button>
           {blocked && <span className="mr-caption">{blocked}</span>}
@@ -157,13 +165,14 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
   const native = (value.executionEnvironment ?? request?.executionEnvironment) === 'cli-native'
   const readOnly = value.readOnly !== false && (value.executionMode ?? request?.executionMode) !== 'workspace-write'
   const blocked = value.status === 'blocked'
+  const manual = request?.assignmentMode === 'manual' || value.assignmentMode === 'manual'
   const blocking = [...new Set([value.reason, ...(Array.isArray(value.blocking) ? value.blocking : [value.blocking])].map(reasonText).filter(Boolean))]
   return (
     <div className="mr-launch-preview" role="region" aria-label="执行预览">
       {changed && <p className="mr-error" role="alert">确认期间情况有变化（例如预算或登录状态），请重新核对下面的确认项。</p>}
       {blocked && <div className="mr-error" role="alert"><strong>当前无法启动执行。</strong>{blocking.length ? <ul>{blocking.map(message => <li key={message}>{message}</li>)}</ul> : <p>执行条件尚未满足，请检查所选权限、工作区和官方工具状态后重新预览。</p>}</div>}
       <div className="mr-result-grid">
-        <div className="mr-metric"><div className="mr-metric-label">{officialTeam ? '执行方式' : '路线'}</div><div className="mr-metric-value">{officialTeam ? '官方工具协作' : value.selected ? `${value.selected.provider}/${value.selected.model}` : '暂无路线'}{value.routingBypassed ? '（指定模型）' : ''}</div></div>
+        <div className="mr-metric"><div className="mr-metric-label">{officialTeam || manual ? '执行方式' : '路线'}</div><div className="mr-metric-value">{manual ? '手动分配 · 按包只读执行' : officialTeam ? '官方工具协作' : value.selected ? `${value.selected.provider}/${value.selected.model}` : '暂无路线'}{value.routingBypassed ? '（指定模型）' : ''}</div></div>
         <div className="mr-metric"><div className="mr-metric-label">预估费用</div><div className="mr-metric-value">{value.estimatedCost === null || value.estimatedCost === undefined ? '价格待配置' : formatUsd(value.estimatedCost)}</div></div>
         <div className="mr-metric"><div className="mr-metric-label">方案</div><div className="mr-metric-value">{ROUTING_PRESETS[value.decision?.preset]?.label ?? '—'}{value.budget?.downgraded ? '（超预算自动降级）' : ''}</div></div>
         <div className="mr-metric"><div className="mr-metric-label">工作区</div><div className="mr-metric-value mr-break"><code>{value.workspace}</code></div></div>
@@ -174,7 +183,10 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
       {value.budget?.message && <p className={value.budget.exceeded ? 'mr-error' : 'mr-caption'}>预算检查：{value.budget.message}</p>}
       {packages.length > 0 && (
         <ol className="mr-launch-packages">
-          {packages.map(item => <li key={item.id}><strong>{item.name}</strong> → {item.route || item.toolLabel || item.toolId || item.tool || '待分配路线'} <span className="mr-caption">（预估 {item.estimatedCost === null || item.estimatedCost === undefined ? '价格待配置' : formatUsd(item.estimatedCost)}{item.channel === 'official-cli' ? ' · 官方 CLI' : item.channel ? ' · 模型目录 API' : ''}）</span>{item.channelDetail && <p className="mr-caption">{item.channelDetail}</p>}</li>)}
+          {packages.map(item => {
+            const tool = item.manualAssignment?.kind === 'tool'
+            return <li key={item.id}><strong>{item.name}</strong>{(manual || item.selectionSource === 'manual') && <span className="mr-pill">手动</span>} → {tool ? `${item.toolLabel || item.toolId || item.manualAssignment.toolId} · 默认模型` : item.route || item.toolLabel || item.toolId || item.tool || '待分配路线'} <span className="mr-caption">（预估 {tool ? '费用未知' : item.estimatedCost === null || item.estimatedCost === undefined ? '价格待配置' : formatUsd(item.estimatedCost)}{item.channel === 'official-cli' ? ' · 官方 CLI' : item.channel ? ' · 模型目录 API' : ''}）</span>{item.channelDetail && <p className="mr-caption">{item.channelDetail}</p>}</li>
+          })}
         </ol>
       )}
       {reasons.length > 0

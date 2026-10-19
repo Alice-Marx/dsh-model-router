@@ -72,6 +72,11 @@
 .mr-package-name { font-size: 12px; font-weight: 750; }
 .mr-package-route { color: var(--mr-accent); font-size: 11px; font-weight: 700; }
 .mr-package-copy { margin: 7px 0 0; color: var(--mr-muted); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.mr-assignment-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.mr-assignment-target { display: grid; gap: 7px; margin: 12px 0; min-width: 0; }
+.mr-assignment-target label { font-size: 12px; font-weight: 650; }
+.mr-assignment-target select { width: 100%; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+.mr-launch-packages .mr-pill { margin-left: 6px; }
 .mr-notice { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(49, 92, 200, .16); border-radius: 12px; background: #eff4ff; color: #354d7a; font-size: 11px; line-height: 1.65; }
 .mr-notice code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }
 @media (max-width: 850px) { .mr-grid { grid-template-columns: 1fr; } .mr-shell { padding: 24px 18px 48px; } }

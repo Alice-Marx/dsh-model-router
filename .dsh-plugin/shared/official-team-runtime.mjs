@@ -12,6 +12,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { runOfficialTool, officialToolExecutionCapabilities, officialToolReadiness } from './official-tool-executor.mjs'
 import { toolForProvider } from './official-tool-registry.mjs'
 import { redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
+import { unsupportedCliReasoning } from './reasoning-execution.mjs'
 
 const MAX_GIT_OUTPUT = 64_000_000
 const GIT_TIMEOUT_MS = 120_000
@@ -455,12 +456,14 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
     if (signal?.aborted) return { status: 'cancelled', workspace: runWorkspace, results: completed,
       ...(isolated ? { baseCommit: isolated.baseCommit } : {}), ...(seeded ? { seeded } : {}) }
     const cliModel = teamCliModel(item, configuredCliModels)
+    const prompt = packagePrompt(task, item, [...context, ...completed])
+    const startedAt = Date.now()
     let result
     try {
       result = await runTool({
         toolId: item.toolId,
         modelId: cliModel,
-        task: packagePrompt(task, item, [...context, ...completed]),
+        task: prompt,
         workspace: runWorkspace,
         mode,
         isolatedRoot: isolated?.isolatedRoot,
@@ -474,6 +477,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       // ledger and retry even when a later adapter rejects before returning.
       result = executionException(error, signal)
     }
+    const durationMs = Date.now() - startedAt
     const reportedModel = reportedCliModel(item.toolId, result.reportedModel)
     const modelMismatch = result.status === 'succeeded' && cliModel && reportedModel
       && cliModel !== reportedModel
@@ -481,6 +485,9 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
     completed.push({ id: item.id, name: item.name,
       ...(item.objective ? { objective: item.objective } : {}), provider: item.recommendedProvider,
       recommendedModel: item.recommendedModel, toolId: item.toolId,
+      ...unsupportedCliReasoning({ reasoningEffort: item.recommendedReasoningEffort }),
+      ...(Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
+      inputChars: prompt.length,
       requestedCliModel: Object.hasOwn(result, 'requestedModel') ? result.requestedModel : cliModel,
       actualModel: reportedModel,
       ...(result.reportedModel !== undefined ? { reportedModel: result.reportedModel } : {}),

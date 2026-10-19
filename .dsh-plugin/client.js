@@ -1052,51 +1052,118 @@ function liveBenchRow(snapshot, model) {
 // .dsh-plugin/shared/assignment-solver.mjs
 var EPSILON = 1e-12;
 var compareText = (a, b2) => a < b2 ? -1 : a > b2 ? 1 : 0;
-var signature = (state) => JSON.stringify(state.choices.map((option) => option.route));
+var choiceSignature = (option) => {
+  if (option.actionId === void 0 && option.effort === void 0 && option.reasoningEffort === void 0) return option.route;
+  return JSON.stringify([option.actionId ?? option.route, option.effort ?? option.reasoningEffort ?? null]);
+};
+var signature = (state) => JSON.stringify(state.choices.map(choiceSignature));
+var compareQuality = (left, right) => left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall;
 function compareStates(left, right, minimizeCost = false) {
   return left.relaxedCount - right.relaxedCount || left.qualityShortfall - right.qualityShortfall || (minimizeCost ? left.cost - right.cost : right.score - left.score) || (minimizeCost ? right.score - left.score : left.cost - right.cost) || left.switches - right.switches || compareText(signature(left), signature(right));
 }
+var dominates = (left, right) => {
+  if (left.cost > right.cost) return false;
+  const quality = compareQuality(left, right);
+  if (quality < 0) return true;
+  if (quality > 0) return false;
+  if (left.score > right.score) return true;
+  if (left.score < right.score) return false;
+  if (left.cost < right.cost) return true;
+  if (left.cost > right.cost) return false;
+  if (left.switches !== right.switches) return left.switches < right.switches;
+  return compareText(signature(left), signature(right)) < 0;
+};
+var dominanceOrder = (left, right) => left.cost - right.cost || compareQuality(left, right) || right.score - left.score || left.switches - right.switches || compareText(signature(left), signature(right));
 function solveCandidateAssignments({ tasks = [], pools = [], budget = Infinity, beamWidth = 256, exactLimit = 4096, handoffPenalty = 0.015, minimizeCost = false } = {}) {
   if (!tasks.length || tasks.length !== pools.length) return null;
+  const taskCount = tasks.length;
+  const taskIndexById = /* @__PURE__ */ new Map();
   const preceding = /* @__PURE__ */ new Set();
-  for (const task of tasks) {
-    if (!task.id || preceding.has(task.id) || (task.dependsOn ?? []).some((id2) => !preceding.has(id2))) {
+  for (let index = 0; index < taskCount; index++) {
+    const task = tasks[index];
+    if (!task || !task.id || preceding.has(task.id) || (task.dependsOn ?? []).some((id2) => !preceding.has(id2))) {
       throw new RangeError("Assignment tasks must have unique ids and known dependencies in topological order");
     }
     preceding.add(task.id);
+    taskIndexById.set(task.id, index);
   }
   const constrained = Number.isFinite(budget);
-  const options = pools.map((pool) => (Array.isArray(pool) ? pool : []).filter((option) => Number.isFinite(option.cost) && option.cost >= 0 && Number.isFinite(option.score) && (!constrained || option.pricingKnown === true)));
+  const options = pools.map((pool) => (Array.isArray(pool) ? pool : []).filter((option) => option && Number.isFinite(option.cost) && option.cost >= 0 && Number.isFinite(option.score) && (!constrained || option.pricingKnown === true)));
   if (options.some((pool) => pool.length === 0)) return null;
-  const suffixMinimum = Array(tasks.length + 1).fill(0);
+  const handoffRoutes = options.map((pool) => pool.map((option) => option.handoffRoute ?? option.route));
+  const maximumScores = options.map((pool) => pool.reduce((best2, option) => Math.max(best2, option.score), -Infinity));
+  const dependencyIndexes = tasks.map((task) => (task.dependsOn ?? []).map((id2) => taskIndexById.get(id2)));
+  const lastUse = new Array(taskCount).fill(-1);
+  for (let index = 0; index < taskCount; index++) {
+    for (const depIndex of dependencyIndexes[index]) {
+      if (index > lastUse[depIndex]) lastUse[depIndex] = index;
+    }
+  }
+  const suffixMinimum = new Array(taskCount + 1).fill(0);
+  const futureRelaxedLower = new Array(taskCount + 1).fill(0);
+  const futureShortfallLower = new Array(taskCount + 1).fill(0);
   let searchSpace = 1;
   let searchSpaceCapped = false;
-  for (let index = tasks.length - 1; index >= 0; index--) {
-    suffixMinimum[index] = suffixMinimum[index + 1] + Math.min(...options[index].map((option) => option.cost));
+  for (let index = taskCount - 1; index >= 0; index--) {
+    let minCost = Infinity;
+    let minRelaxedFlag = 1;
+    let minShortfallAtFlag = Infinity;
+    for (const option of options[index]) {
+      if (option.cost < minCost) minCost = option.cost;
+      const shortfall = Math.max(0, Number(option.qualityShortfall) || 0);
+      const relaxedFlag = shortfall > 0 ? 1 : 0;
+      if (relaxedFlag < minRelaxedFlag || relaxedFlag === minRelaxedFlag && shortfall < minShortfallAtFlag) {
+        minRelaxedFlag = relaxedFlag;
+        minShortfallAtFlag = shortfall;
+      }
+    }
+    suffixMinimum[index] = suffixMinimum[index + 1] + minCost;
+    futureRelaxedLower[index] = futureRelaxedLower[index + 1] + minRelaxedFlag;
+    futureShortfallLower[index] = futureShortfallLower[index + 1] + minShortfallAtFlag;
     const product = searchSpace * options[index].length;
     if (product > Number.MAX_SAFE_INTEGER) searchSpaceCapped = true;
     searchSpace = Math.min(Number.MAX_SAFE_INTEGER, product);
   }
   if (constrained && suffixMinimum[0] > budget + EPSILON) return null;
-  const exact = !searchSpaceCapped && searchSpace <= Math.max(1, exactLimit);
-  const width = Math.max(1, Math.floor(beamWidth) || 256);
-  const search = { method: exact ? "exact" : "beam", exact, searchSpace, searchSpaceCapped, expandedStates: 0, beamPruned: 0 };
+  const parsedExactLimit = Number(exactLimit);
+  const exactThreshold = Number.isFinite(parsedExactLimit) ? Math.max(1, parsedExactLimit) : exactLimit === Infinity ? Number.MAX_SAFE_INTEGER : 4096;
+  const parsedBeamWidth = Number(beamWidth);
+  const width = Number.isFinite(parsedBeamWidth) ? Math.max(1, Math.floor(parsedBeamWidth) || 256) : 256;
+  const exact = !searchSpaceCapped && searchSpace <= exactThreshold;
+  const search = {
+    method: exact ? "exact" : "beam",
+    exact,
+    strategy: exact ? "exact-enumeration" : "boundary-frontier-lookahead",
+    searchSpace,
+    searchSpaceCapped,
+    expandedStates: 0,
+    beamPruned: 0,
+    dominancePruned: 0,
+    peakFrontier: 0,
+    retainedStates: 0,
+    beamWidth: width,
+    approximate: !exact,
+    optimalityScope: "retained input candidate Cartesian space",
+    boundCertified: exact
+  };
+  const unassignedReward = handoffPenalty < 0 ? -handoffPenalty : 0;
   let states = [{ choices: [], routesByTask: /* @__PURE__ */ new Map(), score: 0, cost: 0, switches: 0, relaxedCount: 0, qualityShortfall: 0 }];
-  for (let index = 0; index < tasks.length; index++) {
-    const task = tasks[index];
+  for (let index = 0; index < taskCount; index++) {
     const expanded = [];
     for (const state of states) {
-      for (const option of options[index]) {
+      for (let optionIndex = 0; optionIndex < options[index].length; optionIndex++) {
+        const option = options[index][optionIndex];
         const cost = state.cost + option.cost;
         if (constrained && cost + suffixMinimum[index + 1] > budget + EPSILON) continue;
-        const switches = (task.dependsOn ?? []).reduce((count, dependency) => {
-          const route = state.routesByTask.get(dependency);
-          return count + (route !== void 0 && route !== option.route ? 1 : 0);
-        }, 0);
+        let switches = 0;
+        for (const depIndex of dependencyIndexes[index]) {
+          const route = state.routesByTask.get(tasks[depIndex].id);
+          if (route !== void 0 && route !== handoffRoutes[index][optionIndex]) switches++;
+        }
         const penalty = switches * handoffPenalty;
         const shortfall = Math.max(0, Number(option.qualityShortfall) || 0);
         const routesByTask2 = new Map(state.routesByTask);
-        routesByTask2.set(task.id, option.route);
+        routesByTask2.set(tasks[index].id, handoffRoutes[index][optionIndex]);
         expanded.push({
           choices: [...state.choices, { ...option, handoffPenalty: penalty }],
           routesByTask: routesByTask2,
@@ -1110,20 +1177,402 @@ function solveCandidateAssignments({ tasks = [], pools = [], budget = Infinity, 
       }
     }
     if (!expanded.length) return null;
-    expanded.sort((left, right) => compareStates(left, right, minimizeCost));
-    if (!exact && expanded.length > width) {
-      states = expanded.slice(0, width);
-      if (constrained && index < tasks.length - 1) {
-        const cheapest = expanded.reduce((best2, state) => compareStates(state, best2, true) < 0 ? state : best2);
-        if (!states.includes(cheapest)) states[width - 1] = cheapest;
+    if (exact) {
+      expanded.sort((left, right) => compareStates(left, right, minimizeCost));
+      states = expanded;
+    } else {
+      const groups = /* @__PURE__ */ new Map();
+      for (const state of expanded) {
+        const boundary = [];
+        for (let prev = 0; prev <= index; prev++) {
+          if (lastUse[prev] > index) boundary.push([tasks[prev].id, state.routesByTask.get(tasks[prev].id)]);
+        }
+        const key = JSON.stringify(boundary);
+        const group = groups.get(key);
+        if (group) group.push(state);
+        else groups.set(key, [state]);
       }
-      search.beamPruned += expanded.length - states.length;
-    } else states = expanded;
+      const compressed = [];
+      for (const group of groups.values()) {
+        group.sort(dominanceOrder);
+        const retained = [];
+        for (const candidate of group) {
+          let dominated = false;
+          for (const keeper of retained) {
+            if (dominates(keeper, candidate)) {
+              dominated = true;
+              break;
+            }
+          }
+          if (dominated) search.dominancePruned++;
+          else retained.push(candidate);
+        }
+        for (const state of retained) compressed.push(state);
+      }
+      const scoreUpperCache = /* @__PURE__ */ new Map();
+      const optimisticScore = (state) => {
+        if (scoreUpperCache.has(state)) return scoreUpperCache.get(state);
+        let total = state.score;
+        for (let future = index + 1; future < taskCount; future++) {
+          const deps = dependencyIndexes[future];
+          let unassignedDeps = 0;
+          let assignedCount = 0;
+          const assignedRoutes = /* @__PURE__ */ new Map();
+          for (const depIndex of deps) {
+            if (depIndex > index) unassignedDeps++;
+            else {
+              const route = state.routesByTask.get(tasks[depIndex].id);
+              if (route !== void 0) {
+                assignedCount++;
+                assignedRoutes.set(route, (assignedRoutes.get(route) ?? 0) + 1);
+              }
+            }
+          }
+          if (!assignedCount || handoffPenalty === 0) {
+            total += maximumScores[future] + unassignedReward * unassignedDeps;
+            continue;
+          }
+          let best2 = -Infinity;
+          for (let optionIndex = 0; optionIndex < options[future].length; optionIndex++) {
+            const option = options[future][optionIndex];
+            const matches = assignedRoutes.get(handoffRoutes[future][optionIndex]) ?? 0;
+            let value = option.score - handoffPenalty * (assignedCount - matches);
+            if (unassignedDeps && unassignedReward) value += unassignedReward * unassignedDeps;
+            if (value > best2) best2 = value;
+          }
+          total += best2;
+        }
+        scoreUpperCache.set(state, total);
+        return total;
+      };
+      compressed.sort((left, right) => {
+        const leftRelaxed = left.relaxedCount + futureRelaxedLower[index + 1];
+        const rightRelaxed = right.relaxedCount + futureRelaxedLower[index + 1];
+        if (leftRelaxed !== rightRelaxed) return leftRelaxed - rightRelaxed;
+        const leftShortfall = left.qualityShortfall + futureShortfallLower[index + 1];
+        const rightShortfall = right.qualityShortfall + futureShortfallLower[index + 1];
+        if (leftShortfall !== rightShortfall) return leftShortfall - rightShortfall;
+        const leftScore = optimisticScore(left);
+        const rightScore = optimisticScore(right);
+        const leftCost = left.cost + suffixMinimum[index + 1];
+        const rightCost = right.cost + suffixMinimum[index + 1];
+        if (minimizeCost) {
+          if (leftCost !== rightCost) return leftCost - rightCost;
+          if (leftScore !== rightScore) return rightScore - leftScore;
+        } else {
+          if (leftScore !== rightScore) return rightScore - leftScore;
+          if (leftCost !== rightCost) return leftCost - rightCost;
+        }
+        return compareStates(left, right, minimizeCost);
+      });
+      if (compressed.length > width) {
+        states = compressed.slice(0, width);
+        search.beamPruned += compressed.length - states.length;
+        if (constrained && index < taskCount - 1) {
+          let cheapest = compressed[0];
+          for (const state of compressed) if (compareStates(state, cheapest, true) < 0) cheapest = state;
+          if (!states.includes(cheapest)) states[width - 1] = cheapest;
+        }
+      } else states = compressed;
+    }
+    if (states.length > search.peakFrontier) search.peakFrontier = states.length;
   }
   states.sort((left, right) => compareStates(left, right, minimizeCost));
+  search.retainedStates = states.length;
   const best = states[0];
   const { routesByTask, ...result } = best;
   return { ...result, minimumCostLowerBound: suffixMinimum[0], search };
+}
+
+// .dsh-plugin/shared/routing-evidence.mjs
+var SCHEMA_VERSION = 1;
+var FEATURE_DIMS = 4096;
+var TOKEN_CAP = 512;
+var MAX_TEXT_CHARS = 2e4;
+var MAX_STRING = 200;
+var MAX_EFFORT = 64;
+var MAX_QUALITY_SAMPLES = 1e4;
+var MAX_INPUT_TOKENS = 5e6;
+var MAX_OUTPUT_TOKENS = 2e6;
+var MAX_INPUT_CHARS = 5e6;
+var MAX_DURATION_MS = 864e5;
+var SIM_THRESHOLD = 0.2;
+var MAX_NEIGHBORS = 32;
+var SHRINK_PRIOR = 2;
+var NORM_TOLERANCE = 0.05;
+function isObj(o2) {
+  return o2 !== null && typeof o2 === "object" && !Array.isArray(o2);
+}
+function boundedString(s15, max = MAX_STRING) {
+  return typeof s15 === "string" && s15.length <= max && !/[\u0000-\u001f\u007f]/.test(s15);
+}
+function nonEmpty(s15) {
+  return boundedString(s15) && s15.trim().length > 0;
+}
+function effortOk(s15) {
+  return boundedString(s15, MAX_EFFORT);
+}
+function finite(n) {
+  return typeof n === "number" && Number.isFinite(n);
+}
+function normalizeChannel(c) {
+  if (!nonEmpty(c)) return null;
+  return c === "api" ? "harness-llm" : c;
+}
+function isWordCode(c) {
+  return c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || c === 95;
+}
+function isCjkCode(c) {
+  return c >= 13312 && c <= 19903 || c >= 19968 && c <= 40959 || c >= 63744 && c <= 64255;
+}
+function hashIndex(tok) {
+  let h2 = 2166136261 >>> 0;
+  for (let i = 0; i < tok.length; i++) {
+    h2 ^= tok.charCodeAt(i);
+    h2 = Math.imul(h2, 16777619) >>> 0;
+  }
+  return h2 % FEATURE_DIMS;
+}
+function buildFeatures(text7) {
+  const s15 = text7.length > MAX_TEXT_CHARS ? text7.slice(0, MAX_TEXT_CHARS) : text7;
+  const idxCounts = /* @__PURE__ */ new Map();
+  const seen = /* @__PURE__ */ new Set();
+  const addToken = (tok) => {
+    if (!seen.has(tok)) {
+      if (seen.size >= TOKEN_CAP) return;
+      seen.add(tok);
+    }
+    const h2 = hashIndex(tok);
+    idxCounts.set(h2, (idxCounts.get(h2) || 0) + 1);
+  };
+  let word = "";
+  let cjk = "";
+  const flushWord = () => {
+    if (word) {
+      addToken(word.toLowerCase());
+      word = "";
+    }
+  };
+  const flushCjk = () => {
+    if (cjk) {
+      if (cjk.length === 1) addToken(cjk);
+      else for (let i = 0; i + 1 < cjk.length; i++) addToken(cjk.slice(i, i + 2));
+      cjk = "";
+    }
+  };
+  for (let i = 0; i < s15.length; i++) {
+    const c = s15.charCodeAt(i);
+    if (isWordCode(c)) {
+      flushCjk();
+      word += s15[i];
+    } else if (isCjkCode(c)) {
+      flushWord();
+      cjk += s15[i];
+    } else {
+      flushWord();
+      flushCjk();
+    }
+    if (idxCounts.size >= FEATURE_DIMS) break;
+  }
+  flushWord();
+  flushCjk();
+  let sum = 0;
+  for (const c of idxCounts.values()) sum += c * c;
+  if (sum <= 0) return [];
+  const norm = Math.sqrt(sum);
+  const feats = [];
+  for (const [idx, c] of idxCounts) feats.push([idx, c / norm]);
+  feats.sort((a, b2) => a[0] - b2[0]);
+  return feats;
+}
+function cosine(a, b2) {
+  let na2 = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) na2 += a[i][1] * a[i][1];
+  for (let j2 = 0; j2 < b2.length; j2++) nb += b2[j2][1] * b2[j2][1];
+  const denom = Math.sqrt(na2) * Math.sqrt(nb);
+  if (denom === 0) return 0;
+  let dot = 0;
+  let x = 0;
+  let y = 0;
+  while (x < a.length && y < b2.length) {
+    const ai2 = a[x][0];
+    const bi2 = b2[y][0];
+    if (ai2 === bi2) {
+      dot += a[x][1] * b2[y][1];
+      x++;
+      y++;
+    } else if (ai2 < bi2) x++;
+    else y++;
+  }
+  return dot / denom;
+}
+function validateFeatures(features) {
+  if (!Array.isArray(features) || features.length === 0 || features.length > FEATURE_DIMS) return false;
+  let sum = 0;
+  let prev = -1;
+  for (const pair of features) {
+    if (!Array.isArray(pair) || pair.length !== 2) return false;
+    const idx = pair[0];
+    const w = pair[1];
+    if (!Number.isInteger(idx) || idx < 0 || idx >= FEATURE_DIMS) return false;
+    if (typeof w !== "number" || !Number.isFinite(w) || w <= 0) return false;
+    if (idx <= prev) return false;
+    prev = idx;
+    sum += w * w;
+  }
+  const norm = Math.sqrt(sum);
+  if (!(norm > 0)) return false;
+  return Math.abs(norm - 1) <= NORM_TOLERANCE;
+}
+function validateGroup(g) {
+  if (!isObj(g)) return false;
+  const id2 = g.identity;
+  if (!isObj(id2)) return false;
+  if (!nonEmpty(id2.provider) || !nonEmpty(id2.model)) return false;
+  if (!effortOk(id2.reasoningEffort)) return false;
+  if (!nonEmpty(id2.channel) || normalizeChannel(id2.channel) !== id2.channel) return false;
+  if (!nonEmpty(id2.type)) return false;
+  if (!boundedString(id2.purpose)) return false;
+  if (!Number.isInteger(g.sampleCount) || g.sampleCount < 1 || g.sampleCount > MAX_QUALITY_SAMPLES) return false;
+  for (const k of ["inputTokenRatio", "outputTokens"]) {
+    if (typeof g[k] !== "number" || !Number.isFinite(g[k]) || g[k] < 0) return false;
+  }
+  for (const k of ["durationMs", "promptCharRatio"]) {
+    const v2 = g[k];
+    if (v2 !== null && (typeof v2 !== "number" || !Number.isFinite(v2) || v2 < 0)) return false;
+  }
+  const p90 = g.p90;
+  if (!isObj(p90)) return false;
+  for (const k of ["inputTokenRatio", "outputTokens"]) {
+    if (typeof p90[k] !== "number" || !Number.isFinite(p90[k]) || p90[k] < 0) return false;
+  }
+  for (const k of ["durationMs", "promptCharRatio"]) {
+    const v2 = p90[k];
+    if (v2 !== null && (typeof v2 !== "number" || !Number.isFinite(v2) || v2 < 0)) return false;
+  }
+  for (const k of ["inputTokenRatio", "outputTokens", "durationMs", "promptCharRatio"]) {
+    if (g[k] === null !== (p90[k] === null)) return false;
+    if (g[k] !== null && p90[k] < g[k]) return false;
+  }
+  if (g.inputTokenRatio > MAX_INPUT_TOKENS || p90.inputTokenRatio > MAX_INPUT_TOKENS || g.outputTokens > MAX_OUTPUT_TOKENS || p90.outputTokens > MAX_OUTPUT_TOKENS || g.durationMs !== null && p90.durationMs > MAX_DURATION_MS || g.promptCharRatio !== null && p90.promptCharRatio > MAX_INPUT_CHARS) return false;
+  return true;
+}
+function predictResources(evidence, {
+  provider,
+  model,
+  reasoningEffort = "",
+  channel = "harness-llm",
+  type = "general",
+  purpose = "",
+  inputChars
+} = {}) {
+  if (!isObj(evidence) || evidence.schemaVersion !== SCHEMA_VERSION || !Array.isArray(evidence.resourceGroups)) return null;
+  if (!nonEmpty(provider) || !nonEmpty(model)) return null;
+  if (!effortOk(reasoningEffort)) return null;
+  const ch = normalizeChannel(channel);
+  if (!ch) return null;
+  const ty = nonEmpty(type) ? type : "general";
+  const pu = typeof purpose === "string" ? purpose : "";
+  const minSamples = evidence.minSamples;
+  if (!Number.isInteger(minSamples) || minSamples < 1 || minSamples > 1e3) return null;
+  void inputChars;
+  for (const g of evidence.resourceGroups) {
+    if (!validateGroup(g)) continue;
+    const id2 = g.identity;
+    if (id2.provider === provider && id2.model === model && id2.reasoningEffort === reasoningEffort && id2.channel === ch && id2.type === ty && id2.purpose === pu) {
+      if (!Number.isInteger(g.sampleCount) || g.sampleCount < minSamples) return null;
+      return {
+        inputTokenRatio: g.inputTokenRatio,
+        outputTokens: g.outputTokens,
+        durationMs: g.durationMs,
+        promptCharRatio: g.promptCharRatio,
+        p90: {
+          inputTokenRatio: g.p90.inputTokenRatio,
+          outputTokens: g.p90.outputTokens,
+          durationMs: g.p90.durationMs,
+          promptCharRatio: g.p90.promptCharRatio
+        },
+        sampleCount: g.sampleCount,
+        source: "recorded-resource-evidence"
+      };
+    }
+  }
+  return null;
+}
+function predictQuality(evidence, {
+  text: text7,
+  type = "general",
+  provider,
+  model,
+  reasoningEffort = "",
+  channel = "harness-llm"
+} = {}) {
+  if (!isObj(evidence) || evidence.schemaVersion !== SCHEMA_VERSION || !Array.isArray(evidence.qualitySamples)) return null;
+  if (typeof text7 !== "string" || text7.length === 0) return null;
+  if (!nonEmpty(provider) || !nonEmpty(model)) return null;
+  if (!effortOk(reasoningEffort)) return null;
+  const ch = normalizeChannel(channel);
+  if (!ch) return null;
+  const ty = nonEmpty(type) ? type : "general";
+  const minSamples = evidence.minSamples;
+  if (!Number.isInteger(minSamples) || minSamples < 1 || minSamples > 1e3) return null;
+  const qfeat = buildFeatures(text7);
+  if (qfeat.length === 0) return null;
+  const matched = [];
+  let sumAll = 0;
+  let nAll = 0;
+  for (const s15 of evidence.qualitySamples) {
+    if (!isObj(s15) || !finite(s15.quality) || s15.quality < 0 || s15.quality > 1 || !validateFeatures(s15.features) || s15.split !== "train") continue;
+    if (s15.provider !== provider || s15.model !== model || s15.reasoningEffort !== reasoningEffort || s15.channel !== ch || s15.type !== ty) continue;
+    sumAll += s15.quality;
+    nAll++;
+    const sim = cosine(qfeat, s15.features);
+    if (sim >= SIM_THRESHOLD) matched.push({ s: s15, sim });
+  }
+  if (matched.length === 0) return null;
+  matched.sort((a, b2) => b2.sim - a.sim);
+  const seenGroup = /* @__PURE__ */ new Set();
+  const neighbors = [];
+  for (const m of matched) {
+    if (seenGroup.has(m.s.groupId)) continue;
+    seenGroup.add(m.s.groupId);
+    neighbors.push(m);
+    if (neighbors.length >= MAX_NEIGHBORS) break;
+  }
+  if (neighbors.length < minSamples) return null;
+  const routeTypeMean = nAll > 0 ? sumAll / nAll : neighbors.reduce((a, b2) => a + b2.s.quality, 0) / neighbors.length;
+  let wsum = 0;
+  let wq = 0;
+  for (const n of neighbors) {
+    wsum += n.sim;
+    wq += n.sim * n.s.quality;
+  }
+  if (!(wsum > 0)) return null;
+  const quality = (wq + SHRINK_PRIOR * routeTypeMean) / (wsum + SHRINK_PRIOR);
+  const meanSim = wsum / neighbors.length;
+  const wmean = wq / wsum;
+  let varSum = 0;
+  for (const n of neighbors) {
+    const d = n.s.quality - wmean;
+    varSum += n.sim * d * d;
+  }
+  const spread = Math.sqrt(varSum / wsum);
+  const clamped = Math.min(1, Math.max(0, quality));
+  return {
+    quality: clamped,
+    sampleCount: neighbors.length,
+    similarity: Math.min(1, Math.max(0, meanSim)),
+    source: "recorded-query-evidence",
+    uncertainty: {
+      kind: "empirical-neighbor-spread",
+      neighborCount: neighbors.length,
+      similarityThreshold: SIM_THRESHOLD,
+      spread,
+      calibrated: false,
+      note: "Empirical neighbor spread; not a calibrated probability."
+    }
+  };
 }
 
 // .dsh-plugin/shared/router.mjs
@@ -1184,7 +1633,7 @@ var OPENCODE_CATALOG_PROVIDERS = Object.freeze([
 ]);
 function classifyTask(text7) {
   const value = String(text7 ?? "");
-  if (value.length < 80 && /翻译|解释|translate|explain/i.test(value)) return "general";
+  if (value.length < 80 && /翻译|解释|translate|explain/i.test(value) && !detectTaskTypes(value).some((type) => ["vision", "math", "code", "research"].includes(type))) return "general";
   return detectTaskTypes(value)[0] ?? "general";
 }
 var TASK_TYPE_RULES = Object.freeze([
@@ -1235,10 +1684,12 @@ function specialtyMatch(model, taskType, liveScores = {}) {
   return 0.38;
 }
 function qualityForTask(row, taskType) {
+  if (row?.queryEvidence?.type === taskType) return row.queryEvidence.quality;
   const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.baseQuality ?? row?.quality ?? 0;
   return row?.qualityBias ? clamp(base + row.qualityBias) : base;
 }
 function qualitySourceForTask(row, taskType) {
+  if (row?.queryEvidence?.type === taskType) return "recorded-query-evidence";
   return asScore(row?.liveScores?.[taskType]) !== void 0 || asScore(row?.liveOverall) !== void 0 ? "livebench" : row?.fallbackQualitySource ?? row?.qualitySource ?? "unknown";
 }
 function specialtyForTask(row, taskType) {
@@ -1394,9 +1845,9 @@ function explicitRequirements(text7) {
   const marker = /^(?:[-*•]\s+|\d{1,2}[.)、](?!\d)\s*|[一二三四五六七八九十]{1,3}[、.)]\s*)(.+)$/u;
   const marked = lines.map((line) => marker.exec(line)?.[1]).filter(Boolean).map(requirementText).filter(looksLikeRequirement);
   if (marked.length >= 2) return marked;
-  const plain = lines.filter((line) => !/^#{1,6}\s|^```|[:：]$/u.test(line));
-  if (plain.length >= 2 && plain.every(looksLikeRequirement)) {
-    return plain.map(requirementText).filter((item) => item.length >= 3);
+  const plain2 = lines.filter((line) => !/^#{1,6}\s|^```|[:：]$/u.test(line));
+  if (plain2.length >= 2 && plain2.every(looksLikeRequirement)) {
+    return plain2.map(requirementText).filter((item) => item.length >= 3);
   }
   const clauses = value.split(/[;；，,]/u).map(requirementText).filter(Boolean);
   if (clauses.length >= 2 && clauses.every(looksLikeRequirement)) {
@@ -1539,7 +1990,7 @@ function compareText2(left, right) {
   return a < b2 ? -1 : a > b2 ? 1 : 0;
 }
 function compareRowsStable(left, right) {
-  return compareText2(routeKey(left.provider, left.model), routeKey(right.provider, right.model));
+  return compareText2(routeKey(left.provider, left.model), routeKey(right.provider, right.model)) || compareText2(String(left.actionId ?? ""), String(right.actionId ?? ""));
 }
 function reasoningEffortRank(effort) {
   const normalized2 = String(effort ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -1565,6 +2016,13 @@ function selectReasoningEffort(efforts, preferred = "medium") {
 }
 function reasoningDecision(row, task) {
   const preferred = String(task.preferredReasoningEffort ?? "medium");
+  if (row.reasoningExecution === "unsupported-cli" || row.reasoningExecution === "default") return {
+    reasoningEffort: void 0,
+    reasoningFit: 0.55,
+    preferredReasoningEffort: preferred,
+    multiplier: REASONING_EFFORT_MULTIPLIERS.medium,
+    reasoningExecutionNotice: row.reasoningExecution === "default" ? "\u6307\u5B9A\u6A21\u578B\u4F7F\u7528\u9002\u914D\u5668\u9ED8\u8BA4\u63A8\u7406\u6863\u4F4D\u3002" : "CLI \u63A8\u7406\u6863\u4F4D\u5C1A\u65E0\u7ECF\u9A8C\u8BC1\u7684\u6620\u5C04\uFF0C\u6309\u5382\u5546\u9ED8\u8BA4\u6863\u4F4D\u6267\u884C\u3002"
+  };
   const efforts = Array.isArray(row.reasoningEfforts) ? row.reasoningEfforts : [];
   if (efforts.length === 0) {
     const knownUnsupported = row.reasoningKnown === true;
@@ -1577,7 +2035,7 @@ function reasoningDecision(row, task) {
     };
   }
   const preferredRank = reasoningEffortRank(preferred);
-  const chosen = selectReasoningEffort(efforts, preferred);
+  const chosen = Object.hasOwn(row, "actionEffort") ? row.actionEffort : selectReasoningEffort(efforts, preferred);
   const distance = Math.abs(reasoningEffortRank(chosen) - preferredRank);
   return {
     reasoningEffort: chosen,
@@ -1595,16 +2053,88 @@ function candidateUtility(row, task, weights, cacheReadRatio = 0, cacheWriteRati
   const reasoning = reasoningDecision(row, task);
   const reference = taskCost({ pricing: COST_REFERENCE_PRICING, reasoningKnown: true, reasoningEfforts: [] }, task, text7, complexity, cacheReadRatio, cacheWriteRatio);
   const cost = row.pricing === null ? 0 : 1 / (1 + taskCost(row, task, text7, complexity, cacheReadRatio, cacheWriteRatio) / Math.max(reference, 1e-12));
-  const score = weights.quality * quality + weights.cost * cost + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency)) + weights.specialty * specialtyForTask(row, task.type) + (weights.reasoning ?? 0) * reasoning.reasoningFit - weights.risk * row.risk - qualityGap * (task.criticality ?? 0.75) + preferenceAdjustment;
+  const resources = resourceTokenBudget(row, task, text7, complexity, cacheReadRatio, cacheWriteRatio);
+  const latencyUtility = Number.isFinite(resources.estimatedLatencyMs) ? 1 / (1 + resources.estimatedLatencyMs / 1e4) : 1 - clamp(row.latency * reasoning.multiplier.latency);
+  const score = weights.quality * quality + weights.cost * cost + weights.latency * latencyUtility + weights.specialty * specialtyForTask(row, task.type) + (weights.reasoning ?? 0) * reasoning.reasoningFit - weights.risk * row.risk - qualityGap * (task.criticality ?? 0.75) + preferenceAdjustment;
   return { score, floor, qualityGap, preferenceAdjustment, ...reasoning };
 }
 function taskCost(row, task, text7, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
   if (row?.pricing === null) return 0;
-  const decision = row === null ? null : reasoningDecision(row, task);
-  const tokens = taskTokenBudget(text7, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity, cacheReadRatio, cacheWriteRatio);
+  const tokens = resourceTokenBudget(row, task, text7, complexity, cacheReadRatio, cacheWriteRatio);
   return row === null ? 0 : ((tokens.inputTokens - tokens.cacheReadTokens - tokens.cacheWriteTokens) * row.pricing.input + tokens.cacheReadTokens * row.pricing.cacheRead + tokens.cacheWriteTokens * row.pricing.cacheWrite + tokens.outputTokens * row.pricing.output) / 1e6;
 }
-function dominates(left, right, task, text7, complexity, cacheReadRatio, cacheWriteRatio) {
+function resourceTokenBudget(row, task, text7, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const effort = row ? reasoningDecision(row, task).reasoningEffort : void 0;
+  const fallback = taskTokenBudget(text7, { ...task, reasoningEffort: effort }, complexity, cacheReadRatio, cacheWriteRatio);
+  if (!row?.routingEvidence) return { ...fallback, estimateSource: "heuristic", resourceSampleCount: 0 };
+  const key = JSON.stringify([task.type, task.purpose, effort ?? "", String(text7).length, cacheReadRatio, cacheWriteRatio]);
+  if (row.resourceCache.has(key)) return row.resourceCache.get(key);
+  const observed = predictResources(row.routingEvidence, {
+    provider: row.provider,
+    model: row.model,
+    reasoningEffort: effort ?? "",
+    channel: row.executionChannel ?? "harness-llm",
+    type: task.type,
+    purpose: task.purpose,
+    inputChars: String(text7).length
+  });
+  let result = { ...fallback, estimateSource: "heuristic", resourceSampleCount: 0 };
+  if (observed) {
+    const promptRatio = observed.p90?.promptCharRatio ?? observed.promptCharRatio;
+    const chars = Number.isFinite(promptRatio) ? String(text7).length * promptRatio : fallback.inputTokens * 3.7;
+    const inputTokens = Math.ceil(chars * observed.p90.inputTokenRatio);
+    const outputTokens = Math.ceil(observed.p90.outputTokens);
+    if (Number.isSafeInteger(inputTokens) && inputTokens >= 0 && Number.isSafeInteger(outputTokens) && outputTokens >= 0) {
+      const ratios = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio);
+      const cacheReadTokens = Math.min(inputTokens, Math.round(inputTokens * ratios.read));
+      const cacheWriteTokens = Math.min(inputTokens - cacheReadTokens, Math.round(inputTokens * ratios.write));
+      result = {
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
+        estimateSource: observed.source,
+        resourceSampleCount: observed.sampleCount,
+        estimatedLatencyMs: observed.p90.durationMs,
+        empiricalQuantile: 0.9
+      };
+    }
+  }
+  row.resourceCache.set(key, result);
+  return result;
+}
+function taskActions(row, task) {
+  const text7 = task.objective || row.routingText;
+  const key = JSON.stringify([task.type, task.purpose, task.preferredReasoningEffort, text7]);
+  if (row.actionCache.has(key)) return row.actionCache.get(key);
+  const nearest = reasoningDecision(row, task).reasoningEffort;
+  const qualityAt = (effort) => {
+    const qualityKey = JSON.stringify([task.type, effort ?? "", text7]);
+    if (!row.qualityCache.has(qualityKey)) row.qualityCache.set(qualityKey, predictQuality(row.routingEvidence, {
+      text: text7,
+      type: task.type,
+      provider: row.provider,
+      model: row.model,
+      reasoningEffort: effort ?? "",
+      channel: row.executionChannel ?? "harness-llm"
+    }));
+    return row.qualityCache.get(qualityKey);
+  };
+  let alternatives = [];
+  if (row.reasoningExecution === "api") alternatives = (row.reasoningEfforts ?? []).map((effort) => ({ effort, quality: qualityAt(effort) })).filter((item) => item.quality);
+  const joint = alternatives.length >= 2;
+  const actions = joint ? alternatives : [{ effort: nearest, quality: qualityAt(nearest) }];
+  const variants = actions.map(({ effort, quality }) => ({
+    ...row,
+    actionEffort: effort,
+    actionId: JSON.stringify([row.provider, row.model, effort ?? null]),
+    jointEffort: joint,
+    queryEvidence: quality ? { ...quality, type: task.type } : null
+  }));
+  row.actionCache.set(key, variants);
+  return variants;
+}
+function dominates2(left, right, task, text7, complexity, cacheReadRatio, cacheWriteRatio) {
   if (left.pricing === null || right.pricing === null) return false;
   const leftReasoning = reasoningDecision(left, task);
   const rightReasoning = reasoningDecision(right, task);
@@ -1629,7 +2159,8 @@ function dominates(left, right, task, text7, complexity, cacheReadRatio, cacheWr
   return noWorse && strictlyBetter;
 }
 function eligibleRowsForTask(rows, task) {
-  return task.type === "vision" ? rows.filter((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image")) : rows;
+  const eligible = task.type === "vision" ? rows.filter((row) => row.inputModalities.length === 0 || row.inputModalities.includes("image")) : rows;
+  return eligible.flatMap((row) => taskActions(row, task));
 }
 function candidatePool(rows, task, weights, text7, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive = false) {
   const eligibleRows = eligibleRowsForTask(rows, task);
@@ -1642,7 +2173,7 @@ function candidatePool(rows, task, weights, text7, complexity, cacheReadRatio, c
     decision: candidateUtility(row, task, taskWeights, cacheReadRatio, cacheWriteRatio, text7, complexity),
     cost: taskCost(row, task, text7, complexity, cacheReadRatio, cacheWriteRatio)
   }));
-  const frontier = dependencySensitive ? scored : scored.filter((item) => !scored.some((other) => other !== item && other.decision.score >= item.decision.score && dominates(other.row, item.row, task, text7, complexity, cacheReadRatio, cacheWriteRatio)));
+  const frontier = dependencySensitive ? scored : scored.filter((item) => !scored.some((other) => other !== item && other.decision.score >= item.decision.score && dominates2(other.row, item.row, task, text7, complexity, cacheReadRatio, cacheWriteRatio)));
   const essential = [
     scored.filter((item) => item.row.pricing !== null).sort((left, right) => left.cost - right.cost || compareRowsStable(left.row, right.row))[0],
     scored.slice().sort((left, right) => right.decision.score - left.decision.score || compareRowsStable(left.row, right.row))[0],
@@ -1667,6 +2198,8 @@ function solveAssignments({ rows, tasks, weights, text: text7, complexity, budge
     route: routeKey(option.row.provider, option.row.model),
     score: option.decision.score,
     cost: option.cost,
+    actionId: option.row.actionId,
+    handoffRoute: routeKey(option.row.provider, option.row.model),
     qualityShortfall: Math.max(0, option.decision.floor - qualityForTask(option.row, tasks[index].type)),
     pricingKnown: option.row.pricing !== null,
     payload: option
@@ -1676,7 +2209,7 @@ function solveAssignments({ rows, tasks, weights, text: text7, complexity, budge
     ...result,
     assignments: result.choices.map((choice, index) => ({
       task: tasks[index],
-      row: choice.payload.row,
+      row: { ...choice.payload.row, estimatedCost: choice.payload.row.pricing === null ? null : choice.cost },
       decision: { ...choice.payload.decision, relaxed: choice.qualityShortfall > 0 },
       estimatedCost: choice.cost,
       handoffPenalty: choice.handoffPenalty
@@ -1686,7 +2219,7 @@ function solveAssignments({ rows, tasks, weights, text: text7, complexity, budge
     minimumFeasibleCost: result.minimumCostLowerBound
   };
 }
-function buildPlan({ text: text7 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", dataVersions = null, learning = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+function buildPlan({ text: text7 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", dataVersions = null, learning = null, routingEvidence = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
   const presetId = normalizeRoutingPreset(preset);
   const firstLine = String(text7 ?? "").split(/\r?\n/u)[0].trim();
   const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine) && !/(?:执行|完成|实施|分配)/u.test(firstLine);
@@ -1702,6 +2235,8 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
     return {
       provider: String(entry.provider ?? ""),
       model: String(entry.model ?? ""),
+      executionChannel: ["harness-llm", "official-cli"].includes(entry.executionChannel) ? entry.executionChannel : void 0,
+      reasoningExecution: ["api", "unsupported-cli", "default"].includes(entry.reasoningExecution) ? entry.reasoningExecution : void 0,
       benchmarkModel: typeof entry.benchmarkModel === "string" ? entry.benchmarkModel : void 0,
       reasoningEfforts: [...new Set(reasoningEfforts)],
       defaultReasoningEffort: entry.defaultReasoningEffort === void 0 ? void 0 : String(entry.defaultReasoningEffort),
@@ -1764,6 +2299,13 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
       reasoningEfforts: route.reasoningEfforts,
       defaultReasoningEffort: route.defaultReasoningEffort,
       reasoningKnown: route.reasoningKnown,
+      reasoningExecution: route.reasoningExecution,
+      executionChannel: route.executionChannel,
+      routingEvidence,
+      routingText: text7,
+      actionCache: /* @__PURE__ */ new Map(),
+      qualityCache: /* @__PURE__ */ new Map(),
+      resourceCache: /* @__PURE__ */ new Map(),
       inputModalities: route.inputModalities,
       pricing: pricingRow,
       score: 0,
@@ -1840,13 +2382,14 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
     recommendedReasoningEffort: decision?.reasoningEffort,
     preferredReasoningEffort: decision?.preferredReasoningEffort ?? task.preferredReasoningEffort,
     reasoningFit: Number(Number(decision?.reasoningFit ?? 0).toFixed(3)),
+    ...decision?.reasoningExecutionNotice ? { reasoningExecutionNotice: decision.reasoningExecutionNotice } : {},
     purpose: task.purpose,
     criticality: task.criticality,
     qualityFloor: Number(task.qualityFloor.toFixed(3)),
     dependsOn: [...task.dependsOn ?? []]
   }));
   const costBreakdown = assignments.map(({ task, row, decision, estimatedCost, handoffPenalty }, index) => {
-    const tokens = taskTokenBudget(text7, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity.band, cacheReadRatio, cacheWriteRatio);
+    const tokens = resourceTokenBudget(row, task, text7, complexity.band, cacheReadRatio, cacheWriteRatio);
     const taskEstimate = estimatedCost ?? taskCost(row, task, text7, complexity.band, cacheReadRatio, cacheWriteRatio);
     return {
       stage: index + 1,
@@ -1862,6 +2405,11 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
       cacheReadTokens: tokens.cacheReadTokens,
       cacheWriteTokens: tokens.cacheWriteTokens,
       outputTokens: tokens.outputTokens,
+      estimateSource: tokens.estimateSource,
+      resourceSampleCount: tokens.resourceSampleCount,
+      ...Number.isFinite(tokens.estimatedLatencyMs) ? { estimatedLatencyMs: tokens.estimatedLatencyMs } : {},
+      ...tokens.empiricalQuantile ? { empiricalQuantile: tokens.empiricalQuantile } : {},
+      ...row?.queryEvidence ? { queryEvidenceCount: row.queryEvidence.sampleCount, querySimilarity: row.queryEvidence.similarity } : {},
       estimatedCost: row?.pricing === null || row === null ? null : Number(taskEstimate.toFixed(6)),
       quality: qualitySourceForTask(row, task.type) === "unknown" || row === null ? null : Number(qualityForTask(row, task.type).toFixed(3)),
       qualitySource: qualitySourceForTask(row, task.type),
@@ -1876,7 +2424,8 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
     return { task, strongest };
   });
   const baselineCost = baselineRows.every((item) => item.strongest?.pricing !== null && item.strongest !== null) ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text7, complexity.band, cacheReadRatio, cacheWriteRatio), 0) : null;
-  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => ["livebench", "route", "user"].includes(qualitySourceForTask(row, task.type))) && baselineRows.every(({ strongest, task }) => ["livebench", "route", "user"].includes(qualitySourceForTask(strongest, task.type)));
+  const knownQualitySources = ["livebench", "route", "user", "recorded-query-evidence"];
+  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => knownQualitySources.includes(qualitySourceForTask(row, task.type))) && baselineRows.every(({ strongest, task }) => knownQualitySources.includes(qualitySourceForTask(strongest, task.type)));
   const budgetExceeded = Number(budgetUsd) > 0 && totalEstimate !== null ? totalEstimate > Number(budgetUsd) : null;
   const savings = baselineCost === null || totalEstimate === null || !qualityEvidenceComplete ? null : baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost);
   const paretoPruned = (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.pruned, 0);
@@ -1891,7 +2440,13 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
     taskType,
     taskTypes: [...new Set(taskNodes.map((task) => task.type).filter((type) => type !== "reasoning"))],
     objectiveWeights: weights,
-    candidates: rows.slice(0, 8).map((row) => {
+    candidates: eligibleRowsForTask(rows, taskNodes[0]).map((row) => ({
+      ...row,
+      score: candidateUtility(row, taskNodes[0], weights, cacheReadRatio, cacheWriteRatio, text7, complexity.band).score,
+      quality: qualityForTask(row, taskNodes[0].type),
+      qualitySource: qualitySourceForTask(row, taskNodes[0].type),
+      estimatedCost: row.pricing === null ? null : taskCost(row, taskNodes[0], text7, complexity.band, cacheReadRatio, cacheWriteRatio)
+    })).sort((left, right) => right.score - left.score || compareRowsStable(left, right)).slice(0, 8).map((row) => {
       const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === "simple" ? "low" : "medium" }, weights, cacheReadRatio, cacheWriteRatio, text7, complexity.band);
       return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), preferenceAdjustment: decision.preferenceAdjustment, quality: row.qualitySource === "unknown" ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource, pricingVersion: row.pricingVersion, pricingAsOf: row.snapshotAsOf };
     }),
@@ -1903,6 +2458,11 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
     costBreakdown,
     optimization: {
       dataVersions,
+      evidenceRevision: routingEvidence?.revision ?? null,
+      qualityEvidenceCount: assignments.filter(({ row }) => row.queryEvidence).length,
+      resourceEvidenceCount: costBreakdown.filter((item) => item.estimateSource === "recorded-resource-evidence").length,
+      jointEffortCandidates: (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.options.filter((item) => item.row.jointEffort).length, 0),
+      uncertaintySemantics: "empirical-prediction-not-calibrated-probability-or-joint-budget-guarantee",
       personalization: learning ? {
         policyVersion: learning.policyVersion,
         revision: learning.revision,
@@ -2015,12 +2575,14 @@ function createPlanFromRoutes(task, availableRoutes, {
   liveBenchError = "",
   dataVersions = null,
   learning = null,
+  routingEvidence = null,
   cacheReadRatio = 0,
   cacheWriteRatio = 0,
   directProvider = "",
   directModel = "",
   preset = "balanced",
-  loggedOutToolIds = []
+  loggedOutToolIds = [],
+  forceOfficialCli = false
 } = {}) {
   const taskText = clean2(task);
   if (!taskText) throw new Error("task must contain text");
@@ -2042,13 +2604,28 @@ function createPlanFromRoutes(task, availableRoutes, {
   const channelOf = (provider, model) => {
     const route = routes.find((item) => item.provider === provider && item.model === model);
     const key = `${String(provider ?? "")}\0${String(model ?? "")}\0${route?.execution ?? ""}`;
-    if (!channelCache.has(key)) channelCache.set(key, channelForProvider(provider, installedIds, runnableToolIds, route, loggedOutToolIds));
+    if (!channelCache.has(key)) {
+      const tool = forceOfficialCli ? toolForProvider(provider) : null;
+      channelCache.set(key, tool ? {
+        kind: "official-cli",
+        tool: tool.id,
+        label: tool.label,
+        detail: "\u5B98\u65B9 CLI \u56E2\u961F\u8BA1\u5212\u4EC5\u901A\u8FC7\u5DF2\u6838\u9A8C\u7684\u5B98\u65B9 CLI \u6267\u884C\uFF1B\u4F7F\u7528\u5382\u5546\u9ED8\u8BA4\u63A8\u7406\u6863\u4F4D\u3002"
+      } : channelForProvider(provider, installedIds, runnableToolIds, route, loggedOutToolIds));
+    }
     return channelCache.get(key);
   };
   const needsImage = detectTaskTypes(taskText).includes("vision");
   const plan = buildPlan({
     text: taskText,
-    available: routes,
+    available: routes.map((route) => {
+      const channel = channelOf(route.provider, route.model);
+      return {
+        ...route,
+        executionChannel: channel.kind,
+        reasoningExecution: directRoute ? "default" : channel.kind === "harness-llm" ? "api" : "unsupported-cli"
+      };
+    }),
     mode: directRoute ? "single" : selectedMode,
     budgetUsd: Math.max(0, Number.isFinite(budgetUsd) ? budgetUsd : 0),
     pricing,
@@ -2056,6 +2633,7 @@ function createPlanFromRoutes(task, availableRoutes, {
     liveBenchError,
     dataVersions,
     learning,
+    routingEvidence,
     cacheReadRatio,
     cacheWriteRatio,
     preset
@@ -2093,6 +2671,7 @@ function createPlanFromRoutes(task, availableRoutes, {
         recommendedModel: item.recommended,
         estimatedCost: plan.costBreakdown[index]?.estimatedCost ?? null,
         ...item.recommendedReasoningEffort ? { recommendedReasoningEffort: item.recommendedReasoningEffort } : {},
+        ...item.reasoningExecutionNotice ? { reasoningExecutionNotice: item.reasoningExecutionNotice } : {},
         ...annotate(channelOf(item.recommendedProvider, item.recommended)),
         verificationChecklist: item.purpose === "synthesis" ? ["\u6838\u5BF9\u5404\u5DE5\u4F5C\u5305\u4EA4\u4ED8\u7269\u4E0E\u4F9D\u8D56", "\u8BB0\u5F55\u51B2\u7A81\u3001\u672A\u89E3\u51B3\u4E8B\u9879\u548C\u6700\u7EC8\u9A8C\u6536\u7ED3\u679C"] : item.type === "code" ? ["\u8BF4\u660E\u6539\u52A8\u6587\u4EF6\u4E0E\u63A5\u53E3", "\u8FD0\u884C\u4E0E\u6539\u52A8\u76F8\u5173\u7684\u9A8C\u8BC1\u5E76\u8BB0\u5F55\u7ED3\u679C", "\u5217\u51FA\u5C1A\u672A\u5B8C\u6210\u7684\u8FB9\u754C\u60C5\u51B5"] : item.type === "research" ? ["\u5217\u51FA\u6765\u6E90\u3001\u65E5\u671F\u548C\u53EF\u6838\u5BF9\u7684\u7ED3\u8BBA", "\u6807\u51FA\u63A8\u65AD\u4E0E\u4E0D\u786E\u5B9A\u4E8B\u9879"] : ["\u5217\u51FA\u4EA4\u4ED8\u5185\u5BB9\u548C\u9A8C\u6536\u4F9D\u636E", "\u6807\u51FA\u672A\u5B8C\u6210\u4E8B\u9879"]
       }))
@@ -2100,13 +2679,68 @@ function createPlanFromRoutes(task, availableRoutes, {
   };
 }
 
+// .dsh-plugin/shared/package-assignments.mjs
+var plain = (value) => value !== null && typeof value === "object" && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+var safeText = (value, limit) => typeof value === "string" && value.trim().length > 0 && value.trim().length <= limit && !/[\u0000-\u001f\u007f]/u.test(value);
+var safeKey = (key) => typeof key === "string" && key === key.trim() && safeText(key, 128) && !["__proto__", "constructor", "prototype"].includes(key);
+function parsePackageAssignments(value) {
+  if (value === void 0) return void 0;
+  if (!plain(value)) throw new TypeError("packageAssignments must be an object");
+  const keys = Reflect.ownKeys(value);
+  if (!keys.length || keys.length > 32 || keys.some((key) => !safeKey(key))) {
+    throw new TypeError("packageAssignments requires 1..32 safe package ids");
+  }
+  const result = {};
+  for (const id2 of keys) {
+    const target = value[id2];
+    if (!plain(target)) throw new TypeError(`Invalid package assignment: ${id2}`);
+    const allowed = target.kind === "api" ? ["kind", "provider", "model"] : target.kind === "tool" ? ["kind", "toolId"] : null;
+    if (!allowed || Reflect.ownKeys(target).some((key) => !allowed.includes(key))) {
+      throw new TypeError(`Unsupported package assignment fields: ${id2}`);
+    }
+    if (target.kind === "api") {
+      if (!safeText(target.provider, 160) || !safeText(target.model, 240)) {
+        throw new TypeError(`API assignment requires provider and model: ${id2}`);
+      }
+      result[id2] = { kind: "api", provider: target.provider.trim(), model: target.model.trim() };
+    } else {
+      if (!safeText(target.toolId, 64) || !getOfficialTool(target.toolId.trim())) {
+        throw new TypeError(`Unknown official tool assignment: ${id2}`);
+      }
+      result[id2] = { kind: "tool", toolId: target.toolId.trim() };
+    }
+  }
+  return result;
+}
+function packagePlanKey(plan, task = "") {
+  const packages = plan?.team?.workPackages;
+  if (plan?.routingBypassed || plan?.mode === "direct" || !Array.isArray(packages) || !packages.length) return null;
+  const fields = packages.map((item) => [
+    item?.id ?? "",
+    item?.name ?? "",
+    item?.objective ?? "",
+    item?.type ?? "",
+    item?.purpose ?? "",
+    Array.isArray(item?.dependsOn) ? [...item.dependsOn] : []
+  ]);
+  const text7 = JSON.stringify([String(task ?? "").trim(), fields]);
+  let first = 2166136261;
+  let second = 2246822507;
+  for (let index = 0; index < text7.length; index++) {
+    const code = text7.charCodeAt(index);
+    first = Math.imul(first ^ code, 16777619) >>> 0;
+    second = Math.imul(second ^ code, 3266489909) >>> 0;
+  }
+  return `package-plan-v1-${first.toString(16).padStart(8, "0")}${second.toString(16).padStart(8, "0")}`;
+}
+
 // .dsh-plugin/shared/run-ledger.mjs
-var finite = (value) => typeof value === "number" && Number.isFinite(value);
+var finite2 = (value) => typeof value === "number" && Number.isFinite(value);
 var routeKey2 = (provider, model) => `${String(provider ?? "")}\0${String(model ?? "")}`;
 var MAX_SPENDING_DAYS = 90;
 var MAX_SPENDING_MONTHS = 24;
 function periodSpending(value) {
-  const amount = (field2) => finite(value?.[field2]) && value[field2] >= 0 ? value[field2] : 0;
+  const amount = (field2) => finite2(value?.[field2]) && value[field2] >= 0 ? value[field2] : 0;
   return {
     costUsd: amount("costUsd"),
     unknown: Math.floor(amount("unknown")),
@@ -2126,9 +2760,9 @@ function formatUsd(value) {
 }
 function budgetCheck({ estimateUsd = null, spent = { today: 0, month: 0 }, dailyLimitUsd = 0, monthlyLimitUsd = 0 } = {}) {
   const limits = [];
-  if (finite(dailyLimitUsd) && dailyLimitUsd > 0) limits.push({ period: "daily", label: "\u4ECA\u65E5", limit: dailyLimitUsd, spent: spent.today ?? 0 });
-  if (finite(monthlyLimitUsd) && monthlyLimitUsd > 0) limits.push({ period: "monthly", label: "\u672C\u6708", limit: monthlyLimitUsd, spent: spent.month ?? 0 });
-  const estimateKnown = finite(estimateUsd);
+  if (finite2(dailyLimitUsd) && dailyLimitUsd > 0) limits.push({ period: "daily", label: "\u4ECA\u65E5", limit: dailyLimitUsd, spent: spent.today ?? 0 });
+  if (finite2(monthlyLimitUsd) && monthlyLimitUsd > 0) limits.push({ period: "monthly", label: "\u672C\u6708", limit: monthlyLimitUsd, spent: spent.month ?? 0 });
+  const estimateKnown = finite2(estimateUsd);
   const remaining = limits.length ? Math.max(0, Math.min(...limits.map((item) => item.limit - item.spent))) : null;
   const exceeded = limits.find((item) => item.spent >= item.limit || estimateKnown && item.spent + estimateUsd > item.limit) ?? null;
   return {
@@ -2144,12 +2778,12 @@ function applyQualityBiases(routes, biases) {
   if (!biases || typeof biases !== "object") return routes;
   return (Array.isArray(routes) ? routes : []).map((route) => {
     const bias = biases[routeKey2(route.provider, route.model)];
-    return finite(bias) && bias !== 0 ? { ...route, qualityBias: bias } : route;
+    return finite2(bias) && bias !== 0 ? { ...route, qualityBias: bias } : route;
   });
 }
 
 // .dsh-plugin/shared/adaptive-feedback.mjs
-var finite2 = (value) => typeof value === "number" && Number.isFinite(value);
+var finite3 = (value) => typeof value === "number" && Number.isFinite(value);
 var clean3 = (value) => typeof value === "string" ? value.trim() : "";
 var routeKey3 = (provider, model) => `${provider}\0${model}`;
 var record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -2168,8 +2802,8 @@ function applyFeedbackProfile(routes, profile) {
     if (!Object.hasOwn(profile.adjustments, key)) return base;
     const value = profile.adjustments[key];
     if (!record(value)) return base;
-    const limit = finite2(profile.maxAdjustment) && profile.maxAdjustment >= 0 && profile.maxAdjustment <= 0.1 ? profile.maxAdjustment : 0.1;
-    const adjustments = Object.fromEntries(Object.entries(value).filter(([, bias]) => finite2(bias) && Math.abs(bias) <= limit));
+    const limit = finite3(profile.maxAdjustment) && profile.maxAdjustment >= 0 && profile.maxAdjustment <= 0.1 ? profile.maxAdjustment : 0.1;
+    const adjustments = Object.fromEntries(Object.entries(value).filter(([, bias]) => finite3(bias) && Math.abs(bias) <= limit));
     if (!Object.keys(adjustments).length) return base;
     return {
       ...base,
@@ -2807,7 +3441,59 @@ function billingSwitchText(item) {
   if (!note?.reason) return null;
   return note.reason;
 }
-function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, executor = "routed", executionMode = "read-only", executionEnvironment = "harness" } = {}) {
+function initialPackageAssignments(plan) {
+  if (plan?.routingBypassed || plan?.mode === "direct") return {};
+  const packages = plan?.team?.workPackages ?? [];
+  if (!packages.length) return {};
+  return parsePackageAssignments(Object.fromEntries(packages.map((item) => [
+    item.id,
+    { kind: "api", provider: item.recommendedProvider, model: item.recommendedModel }
+  ])));
+}
+function manualAssignmentOptions(routes = [], toolSnapshot = null, health = null) {
+  const options = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const route of routes) {
+    if (!route?.provider || !route?.model) continue;
+    const binding = { kind: "api", provider: route.provider, model: route.model };
+    const value = JSON.stringify(binding);
+    if (seen.has(value)) continue;
+    seen.add(value);
+    options.push({ value, binding, label: `${route.provider}/${route.model} \xB7 \u6A21\u578B API`, disabled: false, reason: "" });
+  }
+  for (const tool of OFFICIAL_TOOLS) {
+    const probe = toolSnapshot?.probes?.find((item) => item.id === tool.id);
+    const report = health?.tools?.find((item) => item.id === tool.id);
+    const ready = toolSnapshot?.readiness?.find((item) => item.id === tool.id);
+    const capability = toolSnapshot?.capabilities?.find((item) => item.id === tool.id);
+    const installed = probe ? probe.installed === true : report?.installed === true;
+    const modes = ready?.readyModes ?? ready?.modes ?? capability?.modes;
+    const reason = !installed ? "\u672A\u5B89\u88C5\u6216\u5B89\u88C5\u72B6\u6001\u672A\u77E5" : capability?.supported === false ? capability.reason || "\u4E0D\u652F\u6301\u6258\u7BA1\u6267\u884C" : ready?.ready === false ? ready.reason || "\u6267\u884C\u5165\u53E3\u5C1A\u672A\u5C31\u7EEA" : Array.isArray(modes) && !modes.includes("read-only") ? "\u4E0D\u652F\u6301\u53EA\u8BFB\u4EFB\u52A1" : report?.login?.state === "logged-out" ? "\u5C1A\u672A\u767B\u5F55" : "";
+    const pending = !reason && ready?.ready !== true ? " \xB7 \u5F85\u6267\u884C\u9884\u89C8\u6838\u9A8C" : "";
+    const binding = { kind: "tool", toolId: tool.id };
+    options.push({
+      value: JSON.stringify(binding),
+      binding,
+      disabled: Boolean(reason),
+      reason,
+      label: `${tool.label} \xB7 \u5B98\u65B9\u5DE5\u5177\u9ED8\u8BA4\u6A21\u578B${reason ? `\uFF08${reason}\uFF09` : pending}`
+    });
+  }
+  return options;
+}
+function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, executor = "routed", executionMode = "read-only", executionEnvironment = "harness", assignmentMode = "algorithm", packageAssignments, packagePlanKey: packagePlanKey2 } = {}) {
+  if (!["algorithm", "manual"].includes(assignmentMode)) throw new Error("\u4E0D\u652F\u6301\u7684\u5206\u914D\u65B9\u5F0F\u3002");
+  let manual = null;
+  if (assignmentMode === "manual") {
+    if (mode === "direct") throw new Error("\u6307\u5B9A\u5355\u4E00\u6A21\u578B\u6A21\u5F0F\u4E0D\u652F\u6301\u624B\u52A8\u5DE5\u4F5C\u5305\u5206\u914D\u3002");
+    if (typeof packagePlanKey2 !== "string" || !packagePlanKey2.trim() || packagePlanKey2.length > 200) throw new Error("\u8BF7\u91CD\u65B0\u751F\u6210\u5DE5\u4F5C\u5305\u540E\u518D\u624B\u52A8\u5206\u914D\u3002");
+    const assignments = parsePackageAssignments(packageAssignments);
+    if (!assignments) throw new Error("\u8BF7\u9009\u62E9\u5DE5\u4F5C\u5305\u6267\u884C\u76EE\u6807\u3002");
+    manual = { assignmentMode: "manual", packagePlanKey: packagePlanKey2, packageAssignments: assignments };
+    executor = "routed";
+    executionMode = "read-only";
+    executionEnvironment = "harness";
+  }
   if (!["routed", "official-team"].includes(executor)) throw new Error("\u4E0D\u652F\u6301\u7684\u6267\u884C\u65B9\u5F0F\u3002");
   if (!["read-only", "workspace-write"].includes(executionMode)) throw new Error("\u4E0D\u652F\u6301\u7684\u4EFB\u52A1\u6743\u9650\u3002");
   if (executor === "official-team" && mode !== "team") throw new Error("\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u9700\u8981\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D\u3002");
@@ -2820,7 +3506,8 @@ function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, 
     ...executionEnvironment === "cli-native" ? { executionEnvironment } : {},
     ...mode === "direct" && directRoute ? { provider: directRoute.provider, model: directRoute.model } : { planMode: mode === "team" ? "team" : "single", preset },
     ...Number.isFinite(budget) && budget >= 0 ? { budgetUsd: budget } : {},
-    ...typeof workspace === "string" && workspace.trim() ? { workspace: workspace.trim() } : {}
+    ...typeof workspace === "string" && workspace.trim() ? { workspace: workspace.trim() } : {},
+    ...manual ?? {}
   };
 }
 function rerunConfirmations({ run, item, override = null, choice = null, ledger = null, health = null, toolFor = () => null, headlessIds = /* @__PURE__ */ new Set() } = {}) {
@@ -2850,6 +3537,10 @@ function rerunConfirmations({ run, item, override = null, choice = null, ledger 
 
 // .dsh-plugin/client/adaptive-state.mjs
 var ADAPTIVE_DEFAULTS = Object.freeze({
+  routingEvidenceJson: "",
+  resourceLearningEnabled: true,
+  qualityEscalationEnabled: false,
+  qualityGateJson: "",
   feedbackLearningEnabled: true,
   feedbackHalfLifeDays: 30,
   feedbackPriorWeight: 3,
@@ -3271,7 +3962,7 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
   const rerun = rerunSupport(run);
   const canRerun = rerun.supported && !item.ok && !busy;
   const others = routes.filter((route) => `${route.provider}/${route.model}` !== `${item.provider}/${item.model}`);
-  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u8BA1\u8D39\uFF1A", BILLING_CHANNEL_LABEL[item.billing] ?? "\u2014", item.subscriptionRoute ? ` \xB7 \u5957\u9910\u8DEF\u7EBF ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` \xB7 ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "\u8BA1\u8D39\u5207\u6362\uFF1A", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), !item.ok && item.diagnostic && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "CLI \u8BCA\u65AD", Number.isInteger(item.exitCode) ? `\uFF08\u9000\u51FA\u7801 ${item.exitCode}\uFF09` : ""), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.diagnostic)), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === 1 ? "\u518D\u6B21\u70B9\u51FB\u64A4\u56DE\u6709\u7528\u8BC4\u4EF7" : "\u8BC4\u4EF7\u6B64\u7ED3\u679C\u6709\u7528", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "up")) }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === -1 ? "\u518D\u6B21\u70B9\u51FB\u64A4\u56DE\u4E0D\u597D\u8BC4\u4EF7" : "\u8BC4\u4EF7\u6B64\u7ED3\u679C\u4E0D\u597D", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "down")) }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run.id, item.id, null) }, run.kind === "tool" ? "\u91CD\u65B0\u6267\u884C\u6B64\u8C03\u7528" : rerun.writes ? "\u5728\u65B0\u5DE5\u4F5C\u533A\u7EED\u8DD1" : "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
+  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "\uFF08\u5DF2\u6539\u6D3E\uFF09" : ""), item.manualAssignment && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-caption" }, "\u624B\u52A8\u5206\u914D \xB7 ", item.manualAssignment.kind === "tool" ? `\u5B98\u65B9\u5DE5\u5177 ${item.manualAssignment.toolId}\uFF08\u5382\u5546\u9ED8\u8BA4\u6A21\u578B\uFF09` : `\u6A21\u578B API ${item.manualAssignment.provider}/${item.manualAssignment.model}`, item.algorithmRecommendation?.provider ? ` \xB7 \u539F\u63A8\u8350 ${item.algorithmRecommendation.provider}/${item.algorithmRecommendation.model}` : ""), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react2.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, "\u9884\u4F30 ", money(item.estimatedCost), " \xB7 \u5B9E\u9645 ", cost.budget, item.difficulty ? ` \xB7 \u96BE\u5EA6 ${BAND[item.difficulty] ?? item.difficulty}` : "")), cost.reference && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, cost.reference), item.actualModel && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "CLI \u56DE\u62A5\u6A21\u578B\uFF1A", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u8BA1\u8D39\uFF1A", BILLING_CHANNEL_LABEL[item.billing] ?? "\u2014", item.subscriptionRoute ? ` \xB7 \u5957\u9910\u8DEF\u7EBF ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` \xB7 ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "\u8BA1\u8D39\u5207\u6362\uFF1A", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u56DE\u9000\u539F\u56E0\uFF1A", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI \u539F\u59CB\u9519\u8BEF\uFF1A", /* @__PURE__ */ import_react2.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), !item.ok && item.diagnostic && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "CLI \u8BCA\u65AD", Number.isInteger(item.exitCode) ? `\uFF08\u9000\u51FA\u7801 ${item.exitCode}\uFF09` : ""), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.diagnostic)), item.review && /* @__PURE__ */ import_react2.default.createElement("p", { className: "mr-package-copy" }, "\u5F3A\u6A21\u578B\u62BD\u67E5\uFF08", item.review.provider, "/", item.review.model, "\uFF09\uFF1A", item.review.score ? `${item.review.score}/5` : "\u672A\u8BC4\u5206", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react2.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react2.default.createElement("summary", null, "\u67E5\u770B\u7ED3\u679C"), /* @__PURE__ */ import_react2.default.createElement("pre", null, item.answer, item.answerTruncated ? "\n\u2026\uFF08\u5DF2\u622A\u65AD\uFF09" : "")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === 1 ? "\u518D\u6B21\u70B9\u51FB\u64A4\u56DE\u6709\u7528\u8BC4\u4EF7" : "\u8BC4\u4EF7\u6B64\u7ED3\u679C\u6709\u7528", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "up")) }, "\u{1F44D} \u6709\u7528"), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === -1 ? "\u518D\u6B21\u70B9\u51FB\u64A4\u56DE\u4E0D\u597D\u8BC4\u4EF7" : "\u8BC4\u4EF7\u6B64\u7ED3\u679C\u4E0D\u597D", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run, item, "down")) }, "\u{1F44E} \u4E0D\u597D")), canRerun && /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run.id, item.id, null) }, run.kind === "tool" ? "\u91CD\u65B0\u6267\u884C\u6B64\u8C03\u7528" : rerun.writes ? "\u5728\u65B0\u5DE5\u4F5C\u533A\u7EED\u8DD1" : "\u91CD\u8DD1\u6B64\u6B65"), !rerun.supported && !item.ok && item.ran && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react2.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react2.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "\u6539\u6D3E\u5230", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react2.default.createElement("option", { value: "" }, "\u6539\u6D3E\u5230\u2026"), others.map((route) => /* @__PURE__ */ import_react2.default.createElement("option", { key: `${route.provider}/${route.model}`, value: `${route.provider}\0${route.model}` }, route.provider, "/", route.model))), /* @__PURE__ */ import_react2.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
     const [provider, model] = target.split("\0");
     onRerun(run.id, item.id, { provider, model });
   } }, "\u6539\u6D3E\u5E76\u91CD\u8DD1"))));
@@ -3326,18 +4017,23 @@ var STATUS_TEXT = Object.freeze({
   "paused-budget": "\u5DF2\u56E0\u9884\u7B97\u6682\u505C\uFF0C\u672A\u542F\u52A8\u6A21\u578B",
   "paused-subscription-failure": "\u6709\u6B65\u9AA4\u56E0\u8BA2\u9605\u8C03\u7528\u5931\u8D25\u800C\u6682\u505C\uFF0C\u8BF7\u5728\u4E0B\u65B9\u6267\u884C\u8BB0\u5F55\u4E2D\u9009\u62E9\u5982\u4F55\u7EE7\u7EED"
 });
-function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason, planningRevision }) {
+function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason, planningRevision, assignmentMode = "algorithm", packageAssignments = {}, packagePlanKey: packagePlanKey2 }) {
   const [preset, setPreset] = import_react3.default.useState(defaultPreset || "balanced");
   const [executor, setExecutor] = import_react3.default.useState("routed");
   const [executionMode, setExecutionMode] = import_react3.default.useState("read-only");
   const [executionEnvironment, setExecutionEnvironment] = import_react3.default.useState("harness");
+  const manual = assignmentMode === "manual" && mode !== "direct";
+  const runExecutor = manual ? "routed" : executor;
+  const runMode = manual ? "read-only" : executionMode;
+  const runEnvironment = manual ? "harness" : executionEnvironment;
+  const runPreset = manual ? defaultPreset || "balanced" : preset;
   const lastWorkspace = [...ledger?.runs ?? []].map((run) => run.workspace).find(Boolean) ?? "";
   const [workspace, setWorkspace] = import_react3.default.useState("");
   const [phase, setPhase] = import_react3.default.useState({ kind: "idle" });
   const mounted = import_react3.default.useRef(true);
   const confirmRef = import_react3.default.useRef(null);
   const pendingRequest = import_react3.default.useRef(0);
-  const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, preset, workspace, lastWorkspace, planningRevision, disabledReason, executor, executionMode, executionEnvironment]);
+  const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]);
   const latestSignature = import_react3.default.useRef(inputSignature);
   latestSignature.current = inputSignature;
   import_react3.default.useEffect(() => {
@@ -3351,12 +4047,12 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     setPreset(defaultPreset || "balanced");
   }, [defaultPreset]);
   import_react3.default.useEffect(() => {
-    if (mode !== "team") {
+    if (mode !== "team" || manual) {
       setExecutor("routed");
       setExecutionMode("read-only");
       setExecutionEnvironment("harness");
     }
-  }, [mode]);
+  }, [mode, manual]);
   import_react3.default.useEffect(() => {
     pendingRequest.current += 1;
     setPhase((previous) => ["previewing", "preview", "error"].includes(previous.kind) ? { kind: "idle" } : previous);
@@ -3364,16 +4060,35 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   import_react3.default.useEffect(() => {
     if (phase.kind === "preview") confirmRef.current?.focus();
   }, [phase.kind]);
-  const request = () => launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace: text2(workspace) || lastWorkspace, executor, executionMode, executionEnvironment });
+  const request = () => launchRequest({
+    task,
+    mode,
+    directRoute,
+    budgetUsd,
+    preset: runPreset,
+    workspace: text2(workspace) || lastWorkspace,
+    executor: runExecutor,
+    executionMode: runMode,
+    executionEnvironment: runEnvironment,
+    assignmentMode: manual ? "manual" : "algorithm",
+    packageAssignments,
+    packagePlanKey: packagePlanKey2
+  });
   const unavailable = typeof previewRun !== "function" || typeof startRun !== "function";
-  const blocked = disabledReason || (unavailable ? "\u5DE5\u4F5C\u53F0\u6267\u884C\u670D\u52A1\u5C1A\u672A\u52A0\u8F7D\uFF0C\u8BF7\u66F4\u65B0\u63D2\u4EF6\u540E\u91CD\u8BD5\u3002" : !text2(task) ? "\u5148\u5728\u4E0A\u65B9\u201C\u4EFB\u52A1\u89C4\u5212\u201D\u4E2D\u63CF\u8FF0\u4EFB\u52A1\u3002" : executor === "official-team" && mode !== "team" ? "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u9700\u8981\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D\u3002" : "");
+  const blocked = disabledReason || (unavailable ? "\u5DE5\u4F5C\u53F0\u6267\u884C\u670D\u52A1\u5C1A\u672A\u52A0\u8F7D\uFF0C\u8BF7\u66F4\u65B0\u63D2\u4EF6\u540E\u91CD\u8BD5\u3002" : !text2(task) ? "\u5148\u5728\u4E0A\u65B9\u201C\u4EFB\u52A1\u89C4\u5212\u201D\u4E2D\u63CF\u8FF0\u4EFB\u52A1\u3002" : manual && !packagePlanKey2 ? "\u8BF7\u91CD\u65B0\u751F\u6210\u5DE5\u4F5C\u5305\u540E\u518D\u624B\u52A8\u5206\u914D\u3002" : runExecutor === "official-team" && mode !== "team" ? "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u9700\u8981\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D\u3002" : "");
   const busy = phase.kind === "previewing" || phase.kind === "running";
   const recordedRun = phase.kind === "done" && phase.value.runId ? (ledger?.runs ?? []).find((run) => run.id === phase.value.runId) : null;
   const resultStatus = recordedRun?.status ?? phase.value?.status;
   const preview = async () => {
     if (blocked || busy) return;
     const current = ++pendingRequest.current;
-    const snapshot = request();
+    let snapshot;
+    try {
+      snapshot = request();
+    } catch (error) {
+      setPhase({ kind: "error", message: text2(error?.message) || "\u5206\u914D\u8BBE\u7F6E\u65E0\u6548\u3002" });
+      return;
+    }
     const signature2 = inputSignature;
     setPhase({ kind: "previewing" });
     try {
@@ -3402,16 +4117,16 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       if (mounted.current) setPhase({ kind: "error", message: text2(error?.message) || "\u6267\u884C\u5931\u8D25\u3002" });
     }
   };
-  return /* @__PURE__ */ import_react3.default.createElement("section", { className: "mr-card", "aria-label": "\u5728\u5DE5\u4F5C\u53F0\u6267\u884C" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("h2", { className: "mr-card-title" }, "\u5728\u5DE5\u4F5C\u53F0\u6267\u884C"), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-card-copy" }, "\u4F7F\u7528\u4E0A\u65B9\u7684\u4EFB\u52A1\u63CF\u8FF0\u4E0E\u89C4\u5212\u6A21\u5F0F\uFF0C\u5148\u9884\u89C8\u6267\u884C\u8BA1\u5212\u3001\u6743\u9650\u4E0E\u9884\u4F30\u8D39\u7528\uFF0C\u786E\u8BA4\u540E\u624D\u4F1A\u542F\u52A8\u6267\u884C\u3002\u6A21\u578B\u8DEF\u7531\u6267\u884C\u53EA\u8BFB\u4EFB\u52A1\uFF1B\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u53EF\u9009\u62E9\u53EA\u8BFB\u68C0\u67E5\uFF0C\u6216\u5728\u9694\u79BB\u5DE5\u4F5C\u6811\u4E2D\u4F7F\u7528 CLI \u7684\u6B63\u5E38\u5DE5\u5177\u7F16\u8F91\u6587\u4EF6\u3002"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-executor" }, "\u6267\u884C\u65B9\u5F0F"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-executor" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executor === "routed", disabled: busy, onClick: () => {
+  return /* @__PURE__ */ import_react3.default.createElement("section", { className: "mr-card", "aria-label": "\u5728\u5DE5\u4F5C\u53F0\u6267\u884C" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("h2", { className: "mr-card-title" }, "\u5728\u5DE5\u4F5C\u53F0\u6267\u884C"), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-card-copy" }, "\u4F7F\u7528\u4E0A\u65B9\u7684\u4EFB\u52A1\u63CF\u8FF0\u4E0E\u89C4\u5212\u6A21\u5F0F\uFF0C\u5148\u9884\u89C8\u6267\u884C\u8BA1\u5212\u3001\u6743\u9650\u4E0E\u9884\u4F30\u8D39\u7528\uFF0C\u786E\u8BA4\u540E\u624D\u4F1A\u542F\u52A8\u6267\u884C\u3002\u6A21\u578B\u8DEF\u7531\u6267\u884C\u53EA\u8BFB\u4EFB\u52A1\uFF1B\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u53EF\u9009\u62E9\u53EA\u8BFB\u68C0\u67E5\uFF0C\u6216\u5728\u9694\u79BB\u5DE5\u4F5C\u6811\u4E2D\u4F7F\u7528 CLI \u7684\u6B63\u5E38\u5DE5\u5177\u7F16\u8F91\u6587\u4EF6\u3002"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-executor" }, "\u6267\u884C\u65B9\u5F0F"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-executor" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "routed", disabled: busy, onClick: () => {
     setExecutor("routed");
     setExecutionMode("read-only");
     setExecutionEnvironment("harness");
-  } }, "\u6A21\u578B\u8DEF\u7531\uFF08\u53EA\u8BFB\uFF09"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executor === "official-team", disabled: busy || mode !== "team", title: mode !== "team" ? "\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D" : "\u7531\u5B98\u65B9 CLI \u534F\u4F5C\u6267\u884C\u5DE5\u4F5C\u5305", onClick: () => {
-    if (mode === "team") setExecutor("official-team");
-  } }, "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C"))), executor === "official-team" && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-permission" }, "\u4EFB\u52A1\u6743\u9650"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-permission" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionMode === "read-only", disabled: busy, onClick: () => {
+  } }, manual ? "\u624B\u52A8\u5206\u914D\uFF08\u53EA\u8BFB\uFF09" : "\u6A21\u578B\u8DEF\u7531\uFF08\u53EA\u8BFB\uFF09"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "official-team", disabled: busy || mode !== "team" || manual, title: manual ? "\u624B\u52A8\u5206\u914D\u6309\u5305\u6267\u884C\u53EA\u8BFB\u4EFB\u52A1" : mode !== "team" ? "\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D" : "\u7531\u5B98\u65B9 CLI \u534F\u4F5C\u6267\u884C\u5DE5\u4F5C\u5305", onClick: () => {
+    if (mode === "team" && !manual) setExecutor("official-team");
+  } }, "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C"))), runExecutor === "official-team" && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-permission" }, "\u4EFB\u52A1\u6743\u9650"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-permission" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionMode === "read-only", disabled: busy, onClick: () => {
     setExecutionMode("read-only");
     setExecutionEnvironment("harness");
-  } }, "\u53EA\u8BFB\u68C0\u67E5"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionMode === "workspace-write", disabled: busy, onClick: () => setExecutionMode("workspace-write") }, "\u7F16\u8F91\u6587\u4EF6"))), executor === "official-team" && executionMode === "workspace-write" && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-environment" }, "\u6267\u884C\u73AF\u5883"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-environment" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "harness", disabled: busy, onClick: () => setExecutionEnvironment("harness") }, "Harness \u53D7\u9650\u73AF\u5883"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "cli-native", disabled: busy, onClick: () => setExecutionEnvironment("cli-native") }, "\u5382\u5546 CLI \u6B63\u5E38\u73AF\u5883"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-preset" }, "\u8DEF\u7531\u65B9\u6848"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-preset" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react3.default.createElement("button", { key: item.id, type: "button", title: item.description, "aria-pressed": preset === item.id, disabled: busy || mode === "direct", onClick: () => setPreset(item.id) }, item.label)))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group mr-launch-workspace" }, /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-launch-workspace" }, "\u5DE5\u4F5C\u533A\uFF08\u7EDD\u5BF9\u8DEF\u5F84\uFF09"), /* @__PURE__ */ import_react3.default.createElement("input", { className: "mr-input", id: "mr-launch-workspace", value: workspace, disabled: busy, placeholder: lastWorkspace ? `\u7559\u7A7A\u6CBF\u7528\u4E0A\u6B21\u8FD0\u884C\uFF1A${lastWorkspace}` : "\u4F8B\u5982 D:\\projects\\demo \u6216 /home/me/demo", onChange: (event) => setWorkspace(event.target.value) }))), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, executor === "official-team" ? `${executionMode === "workspace-write" ? "\u7F16\u8F91\u6587\u4EF6\uFF1A\u5404\u5DE5\u4F5C\u5305\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u4F7F\u7528 CLI \u6B63\u5E38\u5DE5\u5177\uFF0C\u5B8C\u6210\u540E\u6574\u5408\u56DE\u6240\u9009\u5DE5\u4F5C\u533A\u3002" : "\u53EA\u8BFB\u68C0\u67E5\uFF1A\u5404\u5DE5\u4F5C\u5305\u4F7F\u7528\u53D7\u9650\u5DE5\u5177\u96C6\uFF0C\u4E0D\u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\uFF1BClaude \u7981\u7528 shell\u3001\u6280\u80FD\u53CA\u65E2\u6709 MCP\uFF0C\u5E76\u5FFD\u7565\u7528\u6237\u8BBE\u7F6E\u3002"}\u5931\u8D25\u65F6\u4E0D\u4F1A\u81EA\u52A8\u66FF\u6362\u4E3A\u6A21\u578B\u76EE\u5F55 API\u3002\u5DF2\u767B\u5F55\u4E0D\u4EE3\u8868\u5F53\u524D\u4EFB\u52A1\u6743\u9650\u5DF2\u5C31\u7EEA\uFF0C\u9884\u89C8\u4F1A\u68C0\u67E5\u53EF\u7528\u5DE5\u5177\u3002` : mode === "direct" ? `\u6307\u5B9A\u6A21\u578B\uFF1A${directRoute ? `${directRoute.provider}/${directRoute.model}` : "\u672A\u9009\u62E9"}\uFF08\u8DF3\u8FC7\u8DEF\u7531\uFF0C\u65B9\u6848\u4E0D\u751F\u6548\uFF09` : mode === "team" ? "\u56E2\u961F\u5206\u5DE5\uFF1A\u6309\u4F9D\u8D56\u6267\u884C\u53EA\u8BFB\u5DE5\u4F5C\u5305\uFF0C\u6BCF\u6B65\u4F7F\u7528\u53EF\u7528\u7684\u5B98\u65B9 CLI \u6216\u6A21\u578B\u76EE\u5F55 API\u3002" : "\u5355\u4EFB\u52A1\uFF1A\u6309\u65B9\u6848\u9009\u62E9\u4E00\u6761\u8DEF\u7EBF\u3002"), mode !== "team" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u4F7F\u7528\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u524D\uFF0C\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D\u3002"), executionEnvironment === "cli-native" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5382\u5546 CLI \u4F7F\u7528\u539F\u767B\u5F55\u3001\u914D\u7F6E\u3001\u6280\u80FD\u53CA MCP\uFF0C\u4EE5\u5F53\u524D\u7528\u6237\u6743\u9650\u8FD0\u884C\uFF0C\u4E0D\u7ECF\u8FC7 Harness \u8FDB\u7A0B\u6C99\u7BB1\u3002\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u7528\u4E8E\u6536\u96C6\u6539\u52A8\uFF0C\u4E0D\u662F\u64CD\u4F5C\u7CFB\u7EDF\u8BFB\u5199\u8FB9\u754C\uFF1B\u4E0D\u4F1A\u81EA\u52A8\u5207\u6362\u5230\u6B64\u73AF\u5883\u3002"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button", type: "button", disabled: Boolean(blocked) || busy, onClick: () => {
+  } }, "\u53EA\u8BFB\u68C0\u67E5"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionMode === "workspace-write", disabled: busy, onClick: () => setExecutionMode("workspace-write") }, "\u7F16\u8F91\u6587\u4EF6"))), runExecutor === "official-team" && executionMode === "workspace-write" && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-environment" }, "\u6267\u884C\u73AF\u5883"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-environment" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "harness", disabled: busy, onClick: () => setExecutionEnvironment("harness") }, "Harness \u53D7\u9650\u73AF\u5883"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "cli-native", disabled: busy, onClick: () => setExecutionEnvironment("cli-native") }, "\u5382\u5546 CLI \u6B63\u5E38\u73AF\u5883"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-preset" }, "\u8DEF\u7531\u65B9\u6848"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-preset" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react3.default.createElement("button", { key: item.id, type: "button", title: manual ? "\u624B\u52A8\u5206\u914D\u6CBF\u7528\u5F53\u524D\u5EFA\u8BAE\u7684\u65B9\u6848\uFF1B\u66F4\u6539\u65B9\u6848\u540E\u8BF7\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u3002" : item.description, "aria-pressed": runPreset === item.id, disabled: busy || mode === "direct" || manual, onClick: () => setPreset(item.id) }, item.label)))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group mr-launch-workspace" }, /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-launch-workspace" }, "\u5DE5\u4F5C\u533A\uFF08\u7EDD\u5BF9\u8DEF\u5F84\uFF09"), /* @__PURE__ */ import_react3.default.createElement("input", { className: "mr-input", id: "mr-launch-workspace", value: workspace, disabled: busy, placeholder: lastWorkspace ? `\u7559\u7A7A\u6CBF\u7528\u4E0A\u6B21\u8FD0\u884C\uFF1A${lastWorkspace}` : "\u4F8B\u5982 D:\\projects\\demo \u6216 /home/me/demo", onChange: (event) => setWorkspace(event.target.value) }))), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, manual ? "\u624B\u52A8\u5206\u914D\u6309\u5305\u6267\u884C\u53EA\u8BFB\u4EFB\u52A1\uFF0C\u53EF\u6DF7\u5408\u6A21\u578B API \u4E0E\u5B98\u65B9\u5DE5\u5177\uFF1B\u5DE5\u5177\u4F7F\u7528\u9ED8\u8BA4\u6A21\u578B\u3002\u6240\u9009\u76EE\u6807\u3001\u5C31\u7EEA\u72B6\u6001\u548C\u8D39\u7528\u4EE5\u6267\u884C\u9884\u89C8\u4E3A\u51C6\u3002" : executor === "official-team" ? `${executionMode === "workspace-write" ? "\u7F16\u8F91\u6587\u4EF6\uFF1A\u5404\u5DE5\u4F5C\u5305\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u4F7F\u7528 CLI \u6B63\u5E38\u5DE5\u5177\uFF0C\u5B8C\u6210\u540E\u6574\u5408\u56DE\u6240\u9009\u5DE5\u4F5C\u533A\u3002" : "\u53EA\u8BFB\u68C0\u67E5\uFF1A\u5404\u5DE5\u4F5C\u5305\u4F7F\u7528\u53D7\u9650\u5DE5\u5177\u96C6\uFF0C\u4E0D\u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\uFF1BClaude \u7981\u7528 shell\u3001\u6280\u80FD\u53CA\u65E2\u6709 MCP\uFF0C\u5E76\u5FFD\u7565\u7528\u6237\u8BBE\u7F6E\u3002"}\u5931\u8D25\u65F6\u4E0D\u4F1A\u81EA\u52A8\u66FF\u6362\u4E3A\u6A21\u578B\u76EE\u5F55 API\u3002\u5DF2\u767B\u5F55\u4E0D\u4EE3\u8868\u5F53\u524D\u4EFB\u52A1\u6743\u9650\u5DF2\u5C31\u7EEA\uFF0C\u9884\u89C8\u4F1A\u68C0\u67E5\u53EF\u7528\u5DE5\u5177\u3002` : mode === "direct" ? `\u6307\u5B9A\u6A21\u578B\uFF1A${directRoute ? `${directRoute.provider}/${directRoute.model}` : "\u672A\u9009\u62E9"}\uFF08\u8DF3\u8FC7\u8DEF\u7531\uFF0C\u65B9\u6848\u4E0D\u751F\u6548\uFF09` : mode === "team" ? "\u56E2\u961F\u5206\u5DE5\uFF1A\u6309\u4F9D\u8D56\u6267\u884C\u53EA\u8BFB\u5DE5\u4F5C\u5305\uFF0C\u6BCF\u6B65\u4F7F\u7528\u53EF\u7528\u7684\u5B98\u65B9 CLI \u6216\u6A21\u578B\u76EE\u5F55 API\u3002" : "\u5355\u4EFB\u52A1\uFF1A\u6309\u65B9\u6848\u9009\u62E9\u4E00\u6761\u8DEF\u7EBF\u3002"), mode !== "team" && !manual && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u4F7F\u7528\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u524D\uFF0C\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D\u3002"), runEnvironment === "cli-native" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5382\u5546 CLI \u4F7F\u7528\u539F\u767B\u5F55\u3001\u914D\u7F6E\u3001\u6280\u80FD\u53CA MCP\uFF0C\u4EE5\u5F53\u524D\u7528\u6237\u6743\u9650\u8FD0\u884C\uFF0C\u4E0D\u7ECF\u8FC7 Harness \u8FDB\u7A0B\u6C99\u7BB1\u3002\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u7528\u4E8E\u6536\u96C6\u6539\u52A8\uFF0C\u4E0D\u662F\u64CD\u4F5C\u7CFB\u7EDF\u8BFB\u5199\u8FB9\u754C\uFF1B\u4E0D\u4F1A\u81EA\u52A8\u5207\u6362\u5230\u6B64\u73AF\u5883\u3002"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button", type: "button", disabled: Boolean(blocked) || busy, onClick: () => {
     void preview();
   } }, phase.kind === "previewing" ? "\u6B63\u5728\u751F\u6210\u9884\u89C8\u2026" : "\u9884\u89C8\u6267\u884C\u8BA1\u5212"), blocked && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, blocked)), phase.kind === "previewing" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u6309\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u3001\u767B\u5F55\u72B6\u6001\u548C\u9884\u7B97\u751F\u6210\u6267\u884C\u8BA1\u5212\u2026"), phase.kind === "error" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, phase.message), (phase.kind === "preview" && phase.signature === inputSignature || phase.kind === "running") && /* @__PURE__ */ import_react3.default.createElement(
     LaunchPreview,
@@ -3436,8 +4151,12 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
   const native = (value.executionEnvironment ?? request?.executionEnvironment) === "cli-native";
   const readOnly = value.readOnly !== false && (value.executionMode ?? request?.executionMode) !== "workspace-write";
   const blocked = value.status === "blocked";
+  const manual = request?.assignmentMode === "manual" || value.assignmentMode === "manual";
   const blocking = [...new Set([value.reason, ...Array.isArray(value.blocking) ? value.blocking : [value.blocking]].map(reasonText).filter(Boolean))];
-  return /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-launch-preview", role: "region", "aria-label": "\u6267\u884C\u9884\u89C8" }, changed && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, "\u786E\u8BA4\u671F\u95F4\u60C5\u51B5\u6709\u53D8\u5316\uFF08\u4F8B\u5982\u9884\u7B97\u6216\u767B\u5F55\u72B6\u6001\uFF09\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u4E0B\u9762\u7684\u786E\u8BA4\u9879\u3002"), blocked && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-error", role: "alert" }, /* @__PURE__ */ import_react3.default.createElement("strong", null, "\u5F53\u524D\u65E0\u6CD5\u542F\u52A8\u6267\u884C\u3002"), blocking.length ? /* @__PURE__ */ import_react3.default.createElement("ul", null, blocking.map((message) => /* @__PURE__ */ import_react3.default.createElement("li", { key: message }, message))) : /* @__PURE__ */ import_react3.default.createElement("p", null, "\u6267\u884C\u6761\u4EF6\u5C1A\u672A\u6EE1\u8DB3\uFF0C\u8BF7\u68C0\u67E5\u6240\u9009\u6743\u9650\u3001\u5DE5\u4F5C\u533A\u548C\u5B98\u65B9\u5DE5\u5177\u72B6\u6001\u540E\u91CD\u65B0\u9884\u89C8\u3002")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, officialTeam ? "\u6267\u884C\u65B9\u5F0F" : "\u8DEF\u7EBF"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, officialTeam ? "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C" : value.selected ? `${value.selected.provider}/${value.selected.model}` : "\u6682\u65E0\u8DEF\u7EBF", value.routingBypassed ? "\uFF08\u6307\u5B9A\u6A21\u578B\uFF09" : "")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u9884\u4F30\u8D39\u7528"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, value.estimatedCost === null || value.estimatedCost === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : money(value.estimatedCost))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u65B9\u6848"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[value.decision?.preset]?.label ?? "\u2014", value.budget?.downgraded ? "\uFF08\u8D85\u9884\u7B97\u81EA\u52A8\u964D\u7EA7\uFF09" : "")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u5DE5\u4F5C\u533A"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value mr-break" }, /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace)))), officialTeam && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u4EFB\u52A1\u6743\u9650\uFF1A", readOnly ? "\u53EA\u8BFB\u68C0\u67E5\uFF0C\u4E0D\u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\u3002\u4F7F\u7528\u53D7\u9650\u5DE5\u5177\u96C6\uFF1BClaude \u7981\u7528 shell\u3001\u6280\u80FD\u53CA\u65E2\u6709 MCP\uFF0C\u5E76\u5FFD\u7565\u7528\u6237\u8BBE\u7F6E\u3002" : /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, "\u7F16\u8F91\u6587\u4EF6\u3002\u7F16\u8F91\u8303\u56F4\uFF1A\u6240\u9009\u5DE5\u4F5C\u533A ", /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace), " \u5185\u7684\u4EFB\u52A1\u6587\u4EF6\u3002\u5B98\u65B9 CLI \u4F7F\u7528\u81EA\u5DF1\u7684\u6B63\u5E38\u5DE5\u5177\uFF0C\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u5B8C\u6210\u540E\u6574\u5408\u56DE\u8BE5\u5DE5\u4F5C\u533A\u3002"), "\u5931\u8D25\u65F6\u4E0D\u4F1A\u81EA\u52A8\u66FF\u6362\u4E3A\u6A21\u578B\u76EE\u5F55 API\u3002"), native && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u6267\u884C\u73AF\u5883\uFF1A\u5382\u5546 CLI \u6B63\u5E38\u73AF\u5883\uFF0C\u4EE5\u5F53\u524D\u7528\u6237\u6743\u9650\u8FD0\u884C\uFF0C\u4E0D\u7ECF Harness \u8FDB\u7A0B\u6C99\u7BB1\u3002\u5DE5\u4F5C\u6811\u4E0D\u9650\u5236\u5DE5\u5177\u8BBF\u95EE\u5DE5\u4F5C\u6811\u5916\u8D44\u6E90\u3002"), !officialTeam && !readOnly && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u7F16\u8F91\u8303\u56F4\uFF1A\u6240\u9009\u5DE5\u4F5C\u533A ", /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace), " \u5185\u7684\u4EFB\u52A1\u6587\u4EF6\uFF1B\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u5B8C\u6210\u540E\u6574\u5408\u56DE\u8BE5\u5DE5\u4F5C\u533A\u3002\u4E0D\u4F1A\u81EA\u52A8\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002"), value.budget?.message && /* @__PURE__ */ import_react3.default.createElement("p", { className: value.budget.exceeded ? "mr-error" : "mr-caption" }, "\u9884\u7B97\u68C0\u67E5\uFF1A", value.budget.message), packages.length > 0 && /* @__PURE__ */ import_react3.default.createElement("ol", { className: "mr-launch-packages" }, packages.map((item) => /* @__PURE__ */ import_react3.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react3.default.createElement("strong", null, item.name), " \u2192 ", item.route || item.toolLabel || item.toolId || item.tool || "\u5F85\u5206\u914D\u8DEF\u7EBF", " ", /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\uFF08\u9884\u4F30 ", item.estimatedCost === null || item.estimatedCost === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : money(item.estimatedCost), item.channel === "official-cli" ? " \xB7 \u5B98\u65B9 CLI" : item.channel ? " \xB7 \u6A21\u578B\u76EE\u5F55 API" : "", "\uFF09"), item.channelDetail && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, item.channelDetail)))), reasons.length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-confirm-box" }, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-section-title" }, "\u6267\u884C\u524D\u9700\u8981\u786E\u8BA4\u4EE5\u4E0B ", reasons.length, " \u9879\uFF1A"), /* @__PURE__ */ import_react3.default.createElement("ol", null, reasons.map((item) => /* @__PURE__ */ import_react3.default.createElement("li", { key: item.code }, reasonText(item))))) : /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5F53\u524D\u6CA1\u6709\u989D\u5916\u786E\u8BA4\u9879\u3002", value.estimatedCost === null || value.estimatedCost === void 0 ? "\u8D39\u7528\u672A\u77E5\uFF0C\u65E0\u6CD5\u786E\u8BA4\u672C\u6B21\u8D39\u7528\u662F\u5426\u5728\u9884\u7B97\u5185\u3002" : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u672C\u6B21\u672A\u8D85\u51FA\u9884\u7B97\uFF1B\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002" : "\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { ref: confirmRef, className: "mr-button", type: "button", disabled: running || blocked, onClick: onConfirm }, running ? "\u6B63\u5728\u6267\u884C\u2026" : reasons.length ? "\u5168\u90E8\u786E\u8BA4\u5E76\u6267\u884C" : "\u786E\u8BA4\u6267\u884C"), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: running, onClick: onCancel }, "\u53D6\u6D88"), running && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption", role: "status", "aria-live": "polite" }, "\u6A21\u578B\u8C03\u7528\u53EF\u80FD\u9700\u8981\u51E0\u5206\u949F\uFF0C\u8BF7\u52FF\u5173\u95ED\u5DE5\u4F5C\u53F0\u3002")));
+  return /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-launch-preview", role: "region", "aria-label": "\u6267\u884C\u9884\u89C8" }, changed && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, "\u786E\u8BA4\u671F\u95F4\u60C5\u51B5\u6709\u53D8\u5316\uFF08\u4F8B\u5982\u9884\u7B97\u6216\u767B\u5F55\u72B6\u6001\uFF09\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u4E0B\u9762\u7684\u786E\u8BA4\u9879\u3002"), blocked && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-error", role: "alert" }, /* @__PURE__ */ import_react3.default.createElement("strong", null, "\u5F53\u524D\u65E0\u6CD5\u542F\u52A8\u6267\u884C\u3002"), blocking.length ? /* @__PURE__ */ import_react3.default.createElement("ul", null, blocking.map((message) => /* @__PURE__ */ import_react3.default.createElement("li", { key: message }, message))) : /* @__PURE__ */ import_react3.default.createElement("p", null, "\u6267\u884C\u6761\u4EF6\u5C1A\u672A\u6EE1\u8DB3\uFF0C\u8BF7\u68C0\u67E5\u6240\u9009\u6743\u9650\u3001\u5DE5\u4F5C\u533A\u548C\u5B98\u65B9\u5DE5\u5177\u72B6\u6001\u540E\u91CD\u65B0\u9884\u89C8\u3002")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, officialTeam || manual ? "\u6267\u884C\u65B9\u5F0F" : "\u8DEF\u7EBF"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, manual ? "\u624B\u52A8\u5206\u914D \xB7 \u6309\u5305\u53EA\u8BFB\u6267\u884C" : officialTeam ? "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C" : value.selected ? `${value.selected.provider}/${value.selected.model}` : "\u6682\u65E0\u8DEF\u7EBF", value.routingBypassed ? "\uFF08\u6307\u5B9A\u6A21\u578B\uFF09" : "")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u9884\u4F30\u8D39\u7528"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, value.estimatedCost === null || value.estimatedCost === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : money(value.estimatedCost))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u65B9\u6848"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[value.decision?.preset]?.label ?? "\u2014", value.budget?.downgraded ? "\uFF08\u8D85\u9884\u7B97\u81EA\u52A8\u964D\u7EA7\uFF09" : "")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u5DE5\u4F5C\u533A"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value mr-break" }, /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace)))), officialTeam && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u4EFB\u52A1\u6743\u9650\uFF1A", readOnly ? "\u53EA\u8BFB\u68C0\u67E5\uFF0C\u4E0D\u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\u3002\u4F7F\u7528\u53D7\u9650\u5DE5\u5177\u96C6\uFF1BClaude \u7981\u7528 shell\u3001\u6280\u80FD\u53CA\u65E2\u6709 MCP\uFF0C\u5E76\u5FFD\u7565\u7528\u6237\u8BBE\u7F6E\u3002" : /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, "\u7F16\u8F91\u6587\u4EF6\u3002\u7F16\u8F91\u8303\u56F4\uFF1A\u6240\u9009\u5DE5\u4F5C\u533A ", /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace), " \u5185\u7684\u4EFB\u52A1\u6587\u4EF6\u3002\u5B98\u65B9 CLI \u4F7F\u7528\u81EA\u5DF1\u7684\u6B63\u5E38\u5DE5\u5177\uFF0C\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u5B8C\u6210\u540E\u6574\u5408\u56DE\u8BE5\u5DE5\u4F5C\u533A\u3002"), "\u5931\u8D25\u65F6\u4E0D\u4F1A\u81EA\u52A8\u66FF\u6362\u4E3A\u6A21\u578B\u76EE\u5F55 API\u3002"), native && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u6267\u884C\u73AF\u5883\uFF1A\u5382\u5546 CLI \u6B63\u5E38\u73AF\u5883\uFF0C\u4EE5\u5F53\u524D\u7528\u6237\u6743\u9650\u8FD0\u884C\uFF0C\u4E0D\u7ECF Harness \u8FDB\u7A0B\u6C99\u7BB1\u3002\u5DE5\u4F5C\u6811\u4E0D\u9650\u5236\u5DE5\u5177\u8BBF\u95EE\u5DE5\u4F5C\u6811\u5916\u8D44\u6E90\u3002"), !officialTeam && !readOnly && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u7F16\u8F91\u8303\u56F4\uFF1A\u6240\u9009\u5DE5\u4F5C\u533A ", /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace), " \u5185\u7684\u4EFB\u52A1\u6587\u4EF6\uFF1B\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u5B8C\u6210\u540E\u6574\u5408\u56DE\u8BE5\u5DE5\u4F5C\u533A\u3002\u4E0D\u4F1A\u81EA\u52A8\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002"), value.budget?.message && /* @__PURE__ */ import_react3.default.createElement("p", { className: value.budget.exceeded ? "mr-error" : "mr-caption" }, "\u9884\u7B97\u68C0\u67E5\uFF1A", value.budget.message), packages.length > 0 && /* @__PURE__ */ import_react3.default.createElement("ol", { className: "mr-launch-packages" }, packages.map((item) => {
+    const tool = item.manualAssignment?.kind === "tool";
+    return /* @__PURE__ */ import_react3.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react3.default.createElement("strong", null, item.name), (manual || item.selectionSource === "manual") && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-pill" }, "\u624B\u52A8"), " \u2192 ", tool ? `${item.toolLabel || item.toolId || item.manualAssignment.toolId} \xB7 \u9ED8\u8BA4\u6A21\u578B` : item.route || item.toolLabel || item.toolId || item.tool || "\u5F85\u5206\u914D\u8DEF\u7EBF", " ", /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\uFF08\u9884\u4F30 ", tool ? "\u8D39\u7528\u672A\u77E5" : item.estimatedCost === null || item.estimatedCost === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : money(item.estimatedCost), item.channel === "official-cli" ? " \xB7 \u5B98\u65B9 CLI" : item.channel ? " \xB7 \u6A21\u578B\u76EE\u5F55 API" : "", "\uFF09"), item.channelDetail && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, item.channelDetail));
+  })), reasons.length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-confirm-box" }, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-section-title" }, "\u6267\u884C\u524D\u9700\u8981\u786E\u8BA4\u4EE5\u4E0B ", reasons.length, " \u9879\uFF1A"), /* @__PURE__ */ import_react3.default.createElement("ol", null, reasons.map((item) => /* @__PURE__ */ import_react3.default.createElement("li", { key: item.code }, reasonText(item))))) : /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5F53\u524D\u6CA1\u6709\u989D\u5916\u786E\u8BA4\u9879\u3002", value.estimatedCost === null || value.estimatedCost === void 0 ? "\u8D39\u7528\u672A\u77E5\uFF0C\u65E0\u6CD5\u786E\u8BA4\u672C\u6B21\u8D39\u7528\u662F\u5426\u5728\u9884\u7B97\u5185\u3002" : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u672C\u6B21\u672A\u8D85\u51FA\u9884\u7B97\uFF1B\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002" : "\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { ref: confirmRef, className: "mr-button", type: "button", disabled: running || blocked, onClick: onConfirm }, running ? "\u6B63\u5728\u6267\u884C\u2026" : reasons.length ? "\u5168\u90E8\u786E\u8BA4\u5E76\u6267\u884C" : "\u786E\u8BA4\u6267\u884C"), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: running, onClick: onCancel }, "\u53D6\u6D88"), running && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption", role: "status", "aria-live": "polite" }, "\u6A21\u578B\u8C03\u7528\u53EF\u80FD\u9700\u8981\u51E0\u5206\u949F\uFF0C\u8BF7\u52FF\u5173\u95ED\u5DE5\u4F5C\u53F0\u3002")));
 }
 
 // .dsh-plugin/client/cli-terminal.jsx
@@ -12870,7 +13589,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.21.1" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.22.0" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -13481,6 +14200,11 @@ var router_main_default = `.mr-workspace {
 .mr-package-name { font-size: 12px; font-weight: 750; }
 .mr-package-route { color: var(--mr-accent); font-size: 11px; font-weight: 700; }
 .mr-package-copy { margin: 7px 0 0; color: var(--mr-muted); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.mr-assignment-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.mr-assignment-target { display: grid; gap: 7px; margin: 12px 0; min-width: 0; }
+.mr-assignment-target label { font-size: 12px; font-weight: 650; }
+.mr-assignment-target select { width: 100%; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+.mr-launch-packages .mr-pill { margin-left: 6px; }
 .mr-notice { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(49, 92, 200, .16); border-radius: 12px; background: #eff4ff; color: #354d7a; font-size: 11px; line-height: 1.65; }
 .mr-notice code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }
 @media (max-width: 850px) { .mr-grid { grid-template-columns: 1fr; } .mr-shell { padding: 24px 18px 48px; } }
@@ -13704,6 +14428,7 @@ var text5 = (value) => typeof value === "string" ? value.trim() : "";
 var routingSettingsSignature = (value) => JSON.stringify([
   value.modelProfilesJson,
   value.routingPreset,
+  value.allowManualReassign,
   ...Object.keys(ADAPTIVE_DEFAULTS).map((key) => value[key] ?? ADAPTIVE_DEFAULTS[key])
 ]);
 function RouterPanelIcon({ size = 20, active = false }) {
@@ -13722,12 +14447,25 @@ function ChannelBadge({ item }) {
   const official = item.executionChannel === "official-cli";
   return /* @__PURE__ */ import_react5.default.createElement("span", { className: official ? "mr-pill mr-pill-channel-ok" : "mr-pill", title: item.channelDetail ?? "" }, official ? `\u5B98\u65B9 CLI \xB7 ${item.channelLabel ?? item.channelTool}` : "\u6A21\u578B\u76EE\u5F55 API");
 }
-function PlanResults({ plan, ledger, headingRef }) {
+function PlanResults({ plan, ledger, headingRef, assignmentMode = "algorithm", packageAssignments = {}, assignmentOptions = [], manualAllowed = true, onAssignmentModeChange, onPackageAssignmentChange, onRestoreAssignments }) {
   const selected = plan.selected;
   const budget = planBudget(ledger, plan.estimatedCost);
   const packageNames = new Map((plan.team?.workPackages ?? []).map((item) => [item.id, item.name]));
   const purposeLabel = { analysis: "\u4EFB\u52A1\u5206\u6790", execution: "\u4EFB\u52A1\u5B9E\u65BD", verification: "\u72EC\u7ACB\u9A8C\u8BC1", synthesis: "\u7ED3\u679C\u6574\u5408" };
-  return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8DEF\u7531\u5EFA\u8BAE" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title", ref: headingRef, tabIndex: -1 }, "\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u672C\u5730\u8BA1\u7B97\u5B8C\u6210\uFF0C\u672A\u5411\u6A21\u578B\u53D1\u9001\u4EFB\u52A1\u5185\u5BB9\u3002"))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u63A8\u8350\u8DEF\u7EBF"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "\u6682\u65E0\u8DEF\u7EBF")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u4EFB\u52A1\u590D\u6742\u5EA6 \xB7 \u5206\u503C\uFF080\u20131\uFF09"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u590D\u6742" }[plan.complexity.band] || plan.complexity.band, " \xB7 ", plan.complexity.value)), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u4F30\u7B97\u603B\u6210\u672C"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, money2(plan.estimatedCost))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u8DEF\u7531\u65B9\u6848"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[plan.preset]?.label ?? "\u5747\u8861"))), budget?.exceeded && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, "\u6267\u884C\u524D\u9884\u7B97\u68C0\u67E5\uFF1A", budget.message, " \u5B9E\u9645\u6267\u884C\u65F6\u5C06\u6309\u8BBE\u7F6E\u81EA\u52A8\u964D\u7EA7\u6216\u6682\u505C\u8BE2\u95EE\u3002"), budget?.limited && !budget.exceeded && budget.estimateKnown && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u6267\u884C\u524D\u9884\u7B97\u68C0\u67E5\uFF1A\u672C\u6B21\u9884\u4F30 ", money2(plan.estimatedCost), "\uFF0C\u5269\u4F59\u989D\u5EA6 ", money2(budget.remainingUsd), "\u3002"), plan.loginRequired && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u63A8\u8350\u6A21\u578B\u7684\u5B98\u65B9 CLI \u672A\u767B\u5F55\uFF0C\u6267\u884C\u65F6\u6309\u8BA1\u8D39\u8BBE\u7F6E\u6682\u505C\u6216\u4F7F\u7528\u6A21\u578B\u76EE\u5F55 API\uFF1B\u53EF\u5728\u201C\u5B98\u65B9\u5DE5\u5177\u201D\u5361\u7247\u70B9\u201C\u53BB\u767B\u5F55\u201D\u3002"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-control-label" }, "\u6267\u884C\u6E20\u9053"), /* @__PURE__ */ import_react5.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-plan-explanation" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u67E5\u770B\u89C4\u5212\u4F9D\u636E\u4E0E\u4F30\u7B97\u8BF4\u660E"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.reason), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.pricingNotice, " ", plan.qualityNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")), plan.optimization.budgetExceeded && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error" }, "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u4EFB\u52A1\u53EF\u80FD\u8D85\u8FC7\u672C\u6B21\u9884\u7B97\u3002\u9884\u7B97\u53EA\u5F71\u54CD\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u963B\u6B62\u5B9E\u9645\u6263\u8D39\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("h3", { className: "mr-section-title" }, "\u56E2\u961F\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u4E0B\u65B9\u6A21\u578B\u662F\u5DE5\u4F5C\u5305\u7684\u89C4\u5212\u5EFA\u8BAE\u3002\u6A21\u578B\u8DEF\u7531\u6309\u53EA\u8BFB\u65B9\u5F0F\u6267\u884C\uFF0C\u6BCF\u6B65\u53EF\u4F7F\u7528\u5B98\u65B9 CLI \u6216\u6A21\u578B\u76EE\u5F55 API\uFF1B\u5982\u9700\u7F16\u8F91\u6587\u4EF6\uFF0C\u53EF\u5728\u4E0B\u65B9\u6267\u884C\u533A\u9009\u62E9\u201C\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u201D\u548C\u201C\u7F16\u8F91\u6587\u4EF6\u201D\u6743\u9650\u3002CLI \u8BF7\u6C42\u6A21\u578B\u540D\u9700\u7B26\u5408\u5382\u5546\u89C4\u5219\uFF0C\u5B9E\u9645\u6A21\u578B\u4EE5\u8FD0\u884C\u8BB0\u5F55\u4E3A\u51C6\u3002"), plan.team.workPackages.length > 1 && /* @__PURE__ */ import_react5.default.createElement(DagView, { packages: plan.team.workPackages, label: "\u5DE5\u4F5C\u5305\u4F9D\u8D56\u56FE", renderNode: (item) => /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel) }), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-empty" }, "\u5F53\u524D\u76EE\u5F55\u6CA1\u6709\u53EF\u5206\u914D\u7684\u6A21\u578B\u8DEF\u7EBF\u3002") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-package mr-package-details", key: item.id }, /* @__PURE__ */ import_react5.default.createElement("summary", null, /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-package-route" }, item.recommendedProvider, "/", item.recommendedModel)), item.objective && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u5177\u4F53\u76EE\u6807\uFF1A", item.objective), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, purposeLabel[item.purpose] ?? item.purpose, item.dependsOn.length > 0 ? ` \xB7 \u4F9D\u8D56\uFF1A${item.dependsOn.map((id2) => packageNames.get(id2) ?? id2).join("\u3001")}` : ""), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u96BE\u5EA6\uFF1A", { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u56F0\u96BE" }[item.difficulty] || item.difficulty || "\u5F85\u8BC4\u4F30", " \xB7 \u8D39\u7528\uFF1A", money2(item.estimatedCost)), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u9A8C\u6536\uFF1A", item.verificationChecklist.join("\uFF1B")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react5.default.createElement(ChannelBadge, { item }), item.loginRequired && /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-pill" }, "CLI \u672A\u767B\u5F55")), item.channelDetail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u6E20\u9053\u8BF4\u660E\uFF1A", item.channelDetail)))), plan.routingBypassed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u5DF2\u6307\u5B9A\u5355\u4E00\u6A21\u578B\uFF0C\u672A\u4E0E\u5176\u4ED6\u8DEF\u7EBF\u6BD4\u8F83\u3002\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u8C03\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_execute"), " \u5E76\u4F20\u5165\u8BE5 provider \u4E0E model \u5373\u53EF\u76F4\u63A5\u6267\u884C\uFF1B\u82E5\u8BE5\u6A21\u578B\u5141\u8BB8\u5B98\u65B9\u5DE5\u5177\uFF0C\u4F1A\u4F18\u5148\u4F7F\u7528\u5BF9\u5E94 CLI\u3002"), plan.mode === "team" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.team.handoff)));
+  return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card mr-results", "aria-label": "\u8DEF\u7531\u5EFA\u8BAE" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title", ref: headingRef, tabIndex: -1 }, "\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u672C\u5730\u8BA1\u7B97\u5B8C\u6210\uFF0C\u672A\u5411\u6A21\u578B\u53D1\u9001\u4EFB\u52A1\u5185\u5BB9\u3002"))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, assignmentMode === "manual" ? "\u7B97\u6CD5\u539F\u63A8\u8350\u8DEF\u7EBF" : "\u63A8\u8350\u8DEF\u7EBF"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "\u6682\u65E0\u8DEF\u7EBF")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u4EFB\u52A1\u590D\u6742\u5EA6 \xB7 \u5206\u503C\uFF080\u20131\uFF09"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u590D\u6742" }[plan.complexity.band] || plan.complexity.band, " \xB7 ", plan.complexity.value)), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, assignmentMode === "manual" ? "\u8C03\u6574\u524D\u7B97\u6CD5\u65B9\u6848\u4F30\u7B97" : "\u4F30\u7B97\u603B\u6210\u672C"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, money2(plan.estimatedCost))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-label" }, "\u8DEF\u7531\u65B9\u6848"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[plan.preset]?.label ?? "\u5747\u8861"))), budget?.exceeded && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, assignmentMode === "manual" ? "\u7B97\u6CD5\u539F\u65B9\u6848\u9884\u7B97\u63D0\u793A\uFF1A" : "\u6267\u884C\u524D\u9884\u7B97\u68C0\u67E5\uFF1A", budget.message, " ", assignmentMode === "manual" ? "\u624B\u52A8\u65B9\u6848\u5C06\u91CD\u65B0\u9884\u89C8\u8D39\u7528\uFF0C\u8D85\u9884\u7B97\u65F6\u6682\u505C\u786E\u8BA4\uFF0C\u4E0D\u81EA\u52A8\u66FF\u6362\u76EE\u6807\u3002" : "\u5B9E\u9645\u6267\u884C\u65F6\u5C06\u6309\u8BBE\u7F6E\u81EA\u52A8\u964D\u7EA7\u6216\u6682\u505C\u8BE2\u95EE\u3002"), budget?.limited && !budget.exceeded && budget.estimateKnown && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, assignmentMode === "manual" ? "\u7B97\u6CD5\u539F\u65B9\u6848\uFF1A" : "\u6267\u884C\u524D\u9884\u7B97\u68C0\u67E5\uFF1A\u672C\u6B21\u9884\u4F30 ", money2(plan.estimatedCost), "\uFF0C\u5269\u4F59\u989D\u5EA6 ", money2(budget.remainingUsd), "\u3002"), plan.loginRequired && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u63A8\u8350\u6A21\u578B\u7684\u5B98\u65B9 CLI \u672A\u767B\u5F55\uFF0C\u6267\u884C\u65F6\u6309\u8BA1\u8D39\u8BBE\u7F6E\u6682\u505C\u6216\u4F7F\u7528\u6A21\u578B\u76EE\u5F55 API\uFF1B\u53EF\u5728\u201C\u5B98\u65B9\u5DE5\u5177\u201D\u5361\u7247\u70B9\u201C\u53BB\u767B\u5F55\u201D\u3002"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-control-label" }, assignmentMode === "manual" ? "\u7B97\u6CD5\u539F\u63A8\u8350\u6E20\u9053" : "\u6267\u884C\u6E20\u9053"), /* @__PURE__ */ import_react5.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-plan-explanation" }, /* @__PURE__ */ import_react5.default.createElement("summary", null, "\u67E5\u770B\u89C4\u5212\u4F9D\u636E\u4E0E\u4F30\u7B97\u8BF4\u660E"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.reason), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.pricingNotice, " ", plan.qualityNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")), plan.optimization.budgetExceeded && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error" }, "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u4EFB\u52A1\u53EF\u80FD\u8D85\u8FC7\u672C\u6B21\u9884\u7B97\u3002\u9884\u7B97\u53EA\u5F71\u54CD\u5EFA\u8BAE\uFF0C\u4E0D\u4F1A\u963B\u6B62\u5B9E\u9645\u6263\u8D39\u3002"), !plan.routingBypassed && plan.team && /* @__PURE__ */ import_react5.default.createElement(import_react5.default.Fragment, null, /* @__PURE__ */ import_react5.default.createElement("h3", { className: "mr-section-title" }, plan.mode === "team" ? "\u56E2\u961F\u5DE5\u4F5C\u5305" : "\u4EFB\u52A1\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-assignment-controls" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "\u5DE5\u4F5C\u5305\u5206\u914D\u65B9\u5F0F" }, /* @__PURE__ */ import_react5.default.createElement("button", { type: "button", "aria-pressed": assignmentMode === "algorithm", onClick: () => onAssignmentModeChange?.("algorithm") }, "\u6309\u7B97\u6CD5\u63A8\u8350\u5206\u914D"), /* @__PURE__ */ import_react5.default.createElement("button", { type: "button", "aria-pressed": assignmentMode === "manual", disabled: !manualAllowed || !plan.team.workPackages.length, title: !manualAllowed ? "\u8BBE\u7F6E\u4E2D\u5DF2\u5173\u95ED\u624B\u52A8\u6539\u6D3E" : "\u4E3A\u6BCF\u4E2A\u5DE5\u4F5C\u5305\u9009\u62E9\u6A21\u578B API \u6216\u5B98\u65B9\u5DE5\u5177", onClick: () => onAssignmentModeChange?.("manual") }, "\u624B\u52A8\u8C03\u6574\u5206\u914D")), assignmentMode === "manual" && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: onRestoreAssignments }, "\u6062\u590D\u63A8\u8350\u5206\u914D")), !manualAllowed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u8BBE\u7F6E\u4E2D\u5DF2\u5173\u95ED\u624B\u52A8\u6539\u6D3E\u3002"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, assignmentMode === "manual" ? "\u624B\u52A8\u5206\u914D\u53EF\u6DF7\u5408\u6A21\u578B API \u4E0E\u5B98\u65B9\u5DE5\u5177\uFF0C\u6309\u4F9D\u8D56\u6267\u884C\u53EA\u8BFB\u4EFB\u52A1\uFF1B\u5DE5\u5177\u4F7F\u7528\u9ED8\u8BA4\u6A21\u578B\u3002\u4E0A\u65B9\u8D39\u7528\u4ECD\u662F\u7B97\u6CD5\u5EFA\u8BAE\u4F30\u7B97\uFF0C\u624B\u52A8\u76EE\u6807\u4E0E\u8D39\u7528\u4EE5\u6267\u884C\u9884\u89C8\u4E3A\u51C6\uFF0C\u9884\u89C8\u4F1A\u6838\u9A8C\u5957\u9910\u8BA1\u8D39\u4E0E\u5DE5\u5177\u5C31\u7EEA\u72B6\u6001\u3002" : "\u4E0B\u65B9\u6A21\u578B\u662F\u5DE5\u4F5C\u5305\u7684\u89C4\u5212\u5EFA\u8BAE\u3002\u6A21\u578B\u8DEF\u7531\u6309\u53EA\u8BFB\u65B9\u5F0F\u6267\u884C\uFF0C\u6BCF\u6B65\u53EF\u4F7F\u7528\u5B98\u65B9 CLI \u6216\u6A21\u578B\u76EE\u5F55 API\uFF1B\u5982\u9700\u7F16\u8F91\u6587\u4EF6\uFF0C\u53EF\u5728\u4E0B\u65B9\u6267\u884C\u533A\u9009\u62E9\u201C\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u201D\u548C\u201C\u7F16\u8F91\u6587\u4EF6\u201D\u6743\u9650\u3002CLI \u8BF7\u6C42\u6A21\u578B\u540D\u9700\u7B26\u5408\u5382\u5546\u89C4\u5219\uFF0C\u5B9E\u9645\u6A21\u578B\u4EE5\u8FD0\u884C\u8BB0\u5F55\u4E3A\u51C6\u3002"), plan.team.workPackages.length > 1 && /* @__PURE__ */ import_react5.default.createElement(DagView, { packages: plan.team.workPackages, label: "\u5DE5\u4F5C\u5305\u4F9D\u8D56\u56FE", renderNode: (item) => /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-route" }, "\u7B97\u6CD5\u63A8\u8350\uFF1A", item.recommendedProvider, "/", item.recommendedModel) }), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-empty" }, "\u5F53\u524D\u76EE\u5F55\u6CA1\u6709\u53EF\u5206\u914D\u7684\u6A21\u578B\u8DEF\u7EBF\u3002") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react5.default.createElement("details", { className: "mr-package mr-package-details", key: item.id, open: assignmentMode === "manual" ? true : void 0 }, /* @__PURE__ */ import_react5.default.createElement("summary", null, /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-package-route" }, "\u7B97\u6CD5\u63A8\u8350\uFF1A", item.recommendedProvider, "/", item.recommendedModel)), assignmentMode === "manual" && /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-assignment-target" }, /* @__PURE__ */ import_react5.default.createElement("label", { htmlFor: `mr-assignment-${item.id}` }, item.name, " \u6267\u884C\u76EE\u6807"), /* @__PURE__ */ import_react5.default.createElement(
+    "select",
+    {
+      className: "mr-input",
+      id: `mr-assignment-${item.id}`,
+      value: JSON.stringify(packageAssignments[item.id] ?? {}),
+      onChange: (event) => {
+        const option = assignmentOptions.find((candidate) => candidate.value === event.target.value && !candidate.disabled);
+        if (option) onPackageAssignmentChange?.(item.id, { ...option.binding });
+      }
+    },
+    /* @__PURE__ */ import_react5.default.createElement("optgroup", { label: "\u6A21\u578B\u76EE\u5F55 API" }, assignmentOptions.filter((option) => option.binding.kind === "api").map((option) => /* @__PURE__ */ import_react5.default.createElement("option", { key: option.value, value: option.value, disabled: option.disabled }, option.label))),
+    /* @__PURE__ */ import_react5.default.createElement("optgroup", { label: "\u5B98\u65B9\u5DE5\u5177\uFF08\u9ED8\u8BA4\u6A21\u578B\uFF09" }, assignmentOptions.filter((option) => option.binding.kind === "tool").map((option) => /* @__PURE__ */ import_react5.default.createElement("option", { key: option.value, value: option.value, disabled: option.disabled }, option.label)))
+  )), item.objective && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u5177\u4F53\u76EE\u6807\uFF1A", item.objective), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, purposeLabel[item.purpose] ?? item.purpose, item.dependsOn.length > 0 ? ` \xB7 \u4F9D\u8D56\uFF1A${item.dependsOn.map((id2) => packageNames.get(id2) ?? id2).join("\u3001")}` : ""), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u96BE\u5EA6\uFF1A", { simple: "\u7B80\u5355", balanced: "\u4E2D\u7B49", complex: "\u56F0\u96BE" }[item.difficulty] || item.difficulty || "\u5F85\u8BC4\u4F30", " \xB7 ", assignmentMode === "manual" ? "\u539F\u63A8\u8350\u8D39\u7528" : "\u8D39\u7528", "\uFF1A", money2(item.estimatedCost)), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u9A8C\u6536\uFF1A", item.verificationChecklist.join("\uFF1B")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-channel-line" }, assignmentMode === "manual" && /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, "\u539F\u63A8\u8350\u6E20\u9053\uFF1A"), /* @__PURE__ */ import_react5.default.createElement(ChannelBadge, { item }), item.loginRequired && /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-pill" }, "CLI \u672A\u767B\u5F55")), item.channelDetail && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-package-copy" }, "\u6E20\u9053\u8BF4\u660E\uFF1A", item.channelDetail)))), plan.routingBypassed && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u5DF2\u6307\u5B9A\u5355\u4E00\u6A21\u578B\uFF0C\u672A\u4E0E\u5176\u4ED6\u8DEF\u7EBF\u6BD4\u8F83\u3002\u5728\u5B98\u65B9\u4F1A\u8BDD\u4E2D\u8C03\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_execute"), " \u5E76\u4F20\u5165\u8BE5 provider \u4E0E model \u5373\u53EF\u76F4\u63A5\u6267\u884C\uFF1B\u82E5\u8BE5\u6A21\u578B\u5141\u8BB8\u5B98\u65B9\u5DE5\u5177\uFF0C\u4F1A\u4F18\u5148\u4F7F\u7528\u5BF9\u5E94 CLI\u3002"), plan.mode === "team" && assignmentMode !== "manual" && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, plan.team.handoff)));
 }
 var remoteError = (response, fallback) => remoteErrorText(
   text5(response?.error?.message) || text5(response?.value?.error) || (typeof response?.error === "string" ? response.error : ""),
@@ -14385,6 +15123,8 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
   const [budget, setBudget] = import_react5.default.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0));
   const [query, setQuery] = import_react5.default.useState("");
   const [plan, setPlan] = import_react5.default.useState(null);
+  const [assignmentMode, setAssignmentMode] = import_react5.default.useState("algorithm");
+  const [packageAssignments, setPackageAssignments] = import_react5.default.useState({});
   const [planError, setPlanError] = import_react5.default.useState("");
   const [toolProbes, setToolProbes] = import_react5.default.useState(null);
   const [routingSettings, setRoutingSettings] = import_react5.default.useState(() => {
@@ -14440,12 +15180,18 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
   }, [routingSettings]);
   const dataRevision = workbench.ledger.value?.dynamicData?.revision ?? "";
   const feedbackRevision = workbench.ledger.value?.learning?.revision ?? "";
+  const evidenceRevision = workbench.ledger.value?.routingEvidence?.revision ?? "";
+  const manualAllowed = workbench.ledger.value?.settings?.allowManualReassign !== false && settingsScope.getSnapshot().value?.allowManualReassign !== false;
   import_react5.default.useEffect(() => {
-    if (plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}`) {
+    setAssignmentMode("algorithm");
+    setPackageAssignments({});
+  }, [plan, task, mode, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools, manualAllowed]);
+  import_react5.default.useEffect(() => {
+    if (plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}/${evidenceRevision}`) {
       setPlan(null);
       setPlanError("");
     }
-  }, [dataRevision, feedbackRevision, plan]);
+  }, [dataRevision, feedbackRevision, evidenceRevision, plan]);
   import_react5.default.useEffect(() => {
     mounted.current = true;
     const request = ++catalogRequest.current;
@@ -14462,6 +15208,23 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
     };
   }, []);
   const routes = routesFromModelCatalog(catalogState.catalog);
+  const assignmentOptions = manualAssignmentOptions(routes, toolProbes, workbench.health.report);
+  const currentPackagePlanKey = packagePlanKey(plan, task);
+  const effectiveAssignmentMode = assignmentMode === "manual" && currentPackagePlanKey && manualAllowed && mode !== "direct" ? "manual" : "algorithm";
+  const changeAssignmentMode = (next) => {
+    if (next === "manual") {
+      if (!manualAllowed || !currentPackagePlanKey) return;
+      setPackageAssignments(initialPackageAssignments(plan));
+      setAssignmentMode("manual");
+    } else {
+      setAssignmentMode("algorithm");
+      setPackageAssignments({});
+    }
+  };
+  const changePackageAssignment = (id2, binding) => {
+    if (!manualAllowed || effectiveAssignmentMode !== "manual" || !plan.team.workPackages.some((item) => item.id === id2)) return;
+    setPackageAssignments((previous) => ({ ...previous, [id2]: binding }));
+  };
   const providerCount = new Set(routes.map((route) => route.provider)).size;
   const refresh = async () => {
     const request = ++catalogRequest.current;
@@ -14508,6 +15271,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       const next = createWorkspacePlan(task, catalogState.catalog, {
         ...ledger.routingData,
         learning: ledger.learning,
+        routingEvidence: ledger.routingEvidence,
         mode,
         ...direct ? { directProvider: direct.provider, directModel: direct.model } : {},
         budgetUsd: parsedBudget,
@@ -14517,7 +15281,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         preset: settingsScope.getSnapshot().value?.routingPreset ?? "balanced",
         loggedOutToolIds: (workbench.health.report?.tools ?? []).filter((item) => item.installed && item.login?.state === "logged-out").map((item) => item.id)
       });
-      setPlan({ ...next, workbenchRevision: `${ledger.dynamicData?.revision ?? ""}/${ledger.learning?.revision ?? ""}` });
+      setPlan({ ...next, workbenchRevision: `${ledger.dynamicData?.revision ?? ""}/${ledger.learning?.revision ?? ""}/${ledger.routingEvidence?.revision ?? ""}` });
     } catch (error) {
       if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return;
       setPlan(null);
@@ -14547,7 +15311,23 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
     budgetValue.current = event.target.value;
     setBudget(event.target.value);
     invalidatePlan();
-  } }))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55\u2026" : catalogState.status === "error" ? "\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u201C\u6A21\u578B\u914D\u7F6E\u201D\u4E2D\u5237\u65B0\u3002" : routes.length === 0 ? "\u8BF7\u5148\u5728 Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u6DFB\u52A0\u6A21\u578B\u3002" : toolProbes === null ? "\u6B63\u5728\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u2026" : "\u9884\u7B97 0 \u4E3A\u4E0D\u9650\uFF1B\u8D39\u7528\u4E3A\u4F30\u7B97\u3002")), planError && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react5.default.createElement("aside", { className: "mr-planning-guide", "aria-label": "\u89C4\u5212\u4F7F\u7528\u63D0\u793A" }, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-eyebrow" }, "\u5DE5\u4F5C\u6D41\u7A0B"), /* @__PURE__ */ import_react5.default.createElement("ol", { className: "mr-workflow" }, /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "01"), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u63CF\u8FF0\u4EFB\u52A1"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u9009\u62E9\u5355\u4EFB\u52A1\u3001\u56E2\u961F\u5206\u5DE5\u6216\u6307\u5B9A\u6A21\u578B\u3002"))), /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "02"), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u6838\u5BF9\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u68C0\u67E5\u6A21\u578B\u3001\u5DE5\u4F5C\u5305\u4F9D\u8D56\u548C\u4F30\u7B97\u8D39\u7528\u3002"))), /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "03"), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u9884\u89C8\u5E76\u786E\u8BA4\u6267\u884C"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u786E\u8BA4\u540E\u8C03\u7528\u6A21\u578B\uFF0C\u7ED3\u679C\u5199\u5165\u6267\u884C\u8BB0\u5F55\u3002")))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-guide-links" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("models") }, "\u914D\u7F6E\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B \u2192"), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("tools") }, "\u68C0\u67E5\u5B98\u65B9\u5DE5\u5177\u4E0E\u767B\u5F55 \u2192")), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u7F3A\u5C11\u4EF7\u683C\u65F6\u4F1A\u63D0\u793A\u201C\u4EF7\u683C\u5F85\u914D\u7F6E\u201D\u3002\u53EA\u8BFB\u68C0\u67E5\u53EF\u76F4\u63A5\u9884\u89C8\uFF1B\u4FEE\u6539\u6587\u4EF6\u65F6\uFF0C\u5148\u9009\u201C\u56E2\u961F\u5206\u5DE5\u201D\uFF0C\u518D\u5728\u6267\u884C\u533A\u9009\u62E9\u201C\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u201D\u548C\u201C\u7F16\u8F91\u6587\u4EF6\u201D\u6743\u9650\uFF0C\u6838\u5BF9\u9884\u89C8\u540E\u786E\u8BA4\u6267\u884C\u3002"))), plan && /* @__PURE__ */ import_react5.default.createElement(PlanResults, { plan, ledger: workbench.ledger.value, headingRef: resultHeading }), /* @__PURE__ */ import_react5.default.createElement(
+  } }))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "\u751F\u6210\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react5.default.createElement("span", { className: "mr-caption" }, catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55\u2026" : catalogState.status === "error" ? "\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u201C\u6A21\u578B\u914D\u7F6E\u201D\u4E2D\u5237\u65B0\u3002" : routes.length === 0 ? "\u8BF7\u5148\u5728 Harness \u7684\u201C\u6A21\u578B\u201D\u9875\u6DFB\u52A0\u6A21\u578B\u3002" : toolProbes === null ? "\u6B63\u5728\u68C0\u6D4B\u5B98\u65B9\u5DE5\u5177\u2026" : "\u9884\u7B97 0 \u4E3A\u4E0D\u9650\uFF1B\u8D39\u7528\u4E3A\u4F30\u7B97\u3002")), planError && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react5.default.createElement("aside", { className: "mr-planning-guide", "aria-label": "\u89C4\u5212\u4F7F\u7528\u63D0\u793A" }, /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-eyebrow" }, "\u5DE5\u4F5C\u6D41\u7A0B"), /* @__PURE__ */ import_react5.default.createElement("ol", { className: "mr-workflow" }, /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "01"), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u63CF\u8FF0\u4EFB\u52A1"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u9009\u62E9\u5355\u4EFB\u52A1\u3001\u56E2\u961F\u5206\u5DE5\u6216\u6307\u5B9A\u6A21\u578B\u3002"))), /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "02"), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u6838\u5BF9\u8DEF\u7531\u5EFA\u8BAE"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u68C0\u67E5\u6A21\u578B\u3001\u5DE5\u4F5C\u5305\u4F9D\u8D56\u548C\u4F30\u7B97\u8D39\u7528\u3002"))), /* @__PURE__ */ import_react5.default.createElement("li", null, /* @__PURE__ */ import_react5.default.createElement("span", null, "03"), /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("strong", null, "\u9884\u89C8\u5E76\u786E\u8BA4\u6267\u884C"), /* @__PURE__ */ import_react5.default.createElement("p", null, "\u786E\u8BA4\u540E\u8C03\u7528\u6A21\u578B\uFF0C\u7ED3\u679C\u5199\u5165\u6267\u884C\u8BB0\u5F55\u3002")))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-guide-links" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("models") }, "\u914D\u7F6E\u6A21\u578B\u4EF7\u683C\u4E0E\u80FD\u529B \u2192"), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("tools") }, "\u68C0\u67E5\u5B98\u65B9\u5DE5\u5177\u4E0E\u767B\u5F55 \u2192")), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption" }, "\u7F3A\u5C11\u4EF7\u683C\u65F6\u4F1A\u63D0\u793A\u201C\u4EF7\u683C\u5F85\u914D\u7F6E\u201D\u3002\u53EA\u8BFB\u68C0\u67E5\u53EF\u76F4\u63A5\u9884\u89C8\uFF1B\u4FEE\u6539\u6587\u4EF6\u65F6\uFF0C\u5148\u9009\u201C\u56E2\u961F\u5206\u5DE5\u201D\uFF0C\u518D\u5728\u6267\u884C\u533A\u9009\u62E9\u201C\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u201D\u548C\u201C\u7F16\u8F91\u6587\u4EF6\u201D\u6743\u9650\uFF0C\u6838\u5BF9\u9884\u89C8\u540E\u786E\u8BA4\u6267\u884C\u3002"))), plan && /* @__PURE__ */ import_react5.default.createElement(
+    PlanResults,
+    {
+      plan,
+      ledger: workbench.ledger.value,
+      headingRef: resultHeading,
+      assignmentMode: effectiveAssignmentMode,
+      packageAssignments,
+      assignmentOptions,
+      manualAllowed,
+      onAssignmentModeChange: changeAssignmentMode,
+      onPackageAssignmentChange: changePackageAssignment,
+      onRestoreAssignments: () => {
+        if (manualAllowed && currentPackagePlanKey) setPackageAssignments(initialPackageAssignments(plan));
+      }
+    }
+  ), /* @__PURE__ */ import_react5.default.createElement(
     RunLauncher,
     {
       task,
@@ -14556,7 +15336,10 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       ledger: workbench.ledger.value,
       previewRun,
       startRun,
-      planningRevision: `${routingSettings}/${dataRevision}/${feedbackRevision}`,
+      planningRevision: `${routingSettings}/${dataRevision}/${feedbackRevision}/${evidenceRevision}`,
+      assignmentMode: effectiveAssignmentMode,
+      packageAssignments: effectiveAssignmentMode === "manual" ? packageAssignments : {},
+      packagePlanKey: currentPackagePlanKey,
       directRoute: mode === "direct" ? routes.find((route) => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null,
       defaultPreset: settingsScope.getSnapshot().value?.routingPreset ?? "balanced",
       disabledReason: catalogState.status === "loading" ? "\u6B63\u5728\u8BFB\u53D6\u6A21\u578B\u76EE\u5F55\u2026" : catalogState.status === "error" ? "\u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u5728\u201C\u6A21\u578B\u914D\u7F6E\u201D\u4E2D\u5237\u65B0\u3002" : routes.length === 0 ? "\u8BF7\u5148\u5728\u5B98\u65B9\u201C\u6A21\u578B\u201D\u9875\u914D\u7F6E\u81F3\u5C11\u4E00\u6761\u6A21\u578B\u8DEF\u7EBF\u3002" : "",
@@ -14762,6 +15545,14 @@ function parseRunRequest(value) {
   if (request.executionMode !== void 0 && !["read-only", "workspace-write"].includes(request.executionMode)) throw new TypeError("executionMode is invalid");
   if (request.executionEnvironment !== void 0 && !["harness", "cli-native"].includes(request.executionEnvironment)) throw new TypeError("executionEnvironment is invalid");
   const officialTeam = request.executor === "official-team";
+  if (request.assignmentMode !== void 0 && !["algorithm", "manual"].includes(request.assignmentMode)) throw new TypeError("assignmentMode is invalid");
+  const manual = request.assignmentMode === "manual";
+  if (manual && (officialTeam || provider || model)) throw new TypeError("manual assignments require routed work packages without an explicit global route");
+  if (!manual && (request.packageAssignments !== void 0 || request.packagePlanKey !== void 0)) throw new TypeError("package assignments require manual assignmentMode");
+  const packageAssignments = manual ? parsePackageAssignments(request.packageAssignments) : void 0;
+  if (manual && (!packageAssignments || typeof request.packagePlanKey !== "string" || request.packagePlanKey.length > 200 || !request.packagePlanKey)) {
+    throw new TypeError("manual assignments require packageAssignments and a current packagePlanKey");
+  }
   if (officialTeam && (request.planMode !== "team" || provider || model)) throw new TypeError("official-team requires a team plan without an explicit route");
   if (!officialTeam && request.executionMode === "workspace-write") throw new TypeError("workspace-write requires official-team");
   if (request.executionEnvironment === "cli-native" && (!officialTeam || request.executionMode !== "workspace-write")) {
@@ -14778,6 +15569,7 @@ function parseRunRequest(value) {
       ...request.executionEnvironment === void 0 ? {} : { executionEnvironment: request.executionEnvironment }
     } : {},
     ...provider ? { provider, model } : {},
+    ...manual ? { assignmentMode: "manual", packageAssignments, packagePlanKey: request.packagePlanKey } : {},
     ...["single", "team"].includes(request.planMode) ? { planMode: request.planMode } : {},
     ...["economy", "balanced", "quality"].includes(request.preset) ? { preset: request.preset } : {},
     ...request.budgetUsd !== void 0 ? { budgetUsd: request.budgetUsd } : {},

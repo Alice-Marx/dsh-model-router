@@ -286,7 +286,7 @@ test('official team helpers share mode planning, CLI bindings and execution reco
   const { ctx, streamCalls } = createHarnessContext()
   ctx.sandbox = { confine() { throw new Error('the injected team runner does not spawn') } }
   const config = routerConfig({ modelProfilesJson: JSON.stringify([
-    { provider: 'openai', model: 'gpt-5.6-sol', cliModel: 'cli-alias', quality: 90, pricing: { input: 1, output: 2 } },
+    { provider: 'openai', model: 'gpt-5.6-sol', cliModel: 'cli-alias', execution: 'api', quality: 90, pricing: { input: 1, output: 2 } },
   ]) })
   const options = { workspace: process.cwd(), installedToolIds: ['codex'],
     readiness: [{ id: 'codex', ready: true, readyModes: ['read-only'] }],
@@ -301,6 +301,9 @@ test('official team helpers share mode planning, CLI bindings and execution reco
   assert.equal(planned.status, 'planned')
   assert.ok(planned.plan.team.workPackages.length > 1)
   assert.ok(planned.plan.team.workPackages.every(pkg => pkg.recommendedProvider === 'openai'))
+  assert.equal(planned.plan.executionChannel, 'official-cli')
+  assert.ok(planned.plan.team.workPackages.every(pkg => pkg.executionChannel === 'official-cli'
+    && pkg.recommendedReasoningEffort === undefined))
   assert.ok(Object.values(planned.cliModels).every(value => value === 'cli-alias'))
   const calls = []
   const result = await executeOfficialTeamPlan(ctx, config, planned, { root: process.cwd(), runTeam: async request => {

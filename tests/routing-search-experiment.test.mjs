@@ -106,7 +106,7 @@ test('default controls share 49 fixed spaces across three budgets and six method
   assert.equal(report.summary.byInstanceKind.adversarial.byMethod['auto-exact-4096'].cases, 3)
 })
 
-test('named 1728-combination adversarial join exposes forced-beam path loss separately', () => {
+test('future-aware forced beams recover the named 1728-combination join and retain honest narrow-budget gaps', () => {
   const report = runSearchExperiments({ instanceCount: 0, measureRuntime: false })
   assert.equal(report.instances[0].searchSpace, 1728)
   const records = report.records.filter(row => row.budgetMode === 'unconstrained')
@@ -116,10 +116,28 @@ test('named 1728-combination adversarial join exposes forced-beam path loss sepa
   assert.equal(exact.solverHandoffs, 0)
   near(exact.solverUtility, 2.4)
   for (const row of records.filter(row => row.method.startsWith('beam-'))) {
-    assert.ok(row.utilityGap > 0, row.method)
-    assert.ok(row.solverHandoffs > 0, row.method)
+    assert.equal(row.searchMethod, 'beam')
+    assert.deepEqual(row.solverChoiceRoutes, row.oracleChoiceRoutes)
+    assert.equal(row.utilityOptimal, true)
+    near(row.utilityGap, 0)
+    near(row.solverUtility, row.oracleUtility)
+    assert.equal(row.solverHandoffs, 0)
     assert.equal(row.oracleHandoffs, 0)
     assert.ok(row.beamPruned > 0)
+  }
+  // Width one still sacrifices utility to preserve the affordable prefix on
+  // this tight condition. Fixing the join does not certify beam optimality.
+  const narrow = report.records.find(row => row.budgetMode === 'tight' && row.method === 'beam-1')
+  assert.equal(narrow.utilityOptimal, false)
+  assert.ok(narrow.utilityGap > 0)
+  assert.ok(narrow.solverHandoffs > narrow.oracleHandoffs)
+  assert.equal(narrow.feasibilityConsistent, true)
+  assert.equal(narrow.budgetViolation, false)
+  assert.ok(narrow.solverCost <= narrow.budget + 1e-12)
+  for (const row of report.records.filter(row => row.budgetMode === 'tight' && row.method.startsWith('beam-') && row.method !== 'beam-1')) {
+    assert.deepEqual(row.solverChoiceRoutes, row.oracleChoiceRoutes)
+    assert.equal(row.utilityOptimal, true)
+    near(row.utilityGap, 0)
   }
 })
 

@@ -9,6 +9,7 @@
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, presetFloor, presetWeights } from './routing-presets.mjs'
 import { liveBenchRow } from './livebench.mjs'
 import { solveCandidateAssignments } from './assignment-solver.mjs'
+import { predictQuality, predictResources } from './routing-evidence.mjs'
 
 export const OBJECTIVE_WEIGHTS = Object.freeze({
   simple: Object.freeze({ quality: 0.28, cost: 0.45, latency: 0.14, specialty: 0.04, reasoning: 0.07, risk: 0.02 }),
@@ -135,7 +136,8 @@ export function textFromMessages(messages) {
 
 export function classifyTask(text) {
   const value = String(text ?? '')
-  if (value.length < 80 && /翻译|解释|translate|explain/i.test(value)) return 'general'
+  if (value.length < 80 && /翻译|解释|translate|explain/i.test(value)
+    && !detectTaskTypes(value).some(type => ['vision', 'math', 'code', 'research'].includes(type))) return 'general'
   return detectTaskTypes(value)[0] ?? 'general'
 }
 
@@ -195,6 +197,7 @@ function specialtyMatch(model, taskType, liveScores = {}) {
 }
 
 function qualityForTask(row, taskType) {
+  if (row?.queryEvidence?.type === taskType) return row.queryEvidence.quality
   const base = asScore(row?.liveScores?.[taskType]) ?? asScore(row?.liveOverall) ?? row?.metadata?.quality ?? row?.baseQuality ?? row?.quality ?? 0
   // Legacy programmatic scalar bias only. Production feedback uses an
   // independent preferenceAdjustments utility term, never this quality path.
@@ -202,6 +205,7 @@ function qualityForTask(row, taskType) {
 }
 
 function qualitySourceForTask(row, taskType) {
+  if (row?.queryEvidence?.type === taskType) return 'recorded-query-evidence'
   return asScore(row?.liveScores?.[taskType]) !== undefined || asScore(row?.liveOverall) !== undefined
     ? 'livebench' : row?.fallbackQualitySource ?? row?.qualitySource ?? 'unknown'
 }
@@ -616,6 +620,7 @@ function compareText(left, right) {
 
 function compareRowsStable(left, right) {
   return compareText(routeKey(left.provider, left.model), routeKey(right.provider, right.model))
+    || compareText(String(left.actionId ?? ''), String(right.actionId ?? ''))
 }
 
 function reasoningEffortRank(effort) {
@@ -648,6 +653,12 @@ export function selectReasoningEffort(efforts, preferred = 'medium') {
 
 function reasoningDecision(row, task) {
   const preferred = String(task.preferredReasoningEffort ?? 'medium')
+  if (row.reasoningExecution === 'unsupported-cli' || row.reasoningExecution === 'default') return {
+    reasoningEffort: undefined, reasoningFit: 0.55, preferredReasoningEffort: preferred,
+    multiplier: REASONING_EFFORT_MULTIPLIERS.medium,
+    reasoningExecutionNotice: row.reasoningExecution === 'default' ? '指定模型使用适配器默认推理档位。'
+      : 'CLI 推理档位尚无经验证的映射，按厂商默认档位执行。',
+  }
   const efforts = Array.isArray(row.reasoningEfforts) ? row.reasoningEfforts : []
   if (efforts.length === 0) {
     const knownUnsupported = row.reasoningKnown === true
@@ -662,7 +673,7 @@ function reasoningDecision(row, task) {
   const preferredRank = reasoningEffortRank(preferred)
   // On an equal distance the shared selector prefers the lower effort to
   // avoid unnecessary latency and output-token cost.
-  const chosen = selectReasoningEffort(efforts, preferred)
+  const chosen = Object.hasOwn(row, 'actionEffort') ? row.actionEffort : selectReasoningEffort(efforts, preferred)
   const distance = Math.abs(reasoningEffortRank(chosen) - preferredRank)
   return {
     reasoningEffort: chosen,
@@ -683,9 +694,13 @@ function candidateUtility(row, task, weights, cacheReadRatio = 0, cacheWriteRati
   const reasoning = reasoningDecision(row, task)
   const reference = taskCost({ pricing: COST_REFERENCE_PRICING, reasoningKnown: true, reasoningEfforts: [] }, task, text, complexity, cacheReadRatio, cacheWriteRatio)
   const cost = row.pricing === null ? 0 : 1 / (1 + taskCost(row, task, text, complexity, cacheReadRatio, cacheWriteRatio) / Math.max(reference, 1e-12))
+  const resources = resourceTokenBudget(row, task, text, complexity, cacheReadRatio, cacheWriteRatio)
+  const latencyUtility = Number.isFinite(resources.estimatedLatencyMs)
+    ? 1 / (1 + resources.estimatedLatencyMs / 10_000)
+    : 1 - clamp(row.latency * reasoning.multiplier.latency)
   const score = weights.quality * quality
     + weights.cost * cost
-    + weights.latency * (1 - clamp(row.latency * reasoning.multiplier.latency))
+    + weights.latency * latencyUtility
     + weights.specialty * specialtyForTask(row, task.type)
     + (weights.reasoning ?? 0) * reasoning.reasoningFit
     - weights.risk * row.risk
@@ -696,14 +711,88 @@ function candidateUtility(row, task, weights, cacheReadRatio = 0, cacheWriteRati
 
 function taskCost(row, task, text, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
   if (row?.pricing === null) return 0 // Search sentinel; the public estimate remains null.
-  const decision = row === null ? null : reasoningDecision(row, task)
-  const tokens = taskTokenBudget(text, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity, cacheReadRatio, cacheWriteRatio)
+  const tokens = resourceTokenBudget(row, task, text, complexity, cacheReadRatio, cacheWriteRatio)
   return row === null
     ? 0
     : (((tokens.inputTokens - tokens.cacheReadTokens - tokens.cacheWriteTokens) * row.pricing.input)
       + (tokens.cacheReadTokens * row.pricing.cacheRead)
       + (tokens.cacheWriteTokens * row.pricing.cacheWrite)
       + (tokens.outputTokens * row.pricing.output)) / 1_000_000
+}
+
+/** Empirical quantiles are predictions, never a joint budget certificate. */
+function resourceTokenBudget(row, task, text, complexity, cacheReadRatio = 0, cacheWriteRatio = 0) {
+  const effort = row ? reasoningDecision(row, task).reasoningEffort : undefined
+  const fallback = taskTokenBudget(text, { ...task, reasoningEffort: effort }, complexity, cacheReadRatio, cacheWriteRatio)
+  if (!row?.routingEvidence) return { ...fallback, estimateSource: 'heuristic', resourceSampleCount: 0 }
+  const key = JSON.stringify([task.type, task.purpose, effort ?? '', String(text).length, cacheReadRatio, cacheWriteRatio])
+  if (row.resourceCache.has(key)) return row.resourceCache.get(key)
+  const observed = predictResources(row.routingEvidence, {
+    provider: row.provider, model: row.model, reasoningEffort: effort ?? '',
+    channel: row.executionChannel ?? 'harness-llm', type: task.type, purpose: task.purpose,
+    inputChars: String(text).length,
+  })
+  let result = { ...fallback, estimateSource: 'heuristic', resourceSampleCount: 0 }
+  if (observed) {
+    const promptRatio = observed.p90?.promptCharRatio ?? observed.promptCharRatio
+    const chars = Number.isFinite(promptRatio) ? String(text).length * promptRatio : fallback.inputTokens * 3.7
+    const inputTokens = Math.ceil(chars * observed.p90.inputTokenRatio)
+    const outputTokens = Math.ceil(observed.p90.outputTokens)
+    if (Number.isSafeInteger(inputTokens) && inputTokens >= 0 && Number.isSafeInteger(outputTokens) && outputTokens >= 0) {
+      const ratios = normalizedCacheRatios(cacheReadRatio, cacheWriteRatio)
+      const cacheReadTokens = Math.min(inputTokens, Math.round(inputTokens * ratios.read))
+      const cacheWriteTokens = Math.min(inputTokens - cacheReadTokens, Math.round(inputTokens * ratios.write))
+      result = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens,
+        estimateSource: observed.source, resourceSampleCount: observed.sampleCount,
+        estimatedLatencyMs: observed.p90.durationMs, empiricalQuantile: 0.9 }
+    }
+  }
+  row.resourceCache.set(key, result)
+  return result
+}
+
+/** Estimate one pinned API package without changing the task decomposition or choosing an effort. */
+export function estimateAssignedPackage(route, task, text, complexity = 'balanced', {
+  pricing = {}, routingEvidence = null, cacheReadRatio = 0, cacheWriteRatio = 0,
+} = {}) {
+  const prices = normalizePricing(pricing)
+  const override = prices[normalize(`${route.provider}/${route.model}`)] ?? prices[normalize(route.model)]
+  const selectedPrice = override ?? normalizePricing({ route: route.pricing }).route ?? null
+  const row = { provider: route.provider, model: route.model, pricing: selectedPrice,
+    reasoningExecution: 'default', executionChannel: 'harness-llm', routingEvidence,
+    resourceCache: new Map() }
+  const resources = resourceTokenBudget(row, task, text, complexity, cacheReadRatio, cacheWriteRatio)
+  const cost = selectedPrice === null ? null : taskCost(row, task, text, complexity, cacheReadRatio, cacheWriteRatio)
+  return { provider: route.provider, model: route.model, purpose: task.purpose, difficulty: task.difficulty,
+    ...resources, estimatedCost: Number.isFinite(cost) ? Number(cost.toFixed(6)) : null,
+    pricingSource: selectedPrice === null ? 'unknown' : override ? 'user' : route.pricingSource ?? 'route',
+    quality: null, qualitySource: 'manual-selection', handoffPenalty: 0 }
+}
+
+/** Expand only actions with their own task evidence; cold starts keep the old selector. */
+function taskActions(row, task) {
+  const text = task.objective || row.routingText
+  const key = JSON.stringify([task.type, task.purpose, task.preferredReasoningEffort, text])
+  if (row.actionCache.has(key)) return row.actionCache.get(key)
+  const nearest = reasoningDecision(row, task).reasoningEffort
+  const qualityAt = effort => {
+    const qualityKey = JSON.stringify([task.type, effort ?? '', text])
+    if (!row.qualityCache.has(qualityKey)) row.qualityCache.set(qualityKey, predictQuality(row.routingEvidence, {
+      text, type: task.type, provider: row.provider, model: row.model,
+      reasoningEffort: effort ?? '', channel: row.executionChannel ?? 'harness-llm',
+    }))
+    return row.qualityCache.get(qualityKey)
+  }
+  let alternatives = []
+  if (row.reasoningExecution === 'api') alternatives = (row.reasoningEfforts ?? []).map(effort => ({ effort, quality: qualityAt(effort) })).filter(item => item.quality)
+  const joint = alternatives.length >= 2
+  const actions = joint ? alternatives : [{ effort: nearest, quality: qualityAt(nearest) }]
+  const variants = actions.map(({ effort, quality }) => ({ ...row, actionEffort: effort,
+    actionId: JSON.stringify([row.provider, row.model, effort ?? null]), jointEffort: joint,
+    queryEvidence: quality ? { ...quality, type: task.type } : null,
+  }))
+  row.actionCache.set(key, variants)
+  return variants
 }
 
 function dominates(left, right, task, text, complexity, cacheReadRatio, cacheWriteRatio) {
@@ -742,9 +831,10 @@ function dominates(left, right, task, text, complexity, cacheReadRatio, cacheWri
 }
 
 function eligibleRowsForTask(rows, task) {
-  return task.type === 'vision'
+  const eligible = task.type === 'vision'
     ? rows.filter(row => row.inputModalities.length === 0 || row.inputModalities.includes('image'))
     : rows
+  return eligible.flatMap(row => taskActions(row, task))
 }
 
 function candidatePool(rows, task, weights, text, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive = false) {
@@ -795,13 +885,14 @@ function solveAssignments({ rows, tasks, weights, text, complexity, budget, cach
   const pools = tasks.map(task => candidatePool(rows, task, weights, text, complexity, cacheReadRatio, cacheWriteRatio, dependencySensitive))
   const result = solveCandidateAssignments({ tasks, pools: pools.map((pool, index) => pool.options.map(option => ({
     route: routeKey(option.row.provider, option.row.model), score: option.decision.score, cost: option.cost,
+    actionId: option.row.actionId, handoffRoute: routeKey(option.row.provider, option.row.model),
     qualityShortfall: Math.max(0, option.decision.floor - qualityForTask(option.row, tasks[index].type)),
     pricingKnown: option.row.pricing !== null, payload: option,
   }))), budget, beamWidth: ROUTING_BEAM_WIDTH, minimizeCost })
   if (!result) return null
   return {
     ...result,
-    assignments: result.choices.map((choice, index) => ({ task: tasks[index], row: choice.payload.row,
+    assignments: result.choices.map((choice, index) => ({ task: tasks[index], row: { ...choice.payload.row, estimatedCost: choice.payload.row.pricing === null ? null : choice.cost },
       decision: { ...choice.payload.decision, relaxed: choice.qualityShortfall > 0 },
       estimatedCost: choice.cost, handoffPenalty: choice.handoffPenalty })),
     usedRoutes: new Set(result.choices.map(choice => choice.route)),
@@ -810,7 +901,7 @@ function solveAssignments({ rows, tasks, weights, text, complexity, budget, cach
   }
 }
 
-export function buildPlan({ text = '', available = [], mode = 'collective', pricing = {}, liveBench = null, liveBenchError = '', dataVersions = null, learning = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+export function buildPlan({ text = '', available = [], mode = 'collective', pricing = {}, liveBench = null, liveBenchError = '', dataVersions = null, learning = null, routingEvidence = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
   const presetId = normalizeRoutingPreset(preset)
   const firstLine = String(text ?? '').split(/\r?\n/u)[0].trim()
   const transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine)
@@ -830,6 +921,8 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
         return {
           provider: String(entry.provider ?? ''),
           model: String(entry.model ?? ''),
+          executionChannel: ['harness-llm', 'official-cli'].includes(entry.executionChannel) ? entry.executionChannel : undefined,
+          reasoningExecution: ['api', 'unsupported-cli', 'default'].includes(entry.reasoningExecution) ? entry.reasoningExecution : undefined,
           benchmarkModel: typeof entry.benchmarkModel === 'string' ? entry.benchmarkModel : undefined,
           reasoningEfforts: [...new Set(reasoningEfforts)],
           defaultReasoningEffort: entry.defaultReasoningEffort === undefined ? undefined : String(entry.defaultReasoningEffort),
@@ -902,6 +995,9 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       reasoningEfforts: route.reasoningEfforts,
       defaultReasoningEffort: route.defaultReasoningEffort,
       reasoningKnown: route.reasoningKnown,
+      reasoningExecution: route.reasoningExecution,
+      executionChannel: route.executionChannel,
+      routingEvidence, routingText: text, actionCache: new Map(), qualityCache: new Map(), resourceCache: new Map(),
       inputModalities: route.inputModalities,
       pricing: pricingRow,
       score: 0,
@@ -982,13 +1078,14 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     recommendedReasoningEffort: decision?.reasoningEffort,
     preferredReasoningEffort: decision?.preferredReasoningEffort ?? task.preferredReasoningEffort,
     reasoningFit: Number(Number(decision?.reasoningFit ?? 0).toFixed(3)),
+    ...(decision?.reasoningExecutionNotice ? { reasoningExecutionNotice: decision.reasoningExecutionNotice } : {}),
     purpose: task.purpose,
     criticality: task.criticality,
     qualityFloor: Number(task.qualityFloor.toFixed(3)),
     dependsOn: [...(task.dependsOn ?? [])],
   }))
   const costBreakdown = assignments.map(({ task, row, decision, estimatedCost, handoffPenalty }, index) => {
-    const tokens = taskTokenBudget(text, { ...task, reasoningEffort: decision?.reasoningEffort }, complexity.band, cacheReadRatio, cacheWriteRatio)
+    const tokens = resourceTokenBudget(row, task, text, complexity.band, cacheReadRatio, cacheWriteRatio)
     const taskEstimate = estimatedCost ?? taskCost(row, task, text, complexity.band, cacheReadRatio, cacheWriteRatio)
     return {
       stage: index + 1,
@@ -1004,6 +1101,11 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
       cacheReadTokens: tokens.cacheReadTokens,
       cacheWriteTokens: tokens.cacheWriteTokens,
       outputTokens: tokens.outputTokens,
+      estimateSource: tokens.estimateSource,
+      resourceSampleCount: tokens.resourceSampleCount,
+      ...(Number.isFinite(tokens.estimatedLatencyMs) ? { estimatedLatencyMs: tokens.estimatedLatencyMs } : {}),
+      ...(tokens.empiricalQuantile ? { empiricalQuantile: tokens.empiricalQuantile } : {}),
+      ...(row?.queryEvidence ? { queryEvidenceCount: row.queryEvidence.sampleCount, querySimilarity: row.queryEvidence.similarity } : {}),
       estimatedCost: row?.pricing === null || row === null ? null : Number(taskEstimate.toFixed(6)),
       quality: qualitySourceForTask(row, task.type) === 'unknown' || row === null ? null : Number(qualityForTask(row, task.type).toFixed(3)),
       qualitySource: qualitySourceForTask(row, task.type),
@@ -1021,8 +1123,9 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
   const baselineCost = baselineRows.every(item => item.strongest?.pricing !== null && item.strongest !== null)
     ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text, complexity.band, cacheReadRatio, cacheWriteRatio), 0)
     : null
-  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => ['livebench', 'route', 'user'].includes(qualitySourceForTask(row, task.type)))
-    && baselineRows.every(({ strongest, task }) => ['livebench', 'route', 'user'].includes(qualitySourceForTask(strongest, task.type)))
+  const knownQualitySources = ['livebench', 'route', 'user', 'recorded-query-evidence']
+  const qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => knownQualitySources.includes(qualitySourceForTask(row, task.type)))
+    && baselineRows.every(({ strongest, task }) => knownQualitySources.includes(qualitySourceForTask(strongest, task.type)))
   const budgetExceeded = Number(budgetUsd) > 0 && totalEstimate !== null ? totalEstimate > Number(budgetUsd) : null
   const savings = baselineCost === null || totalEstimate === null || !qualityEvidenceComplete
     ? null : baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost)
@@ -1043,7 +1146,11 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     taskType,
     taskTypes: [...new Set(taskNodes.map(task => task.type).filter(type => type !== 'reasoning'))],
     objectiveWeights: weights,
-    candidates: rows.slice(0, 8).map(row => {
+    candidates: eligibleRowsForTask(rows, taskNodes[0]).map(row => ({ ...row,
+      score: candidateUtility(row, taskNodes[0], weights, cacheReadRatio, cacheWriteRatio, text, complexity.band).score,
+      quality: qualityForTask(row, taskNodes[0].type), qualitySource: qualitySourceForTask(row, taskNodes[0].type),
+      estimatedCost: row.pricing === null ? null : taskCost(row, taskNodes[0], text, complexity.band, cacheReadRatio, cacheWriteRatio),
+    })).sort((left, right) => right.score - left.score || compareRowsStable(left, right)).slice(0, 8).map(row => {
       const decision = candidateUtility(row, taskNodes[0] ?? { type: taskType, qualityFloor: QUALITY_FLOORS[complexity.band], preferredReasoningEffort: complexity.band === 'simple' ? 'low' : 'medium' }, weights, cacheReadRatio, cacheWriteRatio, text, complexity.band)
       return { provider: row.provider, model: row.model, score: Number(row.score.toFixed(3)), preferenceAdjustment: decision.preferenceAdjustment, quality: row.qualitySource === 'unknown' ? null : Number(row.quality.toFixed(3)), qualitySource: row.qualitySource, specialty: Number(row.specialty.toFixed(3)), reasoningEffort: decision.reasoningEffort, preferredReasoningEffort: decision.preferredReasoningEffort, reasoningFit: Number(decision.reasoningFit.toFixed(3)), reasoningKnown: row.reasoningKnown, reasoningEfforts: row.reasoningEfforts, estimatedCost: row.estimatedCost === null ? null : Number(row.estimatedCost.toFixed(6)), inputPrice: row.pricing?.input ?? null, outputPrice: row.pricing?.output ?? null, pricingSource: row.pricingSource, pricingVersion: row.pricingVersion, pricingAsOf: row.snapshotAsOf }
     }),
@@ -1055,6 +1162,11 @@ export function buildPlan({ text = '', available = [], mode = 'collective', pric
     costBreakdown,
     optimization: {
       dataVersions,
+      evidenceRevision: routingEvidence?.revision ?? null,
+      qualityEvidenceCount: assignments.filter(({ row }) => row.queryEvidence).length,
+      resourceEvidenceCount: costBreakdown.filter(item => item.estimateSource === 'recorded-resource-evidence').length,
+      jointEffortCandidates: (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.options.filter(item => item.row.jointEffort).length, 0),
+      uncertaintySemantics: 'empirical-prediction-not-calibrated-probability-or-joint-budget-guarantee',
       personalization: learning ? {
         policyVersion: learning.policyVersion, revision: learning.revision,
         enabled: learning.enabled, scope: learning.scope, window: learning.window,

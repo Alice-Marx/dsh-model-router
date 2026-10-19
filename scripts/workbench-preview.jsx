@@ -9,6 +9,8 @@ import { billingOverview } from '../.dsh-plugin/shared/subscription-billing.mjs'
 import { budgetCheck } from '../.dsh-plugin/shared/run-ledger.mjs'
 import { buildFeedbackProfile } from '../.dsh-plugin/shared/adaptive-feedback.mjs'
 import { ADAPTIVE_DEFAULTS } from '../.dsh-plugin/client/adaptive-state.mjs'
+import { applyManualPackagePlan } from '../.dsh-plugin/shared/manual-plan.mjs'
+import { packagePlanKey } from '../.dsh-plugin/shared/package-assignments.mjs'
 
 // Every figure below is a UI fixture, not a current vendor price or real bill.
 const catalog = {
@@ -154,7 +156,7 @@ function createDemoSession(scenario) {
     const settings = settingsScope.getSnapshot().value
     const spent = scenario === 'empty' ? { today: 0, month: 0, unknownToday: 0, unknownMonth: 0 }
       : { today: 1.28, month: 12.4, unknownToday: 0, unknownMonth: 1, subscriptionToday: 0.18, subscriptionMonth: 2.62, subscriptionRunsMonth: 8 }
-    return { runs: structuredClone(runs), settings: { ...settings }, spent,
+    return { runs: structuredClone(runs).reverse(), settings: { ...settings }, spent,
       budget: { ...budgetCheck({ spent, dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd }),
         dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd, action: settings.overBudgetAction },
       biases: {}, learning: buildFeedbackProfile(runs, {
@@ -169,7 +171,7 @@ function createDemoSession(scenario) {
     billing: { ...billingOverview(routes(), { loginFor: id => id === 'gemini' ? 'logged-out' : 'subscription' }), cooldownMinutes: 60 },
   })
   const preview = request => {
-    const plan = createWorkspacePlan(request.task, source(), {
+    let plan = createWorkspacePlan(request.task, source(), {
       ...ledger().routingData, learning: ledger().learning,
       mode: request.provider ? 'direct' : request.planMode,
       directProvider: request.provider, directModel: request.model,
@@ -177,15 +179,23 @@ function createDemoSession(scenario) {
       modelProfilesJson: settingsScope.getSnapshot().value.modelProfilesJson,
       installedToolIds: [...installed], runnableToolIds: ['claude-code', 'codex'], loggedOutToolIds: ['gemini'],
     })
-    const packages = plan.mode === 'team' ? plan.team.workPackages.map(item => ({
+    if (request.assignmentMode === 'manual') plan = applyManualPackagePlan(plan, {
+      task: request.task, packageAssignments: request.packageAssignments, packagePlanKey: request.packagePlanKey,
+    }, routes(), ledger().routingData)
+    const packages = !plan.routingBypassed ? plan.team.workPackages.map(item => ({
       id: item.id, name: item.name, dependsOn: item.dependsOn,
       provider: item.recommendedProvider, model: item.recommendedModel,
       route: `${item.recommendedProvider}/${item.recommendedModel}`, estimatedCost: item.estimatedCost,
       channel: item.executionChannel === 'official-cli' ? 'official-cli' : 'harness-llm',
+      ...(item.manualAssignment ? { manualAssignment: item.manualAssignment, selectionSource: 'manual',
+        algorithmRecommendation: item.algorithmRecommendation,
+        ...(item.manualAssignment.kind === 'tool' ? { toolId: item.manualAssignment.toolId,
+          toolLabel: OFFICIAL_TOOLS.find(tool => tool.id === item.manualAssignment.toolId)?.label } : {}) } : {}),
     })) : [{ id: 'task', name: '演示任务', dependsOn: [], provider: plan.selected.provider,
       model: plan.selected.model, route: `${plan.selected.provider}/${plan.selected.model}`,
       estimatedCost: plan.estimatedCost, channel: 'harness-llm' }]
     return { status: 'preview', selected: plan.selected, estimatedCost: plan.estimatedCost,
+      assignmentMode: request.assignmentMode ?? 'algorithm', packagePlanKey: packagePlanKey(plan, request.task),
       routingBypassed: plan.routingBypassed, workspace: request.workspace || 'C:\\demo\\router-workspace',
       decision: { preset: plan.preset, complexity: plan.complexity, reason: plan.reason, estimatedCost: plan.estimatedCost, packages },
       budget: budgetCheck({ ...ledger().budget, spent: ledger().spent, estimateUsd: plan.estimatedCost }),
@@ -204,8 +214,8 @@ function createDemoSession(scenario) {
       // delaying config persistence or the independent install summary.
       if (++toolInspections > 1 && scenario === 'tools-hanging') await new Promise(() => {})
       return ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, tools: structuredClone(tools),
-      executionCapabilities: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, mode: 'headless', available: installed.has(tool.id) })),
-      executionReadiness: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ready: tool.id !== 'gemini' && installed.has(tool.id) })),
+      executionCapabilities: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, mode: 'headless', modes: installed.has(tool.id) ? ['read-only'] : [], available: installed.has(tool.id) })),
+      executionReadiness: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ready: tool.id !== 'gemini' && installed.has(tool.id), readyModes: tool.id !== 'gemini' && installed.has(tool.id) ? ['read-only'] : [] })),
       install: demoInstallSummary(settingsScope.getSnapshot().value),
       })
     },
@@ -247,11 +257,12 @@ function createDemoSession(scenario) {
     startRun: async request => {
       const value = preview(request)
       const runId = `demo-${Date.now()}`
-      runs.push({ id: runId, kind: request.planMode === 'team' ? 'team' : 'assign', task: request.task,
+      runs.push({ id: runId, kind: request.assignmentMode === 'manual' ? 'assign' : request.planMode === 'team' ? 'team' : 'assign', task: request.task,
+        assignmentMode: request.assignmentMode ?? 'algorithm',
         createdAt: Date.now(), workspace: value.workspace, executionMode: 'read-only',
         status: 'completed', preset: value.decision.preset, decision: value.decision,
         packages: value.decision.packages.map(item => ({ ...item, status: 'succeeded', ok: true,
-          ran: true, channel: 'harness-llm', billing: 'api', costUsd: 0,
+          ran: true, channel: item.channel, billing: 'api', costUsd: 0,
           finishedAt: Date.now(), type: 'general',
           answer: `模拟提交任务：${request.task}\n本地 UI 演示结果：仅生成浏览器内记录，没有调用模型或修改文件。` })),
       })

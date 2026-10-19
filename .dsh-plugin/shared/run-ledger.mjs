@@ -4,12 +4,16 @@
  * gentle routing adjustments from user ratings and reviews.
  */
 
+import { reasoningExecutionFields, unsupportedCliReasoning } from './reasoning-execution.mjs'
+import { packageSelectionFields } from './package-assignments.mjs'
+
 export const MAX_STORED_ANSWER = 4_000
 export const MAX_STORED_TASK = 20_000
 /** Ratings move a route's quality by at most this much (quality is 0–1). */
 export const MAX_QUALITY_BIAS = 0.04
 
 const finite = value => typeof value === 'number' && Number.isFinite(value)
+const nonEmptyText = value => (typeof value === 'string' && value.length > 0 ? value : null)
 const routeKey = (provider, model) => `${String(provider ?? '')}\u0000${String(model ?? '')}`
 
 function modelIdentity(value) {
@@ -20,8 +24,48 @@ function modelIdentity(value) {
   return null
 }
 
+// A stop marker belongs to one attempt, not to earlier requests in a cascade.
+// Contradictory positive/invalid counters remain potentially paid evidence.
+function clearlyNotStarted(attempt) {
+  if (!attempt || typeof attempt !== 'object' || (attempt.notStarted !== true && attempt.blocked !== true)) return false
+  if (Object.hasOwn(attempt, 'reportedCostUsd') && attempt.reportedCostUsd !== undefined
+    && attempt.reportedCostUsd !== null && attempt.reportedCostUsd !== 0) return false
+  return !['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'].some(key => {
+    const value = attempt.usage?.[key]
+    return value !== undefined && value !== null && value !== 0
+  })
+}
+
+/** True when some quality attempt ran, or execution cannot safely be ruled out. */
+export function hasStartedQualityAttempts(result) {
+  if (!result || !Object.hasOwn(result, 'qualityAttempts')) return false
+  const attempts = result.qualityAttempts
+  if (!Array.isArray(attempts) || attempts.length < 1 || attempts.length > 2) return true
+  return attempts.some(attempt => !clearlyNotStarted(attempt))
+}
+
 /** USD cost of one package. Prefers a CLI-reported cost, else usage × configured price. */
 export function actualCost(result, pricing) {
+  if (result && Object.hasOwn(result, 'qualityAttempts')) {
+    const attempts = result.qualityAttempts
+    if (!Array.isArray(attempts) || attempts.length < 1 || attempts.length > 2
+      || attempts.some(item => !item || typeof item !== 'object' || Object.hasOwn(item, 'qualityAttempts')
+        || item.channel === 'official-cli' || item.billing === 'subscription')) {
+      return { costUsd: null, costSource: 'quality-attempts-invalid' }
+    }
+    const costs = attempts.map(item => clearlyNotStarted(item)
+      ? { costUsd: 0, costSource: 'not-run' }
+      : actualCost(item, item.pricingSnapshot ?? null))
+    if (costs.some(item => item.costUsd === null)) {
+      const knownCostUsd = costs.filter(item => item.costUsd !== null).reduce((sum, item) => sum + item.costUsd, 0)
+      return finite(knownCostUsd) ? { costUsd: null, costSource: 'quality-attempts-incomplete', knownCostUsd,
+        unknownAttemptCount: costs.filter(item => item.costUsd === null).length }
+        : { costUsd: null, costSource: 'cost-invalid' }
+    }
+    const total = costs.reduce((sum, item) => sum + item.costUsd, 0)
+    return finite(total) && total >= 0 ? { costUsd: total, costSource: 'quality-attempts' }
+      : { costUsd: null, costSource: 'cost-invalid' }
+  }
   if (result && Object.hasOwn(result, 'reportedCostUsd') && finite(result.reportedCostUsd) && result.reportedCostUsd >= 0) {
     return { costUsd: result.reportedCostUsd, costSource: 'cli-reported' }
   }
@@ -148,7 +192,10 @@ function* spendingEntries(runs) {
         amount.subscriptionRuns = 1
         if (finite(item.referenceCostUsd) && item.referenceCostUsd >= 0) amount.subscriptionUsd = item.referenceCostUsd
       } else if (finite(item.costUsd) && item.costUsd >= 0) amount.costUsd = item.costUsd
-      else if (item.ran === true) amount.unknown = 1
+      else if (item.ran === true) {
+        amount.unknown = 1
+        if (finite(item.knownCostUsd) && item.knownCostUsd >= 0) amount.costUsd = item.knownCostUsd
+      }
       else continue
       yield { when, amount }
     }
@@ -257,11 +304,16 @@ export function applyQualityBiases(routes, biases) {
 }
 
 function storedPackage(planned, result, pricing, finishedAt, billingFor = billingOf) {
-  const cost = !result || result.blocked || result.notStarted
+  const plannedEffort = nonEmptyText(planned?.recommendedReasoningEffort) ?? nonEmptyText(planned?.plannedReasoningEffort)
+  const startedAttempts = hasStartedQualityAttempts(result)
+  const qualityAttempts = Array.isArray(result?.qualityAttempts)
+    ? result.qualityAttempts.slice(0, 2).map(attempt => attempt && typeof attempt === 'object' ? attempt : {}) : null
+  const cost = !result || ((result.blocked || result.notStarted) && !startedAttempts)
     ? { costUsd: null, costSource: 'not-run', billing: null, referenceCostUsd: null }
     : billedCost(result, pricing, billingFor(result))
   return {
     id: planned.id,
+    ...packageSelectionFields(result?.manualAssignment !== undefined ? { ...planned, ...result } : planned),
     name: planned.name,
     objective: String(planned.objective ?? '').slice(0, 2_000),
     ...(planned.type ? { type: String(planned.type) } : {}),
@@ -270,6 +322,24 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     dependsOn: [...(planned.dependsOn ?? [])],
     recommendedProvider: planned.recommendedProvider,
     recommendedModel: planned.recommendedModel,
+    ...reasoningExecutionFields(result),
+    ...(qualityAttempts ? { qualityAttempts: qualityAttempts.map(attempt => ({
+      provider: attempt.provider, model: attempt.model, channel: 'harness-llm',
+      ok: attempt.ok === true, usage: attempt.usage ?? null,
+      ...(attempt.notStarted === true ? { notStarted: true } : {}),
+      ...(attempt.blocked === true ? { blocked: true } : {}),
+      ...(attempt.usageIncomplete ? { usageIncomplete: true } : {}),
+      ...(finite(attempt.reportedCostUsd) && attempt.reportedCostUsd >= 0 ? { reportedCostUsd: attempt.reportedCostUsd } : {}),
+      pricingSnapshot: attempt.pricingSnapshot ? { ...attempt.pricingSnapshot } : null,
+      ...reasoningExecutionFields(attempt),
+      ...(finite(attempt.durationMs) ? { durationMs: attempt.durationMs } : {}),
+      ...(finite(attempt.inputChars) ? { inputChars: attempt.inputChars } : {}),
+      finishedAt: attempt.finishedAt, error: typeof attempt.error === 'string' ? attempt.error.slice(0, 1_000) : null,
+    })) } : {}),
+    ...(result?.qualityValidation ? { qualityValidation: { ...result.qualityValidation } } : {}),
+    ...(plannedEffort ? { plannedReasoningEffort: plannedEffort } : {}),
+    ...(finite(result?.durationMs) && result.durationMs >= 0 ? { durationMs: result.durationMs } : {}),
+    ...(finite(result?.inputChars) && result.inputChars >= 0 ? { inputChars: result.inputChars } : {}),
     difficulty: planned.difficulty ?? null,
     estimatedCost: finite(planned.estimatedCost) ? planned.estimatedCost : null,
     plannedChannel: planned.executionChannel ?? null,
@@ -278,7 +348,7 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     status: !result ? 'pending' : result.ok ? (result.fallback ? 'fallback' : 'succeeded') : result.paused ? 'paused'
       : result.waiting ? 'waiting' : result.blocked ? 'blocked' : result.cancelled ? 'cancelled' : 'failed',
     ok: result?.ok === true,
-    ran: Boolean(result) && !result.blocked && !result.notStarted,
+    ran: Boolean(result) && (startedAttempts || (!result.blocked && !result.notStarted)),
     blocked: result?.blocked === true,
     ...(result?.paused ? { paused: true, pause: { ...result.pause } } : {}),
     ...(result?.waiting ? { waiting: true } : {}),
@@ -324,6 +394,7 @@ export function plannedPackages(plan, task) {
     const route = plan.directRoute ?? plan.selected
     return [{ id: 'direct', name: '指定模型', objective: String(task ?? ''), dependsOn: [],
       recommendedProvider: route?.provider, recommendedModel: route?.model,
+      ...(typeof route?.reasoningEffort === 'string' && route.reasoningEffort ? { recommendedReasoningEffort: route.reasoningEffort } : {}),
       difficulty: plan.complexity?.band ?? null, estimatedCost: plan.estimatedCost ?? null,
       executionChannel: plan.executionChannel ?? null }]
   }
@@ -344,6 +415,9 @@ export function buildRunRecord({ id, createdAt, task, plan, execution, preset = 
     executionMode,
     routingBypassed: plan?.routingBypassed === true,
     mode: plan?.mode ?? 'single',
+    ...(typeof plan?.assignmentMode === 'string' && plan.assignmentMode.trim().length > 0
+      && plan.assignmentMode.length <= 40 && !/[\u0000-\u001f\u007f]/u.test(plan.assignmentMode)
+      ? { assignmentMode: plan.assignmentMode.trim() } : {}),
     preset,
     decision: {
       dataVersions: plan?.optimization?.dataVersions ?? null,
@@ -385,6 +459,10 @@ export function storedResults(run) {
     id: item.id, name: item.name, ok: item.ok, provider: item.provider, model: item.model,
     channel: item.channel, answer: item.answer, error: item.error, fallback: item.fallback,
     blocked: item.blocked, finishedAt: item.finishedAt,
+    ...packageSelectionFields(item),
+    ...reasoningExecutionFields(item),
+    ...(finite(item.durationMs) && item.durationMs >= 0 ? { durationMs: item.durationMs } : {}),
+    ...(finite(item.inputChars) && item.inputChars >= 0 ? { inputChars: item.inputChars } : {}),
     ...(item.paused ? { paused: true } : {}), ...(item.waiting ? { waiting: true } : {}),
   }))
 }
@@ -406,6 +484,10 @@ export function teamExecutionResults(plan, execution) {
     cancelled: result.status === 'cancelled',
     provider: result.provider,
     model: result.recommendedModel,
+    ...unsupportedCliReasoning({ reasoningEffort: result.recommendedReasoningEffort }),
+    ...reasoningExecutionFields(result),
+    ...(finite(result.durationMs) && result.durationMs >= 0 ? { durationMs: result.durationMs } : {}),
+    ...(finite(result.inputChars) && result.inputChars >= 0 ? { inputChars: result.inputChars } : {}),
     requestedCliModel: result.requestedCliModel ?? null,
     actualModel: result.actualModel ?? null,
     ...(result.reportedModel !== undefined ? { reportedModel: result.reportedModel } : {}),

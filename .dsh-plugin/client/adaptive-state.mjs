@@ -1,5 +1,9 @@
 /** Pure client controls. Host validation and recorded-result binding remain authoritative. */
 export const ADAPTIVE_DEFAULTS = Object.freeze({
+  routingEvidenceJson: '',
+  resourceLearningEnabled: true,
+  qualityEscalationEnabled: false,
+  qualityGateJson: '',
   feedbackLearningEnabled: true,
   feedbackHalfLifeDays: 30,
   feedbackPriorWeight: 3,

@@ -9,18 +9,23 @@ import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from '.
 import { HEALTH_CACHE_MS, apiKeyEnvPresent, healthCache, runHealthCheck, subscriptionLoginOf } from './shared/tool-health.mjs'
 import { latestVersions } from './shared/latest-versions.mjs'
 import {
-  DEFAULT_COOLDOWN_MINUTES, billingOverview, createQuotaTracker, detectQuotaExhaustion, parseQuotaPatterns, vendorKey,
+  DEFAULT_COOLDOWN_MINUTES, billingOverview, billingPlan, createQuotaTracker, detectQuotaExhaustion, parseQuotaPatterns, vendorKey,
 } from './shared/subscription-billing.mjs'
 import { createRouterState } from './shared/router-state.mjs'
 import { applyFeedbackProfile, buildFeedbackProfile } from './shared/adaptive-feedback.mjs'
+import { buildRoutingEvidence, parseRoutingEvidenceJson } from './shared/routing-evidence.mjs'
+import { apiReasoningRequest } from './shared/reasoning-execution.mjs'
+import { parseQualityGateJson, runQualityCascade } from './shared/quality-gates.mjs'
 import { applyPricingSnapshot, createDynamicDataRefresher, dynamicDataSummary, routingData } from './shared/dynamic-data.mjs'
 import { projectDynamicData } from './shared/dynamic-data-view.mjs'
 import {
   budgetCheck, buildRunRecord, formatUsd, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
-  spending, storedResults, actualCost, teamExecutionResults,
+  spending, storedResults, actualCost, hasStartedQualityAttempts, teamExecutionResults,
 } from './shared/run-ledger.mjs'
 import { routeBoundaries } from './shared/security-boundaries.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
+import { applyManualPackagePlan } from './shared/manual-plan.mjs'
+import { parsePackageAssignments, packagePlanKey } from './shared/package-assignments.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
 import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
 import { parseRunRequest } from './shared/official-tools-remote.mjs'
@@ -70,6 +75,10 @@ export const Config = z.object({
   budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
   maxConsultOutputChars: z.number().step(1).min(500).max(50_000).default(12_000).volatile(),
   modelProfilesJson: z.string().max(32_000).default('[]').volatile(),
+  routingEvidenceJson: z.string().max(200_000).default('').volatile(),
+  resourceLearningEnabled: z.boolean().default(true).volatile(),
+  qualityEscalationEnabled: z.boolean().default(false).volatile(),
+  qualityGateJson: z.string().max(8_000).default('').volatile(),
   routingPreset: z.union(['economy', 'balanced', 'quality']).default(DEFAULT_ROUTING_PRESET).volatile(),
   dailyBudgetUsd: z.number().min(0).max(1_000_000).default(0).volatile(),
   monthlyBudgetUsd: z.number().min(0).max(1_000_000).default(0).volatile(),
@@ -440,6 +449,11 @@ async function routingSavedState(config) {
   // Cached source A must not masquerade as a newly configured source B.
   saved.dynamicData = projectDynamicData(refreshedData ?? saved.dynamicData, dynamicOptions(config))
   saved.routingLearning = buildFeedbackProfile(saved.runs, feedbackOptions(config))
+  const imported = text(valueOf(config, 'routingEvidenceJson', ''))
+  saved.routingEvidence = buildRoutingEvidence({
+    runs: valueOf(config, 'resourceLearningEnabled', true) !== false ? saved.runs : [],
+    qualityEvidence: imported ? parseRoutingEvidenceJson(imported) : null,
+  })
   return saved
 }
 
@@ -447,6 +461,7 @@ function planDataOptions(saved, config) {
   return {
     ...routingData(saved.dynamicData, dynamicOptions(config).enabled),
     learning: saved.routingLearning ?? buildFeedbackProfile(saved.runs, feedbackOptions(config)),
+    routingEvidence: saved.routingEvidence ?? buildRoutingEvidence(),
   }
 }
 
@@ -473,7 +488,7 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
       ? Promise.resolve(Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
       : installedToolIds(),
   ])
-  const readiness = options.skipToolProbe === true ? []
+  const readiness = Array.isArray(options.readiness) ? options.readiness : options.skipToolProbe === true ? []
     : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
   const executable = new Set(Array.isArray(options.runnableToolIds)
     ? options.runnableToolIds : readiness.filter(item => item.ready && (item.readyModes ?? item.modes ?? []).includes('read-only')).map(item => item.id))
@@ -487,7 +502,7 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
     preset: routingPresetOf(config, options.preset),
     loggedOutToolIds: loggedOut,
   })
-  return { ...plan, budgetStatus: budgetFor(config, saved, plan.estimatedCost) }
+  return { ...plan, packagePlanKey: packagePlanKey(plan, taskText), budgetStatus: budgetFor(config, saved, plan.estimatedCost) }
 }
 
 /** One bounded, independent call through the same official LLM service. */
@@ -499,6 +514,15 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   if (!taskText) throw new Error('任务内容为空，请先描述任务。')
   throwIfAborted(signal)
   const limit = boundedInteger(outputLimit, 12_000, 1, 50_000)
+  const reasoning = apiReasoningRequest(route)
+  if (reasoning.error) {
+    return {
+      ok: false, provider, model, answer: '', truncated: false, finish: { kind: 'unknown' },
+      error: reasoning.error, ...reasoning.fields, notStarted: true,
+    }
+  }
+  const messageText = `You are an independent specialist consulted by another AI agent. Give a concise, evidence-oriented answer in the task's language.\n\nTask:\n${taskText}`
+  const startedAt = Date.now()
   const controller = new AbortController()
   const onAbort = () => controller.abort(signal.reason)
   signal?.addEventListener('abort', onAbort, { once: true })
@@ -506,6 +530,7 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
   let characterLimitReached = false
   let finish = { kind: 'unknown' }
   let usage = null
+  let usageIncomplete = false
   try {
     const stream = ctx.llm.stream({
       provider,
@@ -514,11 +539,12 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
         role: 'user',
         content: [{
           type: 'text',
-          text: `You are an independent specialist consulted by another AI agent. Give a concise, evidence-oriented answer in the task's language.\n\nTask:\n${taskText}`,
+          text: messageText,
         }],
       }],
       maxTokens: Math.min(4_096, Math.max(256, Math.ceil(limit / 2))),
       signal: controller.signal,
+      ...reasoning.options,
     })
     for await (const chunk of stream) {
       if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') {
@@ -530,11 +556,11 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
           break
         }
       } else if (chunk?.type === 'usage' && chunk.usage && typeof chunk.usage === 'object') {
-        usage = {
-          inputTokens: finiteNumber(chunk.usage.inputTokens, 0),
-          outputTokens: finiteNumber(chunk.usage.outputTokens, 0),
-          cacheReadTokens: finiteNumber(chunk.usage.cacheReadTokens, 0),
-          cacheWriteTokens: finiteNumber(chunk.usage.cacheWriteTokens, 0),
+        usage = {}
+        usageIncomplete = false
+        for (const key of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) {
+          if (typeof chunk.usage[key] === 'number' && Number.isFinite(chunk.usage[key]) && chunk.usage[key] >= 0) usage[key] = chunk.usage[key]
+          else if (Object.hasOwn(chunk.usage, key) || ['inputTokens', 'outputTokens'].includes(key)) usageIncomplete = true
         }
       } else if (chunk?.type === 'finish') {
         const reason = chunk.reason
@@ -544,20 +570,44 @@ export async function consultConfiguredModel(ctx, route, task, outputLimit = 12_
         }
       }
     }
+  } catch (error) {
+    finish = { kind: signal?.aborted ? 'aborted' : 'error', error: String(error?.message ?? error).slice(0, 2_000) }
   } finally {
     signal?.removeEventListener('abort', onAbort)
   }
-  throwIfAborted(signal)
+  const durationMs = Date.now() - startedAt
+  const inputChars = messageText.length
   const tokenLimitReached = finish.kind === 'max-tokens'
   const truncated = characterLimitReached || tokenLimitReached
-  if (!characterLimitReached && (finish.kind === 'error' || finish.kind === 'aborted')) {
-    return { ok: false, provider, model, answer, truncated, finish, error: finish.error }
+  if (signal?.aborted || !characterLimitReached && (finish.kind === 'error' || finish.kind === 'aborted')) {
+    return {
+      ok: false, provider, model, answer, truncated, finish,
+      ...reasoning.fields,
+      ...(Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
+      ...(Number.isFinite(inputChars) && inputChars >= 0 ? { inputChars } : {}),
+      error: finish.error,
+      ...(signal?.aborted ? { cancelled: true } : {}),
+      ...(usageIncomplete ? { usageIncomplete: true } : {}),
+      ...(usage ? { usage } : {}),
+    }
   }
   if (!answer.trim()) {
-    return { ok: false, provider, model, answer, truncated, finish, error: 'model returned no text' }
+    return {
+      ok: false, provider, model, answer, truncated, finish,
+      ...reasoning.fields,
+      ...(Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
+      ...(Number.isFinite(inputChars) && inputChars >= 0 ? { inputChars } : {}),
+      error: 'model returned no text',
+      ...(usageIncomplete ? { usageIncomplete: true } : {}),
+      ...(usage ? { usage } : {}),
+    }
   }
   return {
     ok: true, provider, model, answer, truncated, finish,
+    ...(usageIncomplete ? { usageIncomplete: true } : {}),
+    ...reasoning.fields,
+    ...(Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
+    ...(Number.isFinite(inputChars) && inputChars >= 0 ? { inputChars } : {}),
     ...(usage ? { usage } : {}),
     ...(tokenLimitReached
       ? { truncationReason: 'model-token-limit', notice: '模型达到本次调用的输出 token 上限，回答可能不完整。' }
@@ -699,6 +749,11 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
   const problem = taskTextProblem(taskText)
   if (problem) throw new Error(problem)
   const direct = text(options.provider) || text(options.model)
+  const manual = options.assignmentMode === 'manual'
+  if (options.assignmentMode !== undefined && !['algorithm', 'manual'].includes(options.assignmentMode)) throw new Error('不支持的分配方式。')
+  if (manual && direct) throw new Error('手动分配工作包不能同时指定全局单一模型。')
+  if (!manual && (options.packageAssignments !== undefined || options.packagePlanKey !== undefined)) throw new Error('工作包绑定需要选择手动分配。')
+  if (manual && valueOf(config, 'allowManualReassign', true) === false) throw new Error('设置中已关闭手动改派。')
   if (direct && (!text(options.provider) || !text(options.model))) throw new Error('指定模型需要同时提供 provider 和 model。')
   const saved = await routingSavedState(config)
   const routes = await routesWithLearning(ctx, config, options.signal, saved.runs, saved.dynamicData, saved.routingLearning)
@@ -708,7 +763,7 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
   const installed = options.skipToolProbe === true
     ? (Array.isArray(options.installedToolIds) ? options.installedToolIds : [])
     : await installedToolIds()
-  const readiness = options.skipToolProbe === true ? []
+  const readiness = Array.isArray(options.readiness) ? options.readiness : options.skipToolProbe === true ? []
     : await Promise.all(installed.map(id => officialToolReadiness(id, options.workspace ?? process.cwd())))
   const runnableToolIds = Array.isArray(options.runnableToolIds)
     ? options.runnableToolIds
@@ -729,8 +784,18 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
       budgetUsd, installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
   let plan = planWith(preset, options.budgetUsd)
+  if (manual) {
+    plan = applyManualPackagePlan(plan, { task: taskText, packageAssignments: options.packageAssignments,
+      packagePlanKey: options.packagePlanKey }, routes, planDataOptions(saved, config))
+    await validateManualTools(ctx, plan.manualAssignments, { ...options, installedToolIds: installed, readiness })
+  }
   let budget = budgetFor(config, saved, plan.estimatedCost)
-  if (budget.exceeded && budget.action === 'downgrade' && !direct) {
+  const perRunLimit = Number(options.budgetUsd) || 0
+  if (manual && perRunLimit > 0 && (plan.estimatedCost === null || plan.estimatedCost > perRunLimit)) {
+    budget = { ...budget, exceeded: budget.exceeded || 'run', estimateUsd: plan.estimatedCost,
+      message: plan.estimatedCost === null ? '手动分配包含费用未知的目标，无法确认满足本次预算。' : '手动分配的预估费用超出本次预算。' }
+  }
+  if (budget.exceeded && budget.action === 'downgrade' && !direct && !manual) {
     const cheaper = planWith('economy', budget.remainingUsd > 0 ? budget.remainingUsd : options.budgetUsd)
     const recheck = budgetFor(config, saved, cheaper.estimatedCost)
     if (!recheck.exceeded) {
@@ -742,9 +807,48 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
   return { taskText, direct: Boolean(direct), plan, budget, routes, preset }
 }
 
+/** Check every explicit tool before any package can incur cost. */
+async function validateManualTools(ctx, assignments, options = {}) {
+  const targets = parsePackageAssignments(assignments)
+  const ids = [...new Set(Object.values(targets ?? {}).filter(item => item.kind === 'tool').map(item => item.toolId))]
+  if (!ids.length) return
+  if (typeof ctx.sandbox?.confine !== 'function') throw new Error('手动分配的官方工具需要 Harness 进程沙箱；请检查执行环境后重新预览。')
+  const installed = options.installedToolIds ?? await installedToolIds()
+  const capabilities = options.executionCapabilities ?? officialToolExecutionCapabilities()
+  const knownReadiness = options.manualReadiness ?? options.readiness ?? []
+  for (const id of ids) {
+    if (!installed.includes(id)) throw new Error(`手动分配的官方工具 ${id} 尚未安装。`)
+    if (!capabilities.some(item => item.id === id && item.modes?.includes('read-only'))) throw new Error(`官方工具 ${id} 不支持当前平台的只读执行。`)
+    const ready = knownReadiness.find(item => item.id === id)
+      ?? await (options.readinessFor ?? officialToolReadiness)(id, options.workspace ?? process.cwd())
+    if (ready?.ready !== true || !(ready.readyModes ?? ready.modes ?? []).includes('read-only')) {
+      throw new Error(`官方工具 ${id} 尚未就绪：${ready?.reason ?? '请检查工具安装和只读执行支持。'}`)
+    }
+  }
+}
+
+/** Structural validation is opt-in; each API attempt retains its own price and usage. */
+async function consultWithQualityGate(ctx, route, task, limit, signal, { gate = null, alternatives = [], approveUpgrade } = {}) {
+  if (!gate) return consultConfiguredModel(ctx, route, task, limit, signal)
+  const checked = await runQualityCascade({
+    route, task, gate, alternatives, approveUpgrade, signal,
+    call: request => consultConfiguredModel(ctx, request.route, request.task, limit, request.signal),
+  })
+  return { ...checked.result,
+    provider: checked.result.provider ?? route.provider, model: checked.result.model ?? route.model,
+    ...(checked.attempts.length ? { qualityAttempts: checked.attempts } : {}),
+  }
+}
+
+function apiUpgradeEligible(route, routes) {
+  return (route?.billing === undefined || route.billing === 'api-only') && route?.execution !== 'official'
+    && billingPlan(route, routes).subscription === null
+    && (route?.execution === 'api' || !toolForProvider(route?.provider))
+}
+
 /** Route, or honor one explicit model, then run each package through its adapter. */
 export async function executeConfiguredAssignment(ctx, task, config = {}, options = {}) {
-  const { taskText, direct, plan, budget, routes, preset } = await planAssignment(ctx, task, config, options)
+  const { taskText, direct, plan, budget, routes, preset } = options.preparedAssignment ?? await planAssignment(ctx, task, config, options)
   if (budget.exceeded && options.confirmOverBudget !== true) {
     return {
       plan, execution: null, paused: true,
@@ -757,6 +861,42 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
   const billing = await billingContext(config, options)
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const startedAt = Date.now()
+  const gate = parseQualityGateJson(valueOf(config, 'qualityGateJson', ''))
+  const gatedApi = async ({ route, task: packageTask, signal, subscription }) => {
+    if (subscription) return consultConfiguredModel(ctx, route, packageTask, limit, signal)
+    const quality = routeQuality(route)
+    const alternatives = gate && !direct && route.manualPinned !== true && apiUpgradeEligible(route, routes)
+      && valueOf(config, 'qualityEscalationEnabled', false) === true && quality !== null
+      ? routes.filter(candidate => apiUpgradeEligible(candidate, routes) && routeQuality(candidate) !== null
+        && routeQuality(candidate) > quality && (candidate.provider !== route.provider || candidate.model !== route.model))
+        .slice().sort((left, right) => routeQuality(right) - routeQuality(left)
+          || `${left.provider}/${left.model}`.localeCompare(`${right.provider}/${right.model}`))
+      : []
+    return consultWithQualityGate(ctx, route, packageTask, limit, signal, { gate, alternatives,
+      approveUpgrade: async ({ to, attempts }) => {
+        if (valueOf(config, 'qualityEscalationEnabled', false) !== true || direct || route.manualPinned === true
+          || !apiUpgradeEligible(route, routes) || !apiUpgradeEligible(to, routes)) return false
+        const saved = await routingSavedState(config)
+        const limits = budgetSettings(config)
+        const perRunLimit = Number(plan.optimization?.budgetUsd) || 0
+        const constrained = limits.dailyLimitUsd > 0 || limits.monthlyLimitUsd > 0 || perRunLimit > 0
+        const spent = spending(saved.runs, undefined, saved.archivedSpending)
+        if ((limits.dailyLimitUsd > 0 && spent.unknownToday > 0) || (limits.monthlyLimitUsd > 0 && spent.unknownMonth > 0)) return false
+        const estimate = createPlanFromRoutes(packageTask, [to], {
+          ...planDataOptions(saved, config), mode: 'direct', directProvider: to.provider, directModel: to.model,
+        }).estimatedCost
+        if (!Number.isFinite(estimate) || estimate < 0) return false
+        const costs = [...finished.map(result => !hasStartedQualityAttempts(result)
+          && (result.blocked || result.notStarted || billingForResult(result) === 'subscription') ? { costUsd: 0 }
+          : actualCost(result, routePricing(routes, result))), ...attempts.map(result => actualCost(result, result.pricingSnapshot))]
+        const pending = plan.costBreakdown.slice(finished.length + 1).map(item => item.estimatedCost)
+        if (costs.some(item => item.costUsd === null) || pending.some(value => !Number.isFinite(value))) return !constrained
+        const projected = costs.reduce((sum, item) => sum + item.costUsd, estimate) + pending.reduce((sum, value) => sum + value, 0)
+        if (!Number.isFinite(projected) || perRunLimit > 0 && projected > perRunLimit) return false
+        return !budgetFor(config, saved, projected).exceeded
+      },
+    })
+  }
   let execution
   try {
     execution = await executeAssignmentPlan({
@@ -767,7 +907,7 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
       signal: options.signal,
       ...hooks,
       billing,
-      apiFallback: async ({ route, task: packageTask, signal }) => consultConfiguredModel(ctx, route, packageTask, limit, signal),
+      apiFallback: gatedApi,
     })
   } catch (error) {
     // Steps that already ran (and may have been paid for) are always recorded with their spend.
@@ -882,12 +1022,37 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   const cwd = text(workspace) || run.workspace
   if (!cwd || !(await fileExists(cwd))) throw new Error(`原运行的工作区 ${cwd || '(未记录)'} 不可用，无法重跑该步骤；请恢复该目录，或在原工作区的会话中调用 model_router_rerun_step。`)
   if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, root: text(root) || cwd, signal, options, config })
+  const retryIds = new Set([target.id, ...downstreamPackageIds(run.packages, target.id)
+    .filter(id => run.packages.find(item => item.id === id)?.ok !== true)])
+  const manualRetries = Object.fromEntries(run.packages.filter(item => retryIds.has(item.id) && item.manualAssignment)
+    .map(item => [item.id, item.id === target.id && override ? { kind: 'api', ...override } : item.manualAssignment]))
+  if (Object.keys(manualRetries).length) {
+    for (const [id, assignment] of Object.entries(parsePackageAssignments(manualRetries))) {
+      if (assignment.kind !== 'api') continue
+      const route = routes.find(item => item.provider === assignment.provider && item.model === assignment.model)
+      if (!route) throw new Error('重跑所选的模型已不在官方目录中，请重新分配。')
+      const policy = billingPlan(route, routes)
+      if (policy.mode === 'subscription-only' || policy.subscription?.kind === 'plan-key') throw new Error('该模型使用订阅策略，不能作为手动 API 目标重跑。')
+      const item = run.packages.find(entry => entry.id === id)
+      if (item?.type === 'vision' && Array.isArray(route.inputModalities) && route.inputModalities.length
+        && !route.inputModalities.some(value => String(value).toLowerCase() === 'image')) {
+        throw new Error(`工作包 ${id} 需要图像模型，所选重跑目标仅声明其他输入能力。`)
+      }
+    }
+    await validateManualTools(ctx, manualRetries, { ...options, workspace: cwd })
+  }
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
+  const retryGate = parseQualityGateJson(valueOf(config, 'qualityGateJson', ''))
   const execution = await rerunAssignmentPackage({
     task: run.task,
     packages: run.packages.map(item => ({
       id: item.id, name: item.name, objective: item.objective, dependsOn: item.dependsOn,
+      type: item.type, purpose: item.purpose,
+      ...(item.manualAssignment ? { manualAssignment: item.manualAssignment, selectionSource: 'manual',
+        algorithmRecommendation: item.algorithmRecommendation } : {}),
       recommendedProvider: item.provider ?? item.recommendedProvider, recommendedModel: item.model ?? item.recommendedModel,
+      ...(item.plannedReasoningEffort && item.provider === item.recommendedProvider && item.model === item.recommendedModel
+        ? { recommendedReasoningEffort: item.plannedReasoningEffort } : {}),
     })),
     previous: storedResults(run),
     packageId: target.id,
@@ -899,7 +1064,9 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     ...(choice ? { subscriptionChoice: choice } : {}),
     ...executionHooks(ctx, options),
     billing: await billingContext(config, options),
-    apiFallback: async ({ route, task: packageTask, signal: callSignal }) => consultConfiguredModel(ctx, route, packageTask, limit, callSignal),
+    apiFallback: async ({ route, task: packageTask, signal: callSignal, subscription }) => subscription
+      ? consultConfiguredModel(ctx, route, packageTask, limit, callSignal)
+      : consultWithQualityGate(ctx, route, packageTask, limit, callSignal, { gate: retryGate }),
   })
   const updated = await routerStateStore().updateRun(run.id, current => {
     mergeRerun(current, execution, { rerunIds: execution.ranIds, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
@@ -935,6 +1102,9 @@ function teamPlanFromRun(run, ids, override, targetId) {
     verificationChecklist: item.verificationChecklist ?? [],
     recommendedProvider: item.id === targetId && override ? override.provider : item.recommendedProvider,
     recommendedModel: item.id === targetId && override ? override.model : item.recommendedModel,
+    ...(item.plannedReasoningEffort && !(item.id === targetId && override
+      && (override.provider !== item.recommendedProvider || override.model !== item.recommendedModel))
+      ? { recommendedReasoningEffort: item.plannedReasoningEffort } : {}),
     estimatedCost: item.estimatedCost ?? null,
   }))
   return { mode: 'team', team: { workPackages } }
@@ -1156,6 +1326,7 @@ export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
     // Legacy scalar quality biases are intentionally no longer learned.
     biases: {},
     learning: saved.routingLearning,
+    routingEvidence: saved.routingEvidence,
     dynamicData: dynamicDataSummary(saved.dynamicData, { ...dynamicOptions(config), now: Date.now() }),
     routingData: {
       ...routingData(saved.dynamicData, dynamicOptions(config).enabled),
@@ -1276,7 +1447,7 @@ export async function planOfficialTeam(ctx, config = {}, args = {}, options = {}
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const budgetUsd = Math.max(0, finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)))
   const plan = createPlanFromRoutes(taskText, executableRoutes, {
-    ...planDataOptions(saved, config), mode: 'team', budgetUsd, installedToolIds: installed,
+    ...planDataOptions(saved, config), mode: 'team', budgetUsd, installedToolIds: installed, forceOfficialCli: true,
     runnableToolIds: installed.filter(id => supported.has(id)), preset: routingPresetOf(config, args.preset),
   })
   const bindingsText = text(args.cliModelsJson)
@@ -1338,6 +1509,10 @@ export function decisionSummary(plan) {
       difficulty: item.difficulty ?? null, estimatedCost: item.estimatedCost ?? null,
       channel: item.executionChannel ?? null, channelDetail: item.channelDetail ?? '',
       dependsOn: item.dependsOn ?? [],
+      ...(item.manualAssignment ? { manualAssignment: item.manualAssignment, selectionSource: 'manual',
+        algorithmRecommendation: item.algorithmRecommendation ?? null,
+        ...(item.manualAssignment.kind === 'tool' ? { toolId: item.manualAssignment.toolId,
+          toolLabel: getOfficialTool(item.manualAssignment.toolId)?.label ?? item.manualAssignment.toolId } : {}) } : {}),
     })),
   }
 }
@@ -1413,7 +1588,8 @@ export function approvalReasonCodes(name, args = {}, config = {}, { rerunRun = n
   if (name === 'model_router_rerun_step' && rerunRun && rerunSupport(rerunRun).writes) codes.push(rerunRun.kind === 'tool' ? 'workspace-write' : 'rerun-write')
   if (name === 'model_router_rerun_step' && args.subscriptionChoice === 'api') codes.push('subscription-api')
   if (args.confirmOverBudget === true) codes.push('over-budget')
-  const directRun = name === 'model_router_execute' || (name === 'model_router_rerun_step' && (!rerunRun || rerunSupport(rerunRun).kind === 'assign'))
+  const directRun = name === 'model_router_execute' && args.assignmentMode !== 'manual'
+    || (name === 'model_router_rerun_step' && (!rerunRun || rerunSupport(rerunRun).kind === 'assign') && rerunRun?.assignmentMode !== 'manual')
   if ((name === 'model_router_team_execute' && args.executionEnvironment === 'cli-native')
     || (name === 'model_router_rerun_step' && rerunRun?.executionEnvironment === 'cli-native')) codes.push('unsandboxed')
   if (directRun && valueOf(config, 'confirmUnsandboxedCli', true) !== false && mayLaunchDirectCli(args)) codes.push('unsandboxed')
@@ -1475,7 +1651,12 @@ export async function workbenchWorkspace(requested, runs = []) {
   return chosen
 }
 
-/** Resolve one fresh preview and retain its exact CLI plan for the confirmed run. */
+function manualRequestOptions(request) {
+  return request.assignmentMode === 'manual' ? { assignmentMode: 'manual',
+    packageAssignments: request.packageAssignments, packagePlanKey: request.packagePlanKey } : {}
+}
+
+/** Resolve one fresh preview and retain its exact plan for the confirmed run. */
 async function prepareWorkbenchPreview(ctx, config, supplied = {}, options = {}) {
   const request = parseRunRequest(supplied)
   const saved = await savedState()
@@ -1511,12 +1692,16 @@ async function prepareWorkbenchPreview(ctx, config, supplied = {}, options = {})
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const planned = await planAssignment(ctx, request.task, config, {
     provider: request.provider, model: request.model, planMode: request.planMode, preset: request.preset,
+    ...manualRequestOptions(request),
     budgetUsd: finiteNumber(request.budgetUsd, finiteNumber(configuredBudget, 0)), workspace, signal: options.signal, ...options.planOptions,
   })
   await hydrateHealth()
-  const codes = approvalReasonCodes('model_router_execute', { provider: request.provider, confirmOverBudget: Boolean(planned.budget.exceeded) }, config)
-  return { request, preview: {
+  const codes = request.assignmentMode === 'manual'
+    ? planned.budget.exceeded ? ['over-budget'] : []
+    : approvalReasonCodes('model_router_execute', { provider: request.provider, confirmOverBudget: Boolean(planned.budget.exceeded) }, config)
+  return { request, planned, preview: {
     workspace,
+    assignmentMode: request.assignmentMode ?? 'algorithm', packagePlanKey: packagePlanKey(planned.plan, request.task),
     decision: decisionSummary(planned.plan),
     selected: planned.plan.selected ?? null,
     routingBypassed: planned.plan.routingBypassed === true,
@@ -1553,8 +1738,10 @@ export async function startWorkbenchRun(ctx, config, supplied = {}, options = {}
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const result = await (options.execute ?? executeConfiguredAssignment)(ctx, request.task, config, {
     provider: request.provider, model: request.model, planMode: request.planMode, preset: request.preset,
+    ...manualRequestOptions(request),
     budgetUsd: finiteNumber(request.budgetUsd, finiteNumber(configuredBudget, 0)),
     confirmOverBudget: confirmed.has('over-budget'), workspace: preview.workspace, signal: options.signal, ...options.planOptions,
+    preparedAssignment: prepared.planned,
   })
   const awaiting = result.awaitingConfirmation ?? []
   return {
@@ -1980,12 +2167,15 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_execute',
-    description: 'Run a task on configured models and aggregate the results. Omit provider and model to route first. Supply both to use that one model and skip routing. auto/official profiles try the vendor headless CLI (claude -p, codex exec, gemini -p) and fall back to the Harness model API when the CLI is missing or fails. api profiles always use the model API. This call is read-only and does not apply file edits.',
+    description: 'Run a task on configured models and aggregate the results. Omit provider and model to route first. Supply both to use that one model and skip routing. With assignmentMode manual, use the packagePlanKey from model_router_plan and packageAssignmentsJson to pin each package to an exact API route or registered official tool. Manual tool failures do not fall back to API. Automatic profiles retain CLI/API billing policy. This call is read-only and does not apply file edits.',
     parameters: {
       task: { type: 'string', required: true, description: 'Task to execute.' },
       provider: { type: 'string', description: 'Configured provider. Pair with model to bypass routing.' },
       model: { type: 'string', description: 'Configured model. Pair with provider to bypass routing.' },
       planMode: { type: 'string', enum: ['single', 'team'], description: 'Used only when provider and model are omitted.' },
+      assignmentMode: { type: 'string', enum: ['algorithm', 'manual'], description: 'Use algorithm recommendations, or pin every decomposed package to the user-selected API model or official tool.' },
+      packagePlanKey: { type: 'string', description: 'Required for manual mode: the current decomposition key returned by model_router_plan for the same task and mode.' },
+      packageAssignmentsJson: { type: 'string', description: 'Required for manual mode: JSON object keyed by every package id, values {kind:"api",provider,model} or {kind:"tool",toolId}. Tools use their configured default model. No commands or arguments.' },
       budgetUsd: { type: 'number', description: 'Optional local estimate ceiling when routing. Not a vendor billing cap.' },
       preset: { type: 'string', enum: ['economy', 'balanced', 'quality'], description: 'Optional routing preset for this call; defaults to the saved setting.' },
       confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
@@ -1994,10 +2184,19 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
     async execute(args, exec) {
       const { cwd } = await sessionWorkspace(ctx, exec)
       const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
+      let assignments
+      if (args.packageAssignmentsJson !== undefined) {
+        if (typeof args.packageAssignmentsJson !== 'string' || args.packageAssignmentsJson.length > 32_000) throw new Error('工作包分配 JSON 超出限制。')
+        try { assignments = parsePackageAssignments(JSON.parse(args.packageAssignmentsJson)) }
+        catch { throw new Error('工作包分配 JSON 无效；请按包 ID 提供模型 API 或官方工具目标。') }
+      }
       const result = await executeConfiguredAssignment(ctx, args.task, config, {
         provider: args.provider,
         model: args.model,
         planMode: args.planMode,
+        assignmentMode: args.assignmentMode,
+        ...(assignments === undefined ? {} : { packageAssignments: assignments }),
+        ...(args.packagePlanKey === undefined ? {} : { packagePlanKey: args.packagePlanKey }),
         preset: args.preset,
         budgetUsd: finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)),
         confirmOverBudget: args.confirmOverBudget === true,
@@ -2016,6 +2215,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
         notice: result.paused
           ? '已因预算暂停，未启动任何模型。请向用户说明预估费用，用户同意后再以 confirmOverBudget: true 调用。'
           : result.awaitingConfirmation ? SUBSCRIPTION_PAUSE_NOTICE
+          : result.plan.assignmentMode === 'manual' ? '已按手动分配执行只读工作包；API 模型和官方工具目标固定，工具使用厂商默认模型，失败不会自动改派。可用 model_router_rerun_step 按保存的目标重跑。'
           : '官方 CLI 以只读无界面方式运行。可编辑改动仍使用 model_router_tool_run 或 model_router_team_execute。未安装、未登录、失败或配置为 api 的模型走模型目录 API；回退原因与 CLI 原始错误见 fallback。可用 model_router_rerun_step 重跑失败步骤，model_router_rate 记录评价。',
       })
     },

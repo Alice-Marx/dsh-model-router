@@ -4,7 +4,7 @@
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
 
-Current version: **0.21.1** (`@ljwei-stak/dsh-model-router`). Hermes source installs now honor the shared install root without relocating existing user data, and the interactive terminal appears first on the official-tools page. This follows the Hermes/Pi integration and OpenCode V2 package update in 0.21.0. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**. Hermes and Pi do not yet have verified managed runners; real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.22.0** (`@ljwei-stak/dsh-model-router`). Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
 
@@ -40,16 +40,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.21.1
+@ljwei-stak/dsh-model-router@0.22.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.21.1** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.22.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.21.1`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.22.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -331,11 +331,13 @@ For example, a complete API result with 1,000 uncached input tokens at $1/millio
 
 ## How routing works
 
+Manual assignment: after planning, choose algorithm recommendations or select an API model / official tool for each package. See the [manual assignment guide](docs/MANUAL_TASK_ASSIGNMENT.zh.md).
+
 The planner is a deterministic local heuristic, not a trained success predictor. It classifies text, estimates complexity, creates suitable analysis/execution/verification/synthesis packages, discovers exact configured routes, overlays profiles, and applies capability/quality constraints. An explicit route bypasses comparison with other routes. Catalog quality/latency/risk hints are experimental priors, not measured success probabilities or live vendor quotes. Execution is currently text-oriented; a vision label does not establish an end-to-end multimodal pipeline.
 
 ### Token and price estimate
 
-Base input tokens are `max(80, ceil(text.length / 3.7))`, then adjusted by package-stage multipliers. Base output is 900, adjusted by stage/reasoning effort, with minimum 220. This is a text-length heuristic, not a vendor tokenizer. Let `I` be total estimated input, `R/W` the cached-read/write portions, `O` output, and prices USD per million tokens:
+Without matching resource evidence, base input tokens are `max(80, ceil(text.length / 3.7))`, then adjusted by package-stage multipliers. Base output is 900, adjusted by stage/reasoning effort, with minimum 220. This is a text-length heuristic, not a vendor tokenizer. Sufficient matching, complete history replaces these heuristics with empirical P90 resource estimates, without applying effort or stage multipliers again. Let `I` be total estimated input, `R/W` the cached-read/write portions, `O` output, and prices USD per million tokens:
 
 ```text
 C = ((I − R − W) × p_in + R × p_cache_read
@@ -359,7 +361,7 @@ u = wq × q + wc × costUtility
 assignmentScore = sum(package utility) − 0.015 × crossRouteDependencyEdges
 ```
 
-Quality uses the task-category LiveBench score when available, then overall LiveBench, then profile/catalog estimates. Public-data refresh is opt-in. Human ratings affect only the bounded `preferenceAdjustment`; they cannot increase objective quality or satisfy its floor.
+Quality first uses sufficient matching objective task evidence, then falls back to task-category LiveBench, overall LiveBench, and profile/catalog estimates. Model and effort are compared jointly only when at least two API efforts have usable task evidence; observed duration can replace the latency proxy. Public-data refresh is opt-in. Human ratings affect only the bounded `preferenceAdjustment`; they cannot increase objective quality or satisfy its floor.
 
 | Package basis | Quality | Cost | Latency | Specialty | Reasoning | Risk |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -374,13 +376,15 @@ Base quality floors are **.75 / .78 / .82** for simple/balanced/complex tasks; c
 
 1. Prefer candidates meeting each package's floor. If none qualify, retain up to three highest-quality fallbacks and report relaxation.
 2. Keep at most **12 candidates per package**, including anchors for lowest known cost, greatest utility and highest quality. Local Pareto pruning is disabled when dependencies exist, because route identity affects handoffs.
-3. Validate unique package IDs and topological dependency order. Search the retained Cartesian space exactly when its size is at most **4,096**; otherwise use **beam width 256**. Remaining minimum costs prune infeasible prefixes; the beam protects the cheapest feasible prefix under a finite budget.
+3. Validate unique package IDs and topological dependency order. Search the retained Cartesian space exactly when its size is at most **4,096**; otherwise use **beam width 256**. Search compresses dominated prefixes sharing the same future dependency boundary and ranks them using optimistic future handoffs. Remaining minimum costs prune infeasible prefixes; the beam protects the cheapest feasible prefix under a finite budget.
 4. Compare assignments lexicographically: fewer relaxed packages, smaller quality shortfall, higher utility, lower cost, fewer route switches, then stable route order. Minimum-cost mode compares cost before utility. Each dependency crossing a `provider/model` route subtracts .015 from utility.
 5. Report search metadata and feasibility. When a positive budget has no feasible assignment, a minimum-cost alternative can still be returned with `budgetFeasible: false`. A displayed plan is not proof that the budget is satisfied.
 
 “Exact” applies only to the retained candidate space and proxy objective. Candidate caps and beam pruning preclude a claim of global optimality over every configured model. Unit/synthetic tests establish mechanisms, not actual answer-quality gains. The public 2026-06-25 LiveBench score/cost tables used by the research audit are aggregate data; a paired per-question quality/cost matrix was not obtained, so no real routing gain is claimed. See [research](docs/ROUTING_RESEARCH.zh.md), [derivation/experiments](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and [validation protocol](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md).
 
-Implementation: [router.mjs](.dsh-plugin/shared/router.mjs), [assignment-solver.mjs](.dsh-plugin/shared/assignment-solver.mjs), [routing-presets.mjs](.dsh-plugin/shared/routing-presets.mjs), [harness-plan.mjs](.dsh-plugin/shared/harness-plan.mjs) and [adaptive-feedback.mjs](.dsh-plugin/shared/adaptive-feedback.mjs).
+See the [algorithm optimization guide](docs/ROUTING_ALGORITHM_OPTIMIZATION.zh.md) for evidence import, fallback rules, effort handling, and optional JSON validation with escalation. Escalation defaults to off and permits at most one additional ordinary API request after billing and budget checks.
+
+Implementation: [router.mjs](.dsh-plugin/shared/router.mjs), [assignment-solver.mjs](.dsh-plugin/shared/assignment-solver.mjs), [routing-evidence.mjs](.dsh-plugin/shared/routing-evidence.mjs), [harness-plan.mjs](.dsh-plugin/shared/harness-plan.mjs) and [quality-gates.mjs](.dsh-plugin/shared/quality-gates.mjs).
 
 <a id="data"></a>
 
