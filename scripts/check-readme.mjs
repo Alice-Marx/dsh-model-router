@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(import.meta.dirname, '..')
 const formulaIds = ['actual-cost', 'planning-cost', 'cost-utility', 'latency-utility', 'candidate-utility', 'assignment-score']
+const mathSymbols = new Set(['C_a', 'I_u', 'p_i', 'p_o', 'p_r', 'p_w', 'I', 'O', 'R', 'W', 'R/W', 'U_c', 'C_ref',
+  'q', 'L', 't', 'ℓ', 'e_ℓ', 's/r/k', 's', 'r', 'k', 'f', 'α', 'Δ_p', 'w', 'S', 'E', 'ρ_j', 'j', 'n',
+  '\\ell', 'e_\\ell', '\\alpha', '\\Delta_p', '\\rho_j', 'C_{\\mathrm{ref}}'])
 const normalize = formula => formula.replace(/\s+/g, ' ').trim()
 const escapedAt = (text, index) => {
   let slashes = 0
@@ -12,7 +15,7 @@ const escapedAt = (text, index) => {
   return slashes % 2 === 1
 }
 
-function withoutInlineCode(line) {
+function withoutInlineCode(line, onCode = () => {}) {
   const runs = [...line.matchAll(/`+/g)]
   let result = '', offset = 0
   for (let index = 0; index < runs.length; index++) {
@@ -21,6 +24,12 @@ function withoutInlineCode(line) {
     const endIndex = runs.findIndex((end, next) => next > index && end[0].length === start[0].length)
     if (endIndex < 0) continue
     const end = runs[endIndex]
+    if (start[0].length === 1 && line[start.index - 1] === '$' && !escapedAt(line, start.index - 1)
+      && line[end.index + 1] === '$') {
+      index = endIndex
+      continue
+    }
+    onCode(line.slice(start.index + start[0].length, end.index).trim())
     result += line.slice(offset, start.index)
     offset = end.index + end[0].length
     index = endIndex
@@ -31,15 +40,57 @@ function withoutInlineCode(line) {
 // Structural regression guard only. This does not compile TeX or verify GitHub rendering.
 export function checkReadme(markdown, name = 'README.md') {
   const lines = String(markdown).replace(/\r\n?/g, '\n').split('\n')
-  const errors = [], formulas = {}, counts = new Map()
+  const errors = [], formulas = {}, inlineMath = [], counts = new Map()
   const error = (line, message) => errors.push(`${name}:${line}: ${message}`)
   let fence = null, pending = null
-  const checkDelimiters = (line, number) => {
+  const checkLeadingDecimals = (line, number, prose = false) => {
+    const text = prose ? line.replace(/https?:\/\/[^\s<>]+/g, '')
+      .replace(/(?<=\]\()[^)\s]+(?=\))/g, '')
+      .replace(/(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|[\w.-]*[A-Za-z_][\w.-]*[\\/])[^\s<>()]+/g, '')
+      .replace(/\.\d+\.[a-zA-Z][\w.-]*/g, '') : line
+    if (/(?<![\w.])\.\d+/.test(text)) error(number, 'Decimal fractions must include a leading zero (write 0.28, not .28)')
+  }
+  const checkDelimiters = (line, number, allowInlineMath = false) => {
     if (/\\+[\[\]()]/g.test(line) && [...line.matchAll(/(\\+)[\[\]()]/g)].some(match => match[1].length % 2 === 1)) {
-      error(number, 'Legacy \\[ / \\] / \\( / \\) math delimiters are not allowed; use an anchored math fence')
+      error(number, 'Legacy \\[ / \\] / \\( / \\) math delimiters are not allowed; use $...$ inline or an anchored math fence')
     }
-    if ([...line.matchAll(/\$/g)].some(match => !escapedAt(line, match.index))) {
-      error(number, 'Unescaped $ is not allowed; escape currency as \\$ and put formulas in math fences')
+    const dollars = [...line.matchAll(/\$/g)].filter(match => !escapedAt(line, match.index))
+    if (!allowInlineMath && dollars.length) {
+      error(number, 'Unescaped $ is not allowed inside math fences; escape currency as \\$')
+      return
+    }
+    for (let index = 0; index < dollars.length; index += 2) {
+      const start = dollars[index].index, end = dollars[index + 1]?.index
+      if (line[start + 1] === '$' || line[start - 1] === '$' || (end !== undefined && (line[end + 1] === '$' || line[end - 1] === '$'))) {
+        error(number, 'Empty or $$ display math is not allowed; use $...$ inline or an anchored math fence')
+        continue
+      }
+      if (end === undefined) {
+        error(number, 'Inline math must close on the same line; escape currency as \\$')
+        continue
+      }
+      const raw = line.slice(start + 1, end)
+      const enhanced = raw.startsWith('`') && raw.endsWith('`')
+      const body = enhanced ? raw.slice(1, -1) : raw
+      if (body.includes('`')) {
+        error(number, 'Enhanced inline math must use matching $`...`$ delimiters')
+        continue
+      }
+      if (!body.trim() || body !== body.trim()) {
+        error(number, 'Inline math must be nonempty with no surrounding whitespace; escape currency as \\$')
+        continue
+      }
+      if (/\d/.test(line[end + 1] ?? '')) {
+        error(number, 'Inline math cannot close directly before a digit; escape currency as \\$')
+        continue
+      }
+      if (!enhanced && /[\p{Script=Han}\u3000-\u303f\uff00-\uffef“”‘’/]/u.test((line[start - 1] ?? '') + (line[end + 1] ?? ''))) {
+        error(number, 'Plain inline math next to Chinese text, punctuation or / may not render on GitHub; use enhanced $`...`$ delimiters')
+        continue
+      }
+      if (/\\operatorname\b/.test(body)) error(number, 'GitHub rejected operatorname during rendering; use built-in operators or mathrm labels')
+      checkLeadingDecimals(body, number)
+      inlineMath.push(body)
     }
   }
   for (let index = 0; index < lines.length; index++) {
@@ -58,6 +109,7 @@ export function checkReadme(markdown, name = 'README.md') {
         fence = null
       } else if (fence.math) {
         checkDelimiters(line, number)
+        checkLeadingDecimals(line, number)
         if (/\\operatorname\b/.test(line)) error(number, 'GitHub rejected operatorname during rendering; use built-in operators or mathrm labels')
         fence.body.push(line)
       }
@@ -89,12 +141,16 @@ export function checkReadme(markdown, name = 'README.md') {
       error(pending.line, `Formula ${pending.id} must be followed by a math fence`)
       pending = null
     }
-    checkDelimiters(withoutInlineCode(line), number)
+    const prose = withoutInlineCode(line, code => {
+      if (mathSymbols.has(code)) error(number, `Mathematical symbol ${code} must use inline math ($...$), not inline code`)
+    })
+    checkDelimiters(prose, number, true)
+    checkLeadingDecimals(prose, number, true)
   }
   if (fence) error(fence.line, `Unclosed ${fence.math ? 'math' : 'code'} fence`)
   if (pending) error(pending.line, `Formula ${pending.id} must be followed by a math fence`)
   for (const id of formulaIds) if (!counts.has(id)) error(1, `Missing formula anchor: ${id}`)
-  return { ok: errors.length === 0, errors, formulas }
+  return { ok: errors.length === 0, errors, formulas, inlineMath }
 }
 
 export function checkReadmePair(english, chinese, names = ['README.md', 'README.zh.md']) {
@@ -106,7 +162,14 @@ export function checkReadmePair(english, chinese, names = ['README.md', 'README.
       errors.push(`${names[0]} / ${names[1]}: Formula ${id} differs between translations`)
     }
   }
-  return { ok: errors.length === 0, errors, formulas: { [names[0]]: left.formulas, [names[1]]: right.formulas } }
+  if (left.inlineMath.length !== right.inlineMath.length) errors.push(`${names[0]} / ${names[1]}: Inline math counts differ between translations`)
+  for (let index = 0; index < Math.min(left.inlineMath.length, right.inlineMath.length); index++) {
+    if (normalize(left.inlineMath[index]) !== normalize(right.inlineMath[index])) {
+      errors.push(`${names[0]} / ${names[1]}: Inline math ${index + 1} differs between translations`)
+    }
+  }
+  return { ok: errors.length === 0, errors, formulas: { [names[0]]: left.formulas, [names[1]]: right.formulas },
+    inlineMath: { [names[0]]: left.inlineMath, [names[1]]: right.inlineMath } }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -134,7 +197,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       if (!result.ok) {
         console.error(result.errors.join('\n'))
         process.exitCode = 1
-      } else console.log(`README math structure passed: 6 paired formulas${args.length ? '' : ' and translation hashes'}. TeX compilation and GitHub rendering require separate verification.`)
+      } else console.log(`README math structure passed: 6 paired formulas and ${result.inlineMath[paths[0]].length} paired inline expressions${args.length ? '' : ' and translation hashes'}. TeX compilation and GitHub rendering require separate verification.`)
     } catch (error) {
       console.error(error.message)
       process.exitCode = 1

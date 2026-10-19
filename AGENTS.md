@@ -8,6 +8,13 @@
 - Prefer single-line mathematical expressions with short symbols explained in
   prose. Avoid wrapping ordinary equations; keep line breaks for genuine
   piecewise definitions only.
+- Render mathematical symbols in prose as inline math, including subscripts and
+  Greek letters. Reserve inline code for actual API fields, commands and paths.
+  Check complete explanatory paragraphs as well as display blocks on GitHub.
+  Use GitHub's dollar-plus-backtick inline delimiters to avoid missed rendering
+  next to Chinese punctuation or consecutive expressions.
+- Write decimals with their leading zero (0.28, 0.04, 0.5); do not abbreviate
+  them as .28, .04 or .5 in tables or prose.
 
 - Synchronize releases only when the user requests an update. Do not create
   scheduled synchronization jobs.

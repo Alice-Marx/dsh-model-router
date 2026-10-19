@@ -1,6 +1,6 @@
 # 模型路由工作台：配置、规划与实际执行
 
-适用版本：`@ljwei-stak/dsh-model-router@0.22.1`。声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
+适用版本：`@ljwei-stak/dsh-model-router@0.22.2`。声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2`。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
 
 0.22.0 新增“按算法推荐分配 / 手动调整分配”：生成任务建议后，可为每个工作包选择模型 API 或官方工具；修改后重新预览费用与渠道，再确认执行。任务依赖与重跑目标保留。手动混合执行当前只读，官方工具使用自身默认模型；编辑文件继续选择官方工具协作。详见[手动分配说明](MANUAL_TASK_ASSIGNMENT.zh.md)。Hermes 自定义程序目录、原配置/登录/历史位置，以及工具页顶部终端的行为继续保留。
 

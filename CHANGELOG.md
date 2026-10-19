@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.2 — 2026-10-19
+
+- Render the README's mathematical symbols and expressions in running prose as inline math in both languages, while retaining code formatting for actual API fields. Keep ordinary display equations on one line.
+- Write the routing weights, quality floors and other decimal values with a leading zero throughout both READMEs, without changing their values.
+- Extend the README checks to inline formula pairing, mathematical symbols accidentally formatted as code, and omitted decimal zeros. Actual-page acceptance covers complete explanatory paragraphs and the weight table in addition to display formulas.
+
 ## 0.22.1 — 2026-10-19
 
 - Render the English and Chinese README accounting, planning, latency and assignment formulas with GitHub math fences instead of plain text code blocks. Keep ordinary equations on one line using short symbols explained in prose; reserve line breaks for the latency function's conditions. Escape currency dollar signs and document the historical P90 latency branch already used by the router.
