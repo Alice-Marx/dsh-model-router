@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.1 — 2026-10-19
+
+- Render the English and Chinese README accounting, planning, latency and assignment formulas with GitHub math fences instead of plain text code blocks. Keep ordinary equations on one line using short symbols explained in prose; reserve line breaks for the latency function's conditions. Escape currency dollar signs and document the historical P90 latency branch already used by the router.
+- Guard all six paired formulas and translation hashes with `npm run check:readme`, the full test command, `prepack`, and a focused GitHub Actions workflow. Reject ordinary code fences, missing formulas, mismatched translations and ambiguous dollar signs.
+- Require actual GitHub rendering and a narrow viewport check when changing README formulas. Routing and execution behavior are unchanged.
+
 ## 0.22.0 — 2026-10-19
 
 - Add an explicit algorithm/manual assignment choice after task decomposition. Manually select an exact model API or registered official tool for every package, retain the original recommendation and dependencies, restore recommendations, and invalidate stale execution previews after edits.

@@ -4,7 +4,7 @@
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
 
-Current version: **0.22.0** (`@ljwei-stak/dsh-model-router`). Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.22.1** (`@ljwei-stak/dsh-model-router`). Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
 
@@ -40,16 +40,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.22.0
+@ljwei-stak/dsh-model-router@0.22.1
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.22.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.22.1** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.22.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.22.1`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -317,15 +317,16 @@ Coding-plan keys and endpoints stay in Harness provider settings. A `plan-key` p
 
 A valid CLI-reported USD amount, including explicit zero, wins over token-price calculation. Otherwise, token-based CLI accounting requires complete normalized usage, known nonnegative prices, and a reported actual model matching the priced route or its explicit CLI mapping:
 
-```text
-actualUsd = (inputTokens × inputPrice + outputTokens × outputPrice
-           + cacheReadTokens × cacheReadPrice
-           + cacheWriteTokens × cacheWritePrice) / 1,000,000
+<!-- formula:actual-cost -->
+```math
+C_a = \frac{I_u p_i+O p_o+R p_r+W p_w}{10^6}
 ```
+
+`C_a` is `actualUsd`; `I_u`, `O`, `R`, and `W` correspond to `inputTokens`, `outputTokens`, `cacheReadTokens`, and `cacheWriteTokens`. `p_i`, `p_o`, `p_r`, and `p_w` are the matching input, output, cache-read and cache-write prices in USD per million tokens.
 
 These ledger counters are disjoint after adapter normalization; do not add cached tokens to an inclusive input count. Missing optional cache prices use the input price. Incomplete usage, absent prices or unknown/unmatched identity keep the amount `null`, not zero. Complete terminal evidence can survive a failed/cancelled/timed-out run; partial events are marked `usageIncomplete`.
 
-For example, a complete API result with 1,000 uncached input tokens at $1/million and 500 output tokens at $5/million costs $0.0035. A subscription result can show that amount as `referenceCostUsd` while `costUsd` stays null; reference cost is not added to API spending. A provider-reported $0 is explicit evidence for that attempt, not proof that earlier unknown attempts were free. Actual provider bills are authoritative. No automatic API fallback in official-team mode prevents a router fallback; a vendor CLI may still use its own configured API credentials.
+For example, a complete API result with 1,000 uncached input tokens at \$1/million and 500 output tokens at \$5/million costs \$0.0035. A subscription result can show that amount as `referenceCostUsd` while `costUsd` stays null; reference cost is not added to API spending. A provider-reported \$0 is explicit evidence for that attempt, not proof that earlier unknown attempts were free. Actual provider bills are authoritative. No automatic API fallback in official-team mode prevents a router fallback; a vendor CLI may still use its own configured API credentials.
 
 <a id="routing"></a>
 
@@ -339,27 +340,41 @@ The planner is a deterministic local heuristic, not a trained success predictor.
 
 Without matching resource evidence, base input tokens are `max(80, ceil(text.length / 3.7))`, then adjusted by package-stage multipliers. Base output is 900, adjusted by stage/reasoning effort, with minimum 220. This is a text-length heuristic, not a vendor tokenizer. Sufficient matching, complete history replaces these heuristics with empirical P90 resource estimates, without applying effort or stage multipliers again. Let `I` be total estimated input, `R/W` the cached-read/write portions, `O` output, and prices USD per million tokens:
 
-```text
-C = ((I − R − W) × p_in + R × p_cache_read
-     + W × p_cache_write + O × p_out) / 1,000,000
-costUtility = 1 / (1 + C / C_ref)
+<!-- formula:planning-cost -->
+```math
+C = \frac{(I-R-W)p_i+O p_o+R p_r+W p_w}{10^6}
 ```
 
-`C_ref` uses fixed reference prices (input 1, output 5, cache read/write 1 USD/million), not a vendor offer. Fixed scaling prevents an unrelated expensive candidate from flattening all cost penalties. Unknown prices produce a public estimate of `null` and cost utility 0. Internal unconstrained search uses a cost sentinel of 0, but finite-budget assignment excludes unknown-price candidates; the sentinel never means free execution.
+<!-- formula:cost-utility -->
+```math
+U_c = \frac{1}{1+C/\max(C_{\mathrm{ref}},10^{-12})}
+```
+
+`U_c` is `costUtility`. The price symbols are the same as above. `C_ref` uses fixed reference prices (input 1, output 5, cache read/write 1 USD/million), not a vendor offer. Fixed scaling prevents an unrelated expensive candidate from flattening all cost penalties. Unknown prices produce a public estimate of `null` and cost utility 0. Internal unconstrained search uses a cost sentinel of 0, but finite-budget assignment excludes unknown-price candidates; the sentinel never means free execution.
 
 ### Candidate objective and quality floors
 
 With normalized quality `q` and normalized latency, specialty, reasoning-fit and risk proxies:
 
-```text
-u = wq × q + wc × costUtility
-    + wl × (1 − clamp(latency × effortLatency, 0, 1))
-    + ws × specialty + wr × reasoningFit − wk × risk
-    − max(0, qualityFloor − q) × criticality
-    + preferenceAdjustment
-
-assignmentScore = sum(package utility) − 0.015 × crossRouteDependencyEdges
+<!-- formula:latency-utility -->
+```math
+L = \begin{cases}
+\dfrac{1}{1+t/10\,000}, & t\text{ known}, \\
+1-\min(1,\max(0,\ell e_\ell)), & \text{otherwise}.
+\end{cases}
 ```
+
+<!-- formula:candidate-utility -->
+```math
+u = w_q q+w_c U_c+w_\ell L+w_s s+w_r r-w_k k-\alpha\max(0,f-q)+\Delta_p
+```
+
+<!-- formula:assignment-score -->
+```math
+S = \sum_{j=1}^{n}u_j - 0.015\sum_{(i,j)\in E}\mathbf{1}[\rho_i\ne\rho_j]
+```
+
+`L` is latency utility: `t` is the matching historical P90 duration in milliseconds; otherwise `ℓ` is the latency proxy and `e_ℓ` its effort multiplier. In the utility formula, `s/r/k` are specialty/reasoning-fit/risk, `f` is the quality floor, `α` is criticality, and `Δ_p` is the bounded `preferenceAdjustment`; the `w` terms are the corresponding weights. `S` is `assignmentScore`; `E` contains dependency edges, and `ρ_j` is package `j`'s `provider/model` route. The indicator is 1 when routes differ, otherwise 0.
 
 Quality first uses sufficient matching objective task evidence, then falls back to task-category LiveBench, overall LiveBench, and profile/catalog estimates. Model and effort are compared jointly only when at least two API efforts have usable task evidence; observed duration can replace the latency proxy. Public-data refresh is opt-in. Human ratings affect only the bounded `preferenceAdjustment`; they cannot increase objective quality or satisfy its floor.
 
@@ -439,6 +454,8 @@ Open [the local preview](http://127.0.0.1:4173). It uses mock models, tools and 
 | `scripts/` and `tests/` | Build/package/verification helpers and regression tests. |
 | `experiment-plugin/` | Separate research experiment project; not shipped as part of the router plugin. |
 | `docs/` and dated reports | User documentation and historical verification records. |
+
+`check:readme` guards the six math blocks, matching formulas in both languages and the reviewed blob hashes. `npm test` and `prepack` run this check; render changes must also be viewed on GitHub. The math blocks use [GitHub-supported syntax](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions).
 
 `check:client` rebuilds in memory and compares the generated output with the committed bundle; `prepack` refuses a stale bundle. pnpm 10 has no `pnpm peers check` command: use the strict install above. Unavailable/incompatible host SDK packages may require the installed Harness runtime for local integration testing; [setup-harness-dev.mjs](scripts/setup-harness-dev.mjs) links missing SDK packages from an explicitly supplied Host `node_modules`, and [start-harness-preview.mjs](scripts/start-harness-preview.mjs) starts a separate local web Host profile. These helpers do not replace dependency verification or Desktop acceptance checks.
 

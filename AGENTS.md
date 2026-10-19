@@ -1,5 +1,14 @@
 # Release Synchronization
 
+- Update both README translations together. Render formulas with anchored GitHub
+  `math` fences; keep currency dollar signs escaped. Run `npm run check:readme`
+  and inspect the actual GitHub MathJax output after formula changes, including
+  a narrow viewport. A matching hash or raw Markdown preview is not rendering
+  validation. Refresh `README.i18n.yaml` only after reviewing both texts.
+- Prefer single-line mathematical expressions with short symbols explained in
+  prose. Avoid wrapping ordinary equations; keep line breaks for genuine
+  piecewise definitions only.
+
 - Synchronize releases only when the user requests an update. Do not create
   scheduled synchronization jobs.
 - Compare this repository's package version with all stable npm versions of
