@@ -10,7 +10,33 @@ Official CLI teamwork runs packages sequentially with dependency context and no 
 
 Both README versions describe the same interfaces, formulas, defaults and limits. [Changelog](CHANGELOG.md) preserves release history. More walkthroughs: [workbench](docs/WORKBENCH_USER_GUIDE.zh.md), [installation](docs/INSTALLATION_GUIDE.zh.md), [migration](docs/archive/MIGRATION.md), and [experiment protocol](docs/ROUTING_SELFTEST_STEPS.zh.md).
 
-**Contents:** [Capabilities](#capabilities) · [Install](#install) · [Workbench](#workbench) · [Architecture](#architecture) · [Session tools](#session-tools) · [Official tools](#official-tools) · [Team lifecycle](#team-lifecycle) · [Costs](#costs) · [Routing algorithm](#routing) · [Data](#data) · [Development](#development) · [Troubleshooting](#troubleshooting)
+<a id="quick-evaluation"></a>
+
+## Quick evaluation
+
+**One-line value:** A cost-aware DSH workbench for planning tasks, routing model calls, and running dependent work packages with explicit execution permissions.
+
+**Category:** **Models & Reasoning** (模型与推理), the best fit in the [community directory's category list](https://www.alldsh.com/categories/); this is a community taxonomy, not an official DSH classification.
+
+**Install:** With the DSH CLI available, launch Harness Desktop once to initialize its `desktop` profile, then quit Desktop fully and run:
+
+```sh
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.22.2
+```
+
+You can also paste `@ljwei-stak/dsh-model-router@0.22.2` into **Harness Desktop → Plugins → Add plugin**. Restart Desktop after installation. A global `npm install -g` by itself does not register a Desktop plugin.
+
+**Package and entry point:** [`@ljwei-stak/dsh-model-router@0.22.2` on npm](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) is published. The root [`package.json`](package.json) declares the package and bundle patch; [`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs) exports the required `apply(ctx)` entry point. License: [MIT](LICENSE).
+
+**Configuration:** There is no supported import of a user-authored JSON/YAML configuration file. Configure providers, models, and credentials on Harness's **Models** page; configure routing profiles and preferences in the plugin settings. Persistent router state is stored in `$DSH_HOME/model-router/state.json` (default: `~/.dsh/model-router/state.json`). Provider CLIs retain their own login and configuration. The router does not copy API keys into model profiles or terminal logs.
+
+**Screenshots and evidence:** The [workbench screenshot](docs/assets/workbench-task-preview.jpg) uses fixture models, prices, and health data; it is a simulated UI preview, not a live Harness or model run. See the [routing workflow diagram](docs/assets/routing-workflow.svg) for the execution flow. The [real Windows validation report](docs/releases/0.20.0-validation.md) documents specific 0.20.0 executions and their limits; 0.22.2 has no verified end-to-end vendor run.
+
+**Permissions and risks:** Planning is local and makes no model call. Execution sends the selected task/context to the chosen model API or vendor CLI and may incur charges. The default Harness-restricted environment separates read-only runs from approved `workspace-write` runs. An explicitly selected `cli-native` editable team runs with the current OS user's permissions, outside the Harness process sandbox; a Git worktree collects changes but does not restrict OS access. External providers and CLI services apply their own data handling and billing terms.
+
+**Compatibility:** Declared host support is DeepSeek Harness Desktop **0.2.0-rc.1**, **0.2.0-rc.2**, and **0.2.1-rc.2**. Node.js **>=22.19** and pnpm **10.34.6** are source development/build requirements, not plugin runtime prerequisites. Compatibility beyond the declared host versions is not claimed.
+
+**Contents:** [Quick evaluation](#quick-evaluation) · [Capabilities](#capabilities) · [Install](#install) · [Workbench](#workbench) · [Architecture](#architecture) · [Session tools](#session-tools) · [Official tools](#official-tools) · [Team lifecycle](#team-lifecycle) · [Costs](#costs) · [Routing algorithm](#routing) · [Data](#data) · [Development](#development) · [Troubleshooting](#troubleshooting)
 
 <a id="capabilities"></a>
 
