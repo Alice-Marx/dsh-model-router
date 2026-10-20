@@ -10,7 +10,33 @@
 
 两个 README 版本同步说明接口、公式、默认值与限制。[更新日志](CHANGELOG.md)保留版本历史。更多操作说明：[工作台](docs/WORKBENCH_USER_GUIDE.zh.md)、[安装](docs/INSTALLATION_GUIDE.zh.md)、[迁移](docs/archive/MIGRATION.md)、[实验规程](docs/ROUTING_SELFTEST_STEPS.zh.md)。
 
-**目录：** [功能](#capabilities) · [安装](#install) · [工作台](#workbench) · [架构](#architecture) · [会话工具](#session-tools) · [官方工具](#official-tools) · [团队生命周期](#team-lifecycle) · [费用](#costs) · [路由算法](#routing) · [数据](#data) · [开发](#development) · [排障](#troubleshooting)
+<a id="quick-evaluation"></a>
+
+## 提交前快速评估
+
+**一句话价值：** 面向 DSH 的成本感知模型路由工作台，可本地规划任务、选择模型路线，并在明确权限下执行有依赖关系的工作包。
+
+**类别：** **模型与推理（Models & Reasoning）**，是[社区目录分类](https://www.alldsh.com/categories/)中最贴切的一类；这是社区分类，并非 DSH 官方分类。
+
+**安装：** 先确保 DSH CLI 可用。首次先启动一次 Harness Desktop 初始化 `desktop` 配置，再彻底退出 Desktop，运行：
+
+```sh
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.22.2
+```
+
+也可以在 **Harness Desktop → 插件 → 添加插件** 中粘贴 `@ljwei-stak/dsh-model-router@0.22.2`。安装后重启 Desktop。单独运行全局 `npm install -g` 不会注册 Desktop 插件。
+
+**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.22.2`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) 已发布。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
+
+**配置文件与配置入口：** 当前不支持导入用户编写的 JSON/YAML 配置文件。Provider、模型和凭据在 Harness **模型**页面配置；路由档案与偏好在插件设置中配置。路由器持久状态存于 `$DSH_HOME/model-router/state.json`（默认：`~/.dsh/model-router/state.json`）。Provider CLI 沿用各自的登录和配置；路由器不会把 API 密钥复制进模型档案或终端日志。
+
+**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.22.2 尚无经过验证的端到端厂商运行。
+
+**权限与风险：** 任务规划在本地完成，不调用模型。实际执行会把选定任务和上下文发送到所选模型 API 或厂商 CLI，并可能产生费用。默认使用 Harness 受限环境；只读运行不修改工作区，`workspace-write` 需要用户明确批准。明确选择 `cli-native` 的可编辑团队会在 Harness 进程沙箱之外，以当前操作系统用户权限运行；Git worktree 只收集修改，不限制操作系统访问。外部 Provider 和 CLI 服务各自适用其数据处理及计费规则。
+
+**兼容性：** 声明支持 DeepSeek Harness Desktop **0.2.0-rc.1**、**0.2.0-rc.2**、**0.2.1-rc.2**。Node.js **>=22.19** 与 pnpm **10.34.6** 仅为源码开发/构建要求，不是插件运行时前置条件；不承诺超出上述 Host 版本的兼容性。
+
+**目录：** [快速评估](#quick-evaluation) · [功能](#capabilities) · [安装](#install) · [工作台](#workbench) · [架构](#architecture) · [会话工具](#session-tools) · [官方工具](#official-tools) · [团队生命周期](#team-lifecycle) · [费用](#costs) · [路由算法](#routing) · [数据](#data) · [开发](#development) · [排障](#troubleshooting)
 
 <a id="capabilities"></a>
 
