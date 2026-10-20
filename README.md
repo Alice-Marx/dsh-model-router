@@ -18,13 +18,19 @@ Both README versions describe the same interfaces, formulas, defaults and limits
 
 **Category:** **Models & Reasoning** (模型与推理), the best fit in the [community directory's category list](https://www.alldsh.com/categories/); this is a community taxonomy, not an official DSH classification.
 
-**Install:** With the DSH CLI available, launch Harness Desktop once to initialize its `desktop` profile, then quit Desktop fully and run:
+**Install (DSH Plugin Hub / web profile):** With the DSH CLI available, install the published npm package with:
+
+```sh
+dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.22.2
+```
+
+**Install in Harness Desktop:** Launch Desktop once to initialize its `desktop` profile, quit Desktop fully, then run:
 
 ```sh
 dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.22.2
 ```
 
-You can also paste `@ljwei-stak/dsh-model-router@0.22.2` into **Harness Desktop → Plugins → Add plugin**. Restart Desktop after installation. A global `npm install -g` by itself does not register a Desktop plugin.
+You can also paste the package spec into **Harness Desktop → Plugins → Add plugin**. Restart Desktop after installation. A global `npm install -g` by itself does not register a Desktop plugin.
 
 **Package and entry point:** [`@ljwei-stak/dsh-model-router@0.22.2` on npm](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) is published. The root [`package.json`](package.json) declares the package and bundle patch; [`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs) exports the required `apply(ctx)` entry point. License: [MIT](LICENSE).
 
