@@ -18,13 +18,19 @@
 
 **类别：** **模型与推理（Models & Reasoning）**，是[社区目录分类](https://www.alldsh.com/categories/)中最贴切的一类；这是社区分类，并非 DSH 官方分类。
 
-**安装：** 先确保 DSH CLI 可用。首次先启动一次 Harness Desktop 初始化 `desktop` 配置，再彻底退出 Desktop，运行：
+**安装（DSH Plugin Hub / web profile）：** 确保 DSH CLI 可用，然后安装已发布的 npm 包：
+
+```sh
+dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.22.2
+```
+
+**安装到 Harness Desktop：** 首次先启动一次 Desktop 初始化 `desktop` 配置，再彻底退出 Desktop，运行：
 
 ```sh
 dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.22.2
 ```
 
-也可以在 **Harness Desktop → 插件 → 添加插件** 中粘贴 `@ljwei-stak/dsh-model-router@0.22.2`。安装后重启 Desktop。单独运行全局 `npm install -g` 不会注册 Desktop 插件。
+也可以在 **Harness Desktop → 插件 → 添加插件** 中粘贴包名。安装后重启 Desktop。单独运行全局 `npm install -g` 不会注册 Desktop 插件。
 
 **发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.22.2`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) 已发布。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
 
