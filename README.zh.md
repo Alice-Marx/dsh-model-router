@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router)
+[![npm 版本](https://img.shields.io/npm/v/%40ljwei-stak%2Fdsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router)
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
