@@ -1,0 +1,94 @@
+name: Publish GitHub Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing stable release version
+        required: true
+        default: '0.22.2'
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: ${{ github.workflow }}-${{ inputs.version }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PACKAGE_VERSION: ${{ inputs.version }}
+      PACKAGE_SPEC: '@alice-marx/dsh-model-router@${{ inputs.version }}'
+    steps:
+      - name: Checkout publishing tools
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://npm.pkg.github.com
+          scope: '@alice-marx'
+      - name: Require the highest stable npm release
+        run: |
+          npm view @ljwei-stak/dsh-model-router versions --json --registry https://registry.npmjs.org > source-versions.json
+          python3 -c 'import json,os,re; versions=json.load(open("source-versions.json")); stable=[v for v in versions if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",v)]; highest=max(stable,key=lambda v:tuple(map(int,v.split(".")))); assert os.environ["PACKAGE_VERSION"] == highest, "Select the highest stable release; latest must not be downgraded"'
+      - name: Prepare and verify release package
+        run: |
+          python3 tooling/scripts/prepare-github-package.py prepare \
+            --version "$PACKAGE_VERSION" --output-dir prepared
+      - name: Preview publication
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          npm publish "./prepared/alice-marx-dsh-model-router-$PACKAGE_VERSION.tgz" \
+            --ignore-scripts --registry https://npm.pkg.github.com \
+            --access public --tag latest --dry-run
+      - name: Check existing version
+        id: existing
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          if npm view "$PACKAGE_SPEC" version --json --registry https://npm.pkg.github.com > version.json 2> version.err; then
+            python3 -c 'import json,os; assert json.load(open("version.json")) == os.environ["PACKAGE_VERSION"]'
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            python3 -c 'import json; assert json.load(open("version.json"))["error"]["code"] == "E404", "Registry check failed; publication stopped"'
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish absent version
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          npm publish "./prepared/alice-marx-dsh-model-router-$PACKAGE_VERSION.tgz" \
+            --ignore-scripts --registry https://npm.pkg.github.com \
+            --access public --tag latest
+      - name: Download and verify published contents
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p verified
+          npm pack "$PACKAGE_SPEC" --registry https://npm.pkg.github.com \
+            --ignore-scripts --pack-destination verified
+          python3 tooling/scripts/prepare-github-package.py verify \
+            --verify-against "./verified/alice-marx-dsh-model-router-$PACKAGE_VERSION.tgz" \
+            --local-tarball "./prepared/alice-marx-dsh-model-router-$PACKAGE_VERSION.tgz"
+      - name: Save package evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-package-${{ inputs.version }}
+          path: |
+            prepared/*.tgz
+            prepared/evidence.json
+          if-no-files-found: warn
+      - name: Record result
+        run: |
+          echo "Published and downloaded back: $PACKAGE_SPEC" >> "$GITHUB_STEP_SUMMARY"
+          echo '[Package page](https://github.com/users/Alice-Marx/packages/npm/package/dsh-model-router)' >> "$GITHUB_STEP_SUMMARY"
