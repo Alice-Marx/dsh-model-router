@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { runOfficialTool, officialToolExecutionCapabilities, officialToolReadiness } from './official-tool-executor.mjs'
 import { toolForProvider } from './official-tool-registry.mjs'
-import { redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
+import { observeExecutionProgress, redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
 import { unsupportedCliReasoning } from './reasoning-execution.mjs'
 
 const MAX_GIT_OUTPUT = 64_000_000
@@ -96,6 +96,8 @@ export async function sessionWorkspace(ctx, exec) {
 }
 
 function git(args, { cwd, input, signal, timeoutMs = GIT_TIMEOUT_MS } = {}) {
+  // In particular, never start git apply with an already cancelled signal.
+  if (signal?.aborted) return Promise.resolve({ ok: false, code: null, output: Buffer.alloc(0), cancelled: true })
   return new Promise(resolveResult => {
     let child
     try {
@@ -123,6 +125,7 @@ function git(args, { cwd, input, signal, timeoutMs = GIT_TIMEOUT_MS } = {}) {
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM') }, timeoutMs)
     child.on('error', error => finish(null, error))
     child.on('close', code => finish(code))
+    if (signal?.aborted) onAbort()
     if (input === undefined) child.stdin.end()
     else child.stdin.end(input)
     let finished = false
@@ -412,7 +415,8 @@ async function seedWorktree(isolated, seedFrom, signal) {
 }
 
 /** Sequential execution preserves DAG dependencies and avoids edit conflicts. */
-export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', executionEnvironment = 'harness', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null, seedFrom = null }) {
+export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', executionEnvironment = 'harness', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null, seedFrom = null, onPackageStart, onPackage, onStage }) {
+  await observeExecutionProgress(onStage, 'preparing')
   if (!['harness', 'cli-native'].includes(executionEnvironment)
     || (executionEnvironment === 'cli-native' && mode !== 'workspace-write')) throw new TypeError('invalid team CLI execution environment')
   // A retry runs only `onlyIds`; earlier results feed dependency context. An
@@ -431,6 +435,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   if (mode !== 'read-only' && mode !== 'workspace-write') throw new TypeError('team mode must be read-only or workspace-write')
   const configuredCliModels = checkedTeamCliModels(cliModels, assigned)
   const source = await approvedSource(workspace, allowedRoot)
+  if (signal?.aborted) return { status: 'cancelled', workspace: source, results: [] }
   if (executionEnvironment === 'harness' && typeof sandbox?.confine !== 'function') return { status: 'blocked', blocking: [{ reason: '官方 Harness 进程沙箱不可用。' }], results: [] }
   // The Host passes no runtime override. Tests can inject inert CLI adapters to
   // exercise assignment, stopping, and Git integration without provider accounts.
@@ -440,6 +445,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   const unready = readiness.filter(item => !item.ready || !(item.readyModes ?? item.modes ?? [mode]).includes(mode))
   if (unready.length > 0) return { status: 'blocked', blocking: unready.map(item => ({ toolId: item.id,
     reason: item.reason ?? `官方 CLI 尚未就绪，或不支持 ${mode} 模式。` })), results: [] }
+  if (signal?.aborted) return { status: 'cancelled', workspace: source, results: [] }
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
   const runWorkspace = isolated?.workspace ?? source
   let seeded = null
@@ -451,13 +457,18 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
     }
   }
   const completed = []
+  const cancelledRun = () => ({ status: 'cancelled', workspace: runWorkspace, results: completed,
+    ...(isolated ? { baseCommit: isolated.baseCommit } : {}), ...(seeded ? { seeded } : {}) })
   const context = retry ? (Array.isArray(previous) ? previous : []).filter(item => item?.id && typeof item.finalText === 'string') : []
+  if (!signal?.aborted) await observeExecutionProgress(onStage, 'executing')
   for (const item of assigned) {
-    if (signal?.aborted) return { status: 'cancelled', workspace: runWorkspace, results: completed,
-      ...(isolated ? { baseCommit: isolated.baseCommit } : {}), ...(seeded ? { seeded } : {}) }
+    if (signal?.aborted) return cancelledRun()
     const cliModel = teamCliModel(item, configuredCliModels)
     const prompt = packagePrompt(task, item, [...context, ...completed])
     const startedAt = Date.now()
+    await observeExecutionProgress(onPackageStart, { ...item, provider: item.recommendedProvider,
+      model: item.recommendedModel, requestedCliModel: cliModel, startedAt })
+    if (signal?.aborted) return cancelledRun()
     let result
     try {
       result = await runTool({
@@ -507,11 +518,15 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       error: modelMismatch ? '官方 CLI 实际模型与指定模型不一致。'
         : (result.error || result.reason) ? executionDiagnostic(result.error || result.reason) : null,
       outputTail: result.status === 'succeeded' ? null : executionDiagnostic(verifiedDiagnostic(result)) || null })
+    await observeExecutionProgress(onPackage, completed.at(-1))
+    if (signal?.aborted) return cancelledRun()
     if (packageStatus !== 'succeeded') return { status: packageStatus === 'cancelled' ? 'cancelled' : 'incomplete', workspace: runWorkspace, results: completed,
       ...(isolated ? { baseCommit: isolated.baseCommit } : {}), ...(seeded ? { seeded } : {}) }
   }
   if (!isolated) return { status: 'cli-completed', workspace: runWorkspace, results: completed,
     notice: '只读模式已收集各工作包结果；模型输出仍需人工验收。' }
+  await observeExecutionProgress(onStage, 'integrating')
+  if (signal?.aborted) return cancelledRun()
   try {
     const integration = await integrateWorktree(source, runWorkspace, isolated.baseCommit, signal)
     return { status: integration.ignoredArtifacts > 0 ? 'integration-pending' : 'cli-completed',
@@ -520,6 +535,8 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
         ? '受 Git 管理的源文件已整合；忽略产物保留在独立工作区，仍需核对和补交。'
         : '各 CLI 进程成功结束且可用补丁已整合；文件内容仍需按任务要求验收。' }
   } catch (error) {
+    if (signal?.aborted) return { ...cancelledRun(), error: String(error?.message ?? error),
+      notice: '执行已取消；独立工作区及工作包结果已保留。' }
     return { status: 'integration-pending', workspace: runWorkspace, results: completed, baseCommit: isolated.baseCommit,
       ...(seeded ? { seeded } : {}),
       error: String(error?.message ?? error), notice: '独立工作区已保留；原工作区未自动整合。' }
@@ -529,12 +546,14 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
 /** One editable CLI task also uses the same isolated workspace and merge gate. */
 export async function runOfficialTask({ toolId, task, workspace, allowedRoot, modelId, mode = 'read-only', signal, sandbox, runtime }) {
   const source = await approvedSource(workspace, allowedRoot)
+  if (signal?.aborted) return { toolId, status: 'cancelled', notStarted: true, finalText: '' }
   if (typeof sandbox?.confine !== 'function') return { toolId, status: 'unsupported', reason: '官方 Harness 进程沙箱不可用。' }
   // The Host supplies no runtime override; offline tests use inert adapters.
   const readiness = await (runtime?.readiness ?? officialToolReadiness)(toolId, source)
   const readyModes = readiness.readyModes ?? readiness.modes ?? []
   if (!readiness.ready || !readyModes.includes(mode)) return { toolId, status: 'unsupported',
     reason: readiness.reason ?? readiness.modeReasons?.[mode] ?? `官方 CLI 尚未就绪，或不支持 ${mode} 模式。` }
+  if (signal?.aborted) return { toolId, status: 'cancelled', notStarted: true, finalText: '' }
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
   let result
   try {
@@ -545,6 +564,8 @@ export async function runOfficialTask({ toolId, task, workspace, allowedRoot, mo
     result = executionException(error, signal)
   }
   result = withFailureDiagnostic(result)
+  if (signal?.aborted) return { ...result, status: 'cancelled',
+    ...(isolated ? { isolatedWorkspace: isolated.workspace, baseCommit: isolated.baseCommit } : {}) }
   if (!isolated || result.status !== 'succeeded') return { ...result, ...(isolated ? { isolatedWorkspace: isolated.workspace, baseCommit: isolated.baseCommit } : {}) }
   try {
     const integration = await integrateWorktree(source, isolated.workspace, isolated.baseCommit, signal)
@@ -552,6 +573,8 @@ export async function runOfficialTask({ toolId, task, workspace, allowedRoot, mo
       ...(integration.ignoredArtifacts > 0 ? { status: 'integration-pending' } : {}),
       isolatedWorkspace: isolated.workspace, integration }
   } catch (error) {
+    if (signal?.aborted) return { ...result, status: 'cancelled', isolatedWorkspace: isolated.workspace,
+      baseCommit: isolated.baseCommit, integrationError: String(error?.message ?? error) }
     return { ...result, status: 'integration-pending', isolatedWorkspace: isolated.workspace,
       integrationError: String(error?.message ?? error) }
   }

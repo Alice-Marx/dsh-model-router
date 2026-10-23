@@ -149,6 +149,8 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
 
   /** Execute a previewed run once every listed reason was confirmed. */
   startRun(request) { return settled(() => (this.services.startRun ?? unavailable)(request)) }
+  runStatus(request) { return settled(() => (this.services.runStatus ?? unavailable)(request)) }
+  cancelRun(request) { return settled(() => (this.services.cancelRun ?? unavailable)(request)) }
 
   /** Terminal backend (PTY or pipe fallback), limits and live sessions. */
   terminalInfo() { return settled(() => (this.services.terminalInfo ?? unavailable)()) }

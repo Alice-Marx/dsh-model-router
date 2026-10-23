@@ -9,6 +9,38 @@ const STATUS_TEXT = Object.freeze({
   'integration-pending': '执行完成，改动等待整合', pending: '等待执行',
   'paused-budget': '已因预算暂停，未启动模型', 'paused-subscription-failure': '有步骤因订阅调用失败而暂停，请在下方执行记录中选择如何继续',
 })
+const LIVE_STATUSES = new Set(['running', 'cancelling'])
+const JOB_STATUSES = new Set([...LIVE_STATUSES, 'completed', 'cancelled', 'failed'])
+const PACKAGE_STATUS_TEXT = Object.freeze({ pending: '等待执行', running: '正在执行', succeeded: '已完成', failed: '执行失败', cancelled: '已取消', blocked: '依赖未完成', skipped: '已跳过' })
+const STAGE_TEXT = Object.freeze({ starting: '正在启动任务…', preparing: '正在准备执行计划…', executing: '正在安排工作包…',
+  integrating: '正在整合工作包结果…', reviewing: '正在检查执行结果…', saving: '正在保存执行记录…' })
+const ACTIVE_JOB_KEY = 'dsh-model-router:active-run-job'
+const isJobSnapshot = value => Boolean(text(value?.jobId) && JOB_STATUSES.has(value.status))
+// The browser retains only this opaque ID. Task text, configuration, and
+// answers remain in Host memory/the existing ledger.
+function savedJob() {
+  try { return typeof sessionStorage === 'undefined' ? '' : text(sessionStorage.getItem(ACTIVE_JOB_KEY)) } catch { return '' }
+}
+function rememberJob(jobId) {
+  try { if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(ACTIVE_JOB_KEY, jobId) } catch { /* storage may be disabled */ }
+}
+function forgetJob(jobId) {
+  try { if (typeof sessionStorage !== 'undefined' && savedJob() === jobId) sessionStorage.removeItem(ACTIVE_JOB_KEY) } catch { /* storage may be disabled */ }
+}
+const unknownJob = error => /unknown run job id\.?/i.test(text(error?.message))
+// A launch ACK may outlive its panel. Keep only an opaque in-memory identity
+// until it arrives, so a replacement panel can wait and take over the job.
+let pendingLaunch = null
+const launchListeners = new Set()
+function notifyLaunch(event) {
+  for (const listener of launchListeners) listener(event)
+}
+function settleLaunch(identity, value, error) {
+  if (pendingLaunch !== identity) return
+  pendingLaunch = null
+  if (isJobSnapshot(value) && LIVE_STATUSES.has(value.status)) rememberJob(value.jobId)
+  notifyLaunch({ kind: 'settled', identity, value, error })
+}
 
 /**
  * 工作台直接执行: task + preset (+ one model) → host preview (plan, cost
@@ -16,7 +48,7 @@ const STATUS_TEXT = Object.freeze({
  * Routed runs are read-only; official teams can use an isolated editable
  * worktree. Nothing starts before the user presses the confirm button.
  */
-export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason, planningRevision, assignmentMode = 'algorithm', packageAssignments = {}, packagePlanKey }) {
+export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = 'algorithm', packageAssignments = {}, packagePlanKey }) {
   const [preset, setPreset] = React.useState(defaultPreset || 'balanced')
   const [executor, setExecutor] = React.useState('routed')
   const [executionMode, setExecutionMode] = React.useState('read-only')
@@ -29,13 +61,70 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   const lastWorkspace = [...(ledger?.runs ?? [])].map(run => run.workspace).find(Boolean) ?? ''
   const [workspace, setWorkspace] = React.useState('')
   const [phase, setPhase] = React.useState({ kind: 'idle' })
+  const currentPhase = React.useRef(phase)
+  currentPhase.current = phase
+  const [now, setNow] = React.useState(Date.now)
   const mounted = React.useRef(true)
   const confirmRef = React.useRef(null)
   const pendingRequest = React.useRef(0)
+  // This identity is independent of the editable form and preview revision.
+  const activeRun = React.useRef(null)
+  const launchSequence = React.useRef(0)
+  const launching = React.useRef(false)
+  const awaitingLaunch = React.useRef(null)
+  const onFinished = React.useRef(onStarted)
+  onFinished.current = onStarted
   const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey, packageAssignments])
   const latestSignature = React.useRef(inputSignature)
   latestSignature.current = inputSignature
-  React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; pendingRequest.current += 1 } }, [])
+  React.useEffect(() => {
+    mounted.current = true
+    const resume = (jobId, snapshot) => {
+      activeRun.current = { token: ++launchSequence.current, jobId, terminal: false, cancelRequested: false,
+        cancelPending: false, requestSequence: 0, appliedSequence: 0, restoring: true }
+      launching.current = true
+      setPhase({ kind: 'running', job: snapshot ?? { jobId, status: 'running' }, restoring: !snapshot })
+    }
+    const receiveLaunch = event => {
+      if (!mounted.current) return
+      if (event.kind === 'pending') {
+        if (activeRun.current?.launchIdentity === event.identity || (activeRun.current?.jobId && !activeRun.current.terminal)) return
+        awaitingLaunch.current = event.identity
+        pendingRequest.current += 1
+        launching.current = true
+        setPhase({ kind: 'starting' })
+        return
+      }
+      if (awaitingLaunch.current !== event.identity) return
+      awaitingLaunch.current = null
+      const value = event.value
+      if (isJobSnapshot(value) && LIVE_STATUSES.has(value.status)) {
+        resume(value.jobId, value)
+        return
+      }
+      launching.current = false
+      if (event.error || value?.status === 'needs-confirmation') {
+        setPhase({ kind: 'error', message: event.error || '启动前的确认项已变化，请重新预览并确认执行。' })
+        return
+      }
+      const result = isJobSnapshot(value) ? value.result ?? { status: value.status } : value
+      if (isJobSnapshot(value)) forgetJob(value.jobId)
+      setPhase({ kind: 'done', value: result })
+      onFinished.current?.(result.runId)
+    }
+    launchListeners.add(receiveLaunch)
+    if (pendingLaunch) receiveLaunch({ kind: 'pending', identity: pendingLaunch })
+    else {
+      const jobId = savedJob()
+      if (jobId && !activeRun.current) resume(jobId)
+    }
+    return () => {
+      mounted.current = false
+      launchListeners.delete(receiveLaunch)
+      pendingRequest.current += 1
+      activeRun.current = null
+    }
+  }, [])
   React.useEffect(() => { setPreset(defaultPreset || 'balanced') }, [defaultPreset])
   React.useEffect(() => {
     if (mode !== 'team' || manual) {
@@ -51,12 +140,88 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   }, [inputSignature])
   React.useEffect(() => { if (phase.kind === 'preview') confirmRef.current?.focus() }, [phase.kind])
 
+  const acceptSnapshot = React.useCallback((value, token, sequence, cancelAcknowledged = false) => {
+    const active = activeRun.current
+    if (!mounted.current || !active || active.token !== token || active.terminal || value.jobId !== active.jobId) return false
+    if (!isJobSnapshot(value)) throw new Error('暂时无法读取执行进度。')
+    const terminal = !LIVE_STATUSES.has(value.status)
+    // A cancellation ACK can overtake a status request. Never regress to the
+    // earlier running snapshot, and never replace an accepted terminal state.
+    if (!terminal && sequence < active.appliedSequence) {
+      if (cancelAcknowledged) {
+        active.cancelRequested = true
+        setPhase(previous => previous.kind === 'running' ? { ...previous,
+          job: { ...previous.job, status: 'cancelling', cancelRequested: true }, cancelPending: false, cancelError: '' } : previous)
+        return true
+      }
+      return false
+    }
+    active.appliedSequence = Math.max(active.appliedSequence, sequence)
+    active.cancelRequested ||= cancelAcknowledged || value.cancelRequested || value.status === 'cancelling'
+    const job = { ...value, cancelRequested: Boolean(active.cancelRequested),
+      status: !terminal && active.cancelRequested ? 'cancelling' : value.status }
+    if (terminal) {
+      active.terminal = true
+      launching.current = false
+      forgetJob(value.jobId)
+      const result = value.result ?? { status: value.status }
+      setPhase({ kind: 'done', value: result, job })
+      onFinished.current?.(result.runId)
+    } else {
+      rememberJob(value.jobId)
+      setPhase(previous => previous.kind === 'running' ? { ...previous, job, restoring: false, pollError: '', cancelError: cancelAcknowledged ? '' : previous.cancelError,
+        cancelPending: cancelAcknowledged ? false : previous.cancelPending } : previous)
+    }
+    return true
+  }, [])
+
+  const runningJobId = phase.kind === 'running' ? phase.job?.jobId : null
+  React.useEffect(() => {
+    if (!runningJobId || typeof runStatus !== 'function') return
+    const active = activeRun.current
+    if (!active || active.jobId !== runningJobId) return
+    let disposed = false, timer
+    const poll = async () => {
+      if (disposed || activeRun.current !== active || active.terminal) return
+      const sequence = ++active.requestSequence
+      try {
+        const value = unwrapRemote(await runStatus({ jobId: runningJobId }), '暂时无法读取执行进度。')
+        if (disposed) return
+        if (!isJobSnapshot(value) || value.jobId !== runningJobId) throw new Error('暂时无法读取执行进度。')
+        acceptSnapshot(value, active.token, sequence)
+      } catch (error) {
+        if (!disposed && mounted.current && activeRun.current === active && !active.terminal) {
+          if (unknownJob(error)) {
+            active.terminal = true
+            launching.current = false
+            forgetJob(runningJobId)
+            setPhase({ kind: 'error', message: '无法找到此前的执行，可能已过期或工作台已重新启动。请刷新下方执行记录核对结果。' })
+          } else {
+            setPhase(previous => previous.kind === 'running' && previous.job?.jobId === runningJobId
+              ? { ...previous, restoring: false, pollError: '暂时无法更新执行进度，将自动重试；任务可能仍在执行。' } : previous)
+          }
+        }
+      } finally {
+        if (!disposed && activeRun.current === active && !active.terminal) timer = setTimeout(poll, 1000)
+      }
+    }
+    timer = setTimeout(poll, active.restoring ? 0 : 1000)
+    active.restoring = false
+    return () => { disposed = true; clearTimeout(timer) }
+  }, [runningJobId, runStatus, acceptSnapshot])
+  React.useEffect(() => {
+    if (!runningJobId) return
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [runningJobId])
+
   const request = () => launchRequest({ task, mode, directRoute, budgetUsd, preset: runPreset, workspace: text(workspace) || lastWorkspace,
     executor: runExecutor, executionMode: runMode, executionEnvironment: runEnvironment,
     assignmentMode: manual ? 'manual' : 'algorithm', packageAssignments, packagePlanKey })
   const unavailable = typeof previewRun !== 'function' || typeof startRun !== 'function'
   const blocked = disabledReason || (unavailable ? '工作台执行服务尚未加载，请更新插件后重试。' : !text(task) ? '先在上方“任务规划”中描述任务。' : manual && !packagePlanKey ? '请重新生成工作包后再手动分配。' : runExecutor === 'official-team' && mode !== 'team' ? '官方工具协作需要先在上方选择“团队分工”。' : '')
-  const busy = phase.kind === 'previewing' || phase.kind === 'running'
+  const busy = phase.kind === 'previewing' || phase.kind === 'running' || phase.kind === 'starting'
   // Reruns update the ledger separately from the original startRun response.
   // Only the launcher's own run may replace its displayed terminal status.
   const recordedRun = phase.kind === 'done' && phase.value.runId
@@ -64,7 +229,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   const resultStatus = recordedRun?.status ?? phase.value?.status
 
   const preview = async () => {
-    if (blocked || busy) return
+    if (blocked || busy || launching.current || pendingLaunch) return
     const current = ++pendingRequest.current
     let snapshot
     try { snapshot = request() } catch (error) { setPhase({ kind: 'error', message: text(error?.message) || '分配设置无效。' }); return }
@@ -78,14 +243,30 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
     }
   }
   const confirm = async () => {
-    if (blocked || phase.kind !== 'preview' || phase.signature !== latestSignature.current || phase.value.status === 'blocked') return
+    if (launching.current || pendingLaunch || currentPhase.current !== phase || blocked || phase.kind !== 'preview' || phase.signature !== latestSignature.current || phase.value.status === 'blocked') return
     const shown = phase.value
     const snapshot = phase.request
     const signature = phase.signature
+    launching.current = true
+    const identity = Symbol('launch')
+    const active = { token: ++launchSequence.current, launchIdentity: identity, jobId: null, terminal: false, cancelRequested: false,
+      cancelPending: false, requestSequence: 0, appliedSequence: 0 }
+    activeRun.current = active
+    pendingLaunch = identity
+    notifyLaunch({ kind: 'pending', identity })
     setPhase({ kind: 'running', value: shown, request: snapshot, signature })
     try {
       const value = unwrapRemote(await startRun({ ...snapshot, confirmedReasons: (shown.reasons ?? []).map(item => item.code) }), '执行失败。')
+      settleLaunch(identity, value)
       if (!mounted.current) return
+      if (activeRun.current !== active) return
+      if (isJobSnapshot(value)) {
+        active.jobId = value.jobId
+        acceptSnapshot(value, active.token, ++active.requestSequence)
+        return
+      }
+      active.terminal = true
+      launching.current = false
       if (value.status === 'needs-confirmation') {
         setPhase(signature === latestSignature.current ? { kind: 'preview', value, request: snapshot, signature, changed: true } : { kind: 'idle' })
         return
@@ -93,8 +274,31 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
       setPhase({ kind: 'done', value })
       onStarted?.(value.runId)
     } catch (error) {
-      if (mounted.current) setPhase({ kind: 'error', message: text(error?.message) || '执行失败。' })
+      settleLaunch(identity, null, text(error?.message) || '执行失败。')
+      if (mounted.current && activeRun.current === active) {
+        active.terminal = true
+        launching.current = false
+        setPhase({ kind: 'error', message: text(error?.message) || '执行失败。' })
+      }
     }
+  }
+
+  const cancel = async () => {
+    const active = activeRun.current
+    if (!active?.jobId || active.terminal || active.cancelPending || active.cancelRequested || typeof cancelRun !== 'function') return
+    active.cancelPending = true
+    const sequence = ++active.requestSequence
+    setPhase(previous => previous.kind === 'running' ? { ...previous, cancelPending: true, cancelError: '' } : previous)
+    try {
+      const value = unwrapRemote(await cancelRun({ jobId: active.jobId }), '取消请求未确认。')
+      if (!isJobSnapshot(value) || value.jobId !== active.jobId) throw new Error('取消请求未确认。')
+      acceptSnapshot(value, active.token, sequence, true)
+    } catch {
+      if (mounted.current && activeRun.current === active && !active.terminal) {
+        setPhase(previous => previous.kind === 'running' ? { ...previous, cancelPending: false,
+          cancelError: '取消请求未确认，任务可能仍在执行。请重试取消。' } : previous)
+      }
+    } finally { active.cancelPending = false }
   }
 
   return (
@@ -142,9 +346,13 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
           {blocked && <span className="mr-caption">{blocked}</span>}
         </div>
         {phase.kind === 'previewing' && <p className="mr-empty" role="status">正在按当前模型目录、登录状态和预算生成执行计划…</p>}
+        {phase.kind === 'starting' && <p className="mr-empty" role="status">正在等待已确认任务的启动结果，请稍候…</p>}
         {phase.kind === 'error' && <p className="mr-error" role="alert">{phase.message}</p>}
-        {((phase.kind === 'preview' && phase.signature === inputSignature) || phase.kind === 'running') && <LaunchPreview value={phase.value} request={phase.request} changed={phase.changed} running={phase.kind === 'running'} confirmRef={confirmRef}
-          onConfirm={() => { void confirm() }} onCancel={() => setPhase({ kind: 'idle' })} />}
+        {((phase.kind === 'preview' && phase.signature === inputSignature) || (phase.kind === 'running' && !phase.job)) && <LaunchPreview value={phase.value} request={phase.request} changed={phase.changed} running={phase.kind === 'running'} confirmRef={confirmRef}
+          onConfirm={() => { void confirm() }} onCancel={() => { if (!launching.current) setPhase({ kind: 'idle' }) }} />}
+        {phase.kind === 'running' && phase.job && <RunProgress job={phase.job} now={now} restoring={phase.restoring} cancelPending={phase.cancelPending}
+          pollError={phase.pollError || (typeof runStatus !== 'function' ? '当前无法更新执行进度，任务可能仍在执行。请更新插件后查看执行记录。' : '')}
+          cancelError={phase.cancelError} canCancel={typeof cancelRun === 'function'} onCancel={() => { void cancel() }} />}
         {phase.kind === 'done' && (
           <div className={['failed', 'partial', 'blocked', 'incomplete'].includes(resultStatus) || resultStatus?.startsWith('paused') ? 'mr-error' : 'mr-empty'} role="status">
             {STATUS_TEXT[resultStatus] ?? `状态：${resultStatus}`}{phase.value.runId ? `；结果已记录（运行 ${phase.value.runId.slice(0, 8)}），见下方“执行记录与子任务”。` : '。'}
@@ -195,8 +403,34 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
       <div className="mr-actions">
         <button ref={confirmRef} className="mr-button" type="button" disabled={running || blocked} onClick={onConfirm}>{running ? '正在执行…' : reasons.length ? '全部确认并执行' : '确认执行'}</button>
         <button className="mr-button mr-button-secondary" type="button" disabled={running} onClick={onCancel}>取消</button>
-        {running && <span className="mr-caption" role="status" aria-live="polite">模型调用可能需要几分钟，请勿关闭工作台。</span>}
+        {running && <span className="mr-caption" role="status" aria-live="polite">正在启动执行，请稍候…</span>}
       </div>
     </div>
   )
+}
+
+function RunProgress({ job, now, restoring, pollError, cancelError, cancelPending, canCancel, onCancel }) {
+  const progress = job.progress ?? {}
+  const packages = Array.isArray(progress.packages) ? progress.packages : []
+  const startedAt = typeof job.startedAt === 'number' ? job.startedAt : Date.parse(job.startedAt)
+  const seconds = Number.isFinite(startedAt) ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0
+  const elapsed = Number.isFinite(startedAt) ? `${Math.floor(seconds / 60)} 分 ${String(seconds % 60).padStart(2, '0')} 秒` : '待更新'
+  const cancelling = job.cancelRequested || job.status === 'cancelling'
+  return <div className="mr-launch-preview mr-run-progress" role="region" aria-label="执行进度">
+    <div className="mr-run-progress-head"><strong role="status">{cancelling ? '正在取消…' : restoring ? '正在恢复执行进度…' : '正在执行…'}</strong>
+      <span className="mr-caption">已耗时 {elapsed}</span></div>
+    {job.progress && <><p className="mr-caption">已处理 {progress.completed ?? 0} / {progress.total ?? packages.length} 个工作包</p>
+      <progress className="mr-run-meter" aria-label="工作包完成进度" value={progress.completed ?? 0} max={Math.max(1, progress.total ?? packages.length)} /></>}
+    <p className="mr-caption" aria-live="polite">{progress.current ? `当前工作包：${progress.current.name || progress.current.id}` : cancelling ? '正在结束当前执行并保留已完成结果。' : STAGE_TEXT[progress.stage] ?? '正在读取执行进度…'}</p>
+    {packages.length > 0 && <ol className="mr-run-packages">{packages.map(item => <li key={item.id}>
+      <span>{item.name || item.id}</span><span className={`mr-pill mr-run-package-${item.status}`}>{PACKAGE_STATUS_TEXT[item.status] ?? '等待更新'}</span>
+    </li>)}</ol>}
+    {pollError && <p className="mr-error" role="status">{pollError}</p>}
+    {cancelError && <p className="mr-error" role="alert">{cancelError}</p>}
+    <div className="mr-actions"><button className="mr-button mr-button-secondary" type="button"
+      disabled={!canCancel || cancelPending || cancelling} onClick={onCancel}>{cancelPending ? '正在请求取消…' : cancelling ? '正在取消…' : '取消执行'}</button>
+      {cancelling && <span className="mr-caption">取消已请求，等待执行结束；已完成结果会保留在执行记录中。</span>}
+      {!canCancel && <span className="mr-caption">当前工作台暂不支持取消，请更新插件。</span>}
+    </div>
+  </div>
 }

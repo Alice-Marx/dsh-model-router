@@ -10,7 +10,7 @@
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
-当前版本：**0.22.2**（`@ljwei-stak/dsh-model-router`）。新增“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。继续兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
+当前版本：**0.23.0**（`@ljwei-stak/dsh-model-router`）。工作台执行新增实时耗时、逐工作包进度和取消，保留已完成结果与已报告费用；关闭重开面板可接管原任务。支持“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。继续兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
 
 官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
 
@@ -27,22 +27,22 @@
 **安装（DSH Plugin Hub / web profile）：** 确保 DSH CLI 可用，然后安装已发布的 npm 包：
 
 ```sh
-dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.22.2
+dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.23.0
 ```
 
 **安装到 Harness Desktop：** 首次先启动一次 Desktop 初始化 `desktop` 配置，再彻底退出 Desktop，运行：
 
 ```sh
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.22.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.23.0
 ```
 
 也可以在 **Harness Desktop → 插件 → 添加插件** 中粘贴包名。安装后重启 Desktop。单独运行全局 `npm install -g` 不会注册 Desktop 插件。
 
-**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.22.2`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) 已发布。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
+**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.23.0`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) 已发布。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
 
 **配置文件与配置入口：** 当前不支持导入用户编写的 JSON/YAML 配置文件。Provider、模型和凭据在 Harness **模型**页面配置；路由档案与偏好在插件设置中配置。路由器持久状态存于 `$DSH_HOME/model-router/state.json`（默认：`~/.dsh/model-router/state.json`）。Provider CLI 沿用各自的登录和配置；路由器不会把 API 密钥复制进模型档案或终端日志。
 
-**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.22.2 尚无经过验证的端到端厂商运行。
+**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.23.0 尚无经过验证的端到端厂商运行。[实时进度截图](docs/assets/workbench-run-progress.png)是离线模拟；取消、重开恢复与验证边界见[0.23.0 验收报告](docs/releases/0.23.0-validation.md)。
 
 **权限与风险：** 任务规划在本地完成，不调用模型。实际执行会把选定任务和上下文发送到所选模型 API 或厂商 CLI，并可能产生费用。默认使用 Harness 受限环境；只读运行不修改工作区，`workspace-write` 需要用户明确批准。明确选择 `cli-native` 的可编辑团队会在 Harness 进程沙箱之外，以当前操作系统用户权限运行；Git worktree 只收集修改，不限制操作系统访问。外部 Provider 和 CLI 服务各自适用其数据处理及计费规则。
 
@@ -78,16 +78,16 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.22.2
 打开 **插件 → 添加插件**，输入：
 
 ```text
-@ljwei-stak/dsh-model-router@0.22.2
+@ljwei-stak/dsh-model-router@0.23.0
 ```
 
-镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.22.2**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
+镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.23.0**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
 
 也可以通过插件管理器安装本地 `.tgz` 压缩包，或解压后的内部 `package` 目录。两者都必须包含 `package.json` 和 `.dsh-plugin`。历史构建见 [Releases](https://github.com/Alice-Marx/dsh-model-router/releases)，也可按下文从源码构建。
 
 ### 从旧包名升级
 
-旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.22.2`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
+旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.23.0`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
 
 从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 
@@ -116,6 +116,8 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.22.2
 4. 设置本次估算预算；`0` 表示移除该规划约束。点击 **生成路由建议**，结果直接显示在规划区下方。检查路线、复杂度、费用、执行通道及各包的依赖/验收清单。
 5. 在 **在工作台执行** 中，选择 **模型路由（只读）** 使用现有路由执行器；或先选择 **团队分工**，再选择 **官方工具协作**。官方协作可选择 **只读检查** 或 **编辑文件**。可编辑团队还需选择 **Harness 受限环境**（默认沙箱）或 **厂商 CLI 正常环境**（在 Harness 沙箱外运行）。填入已存在的工作区绝对路径，或沿用上次运行路径。点击 **预览执行计划**，查看各包、权限与所需确认，然后显式确认执行。Host 启动前会重新检查计划；条件变化可能要求重新确认。
 6. 在 **执行记录与子任务** 查看实际通道、回答、失败、费用与评分。官方协作仅使用已安装、且在所选权限模式下就绪的 CLI 重新规划。编辑需要批准和干净的 Git 仓库；成功的 worktree 修改有条件地合入。该模式下，不可用或失败的 CLI 不会静默变成 API 调用。
+
+执行开始后，工作台显示已耗时、当前工作包与每包状态。**取消执行**会请求停止当前调用，并阻止后续工作包启动；执行器完成收尾前持续显示**正在取消**。已完成结果和已报告用量仍保留在历史中。取消不能撤销已经产生的费用或已经整合的改动。关闭面板不会取消执行；同一浏览器会话重新打开后，可在 Host 仍保留该任务时重新连接。Host 重启会清除内存任务，已保存的历史记录仍可查看。
 
 修改任务文本、规划模式、路线配置、目录或相关设置，会使旧建议失效。修改执行输入也会丢弃待确认或已完成的预览，必须对当前请求重新预览。执行预览使用 Host 当前状态，因此可能与先前本地计划不同。
 
@@ -188,6 +190,8 @@ flowchart TD
 将工作区替换为已存在且干净的 Git 根目录。调用 `previewRun(request)`，用客户端 `unwrapRemote` 辅助函数解码响应，展示计划和 `reasons`；被阻止时停止。预览不调用模型，也不创建 worktree；入口、版本和完整性检查可能联网。只有用户接受所有当前原因后，客户端才可调用 `startRun({ ...request, confirmedReasons: preview.reasons.map(r => r.code) })`。
 
 正常环境编辑通常要求 `workspace-write` 和 `unsandboxed` 确认；超预算还会增加 `over-budget`。不要硬编码该列表，也不要未经同意自动填入。`startRun` 会重新规划和预检，不会消费一个冻结的预览令牌。出现新的确认要求时，返回 `needs-confirmation`，并给出 `missing` 与更新后的原因。修改任务、模式、工作区或路线配置后必须重新预览。工作台请求使用已保存路线的 `cliModel` 映射；临时 `cliModelsJson` 绑定属于下文的会话工具。
+
+`startRun` 接受执行后，在任务完成前返回含 `jobId`、`status` 和 `progress` 的任务快照。通过 `runStatus({ jobId })` 读取状态，通过 `cancelRun({ jobId })` 请求取消。任务状态为 `running`、`cancelling`、`completed`、`cancelled` 或 `failed`。终态快照的 `result` 包含最终工作台响应，以及成功保存后的账本 `runId`。`completed` 表示后台执行已结束，任务实际结果仍查看 `result.status`。进度仅包含工作包身份与状态，不包含回答正文。读取状态失败不代表执行已停止，客户端不得因此自动重发 `startRun`。
 
 <a id="session-tools"></a>
 

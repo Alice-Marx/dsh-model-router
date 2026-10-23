@@ -104,6 +104,15 @@ const idText = (value, subject) => {
   return value
 }
 
+/** A status/cancel request can only address an existing Host-owned run. */
+export function parseRunJobRequest(value) {
+  const request = plainObject(value, 'run job request')
+  if (Object.keys(request).some(key => key !== 'jobId')) throw new TypeError('run job request only accepts jobId')
+  return { jobId: idText(request.jobId, 'jobId') }
+}
+
+const runJobRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunJobRequest`, parseRunJobRequest)
+
 const optionalRouteText = (value, subject) => {
   if (value === undefined || value === null || value === '') return undefined
   if (typeof value !== 'string' || value.length > 240 || value.includes('\0')) throw new TypeError(`${subject} is invalid`)
@@ -231,6 +240,8 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview')),
   descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),
+  descriptor('runStatus', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus')),
+  descriptor('cancelRun', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus')),
   // Workbench "官方工具终端": interactive shell / fixed official CLI sessions.
   // Output streams through long-poll reads; input and resize are unary calls.
   descriptor('terminalInfo', [], anyObjectCodec('TerminalInfo')),

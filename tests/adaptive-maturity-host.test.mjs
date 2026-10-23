@@ -150,3 +150,25 @@ test('nested damaged fee history stays visible as incomplete and cannot pass a c
   assert.match(summary.storageNotice, /不完整/)
   await assert.rejects(host.executeConfiguredAssignment(context(), '请写代码', { dailyBudgetUsd: 1 }, options), /无法读取费用历史/)
 })
+
+test('failed corrupt-state recovery cannot authorize paid execution after a later successful save', async t => {
+  await reset()
+  publicFixture(t)
+  const store = host.routerStateStore()
+  await writeFile(store.file, '{broken synthetic charge history before failed update')
+  await assert.rejects(store.update(() => {
+    throw new Error('Synthetic recovery callback failure')
+  }), /Synthetic recovery callback failure/)
+  await store.saveHealth({ tools: [] })
+  const summary = await host.ledgerSummary({})
+  assert.equal(summary.storageAvailable, true)
+  assert.equal(summary.budget.historyVerified, false)
+  assert.match(summary.storageNotice, /不完整/)
+  const ctx = context()
+  let calls = 0
+  ctx.llm.stream = () => { calls++; throw new Error('A model must not execute') }
+  for (const budget of [{ dailyBudgetUsd: 1 }, { monthlyBudgetUsd: 1 }]) {
+    await assert.rejects(host.executeConfiguredAssignment(ctx, '请写代码', budget, options), /无法读取费用历史/)
+  }
+  assert.equal(calls, 0)
+})

@@ -140,6 +140,7 @@ function createDemoSession(scenario) {
   const settingsScope = createSettingsScope()
   let toolInspections = 0
   let runs = scenario === 'empty' ? [] : sampleRuns()
+  const jobs = new Map()
   let completedAt = scenario === 'onboarding' ? null : Date.now()
   const installed = new Set(scenario === 'terminal-all' ? OFFICIAL_TOOLS.map(tool => tool.id) : ['claude-code', 'codex', 'gemini'])
   const source = () => scenario === 'empty' ? { groups: [], routableProviders: [], failures: [] } : catalog
@@ -201,6 +202,24 @@ function createDemoSession(scenario) {
       budget: budgetCheck({ ...ledger().budget, spent: ledger().spent, estimateUsd: plan.estimatedCost }),
       reasons: [{ code: 'demo-only', zh: '这是模拟执行：只在浏览器内生成示例记录，不会调用模型或读取工作区。' }] }
   }
+  const jobSnapshot = job => {
+    const elapsed = Date.now() - job.startedAt
+    const count = job.run.packages.length
+    const completed = Math.min(count, job.cancelAt ? job.completedAtCancel : Math.floor(elapsed / 6000))
+    const terminal = job.cancelAt ? Date.now() - job.cancelAt >= 1500 : completed === count
+    const status = terminal ? job.cancelAt ? 'cancelled' : 'completed' : job.cancelAt ? 'cancelling' : 'running'
+    const packages = job.run.packages.map((item, index) => ({ id: item.id, name: item.name,
+      status: index < completed ? 'succeeded' : terminal ? 'cancelled' : index === completed ? 'running' : 'pending' }))
+    job.run.status = status
+    job.run.packages.forEach((item, index) => Object.assign(item, { status: packages[index].status,
+      ok: packages[index].status === 'succeeded', ran: index <= completed,
+      finishedAt: terminal || index < completed ? Date.now() : null }))
+    return { jobId: job.jobId, status, startedAt: job.startedAt, finishedAt: terminal ? Date.now() : null,
+      cancelRequested: Boolean(job.cancelAt), progress: { total: count,
+        completed: terminal && job.cancelAt ? count : completed,
+        current: terminal ? null : packages[completed] ? { id: packages[completed].id, name: packages[completed].name } : null,
+        stage: terminal ? status : 'executing', packages }, result: terminal ? { status, runId: job.run.id } : null }
+  }
   return {
     settingsScope,
     terminalApi: {
@@ -257,7 +276,7 @@ function createDemoSession(scenario) {
     startRun: async request => {
       const value = preview(request)
       const runId = `demo-${Date.now()}`
-      runs.push({ id: runId, kind: request.assignmentMode === 'manual' ? 'assign' : request.planMode === 'team' ? 'team' : 'assign', task: request.task,
+      const run = { id: runId, kind: request.assignmentMode === 'manual' ? 'assign' : request.planMode === 'team' ? 'team' : 'assign', task: request.task,
         assignmentMode: request.assignmentMode ?? 'algorithm',
         createdAt: Date.now(), workspace: value.workspace, executionMode: 'read-only',
         status: 'completed', preset: value.decision.preset, decision: value.decision,
@@ -265,13 +284,33 @@ function createDemoSession(scenario) {
           ran: true, channel: item.channel, billing: 'api', costUsd: 0,
           finishedAt: Date.now(), type: 'general',
           answer: `模拟提交任务：${request.task}\n本地 UI 演示结果：仅生成浏览器内记录，没有调用模型或修改文件。` })),
-      })
+      }
+      runs.push(run)
+      if (scenario === 'run-progress') {
+        const job = { jobId: `job-${runId}`, run, startedAt: Date.now(), cancelAt: null }
+        jobs.set(job.jobId, job)
+        return ok(jobSnapshot(job))
+      }
       return ok({ status: 'completed', runId })
+    },
+    runStatus: async ({ jobId }) => {
+      const job = jobs.get(jobId)
+      return job ? ok(jobSnapshot(job)) : { ok: false, error: { message: 'Unknown run job id.' } }
+    },
+    cancelRun: async ({ jobId }) => {
+      const job = jobs.get(jobId)
+      if (!job) return { ok: false, error: { message: 'Unknown run job id.' } }
+      const current = jobSnapshot(job)
+      if (current.status === 'running') {
+        job.completedAtCancel = current.progress.completed
+        job.cancelAt = Date.now()
+      }
+      return ok(jobSnapshot(job))
     },
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
+const scenarios = [['populated', '完整示例'], ['run-progress', '实时进度与取消（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')

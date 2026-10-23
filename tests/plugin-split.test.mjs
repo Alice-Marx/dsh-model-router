@@ -72,7 +72,7 @@ test('invalid Host install settings reject previews and actions before any CLI i
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.22.2')
+  assert.equal(manifest.version, '0.23.0')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)
@@ -102,7 +102,7 @@ test('router remote retains installer methods and owns no GAL endpoints', () => 
   assert.equal(OFFICIAL_TOOLS_REMOTE_NAMESPACE, 'modelRouterOfficialTools')
   assert.deepEqual(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.map(item => item.method), [
     'list', 'installSettings', 'installTool', 'uninstallTool', 'repairTool', 'cancel', 'status',
-    'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'boundaries', 'previewRun', 'startRun',
+    'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'boundaries', 'previewRun', 'startRun', 'runStatus', 'cancelRun',
     'terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop',
   ])
   for (const method of ['installTool', 'uninstallTool', 'repairTool']) {

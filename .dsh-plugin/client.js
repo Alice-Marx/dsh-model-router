@@ -4017,7 +4017,51 @@ var STATUS_TEXT = Object.freeze({
   "paused-budget": "\u5DF2\u56E0\u9884\u7B97\u6682\u505C\uFF0C\u672A\u542F\u52A8\u6A21\u578B",
   "paused-subscription-failure": "\u6709\u6B65\u9AA4\u56E0\u8BA2\u9605\u8C03\u7528\u5931\u8D25\u800C\u6682\u505C\uFF0C\u8BF7\u5728\u4E0B\u65B9\u6267\u884C\u8BB0\u5F55\u4E2D\u9009\u62E9\u5982\u4F55\u7EE7\u7EED"
 });
-function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, onStarted, disabledReason, planningRevision, assignmentMode = "algorithm", packageAssignments = {}, packagePlanKey: packagePlanKey2 }) {
+var LIVE_STATUSES = /* @__PURE__ */ new Set(["running", "cancelling"]);
+var JOB_STATUSES = /* @__PURE__ */ new Set([...LIVE_STATUSES, "completed", "cancelled", "failed"]);
+var PACKAGE_STATUS_TEXT = Object.freeze({ pending: "\u7B49\u5F85\u6267\u884C", running: "\u6B63\u5728\u6267\u884C", succeeded: "\u5DF2\u5B8C\u6210", failed: "\u6267\u884C\u5931\u8D25", cancelled: "\u5DF2\u53D6\u6D88", blocked: "\u4F9D\u8D56\u672A\u5B8C\u6210", skipped: "\u5DF2\u8DF3\u8FC7" });
+var STAGE_TEXT = Object.freeze({
+  starting: "\u6B63\u5728\u542F\u52A8\u4EFB\u52A1\u2026",
+  preparing: "\u6B63\u5728\u51C6\u5907\u6267\u884C\u8BA1\u5212\u2026",
+  executing: "\u6B63\u5728\u5B89\u6392\u5DE5\u4F5C\u5305\u2026",
+  integrating: "\u6B63\u5728\u6574\u5408\u5DE5\u4F5C\u5305\u7ED3\u679C\u2026",
+  reviewing: "\u6B63\u5728\u68C0\u67E5\u6267\u884C\u7ED3\u679C\u2026",
+  saving: "\u6B63\u5728\u4FDD\u5B58\u6267\u884C\u8BB0\u5F55\u2026"
+});
+var ACTIVE_JOB_KEY = "dsh-model-router:active-run-job";
+var isJobSnapshot = (value) => Boolean(text2(value?.jobId) && JOB_STATUSES.has(value.status));
+function savedJob() {
+  try {
+    return typeof sessionStorage === "undefined" ? "" : text2(sessionStorage.getItem(ACTIVE_JOB_KEY));
+  } catch {
+    return "";
+  }
+}
+function rememberJob(jobId) {
+  try {
+    if (typeof sessionStorage !== "undefined") sessionStorage.setItem(ACTIVE_JOB_KEY, jobId);
+  } catch {
+  }
+}
+function forgetJob(jobId) {
+  try {
+    if (typeof sessionStorage !== "undefined" && savedJob() === jobId) sessionStorage.removeItem(ACTIVE_JOB_KEY);
+  } catch {
+  }
+}
+var unknownJob = (error) => /unknown run job id\.?/i.test(text2(error?.message));
+var pendingLaunch = null;
+var launchListeners = /* @__PURE__ */ new Set();
+function notifyLaunch(event) {
+  for (const listener of launchListeners) listener(event);
+}
+function settleLaunch(identity, value, error) {
+  if (pendingLaunch !== identity) return;
+  pendingLaunch = null;
+  if (isJobSnapshot(value) && LIVE_STATUSES.has(value.status)) rememberJob(value.jobId);
+  notifyLaunch({ kind: "settled", identity, value, error });
+}
+function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = "algorithm", packageAssignments = {}, packagePlanKey: packagePlanKey2 }) {
   const [preset, setPreset] = import_react3.default.useState(defaultPreset || "balanced");
   const [executor, setExecutor] = import_react3.default.useState("routed");
   const [executionMode, setExecutionMode] = import_react3.default.useState("read-only");
@@ -4030,17 +4074,75 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   const lastWorkspace = [...ledger?.runs ?? []].map((run) => run.workspace).find(Boolean) ?? "";
   const [workspace, setWorkspace] = import_react3.default.useState("");
   const [phase, setPhase] = import_react3.default.useState({ kind: "idle" });
+  const currentPhase = import_react3.default.useRef(phase);
+  currentPhase.current = phase;
+  const [now, setNow] = import_react3.default.useState(Date.now);
   const mounted = import_react3.default.useRef(true);
   const confirmRef = import_react3.default.useRef(null);
   const pendingRequest = import_react3.default.useRef(0);
+  const activeRun = import_react3.default.useRef(null);
+  const launchSequence = import_react3.default.useRef(0);
+  const launching = import_react3.default.useRef(false);
+  const awaitingLaunch = import_react3.default.useRef(null);
+  const onFinished = import_react3.default.useRef(onStarted);
+  onFinished.current = onStarted;
   const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]);
   const latestSignature = import_react3.default.useRef(inputSignature);
   latestSignature.current = inputSignature;
   import_react3.default.useEffect(() => {
     mounted.current = true;
+    const resume = (jobId, snapshot) => {
+      activeRun.current = {
+        token: ++launchSequence.current,
+        jobId,
+        terminal: false,
+        cancelRequested: false,
+        cancelPending: false,
+        requestSequence: 0,
+        appliedSequence: 0,
+        restoring: true
+      };
+      launching.current = true;
+      setPhase({ kind: "running", job: snapshot ?? { jobId, status: "running" }, restoring: !snapshot });
+    };
+    const receiveLaunch = (event) => {
+      if (!mounted.current) return;
+      if (event.kind === "pending") {
+        if (activeRun.current?.launchIdentity === event.identity || activeRun.current?.jobId && !activeRun.current.terminal) return;
+        awaitingLaunch.current = event.identity;
+        pendingRequest.current += 1;
+        launching.current = true;
+        setPhase({ kind: "starting" });
+        return;
+      }
+      if (awaitingLaunch.current !== event.identity) return;
+      awaitingLaunch.current = null;
+      const value = event.value;
+      if (isJobSnapshot(value) && LIVE_STATUSES.has(value.status)) {
+        resume(value.jobId, value);
+        return;
+      }
+      launching.current = false;
+      if (event.error || value?.status === "needs-confirmation") {
+        setPhase({ kind: "error", message: event.error || "\u542F\u52A8\u524D\u7684\u786E\u8BA4\u9879\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9884\u89C8\u5E76\u786E\u8BA4\u6267\u884C\u3002" });
+        return;
+      }
+      const result = isJobSnapshot(value) ? value.result ?? { status: value.status } : value;
+      if (isJobSnapshot(value)) forgetJob(value.jobId);
+      setPhase({ kind: "done", value: result });
+      onFinished.current?.(result.runId);
+    };
+    launchListeners.add(receiveLaunch);
+    if (pendingLaunch) receiveLaunch({ kind: "pending", identity: pendingLaunch });
+    else {
+      const jobId = savedJob();
+      if (jobId && !activeRun.current) resume(jobId);
+    }
     return () => {
       mounted.current = false;
+      launchListeners.delete(receiveLaunch);
       pendingRequest.current += 1;
+      activeRun.current = null;
     };
   }, []);
   import_react3.default.useEffect(() => {
@@ -4060,6 +4162,93 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   import_react3.default.useEffect(() => {
     if (phase.kind === "preview") confirmRef.current?.focus();
   }, [phase.kind]);
+  const acceptSnapshot = import_react3.default.useCallback((value, token, sequence, cancelAcknowledged = false) => {
+    const active = activeRun.current;
+    if (!mounted.current || !active || active.token !== token || active.terminal || value.jobId !== active.jobId) return false;
+    if (!isJobSnapshot(value)) throw new Error("\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6267\u884C\u8FDB\u5EA6\u3002");
+    const terminal = !LIVE_STATUSES.has(value.status);
+    if (!terminal && sequence < active.appliedSequence) {
+      if (cancelAcknowledged) {
+        active.cancelRequested = true;
+        setPhase((previous) => previous.kind === "running" ? {
+          ...previous,
+          job: { ...previous.job, status: "cancelling", cancelRequested: true },
+          cancelPending: false,
+          cancelError: ""
+        } : previous);
+        return true;
+      }
+      return false;
+    }
+    active.appliedSequence = Math.max(active.appliedSequence, sequence);
+    active.cancelRequested || (active.cancelRequested = cancelAcknowledged || value.cancelRequested || value.status === "cancelling");
+    const job = {
+      ...value,
+      cancelRequested: Boolean(active.cancelRequested),
+      status: !terminal && active.cancelRequested ? "cancelling" : value.status
+    };
+    if (terminal) {
+      active.terminal = true;
+      launching.current = false;
+      forgetJob(value.jobId);
+      const result = value.result ?? { status: value.status };
+      setPhase({ kind: "done", value: result, job });
+      onFinished.current?.(result.runId);
+    } else {
+      rememberJob(value.jobId);
+      setPhase((previous) => previous.kind === "running" ? {
+        ...previous,
+        job,
+        restoring: false,
+        pollError: "",
+        cancelError: cancelAcknowledged ? "" : previous.cancelError,
+        cancelPending: cancelAcknowledged ? false : previous.cancelPending
+      } : previous);
+    }
+    return true;
+  }, []);
+  const runningJobId = phase.kind === "running" ? phase.job?.jobId : null;
+  import_react3.default.useEffect(() => {
+    if (!runningJobId || typeof runStatus !== "function") return;
+    const active = activeRun.current;
+    if (!active || active.jobId !== runningJobId) return;
+    let disposed = false, timer;
+    const poll = async () => {
+      if (disposed || activeRun.current !== active || active.terminal) return;
+      const sequence = ++active.requestSequence;
+      try {
+        const value = unwrapRemote(await runStatus({ jobId: runningJobId }), "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6267\u884C\u8FDB\u5EA6\u3002");
+        if (disposed) return;
+        if (!isJobSnapshot(value) || value.jobId !== runningJobId) throw new Error("\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6267\u884C\u8FDB\u5EA6\u3002");
+        acceptSnapshot(value, active.token, sequence);
+      } catch (error) {
+        if (!disposed && mounted.current && activeRun.current === active && !active.terminal) {
+          if (unknownJob(error)) {
+            active.terminal = true;
+            launching.current = false;
+            forgetJob(runningJobId);
+            setPhase({ kind: "error", message: "\u65E0\u6CD5\u627E\u5230\u6B64\u524D\u7684\u6267\u884C\uFF0C\u53EF\u80FD\u5DF2\u8FC7\u671F\u6216\u5DE5\u4F5C\u53F0\u5DF2\u91CD\u65B0\u542F\u52A8\u3002\u8BF7\u5237\u65B0\u4E0B\u65B9\u6267\u884C\u8BB0\u5F55\u6838\u5BF9\u7ED3\u679C\u3002" });
+          } else {
+            setPhase((previous) => previous.kind === "running" && previous.job?.jobId === runningJobId ? { ...previous, restoring: false, pollError: "\u6682\u65F6\u65E0\u6CD5\u66F4\u65B0\u6267\u884C\u8FDB\u5EA6\uFF0C\u5C06\u81EA\u52A8\u91CD\u8BD5\uFF1B\u4EFB\u52A1\u53EF\u80FD\u4ECD\u5728\u6267\u884C\u3002" } : previous);
+          }
+        }
+      } finally {
+        if (!disposed && activeRun.current === active && !active.terminal) timer = setTimeout(poll, 1e3);
+      }
+    };
+    timer = setTimeout(poll, active.restoring ? 0 : 1e3);
+    active.restoring = false;
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+    };
+  }, [runningJobId, runStatus, acceptSnapshot]);
+  import_react3.default.useEffect(() => {
+    if (!runningJobId) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1e3);
+    return () => clearInterval(timer);
+  }, [runningJobId]);
   const request = () => launchRequest({
     task,
     mode,
@@ -4076,11 +4265,11 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   });
   const unavailable = typeof previewRun !== "function" || typeof startRun !== "function";
   const blocked = disabledReason || (unavailable ? "\u5DE5\u4F5C\u53F0\u6267\u884C\u670D\u52A1\u5C1A\u672A\u52A0\u8F7D\uFF0C\u8BF7\u66F4\u65B0\u63D2\u4EF6\u540E\u91CD\u8BD5\u3002" : !text2(task) ? "\u5148\u5728\u4E0A\u65B9\u201C\u4EFB\u52A1\u89C4\u5212\u201D\u4E2D\u63CF\u8FF0\u4EFB\u52A1\u3002" : manual && !packagePlanKey2 ? "\u8BF7\u91CD\u65B0\u751F\u6210\u5DE5\u4F5C\u5305\u540E\u518D\u624B\u52A8\u5206\u914D\u3002" : runExecutor === "official-team" && mode !== "team" ? "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u9700\u8981\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D\u3002" : "");
-  const busy = phase.kind === "previewing" || phase.kind === "running";
+  const busy = phase.kind === "previewing" || phase.kind === "running" || phase.kind === "starting";
   const recordedRun = phase.kind === "done" && phase.value.runId ? (ledger?.runs ?? []).find((run) => run.id === phase.value.runId) : null;
   const resultStatus = recordedRun?.status ?? phase.value?.status;
   const preview = async () => {
-    if (blocked || busy) return;
+    if (blocked || busy || launching.current || pendingLaunch) return;
     const current = ++pendingRequest.current;
     let snapshot;
     try {
@@ -4099,14 +4288,38 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     }
   };
   const confirm2 = async () => {
-    if (blocked || phase.kind !== "preview" || phase.signature !== latestSignature.current || phase.value.status === "blocked") return;
+    if (launching.current || pendingLaunch || currentPhase.current !== phase || blocked || phase.kind !== "preview" || phase.signature !== latestSignature.current || phase.value.status === "blocked") return;
     const shown = phase.value;
     const snapshot = phase.request;
     const signature2 = phase.signature;
+    launching.current = true;
+    const identity = /* @__PURE__ */ Symbol("launch");
+    const active = {
+      token: ++launchSequence.current,
+      launchIdentity: identity,
+      jobId: null,
+      terminal: false,
+      cancelRequested: false,
+      cancelPending: false,
+      requestSequence: 0,
+      appliedSequence: 0
+    };
+    activeRun.current = active;
+    pendingLaunch = identity;
+    notifyLaunch({ kind: "pending", identity });
     setPhase({ kind: "running", value: shown, request: snapshot, signature: signature2 });
     try {
       const value = unwrapRemote(await startRun({ ...snapshot, confirmedReasons: (shown.reasons ?? []).map((item) => item.code) }), "\u6267\u884C\u5931\u8D25\u3002");
+      settleLaunch(identity, value);
       if (!mounted.current) return;
+      if (activeRun.current !== active) return;
+      if (isJobSnapshot(value)) {
+        active.jobId = value.jobId;
+        acceptSnapshot(value, active.token, ++active.requestSequence);
+        return;
+      }
+      active.terminal = true;
+      launching.current = false;
       if (value.status === "needs-confirmation") {
         setPhase(signature2 === latestSignature.current ? { kind: "preview", value, request: snapshot, signature: signature2, changed: true } : { kind: "idle" });
         return;
@@ -4114,7 +4327,34 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       setPhase({ kind: "done", value });
       onStarted?.(value.runId);
     } catch (error) {
-      if (mounted.current) setPhase({ kind: "error", message: text2(error?.message) || "\u6267\u884C\u5931\u8D25\u3002" });
+      settleLaunch(identity, null, text2(error?.message) || "\u6267\u884C\u5931\u8D25\u3002");
+      if (mounted.current && activeRun.current === active) {
+        active.terminal = true;
+        launching.current = false;
+        setPhase({ kind: "error", message: text2(error?.message) || "\u6267\u884C\u5931\u8D25\u3002" });
+      }
+    }
+  };
+  const cancel = async () => {
+    const active = activeRun.current;
+    if (!active?.jobId || active.terminal || active.cancelPending || active.cancelRequested || typeof cancelRun !== "function") return;
+    active.cancelPending = true;
+    const sequence = ++active.requestSequence;
+    setPhase((previous) => previous.kind === "running" ? { ...previous, cancelPending: true, cancelError: "" } : previous);
+    try {
+      const value = unwrapRemote(await cancelRun({ jobId: active.jobId }), "\u53D6\u6D88\u8BF7\u6C42\u672A\u786E\u8BA4\u3002");
+      if (!isJobSnapshot(value) || value.jobId !== active.jobId) throw new Error("\u53D6\u6D88\u8BF7\u6C42\u672A\u786E\u8BA4\u3002");
+      acceptSnapshot(value, active.token, sequence, true);
+    } catch {
+      if (mounted.current && activeRun.current === active && !active.terminal) {
+        setPhase((previous) => previous.kind === "running" ? {
+          ...previous,
+          cancelPending: false,
+          cancelError: "\u53D6\u6D88\u8BF7\u6C42\u672A\u786E\u8BA4\uFF0C\u4EFB\u52A1\u53EF\u80FD\u4ECD\u5728\u6267\u884C\u3002\u8BF7\u91CD\u8BD5\u53D6\u6D88\u3002"
+        } : previous);
+      }
+    } finally {
+      active.cancelPending = false;
     }
   };
   return /* @__PURE__ */ import_react3.default.createElement("section", { className: "mr-card", "aria-label": "\u5728\u5DE5\u4F5C\u53F0\u6267\u884C" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("h2", { className: "mr-card-title" }, "\u5728\u5DE5\u4F5C\u53F0\u6267\u884C"), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-card-copy" }, "\u4F7F\u7528\u4E0A\u65B9\u7684\u4EFB\u52A1\u63CF\u8FF0\u4E0E\u89C4\u5212\u6A21\u5F0F\uFF0C\u5148\u9884\u89C8\u6267\u884C\u8BA1\u5212\u3001\u6743\u9650\u4E0E\u9884\u4F30\u8D39\u7528\uFF0C\u786E\u8BA4\u540E\u624D\u4F1A\u542F\u52A8\u6267\u884C\u3002\u6A21\u578B\u8DEF\u7531\u6267\u884C\u53EA\u8BFB\u4EFB\u52A1\uFF1B\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u53EF\u9009\u62E9\u53EA\u8BFB\u68C0\u67E5\uFF0C\u6216\u5728\u9694\u79BB\u5DE5\u4F5C\u6811\u4E2D\u4F7F\u7528 CLI \u7684\u6B63\u5E38\u5DE5\u5177\u7F16\u8F91\u6587\u4EF6\u3002"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-executor" }, "\u6267\u884C\u65B9\u5F0F"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-executor" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "routed", disabled: busy, onClick: () => {
@@ -4128,7 +4368,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     setExecutionEnvironment("harness");
   } }, "\u53EA\u8BFB\u68C0\u67E5"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionMode === "workspace-write", disabled: busy, onClick: () => setExecutionMode("workspace-write") }, "\u7F16\u8F91\u6587\u4EF6"))), runExecutor === "official-team" && executionMode === "workspace-write" && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-environment" }, "\u6267\u884C\u73AF\u5883"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-environment" }, /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "harness", disabled: busy, onClick: () => setExecutionEnvironment("harness") }, "Harness \u53D7\u9650\u73AF\u5883"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "cli-native", disabled: busy, onClick: () => setExecutionEnvironment("cli-native") }, "\u5382\u5546 CLI \u6B63\u5E38\u73AF\u5883"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-control-label", id: "mr-launch-preset" }, "\u8DEF\u7531\u65B9\u6848"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-preset" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react3.default.createElement("button", { key: item.id, type: "button", title: manual ? "\u624B\u52A8\u5206\u914D\u6CBF\u7528\u5F53\u524D\u5EFA\u8BAE\u7684\u65B9\u6848\uFF1B\u66F4\u6539\u65B9\u6848\u540E\u8BF7\u91CD\u65B0\u751F\u6210\u5EFA\u8BAE\u3002" : item.description, "aria-pressed": runPreset === item.id, disabled: busy || mode === "direct" || manual, onClick: () => setPreset(item.id) }, item.label)))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-control-group mr-launch-workspace" }, /* @__PURE__ */ import_react3.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-launch-workspace" }, "\u5DE5\u4F5C\u533A\uFF08\u7EDD\u5BF9\u8DEF\u5F84\uFF09"), /* @__PURE__ */ import_react3.default.createElement("input", { className: "mr-input", id: "mr-launch-workspace", value: workspace, disabled: busy, placeholder: lastWorkspace ? `\u7559\u7A7A\u6CBF\u7528\u4E0A\u6B21\u8FD0\u884C\uFF1A${lastWorkspace}` : "\u4F8B\u5982 D:\\projects\\demo \u6216 /home/me/demo", onChange: (event) => setWorkspace(event.target.value) }))), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, manual ? "\u624B\u52A8\u5206\u914D\u6309\u5305\u6267\u884C\u53EA\u8BFB\u4EFB\u52A1\uFF0C\u53EF\u6DF7\u5408\u6A21\u578B API \u4E0E\u5B98\u65B9\u5DE5\u5177\uFF1B\u5DE5\u5177\u4F7F\u7528\u9ED8\u8BA4\u6A21\u578B\u3002\u6240\u9009\u76EE\u6807\u3001\u5C31\u7EEA\u72B6\u6001\u548C\u8D39\u7528\u4EE5\u6267\u884C\u9884\u89C8\u4E3A\u51C6\u3002" : executor === "official-team" ? `${executionMode === "workspace-write" ? "\u7F16\u8F91\u6587\u4EF6\uFF1A\u5404\u5DE5\u4F5C\u5305\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u4F7F\u7528 CLI \u6B63\u5E38\u5DE5\u5177\uFF0C\u5B8C\u6210\u540E\u6574\u5408\u56DE\u6240\u9009\u5DE5\u4F5C\u533A\u3002" : "\u53EA\u8BFB\u68C0\u67E5\uFF1A\u5404\u5DE5\u4F5C\u5305\u4F7F\u7528\u53D7\u9650\u5DE5\u5177\u96C6\uFF0C\u4E0D\u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\uFF1BClaude \u7981\u7528 shell\u3001\u6280\u80FD\u53CA\u65E2\u6709 MCP\uFF0C\u5E76\u5FFD\u7565\u7528\u6237\u8BBE\u7F6E\u3002"}\u5931\u8D25\u65F6\u4E0D\u4F1A\u81EA\u52A8\u66FF\u6362\u4E3A\u6A21\u578B\u76EE\u5F55 API\u3002\u5DF2\u767B\u5F55\u4E0D\u4EE3\u8868\u5F53\u524D\u4EFB\u52A1\u6743\u9650\u5DF2\u5C31\u7EEA\uFF0C\u9884\u89C8\u4F1A\u68C0\u67E5\u53EF\u7528\u5DE5\u5177\u3002` : mode === "direct" ? `\u6307\u5B9A\u6A21\u578B\uFF1A${directRoute ? `${directRoute.provider}/${directRoute.model}` : "\u672A\u9009\u62E9"}\uFF08\u8DF3\u8FC7\u8DEF\u7531\uFF0C\u65B9\u6848\u4E0D\u751F\u6548\uFF09` : mode === "team" ? "\u56E2\u961F\u5206\u5DE5\uFF1A\u6309\u4F9D\u8D56\u6267\u884C\u53EA\u8BFB\u5DE5\u4F5C\u5305\uFF0C\u6BCF\u6B65\u4F7F\u7528\u53EF\u7528\u7684\u5B98\u65B9 CLI \u6216\u6A21\u578B\u76EE\u5F55 API\u3002" : "\u5355\u4EFB\u52A1\uFF1A\u6309\u65B9\u6848\u9009\u62E9\u4E00\u6761\u8DEF\u7EBF\u3002"), mode !== "team" && !manual && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u4F7F\u7528\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C\u524D\uFF0C\u5148\u5728\u4E0A\u65B9\u9009\u62E9\u201C\u56E2\u961F\u5206\u5DE5\u201D\u3002"), runEnvironment === "cli-native" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5382\u5546 CLI \u4F7F\u7528\u539F\u767B\u5F55\u3001\u914D\u7F6E\u3001\u6280\u80FD\u53CA MCP\uFF0C\u4EE5\u5F53\u524D\u7528\u6237\u6743\u9650\u8FD0\u884C\uFF0C\u4E0D\u7ECF\u8FC7 Harness \u8FDB\u7A0B\u6C99\u7BB1\u3002\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u7528\u4E8E\u6536\u96C6\u6539\u52A8\uFF0C\u4E0D\u662F\u64CD\u4F5C\u7CFB\u7EDF\u8BFB\u5199\u8FB9\u754C\uFF1B\u4E0D\u4F1A\u81EA\u52A8\u5207\u6362\u5230\u6B64\u73AF\u5883\u3002"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button", type: "button", disabled: Boolean(blocked) || busy, onClick: () => {
     void preview();
-  } }, phase.kind === "previewing" ? "\u6B63\u5728\u751F\u6210\u9884\u89C8\u2026" : "\u9884\u89C8\u6267\u884C\u8BA1\u5212"), blocked && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, blocked)), phase.kind === "previewing" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u6309\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u3001\u767B\u5F55\u72B6\u6001\u548C\u9884\u7B97\u751F\u6210\u6267\u884C\u8BA1\u5212\u2026"), phase.kind === "error" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, phase.message), (phase.kind === "preview" && phase.signature === inputSignature || phase.kind === "running") && /* @__PURE__ */ import_react3.default.createElement(
+  } }, phase.kind === "previewing" ? "\u6B63\u5728\u751F\u6210\u9884\u89C8\u2026" : "\u9884\u89C8\u6267\u884C\u8BA1\u5212"), blocked && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, blocked)), phase.kind === "previewing" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u6309\u5F53\u524D\u6A21\u578B\u76EE\u5F55\u3001\u767B\u5F55\u72B6\u6001\u548C\u9884\u7B97\u751F\u6210\u6267\u884C\u8BA1\u5212\u2026"), phase.kind === "starting" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-empty", role: "status" }, "\u6B63\u5728\u7B49\u5F85\u5DF2\u786E\u8BA4\u4EFB\u52A1\u7684\u542F\u52A8\u7ED3\u679C\uFF0C\u8BF7\u7A0D\u5019\u2026"), phase.kind === "error" && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, phase.message), (phase.kind === "preview" && phase.signature === inputSignature || phase.kind === "running" && !phase.job) && /* @__PURE__ */ import_react3.default.createElement(
     LaunchPreview,
     {
       value: phase.value,
@@ -4139,7 +4379,23 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       onConfirm: () => {
         void confirm2();
       },
-      onCancel: () => setPhase({ kind: "idle" })
+      onCancel: () => {
+        if (!launching.current) setPhase({ kind: "idle" });
+      }
+    }
+  ), phase.kind === "running" && phase.job && /* @__PURE__ */ import_react3.default.createElement(
+    RunProgress,
+    {
+      job: phase.job,
+      now,
+      restoring: phase.restoring,
+      cancelPending: phase.cancelPending,
+      pollError: phase.pollError || (typeof runStatus !== "function" ? "\u5F53\u524D\u65E0\u6CD5\u66F4\u65B0\u6267\u884C\u8FDB\u5EA6\uFF0C\u4EFB\u52A1\u53EF\u80FD\u4ECD\u5728\u6267\u884C\u3002\u8BF7\u66F4\u65B0\u63D2\u4EF6\u540E\u67E5\u770B\u6267\u884C\u8BB0\u5F55\u3002" : ""),
+      cancelError: phase.cancelError,
+      canCancel: typeof cancelRun === "function",
+      onCancel: () => {
+        void cancel();
+      }
     }
   ), phase.kind === "done" && /* @__PURE__ */ import_react3.default.createElement("div", { className: ["failed", "partial", "blocked", "incomplete"].includes(resultStatus) || resultStatus?.startsWith("paused") ? "mr-error" : "mr-empty", role: "status" }, STATUS_TEXT[resultStatus] ?? `\u72B6\u6001\uFF1A${resultStatus}`, phase.value.runId ? `\uFF1B\u7ED3\u679C\u5DF2\u8BB0\u5F55\uFF08\u8FD0\u884C ${phase.value.runId.slice(0, 8)}\uFF09\uFF0C\u89C1\u4E0B\u65B9\u201C\u6267\u884C\u8BB0\u5F55\u4E0E\u5B50\u4EFB\u52A1\u201D\u3002` : "\u3002", phase.value.budget?.message ? ` ${phase.value.budget.exceeded && resultStatus !== "paused-budget" ? "\u5DF2\u6309\u4F60\u7684\u786E\u8BA4\u8D85\u9884\u7B97\u6267\u884C\uFF1A" : ""}${phase.value.budget.message}` : "")));
 }
@@ -4156,7 +4412,25 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
   return /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-launch-preview", role: "region", "aria-label": "\u6267\u884C\u9884\u89C8" }, changed && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, "\u786E\u8BA4\u671F\u95F4\u60C5\u51B5\u6709\u53D8\u5316\uFF08\u4F8B\u5982\u9884\u7B97\u6216\u767B\u5F55\u72B6\u6001\uFF09\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u4E0B\u9762\u7684\u786E\u8BA4\u9879\u3002"), blocked && /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-error", role: "alert" }, /* @__PURE__ */ import_react3.default.createElement("strong", null, "\u5F53\u524D\u65E0\u6CD5\u542F\u52A8\u6267\u884C\u3002"), blocking.length ? /* @__PURE__ */ import_react3.default.createElement("ul", null, blocking.map((message) => /* @__PURE__ */ import_react3.default.createElement("li", { key: message }, message))) : /* @__PURE__ */ import_react3.default.createElement("p", null, "\u6267\u884C\u6761\u4EF6\u5C1A\u672A\u6EE1\u8DB3\uFF0C\u8BF7\u68C0\u67E5\u6240\u9009\u6743\u9650\u3001\u5DE5\u4F5C\u533A\u548C\u5B98\u65B9\u5DE5\u5177\u72B6\u6001\u540E\u91CD\u65B0\u9884\u89C8\u3002")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, officialTeam || manual ? "\u6267\u884C\u65B9\u5F0F" : "\u8DEF\u7EBF"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, manual ? "\u624B\u52A8\u5206\u914D \xB7 \u6309\u5305\u53EA\u8BFB\u6267\u884C" : officialTeam ? "\u5B98\u65B9\u5DE5\u5177\u534F\u4F5C" : value.selected ? `${value.selected.provider}/${value.selected.model}` : "\u6682\u65E0\u8DEF\u7EBF", value.routingBypassed ? "\uFF08\u6307\u5B9A\u6A21\u578B\uFF09" : "")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u9884\u4F30\u8D39\u7528"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, value.estimatedCost === null || value.estimatedCost === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : money(value.estimatedCost))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u65B9\u6848"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[value.decision?.preset]?.label ?? "\u2014", value.budget?.downgraded ? "\uFF08\u8D85\u9884\u7B97\u81EA\u52A8\u964D\u7EA7\uFF09" : "")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-label" }, "\u5DE5\u4F5C\u533A"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-metric-value mr-break" }, /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace)))), officialTeam && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u4EFB\u52A1\u6743\u9650\uFF1A", readOnly ? "\u53EA\u8BFB\u68C0\u67E5\uFF0C\u4E0D\u4FEE\u6539\u5DE5\u4F5C\u533A\u6587\u4EF6\u3002\u4F7F\u7528\u53D7\u9650\u5DE5\u5177\u96C6\uFF1BClaude \u7981\u7528 shell\u3001\u6280\u80FD\u53CA\u65E2\u6709 MCP\uFF0C\u5E76\u5FFD\u7565\u7528\u6237\u8BBE\u7F6E\u3002" : /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, "\u7F16\u8F91\u6587\u4EF6\u3002\u7F16\u8F91\u8303\u56F4\uFF1A\u6240\u9009\u5DE5\u4F5C\u533A ", /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace), " \u5185\u7684\u4EFB\u52A1\u6587\u4EF6\u3002\u5B98\u65B9 CLI \u4F7F\u7528\u81EA\u5DF1\u7684\u6B63\u5E38\u5DE5\u5177\uFF0C\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u5B8C\u6210\u540E\u6574\u5408\u56DE\u8BE5\u5DE5\u4F5C\u533A\u3002"), "\u5931\u8D25\u65F6\u4E0D\u4F1A\u81EA\u52A8\u66FF\u6362\u4E3A\u6A21\u578B\u76EE\u5F55 API\u3002"), native && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u6267\u884C\u73AF\u5883\uFF1A\u5382\u5546 CLI \u6B63\u5E38\u73AF\u5883\uFF0C\u4EE5\u5F53\u524D\u7528\u6237\u6743\u9650\u8FD0\u884C\uFF0C\u4E0D\u7ECF Harness \u8FDB\u7A0B\u6C99\u7BB1\u3002\u5DE5\u4F5C\u6811\u4E0D\u9650\u5236\u5DE5\u5177\u8BBF\u95EE\u5DE5\u4F5C\u6811\u5916\u8D44\u6E90\u3002"), !officialTeam && !readOnly && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u7F16\u8F91\u8303\u56F4\uFF1A\u6240\u9009\u5DE5\u4F5C\u533A ", /* @__PURE__ */ import_react3.default.createElement("code", null, value.workspace), " \u5185\u7684\u4EFB\u52A1\u6587\u4EF6\uFF1B\u5728\u72EC\u7ACB Git \u5DE5\u4F5C\u6811\u4E2D\u5B8C\u6210\u540E\u6574\u5408\u56DE\u8BE5\u5DE5\u4F5C\u533A\u3002\u4E0D\u4F1A\u81EA\u52A8\u56DE\u9000\u6A21\u578B\u76EE\u5F55 API\u3002"), value.budget?.message && /* @__PURE__ */ import_react3.default.createElement("p", { className: value.budget.exceeded ? "mr-error" : "mr-caption" }, "\u9884\u7B97\u68C0\u67E5\uFF1A", value.budget.message), packages.length > 0 && /* @__PURE__ */ import_react3.default.createElement("ol", { className: "mr-launch-packages" }, packages.map((item) => {
     const tool = item.manualAssignment?.kind === "tool";
     return /* @__PURE__ */ import_react3.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react3.default.createElement("strong", null, item.name), (manual || item.selectionSource === "manual") && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-pill" }, "\u624B\u52A8"), " \u2192 ", tool ? `${item.toolLabel || item.toolId || item.manualAssignment.toolId} \xB7 \u9ED8\u8BA4\u6A21\u578B` : item.route || item.toolLabel || item.toolId || item.tool || "\u5F85\u5206\u914D\u8DEF\u7EBF", " ", /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\uFF08\u9884\u4F30 ", tool ? "\u8D39\u7528\u672A\u77E5" : item.estimatedCost === null || item.estimatedCost === void 0 ? "\u4EF7\u683C\u5F85\u914D\u7F6E" : money(item.estimatedCost), item.channel === "official-cli" ? " \xB7 \u5B98\u65B9 CLI" : item.channel ? " \xB7 \u6A21\u578B\u76EE\u5F55 API" : "", "\uFF09"), item.channelDetail && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, item.channelDetail));
-  })), reasons.length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-confirm-box" }, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-section-title" }, "\u6267\u884C\u524D\u9700\u8981\u786E\u8BA4\u4EE5\u4E0B ", reasons.length, " \u9879\uFF1A"), /* @__PURE__ */ import_react3.default.createElement("ol", null, reasons.map((item) => /* @__PURE__ */ import_react3.default.createElement("li", { key: item.code }, reasonText(item))))) : /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5F53\u524D\u6CA1\u6709\u989D\u5916\u786E\u8BA4\u9879\u3002", value.estimatedCost === null || value.estimatedCost === void 0 ? "\u8D39\u7528\u672A\u77E5\uFF0C\u65E0\u6CD5\u786E\u8BA4\u672C\u6B21\u8D39\u7528\u662F\u5426\u5728\u9884\u7B97\u5185\u3002" : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u672C\u6B21\u672A\u8D85\u51FA\u9884\u7B97\uFF1B\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002" : "\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { ref: confirmRef, className: "mr-button", type: "button", disabled: running || blocked, onClick: onConfirm }, running ? "\u6B63\u5728\u6267\u884C\u2026" : reasons.length ? "\u5168\u90E8\u786E\u8BA4\u5E76\u6267\u884C" : "\u786E\u8BA4\u6267\u884C"), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: running, onClick: onCancel }, "\u53D6\u6D88"), running && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption", role: "status", "aria-live": "polite" }, "\u6A21\u578B\u8C03\u7528\u53EF\u80FD\u9700\u8981\u51E0\u5206\u949F\uFF0C\u8BF7\u52FF\u5173\u95ED\u5DE5\u4F5C\u53F0\u3002")));
+  })), reasons.length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-confirm-box" }, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-section-title" }, "\u6267\u884C\u524D\u9700\u8981\u786E\u8BA4\u4EE5\u4E0B ", reasons.length, " \u9879\uFF1A"), /* @__PURE__ */ import_react3.default.createElement("ol", null, reasons.map((item) => /* @__PURE__ */ import_react3.default.createElement("li", { key: item.code }, reasonText(item))))) : /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5F53\u524D\u6CA1\u6709\u989D\u5916\u786E\u8BA4\u9879\u3002", value.estimatedCost === null || value.estimatedCost === void 0 ? "\u8D39\u7528\u672A\u77E5\uFF0C\u65E0\u6CD5\u786E\u8BA4\u672C\u6B21\u8D39\u7528\u662F\u5426\u5728\u9884\u7B97\u5185\u3002" : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? "\u6309\u5DF2\u63D0\u4F9B\u5355\u4EF7\u4F30\u7B97\uFF0C\u672C\u6B21\u672A\u8D85\u51FA\u9884\u7B97\uFF1B\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002" : "\u5B9E\u9645\u8D39\u7528\u4EE5\u6267\u884C\u8BB0\u5F55\u548C\u8D26\u5355\u4E3A\u51C6\u3002"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement("button", { ref: confirmRef, className: "mr-button", type: "button", disabled: running || blocked, onClick: onConfirm }, running ? "\u6B63\u5728\u6267\u884C\u2026" : reasons.length ? "\u5168\u90E8\u786E\u8BA4\u5E76\u6267\u884C" : "\u786E\u8BA4\u6267\u884C"), /* @__PURE__ */ import_react3.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: running, onClick: onCancel }, "\u53D6\u6D88"), running && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption", role: "status", "aria-live": "polite" }, "\u6B63\u5728\u542F\u52A8\u6267\u884C\uFF0C\u8BF7\u7A0D\u5019\u2026")));
+}
+function RunProgress({ job, now, restoring, pollError, cancelError, cancelPending, canCancel, onCancel }) {
+  const progress = job.progress ?? {};
+  const packages = Array.isArray(progress.packages) ? progress.packages : [];
+  const startedAt = typeof job.startedAt === "number" ? job.startedAt : Date.parse(job.startedAt);
+  const seconds = Number.isFinite(startedAt) ? Math.max(0, Math.floor((now - startedAt) / 1e3)) : 0;
+  const elapsed = Number.isFinite(startedAt) ? `${Math.floor(seconds / 60)} \u5206 ${String(seconds % 60).padStart(2, "0")} \u79D2` : "\u5F85\u66F4\u65B0";
+  const cancelling = job.cancelRequested || job.status === "cancelling";
+  return /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-launch-preview mr-run-progress", role: "region", "aria-label": "\u6267\u884C\u8FDB\u5EA6" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-run-progress-head" }, /* @__PURE__ */ import_react3.default.createElement("strong", { role: "status" }, cancelling ? "\u6B63\u5728\u53D6\u6D88\u2026" : restoring ? "\u6B63\u5728\u6062\u590D\u6267\u884C\u8FDB\u5EA6\u2026" : "\u6B63\u5728\u6267\u884C\u2026"), /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\u5DF2\u8017\u65F6 ", elapsed)), job.progress && /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption" }, "\u5DF2\u5904\u7406 ", progress.completed ?? 0, " / ", progress.total ?? packages.length, " \u4E2A\u5DE5\u4F5C\u5305"), /* @__PURE__ */ import_react3.default.createElement("progress", { className: "mr-run-meter", "aria-label": "\u5DE5\u4F5C\u5305\u5B8C\u6210\u8FDB\u5EA6", value: progress.completed ?? 0, max: Math.max(1, progress.total ?? packages.length) })), /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-caption", "aria-live": "polite" }, progress.current ? `\u5F53\u524D\u5DE5\u4F5C\u5305\uFF1A${progress.current.name || progress.current.id}` : cancelling ? "\u6B63\u5728\u7ED3\u675F\u5F53\u524D\u6267\u884C\u5E76\u4FDD\u7559\u5DF2\u5B8C\u6210\u7ED3\u679C\u3002" : STAGE_TEXT[progress.stage] ?? "\u6B63\u5728\u8BFB\u53D6\u6267\u884C\u8FDB\u5EA6\u2026"), packages.length > 0 && /* @__PURE__ */ import_react3.default.createElement("ol", { className: "mr-run-packages" }, packages.map((item) => /* @__PURE__ */ import_react3.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react3.default.createElement("span", null, item.name || item.id), /* @__PURE__ */ import_react3.default.createElement("span", { className: `mr-pill mr-run-package-${item.status}` }, PACKAGE_STATUS_TEXT[item.status] ?? "\u7B49\u5F85\u66F4\u65B0")))), pollError && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "status" }, pollError), cancelError && /* @__PURE__ */ import_react3.default.createElement("p", { className: "mr-error", role: "alert" }, cancelError), /* @__PURE__ */ import_react3.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react3.default.createElement(
+    "button",
+    {
+      className: "mr-button mr-button-secondary",
+      type: "button",
+      disabled: !canCancel || cancelPending || cancelling,
+      onClick: onCancel
+    },
+    cancelPending ? "\u6B63\u5728\u8BF7\u6C42\u53D6\u6D88\u2026" : cancelling ? "\u6B63\u5728\u53D6\u6D88\u2026" : "\u53D6\u6D88\u6267\u884C"
+  ), cancelling && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\u53D6\u6D88\u5DF2\u8BF7\u6C42\uFF0C\u7B49\u5F85\u6267\u884C\u7ED3\u675F\uFF1B\u5DF2\u5B8C\u6210\u7ED3\u679C\u4F1A\u4FDD\u7559\u5728\u6267\u884C\u8BB0\u5F55\u4E2D\u3002"), !canCancel && /* @__PURE__ */ import_react3.default.createElement("span", { className: "mr-caption" }, "\u5F53\u524D\u5DE5\u4F5C\u53F0\u6682\u4E0D\u652F\u6301\u53D6\u6D88\uFF0C\u8BF7\u66F4\u65B0\u63D2\u4EF6\u3002")));
 }
 
 // .dsh-plugin/client/cli-terminal.jsx
@@ -13589,7 +13863,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.22.2" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.23.0" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -14315,12 +14589,21 @@ var router_main_default = `.mr-workspace {
 .mr-launch-workspace { flex: 1 1 320px; min-width: min(100%, 260px); }
 .mr-launch-preview { margin-top: 16px; padding: 14px; border: 1px solid var(--mr-line); border-radius: 12px; background: #f9fbfe; }
 .mr-launch-packages { margin: 12px 0 0; padding-left: 20px; font-size: 12px; line-height: 1.7; }
+.mr-run-progress-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.mr-run-meter { display: block; width: 100%; height: 8px; accent-color: var(--mr-accent); }
+.mr-run-packages { display: grid; gap: 7px; margin: 12px 0; padding-left: 20px; font-size: 12px; line-height: 1.6; }
+.mr-run-packages li > span:first-child { margin-right: 8px; }
+.mr-run-package-running { color: var(--mr-accent); }
+.mr-run-package-failed, .mr-run-package-blocked { color: #b42c39; }
+.mr-run-package-succeeded { color: #187042; }
 .mr-confirm-box { margin-top: 12px; padding: 10px 14px; border: 1px solid rgba(217, 140, 30, .35); border-radius: 10px; background: #fff8ec; color: #6d4a12; font-size: 12px; line-height: 1.6; }
 .mr-confirm-box .mr-section-title { margin: 0 0 6px; }
 .mr-confirm-box ol { margin: 0; padding-left: 20px; }
 .mr-break { overflow-wrap: anywhere; }
 @media (prefers-color-scheme: dark) {
   .mr-launch-preview { background: rgba(255, 255, 255, .04); }
+  .mr-run-package-failed, .mr-run-package-blocked { color: #ffd4da; }
+  .mr-run-package-succeeded { color: #b4f1cc; }
   .mr-confirm-box { background: rgba(217, 140, 30, .12); color: #f2d39b; }
 }
 
@@ -15114,7 +15397,7 @@ ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join("\n")}
   }, []);
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun };
 }
-function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
+function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries });
   const [catalogState, setCatalogState] = import_react5.default.useState({ status: "loading", catalog: null, error: "" });
   const [task, setTask] = import_react5.default.useState("");
@@ -15336,6 +15619,8 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       ledger: workbench.ledger.value,
       previewRun,
       startRun,
+      runStatus,
+      cancelRun,
       planningRevision: `${routingSettings}/${dataRevision}/${feedbackRevision}/${evidenceRevision}`,
       assignmentMode: effectiveAssignmentMode,
       packageAssignments: effectiveAssignmentMode === "manual" ? packageAssignments : {},
@@ -15494,6 +15779,12 @@ var idText = (value, subject) => {
   if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,80}$/.test(value)) throw new TypeError(`${subject} must be a short id`);
   return value;
 };
+function parseRunJobRequest(value) {
+  const request = plainObject2(value, "run job request");
+  if (Object.keys(request).some((key) => key !== "jobId")) throw new TypeError("run job request only accepts jobId");
+  return { jobId: idText(request.jobId, "jobId") };
+}
+var runJobRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunJobRequest`, parseRunJobRequest);
 var optionalRouteText = (value, subject) => {
   if (value === void 0 || value === null || value === "") return void 0;
   if (typeof value !== "string" || value.length > 240 || value.includes("\0")) throw new TypeError(`${subject} is invalid`);
@@ -15619,6 +15910,8 @@ var OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview")),
   descriptor("startRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunStarted")),
+  descriptor("runStatus", [jsonParameter("request", runJobRequestCodec)], anyObjectCodec("RunJobStatus")),
+  descriptor("cancelRun", [jsonParameter("request", runJobRequestCodec)], anyObjectCodec("RunJobStatus")),
   // Workbench "官方工具终端": interactive shell / fixed official CLI sessions.
   // Output streams through long-poll reads; input and resize are unary calls.
   descriptor("terminalInfo", [], anyObjectCodec("TerminalInfo")),
@@ -16072,6 +16365,8 @@ function registerUi(ctx) {
       loadBoundaries: () => officialToolsRemote.boundaries(),
       previewRun: (request) => officialToolsRemote.previewRun(request),
       startRun: (request) => officialToolsRemote.startRun(request),
+      runStatus: (request) => officialToolsRemote.runStatus(request),
+      cancelRun: (request) => officialToolsRemote.cancelRun(request),
       terminalApi: Object.freeze({
         terminalInfo: () => officialToolsRemote.terminalInfo(),
         terminalStart: (request) => officialToolsRemote.terminalStart(request),

@@ -269,7 +269,12 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
       try {
         cache = null
         const { state } = await readFresh({ recoverCorrupt: true })
-        if (pendingNotices.length) state.notices.push(...pendingNotices)
+        if (pendingNotices.length) {
+          state.notices.push(...pendingNotices)
+          // Recovery may already have moved the damaged file before a failed
+          // update. Its pending notice must carry the missing-history marker.
+          state.historyIncomplete ||= pendingNotices.some(notice => notice.kind === 'state-corrupt')
+        }
         const result = await change(state)
         const returned = result === undefined ? undefined : structuredClone(result)
         retainRuns(state, historyLimit)

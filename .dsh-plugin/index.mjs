@@ -12,6 +12,7 @@ import {
   DEFAULT_COOLDOWN_MINUTES, billingOverview, billingPlan, createQuotaTracker, detectQuotaExhaustion, parseQuotaPatterns, vendorKey,
 } from './shared/subscription-billing.mjs'
 import { createRouterState } from './shared/router-state.mjs'
+import { createRunJobs } from './shared/run-jobs.mjs'
 import { applyFeedbackProfile, buildFeedbackProfile } from './shared/adaptive-feedback.mjs'
 import { buildRoutingEvidence, parseRoutingEvidenceJson } from './shared/routing-evidence.mjs'
 import { apiReasoningRequest } from './shared/reasoning-execution.mjs'
@@ -28,7 +29,7 @@ import { applyManualPackagePlan } from './shared/manual-plan.mjs'
 import { parsePackageAssignments, packagePlanKey } from './shared/package-assignments.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
 import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
-import { parseRunRequest } from './shared/official-tools-remote.mjs'
+import { parseRunRequest, parseRunJobRequest } from './shared/official-tools-remote.mjs'
 import { createTerminalManager } from './shared/cli-terminal.mjs'
 import {
   parseTerminalRead,
@@ -682,6 +683,7 @@ export async function reviewRunPackages(ctx, run, routes, config, { signal, rand
   const reviewerQuality = routeQuality(reviewer)
   const reviews = []
   for (const item of run.packages) {
+    if (signal?.aborted) break
     if (!item.ok || !text(item.answer)) continue
     if (item.provider === reviewer.provider && item.model === reviewer.model) continue
     const own = routeQuality(routes.find(route => route.provider === item.provider && route.model === item.model))
@@ -708,16 +710,26 @@ export async function reviewRunPackages(ctx, run, routes, config, { signal, rand
       run.reviews.push(entry)
       reviews.push({ ...entry, score })
     } catch (error) {
-      if (signal?.aborted) throw error
+      if (signal?.aborted) break
       item.review = { provider: reviewer.provider, model: reviewer.model, score: null, summary: `审阅失败：${errorText(error).slice(0, 200)}`, at: Date.now() }
     }
   }
   return reviews
 }
 
+async function reportRunProgress(options, event) {
+  try { if (typeof options.onProgress === 'function') await options.onProgress(event) }
+  catch { /* Observing progress must not discard results or incurred spend. */ }
+}
+
 function executionHooks(ctx, options) {
   return {
     skipOfficial: options.skipOfficial ?? (request => healthCache.skipReason(request)),
+    onStage: stage => reportRunProgress(options, { type: 'stage', stage }),
+    onPackageStart: async item => {
+      await reportRunProgress(options, { type: 'package-start', package: item })
+      if (typeof options.onPackageStart === 'function') await options.onPackageStart(item)
+    },
     onPackage: async result => {
       // A CLI that reports "not logged in" is marked; with a subscription the router then asks instead of using the API key.
       const failed = result?.toolId && (result.fallback?.loginRequired ? result.fallback.error : result.pause?.loginRequired && result.pause.kind !== 'subscription-login' ? result.pause.detail : null)
@@ -729,6 +741,7 @@ function executionHooks(ctx, options) {
         healthCache.clearLoggedOut(result.toolId)
         try { await routerStateStore().saveAuthFailure(result.toolId, null) } catch { /* the cache still serves this process */ }
       }
+      await reportRunProgress(options, { type: 'package-complete', package: result })
       if (typeof options.onPackage === 'function') await options.onPackage(result)
     },
     credentialsFor: route => credentialsForRoute(ctx, route),
@@ -857,7 +870,10 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
     }
   }
   const finished = []
-  const hooks = executionHooks(ctx, { ...options, onPackage: result => { finished.push(result) } })
+  const hooks = executionHooks(ctx, { ...options, onPackage: async result => {
+    finished.push(result)
+    if (typeof options.onPackage === 'function') await options.onPackage(result)
+  } })
   const billing = await billingContext(config, options)
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const startedAt = Date.now()
@@ -934,7 +950,10 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
     billingFor: billingForResult,
     budget: { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: budget.downgraded === true, confirmed: budget.exceeded ? true : undefined },
   })
+  await reportRunProgress(options, { type: 'stage', stage: 'reviewing' })
   const reviews = await reviewRunPackages(ctx, run, routes, config, { signal: options.signal, random: options.random })
+  if (options.signal?.aborted) { run.status = 'cancelled'; execution.status = 'cancelled' }
+  await reportRunProgress(options, { type: 'stage', stage: 'saving' })
   let stored = true
   try { await routerStateStore().appendRun(run) } catch { stored = false }
   const awaiting = pausedSteps(execution)
@@ -1482,7 +1501,11 @@ export async function executeOfficialTeamPlan(ctx, config = {}, planned, options
   const startedAt = Date.now()
   const execution = await (options.runTeam ?? runOfficialTeam)({ plan: planned.plan, task: planned.taskText, workspace,
     allowedRoot: options.root ?? workspace, mode: planned.mode, executionEnvironment, installedIds: planned.installed,
-    cliModels: planned.cliModels, signal: options.signal, sandbox: ctx.sandbox })
+    cliModels: planned.cliModels, signal: options.signal, sandbox: ctx.sandbox,
+    onPackageStart: item => reportRunProgress(options, { type: 'package-start', package: item }),
+    onPackage: item => reportRunProgress(options, { type: 'package-complete', package: item }),
+    onStage: stage => reportRunProgress(options, { type: 'stage', stage }) })
+  await reportRunProgress(options, { type: 'stage', stage: 'saving' })
   const run = await recordTeamRun({ task: planned.taskText, plan: planned.plan, execution, mode: planned.mode, executionEnvironment, workspace,
     routes: planned.routes, cliModels: planned.cliModels, budget, startedAt, config })
   return { ...common, status: execution.status, execution, run, runId: run?.id ?? null,
@@ -1720,15 +1743,26 @@ export async function previewWorkbenchRun(ctx, config, request = {}, options = {
 /** Execute from the workbench; refuses until every current reason is in confirmedReasons. */
 export async function startWorkbenchRun(ctx, config, supplied = {}, options = {}) {
   const prepared = await prepareWorkbenchPreview(ctx, config, supplied, options)
-  const { preview, request } = prepared
+  return refusedWorkbenchStart(prepared) ?? executePreparedWorkbenchRun(ctx, config, prepared, options)
+}
+
+function refusedWorkbenchStart({ preview, request }) {
   if (preview.status === 'blocked') return preview
-  const confirmed = new Set(Array.isArray(request.confirmedReasons) ? request.confirmedReasons : [])
+  const confirmed = new Set(request.confirmedReasons ?? [])
   const missing = preview.reasons.filter(item => !confirmed.has(item.code))
-  if (missing.length) return { ...preview, status: 'needs-confirmation', reasons: preview.reasons, missing: missing.map(item => item.code) }
+  return missing.length ? { ...preview, status: 'needs-confirmation', reasons: preview.reasons,
+    missing: missing.map(item => item.code) } : null
+}
+
+async function executePreparedWorkbenchRun(ctx, config, prepared, options = {}) {
+  const { preview, request } = prepared
+  const confirmed = new Set(Array.isArray(request.confirmedReasons) ? request.confirmedReasons : [])
+  throwIfAborted(options.signal)
+  await reportRunProgress(options, { type: 'stage', stage: 'executing' })
   if (request.executor === 'official-team') {
     const result = await (options.executeOfficialTeam ?? executeOfficialTeamPlan)(ctx, config, prepared.planned, {
-      workspace: preview.workspace, root: preview.workspace, signal: options.signal,
       confirmOverBudget: confirmed.has('over-budget'), confirmUnsandboxed: confirmed.has('unsandboxed'), ...(options.teamOptions ?? {}),
+      workspace: preview.workspace, root: preview.workspace, signal: options.signal, onProgress: options.onProgress,
     })
     return { status: result.status, runId: result.runId ?? null, workspace: preview.workspace,
       executor: 'official-team', executionMode: request.executionMode, executionEnvironment: preview.executionEnvironment, decision: preview.decision,
@@ -1740,8 +1774,8 @@ export async function startWorkbenchRun(ctx, config, supplied = {}, options = {}
     provider: request.provider, model: request.model, planMode: request.planMode, preset: request.preset,
     ...manualRequestOptions(request),
     budgetUsd: finiteNumber(request.budgetUsd, finiteNumber(configuredBudget, 0)),
-    confirmOverBudget: confirmed.has('over-budget'), workspace: preview.workspace, signal: options.signal, ...options.planOptions,
-    preparedAssignment: prepared.planned,
+    confirmOverBudget: confirmed.has('over-budget'), workspace: preview.workspace, ...options.planOptions,
+    preparedAssignment: prepared.planned, signal: options.signal, onProgress: options.onProgress,
   })
   const awaiting = result.awaitingConfirmation ?? []
   return {
@@ -1749,6 +1783,25 @@ export async function startWorkbenchRun(ctx, config, supplied = {}, options = {}
     runId: result.runId ?? null, workspace: preview.workspace, budget: result.budget, decision: decisionSummary(result.plan),
     ...(awaiting.length ? { awaitingConfirmation: awaiting } : {}),
   }
+}
+
+/** Desktop starts an observable job after fresh preflight and confirmation checks. */
+export async function launchWorkbenchRun(ctx, config, supplied = {}, { runJobs, ...options } = {}) {
+  if (!runJobs) throw new Error('工作台任务服务不可用，请重启 Harness 后重试。')
+  const prepared = await prepareWorkbenchPreview(ctx, config, supplied, options)
+  const refused = refusedWorkbenchStart(prepared)
+  if (refused) return refused
+  return runJobs.start({
+    packages: prepared.preview.decision?.packages ?? [],
+    run: async ({ signal, onProgress }) => {
+      try { return await executePreparedWorkbenchRun(ctx, config, prepared, { ...options, signal, onProgress }) }
+      catch (error) {
+        if (error?.runId) return { status: signal.aborted ? 'cancelled' : 'failed', runId: error.runId,
+          workspace: prepared.preview.workspace, notice: '执行未完成，已产生的结果与费用请查看执行记录。' }
+        throw error
+      }
+    },
+  })
 }
 
 /** Host operations behind the workbench RPC; the client never supplies commands or paths. */
@@ -1786,7 +1839,7 @@ function terminalServices(terminals, assertPreferences = () => {}) {
   }
 }
 
-export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences } = {}) {
+export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences, runJobs = createRunJobs(), runOptions = {} } = {}) {
   return {
     ...terminalServices(terminals, assertPreferences),
     health: async fresh => {
@@ -1804,8 +1857,10 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
       ...(request?.subscriptionChoice ? { subscriptionChoice: request.subscriptionChoice } : {}),
     }),
     boundaries: () => securityBoundaries(ctx, config),
-    previewRun: request => previewWorkbenchRun(ctx, config, request),
-    startRun: request => startWorkbenchRun(ctx, config, request),
+    previewRun: request => previewWorkbenchRun(ctx, config, request, runOptions),
+    startRun: request => launchWorkbenchRun(ctx, config, request, { ...runOptions, runJobs }),
+    runStatus: request => runJobs.status(parseRunJobRequest(request).jobId),
+    cancelRun: request => runJobs.cancel(parseRunJobRequest(request).jobId),
   }
 }
 
@@ -1835,14 +1890,15 @@ export function apply(ctx, config = {}) {
   // supply only the model/command services and do not expose the Desktop RPC.
   if (ctx.typert) {
     const terminals = createRouterTerminals()
+    const runJobs = createRunJobs()
     // Plugin unload or patch reload kills every interactive session.
     ctx.effect(() => {
-      const onExit = () => { terminals.disposeAll('dispose') }
+      const onExit = () => { terminals.disposeAll('dispose'); runJobs.dispose() }
       process.once('exit', onExit)
-      return () => { process.off('exit', onExit); terminals.disposeAll('dispose') }
+      return () => { process.off('exit', onExit); terminals.disposeAll('dispose'); runJobs.dispose() }
     }, 'model-router-galgame: interactive terminals')
     registerOfficialToolsRemote(ctx, {
-      ...routerRemoteServices(ctx, config, { terminals, assertPreferences: assertInstallPreferences }),
+      ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences }),
       installSettingsError: () => installPreferenceError,
       installRequestedDirectory: () => valueOf(config, 'toolInstallDir', ''),
       zcodeRequestedDirectory: () => valueOf(config, 'zcodeInstallDir', ''),

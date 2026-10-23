@@ -168,6 +168,31 @@ test('same-clock corrupt recoveries keep unique backups and the incomplete marke
   assert.equal(state.historyIncomplete, true)
 })
 
+test('failed corrupt recovery keeps history incomplete when a later read or write commits its notice', async t => {
+  for (const failure of ['callback', 'serialization']) for (const recovery of ['read', 'write']) {
+    await t.test(`${failure} failure followed by ${recovery}`, async t => {
+      const { file, directory, store } = await fixture(t)
+      const damaged = '{broken synthetic charge history'
+      await writeFile(file, damaged)
+      await assert.rejects(store.update(state => {
+        state.runs.push({ id: 'uncommitted', packages: [] })
+        if (failure === 'callback') throw new Error('Synthetic recovery callback failure')
+        state.invalid = 1n
+      }), failure === 'callback' ? /Synthetic recovery callback failure/ : /BigInt/)
+      if (recovery === 'write') await store.appendRun({ id: 'after-failure', packages: [] })
+      const cached = await store.read()
+      assert.equal(cached.historyIncomplete, true)
+      assert.deepEqual(cached.runs.map(run => run.id), recovery === 'write' ? ['after-failure'] : [])
+      assert.deepEqual(cached.notices.map(notice => notice.kind), ['state-corrupt'])
+      assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), cached)
+      assert.deepEqual(await createRouterState({ file }).read(), cached)
+      const backups = (await readdir(directory)).filter(name => name.startsWith('state.json.corrupt-'))
+      assert.equal(backups.length, 1)
+      assert.equal(await readFile(join(directory, backups[0]), 'utf8'), damaged)
+    })
+  }
+})
+
 test('updateRun awaits an asynchronous change and rolls back its asynchronous rejection', async t => {
   const { store } = await fixture(t)
   await store.appendRun({ id: 'one', packages: [] })

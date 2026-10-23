@@ -466,6 +466,8 @@ function registerUi(ctx) {
       loadBoundaries: () => officialToolsRemote.boundaries(),
       previewRun: request => officialToolsRemote.previewRun(request),
       startRun: request => officialToolsRemote.startRun(request),
+      runStatus: request => officialToolsRemote.runStatus(request),
+      cancelRun: request => officialToolsRemote.cancelRun(request),
       terminalApi: Object.freeze({
         terminalInfo: () => officialToolsRemote.terminalInfo(),
         terminalStart: request => officialToolsRemote.terminalStart(request),

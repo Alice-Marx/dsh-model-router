@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.0 — 2026-10-23
+
+- Return an observable Host job when a workbench execution starts. Show elapsed time, the current work package and per-package states, with status reads and cancellation through the typed desktop gateway.
+- Propagate cancellation to API streams and official CLI teams, wait for execution cleanup, retain completed results and reported usage, and prevent cancelled editable worktrees from starting integration. Closing the panel does not cancel execution.
+- Keep preview and permission checks before job acceptance, preserve legacy synchronous execution helpers, and cover job lifecycles, gateway boundaries, cancellation accounting and UI races with offline fixtures.
+
+- Preserve the incomplete-history budget marker when a corrupt-state recovery fails before a later read or write commits its pending notice, so missing charge history cannot become a zero-spend assumption.
+
 ## 0.22.2 — 2026-10-19
 
 - Render the README's mathematical symbols and expressions in running prose as inline math in both languages, while retaining code formatting for actual API fields. Keep ordinary display equations on one line.

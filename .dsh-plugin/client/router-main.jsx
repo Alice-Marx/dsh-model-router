@@ -852,7 +852,7 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun }
 }
 
-export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, terminalApi }) {
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')
@@ -1087,7 +1087,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           assignmentMode={effectiveAssignmentMode} packageAssignments={packageAssignments} assignmentOptions={assignmentOptions} manualAllowed={manualAllowed}
           onAssignmentModeChange={changeAssignmentMode} onPackageAssignmentChange={changePackageAssignment}
           onRestoreAssignments={() => { if (manualAllowed && currentPackagePlanKey) setPackageAssignments(initialPackageAssignments(plan)) }} />}
-        <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun}
+        <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun} runStatus={runStatus} cancelRun={cancelRun}
           planningRevision={`${routingSettings}/${dataRevision}/${feedbackRevision}/${evidenceRevision}`}
           assignmentMode={effectiveAssignmentMode} packageAssignments={effectiveAssignmentMode === 'manual' ? packageAssignments : {}} packagePlanKey={currentPackagePlanKey}
           directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}

@@ -1223,6 +1223,12 @@ function aggregateOf(results) {
   return { status, packages: results, aggregate }
 }
 
+/** Host-only observation hooks must never discard execution or billing evidence. */
+export async function observeExecutionProgress(hook, value) {
+  if (typeof hook !== 'function') return
+  try { await hook(value) } catch { /* Progress reporting does not control execution. */ }
+}
+
 function checkedPackageSelections(packages, routes, overrides, runVerified, targets) {
   const preceding = new Set()
   const selected = {}
@@ -1299,10 +1305,12 @@ async function runManualTool(target, prompt, options) {
  */
 async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, choices = {}, options }) {
   const routeList = Array.isArray(routes) ? routes : []
-  const { credentialsFor, onPackage, billing, ...runOptions } = options
+  const { credentialsFor, onPackageStart, onPackage, onStage, billing, ...runOptions } = options
+  await observeExecutionProgress(onStage, 'preparing')
   const effectivePackages = checkedPackageSelections(packages, routeList, overrides, runOptions.runVerified, targets)
   const results = []
   const ranIds = []
+  if (!runOptions.signal?.aborted) await observeExecutionProgress(onStage, 'executing')
   for (const item of effectivePackages) {
     const kept = previous.find(result => result.id === item.id)
     if (targets && !targets.has(item.id) && kept) {
@@ -1315,14 +1323,17 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     const provider = target?.kind === 'tool' ? 'official-tool' : target?.provider ?? override?.provider ?? item.recommendedProvider
     const model = target?.kind === 'tool' ? target.toolId : target?.model ?? override?.model ?? item.recommendedModel
     const identity = { ...selection, ...(item.type ? { type: item.type } : {}), ...(item.purpose ? { purpose: item.purpose } : {}) }
-    if (runOptions.signal?.aborted) {
+    const cancelledBeforeStart = async () => {
       // Cancelled: later packages are not started (no CLI process, no API spend).
       const cancelled = { id: item.id, name: item.name, ok: false, provider, model,
         channel: target?.kind === 'tool' ? 'official-cli' : 'harness-llm', ...(target?.kind === 'tool' ? { toolId: target.toolId } : {}),
         ...identity, answer: '', fallback: null, cancelled: true, notStarted: true, error: '执行已取消，此步骤未开始。' }
       results.push(cancelled)
       ranIds.push(item.id)
-      if (typeof onPackage === 'function') await onPackage(cancelled)
+      await observeExecutionProgress(onPackage, cancelled)
+    }
+    if (runOptions.signal?.aborted) {
+      await cancelledBeforeStart()
       continue
     }
     const unmet = (item.dependsOn ?? []).filter(id => results.find(result => result.id === id)?.ok !== true)
@@ -1338,7 +1349,7 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
       }
       results.push(blocked)
       ranIds.push(item.id)
-      if (typeof onPackage === 'function') await onPackage(blocked)
+      await observeExecutionProgress(onPackage, blocked)
       continue
     }
     const plannedRoute = routeList.find(candidate => candidate.provider === provider && candidate.model === model)
@@ -1347,13 +1358,24 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
       : target?.kind === 'tool' ? { provider, model } : reasoningRouteForAssignment(plannedRoute, item, override)
     if (target?.kind === 'api') delete route.reasoningEffort
     const promptText = routingBypassed ? checkedTask(task) : packagePrompt(task, item, results)
+    const credentials = !target ? (typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null) : null
+    if (runOptions.signal?.aborted) {
+      await cancelledBeforeStart()
+      continue
+    }
     const startedAt = Date.now()
+    await observeExecutionProgress(onPackageStart, { ...item, ...identity, provider, model, startedAt,
+      channel: target?.kind === 'tool' ? 'official-cli' : 'harness-llm',
+      ...(target?.kind === 'tool' ? { toolId: target.toolId } : {}) })
+    if (runOptions.signal?.aborted) {
+      await cancelledBeforeStart()
+      continue
+    }
     let result
     if (target?.kind === 'tool') result = await runManualTool(target, promptText, runOptions)
     else if (target?.kind === 'api') result = { ...await useApi(runOptions.apiFallback, { route, task: promptText,
       signal: runOptions.signal, preference: 'api', reason: '按工作包手动选择模型目录 API。' }), fallback: null }
     else {
-      const credentials = typeof credentialsFor === 'function' ? await credentialsFor(route) : runOptions.credentials ?? null
       result = await executeRouteWithBilling({
         ...runOptions,
         billing: billing ? { ...billing, routes: billing.routes ?? routeList, ...(choices[item.id] ? { choice: choices[item.id] } : {}) } : null,
@@ -1382,7 +1404,7 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     }
     results.push(entry)
     ranIds.push(item.id)
-    if (typeof onPackage === 'function') await onPackage(entry)
+    await observeExecutionProgress(onPackage, entry)
   }
   return { ...aggregateOf(results), ranIds }
 }
