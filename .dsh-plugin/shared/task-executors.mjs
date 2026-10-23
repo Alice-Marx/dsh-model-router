@@ -1229,6 +1229,25 @@ export async function observeExecutionProgress(hook, value) {
   try { await hook(value) } catch { /* Progress reporting does not control execution. */ }
 }
 
+/** Required Host persistence is a dispatch boundary, unlike progress observers. */
+export async function awaitExecutionCheckpoint(hook, value, partial, stage) {
+  if (typeof hook !== 'function') return
+  try { await hook(value) } catch (cause) {
+    const budgetChanged = cause?.code === 'ROUTER_BUDGET_CHANGED'
+    const error = new Error(budgetChanged ? String(cause.message) : `执行检查点保存失败：${String(cause?.message ?? cause)}`, { cause })
+    error.code = budgetChanged ? 'ROUTER_BUDGET_CHANGED' : 'ROUTER_CHECKPOINT_FAILED'
+    if (budgetChanged) {
+      error.budget = cause.budget
+      error.runId = cause.runId
+      error.reason = cause.reason
+    }
+    error.checkpointStage = stage
+    // The caller can retain paid receipts even when the persistence sink failed.
+    error.execution = typeof partial === 'function' ? partial() : partial
+    throw error
+  }
+}
+
 function checkedPackageSelections(packages, routes, overrides, runVerified, targets) {
   const preceding = new Set()
   const selected = {}
@@ -1305,11 +1324,12 @@ async function runManualTool(target, prompt, options) {
  */
 async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, choices = {}, options }) {
   const routeList = Array.isArray(routes) ? routes : []
-  const { credentialsFor, onPackageStart, onPackage, onStage, billing, ...runOptions } = options
+  const { credentialsFor, onPackageStart, onPackage, onStage, onCheckpointStart, onCheckpointResult, billing, ...runOptions } = options
   await observeExecutionProgress(onStage, 'preparing')
   const effectivePackages = checkedPackageSelections(packages, routeList, overrides, runOptions.runVerified, targets)
   const results = []
   const ranIds = []
+  const partial = () => ({ ...aggregateOf([...results]), status: runOptions.signal?.aborted ? 'cancelled' : 'failed', ranIds: [...ranIds] })
   if (!runOptions.signal?.aborted) await observeExecutionProgress(onStage, 'executing')
   for (const item of effectivePackages) {
     const kept = previous.find(result => result.id === item.id)
@@ -1330,6 +1350,7 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
         ...identity, answer: '', fallback: null, cancelled: true, notStarted: true, error: '执行已取消，此步骤未开始。' }
       results.push(cancelled)
       ranIds.push(item.id)
+      await awaitExecutionCheckpoint(onCheckpointResult, cancelled, partial, 'result')
       await observeExecutionProgress(onPackage, cancelled)
     }
     if (runOptions.signal?.aborted) {
@@ -1349,6 +1370,7 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
       }
       results.push(blocked)
       ranIds.push(item.id)
+      await awaitExecutionCheckpoint(onCheckpointResult, blocked, partial, 'result')
       await observeExecutionProgress(onPackage, blocked)
       continue
     }
@@ -1364,9 +1386,15 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
       continue
     }
     const startedAt = Date.now()
-    await observeExecutionProgress(onPackageStart, { ...item, ...identity, provider, model, startedAt,
+    const starting = { ...item, ...identity, provider, model, startedAt,
       channel: target?.kind === 'tool' ? 'official-cli' : 'harness-llm',
-      ...(target?.kind === 'tool' ? { toolId: target.toolId } : {}) })
+      ...(target?.kind === 'tool' ? { toolId: target.toolId } : {}) }
+    await observeExecutionProgress(onPackageStart, starting)
+    if (runOptions.signal?.aborted) {
+      await cancelledBeforeStart()
+      continue
+    }
+    await awaitExecutionCheckpoint(onCheckpointStart, starting, partial, 'start')
     if (runOptions.signal?.aborted) {
       await cancelledBeforeStart()
       continue
@@ -1404,6 +1432,7 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     }
     results.push(entry)
     ranIds.push(item.id)
+    await awaitExecutionCheckpoint(onCheckpointResult, entry, partial, 'result')
     await observeExecutionProgress(onPackage, entry)
   }
   return { ...aggregateOf(results), ranIds }

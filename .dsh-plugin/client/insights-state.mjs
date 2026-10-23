@@ -8,6 +8,8 @@ import { parsePackageAssignments } from '../shared/package-assignments.mjs'
 
 export const PACKAGE_STATUS = Object.freeze({
   pending: Object.freeze({ label: '待执行', tone: 'pending' }),
+  running: Object.freeze({ label: '执行中', tone: 'pending' }),
+  interrupted: Object.freeze({ label: '执行中断，费用待核对', tone: 'warn' }),
   succeeded: Object.freeze({ label: '官方 CLI 完成', tone: 'ok' }),
   fallback: Object.freeze({ label: '已回退 API 完成', tone: 'warn' }),
   failed: Object.freeze({ label: '失败', tone: 'error' }),
@@ -85,15 +87,44 @@ export function budgetMeter(spent, limit) {
   return { limited: true, share, over: spent >= limit, text: `${money(spent)} / ${money(limit)}` }
 }
 
-/** Pre-run check of a local plan against the ledger's recorded spending. */
+const nonnegative = value => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0
+
+/** Holds remain estimates; they never become actual spending in the view. */
+export function reservationSummary(ledger) {
+  const value = ledger?.reserved ?? {}
+  const reservations = (ledger?.reservations ?? []).filter(item => ['active', 'interrupted'].includes(item.status))
+  return {
+    today: nonnegative(value.today), month: nonnegative(value.month),
+    unknownToday: nonnegative(value.unknownToday), unknownMonth: nonnegative(value.unknownMonth),
+    activeCount: value.activeCount === undefined ? reservations.filter(item => item.status === 'active').length : nonnegative(value.activeCount),
+    interruptedCount: value.interruptedCount === undefined ? reservations.filter(item => item.status === 'interrupted').length : nonnegative(value.interruptedCount),
+  }
+}
+
+export function budgetOccupancyMeter(spent, limit, reserved = 0) {
+  const actual = nonnegative(spent)
+  const hold = nonnegative(reserved)
+  const meter = budgetMeter(actual + hold, limit)
+  return { ...meter, text: `已发生 ${money(actual)} · 预占 ${money(hold)}${limit > 0 ? ` / 上限 ${money(limit)}` : '（未设上限）'}` }
+}
+
+/** Pre-run check includes concurrent holds while preserving separate actuals. */
 export function planBudget(ledger, estimateUsd) {
   if (!ledger?.budget) return null
-  return budgetCheck({
+  const actual = ledger.spent ?? { today: 0, month: 0 }
+  const reserved = reservationSummary(ledger)
+  const result = budgetCheck({
     estimateUsd,
-    spent: ledger.spent ?? { today: 0, month: 0 },
+    spent: { ...actual, today: nonnegative(actual.today) + reserved.today, month: nonnegative(actual.month) + reserved.month },
     dailyLimitUsd: ledger.budget.dailyLimitUsd,
     monthlyLimitUsd: ledger.budget.monthlyLimitUsd,
   })
+  if (result.exceeded) {
+    const period = result.exceeded === 'daily' ? 'today' : 'month'
+    if (reserved[period] > 0) result.message = result.message.replace(`已用 ${money(nonnegative(actual[period]) + reserved[period])}`,
+      `已发生 ${money(nonnegative(actual[period]))}，预占 ${money(reserved[period])}`)
+  }
+  return result
 }
 
 /** Routes with learned biases applied, for the local planner. */
@@ -116,6 +147,7 @@ export function unwrapRemote(response, fallback) {
 export const RUN_KIND_LABEL = Object.freeze({ assign: '路由执行', team: '团队执行', tool: '单工具调用' })
 export const RUN_STATUS_LABEL = Object.freeze({
   completed: '完成', partial: '部分完成', failed: '失败', 'cli-completed': '完成',
+  running: '执行中', interrupted: '执行中断，费用待核对',
   incomplete: '未完成', paused: '等待确认', 'integration-pending': '待整合', blocked: '被阻止', cancelled: '已取消', pending: '待执行',
 })
 
@@ -175,7 +207,14 @@ export function runTotals(run) {
  * - everything else re-runs the failed step and its unfinished downstream steps.
  * `writes` means the rerun edits files and needs an explicit confirmation.
  */
-export function rerunSupport(run) {
+export function rerunSupport(run, ledger = null) {
+  const reservation = (ledger?.reservations ?? []).find(item => item.runId === run?.id && ['active', 'interrupted'].includes(item.status))
+  if (['running', 'interrupted'].includes(run?.status) || reservation) {
+    const interrupted = run?.status === 'interrupted' || reservation?.status === 'interrupted'
+    return { supported: false, writes: run?.executionMode === 'workspace-write', reassign: false, confirm: '',
+      reason: interrupted ? '执行中断，费用待核对，不能直接重跑。请先核对旧任务与厂商账单，并保留原始状态及已保存结果；不会自动付费恢复。'
+        : '任务仍在执行或保留预算预占，不能直接重跑。请先等待原任务结束，或在执行进度中取消后核对结果与厂商账单。' }
+  }
   if (run?.kind === 'tool') {
     const editable = run.executionMode === 'workspace-write'
     return { supported: true, writes: editable, reassign: false,
@@ -320,7 +359,8 @@ export function launchRequest({ task, mode, directRoute, budgetUsd, preset, work
  */
 export function rerunConfirmations({ run, item, override = null, choice = null, ledger = null, health = null, toolFor = () => null, headlessIds = new Set() } = {}) {
   const reasons = []
-  const support = rerunSupport(run)
+  const support = rerunSupport(run, ledger)
+  if (!support.supported) return reasons
   if (support.writes) reasons.push({ code: 'workspace-write', text: support.confirm })
   if (run?.kind === 'team' && run.executionEnvironment === 'cli-native') reasons.push({ code: 'unsandboxed',
     text: '厂商 CLI 正常环境：以当前用户权限使用原登录、配置、技能及 MCP，不经 Harness 沙箱；Git 工作树仅用于改动回收，不限制工作树外资源访问。' })
@@ -332,8 +372,7 @@ export function rerunConfirmations({ run, item, override = null, choice = null, 
     reasons.push({ code: 'unsandboxed', text: `会直接启动 ${tool.label} 的无界面 CLI，不经过 Harness 进程沙箱，只读仅由 CLI 参数保证。` })
   }
   const estimate = override ? null : item?.estimatedCost
-  const check = ledger?.budget ? budgetCheck({ estimateUsd: typeof estimate === 'number' ? estimate : null, spent: ledger.spent ?? {},
-    dailyLimitUsd: ledger.budget.dailyLimitUsd, monthlyLimitUsd: ledger.budget.monthlyLimitUsd }) : null
+  const check = planBudget(ledger, typeof estimate === 'number' ? estimate : null)
   if (check?.exceeded) reasons.push({ code: 'over-budget', text: `超出预算：${check.message}` })
   return reasons
 }

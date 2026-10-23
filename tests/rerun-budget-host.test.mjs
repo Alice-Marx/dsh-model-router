@@ -115,13 +115,17 @@ test('failed and transitively blocked downstream packages both count against the
   assert.equal(ctx.calls.length, 0)
 })
 
-test('an unknown downstream estimate keeps the total unknown under the existing unknown-price budget policy', async () => {
+test('an unknown downstream estimate requires explicit confirmation under a finite budget', async () => {
   const run = await stored([item('a', 0.2, [], 'failed'), item('b', null, ['a'])])
   const ctx = context()
   const result = await host.rerunRecordedStep(ctx, settings(), { ...options, runId: run.id, packageId: 'a' })
   assert.equal(result.budget.estimateKnown, false)
   assert.equal(result.budget.estimateUsd, null)
-  assert.equal(result.budget.exceeded, null)
+  assert.equal(result.budget.exceeded, 'unknown')
+  assert.equal(result.paused, true)
+  assert.equal(ctx.calls.length, 0)
+  const confirmed = await host.rerunRecordedStep(ctx, settings(), { ...options, runId: run.id, packageId: 'a', confirmOverBudget: true })
+  assert.equal(confirmed.budget.estimateUsd, null)
   assert.equal(ctx.calls.length, 2)
 })
 
@@ -166,7 +170,13 @@ test('reassignment to an unpriced route does not reuse the old route estimate', 
   })
   assert.equal(result.budget.estimateKnown, false)
   assert.equal(result.budget.estimateUsd, null)
-  assert.equal(result.run.packages[0].estimatedCost, null)
+  assert.equal(result.paused, true)
+  assert.equal(result.budget.exceeded, 'unknown')
+  assert.equal(ctx.calls.length, 0)
+  const confirmed = await host.rerunRecordedStep(ctx, settings(), {
+    ...options, runId: run.id, packageId: 'a', provider, model: models[2], confirmOverBudget: true,
+  })
+  assert.equal(confirmed.run.packages[0].estimatedCost, null)
   assert.equal(ctx.calls.length, 1)
   assert.equal(ctx.calls[0].model, models[2])
 })

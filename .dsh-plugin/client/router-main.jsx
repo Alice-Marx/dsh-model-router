@@ -5,7 +5,7 @@ import { acceptedInstallJob, installClickRefusal, installSummaryMatchesSettings,
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
-import { healthSummary, initialPackageAssignments, manualAssignmentOptions, planBudget, rerunConfirmations, unwrapRemote } from './insights-state.mjs'
+import { healthSummary, initialPackageAssignments, manualAssignmentOptions, planBudget, rerunConfirmations, rerunSupport, reservationSummary, unwrapRemote } from './insights-state.mjs'
 import { packagePlanKey } from '../shared/package-assignments.mjs'
 import { RunLauncher } from './run-launcher.jsx'
 import { CliTerminalCard } from './cli-terminal.jsx'
@@ -817,6 +817,11 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
     if (mutationBusy.current) return
     const run = ledger.value?.runs?.find(item => item.id === runId)
     const item = run?.packages?.find(entry => entry.id === packageId)
+    const support = rerunSupport(run, ledger.value)
+    if (!support.supported) {
+      setLedger(previous => ({ ...previous, error: support.reason }))
+      return
+    }
     // One prompt lists every reason (file edits, unsandboxed CLI, budget); the Host re-checks all of them.
     const reasons = rerunConfirmations({ run, item, override, choice, ledger: ledger.value, health: health.report, toolFor: toolForProvider, headlessIds: HEADLESS_TOOLS })
     if (reasons.length && !window.confirm(reasons.length === 1
@@ -1046,7 +1051,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         <div className="mr-overview" aria-label="工作台概览">
           <button type="button" className="mr-overview-item" onClick={() => selectView('models')}><span className="mr-overview-label">模型路线</span><strong>{catalogState.status === 'ready' ? routes.length : '—'}</strong><span className="mr-overview-detail">{catalogState.status === 'ready' ? `${providerCount} 个供应商 · 配置价格与能力 →` : '等待目录加载'}</span></button>
           <button type="button" className="mr-overview-item" onClick={() => selectView('tools')}><span className="mr-overview-label">官方工具</span><strong>{workbench.health.report ? summary.installed : '—'}<small> / {OFFICIAL_TOOLS.length}</small></strong><span className="mr-overview-detail">{workbench.health.report ? `${summary.ready} 个已登录 · 查看体检 →` : '查看安装与登录状态 →'}</span></button>
-          <button type="button" className="mr-overview-item" onClick={() => selectView('controls')}><span className="mr-overview-label">今日 API 费用</span><strong>{workbench.ledger.value ? money(workbench.ledger.value.spent?.today ?? 0) : '—'}</strong><span className="mr-overview-detail">本机记录估算 · 查看预算 →</span></button>
+          <button type="button" className="mr-overview-item" onClick={() => selectView('controls')}><span className="mr-overview-label">今日已发生 API 费用</span><strong>{workbench.ledger.value ? money(workbench.ledger.value.spent?.today ?? 0) : '—'}</strong><span className="mr-overview-detail">预占 {money(reservationSummary(workbench.ledger.value).today)} · 查看预算 →</span></button>
         </div>
 
         <div className="mr-workspace-tabs" role="tablist" aria-label="工作台功能">

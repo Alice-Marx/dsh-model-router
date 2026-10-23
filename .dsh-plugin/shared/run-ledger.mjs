@@ -13,6 +13,7 @@ export const MAX_STORED_TASK = 20_000
 export const MAX_QUALITY_BIAS = 0.04
 
 const finite = value => typeof value === 'number' && Number.isFinite(value)
+const receiptTimestamp = value => finite(value) && value >= 0 && Number.isFinite(new Date(value).getTime())
 const nonEmptyText = value => (typeof value === 'string' && value.length > 0 ? value : null)
 const routeKey = (provider, model) => `${String(provider ?? '')}\u0000${String(model ?? '')}`
 
@@ -382,7 +383,7 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     // silently rewrite historical spend calculated from usage.
     pricingSnapshot: pricing ? { ...pricing } : null,
     ...cost,
-    finishedAt,
+    finishedAt: receiptTimestamp(result?.finishedAt) ? result.finishedAt : finishedAt,
     review: planned.review ?? null,
     rating: planned.rating ?? null,
   }
@@ -488,6 +489,7 @@ export function teamExecutionResults(plan, execution) {
     ...reasoningExecutionFields(result),
     ...(finite(result.durationMs) && result.durationMs >= 0 ? { durationMs: result.durationMs } : {}),
     ...(finite(result.inputChars) && result.inputChars >= 0 ? { inputChars: result.inputChars } : {}),
+    ...(receiptTimestamp(result.finishedAt) ? { finishedAt: result.finishedAt } : {}),
     requestedCliModel: result.requestedCliModel ?? null,
     actualModel: result.actualModel ?? null,
     ...(result.reportedModel !== undefined ? { reportedModel: result.reportedModel } : {}),
@@ -541,6 +543,8 @@ export function buildToolRunRecord({ toolId, toolLabel, provider, model, cliMode
     status: result?.status ?? 'pending',
     packages: [{
       id: packageId, ok: succeeded, cancelled: result?.status === 'cancelled',
+      ...(result?.notStarted === true || result?.status === 'unsupported' ? { notStarted: true } : {}),
+      ...(result?.blocked === true ? { blocked: true } : {}),
       provider: plan.directRoute.provider, model: plan.directRoute.model,
       channel: 'official-cli', toolId,
       requestedCliModel: Object.hasOwn(result ?? {}, 'requestedModel') ? result.requestedModel : cliModel,
@@ -550,6 +554,7 @@ export function buildToolRunRecord({ toolId, toolLabel, provider, model, cliMode
       ...(typeof result?.source === 'string' ? { source: result.source } : {}),
       ...(typeof result?.sandboxEnforcement === 'string' ? { sandboxEnforcement: result.sandboxEnforcement } : {}),
       ...(result?.usageIncomplete === true ? { usageIncomplete: true } : {}),
+      ...(receiptTimestamp(result?.finishedAt) ? { finishedAt: result.finishedAt } : {}),
       answer: String(result?.finalText ?? ''),
       error: succeeded ? null : String(result?.error ?? result?.reason ?? result?.status ?? '官方 CLI 未成功完成。'),
       ...(!succeeded && typeof result?.diagnostic === 'string' && result.diagnostic.trim()

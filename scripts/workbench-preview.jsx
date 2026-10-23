@@ -140,6 +140,15 @@ function createDemoSession(scenario) {
   const settingsScope = createSettingsScope()
   let toolInspections = 0
   let runs = scenario === 'empty' ? [] : sampleRuns()
+  if (scenario === 'budget-reservations') {
+    runs[0].status = 'interrupted'
+    runs[0].task = '演示：中断任务保留已完成结果，等待费用核对'
+    runs[0].packages[1] = { ...runs[0].packages[1], status: 'interrupted', billing: 'api',
+      costUsd: null, referenceCostUsd: null, error: '演示：执行进程已结束，尚未收到最终用量，费用待核对。' }
+    runs.push({ ...structuredClone(runs[0]), id: 'demo-active-002', status: 'running',
+      task: '演示：运行中任务预占剩余预算', packages: runs[0].packages.map((item, index) => index === 1
+        ? { ...item, status: 'running', ran: false, inFlight: true, error: null } : { ...item }) })
+  }
   const jobs = new Map()
   let completedAt = scenario === 'onboarding' ? null : Date.now()
   const installed = new Set(scenario === 'terminal-all' ? OFFICIAL_TOOLS.map(tool => tool.id) : ['claude-code', 'codex', 'gemini'])
@@ -159,7 +168,15 @@ function createDemoSession(scenario) {
     const settings = settingsScope.getSnapshot().value
     const spent = scenario === 'empty' ? { today: 0, month: 0, unknownToday: 0, unknownMonth: 0 }
       : { today: 1.28, month: 12.4, unknownToday: 0, unknownMonth: 1, subscriptionToday: 0.18, subscriptionMonth: 2.62, subscriptionRunsMonth: 8 }
+    const reservations = scenario === 'budget-reservations' ? [
+      { id: 'demo-team-001', runId: 'demo-team-001', status: 'interrupted', remainingEstimateUsd: 0.6, unknown: true, updatedAt: Date.now() },
+      { id: 'demo-active-002', runId: 'demo-active-002', status: 'active', remainingEstimateUsd: 0.9, unknown: false, updatedAt: Date.now() },
+    ] : []
+    const reserved = { today: reservations.length ? 1.5 : 0, month: reservations.length ? 1.5 : 0,
+      reservedUsd: reservations.length ? 1.5 : 0, unknownReservations: reservations.length ? 1 : 0,
+      activeCount: reservations.length ? 1 : 0, interruptedCount: reservations.length ? 1 : 0 }
     return { runs: structuredClone(runs).reverse(), settings: { ...settings }, spent,
+      reservations, reserved,
       budget: { ...budgetCheck({ spent, dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd }),
         dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd, action: settings.overBudgetAction },
       biases: {}, learning: buildFeedbackProfile(runs, {
@@ -314,7 +331,7 @@ function createDemoSession(scenario) {
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
+const scenarios = [['populated', '完整示例'], ['budget-reservations', '预算预占与中断核对（模拟账本）'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')

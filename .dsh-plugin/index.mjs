@@ -13,6 +13,8 @@ import {
 } from './shared/subscription-billing.mjs'
 import { createRouterState } from './shared/router-state.mjs'
 import { createRunJobs } from './shared/run-jobs.mjs'
+import { createBudgetReservations, reservationSpending } from './shared/budget-reservations.mjs'
+import { beginExecutionLifecycle } from './shared/execution-lifecycle.mjs'
 import { applyFeedbackProfile, buildFeedbackProfile } from './shared/adaptive-feedback.mjs'
 import { buildRoutingEvidence, parseRoutingEvidenceJson } from './shared/routing-evidence.mjs'
 import { apiReasoningRequest } from './shared/reasoning-execution.mjs'
@@ -21,7 +23,7 @@ import { applyPricingSnapshot, createDynamicDataRefresher, dynamicDataSummary, r
 import { projectDynamicData } from './shared/dynamic-data-view.mjs'
 import {
   budgetCheck, buildRunRecord, formatUsd, buildTeamRunRecord, buildToolRunRecord, billingOf, mergeRerun,
-  spending, storedResults, actualCost, hasStartedQualityAttempts, teamExecutionResults,
+  spending, storedResults, actualCost, hasStartedQualityAttempts, teamExecutionResults, plannedPackages,
 } from './shared/run-ledger.mjs'
 import { routeBoundaries } from './shared/security-boundaries.mjs'
 import { createPlanFromRoutes } from './shared/harness-plan.mjs'
@@ -377,13 +379,81 @@ function budgetSettings(config) {
   }
 }
 
-function budgetFor(config, saved, estimateUsd) {
+function budgetFor(config, saved, estimateUsd, { checkEstimate = true } = {}) {
   const settings = budgetSettings(config)
   if ((saved.storageAvailable === false || saved.historyVerified === false) && (settings.dailyLimitUsd > 0 || settings.monthlyLimitUsd > 0)) {
     throw new Error('无法读取费用历史，不能核验日/月预算；请恢复存储连接后再执行。')
   }
-  const spent = spending(saved.runs, undefined, saved.archivedSpending)
-  return { ...budgetCheck({ estimateUsd, spent, ...settings }), spent, ...settings }
+  const recorded = spending(saved.runs, undefined, saved.archivedSpending)
+  const reserved = reservationSpending(saved)
+  const spent = { ...recorded, today: recorded.today + reserved.today, month: recorded.month + reserved.month,
+    unknownToday: recorded.unknownToday + reserved.unknownToday, unknownMonth: recorded.unknownMonth + reserved.unknownMonth }
+  const check = budgetCheck({ estimateUsd, spent, ...settings })
+  if (check.limited && (checkEstimate && !check.estimateKnown || settings.dailyLimitUsd > 0 && spent.unknownToday > 0
+    || settings.monthlyLimitUsd > 0 && spent.unknownMonth > 0) && !check.exceeded) {
+    check.exceeded = 'unknown'
+    check.message = '存在未核对费用或缺少单价，无法核验预算；请先核对账单或明确确认继续。'
+  }
+  return { ...check, spent, reserved, ...settings }
+}
+
+function pausedExecutionBudget(lifecycle) {
+  if (['history-incomplete', 'active-run', 'reservation-capacity'].includes(lifecycle.reason)) {
+    throw new Error(lifecycle.reason === 'active-run' ? '该运行仍在执行或费用待核对，不能重复启动。'
+      : lifecycle.reason === 'history-incomplete' ? '费用历史不完整，不能核验执行预算。' : '待核对运行过多，请先核对执行记录和费用。')
+  }
+  return { ...lifecycle.budget, paused: true, exceeded: lifecycle.budget?.exceeded ?? 'unknown' }
+}
+
+function packageEstimates(plan, task) {
+  return plannedPackages(plan, task).map(item => ({ id: item.id, estimatedCostUsd: item.estimatedCost ?? null }))
+}
+
+/** Reprice a subscription fallback against the route that will actually bill. */
+async function reserveChangedApiRoute(lifecycle, expected, route, task, config, confirmOverBudget) {
+  if (expected?.provider === route.provider && expected?.model === route.model) return null
+  const id = lifecycle.activePackageId()
+  if (!id) throw new Error('缺少执行检查点，不能启动 API 路线。')
+  const saved = await routingSavedState(config)
+  const estimate = createPlanFromRoutes(task, [route], { ...planDataOptions(saved, config),
+    mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost
+  const reserved = await lifecycle.reserveExtra(id, estimate, { confirmOverBudget: confirmOverBudget === true })
+  if (reserved.accepted) return null
+  return { ok: false, notStarted: true, error: `实际 API 路线预算未确认，已停止调用。${reserved.budget.message}` }
+}
+
+/** A changed budget stops before dispatch; storage failures retain their hold. */
+async function stopExecutionLifecycle(lifecycle, error, run = lifecycle.current('interrupted')) {
+  if (error?.code === 'ROUTER_BUDGET_CHANGED') {
+    run.status = 'paused-budget'
+    run.error = error.message
+    run.finishedAt = Date.now()
+    try { await lifecycle.finish(run); error.runId = run.id; return true }
+    catch { await lifecycle.interrupt(run); return false }
+  }
+  await lifecycle.interrupt(run)
+  return false
+}
+
+/** The independent-opinion tool uses the same durable API budget boundary. */
+export async function executeBudgetedConsult(ctx, route, task, config = {}, { signal, limit = 12_000, confirmOverBudget = false } = {}) {
+  const problem = taskTextProblem(text(task))
+  if (problem) throw new Error(problem)
+  const plan = createPlanFromRoutes(task, [route], { mode: 'direct', directProvider: route.provider, directModel: route.model })
+  const id = randomUUID(), at = Date.now()
+  const record = (status, results) => buildRunRecord({ id, createdAt: at, finishedAt: Date.now(), task, plan,
+    execution: { status, packages: results }, workspace: process.cwd(), pricingFor: () => route.pricing ?? null, billingFor: () => 'api' })
+  const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: ({ status, results }) => record(status, results),
+    packageEstimates: packageEstimates(plan, task), settings: budgetSettings(config), confirmOverBudget })
+  if (!lifecycle.accepted) return { status: 'paused-budget', paused: true, budget: pausedExecutionBudget(lifecycle), ok: false }
+  let result
+  try {
+    await lifecycle.onCheckpointStart({ id: 'direct', provider: route.provider, model: route.model, channel: 'harness-llm' })
+    result = await consultConfiguredModel(ctx, route, task, limit, signal)
+    await lifecycle.onCheckpointResult({ ...result, id: 'direct', provider: route.provider, model: route.model, channel: 'harness-llm' })
+    await lifecycle.finish(record(result.cancelled ? 'cancelled' : result.ok ? 'completed' : 'failed', lifecycle.results()))
+  } catch (error) { await stopExecutionLifecycle(lifecycle, error); throw error }
+  return { ...result, runId: id }
 }
 
 /**
@@ -674,7 +744,7 @@ function reviewScore(answer) {
  * 质量回路: a stronger configured model spot-checks answers from cheaper
  * routes. `sample` reviews a random share; `always` reviews every cheaper answer.
  */
-export async function reviewRunPackages(ctx, run, routes, config, { signal, random = Math.random } = {}) {
+export async function reviewRunPackages(ctx, run, routes, config, { signal, random = Math.random, lifecycle } = {}) {
   const mode = valueOf(config, 'reviewMode', 'off')
   if (mode !== 'sample' && mode !== 'always') return []
   const rate = Math.min(1, Math.max(0, finiteNumber(valueOf(config, 'reviewSampleRate', 0.2), 0.2)))
@@ -696,6 +766,24 @@ export async function reviewRunPackages(ctx, run, routes, config, { signal, rand
       `工作包：${item.name}\n${item.objective.slice(0, 1_500)}`,
       `待审结果：\n${item.answer.slice(0, 3_500)}`,
     ].join('\n\n')
+    const reviewId = `review:${item.id}`
+    let pendingReview = null
+    if (lifecycle) {
+      const estimate = createPlanFromRoutes(prompt, [reviewer], { mode: 'direct', directProvider: reviewer.provider,
+        directModel: reviewer.model }).estimatedCost
+      const reserved = await lifecycle.reserveExtra(reviewId, estimate)
+      if (!reserved.accepted) { item.review = { score: null, summary: '预算未确认，已跳过额外审阅。', at: Date.now() }; continue }
+      pendingReview = { id: reviewId, packageId: item.id, provider: reviewer.provider, model: reviewer.model,
+        status: 'running', inFlight: true, ran: false, costUsd: null, billing: 'api', finishedAt: Date.now() }
+      run.reviews.push(pendingReview)
+      try { await lifecycle.saveRun(run, { startedIds: [reviewId] }) }
+      catch (error) {
+        if (error.code !== 'ROUTER_BUDGET_CHANGED') throw error
+        run.reviews = run.reviews.filter(entry => entry !== pendingReview)
+        item.review = { score: null, summary: '预算已变化，已跳过额外审阅。', at: Date.now() }
+        break
+      }
+    }
     try {
       const result = await consultConfiguredModel(ctx, reviewer, prompt, 1_200, signal)
       const score = result.ok ? reviewScore(result.answer) : null
@@ -707,9 +795,16 @@ export async function reviewRunPackages(ctx, run, routes, config, { signal, rand
       }
       const cost = actualCost(result, reviewer.pricing ?? null)
       const entry = { packageId: item.id, provider: reviewer.provider, model: reviewer.model, ran: true, finishedAt: Date.now(), usage: result.usage ?? null, ...cost, billing: 'api', referenceCostUsd: null }
-      run.reviews.push(entry)
+      if (pendingReview) Object.assign(pendingReview, entry, { status: 'completed', inFlight: false })
+      else run.reviews.push(entry)
       reviews.push({ ...entry, score })
+      if (lifecycle) await lifecycle.saveRun(run, { completedIds: [reviewId] })
     } catch (error) {
+      if (error.code === 'ROUTER_CHECKPOINT_FAILED') throw error
+      if (pendingReview) {
+        Object.assign(pendingReview, { status: 'failed', inFlight: false, ran: true, costUsd: null, finishedAt: Date.now() })
+        await lifecycle.saveRun(run, { completedIds: [reviewId] })
+      }
       if (signal?.aborted) break
       item.review = { provider: reviewer.provider, model: reviewer.model, score: null, summary: `审阅失败：${errorText(error).slice(0, 200)}`, at: Date.now() }
     }
@@ -724,6 +819,8 @@ async function reportRunProgress(options, event) {
 
 function executionHooks(ctx, options) {
   return {
+    onCheckpointStart: options.onCheckpointStart,
+    onCheckpointResult: options.onCheckpointResult,
     skipOfficial: options.skipOfficial ?? (request => healthCache.skipReason(request)),
     onStage: stage => reportRunProgress(options, { type: 'stage', stage }),
     onPackageStart: async item => {
@@ -877,9 +974,24 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
   const billing = await billingContext(config, options)
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const startedAt = Date.now()
+  const runId = randomUUID()
+  const makeRecord = execution => buildRunRecord({ id: runId, createdAt: startedAt, finishedAt: Date.now(),
+    task: taskText, plan, execution, preset: plan.preset ?? preset, workspace: options.workspace ?? '',
+    pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
+    budget: { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: budget.downgraded === true,
+      confirmed: options.confirmOverBudget === true } })
+  const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(),
+    packageEstimates: packageEstimates(plan, taskText), settings: budgetSettings(config),
+    confirmOverBudget: options.confirmOverBudget === true,
+    buildRun: ({ status, results }) => makeRecord({ status, packages: results }) })
+  if (!lifecycle.accepted) return { plan, execution: null, paused: true, budget: pausedExecutionBudget(lifecycle) }
   const gate = parseQualityGateJson(valueOf(config, 'qualityGateJson', ''))
   const gatedApi = async ({ route, task: packageTask, signal, subscription }) => {
     if (subscription) return consultConfiguredModel(ctx, route, packageTask, limit, signal)
+    const plannedPackage = plannedPackages(plan, taskText).find(item => item.id === lifecycle.activePackageId())
+    const denied = await reserveChangedApiRoute(lifecycle, { provider: plannedPackage?.recommendedProvider,
+      model: plannedPackage?.recommendedModel }, route, packageTask, config, options.confirmOverBudget)
+    if (denied) return denied
     const quality = routeQuality(route)
     const alternatives = gate && !direct && route.manualPinned !== true && apiUpgradeEligible(route, routes)
       && valueOf(config, 'qualityEscalationEnabled', false) === true && quality !== null
@@ -906,10 +1018,22 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
           && (result.blocked || result.notStarted || billingForResult(result) === 'subscription') ? { costUsd: 0 }
           : actualCost(result, routePricing(routes, result))), ...attempts.map(result => actualCost(result, result.pricingSnapshot))]
         const pending = plan.costBreakdown.slice(finished.length + 1).map(item => item.estimatedCost)
-        if (costs.some(item => item.costUsd === null) || pending.some(value => !Number.isFinite(value))) return !constrained
-        const projected = costs.reduce((sum, item) => sum + item.costUsd, estimate) + pending.reduce((sum, value) => sum + value, 0)
-        if (!Number.isFinite(projected) || perRunLimit > 0 && projected > perRunLimit) return false
-        return !budgetFor(config, saved, projected).exceeded
+        const unknownProjection = costs.some(item => item.costUsd === null) || pending.some(value => !Number.isFinite(value))
+        if (unknownProjection && constrained) return false
+        const projected = unknownProjection ? null
+          : costs.reduce((sum, item) => sum + item.costUsd, estimate) + pending.reduce((sum, value) => sum + value, 0)
+        if (!unknownProjection && (!Number.isFinite(projected) || perRunLimit > 0 && projected > perRunLimit)) return false
+        const id = lifecycle.activePackageId()
+        if (!id) return false
+        await lifecycle.partialResult({ ...attempts.at(-1), id, ok: false, qualityAttempts: attempts })
+        if (!(await lifecycle.reserveExtra(id, estimate)).accepted) return false
+        // The extra request can be charged before its receipt arrives. Persist
+        // both the first receipt and the unknown second attempt before dispatch.
+        await lifecycle.partialResult({ ...attempts.at(-1), id, ok: false, qualityAttempts: [...attempts, {
+          provider: to.provider, model: to.model, channel: 'harness-llm', ok: false,
+          usage: null, usageIncomplete: true, pricingSnapshot: to.pricing ?? null, finishedAt: Date.now(),
+        }] }, { checkBudget: true })
+        return true
       },
     })
   }
@@ -922,40 +1046,49 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
       workspace: options.workspace,
       signal: options.signal,
       ...hooks,
+      onCheckpointStart: item => lifecycle.onCheckpointStart(item),
+      onCheckpointResult: result => lifecycle.onCheckpointResult(result),
       billing,
       apiFallback: gatedApi,
     })
   } catch (error) {
     // Steps that already ran (and may have been paid for) are always recorded with their spend.
     const message = String(error?.message ?? error)
-    const partial = { status: options.signal?.aborted ? 'cancelled' : 'failed', packages: finished, aggregate: '', error: message }
+    const receipts = new Map([...finished, ...lifecycle.results(), ...(error.execution?.packages ?? [])].map(item => [item.id, item]))
+    const partial = { status: options.signal?.aborted ? 'cancelled' : 'failed', packages: [...receipts.values()], aggregate: '', error: message }
     const run = buildRunRecord({
-      id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution: partial,
+      id: runId, createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution: partial,
       preset: plan.preset ?? preset, workspace: options.workspace ?? '',
       pricingFor: item => routePricing(routes, item), billingFor: billingForResult,
       budget: { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: budget.downgraded === true, confirmed: budget.exceeded ? true : undefined },
     })
     run.error = message.slice(0, 2_000)
     let stored = true
-    try { await routerStateStore().appendRun(run) } catch { stored = false }
+    try {
+      if (error.code === 'ROUTER_BUDGET_CHANGED') stored = await stopExecutionLifecycle(lifecycle, error, run)
+      else if (error.code === 'ROUTER_CHECKPOINT_FAILED') { await lifecycle.interrupt(run); stored = false }
+      else await lifecycle.finish(run)
+    } catch { stored = false; await lifecycle.interrupt(run) }
     const wrapped = new Error(`${message}${finished.length ? `（已完成 ${finished.length} 个步骤，${stored ? `已记录到运行 ${run.id}，费用计入预算` : '但运行记录保存失败'}）` : ''}`)
     wrapped.runId = stored ? run.id : null
     wrapped.cause = error
     throw wrapped
   }
   const run = buildRunRecord({
-    id: randomUUID(), createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution,
+    id: runId, createdAt: startedAt, finishedAt: Date.now(), task: taskText, plan, execution,
     preset: plan.preset ?? preset, workspace: options.workspace ?? '',
     pricingFor: item => routePricing(routes, item),
     billingFor: billingForResult,
     budget: { estimateUsd: budget.estimateUsd, exceeded: budget.exceeded, downgraded: budget.downgraded === true, confirmed: budget.exceeded ? true : undefined },
   })
   await reportRunProgress(options, { type: 'stage', stage: 'reviewing' })
-  const reviews = await reviewRunPackages(ctx, run, routes, config, { signal: options.signal, random: options.random })
+  let reviews
+  try { reviews = await reviewRunPackages(ctx, run, routes, config, { signal: options.signal, random: options.random, lifecycle }) }
+  catch (error) { await lifecycle.interrupt(run); throw error }
   if (options.signal?.aborted) { run.status = 'cancelled'; execution.status = 'cancelled' }
   await reportRunProgress(options, { type: 'stage', stage: 'saving' })
   let stored = true
-  try { await routerStateStore().appendRun(run) } catch { stored = false }
+  try { await lifecycle.finish(run) } catch { stored = false; await lifecycle.interrupt(run) }
   const awaiting = pausedSteps(execution)
   return { plan, execution, budget, runId: run.id, run, reviews, stored, ...(awaiting.length ? { awaitingConfirmation: awaiting } : {}) }
 }
@@ -1022,6 +1155,7 @@ function rerunEstimates(run, ids, targetId, override, routes, dataOptions) {
 
 export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, confirmWrite = false, confirmUnsandboxed = false, subscriptionChoice = null, workspace, root, signal, ...options } = {}) {
   const { run, saved } = await storedRun(runId)
+  if (saved.budgetReservations?.[run.id]) throw new Error('该运行仍在执行或费用待核对，请先核对原任务与厂商账单，不能直接重跑。')
   const target = run.packages.find(item => item.id === text(packageId))
   if (!target) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
   const choice = text(subscriptionChoice) || null
@@ -1068,7 +1202,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   const cwd = text(workspace) || run.workspace
   if (!cwd || !(await fileExists(cwd))) throw new Error(`原运行的工作区 ${cwd || '(未记录)'} 不可用，无法重跑该步骤；请恢复该目录，或在原工作区的会话中调用 model_router_rerun_step。`)
   if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget,
-    ids: [...retryIds], estimates: estimates.byId, cwd, root: text(root) || cwd, signal, options, config })
+    ids: [...retryIds], estimates: estimates.byId, confirmOverBudget, cwd, root: text(root) || cwd, signal, options, config })
   const manualRetries = Object.fromEntries(run.packages.filter(item => retryIds.has(item.id) && item.manualAssignment)
     .map(item => [item.id, item.id === target.id && override ? { kind: 'api', ...override } : item.manualAssignment]))
   if (Object.keys(manualRetries).length) {
@@ -1088,7 +1222,18 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   }
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const retryGate = parseQualityGateJson(valueOf(config, 'qualityGateJson', ''))
-  const execution = await rerunAssignmentPackage({
+  const buildRetry = ({ status, results }) => {
+    const next = structuredClone(run)
+    mergeRerun(next, { status, packages: results }, { rerunIds: [...retryIds], pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
+    for (const item of next.packages) if (retryIds.has(item.id)) item.estimatedCost = estimates.byId.get(item.id) ?? null
+    return next
+  }
+  const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: buildRetry,
+    packageEstimates: [...estimates.byId].map(([id, estimatedCostUsd]) => ({ id, estimatedCostUsd })),
+    settings: budgetSettings(config), confirmOverBudget })
+  if (!lifecycle.accepted) return { paused: true, run, budget: pausedExecutionBudget(lifecycle) }
+  let execution
+  try { execution = await rerunAssignmentPackage({
     task: run.task,
     packages: run.packages.map(item => ({
       id: item.id, name: item.name, objective: item.objective, dependsOn: item.dependsOn,
@@ -1108,17 +1253,21 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     signal,
     ...(choice ? { subscriptionChoice: choice } : {}),
     ...executionHooks(ctx, options),
+    onCheckpointStart: item => lifecycle.onCheckpointStart(item),
+    onCheckpointResult: result => lifecycle.onCheckpointResult(result),
     billing: await billingContext(config, options),
-    apiFallback: async ({ route, task: packageTask, signal: callSignal, subscription }) => subscription
-      ? consultConfiguredModel(ctx, route, packageTask, limit, callSignal)
-      : consultWithQualityGate(ctx, route, packageTask, limit, callSignal, { gate: retryGate }),
-  })
-  const updated = await routerStateStore().updateRun(run.id, current => {
-    mergeRerun(current, execution, { rerunIds: execution.ranIds, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
-    for (const item of current.packages) {
-      if (execution.ranIds.includes(item.id)) item.estimatedCost = estimates.byId.get(item.id) ?? null
-    }
-  })
+    apiFallback: async ({ route, task: packageTask, signal: callSignal, subscription }) => {
+      if (subscription) return consultConfiguredModel(ctx, route, packageTask, limit, callSignal)
+      const id = lifecycle.activePackageId()
+      const previous = run.packages.find(item => item.id === id)
+      const expected = override && id === target.id ? override
+        : { provider: previous?.provider ?? previous?.recommendedProvider, model: previous?.model ?? previous?.recommendedModel }
+      const denied = await reserveChangedApiRoute(lifecycle, expected, route, packageTask, config, confirmOverBudget)
+      return denied ?? consultWithQualityGate(ctx, route, packageTask, limit, callSignal, { gate: retryGate })
+    },
+  }) } catch (error) { await stopExecutionLifecycle(lifecycle, error); throw error }
+  const updated = buildRetry({ status: execution.status, results: execution.packages })
+  try { await lifecycle.finish(updated) } catch (error) { await lifecycle.interrupt(updated); throw error }
   const awaiting = pausedSteps(execution)
   return { run: updated, execution, budget, ...(awaiting.length ? { awaitingConfirmation: awaiting } : {}) }
 }
@@ -1162,7 +1311,7 @@ function teamPlanFromRun(run, ids, override, targetId, estimates) {
  * Read-only team retry: the failed step plus downstream steps that had not
  * succeeded run through the same signed runner; earlier answers are context.
  */
-async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, estimates, cwd, root, signal, options, config = {} }) {
+async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, estimates, confirmOverBudget, cwd, root, signal, options, config = {} }) {
   const mode = run.executionMode === 'workspace-write' ? 'workspace-write' : 'read-only'
   const executionEnvironment = teamExecutionEnvironment(run.executionEnvironment, mode)
   const plan = teamPlanFromRun(run, ids, override, target.id, estimates)
@@ -1175,10 +1324,31 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, 
     .map(item => ({ id: item.id, name: item.name, finalText: item.answer }))
   const runTeam = options.runTeam ?? runOfficialTeam
   const installed = Array.isArray(options.installedToolIds) ? options.installedToolIds : await installedToolIds()
-  const execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: root ?? cwd, mode, executionEnvironment,
+  const buildRetry = ({ status, results, workspace = {} }) => {
+    const next = structuredClone(run)
+    const converted = teamExecutionResults(plan, { status, results })
+    if (override) {
+      const item = converted.packages.find(item => item.id === target.id)
+      if (item) item.reassigned = true
+    }
+    mergeRerun(next, converted, { rerunIds: ids, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
+    for (const item of next.packages) if (ids.includes(item.id)) item.estimatedCost = estimates.get(item.id) ?? null
+    next.executionEnvironment = executionEnvironment
+    if (mode === 'workspace-write' && workspace.workspace) next.isolatedWorkspace = workspace.workspace
+    if (workspace.baseCommit) next.baseCommit = workspace.baseCommit
+    return next
+  }
+  const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: buildRetry,
+    packageEstimates: [...estimates].map(([id, estimatedCostUsd]) => ({ id, estimatedCostUsd })), settings: budgetSettings(config), confirmOverBudget })
+  if (!lifecycle.accepted) return { paused: true, run, budget: pausedExecutionBudget(lifecycle) }
+  let execution
+  try { execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: root ?? cwd, mode, executionEnvironment,
     installedIds: installed, cliModels, signal, sandbox: ctx.sandbox, previous, onlyIds: ids,
+    onCheckpointStart: item => lifecycle.onCheckpointStart(item), onCheckpointResult: result => lifecycle.onCheckpointResult(result),
+    onWorkspace: value => lifecycle.onWorkspace(value),
     ...(mode === 'workspace-write' ? { seedFrom: { workspace: run.isolatedWorkspace, baseCommit: run.baseCommit } } : {}),
-    ...(options.runtime ? { runtime: options.runtime } : {}) })
+    ...(options.runtime ? { runtime: options.runtime } : {}) }) }
+  catch (error) { await stopExecutionLifecycle(lifecycle, error); throw error }
   const converted = teamExecutionResults(plan, execution)
   if (override) {
     const entry = converted.packages.find(item => item.id === target.id)
@@ -1190,8 +1360,9 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, 
     const note = await noteCliQuota(config, result.toolId, `${result.error ?? ''}\n${result.outputTail ?? ''}`)
     if (note) quotaNotes.push([result.id, note])
   }
-  const updated = await routerStateStore().updateRun(run.id, current => {
-    mergeRerun(current, converted, { rerunIds: ids, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
+  const updated = buildRetry({ status: execution.status, results: execution.results,
+    workspace: { workspace: execution.workspace, baseCommit: execution.baseCommit } })
+  const current = updated
     for (const item of current.packages) {
       if (ids.includes(item.id)) item.estimatedCost = estimates.get(item.id) ?? null
     }
@@ -1214,7 +1385,7 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, 
       if (cliModels[target.id]) bindings[target.id] = cliModels[target.id]
       current.cliModels = bindings
     }
-  })
+  try { await lifecycle.finish(updated) } catch (error) { await lifecycle.interrupt(updated); throw error }
   return { run: updated, execution: { ...converted, ranIds: ids, raw: execution }, budget }
 }
 
@@ -1240,6 +1411,7 @@ async function rerunToolRun(ctx, config, { run, confirmOverBudget, confirmWrite,
   const cwd = text(workspace) || run.workspace
   if (!cwd || !(await fileExists(cwd))) throw new Error('原运行的工作区不可用，无法重跑；请在原工作区的会话中重试。')
   const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root: text(root) || cwd, signal, rerunOf: run.id,
+    confirmOverBudget,
     ...(options.runTask ? { runTask: options.runTask } : {}) })
   const execution = { status: result.status, packages: recorded?.packages ?? [], ranIds: ['direct'], raw: result }
   return { run: recorded ?? run, execution, budget: planned.budget, rerunOf: run.id, newRunId: recorded?.id ?? null }
@@ -1308,16 +1480,40 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
 }
 
 /** Run a planned tool call and record it; `rerunOf` links a rerun to the original run. */
-async function runPlannedTool(ctx, config, planned, { cwd, root, signal, rerunOf = null, runTask = runOfficialTask }) {
+async function runPlannedTool(ctx, config, planned, { cwd, root, signal, rerunOf = null, confirmOverBudget = false, runTask = runOfficialTask }) {
   const startedAt = Date.now()
-  const result = await runTask({ toolId: planned.toolId, task: planned.taskText, modelId: planned.modelId, workspace: cwd, allowedRoot: root ?? cwd,
-    mode: planned.mode, signal, sandbox: ctx.sandbox })
-  const recorded = result.status === 'unsupported' ? null : await recordToolRun({
-    toolId: planned.toolId, task: planned.taskText, provider: planned.provider, model: planned.model, cliModel: planned.cliModel,
-    mode: planned.mode, workspace: cwd, result, startedAt, routes: planned.routes, config,
-    estimatedCost: planned.estimate, budget: planned.budget, rerunOf,
-  })
-  return { result, recorded }
+  const runId = randomUUID()
+  const makeToolRecord = (result, location = {}) => {
+    const run = buildToolRunRecord({ id: runId, createdAt: startedAt, finishedAt: Date.now(),
+      toolId: planned.toolId, toolLabel: planned.tool?.label ?? planned.toolId, task: planned.taskText,
+      provider: planned.provider, model: planned.model, cliModel: planned.cliModel,
+      mode: planned.mode, workspace: cwd, result, estimatedCost: planned.estimate, rerunOf,
+      pricingFor: item => routePricing(planned.routes, item), billingFor: billingForResult, budget: planned.budget })
+    if (location.isolatedWorkspace) run.isolatedWorkspace = location.isolatedWorkspace
+    if (location.baseCommit) run.baseCommit = location.baseCommit
+    return run
+  }
+  const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), settings: budgetSettings(config), confirmOverBudget,
+    packageEstimates: [{ id: 'direct', estimatedCostUsd: planned.estimate ?? null }],
+    buildRun: ({ status, results, workspace }) => makeToolRecord(results[0] ?? { status, notStarted: true }, workspace) })
+  if (!lifecycle.accepted) {
+    planned.budget = pausedExecutionBudget(lifecycle)
+    return { result: { status: 'paused-budget', budget: planned.budget }, recorded: null }
+  }
+  let result
+  try {
+    result = await runTask({ toolId: planned.toolId, task: planned.taskText, modelId: planned.modelId, workspace: cwd, allowedRoot: root ?? cwd,
+      mode: planned.mode, signal, sandbox: ctx.sandbox,
+      onCheckpointStart: item => lifecycle.onCheckpointStart(item), onCheckpointResult: item => lifecycle.onCheckpointResult(item),
+      onWorkspace: value => lifecycle.onWorkspace(value) })
+  } catch (error) { await stopExecutionLifecycle(lifecycle, error); throw error }
+  const recorded = makeToolRecord(result, { isolatedWorkspace: result.isolatedWorkspace, baseCommit: result.baseCommit })
+  try {
+    if (result.status !== 'succeeded') await annotateCliQuota(recorded, config,
+      [{ id: 'direct', toolId: planned.toolId, text: `${result.error ?? result.reason ?? ''}\n${result.outputTail ?? ''}` }])
+    await lifecycle.finish(recorded)
+  } catch (error) { await lifecycle.interrupt(recorded); throw error }
+  return { result, recorded: result.status === 'unsupported' ? null : recorded }
 }
 
 /** Ledger record for model_router_tool_run. */
@@ -1356,9 +1552,13 @@ export async function rateRecordedResult({ runId, packageId, rating, expectedFin
 
 /** Everything the workbench shows: recent runs, spending, budget, learned biases and settings. */
 export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
+  await createBudgetReservations({ state: routerStateStore() }).recoverInterruptedExecutions()
   const saved = await routingSavedState(config)
   const spent = spending(saved.runs, undefined, saved.archivedSpending)
   const settings = budgetSettings(config)
+  const entries = Object.values(saved.budgetReservations ?? {})
+  const reserved = { ...reservationSpending(saved), activeCount: entries.filter(item => item.status === 'active').length,
+    interruptedCount: entries.filter(item => item.status === 'interrupted').length }
   return {
     runs: saved.runs.slice(-limit).reverse().map(run => ({
       ...run,
@@ -1367,7 +1567,12 @@ export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
         .map(item => ({ ...item, answer: text(item.answer).slice(0, 1_500) })),
     })),
     spent,
-    budget: { ...settings, ...budgetCheck({ estimateUsd: null, spent, ...settings }), historyVerified: saved.historyVerified !== false },
+    reserved,
+    reservations: entries.map(entry => ({ id: entry.id, runId: entry.runId, status: entry.status, updatedAt: entry.updatedAt,
+      unknown: entry.packages.some(item => item.estimatedCostUsd === null || entry.status === 'interrupted' && item.started),
+      remainingEstimateUsd: entry.packages.every(item => Number.isFinite(item.estimatedCostUsd))
+        ? entry.packages.reduce((sum, item) => sum + item.estimatedCostUsd, 0) : null })),
+    budget: { ...budgetFor(config, saved, null, { checkEstimate: false }), historyVerified: saved.historyVerified !== false },
     storageAvailable: saved.storageAvailable !== false,
     storageNotice: saved.storageAvailable === false ? '执行记录存储暂不可用；下方费用与学习摘要尚未核验，不能当作零花费或没有反馈。'
       : saved.historyVerified === false ? '此前执行记录已损坏或不完整，当前摘要只包含可读记录；不能视为完整费用历史，请从备份恢复后再核验预算。' : '',
@@ -1528,15 +1733,39 @@ export async function executeOfficialTeamPlan(ctx, config = {}, planned, options
     reason: '官方 Harness 进程沙箱不可用，不能执行官方 CLI 团队。' }
   throwIfAborted(options.signal)
   const startedAt = Date.now()
-  const execution = await (options.runTeam ?? runOfficialTeam)({ plan: planned.plan, task: planned.taskText, workspace,
+  const runId = randomUUID()
+  const makeTeamRecord = (execution, location = {}) => {
+    const run = buildTeamRunRecord({ id: runId, createdAt: startedAt, finishedAt: Date.now(), task: planned.taskText,
+      plan: planned.plan, execution, mode: planned.mode, workspace,
+      preset: planned.plan.preset ?? DEFAULT_ROUTING_PRESET, pricingFor: item => routePricing(planned.routes, item), billingFor: billingForResult,
+      budget: { estimateUsd: budget.estimateUsd, confirmed: options.confirmOverBudget === true } })
+    run.executionEnvironment = executionEnvironment
+    run.cliModels = { ...planned.cliModels }
+    if (planned.mode === 'workspace-write' && location.workspace) run.isolatedWorkspace = location.workspace
+    if (location.baseCommit) run.baseCommit = location.baseCommit
+    return run
+  }
+  const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), settings: budgetSettings(config),
+    confirmOverBudget: options.confirmOverBudget === true, packageEstimates: packageEstimates(planned.plan, planned.taskText),
+    buildRun: ({ status, results, workspace: location }) => makeTeamRecord({ status, results }, location) })
+  if (!lifecycle.accepted) return { ...common, status: 'paused-budget', budget: pausedExecutionBudget(lifecycle) }
+  let execution
+  try { execution = await (options.runTeam ?? runOfficialTeam)({ plan: planned.plan, task: planned.taskText, workspace,
     allowedRoot: options.root ?? workspace, mode: planned.mode, executionEnvironment, installedIds: planned.installed,
     cliModels: planned.cliModels, signal: options.signal, sandbox: ctx.sandbox,
     onPackageStart: item => reportRunProgress(options, { type: 'package-start', package: item }),
     onPackage: item => reportRunProgress(options, { type: 'package-complete', package: item }),
-    onStage: stage => reportRunProgress(options, { type: 'stage', stage }) })
+    onStage: stage => reportRunProgress(options, { type: 'stage', stage }),
+    onCheckpointStart: item => lifecycle.onCheckpointStart(item), onCheckpointResult: result => lifecycle.onCheckpointResult(result),
+    onWorkspace: value => lifecycle.onWorkspace(value) }) }
+  catch (error) { await stopExecutionLifecycle(lifecycle, error); throw error }
   await reportRunProgress(options, { type: 'stage', stage: 'saving' })
-  const run = await recordTeamRun({ task: planned.taskText, plan: planned.plan, execution, mode: planned.mode, executionEnvironment, workspace,
-    routes: planned.routes, cliModels: planned.cliModels, budget, startedAt, config })
+  const run = makeTeamRecord(execution, { workspace: execution.workspace, baseCommit: execution.baseCommit })
+  try {
+    await annotateCliQuota(run, config, (execution.results ?? []).filter(item => item.status !== 'succeeded' && item.toolId)
+      .map(item => ({ id: item.id, toolId: item.toolId, text: `${item.error ?? ''}\n${item.outputTail ?? ''}` })))
+    await lifecycle.finish(run)
+  } catch (error) { await lifecycle.interrupt(run); throw error }
   return { ...common, status: execution.status, execution, run, runId: run?.id ?? null,
     rerunNotice: planned.mode === 'read-only'
       ? '失败的工作包可用 model_router_rerun_step 单步重跑（只重跑该步及其未完成的下游）。'
@@ -1634,7 +1863,7 @@ const APPROVAL_TEXT = Object.freeze({
  */
 export function approvalReasonCodes(name, args = {}, config = {}, { rerunRun = null } = {}) {
   const codes = []
-  const runKinds = ['model_router_execute', 'model_router_rerun_step', 'model_router_team_execute', 'model_router_tool_run']
+  const runKinds = ['model_router_execute', 'model_router_rerun_step', 'model_router_team_execute', 'model_router_tool_run', 'model_router_consult']
   if (!runKinds.includes(name)) return codes
   if ((name === 'model_router_tool_run' || name === 'model_router_team_execute') && args.mode === 'workspace-write') codes.push('workspace-write')
   if (name === 'model_router_rerun_step' && rerunRun && rerunSupport(rerunRun).writes) codes.push(rerunRun.kind === 'tool' ? 'workspace-write' : 'rerun-write')
@@ -2012,6 +2241,7 @@ export function apply(ctx, config = {}) {
       provider: { type: 'string', description: 'Configured provider id; pair with model.' },
       model: { type: 'string', description: 'Configured model id; pair with provider.' },
       outputLimit: { type: 'number', description: 'Maximum returned characters, from 500 to 50000.' },
+      confirmOverBudget: { type: 'boolean', description: 'Only after explicit user approval when the API budget is exceeded or unverified.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
@@ -2022,7 +2252,7 @@ export function apply(ctx, config = {}) {
       const route = requested ?? chooseConsultRoute(plan, routes, exec.agent)
       const fallback = valueOf(config, 'maxConsultOutputChars', 12_000)
       const limit = boundedInteger(args.outputLimit, finiteNumber(fallback, 12_000), 500, 50_000)
-      return jsonValue(await consultConfiguredModel(ctx, route, args.task, limit, exec.signal))
+      return jsonValue(await executeBudgetedConsult(ctx, route, args.task, config, { limit, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true }))
     },
   }))
   ctx.commands.register({
@@ -2242,7 +2472,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
         return jsonValue({ status: 'paused-budget', budget: { ...planned.budget, paused: true }, estimateUsd: planned.estimate,
           notice: `${planned.budget.message} 已暂停，未启动 ${planned.tool.label}。请向用户说明后，以 confirmOverBudget: true 重新调用。` })
       }
-      const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root, signal: exec.signal })
+      const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true })
       return jsonValue({ ...result, runId: recorded?.id ?? null, estimateUsd: planned.estimate, budget: planned.budget,
         ...(!planned.modelId && planned.model ? { modelNotice: result.modelNotice
           ?? 'Harness 模型 ID 未经此厂商 CLI 验证；本次使用厂商 CLI 已配置的默认模型。' } : {}),

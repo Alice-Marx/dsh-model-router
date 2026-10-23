@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { runOfficialTool, officialToolExecutionCapabilities, officialToolReadiness } from './official-tool-executor.mjs'
 import { toolForProvider } from './official-tool-registry.mjs'
-import { observeExecutionProgress, redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
+import { awaitExecutionCheckpoint, observeExecutionProgress, redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
 import { unsupportedCliReasoning } from './reasoning-execution.mjs'
 
 const MAX_GIT_OUTPUT = 64_000_000
@@ -415,7 +415,7 @@ async function seedWorktree(isolated, seedFrom, signal) {
 }
 
 /** Sequential execution preserves DAG dependencies and avoids edit conflicts. */
-export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', executionEnvironment = 'harness', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null, seedFrom = null, onPackageStart, onPackage, onStage }) {
+export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', executionEnvironment = 'harness', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null, seedFrom = null, onPackageStart, onPackage, onStage, onCheckpointStart, onCheckpointResult, onWorkspace }) {
   await observeExecutionProgress(onStage, 'preparing')
   if (!['harness', 'cli-native'].includes(executionEnvironment)
     || (executionEnvironment === 'cli-native' && mode !== 'workspace-write')) throw new TypeError('invalid team CLI execution environment')
@@ -448,6 +448,11 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   if (signal?.aborted) return { status: 'cancelled', workspace: source, results: [] }
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
   const runWorkspace = isolated?.workspace ?? source
+  const completed = []
+  const partial = () => ({ status: signal?.aborted ? 'cancelled' : 'incomplete', workspace: runWorkspace,
+    results: [...completed], ...(isolated ? { baseCommit: isolated.baseCommit } : {}) })
+  await awaitExecutionCheckpoint(onWorkspace, { workspace: runWorkspace, sourceWorkspace: source,
+    isolatedWorkspace: isolated?.workspace ?? null, baseCommit: isolated?.baseCommit ?? null }, partial, 'workspace')
   let seeded = null
   if (isolated && retry) {
     try { seeded = await seedWorktree(isolated, seedFrom, signal) }
@@ -456,7 +461,6 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       return { status: 'blocked', blocking: [{ reason: String(error?.message ?? error) }], results: [] }
     }
   }
-  const completed = []
   const cancelledRun = () => ({ status: 'cancelled', workspace: runWorkspace, results: completed,
     ...(isolated ? { baseCommit: isolated.baseCommit } : {}), ...(seeded ? { seeded } : {}) })
   const context = retry ? (Array.isArray(previous) ? previous : []).filter(item => item?.id && typeof item.finalText === 'string') : []
@@ -466,8 +470,11 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
     const cliModel = teamCliModel(item, configuredCliModels)
     const prompt = packagePrompt(task, item, [...context, ...completed])
     const startedAt = Date.now()
-    await observeExecutionProgress(onPackageStart, { ...item, provider: item.recommendedProvider,
-      model: item.recommendedModel, requestedCliModel: cliModel, startedAt })
+    const starting = { ...item, provider: item.recommendedProvider,
+      model: item.recommendedModel, requestedCliModel: cliModel, startedAt }
+    await observeExecutionProgress(onPackageStart, starting)
+    if (signal?.aborted) return cancelledRun()
+    await awaitExecutionCheckpoint(onCheckpointStart, starting, partial, 'start')
     if (signal?.aborted) return cancelledRun()
     let result
     try {
@@ -518,6 +525,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       error: modelMismatch ? '官方 CLI 实际模型与指定模型不一致。'
         : (result.error || result.reason) ? executionDiagnostic(result.error || result.reason) : null,
       outputTail: result.status === 'succeeded' ? null : executionDiagnostic(verifiedDiagnostic(result)) || null })
+    await awaitExecutionCheckpoint(onCheckpointResult, completed.at(-1), partial, 'result')
     await observeExecutionProgress(onPackage, completed.at(-1))
     if (signal?.aborted) return cancelledRun()
     if (packageStatus !== 'succeeded') return { status: packageStatus === 'cancelled' ? 'cancelled' : 'incomplete', workspace: runWorkspace, results: completed,
@@ -544,7 +552,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
 }
 
 /** One editable CLI task also uses the same isolated workspace and merge gate. */
-export async function runOfficialTask({ toolId, task, workspace, allowedRoot, modelId, mode = 'read-only', signal, sandbox, runtime }) {
+export async function runOfficialTask({ toolId, task, workspace, allowedRoot, modelId, mode = 'read-only', signal, sandbox, runtime, onCheckpointStart, onCheckpointResult, onWorkspace }) {
   const source = await approvedSource(workspace, allowedRoot)
   if (signal?.aborted) return { toolId, status: 'cancelled', notStarted: true, finalText: '' }
   if (typeof sandbox?.confine !== 'function') return { toolId, status: 'unsupported', reason: '官方 Harness 进程沙箱不可用。' }
@@ -555,18 +563,29 @@ export async function runOfficialTask({ toolId, task, workspace, allowedRoot, mo
     reason: readiness.reason ?? readiness.modeReasons?.[mode] ?? `官方 CLI 尚未就绪，或不支持 ${mode} 模式。` }
   if (signal?.aborted) return { toolId, status: 'cancelled', notStarted: true, finalText: '' }
   const isolated = mode === 'workspace-write' ? await isolatedWorktree(source, signal, allowedRoot) : null
+  const runWorkspace = isolated?.workspace ?? source
+  const location = isolated ? { isolatedWorkspace: isolated.workspace, baseCommit: isolated.baseCommit } : {}
   let result
+  const partial = () => ({ id: 'direct', toolId, status: signal?.aborted ? 'cancelled' : 'failed',
+    notStarted: !result, finalText: '', ...result, ...location })
+  await awaitExecutionCheckpoint(onWorkspace, { workspace: runWorkspace, sourceWorkspace: source,
+    isolatedWorkspace: isolated?.workspace ?? null, baseCommit: isolated?.baseCommit ?? null }, partial, 'workspace')
+  if (signal?.aborted) return { ...partial(), status: 'cancelled', notStarted: true }
+  await awaitExecutionCheckpoint(onCheckpointStart, { id: 'direct', toolId, model: modelId ?? null,
+    workspace: runWorkspace, startedAt: Date.now() }, partial, 'start')
+  if (signal?.aborted) return { ...partial(), status: 'cancelled', notStarted: true }
   try {
-    result = await (runtime?.runTool ?? runOfficialTool)({ toolId, task, modelId, workspace: isolated?.workspace ?? source,
+    result = await (runtime?.runTool ?? runOfficialTool)({ toolId, task, modelId, workspace: runWorkspace,
       mode, isolatedRoot: isolated?.isolatedRoot, signal, sandbox })
     if (!result || typeof result.status !== 'string') throw new TypeError('官方 CLI 执行器没有返回有效状态。')
   } catch (error) {
     result = executionException(error, signal)
   }
   result = withFailureDiagnostic(result)
-  if (signal?.aborted) return { ...result, status: 'cancelled',
-    ...(isolated ? { isolatedWorkspace: isolated.workspace, baseCommit: isolated.baseCommit } : {}) }
-  if (!isolated || result.status !== 'succeeded') return { ...result, ...(isolated ? { isolatedWorkspace: isolated.workspace, baseCommit: isolated.baseCommit } : {}) }
+  result = { ...result, ...location, ...(signal?.aborted ? { status: 'cancelled' } : {}) }
+  await awaitExecutionCheckpoint(onCheckpointResult, { ...result, id: 'direct' }, partial, 'result')
+  if (signal?.aborted) return { ...result, status: 'cancelled' }
+  if (!isolated || result.status !== 'succeeded') return result
   try {
     const integration = await integrateWorktree(source, isolated.workspace, isolated.baseCommit, signal)
     return { ...result,

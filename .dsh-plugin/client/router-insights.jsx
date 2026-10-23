@@ -2,8 +2,8 @@ import React from 'react'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { BILLING_MODE_LABEL } from '../shared/subscription-billing.mjs'
 import {
-  BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, UNTESTED_VERSION_NOTE, budgetMeter, dagLayers, formatUsd, healthSummary,
-  packageCost, packageStatus, priorAttemptTotals, rerunSupport, runTotals, versionLine,
+  BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, UNTESTED_VERSION_NOTE, budgetOccupancyMeter, dagLayers, formatUsd, healthSummary,
+  packageCost, packageStatus, priorAttemptTotals, rerunSupport, reservationSummary, runTotals, versionLine,
 } from './insights-state.mjs'
 import {
   ADAPTIVE_NUMBER_FIELDS, adaptiveSettingValue, dynamicSourceView, feedbackRatingArguments,
@@ -272,6 +272,8 @@ export function CostControlCard({ ledger, settingsScope, onChanged, error, refre
   const daily = Number(value.dailyBudgetUsd ?? 0)
   const monthly = Number(value.monthlyBudgetUsd ?? 0)
   const spent = ledger?.spent ?? { today: 0, month: 0, unknownToday: 0, unknownMonth: 0 }
+  const reserved = reservationSummary(ledger)
+  const reservations = (ledger?.reservations ?? []).filter(item => ['active', 'interrupted'].includes(item.status))
   const set = async (key, next) => { if (await settings.write(key, next)) onChanged?.() }
   const saveLimit = async (key, draft, reset) => {
     const parsed = Number(draft)
@@ -287,9 +289,15 @@ export function CostControlCard({ ledger, settingsScope, onChanged, error, refre
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
         <div className="mr-meters">
-          <Meter label="今日已用（计入预算）" meter={budgetMeter(spent.today, daily)} />
-          <Meter label="本月已用（计入预算）" meter={budgetMeter(spent.month, monthly)} />
+          <Meter label="今日预算占用" meter={budgetOccupancyMeter(spent.today, daily, reserved.today)} />
+          <Meter label="本月预算占用" meter={budgetOccupancyMeter(spent.month, monthly, reserved.month)} />
         </div>
+        <p className="mr-caption">预占是尚未结算的费用估算，不是实际账单；剩余额度已扣除已发生费用与已知预占。执行中 {reserved.activeCount} 项 · 待核对中断 {reserved.interruptedCount} 项。</p>
+        {(reserved.unknownToday > 0 || reserved.unknownMonth > 0) && <p className="mr-caption mr-warn-text">预占金额未知：今日 {reserved.unknownToday} 项 · 本月 {reserved.unknownMonth} 项，未计入上方预占金额，不能视为零费用。请核对厂商账单与原任务记录。</p>}
+        {reserved.interruptedCount > 0 && <p className="mr-error" role="alert">有中断任务尚未核对，预占继续保留，不能直接重跑。请先核对旧任务与厂商账单，保留原始状态文件和已保存结果；若记录损坏，从可信备份恢复完整状态。当前界面不支持手动结算或自动付费恢复。</p>}
+        {reservations.length > 0 && <details className="mr-tool-log"><summary>查看未结算预占（{reservations.length} 项）</summary>
+          <ul className="mr-checklist">{reservations.map(item => <li key={item.id}>运行 <code>{item.runId || item.id}</code> · {item.status === 'interrupted' ? '执行中断，费用待核对' : '执行中'} · 剩余预占 {item.unknown || !Number.isFinite(item.remainingEstimateUsd) ? '金额未知' : formatUsd(item.remainingEstimateUsd)}{Number.isFinite(item.updatedAt) ? ` · 最近保存 ${new Date(item.updatedAt).toLocaleString()}` : ''}</li>)}</ul>
+        </details>}
         {(spent.subscriptionRunsMonth ?? 0) > 0 && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：今日 {formatUsd(spent.subscriptionToday ?? 0)} · 本月 {formatUsd(spent.subscriptionMonth ?? 0)}，本月共 {spent.subscriptionRunsMonth} 次订阅登录调用。</p>}
         {(spent.unknownToday > 0 || spent.unknownMonth > 0) && <p className="mr-caption">本月有 {spent.unknownMonth} 次调用缺少单价或用量，未计入金额。请在“模型价格与能力”中补齐单价。</p>}
         {ledger?.budget?.exceeded && <p className="mr-error" role="alert">{ledger.budget.message} {ledger.budget.action === 'pause' ? '新的执行会先暂停并请求确认。' : '新的执行会尝试自动降级为“省钱优先”。'}</p>}
@@ -364,15 +372,15 @@ export function DagView({ packages, renderNode, label = '子任务依赖图' }) 
 }
 
 function ChannelText({ item }) {
-  if (!item.channel) return <span className="mr-pill">待执行</span>
+  if (!item.channel) return <span className="mr-pill">{item.status === 'running' ? '执行中' : item.status === 'interrupted' ? '执行中断' : '待执行'}</span>
   return <span className={item.channel === 'official-cli' ? 'mr-pill mr-pill-channel-ok' : 'mr-pill'}>{item.channel === 'official-cli' ? `官方 CLI · ${item.toolId ?? ''}` : '模型目录 API'}</span>
 }
 
-function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
+function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun, ledger }) {
   const [target, setTarget] = React.useState('')
-  if (item.status === 'paused') return <PausedNode run={run} item={item} busy={busy} onRerun={onRerun} />
+  const rerun = rerunSupport(run, ledger)
+  if (item.status === 'paused') return <PausedNode run={run} item={item} busy={busy} onRerun={onRerun} rerun={rerun} />
   const cost = packageCost(item)
-  const rerun = rerunSupport(run)
   const canRerun = rerun.supported && !item.ok && !busy
   const others = routes.filter(route => `${route.provider}/${route.model}` !== `${item.provider}/${item.model}`)
   return (
@@ -399,7 +407,7 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
           <button className="mr-button mr-button-secondary mr-mini" type="button" title={item.rating === -1 ? '再次点击撤回不好评价' : '评价此结果不好'} aria-pressed={item.rating === -1} disabled={busy} onClick={() => onRate(...feedbackRatingArguments(run, item, 'down'))}>👎 不好</button>
         </>}
         {canRerun && <button className="mr-button mr-mini" type="button" title={rerun.confirm || undefined} onClick={() => onRerun(run.id, item.id, null)}>{run.kind === 'tool' ? '重新执行此调用' : rerun.writes ? '在新工作区续跑' : '重跑此步'}</button>}
-        {!rerun.supported && !item.ok && item.ran && <span className="mr-caption">{rerun.reason}</span>}
+        {!rerun.supported && !item.ok && <span className="mr-caption">{rerun.reason}</span>}
         {rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && (
           <span className="mr-inline">
             <select className="mr-input mr-mini-select" aria-label="改派到" value={target} onChange={event => setTarget(event.target.value)}>
@@ -415,7 +423,7 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun }) {
 }
 
 /** A step paused after a non-quota subscription failure: the user picks how to continue. */
-function PausedNode({ run, item, busy, onRerun }) {
+function PausedNode({ run, item, busy, onRerun, rerun }) {
   const pause = item.pause ?? {}
   return (
     <>
@@ -426,10 +434,11 @@ function PausedNode({ run, item, busy, onRerun }) {
       {pause.loginRequired && <p className="mr-package-copy">看起来是登录问题：请先在终端重新登录该 CLI，再点“重试订阅”。</p>}
       <div className="mr-node-actions">
         {SUBSCRIPTION_CHOICE_BUTTONS.map(([choice, label, secondary]) => (
-          <button key={choice} className={`mr-button mr-mini${secondary ? ' mr-button-secondary' : ''}`} type="button" disabled={busy}
+          <button key={choice} className={`mr-button mr-mini${secondary ? ' mr-button-secondary' : ''}`} type="button" disabled={busy || !rerun.supported}
             onClick={() => onRerun(run.id, item.id, null, choice)}>{label}</button>
         ))}
       </div>
+      {!rerun.supported && <p className="mr-caption">{rerun.reason}</p>}
     </>
   )
 }
@@ -439,6 +448,9 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
   const runs = ledger?.runs ?? []
   const [openId, setOpenId] = React.useState(null)
   const current = runs.find(run => run.id === openId) ?? runs[0]
+  const support = rerunSupport(current, ledger)
+  const unresolved = ['running', 'interrupted'].includes(current?.status)
+    || (ledger?.reservations ?? []).some(item => item.runId === current?.id && ['active', 'interrupted'].includes(item.status))
   const totals = runTotals(current)
   const prior = priorAttemptTotals(current)
   const unknownCalls = prior.unknownCalls + [...(current?.packages ?? []), ...(current?.reviews ?? [])]
@@ -447,7 +459,7 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
     <section className="mr-card mr-results" aria-label="执行记录">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">执行记录与子任务</h2>
-        <p className="mr-card-copy">查看模型分配、逐步结果与费用。失败步骤可重跑或改派；已完成的上游保持原结果。</p>
+        <p className="mr-card-copy">查看模型分配、逐步结果与费用。已结束任务的失败步骤可重跑或改派；已完成的上游保持原结果。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={busy} onClick={onRefresh}>刷新</button></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
@@ -476,7 +488,8 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
                 {current.isolatedWorkspace && <p className="mr-caption">独立工作区：<code>{current.isolatedWorkspace}</code></p>}
                 {current.rerunOf && <p className="mr-caption">重新执行自运行 {current.rerunOf.slice(0, 8)}。</p>}
                 {current.decision?.reason && <p className="mr-caption">路由原因：{current.decision.reason}</p>}
-                <DagView packages={current.packages} renderNode={item => <RunNode run={current} item={item} routes={routes} allowReassign={ledger?.settings?.allowManualReassign !== false} busy={busy} onRate={onRate} onRerun={onRerun} />} />
+                {!support.supported && unresolved && <p className="mr-caption mr-warn-text">{support.reason}</p>}
+                <DagView packages={current.packages} renderNode={item => <RunNode run={current} item={item} routes={routes} ledger={ledger} allowReassign={ledger?.settings?.allowManualReassign !== false} busy={busy} onRate={onRate} onRerun={onRerun} />} />
               </div>
             )}
           </>

@@ -1,0 +1,54 @@
+name: Test, build and verify package
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Node 24 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Enable the packageManager-pinned pnpm
+        run: |
+          corepack enable
+          corepack install
+      - name: Install the exact dependency graph
+        run: pnpm install --frozen-lockfile --strict-peer-dependencies
+      - name: Run the complete test suite
+        run: npm test
+      - name: Test package verification failures
+        run: node --test tests/ci-contract.test.mjs
+      - name: Verify the committed client before rebuilding
+        run: npm run check:client
+      - name: Build the actual desktop client
+        run: npm run build:client
+      - name: Verify the generated client
+        run: npm run check:client
+      - name: Compile the offline workbench preview
+        run: node scripts/workbench-preview.mjs --check
+      - name: Pack the release candidate
+        run: npm pack --pack-destination dist
+      - name: Verify runtime closure and every packaged byte against Git
+        run: node scripts/check-package.mjs

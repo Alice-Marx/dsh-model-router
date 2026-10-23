@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.24.0 — 2026-10-24
+
+- Reserve remaining execution estimates in shared persistent state before admission. Daily/monthly checks account for recorded API spending plus other active or interrupted reservations, preventing concurrent tasks from independently admitting the same estimated capacity. Unknown estimates or unresolved costs under a finite budget require explicit confirmation.
+- Save mandatory package checkpoints before external calls and after receipts, with actual usage replacing the completed estimate before another paid step. Apply the lifecycle to routed runs, retries/reassignment, official teams, single-tool runs and consultations; optional review and quality-upgrade calls reserve extra capacity first. Checkpoint failures stop later calls and retain evidence.
+- Recheck fresh actual spending and remaining reservations before each later paid call. Earlier costs above estimate or unresolved under a finite budget stop downstream calls; after worker cleanup, a budget stop retains completed receipts and releases unused holds. Subscription-to-API fallback re-estimates the actual route and rejects missing-price or over-budget calls. Save the first receipt and pending extra attempt before a quality upgrade starts.
+- Preserve interrupted reservations and unknown usage when an execution owner is confirmed dead. Protect referenced run records from trimming, block rerun/reassignment while a hold exists, and distinguish actual spending from reserved estimates in the UI. No automatic replay, time-based hold expiry or manual reconciliation/release control is added.
+- Upgrade state schema from v1 to v2 while preserving the ledger. Older plugin versions reject v2 state, so fully stop all Host processes before updating and back up state before a downgrade.
+- Add Windows/Linux Node 24 CI for strict frozen dependency installation, the complete test suite, committed and rebuilt client consistency, offline preview compilation, and npm archive verification against raw Git blobs and the runtime import closure.
+
+Validation evidence and pending release checks are tracked in the [0.24.0 acceptance report](docs/releases/0.24.0-validation.md). No new real provider or vendor CLI inference is claimed. Budget reservations are local estimates, not a provider billing cap; interrupted fees must be reconciled before their capacity can safely be reused.
+
 ## 0.23.1 — 2026-10-23
 
 - Check retry budgets against the target and every unfinished downstream package that will execute. Reassignment uses the selected route estimate; successful downstream packages are excluded and unknown prices remain unknown.

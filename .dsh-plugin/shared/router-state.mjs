@@ -17,9 +17,11 @@ import { mkdir, open, readFile, rename, stat, unlink, writeFile } from 'node:fs/
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { archiveSpending, sanitizeArchivedSpending } from './run-ledger.mjs'
+import { sanitizeBudgetReservations } from './budget-reservations.mjs'
 
 export const MAX_RUNS = 200
-const STATE_VERSION = 1
+// Older Hosts must refuse v2 instead of dropping durable execution holds.
+const STATE_VERSION = 2
 
 /** Same DSH home rule as the Host: DSH_HOME (with ~ expansion) or ~/.dsh. */
 export function resolveStateHome(env = process.env, home = homedir(), cwd = process.cwd()) {
@@ -41,7 +43,7 @@ const LOCK_STALE_MS = 15_000
 const LOCK_TIMEOUT_MS = 10_000
 
 function emptyState() {
-  return { version: STATE_VERSION, historyIncomplete: false, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], dynamicData: { liveBench: null, pricing: null, status: {}, revision: '' }, archivedSpending: sanitizeArchivedSpending(), notices: [], terminalSessions: [] }
+  return { version: STATE_VERSION, historyIncomplete: false, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], budgetReservations: {}, dynamicData: { liveBench: null, pricing: null, status: {}, revision: '' }, archivedSpending: sanitizeArchivedSpending(), notices: [], terminalSessions: [] }
 }
 
 function sanitizeNotices(value) {
@@ -51,9 +53,16 @@ function sanitizeNotices(value) {
 }
 
 function retainRuns(state, maxRuns) {
-  const removed = Math.max(0, state.runs.length - maxRuns)
-  state.archivedSpending = archiveSpending(state.runs.slice(0, removed), state.archivedSpending)
-  state.runs = state.runs.slice(removed)
+  // A partial run must stay addressable until its hold is reconciled. Archiving
+  // it and later upserting a checkpoint would count its receipts twice.
+  const protectedIds = new Set(Object.values(state.budgetReservations ?? {}).map(entry => entry.runId))
+  let remove = Math.max(0, state.runs.length - Math.max(maxRuns, protectedIds.size))
+  const evicted = []
+  state.runs = state.runs.filter(run => {
+    if (remove > 0 && !protectedIds.has(run.id)) { remove -= 1; evicted.push(run); return false }
+    return true
+  })
+  state.archivedSpending = archiveSpending(evicted, state.archivedSpending)
   return state
 }
 
@@ -94,19 +103,21 @@ function invalidRunSpending(run) {
 }
 
 function sanitize(value, maxRuns) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || value.version !== STATE_VERSION
+  if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, STATE_VERSION].includes(value.version)
     || !Array.isArray(value.runs)) {
     const error = new Error('模型路由状态版本或结构不受支持；原文件未修改，请先恢复或升级兼容版本。')
     error.code = 'ROUTER_STATE_UNSUPPORTED'
     throw error
   }
   const runs = value.runs.filter(run => run && typeof run.id === 'string')
+  const held = sanitizeBudgetReservations(value.budgetReservations)
   return retainRuns({
     version: STATE_VERSION,
     // Unlike bounded notices, an incomplete-history marker cannot silently
     // expire. Restoring a verified state file is required to recover budgets.
     historyIncomplete: value.historyIncomplete === true || runs.length !== value.runs.length
-      || invalidArchivedSpending(value.archivedSpending) || runs.some(invalidRunSpending)
+      || invalidArchivedSpending(value.archivedSpending) || runs.some(invalidRunSpending) || held.invalid
+      || Object.values(held.reservations).some(entry => !runs.some(run => run.id === entry.runId))
       || sanitizeNotices(value.notices).some(notice => notice.kind === 'state-corrupt'),
     onboarding: { completedAt: Number.isFinite(value.onboarding?.completedAt) ? value.onboarding.completedAt : null },
     health: value.health && Array.isArray(value.health.tools) ? value.health : null,
@@ -114,6 +125,7 @@ function sanitize(value, maxRuns) {
     authFailures: Object.fromEntries(Object.entries(value.authFailures && typeof value.authFailures === 'object' && !Array.isArray(value.authFailures) ? value.authFailures : {})
       .filter(([, entry]) => Number.isFinite(entry?.at))),
     runs,
+    budgetReservations: held.reservations,
     dynamicData: value.dynamicData && typeof value.dynamicData === 'object' && !Array.isArray(value.dynamicData) ? value.dynamicData : { liveBench: null, pricing: null, status: {}, revision: '' },
     archivedSpending: sanitizeArchivedSpending(value.archivedSpending),
     notices: sanitizeNotices(value.notices),

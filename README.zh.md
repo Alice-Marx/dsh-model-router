@@ -10,7 +10,7 @@
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
-当前版本：**0.23.1**（`@ljwei-stak/dsh-model-router`）。重跑预算现在覆盖实际会执行的未完成下游，进度和取消请求挂起后可恢复。工作台支持实时耗时、逐工作包进度和取消，保留已完成结果与已报告费用；关闭重开面板可接管原任务。支持“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。继续兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
+当前版本：**0.24.0**（`@ljwei-stak/dsh-model-router`）。并发执行现在会在共享持久状态中预占剩余估算预算；每个工作包调用前、收到结果后都必须保存检查点。中断任务保留预算预占和待核对费用证据，工作台分别显示已记录支出和预占估计。新增 Windows/Linux Node 24 CI，执行全量测试、客户端构建和包完整性检查。工作台支持实时耗时、逐工作包进度和取消，保留已完成结果与已报告费用；关闭重开面板可接管原任务。支持“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。继续兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
 
 官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
 
@@ -27,22 +27,22 @@
 **安装（DSH Plugin Hub / web profile）：** 确保 DSH CLI 可用，然后安装已发布的 npm 包：
 
 ```sh
-dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.23.1
+dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.24.0
 ```
 
 **安装到 Harness Desktop：** 首次先启动一次 Desktop 初始化 `desktop` 配置，再彻底退出 Desktop，运行：
 
 ```sh
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.23.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.24.0
 ```
 
 也可以在 **Harness Desktop → 插件 → 添加插件** 中粘贴包名。安装后重启 Desktop。单独运行全局 `npm install -g` 不会注册 Desktop 插件。
 
-**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.23.1`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) 已发布。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
+**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.24.0`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router)。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
 
 **配置文件与配置入口：** 当前不支持导入用户编写的 JSON/YAML 配置文件。Provider、模型和凭据在 Harness **模型**页面配置；路由档案与偏好在插件设置中配置。路由器持久状态存于 `$DSH_HOME/model-router/state.json`（默认：`~/.dsh/model-router/state.json`）。Provider CLI 沿用各自的登录和配置；路由器不会把 API 密钥复制进模型档案或终端日志。
 
-**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.23.1 尚无经过验证的端到端厂商运行。[实时进度截图](docs/assets/workbench-run-progress.png)是离线模拟；取消、重开恢复与验证边界见[0.23.1 验收报告](docs/releases/0.23.1-validation.md)。
+**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.24.0 尚无经过验证的端到端厂商运行。[实时进度截图](docs/assets/workbench-run-progress.png)是离线模拟；预算预占、检查点与验证边界见[0.24.0 验收报告](docs/releases/0.24.0-validation.md)。
 
 **权限与风险：** 任务规划在本地完成，不调用模型。实际执行会把选定任务和上下文发送到所选模型 API 或厂商 CLI，并可能产生费用。默认使用 Harness 受限环境；只读运行不修改工作区，`workspace-write` 需要用户明确批准。明确选择 `cli-native` 的可编辑团队会在 Harness 进程沙箱之外，以当前操作系统用户权限运行；Git worktree 只收集修改，不限制操作系统访问。外部 Provider 和 CLI 服务各自适用其数据处理及计费规则。
 
@@ -63,7 +63,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.23.1
 | 可编辑 CLI 执行 | 从工作台执行顺序 CLI 团队，或在会话中调用单个受支持 CLI；使用获批的隔离 Git worktree，并有条件地合入补丁。 |
 | 官方工具 | 对注册表中的十二种工具检测、安装/更新、检查启动就绪和登录状态；安装任务提供日志和取消功能。 |
 | 交互终端 | PowerShell/系统 shell 与十二种注册表 CLI 目标（经过验证的 Windows 桌面安装支持 ZCode TUI）；包含固定登录命令、实时输出和多会话。 |
-| 费用与订阅 | 日/月预算检查、降级为省钱预设或暂停、订阅优先路由、额度冷却，以及对其他订阅失败的显式处理。 |
+| 费用与订阅 | 日/月检查计入持久并发预占，已记录支出与剩余估计分别显示；保留订阅优先、额度冷却，以及其他订阅失败的显式处理。 |
 | 历史与质量 | 逐包结果、依赖视图、失败详情、重跑/改派、评分与可选的更强模型复核。 |
 | 执行边界 | 显示每条路线可读写的范围，以及进程是否使用 Harness 沙箱。 |
 
@@ -78,16 +78,16 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.23.1
 打开 **插件 → 添加插件**，输入：
 
 ```text
-@ljwei-stak/dsh-model-router@0.23.1
+@ljwei-stak/dsh-model-router@0.24.0
 ```
 
-镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.23.1**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
+镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.24.0**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
 
 也可以通过插件管理器安装本地 `.tgz` 压缩包，或解压后的内部 `package` 目录。两者都必须包含 `package.json` 和 `.dsh-plugin`。历史构建见 [Releases](https://github.com/Alice-Marx/dsh-model-router/releases)，也可按下文从源码构建。
 
 ### 从旧包名升级
 
-旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.23.1`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
+旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.24.0`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
 
 从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 
@@ -117,9 +117,11 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.23.1
 5. 在 **在工作台执行** 中，选择 **模型路由（只读）** 使用现有路由执行器；或先选择 **团队分工**，再选择 **官方工具协作**。官方协作可选择 **只读检查** 或 **编辑文件**。可编辑团队还需选择 **Harness 受限环境**（默认沙箱）或 **厂商 CLI 正常环境**（在 Harness 沙箱外运行）。填入已存在的工作区绝对路径，或沿用上次运行路径。点击 **预览执行计划**，查看各包、权限与所需确认，然后显式确认执行。Host 启动前会重新检查计划；条件变化可能要求重新确认。
 6. 在 **执行记录与子任务** 查看实际通道、回答、失败、费用与评分。官方协作仅使用已安装、且在所选权限模式下就绪的 CLI 重新规划。编辑需要批准和干净的 Git 仓库；成功的 worktree 修改有条件地合入。该模式下，不可用或失败的 CLI 不会静默变成 API 调用。
 
-执行开始后，工作台显示已耗时、当前工作包与每包状态。**取消执行**会请求停止当前调用，并阻止后续工作包启动；执行器完成收尾前持续显示**正在取消**。已完成结果和已报告用量仍保留在历史中。取消不能撤销已经产生的费用或已经整合的改动。关闭面板不会取消执行；同一浏览器会话重新打开后，可在 Host 仍保留该任务时重新连接。Host 重启会清除内存任务，已保存的历史记录仍可查看。
+执行开始后，工作台显示已耗时、当前工作包与每包状态。**取消执行**会请求停止当前调用，并阻止后续工作包启动；执行器完成收尾前持续显示**正在取消**。已完成结果和已报告用量仍保留在历史中。取消不能撤销已经产生的费用或已经整合的改动。关闭面板不会取消执行；同一浏览器会话重新打开后，可在 Host 仍保留该任务时重新连接。Host 重启会清除内存任务，已落盘的工作包结果与预算预占仍保留。确认执行进程已经退出后标记为 `interrupted`，不会自动续跑调用或释放预占。
 
 预览、进度和取消请求最长等待 15 秒。进度读取超时后继续查询同一任务；取消未确认时可手动重试。网络等待超时不代表 Host 任务已停止，也不会自动重发 `startRun`。重跑历史步骤前，预算覆盖该步及实际会执行的全部未完成下游；改派使用所选路线估价，未知价格仍保持未知。[超时恢复截图](docs/assets/workbench-run-timeout.png)为离线模拟。
+
+历史将活动/中断的预算预占与实际支出分别显示；有预占的运行不能重跑或改派。Host 崩溃或检查点保存失败后，请先核对原任务、保留的 worktree 和供应商账单；本版没有手工核对并释放预占的操作入口。不要通过删除状态把占用当成可用额度。
 
 修改任务文本、规划模式、路线配置、目录或相关设置，会使旧建议失效。修改执行输入也会丢弃待确认或已完成的预览，必须对当前请求重新预览。执行预览使用 Host 当前状态，因此可能与先前本地计划不同。
 
@@ -339,9 +341,9 @@ worktree 用于分离和收集修改；只有所选 Harness 环境提供操作�
 
 ### 失败与重试
 
-历史保存包状态、退出码、经过脱敏且有长度限制的诊断、入口/模型证据，以及可用的用量/费用。后续适配器异常不会丢弃先前结果。`cli-completed` 表示运行时完成了进程/补丁流程；交付物仍需通过验收。`blocked`、`cancelled`、`incomplete` 和 `integration-pending` 分别区分预检阻止、中断、包失败与合入问题。
+必须保存的检查点在外部调用前记录启动状态，在下一次付费步骤前保存已有结果、用量和费用。检查点保存失败会停止后续步骤，保留预占以供核对。历史保存包状态、退出码、经过脱敏且有长度限制的诊断、入口/模型证据，以及可用的用量/费用。后续适配器异常不会丢弃先前结果。`cli-completed` 表示运行时完成了进程/补丁流程；交付物仍需通过验收。`blocked`、`cancelled`、`incomplete` 和 `integration-pending` 分别区分预检阻止、中断、包失败与合入问题。
 
-重试针对失败包和未完成的后续依赖，保留其他成功结果。符合条件的可编辑 `incomplete/cancelled` 运行要求记录的源目录、保留的 worktree 与基线：Host 验证后创建新 worktree，播种先前尚未合入的修改，再继续执行。已经合入或 `integration-pending` 的团队不能使用这一步骤恢复路径。正常环境重试仍需写入和沙箱外执行的同意（工作台重跑请求中的 `confirmWrite` 与 `confirmUnsandboxed`）；关闭旧设置 `confirmUnsandboxedCli` 也不能绕过。先前尝试的费用保留在支出总额中。
+重试针对失败包和未完成的后续依赖，保留其他成功结果。符合条件的可编辑 `incomplete/cancelled` 运行要求记录的源目录、保留的 worktree 与基线：Host 验证后创建新 worktree，播种先前尚未合入的修改，再继续执行。已经合入或 `integration-pending` 的团队不能使用这一步骤恢复路径。正常环境重试仍需写入和沙箱外执行的同意（工作台重跑请求中的 `confirmWrite` 与 `confirmUnsandboxed`）；关闭旧设置 `confirmUnsandboxedCli` 也不能绕过。先前尝试的费用保留在支出总额中。原运行必须没有活动或中断预占，才能走这条重试路径；崩溃检查点是待核对证据，不是自动续跑令牌。
 
 实现：[official-team-runtime.mjs](.dsh-plugin/shared/official-team-runtime.mjs)、[official-tool-executor.mjs](.dsh-plugin/shared/official-tool-executor.mjs) 与 [run-ledger.mjs](.dsh-plugin/shared/run-ledger.mjs)。
 
@@ -349,9 +351,10 @@ worktree 用于分离和收集修改；只有所选 Harness 环境提供操作�
 
 ## 成本、订阅与质量
 
-- **预算：** 单次规划目标加日/月检查。超预算路由可以尝试省钱预设，或暂停等待确认。未知价格保持未知。这些是本地核算/估计控制，不是厂商的硬性计费上限。
+- **预算：** 单次规划目标加日/月检查。在同一个 DSH_HOME 中，启动时原子检查已记录的 API 支出和其他任务的剩余预占，再为本次执行预占预算。保存每步结果后，以实际核算替换相应估计；执行器完成收尾后才释放剩余预占。超预算路由可以尝试省钱预设，或暂停等待确认。有限日/月预算遇到未知价格、待核对实际费用或未知预占时，需要显式确认。每次后续付费调用前，都会按最新实际支出和剩余预占重新检查；前一步实际费用超过估计，或在有限预算下变成未知时，会暂停后续调用。预算检查停止运行后，已完成收据保留，未用预占在执行器收尾后释放；崩溃或存储失败则继续保留预占。这些本地估计不能保证厂商硬性计费上限。
+- **检查点与中断：** 路由执行、重跑/改派、官方团队、单工具运行和会话咨询共用持久执行生命周期。可选复核和质量升级在追加调用前预占额度。质量升级启动前，先保存首个收据与待核对的追加尝试，避免中断时抹掉首次费用或把第二次尝试视为免费。界面区分实际支出与预占，预占不是账单。确认进程退出后仍保留中断预占及未知用量证据以供核对；仅凭经过时间不会释放，也不会自动重放调用。
 - **订阅优先：** 默认优先检测到的 CLI 账号订阅或已配置 coding-plan 路线。CLI 订阅尝试会移除 API-key 环境变量。`billing` 可为 `subscription-first`、`api-only` 或 `subscription-only`；`subscription` 可为 `cli-login`、`plan-key` 或 `none`。
-- **回退：** 检测到额度耗尽/限流时，将订阅标记为冷却，并可按策略与可用性在已配置 API 路线上重试该路由步骤。其他已尝试的订阅失败默认暂停（`onSubscriptionFailure: "ask"`）：可在历史中选择 API 重试、订阅重试或取消。托管可编辑/单工具/团队运行不会自动在 API 上重试。
+- **回退：** 检测到额度耗尽/限流时，将订阅标记为冷却，并可按策略与可用性在已配置 API 路线上重试该路由步骤。其他已尝试的订阅失败默认暂停（`onSubscriptionFailure: "ask"`）：可在历史中选择 API 重试、订阅重试或取消。订阅切换到 API 时，必须按实际 API 路线重新估算并检查预占；缺少价格或超预算时不会启动调用。托管可编辑/单工具/团队运行不会自动在 API 上重试。
 - **核算：** API 费用计入预算。订阅运行单独显示参考费用。有效的 CLI 报告金额（包括零）优先采用。按 token 计算 CLI 费用，需要完整用量，以及报告的实际模型匹配某个已配置模型或其显式 CLI 映射；身份未知或不匹配时费用保持未知。仅有推荐路线价格不能确定实际 CLI 费用。厂商账单为准。0.15.0 起保留已淘汰详细运行和被重试替换结果的支出，因此裁剪历史或重试步骤不会抹掉先前费用。更早版本已丢弃的费用无法重建。
 - **质量与偏好：** 可选 `off`/`sample`/`always` 更强模型复核可能增加付费调用，且不作为人工反馈。显式评分以时间衰减和小样本收缩，调整精确路线、任务类型对应的独立主观效用（默认上限 ±0.04，可配置至 ±0.1）。评分不改变客观质量分或其硬下限；可禁用学习、撤回评分或重置学习起点。
 
@@ -449,13 +452,13 @@ $`L`$ 为延迟效用：$`t`$ 是匹配历史的 P90 耗时，单位为毫秒；
 
 ## 数据与隐私
 
-路由配置/偏好保存在 Harness 插件设置中。运行时状态写入 `<DSH_HOME>/model-router/state.json`（默认 `~/.dsh/model-router/state.json`）：健康/入门状态、订阅冷却、评分、最多 200 条近期运行、50 条终端元数据，以及主动启用的公共数据快照。运行记录会冻结采用的单价、数据/反馈策略版本。偏好属于共享的本地 DSH_HOME，不是经过认证的独立用户账号；公共数据请求不会上传任务或反馈。
+路由配置/偏好保存在 Harness 插件设置中。运行时状态写入 `<DSH_HOME>/model-router/state.json`（默认 `~/.dsh/model-router/state.json`）：健康/入门状态、订阅冷却、评分、最多 200 条近期运行、最多 100 条执行预占、50 条终端元数据，以及主动启用的公共数据快照。预占引用的运行不会被历史裁剪删除。运行记录会冻结采用的单价、数据/反馈策略版本。偏好属于共享的本地 DSH_HOME，不是经过认证的独立用户账号；公共数据请求不会上传任务或反馈。
 
 0.15.0 起还保留有界支出汇总，最多覆盖 90 个有数据的日历日期与 24 个月。只包含金额/计数，不含任务或回答内容。
 
 运行历史包含任务文本、输出节选、路线/工作区、失败与费用。保存的任务最多 20,000 字符，每条回答最多 4,000 字符，因此重跑可能依赖被截断的已存上下文。插件不把 API key 存进模型配置，也不保存终端转录。任务执行仍会把所选任务/上下文发送给相应供应商或 CLI。
 
-状态写入使用锁和原子替换。无法解析的状态保留为 `state.json.corrupt-<timestamp>` 备份，并显示提示。迁移前请备份状态/配置档数据；不要分享未经脱敏的历史或日志。
+状态写入使用锁和原子替换。状态结构 v2 保存执行所有权、预占和检查点，并升级可读的 v1 状态而不丢弃账本。旧插件会拒绝读取 v2 状态；升级前请完全停止所有 Host 进程，降级前先备份状态。无法解析的状态保留为 `state.json.corrupt-<timestamp>` 备份，并显示提示。迁移前请备份状态/配置档数据；不要分享未经脱敏的历史或日志。
 
 <a id="development"></a>
 
@@ -493,6 +496,7 @@ npm run preview:ui
 | `shared/official-tool-executor.mjs`、`official-team-runtime.mjs` | 可信入口、权限/进程捕获、依赖执行与补丁合入。 |
 | `shared/task-executors.mjs`、`subscription-billing.mjs` | 路由 CLI/API 执行、订阅策略与回退。 |
 | `shared/run-ledger.mjs`、`router-state.mjs` | 身份/用量/费用记录、支出保留与加锁原子持久化。 |
+| `shared/budget-reservations.mjs`、`execution-lifecycle.mjs` | 跨进程预算准入、剩余预占、必须保存的检查点和中断进程证据。 |
 | 其他 `.dsh-plugin/shared/` 模块 | 终端契约、工具健康、公共快照与有界反馈。 |
 | `.dsh-plugin/client.js` | 生成的 Desktop 客户端 bundle；修改客户端后需重建。 |
 | `scripts/` 与 `tests/` | 构建/打包/验证辅助脚本与回归测试。 |
@@ -502,6 +506,8 @@ npm run preview:ui
 `check:readme` 检查六个展示公式、正文行内数学符号、小数前导零、双语公式一致性和审阅后的 blob 哈希；`npm test` 与 `prepack` 均会执行。修改公式后还须在 GitHub 页面查看实际渲染。公式块采用 [GitHub 官方支持的语法](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions)。
 
 `check:client` 在内存中重建并比较已提交 bundle；`prepack` 会拒绝过期 bundle。pnpm 10 没有 `pnpm peers check` 命令：请使用上述严格安装。Host SDK 包不可用/不兼容时，本地集成测试可能需要已安装的 Harness 运行时；[setup-harness-dev.mjs](scripts/setup-harness-dev.mjs) 从显式提供的 Host `node_modules` 链接缺失 SDK 包，[start-harness-preview.mjs](scripts/start-harness-preview.mjs) 启动独立的本地 Web Host 配置档。这些辅助脚本不能代替依赖验证或 Desktop 验收。
+
+GitHub Actions 通过 Windows/Linux Node 24 矩阵执行冻结锁文件严格依赖安装、全量测试、已提交客户端一致性、实际客户端构建和离线预览编译。打包后逐文件对比原始 Git blob，并检查运行时 import 依赖是否完整。这些检查使用本地预置数据，不验证真实供应商计费。提交本地候选后，可先运行 `npm run pack:local`，再运行 `node scripts/check-package.mjs` 复现包验证。
 
 旧兼容/研究文件和带日期报告保留作参考；它们的存在不代表当前发行插件仍启用所有旧集成。发布与同步遵循 [AGENTS.md](AGENTS.md)；重现某次发布请使用带版本号的包或已验证的发布 tag。
 
@@ -531,6 +537,8 @@ npm run preview:ui
 | 登录/模型权限仍失败 | 检查厂商账号、CLI 登录、网络和实际模型访问；仅安装成功不够。 |
 | 前端提示 Host 版本较旧 | 完全退出 Harness（包括托盘进程）后重启。 |
 | 预览与旧建议不同 | 目录、登录、额度或预算状态已变化；请查看新预览。 |
+| 中断后预算仍被预占 | 核对原任务、保留的 worktree 和供应商账单。预占不会自动释放或续跑，本版没有手工核对并释放的操作入口。 |
+| 旧插件无法读取状态 | v2 状态包含受保护的预占；恢复兼容版本，不要删除账本绕过检查。 |
 | 终端 TUI 不渲染 | 检查卡片报告的是 PTY 还是管道回退模式。 |
 | 已登录但团队没有可执行路线 | 检查 `readyModes`、平台、所选安装和权限模式；仅终端已登录不能证明具备托管执行能力。 |
 | Claude 只读中没有 skills/MCP | 受限模式会禁用它们；可编辑/正常环境选项权限不同，需要相应确认。 |
