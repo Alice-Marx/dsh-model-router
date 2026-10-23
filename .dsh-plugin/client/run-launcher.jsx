@@ -16,6 +16,25 @@ const STAGE_TEXT = Object.freeze({ starting: '正在启动任务…', preparing:
   integrating: '正在整合工作包结果…', reviewing: '正在检查执行结果…', saving: '正在保存执行记录…' })
 const ACTIVE_JOB_KEY = 'dsh-model-router:active-run-job'
 const isJobSnapshot = value => Boolean(text(value?.jobId) && JOB_STATUSES.has(value.status))
+const REMOTE_WAIT_MS = 15_000
+// Only retryable reads/cancel requests use this deadline. Aborting their HTTP
+// wait does not cancel a Host job, and startRun must never be replayed on timeout.
+async function waitForRemote(operation, controllers) {
+  const controller = new AbortController()
+  controllers.add(controller)
+  let timer
+  try {
+    return await new Promise((resolve, reject) => {
+      controller.signal.onabort = () => { clearTimeout(timer); reject(new Error('工作台请求等待超时，请在连接恢复后重试。')) }
+      timer = setTimeout(() => controller.abort(), REMOTE_WAIT_MS)
+      Promise.resolve(operation(controller.signal)).then(resolve, reject)
+    })
+  } finally {
+    clearTimeout(timer)
+    controller.signal.onabort = null
+    controllers.delete(controller)
+  }
+}
 // The browser retains only this opaque ID. Task text, configuration, and
 // answers remain in Host memory/the existing ledger.
 function savedJob() {
@@ -72,6 +91,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   const launchSequence = React.useRef(0)
   const launching = React.useRef(false)
   const awaitingLaunch = React.useRef(null)
+  const pendingRemotes = React.useRef(new Set())
   const onFinished = React.useRef(onStarted)
   onFinished.current = onStarted
   const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey, packageAssignments])
@@ -120,6 +140,8 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
     }
     return () => {
       mounted.current = false
+      for (const controller of pendingRemotes.current) controller.abort()
+      pendingRemotes.current.clear()
       launchListeners.delete(receiveLaunch)
       pendingRequest.current += 1
       activeRun.current = null
@@ -185,7 +207,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
       if (disposed || activeRun.current !== active || active.terminal) return
       const sequence = ++active.requestSequence
       try {
-        const value = unwrapRemote(await runStatus({ jobId: runningJobId }), '暂时无法读取执行进度。')
+        const value = unwrapRemote(await waitForRemote(signal => runStatus({ jobId: runningJobId }, signal), pendingRemotes.current), '暂时无法读取执行进度。')
         if (disposed) return
         if (!isJobSnapshot(value) || value.jobId !== runningJobId) throw new Error('暂时无法读取执行进度。')
         acceptSnapshot(value, active.token, sequence)
@@ -236,7 +258,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
     const signature = inputSignature
     setPhase({ kind: 'previewing' })
     try {
-      const value = unwrapRemote(await previewRun(snapshot), '执行预览失败。')
+      const value = unwrapRemote(await waitForRemote(signal => previewRun(snapshot, signal), pendingRemotes.current), '执行预览失败。')
       if (mounted.current && current === pendingRequest.current && signature === latestSignature.current) setPhase({ kind: 'preview', value, request: snapshot, signature })
     } catch (error) {
       if (mounted.current && current === pendingRequest.current && signature === latestSignature.current) setPhase({ kind: 'error', message: text(error?.message) || '执行预览失败。' })
@@ -290,7 +312,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
     const sequence = ++active.requestSequence
     setPhase(previous => previous.kind === 'running' ? { ...previous, cancelPending: true, cancelError: '' } : previous)
     try {
-      const value = unwrapRemote(await cancelRun({ jobId: active.jobId }), '取消请求未确认。')
+      const value = unwrapRemote(await waitForRemote(signal => cancelRun({ jobId: active.jobId }, signal), pendingRemotes.current), '取消请求未确认。')
       if (!isJobSnapshot(value) || value.jobId !== active.jobId) throw new Error('取消请求未确认。')
       acceptSnapshot(value, active.token, sequence, true)
     } catch {

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.1 — 2026-10-23
+
+- Check retry budgets against the target and every unfinished downstream package that will execute. Reassignment uses the selected route estimate; successful downstream packages are excluded and unknown prices remain unknown.
+- Bound workbench preview, progress and cancel requests to 15 seconds, abort stalled transport waits, retry progress against the same job and allow an unacknowledged cancellation to be retried. Never automatically replay task starts.
+- Preserve late-response fences and clear request lifetimes on panel close. Add offline Host budget, real SDK cancellation transport and hung-request UI regressions.
+
+
 ## 0.23.0 — 2026-10-23
 
 - Return an observable Host job when a workbench execution starts. Show elapsed time, the current work package and per-package states, with status reads and cancellation through the typed desktop gateway.

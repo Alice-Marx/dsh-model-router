@@ -464,10 +464,10 @@ function registerUi(ctx) {
       rateResult: request => officialToolsRemote.rateResult(request),
       rerunStep: request => officialToolsRemote.rerunStep(request),
       loadBoundaries: () => officialToolsRemote.boundaries(),
-      previewRun: request => officialToolsRemote.previewRun(request),
+      previewRun: (request, signal) => officialToolsRemote.previewRun(request, signal),
       startRun: request => officialToolsRemote.startRun(request),
-      runStatus: request => officialToolsRemote.runStatus(request),
-      cancelRun: request => officialToolsRemote.cancelRun(request),
+      runStatus: (request, signal) => officialToolsRemote.runStatus(request, signal),
+      cancelRun: (request, signal) => officialToolsRemote.cancelRun(request, signal),
       terminalApi: Object.freeze({
         terminalInfo: () => officialToolsRemote.terminalInfo(),
         terminalStart: request => officialToolsRemote.terminalStart(request),

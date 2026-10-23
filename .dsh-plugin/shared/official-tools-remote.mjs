@@ -205,7 +205,7 @@ const terminalStopCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#Terminal
 
 const runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest)
 
-function descriptor(method, parameters, result) {
+function descriptor(method, parameters, result, cancellable = false) {
   return Object.freeze({
     id: `${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${OFFICIAL_TOOLS_REMOTE_NAMESPACE}/${method}`,
     service: OFFICIAL_TOOLS_REMOTE_NAMESPACE,
@@ -214,6 +214,7 @@ function descriptor(method, parameters, result) {
     invocation: { kind: 'direct' },
     parameters,
     result,
+    ...(cancellable ? { cancellation: { parameter: 'signal' } } : {}),
   })
 }
 
@@ -238,10 +239,10 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('rerunStep', [jsonParameter('request', rerunRequestCodec)], anyObjectCodec('RerunResult')),
   descriptor('boundaries', [], anyObjectCodec('SecurityBoundaries')),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
-  descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview')),
+  descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview'), true),
   descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),
-  descriptor('runStatus', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus')),
-  descriptor('cancelRun', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus')),
+  descriptor('runStatus', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus'), true),
+  descriptor('cancelRun', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus'), true),
   // Workbench "官方工具终端": interactive shell / fixed official CLI sessions.
   // Output streams through long-poll reads; input and resize are unary calls.
   descriptor('terminalInfo', [], anyObjectCodec('TerminalInfo')),

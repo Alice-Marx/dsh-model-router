@@ -10,7 +10,7 @@ Want release notes only? Click **Watch → Custom → Releases** (you do not nee
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
 
-Current version: **0.23.0** (`@ljwei-stak/dsh-model-router`). Workbench execution now shows live elapsed time and per-package progress, supports cancellation with completed results and reported costs retained, and reconnects to the active job when the panel is reopened. Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.23.1** (`@ljwei-stak/dsh-model-router`). Retries now check the whole unfinished downstream group against the budget, and stalled progress/cancel requests recover after a bounded wait. Workbench execution shows live elapsed time and per-package progress, supports cancellation with completed results and reported costs retained, and reconnects to the active job when the panel is reopened. Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
 
@@ -27,22 +27,22 @@ Both README versions describe the same interfaces, formulas, defaults and limits
 **Install (DSH Plugin Hub / web profile):** With the DSH CLI available, install the published npm package with:
 
 ```sh
-dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.23.0
+dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.23.1
 ```
 
 **Install in Harness Desktop:** Launch Desktop once to initialize its `desktop` profile, quit Desktop fully, then run:
 
 ```sh
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.23.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.23.1
 ```
 
 You can also paste the package spec into **Harness Desktop → Plugins → Add plugin**. Restart Desktop after installation. A global `npm install -g` by itself does not register a Desktop plugin.
 
-**Package and entry point:** [`@ljwei-stak/dsh-model-router@0.23.0` on npm](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) is published. The root [`package.json`](package.json) declares the package and bundle patch; [`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs) exports the required `apply(ctx)` entry point. License: [MIT](LICENSE).
+**Package and entry point:** [`@ljwei-stak/dsh-model-router@0.23.1` on npm](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) is published. The root [`package.json`](package.json) declares the package and bundle patch; [`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs) exports the required `apply(ctx)` entry point. License: [MIT](LICENSE).
 
 **Configuration:** There is no supported import of a user-authored JSON/YAML configuration file. Configure providers, models, and credentials on Harness's **Models** page; configure routing profiles and preferences in the plugin settings. Persistent router state is stored in `$DSH_HOME/model-router/state.json` (default: `~/.dsh/model-router/state.json`). Provider CLIs retain their own login and configuration. The router does not copy API keys into model profiles or terminal logs.
 
-**Screenshots and evidence:** The [workbench screenshot](docs/assets/workbench-task-preview.jpg) uses fixture models, prices, and health data; it is a simulated UI preview, not a live Harness or model run. See the [routing workflow diagram](docs/assets/routing-workflow.svg) for the execution flow. The [real Windows validation report](docs/releases/0.20.0-validation.md) documents specific 0.20.0 executions and their limits; 0.23.0 has no verified end-to-end vendor run. The [live progress screenshot](docs/assets/workbench-run-progress.png) is an offline simulation; see the [0.23.0 acceptance report](docs/releases/0.23.0-validation.md) for cancellation, recovery and validation boundaries.
+**Screenshots and evidence:** The [workbench screenshot](docs/assets/workbench-task-preview.jpg) uses fixture models, prices, and health data; it is a simulated UI preview, not a live Harness or model run. See the [routing workflow diagram](docs/assets/routing-workflow.svg) for the execution flow. The [real Windows validation report](docs/releases/0.20.0-validation.md) documents specific 0.20.0 executions and their limits; 0.23.1 has no verified end-to-end vendor run. The [live progress screenshot](docs/assets/workbench-run-progress.png) is an offline simulation; see the [0.23.1 acceptance report](docs/releases/0.23.1-validation.md) for cancellation, recovery and validation boundaries.
 
 **Permissions and risks:** Planning is local and makes no model call. Execution sends the selected task/context to the chosen model API or vendor CLI and may incur charges. The default Harness-restricted environment separates read-only runs from approved `workspace-write` runs. An explicitly selected `cli-native` editable team runs with the current OS user's permissions, outside the Harness process sandbox; a Git worktree collects changes but does not restrict OS access. External providers and CLI services apply their own data handling and billing terms.
 
@@ -78,16 +78,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.23.0
+@ljwei-stak/dsh-model-router@0.23.1
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.23.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.23.1** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.23.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.23.1`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -118,6 +118,8 @@ Switching tabs keeps the panels mounted, preserving in-progress installation and
 6. Inspect **执行记录与子任务** for the actual channel, response, failures, cost and ratings. Official teamwork replans using only installed CLIs ready for the selected permission mode. Edits require approval and a clean Git repository; successful worktree changes are conditionally integrated. An unavailable or failed CLI never silently becomes an API call in this mode.
 
 After execution starts, the workbench shows elapsed time, the current package and each package's state. **取消执行** requests cancellation of the active call and stops later packages from starting; **正在取消** remains visible until the executor finishes cleanup. Completed results and reported usage remain in history. Cancelling cannot undo charges already incurred or changes already integrated. Closing the panel does not cancel a run; reopening it in the same browser session can reconnect while the Host retains that job. Host restarts clear these in-memory jobs, and completed ledger records remain available.
+
+Preview, progress and cancellation requests stop waiting after 15 seconds. Progress reads retry against the same job; an unacknowledged cancellation can be retried explicitly. A transport timeout does not establish that the Host task stopped and never automatically resubmits `startRun`. Before retrying a recorded step, budget checks include that step and all unfinished downstream packages that will execute; reassignment uses the selected route estimate and unknown prices remain unknown. The [timeout recovery screenshot](docs/assets/workbench-run-timeout.png) is an offline simulation.
 
 Changing task text, planning mode, profiles, directory or relevant settings invalidates the prior recommendation. Changing execution inputs also discards the pending or completed preview, so execution requires a new preview of the current request. Previewing execution uses current Host state and can differ from a previous local plan.
 

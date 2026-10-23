@@ -194,6 +194,75 @@ test('cancel request failure can be retried and successful ACK waits for a Host 
   assert.equal(ui.button('预览执行计划').disabled, false)
 })
 
+test('a hung status request times out and aborts transport, then resumes the same job without accepting late responses', async t => {
+  const pending = deferred(), polls = [], signals = [], finished = []
+  const ui = await launcherHarness({ onStarted: id => finished.push(id), runStatus: (request, signal) => {
+    polls.push(request); signals.push(signal)
+    return polls.length === 1 ? pending.promise : Promise.resolve(ok(snapshot({ status: 'completed', result: { status: 'completed', runId: 'recovered' } })))
+  } })
+  t.after(() => ui.unmount())
+  await ui.start(); await ui.advance(16_000)
+  assert.equal(signals[0].aborted, true)
+  assert.match(ui.text(), /将自动重试；任务可能仍在执行/)
+  assert.equal(ui.button('取消执行').disabled, false)
+  assert.equal(ui.storage.get('dsh-model-router:active-run-job'), 'job-one')
+  assert.equal(polls.length, 1)
+  await ui.advance(1000)
+  assert.deepEqual(polls, [{ jobId: 'job-one' }, { jobId: 'job-one' }])
+  assert.deepEqual(finished, ['recovered'])
+  assert.equal(ui.timerCount(), 0)
+  pending.resolve(ok(snapshot({ status: 'cancelled', result: { status: 'cancelled', runId: 'stale' } })))
+  await tick(); ui.render()
+  assert.deepEqual(finished, ['recovered'])
+  assert.doesNotMatch(ui.text(), /已取消/)
+})
+
+test('a hung cancel request can be retried after its deadline and a late ACK cannot replace the retry', async t => {
+  const first = deferred(), second = deferred(), signals = [], cancellations = []
+  let status = snapshot()
+  const ui = await launcherHarness({ runStatus: async () => ok(status), cancelRun: (request, signal) => {
+    cancellations.push(request); signals.push(signal)
+    return cancellations.length === 1 ? first.promise : second.promise
+  } })
+  t.after(() => ui.unmount())
+  await ui.start()
+  ui.button('取消执行').onClick(); await tick(); ui.render(); await ui.advance(15_000)
+  assert.equal(signals[0].aborted, true)
+  assert.match(ui.text(), /取消请求未确认/)
+  assert.equal(ui.button('取消执行').disabled, false)
+  ui.button('取消执行').onClick(); await tick(); ui.render()
+  first.resolve(ok(snapshot({ status: 'cancelled', result: { status: 'cancelled', runId: 'late' } })))
+  await tick(); ui.render()
+  assert.equal(ui.button('正在请求取消…').disabled, true)
+  assert.doesNotMatch(ui.text(), /已取消/)
+  second.resolve(ok(snapshot({ status: 'cancelling', cancelRequested: true })))
+  await tick(); ui.render()
+  assert.equal(ui.button('正在取消…').disabled, true)
+  assert.deepEqual(cancellations, [{ jobId: 'job-one' }, { jobId: 'job-one' }])
+  status = snapshot({ status: 'cancelled', result: { status: 'cancelled', runId: 'confirmed' } })
+  await ui.advance(1000)
+  assert.match(ui.text(), /已取消/)
+  assert.equal(ui.timerCount(), 0)
+})
+
+test('a hung preview releases controls after its deadline and ignores the late preview', async t => {
+  const first = deferred(), signals = []
+  let calls = 0, starts = 0
+  const ui = await launcherHarness({ previewRun: (request, signal) => { signals.push(signal); return ++calls === 1 ? first.promise : Promise.resolve(ok(preview)) },
+    startRun: async () => { starts += 1; return ok(snapshot()) } })
+  t.after(() => ui.unmount())
+  ui.button('预览执行计划').onClick(); await tick(); ui.render(); await ui.advance(15_000)
+  assert.equal(signals[0].aborted, true)
+  assert.match(ui.text(), /工作台请求等待超时/)
+  assert.equal(ui.button('预览执行计划').disabled, false)
+  assert.equal(calls, 1)
+  ui.button('预览执行计划').onClick(); await tick(); ui.render()
+  first.resolve(ok({ ...preview, status: 'blocked' }))
+  await tick(); ui.render()
+  assert.equal(ui.button('确认执行').disabled, false)
+  assert.equal(starts, 0, 'a timeout never implies consent to start execution')
+})
+
 test('a status response from before cancellation cannot erase the acknowledged cancelling state', async t => {
   const stale = deferred()
   const ui = await launcherHarness({ runStatus: () => stale.promise })

@@ -4030,6 +4030,26 @@ var STAGE_TEXT = Object.freeze({
 });
 var ACTIVE_JOB_KEY = "dsh-model-router:active-run-job";
 var isJobSnapshot = (value) => Boolean(text2(value?.jobId) && JOB_STATUSES.has(value.status));
+var REMOTE_WAIT_MS = 15e3;
+async function waitForRemote(operation, controllers) {
+  const controller = new AbortController();
+  controllers.add(controller);
+  let timer;
+  try {
+    return await new Promise((resolve, reject) => {
+      controller.signal.onabort = () => {
+        clearTimeout(timer);
+        reject(new Error("\u5DE5\u4F5C\u53F0\u8BF7\u6C42\u7B49\u5F85\u8D85\u65F6\uFF0C\u8BF7\u5728\u8FDE\u63A5\u6062\u590D\u540E\u91CD\u8BD5\u3002"));
+      };
+      timer = setTimeout(() => controller.abort(), REMOTE_WAIT_MS);
+      Promise.resolve(operation(controller.signal)).then(resolve, reject);
+    });
+  } finally {
+    clearTimeout(timer);
+    controller.signal.onabort = null;
+    controllers.delete(controller);
+  }
+}
 function savedJob() {
   try {
     return typeof sessionStorage === "undefined" ? "" : text2(sessionStorage.getItem(ACTIVE_JOB_KEY));
@@ -4084,6 +4104,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   const launchSequence = import_react3.default.useRef(0);
   const launching = import_react3.default.useRef(false);
   const awaitingLaunch = import_react3.default.useRef(null);
+  const pendingRemotes = import_react3.default.useRef(/* @__PURE__ */ new Set());
   const onFinished = import_react3.default.useRef(onStarted);
   onFinished.current = onStarted;
   const inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]);
@@ -4140,6 +4161,8 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     }
     return () => {
       mounted.current = false;
+      for (const controller of pendingRemotes.current) controller.abort();
+      pendingRemotes.current.clear();
       launchListeners.delete(receiveLaunch);
       pendingRequest.current += 1;
       activeRun.current = null;
@@ -4217,7 +4240,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       if (disposed || activeRun.current !== active || active.terminal) return;
       const sequence = ++active.requestSequence;
       try {
-        const value = unwrapRemote(await runStatus({ jobId: runningJobId }), "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6267\u884C\u8FDB\u5EA6\u3002");
+        const value = unwrapRemote(await waitForRemote((signal) => runStatus({ jobId: runningJobId }, signal), pendingRemotes.current), "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6267\u884C\u8FDB\u5EA6\u3002");
         if (disposed) return;
         if (!isJobSnapshot(value) || value.jobId !== runningJobId) throw new Error("\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6267\u884C\u8FDB\u5EA6\u3002");
         acceptSnapshot(value, active.token, sequence);
@@ -4281,7 +4304,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     const signature2 = inputSignature;
     setPhase({ kind: "previewing" });
     try {
-      const value = unwrapRemote(await previewRun(snapshot), "\u6267\u884C\u9884\u89C8\u5931\u8D25\u3002");
+      const value = unwrapRemote(await waitForRemote((signal) => previewRun(snapshot, signal), pendingRemotes.current), "\u6267\u884C\u9884\u89C8\u5931\u8D25\u3002");
       if (mounted.current && current === pendingRequest.current && signature2 === latestSignature.current) setPhase({ kind: "preview", value, request: snapshot, signature: signature2 });
     } catch (error) {
       if (mounted.current && current === pendingRequest.current && signature2 === latestSignature.current) setPhase({ kind: "error", message: text2(error?.message) || "\u6267\u884C\u9884\u89C8\u5931\u8D25\u3002" });
@@ -4342,7 +4365,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     const sequence = ++active.requestSequence;
     setPhase((previous) => previous.kind === "running" ? { ...previous, cancelPending: true, cancelError: "" } : previous);
     try {
-      const value = unwrapRemote(await cancelRun({ jobId: active.jobId }), "\u53D6\u6D88\u8BF7\u6C42\u672A\u786E\u8BA4\u3002");
+      const value = unwrapRemote(await waitForRemote((signal) => cancelRun({ jobId: active.jobId }, signal), pendingRemotes.current), "\u53D6\u6D88\u8BF7\u6C42\u672A\u786E\u8BA4\u3002");
       if (!isJobSnapshot(value) || value.jobId !== active.jobId) throw new Error("\u53D6\u6D88\u8BF7\u6C42\u672A\u786E\u8BA4\u3002");
       acceptSnapshot(value, active.token, sequence, true);
     } catch {
@@ -13863,7 +13886,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = true ? "0.23.0" : "";
+var ROUTER_CLIENT_VERSION = true ? "0.23.1" : "";
 var STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   const value = String(message ?? "");
@@ -15874,7 +15897,7 @@ var terminalWriteCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalW
 var terminalResizeCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalResize`, parseTerminalResize);
 var terminalStopCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStop`, parseTerminalStop);
 var runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest);
-function descriptor(method, parameters, result) {
+function descriptor(method, parameters, result, cancellable = false) {
   return Object.freeze({
     id: `${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${OFFICIAL_TOOLS_REMOTE_NAMESPACE}/${method}`,
     service: OFFICIAL_TOOLS_REMOTE_NAMESPACE,
@@ -15882,7 +15905,8 @@ function descriptor(method, parameters, result) {
     method,
     invocation: { kind: "direct" },
     parameters,
-    result
+    result,
+    ...cancellable ? { cancellation: { parameter: "signal" } } : {}
   });
 }
 var toolIdParameter = Object.freeze({
@@ -15908,10 +15932,10 @@ var OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor("rerunStep", [jsonParameter("request", rerunRequestCodec)], anyObjectCodec("RerunResult")),
   descriptor("boundaries", [], anyObjectCodec("SecurityBoundaries")),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
-  descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview")),
+  descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview"), true),
   descriptor("startRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunStarted")),
-  descriptor("runStatus", [jsonParameter("request", runJobRequestCodec)], anyObjectCodec("RunJobStatus")),
-  descriptor("cancelRun", [jsonParameter("request", runJobRequestCodec)], anyObjectCodec("RunJobStatus")),
+  descriptor("runStatus", [jsonParameter("request", runJobRequestCodec)], anyObjectCodec("RunJobStatus"), true),
+  descriptor("cancelRun", [jsonParameter("request", runJobRequestCodec)], anyObjectCodec("RunJobStatus"), true),
   // Workbench "官方工具终端": interactive shell / fixed official CLI sessions.
   // Output streams through long-poll reads; input and resize are unary calls.
   descriptor("terminalInfo", [], anyObjectCodec("TerminalInfo")),
@@ -16363,10 +16387,10 @@ function registerUi(ctx) {
       rateResult: (request) => officialToolsRemote.rateResult(request),
       rerunStep: (request) => officialToolsRemote.rerunStep(request),
       loadBoundaries: () => officialToolsRemote.boundaries(),
-      previewRun: (request) => officialToolsRemote.previewRun(request),
+      previewRun: (request, signal) => officialToolsRemote.previewRun(request, signal),
       startRun: (request) => officialToolsRemote.startRun(request),
-      runStatus: (request) => officialToolsRemote.runStatus(request),
-      cancelRun: (request) => officialToolsRemote.cancelRun(request),
+      runStatus: (request, signal) => officialToolsRemote.runStatus(request, signal),
+      cancelRun: (request, signal) => officialToolsRemote.cancelRun(request, signal),
       terminalApi: Object.freeze({
         terminalInfo: () => officialToolsRemote.terminalInfo(),
         terminalStart: (request) => officialToolsRemote.terminalStart(request),

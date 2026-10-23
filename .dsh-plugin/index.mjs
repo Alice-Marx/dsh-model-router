@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { isAbsolute } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { DEFAULT_ROUTER_SETTINGS, modelMetadata } from './shared/router.mjs'
+import { DEFAULT_ROUTER_SETTINGS, estimateAssignedPackage, modelMetadata } from './shared/router.mjs'
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
 import { HEALTH_CACHE_MS, apiKeyEnvPresent, healthCache, runHealthCheck, subscriptionLoginOf } from './shared/tool-health.mjs'
 import { latestVersions } from './shared/latest-versions.mjs'
@@ -995,6 +995,31 @@ export function rerunSupport(run) {
   return { ok: true, kind: run.kind === 'team' ? 'team' : 'assign', writes: false }
 }
 
+/** Estimate exactly the packages a retry will start, retaining unknown prices. */
+function rerunEstimates(run, ids, targetId, override, routes, dataOptions) {
+  const estimates = new Map()
+  for (const item of run.packages.filter(item => ids.has(item.id))) {
+    const assigned = item.id === targetId ? override : null
+    const provider = assigned?.provider ?? item.provider ?? item.recommendedProvider
+    const model = assigned?.model ?? item.model ?? item.recommendedModel
+    const changedRoute = provider !== item.recommendedProvider || model !== item.recommendedModel
+    const reassignsRoute = assigned && (assigned.provider !== (item.provider ?? item.recommendedProvider)
+      || assigned.model !== (item.model ?? item.recommendedModel))
+    let estimate = item.estimatedCost
+    // An unchanged route can retain its planned effort; changing identity uses
+    // the new adapter's default effort, just like rerunAssignmentPackage.
+    if (reassignsRoute || changedRoute) {
+      const route = routes.find(route => route.provider === provider && route.model === model)
+      estimate = route ? estimateAssignedPackage(route, item, run.task,
+        run.decision?.complexity?.band ?? 'balanced', dataOptions).estimatedCost : null
+    }
+    estimates.set(item.id, Number.isFinite(estimate) && estimate >= 0 ? estimate : null)
+  }
+  const values = [...estimates.values()]
+  const total = values.every(value => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null
+  return { byId: estimates, total: Number.isFinite(total) ? total : null }
+}
+
 export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, confirmWrite = false, confirmUnsandboxed = false, subscriptionChoice = null, workspace, root, signal, ...options } = {}) {
   const { run, saved } = await storedRun(runId)
   const target = run.packages.find(item => item.id === text(packageId))
@@ -1033,16 +1058,17 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     return { paused: true, needsConfirmation: missingConfirmations, run,
       budget: null, message: '请确认续跑所需的文件修改与执行环境权限后继续；厂商 CLI 正常环境以当前用户权限运行，独立 Git 工作树不是操作系统读写边界。' }
   }
-  const sameRoute = !override || (override.provider === target.recommendedProvider && override.model === target.recommendedModel)
-  const budget = budgetFor(config, saved, sameRoute ? target.estimatedCost : null)
+  const retryIds = new Set([target.id, ...downstreamPackageIds(run.packages, target.id)
+    .filter(id => run.packages.find(item => item.id === id)?.ok !== true)])
+  const estimates = rerunEstimates(run, retryIds, target.id, override, routes, planDataOptions(refreshed, config))
+  const budget = budgetFor(config, saved, estimates.total)
   if (budget.exceeded && confirmOverBudget !== true) {
     return { paused: true, budget: { ...budget, paused: true, message: `${budget.message} 已暂停重跑，请确认后再试。` }, run }
   }
   const cwd = text(workspace) || run.workspace
   if (!cwd || !(await fileExists(cwd))) throw new Error(`原运行的工作区 ${cwd || '(未记录)'} 不可用，无法重跑该步骤；请恢复该目录，或在原工作区的会话中调用 model_router_rerun_step。`)
-  if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, root: text(root) || cwd, signal, options, config })
-  const retryIds = new Set([target.id, ...downstreamPackageIds(run.packages, target.id)
-    .filter(id => run.packages.find(item => item.id === id)?.ok !== true)])
+  if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget,
+    ids: [...retryIds], estimates: estimates.byId, cwd, root: text(root) || cwd, signal, options, config })
   const manualRetries = Object.fromEntries(run.packages.filter(item => retryIds.has(item.id) && item.manualAssignment)
     .map(item => [item.id, item.id === target.id && override ? { kind: 'api', ...override } : item.manualAssignment]))
   if (Object.keys(manualRetries).length) {
@@ -1089,6 +1115,9 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   })
   const updated = await routerStateStore().updateRun(run.id, current => {
     mergeRerun(current, execution, { rerunIds: execution.ranIds, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
+    for (const item of current.packages) {
+      if (execution.ranIds.includes(item.id)) item.estimatedCost = estimates.byId.get(item.id) ?? null
+    }
   })
   const awaiting = pausedSteps(execution)
   return { run: updated, execution, budget, ...(awaiting.length ? { awaitingConfirmation: awaiting } : {}) }
@@ -1114,7 +1143,7 @@ async function cancelPausedStep(runId, packageId) {
 }
 
 /** Stored team packages in plan shape; `override` reassigns the retried package. */
-function teamPlanFromRun(run, ids, override, targetId) {
+function teamPlanFromRun(run, ids, override, targetId, estimates) {
   const workPackages = run.packages.filter(item => ids.includes(item.id)).map(item => ({
     id: item.id, name: item.name, objective: item.objective, dependsOn: item.dependsOn ?? [],
     type: item.type ?? 'general', purpose: item.purpose ?? 'execution',
@@ -1124,7 +1153,7 @@ function teamPlanFromRun(run, ids, override, targetId) {
     ...(item.plannedReasoningEffort && !(item.id === targetId && override
       && (override.provider !== item.recommendedProvider || override.model !== item.recommendedModel))
       ? { recommendedReasoningEffort: item.plannedReasoningEffort } : {}),
-    estimatedCost: item.estimatedCost ?? null,
+    estimatedCost: estimates.get(item.id) ?? null,
   }))
   return { mode: 'team', team: { workPackages } }
 }
@@ -1133,13 +1162,10 @@ function teamPlanFromRun(run, ids, override, targetId) {
  * Read-only team retry: the failed step plus downstream steps that had not
  * succeeded run through the same signed runner; earlier answers are context.
  */
-async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, root, signal, options, config = {} }) {
+async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, estimates, cwd, root, signal, options, config = {} }) {
   const mode = run.executionMode === 'workspace-write' ? 'workspace-write' : 'read-only'
   const executionEnvironment = teamExecutionEnvironment(run.executionEnvironment, mode)
-  const downstream = downstreamPackageIds(run.packages, target.id)
-    .filter(id => !run.packages.find(item => item.id === id)?.ok)
-  const ids = [target.id, ...downstream]
-  const plan = teamPlanFromRun(run, ids, override, target.id)
+  const plan = teamPlanFromRun(run, ids, override, target.id, estimates)
   const cliModels = Object.fromEntries(Object.entries(run.cliModels ?? {}).filter(([key]) => ids.includes(key) && !(override && key === target.id)))
   if (override) {
     const reassignedPlan = { team: { workPackages: plan.team.workPackages.filter(item => item.id === target.id) } }
@@ -1166,6 +1192,9 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, cwd, 
   }
   const updated = await routerStateStore().updateRun(run.id, current => {
     mergeRerun(current, converted, { rerunIds: ids, pricingFor: item => routePricing(routes, item), billingFor: billingForResult })
+    for (const item of current.packages) {
+      if (ids.includes(item.id)) item.estimatedCost = estimates.get(item.id) ?? null
+    }
     for (const [id, note] of quotaNotes) {
       const stored = current.packages.find(item => item.id === id)
       if (stored) stored.billingSwitch = note

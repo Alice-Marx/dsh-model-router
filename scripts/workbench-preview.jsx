@@ -143,6 +143,8 @@ function createDemoSession(scenario) {
   const jobs = new Map()
   let completedAt = scenario === 'onboarding' ? null : Date.now()
   const installed = new Set(scenario === 'terminal-all' ? OFFICIAL_TOOLS.map(tool => tool.id) : ['claude-code', 'codex', 'gemini'])
+  let statusRequests = 0, cancelRequests = 0
+  const hangTransport = signal => new Promise((_, reject) => signal?.addEventListener('abort', () => reject(signal.reason), { once: true }))
   const source = () => scenario === 'empty' ? { groups: [], routableProviders: [], failures: [] } : catalog
   const routes = () => applyModelProfiles(routesFromModelCatalog(source()), parseModelProfilesJson(settingsScope.getSnapshot().value.modelProfilesJson))
   const tools = OFFICIAL_TOOLS.map(tool => ({
@@ -205,7 +207,7 @@ function createDemoSession(scenario) {
   const jobSnapshot = job => {
     const elapsed = Date.now() - job.startedAt
     const count = job.run.packages.length
-    const completed = Math.min(count, job.cancelAt ? job.completedAtCancel : Math.floor(elapsed / 6000))
+    const completed = Math.min(count, job.cancelAt ? job.completedAtCancel : Math.floor(elapsed / (scenario === 'run-hanging' ? 30_000 : 6000)))
     const terminal = job.cancelAt ? Date.now() - job.cancelAt >= 1500 : completed === count
     const status = terminal ? job.cancelAt ? 'cancelled' : 'completed' : job.cancelAt ? 'cancelling' : 'running'
     const packages = job.run.packages.map((item, index) => ({ id: item.id, name: item.name,
@@ -286,18 +288,20 @@ function createDemoSession(scenario) {
           answer: `模拟提交任务：${request.task}\n本地 UI 演示结果：仅生成浏览器内记录，没有调用模型或修改文件。` })),
       }
       runs.push(run)
-      if (scenario === 'run-progress') {
+      if (scenario === 'run-progress' || scenario === 'run-hanging') {
         const job = { jobId: `job-${runId}`, run, startedAt: Date.now(), cancelAt: null }
         jobs.set(job.jobId, job)
         return ok(jobSnapshot(job))
       }
       return ok({ status: 'completed', runId })
     },
-    runStatus: async ({ jobId }) => {
+    runStatus: async ({ jobId }, signal) => {
+      if (scenario === 'run-hanging' && ++statusRequests === 1) await hangTransport(signal)
       const job = jobs.get(jobId)
       return job ? ok(jobSnapshot(job)) : { ok: false, error: { message: 'Unknown run job id.' } }
     },
-    cancelRun: async ({ jobId }) => {
+    cancelRun: async ({ jobId }, signal) => {
+      if (scenario === 'run-hanging' && ++cancelRequests === 1) await hangTransport(signal)
       const job = jobs.get(jobId)
       if (!job) return { ok: false, error: { message: 'Unknown run job id.' } }
       const current = jobSnapshot(job)
@@ -310,7 +314,7 @@ function createDemoSession(scenario) {
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['run-progress', '实时进度与取消（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
+const scenarios = [['populated', '完整示例'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')
