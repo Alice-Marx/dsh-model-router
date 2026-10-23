@@ -10,6 +10,8 @@
 - Add Windows/Linux Node 24 CI for strict frozen dependency installation, the complete test suite, committed and rebuilt client consistency, offline preview compilation, and npm archive verification against raw Git blobs and the runtime import closure.
 
 Validation evidence and pending release checks are tracked in the [0.24.0 acceptance report](docs/releases/0.24.0-validation.md). No new real provider or vendor CLI inference is claimed. Budget reservations are local estimates, not a provider billing cap; interrupted fees must be reconciled before their capacity can safely be reused.
+- Preserve observed receipt timestamps across checkpoints; handle Windows lock contention and declared-platform PATH/ZCode paths, with canonical temporary-path and explicit adapter-capability CI fixtures.
+
 
 ## 0.23.1 — 2026-10-23
 
