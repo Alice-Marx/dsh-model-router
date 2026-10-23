@@ -72,19 +72,21 @@ test('real Loader saves npm, pnpm and automatic selection into runtime prefs wit
 
 test('real Loader immediately applies directory, sources and script policy together', async t => {
   const { save, remote } = await mountedRouter(t)
+  const stepMethod = process.platform === 'win32' ? 'script-powershell' : 'script-bash'
+  const scriptUrl = `https://mirror.example.com/stepcode/install.${process.platform === 'win32' ? 'ps1' : 'sh'}`
   await save({
     toolInstallDir: 'D:/AI/tools',
     toolNpmRegistry: 'https://registry.npmmirror.com/',
-    toolInstallMethodsJson: '{"stepcode":"script-powershell"}',
-    toolScriptUrlsJson: '{"stepcode":"https://mirror.example.com/stepcode/install.ps1"}',
+    toolInstallMethodsJson: JSON.stringify({ stepcode: stepMethod }),
+    toolScriptUrlsJson: JSON.stringify({ stepcode: scriptUrl }),
     toolAllowScriptInstall: false,
   })
   const summary = remote.installSettings().install
   assert.equal(summary.installDir, 'D:/AI/tools')
   assert.equal(summary.registry, 'https://registry.npmmirror.com/')
   assert.equal(summary.allowScriptInstall, false)
-  assert.deepEqual(summary.scriptUrls, { stepcode: 'https://mirror.example.com/stepcode/install.ps1' })
-  assert.equal(summary.tools.find(tool => tool.id === 'stepcode').savedMethodId, 'script-powershell')
+  assert.deepEqual(summary.scriptUrls, { stepcode: scriptUrl })
+  assert.equal(summary.tools.find(tool => tool.id === 'stepcode').savedMethodId, stepMethod)
   assert.match(summary.tools.find(tool => tool.id === 'stepcode').error, /关闭/)
   const codex = summary.tools.find(tool => tool.id === 'codex')
   assert.match(codex.command, /registry\.npmmirror\.com/)
@@ -122,7 +124,12 @@ test('ZCode desktop directory applies live independently of the unified package 
   const summary = remote.installSettings().install
   assert.equal(summary.zcodeInstallDir, 'D:/Program Files/ZCode')
   assert.equal(summary.tools.find(tool => tool.id === 'zcode').installDir, summary.zcodeInstallDir)
-  assert.match(summary.tools.find(tool => tool.id === 'zcode').notices[0], /TUI.*ZCode/)
+  const zcode = summary.tools.find(tool => tool.id === 'zcode')
+  if (process.platform === 'win32') assert.match(zcode.notices[0], /TUI.*ZCode/)
+  else {
+    assert.match(zcode.installError, /ZCode 签名安装器仅支持 Windows/)
+    assert.equal(zcode.command, null)
+  }
   await save({ zcodeInstallDir: '' })
   assert.equal(installPreferences().zcodeInstallDir, '')
   assert.equal(installPreferences().installDir, 'D:/AI/tools')

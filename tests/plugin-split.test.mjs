@@ -22,7 +22,7 @@ test('install settings return current saved commands synchronously without tool 
     assert.equal(codex.savedMethodId, 'pnpm')
     assert.equal(codex.methodId, 'pnpm')
     assert.match(codex.command, /^pnpm /)
-    assert.equal(codex.installDir, 'D:/AI/tools')
+    assert.equal(codex.installDir, process.platform === 'win32' ? 'D:/AI/tools' : 'D:/AI/tools/bin')
     assert.equal(updated.hostVersion, manifest.version)
   } finally { setInstallPreferences(original) }
 })

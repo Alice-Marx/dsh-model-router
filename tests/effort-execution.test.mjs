@@ -255,12 +255,13 @@ test('team CLI execution records unsupported effort without passing it to its ru
   const calls = []
   const execution = await runOfficialTeam({ plan: { team: { workPackages: [item] } }, task: 'team test', workspace,
     mode: 'read-only', installedIds: ['codex'], sandbox: { confine() { throw new Error('runner must be inert') } },
-    runtime: { readiness: async id => ({ id, ready: true, readyModes: ['read-only'] }), runTool: async args => {
+    runtime: { capabilities: [{ id: 'codex', supported: true, modes: ['read-only'] }],
+      readiness: async id => ({ id, ready: true, readyModes: ['read-only'] }), runTool: async args => {
       calls.push(args)
       return { status: 'succeeded', finalText: 'team done' }
     } },
   })
-  assert.equal(execution.status, 'cli-completed')
+  assert.equal(execution.status, 'cli-completed', JSON.stringify(execution.blocking))
   assert.equal(calls.length, 1)
   assert.equal(Object.hasOwn(calls[0], 'reasoningEffort'), false)
   const result = execution.results[0]
@@ -270,6 +271,21 @@ test('team CLI execution records unsupported effort without passing it to its ru
   assert.equal(result.actualModel, null)
   assert.equal(result.inputChars, calls[0].task.length)
   assert.ok(Number.isFinite(result.durationMs) && result.durationMs >= 0)
+})
+
+test('an injected team adapter still blocks undeclared capabilities before readiness or dispatch', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'effort-team-blocked-'))
+  const item = { id: 'p1', name: 'Package', type: 'code', purpose: 'execution', dependsOn: [],
+    recommendedProvider: 'openai', recommendedModel: 'catalog-model' }
+  const execution = await runOfficialTeam({ plan: { team: { workPackages: [item] } }, task: 'team test', workspace,
+    mode: 'read-only', installedIds: ['codex'], sandbox: { confine() { throw new Error('runner must be inert') } },
+    runtime: { capabilities: [],
+      readiness: async () => { throw new Error('must not probe an undeclared capability') },
+      runTool: async () => { throw new Error('must not dispatch an undeclared capability') } },
+  })
+  assert.equal(execution.status, 'blocked')
+  assert.equal(execution.blocking[0].toolId, 'codex')
+  assert.deepEqual(execution.results, [])
 })
 
 test('ordinary CLI success reports unsupported reasoning and no inferred actual model', async () => {

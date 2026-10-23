@@ -314,7 +314,7 @@ test('claude, codex, and gemini adapters use fixed headless arguments and the co
     assert.equal(JSON.stringify(result).includes(secret), false)
     assert.equal(calls.at(-1).options.shell, false)
     assert.equal(calls.at(-1).options.env[result.toolId === 'codex' ? 'OPENAI_API_KEY' : result.toolId === 'gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY'], secret)
-    assert.equal(calls.at(-1).options.cwd, cwd)
+    assert.equal(calls.at(-1).options.cwd, await realpath(cwd))
     if (item.file === 'claude') assert.equal(chunks.join('').includes(secret), false)
   }
 })

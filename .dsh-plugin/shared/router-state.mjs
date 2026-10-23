@@ -184,7 +184,10 @@ async function acquireLock(lockFile, { staleMs = LOCK_STALE_MS, timeoutMs = LOCK
         if (await readFile(lockFile, 'utf8').catch(() => null) === owner) await unlink(lockFile).catch(() => {})
       }
     } catch (error) {
-      if (error?.code !== 'EEXIST') throw error
+      // Windows can report a sharing/delete-pending race as EPERM while
+      // another owner closes and removes its lock. Retry within the same
+      // bounded wait; never treat this as permission to remove a live lock.
+      if (error?.code !== 'EEXIST' && !(process.platform === 'win32' && error?.code === 'EPERM')) throw error
       const info = await stat(lockFile).catch(() => null)
       const owner = await readFile(lockFile, 'utf8').catch(() => null)
       if (info && owner !== null && now() - info.mtimeMs > staleMs && ownerIsDead(ownerPid(owner))) {

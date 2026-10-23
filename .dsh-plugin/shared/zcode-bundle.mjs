@@ -99,7 +99,7 @@ function rootFromCommand(value) {
   const trimmed = value.trim()
   const quoted = /^"([^"]+)"/.exec(trimmed)
   const executable = quoted?.[1] ?? /^(.+?\.(?:exe|ico))(?=,|\s|$)/i.exec(trimmed)?.[1]
-  return executable && win32.isAbsolute(executable) ? dirname(executable) : null
+  return executable && win32.isAbsolute(executable) ? win32.dirname(executable) : null
 }
 
 /** Explicit selection is authoritative, even when the selected bundle is missing. */
@@ -125,8 +125,8 @@ export function zcodeDiscoveryCandidates({ installDir = '', env = process.env, r
   }
   for (const parent of [env.LOCALAPPDATA, env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432]) {
     if (typeof parent !== 'string' || !win32.isAbsolute(parent)) continue
-    add(join(parent, 'Programs', 'ZCode'), 'standard-directory')
-    add(join(parent, 'ZCode'), 'standard-directory')
+    add(win32.join(parent, 'Programs', 'ZCode'), 'standard-directory')
+    add(win32.join(parent, 'ZCode'), 'standard-directory')
   }
   return candidates
 }

@@ -73,12 +73,13 @@ test('native team passes the explicit environment, preserves dependencies, and i
   const seen = []
   const result = await runOfficialTeam({ workspace: source, allowedRoot: source, mode: 'workspace-write', executionEnvironment: 'cli-native',
     task: 'fixture', installedIds: ['claude-code'], plan: { team: { workPackages: [item('first'), item('second', ['first'])] } },
-    runtime: { readiness: async (_id, _source, options) => { assert.equal(options.executionEnvironment, 'cli-native'); return { ready: true, readyModes: ['workspace-write'] } },
+    runtime: { capabilities: [{ id: 'claude-code', supported: true, modes: ['workspace-write'] }],
+      readiness: async (_id, _source, options) => { assert.equal(options.executionEnvironment, 'cli-native'); return { ready: true, readyModes: ['workspace-write'] } },
       runTool: async options => { seen.push(options); assert.equal(options.executionEnvironment, 'cli-native');
         if (seen.length === 2) assert.match(options.task, /first: first completed/)
         await writeFile(join(options.workspace, `output${seen.length}.txt`), 'done\n')
         return { status: 'succeeded', finalText: `${seen.length === 1 ? 'first' : 'second'} completed`, sandboxEnforcement: 'none' } } } })
-  assert.equal(result.status, 'cli-completed')
+  assert.equal(result.status, 'cli-completed', JSON.stringify(result.blocking))
   assert.equal(seen.length, 2)
   assert.ok(seen.every(entry => entry.workspace !== source))
   assert.ok(result.results.every(entry => entry.executionEnvironment === 'cli-native' && entry.sandboxEnforcement === 'none'))

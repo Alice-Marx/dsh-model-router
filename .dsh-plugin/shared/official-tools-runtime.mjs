@@ -14,7 +14,7 @@
 import { spawn } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path'
 import {
   DEFAULT_NPM_REGISTRY,
   defaultInstallMethod,
@@ -1042,7 +1042,8 @@ let prefixPromise = null
 /** Add one directory to this process's PATH unless it is already there. */
 export function appendToProcessPath(directory, { prepend = false, env = process.env, platform = process.platform } = {}) {
   const target = String(directory ?? '').trim()
-  if (!target || !isAbsolute(target)) return
+  const paths = platform === 'win32' ? win32 : posix
+  if (!target || !paths.isAbsolute(target)) return
   const separator = platform === 'win32' ? ';' : ':'
   const key = Object.keys(env).find(name => name.toUpperCase() === 'PATH') ?? 'PATH'
   const parts = String(env[key] ?? '').split(separator).filter(Boolean)

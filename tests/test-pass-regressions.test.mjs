@@ -7,7 +7,7 @@ import { mkdtempSync, existsSync, readdirSync, writeFileSync, chmodSync, readFil
 import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { strictCtx } from './helpers/strict-ctx.mjs'
 
 process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'model-router-regressions-'))
@@ -172,14 +172,21 @@ test('M1: killProcessTree signals the POSIX group, uses System32 taskkill /T on 
 test('M2: several processes appending runs to one state file lose nothing', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'model-router-state-multi-'))
   const file = join(dir, 'state.json')
-  const moduleUrl = new URL('../.dsh-plugin/shared/router-state.mjs', import.meta.url).href
+  const modulePath = fileURLToPath(new URL('../.dsh-plugin/shared/router-state.mjs', import.meta.url))
+  const moduleUrl = pathToFileURL(modulePath).href
   const code = `const { createRouterState } = await import(${JSON.stringify(moduleUrl)})
 const store = createRouterState({ file: ${JSON.stringify(file)} })
 await Promise.all(Array.from({ length: 10 }, (_, i) => store.appendRun({ id: process.pid + '-' + i, packages: [] })))
 await store.updateRun(process.pid + '-3', run => { run.rated = true })`
   const runOne = () => new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--input-type=module', '-e', code], { stdio: 'inherit' })
-    child.on('exit', status => status === 0 ? resolve() : reject(new Error(`exit ${status}`)))
+    const child = spawn(process.execPath, ['--input-type=module', '-e', code], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8').on('data', chunk => { stdout += chunk })
+    child.stderr.setEncoding('utf8').on('data', chunk => { stderr += chunk })
+    child.on('error', reject)
+    child.on('close', (status, signal) => status === 0 ? resolve()
+      : reject(new Error(`state worker exited with code ${status}, signal ${signal ?? 'none'}\n${stderr || stdout || '(no worker output)'}`)))
   })
   await Promise.all([runOne(), runOne(), runOne(), runOne()])
   const state = JSON.parse(await readFile(file, 'utf8'))

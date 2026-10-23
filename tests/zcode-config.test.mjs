@@ -43,6 +43,7 @@ test('clearing the independent ZCode selection restores registry and standard-di
   assert.equal(candidates[0].path, 'E:\\Apps\\ZCode')
   assert.equal(candidates[0].source, 'uninstall-registry')
   assert.equal(candidates[0].registryVersion, '3.15.1')
+  assert.ok(candidates.some(candidate => candidate.path === 'D:\\Program Files\\Programs\\ZCode'), 'Windows standard paths use Windows separators on every host')
   assert.ok(candidates.some(candidate => candidate.path.replaceAll('\\', '/') === 'D:/Program Files/ZCode'))
 })
 

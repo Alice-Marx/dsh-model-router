@@ -401,6 +401,8 @@ test('PATH updates are bounded, platform-aware and can put the selected command 
   assert.equal(posix.PATH, '/opt/tools/bin:/usr/bin')
   appendToProcessPath('/opt/Tools/bin', { env: posix, platform: 'linux' })
   assert.equal(posix.PATH, '/opt/tools/bin:/usr/bin:/opt/Tools/bin', 'POSIX paths keep their case')
+  appendToProcessPath('D:\\Tools', { env: posix, platform: 'linux', prepend: true })
+  assert.equal(posix.PATH, '/opt/tools/bin:/usr/bin:/opt/Tools/bin', 'a Windows absolute path is relative on POSIX, regardless of the test host')
   const windows = { Path: 'C:\\old;d:\\tools' }
   appendToProcessPath('D:\\Tools', { env: windows, platform: 'win32', prepend: true })
   assert.equal(windows.Path, 'D:\\Tools;C:\\old')

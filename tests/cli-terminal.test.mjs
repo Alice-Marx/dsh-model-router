@@ -5,7 +5,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { EventEmitter } from 'node:events'
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { strictCtx } from './helpers/strict-ctx.mjs'
@@ -134,10 +134,10 @@ test('OpenCode uses the V2 package in the selected directory when a legacy V1 co
     preferences: { installDir: root, methods: { opencode: 'npm' } },
     locate: async () => { throw new Error('selected installation must not use PATH') } }
   const interactive = await resolveTerminalLaunch('opencode', 'interactive', options)
-  assert.equal(interactive.file, entries['@opencode/cli'])
+  assert.equal(interactive.file, await realpath(entries['@opencode/cli']))
   assert.deepEqual(interactive.args, [])
   const login = await resolveTerminalLaunch('opencode', 'login', options)
-  assert.equal(login.file, entries['@opencode/cli'])
+  assert.equal(login.file, await realpath(entries['@opencode/cli']))
   assert.deepEqual(login.args, ['auth', 'login'])
 })
 
@@ -173,10 +173,10 @@ test('configured npm and pnpm terminal launches use their actual package entries
     locate: async () => { throw new Error('configured launch must never consult PATH') }, findNode: async () => process.execPath }
   const npm = await resolveTerminalLaunch('gemini', 'interactive', common)
   assert.equal(npm.file, process.execPath)
-  assert.deepEqual(npm.args, [join(npmRoot, 'bundle', 'gemini.js')])
+  assert.deepEqual(npm.args, [await realpath(join(npmRoot, 'bundle', 'gemini.js'))])
   const pnpm = await resolveTerminalLaunch('gemini', 'interactive', { ...common,
     preferences: { installDir: root, methods: { gemini: 'pnpm' } } })
-  assert.deepEqual(pnpm.args, [join(pnpmRoot, 'bundle', 'gemini.js')])
+  assert.deepEqual(pnpm.args, [await realpath(join(pnpmRoot, 'bundle', 'gemini.js'))])
   await assert.rejects(resolveTerminalLaunch('claude-code', 'interactive', common), /真实命令入口/,
     'a different PATH copy cannot satisfy a missing selected package')
 })

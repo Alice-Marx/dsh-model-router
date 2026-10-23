@@ -313,8 +313,10 @@ function packagePrompt(task, item, completed) {
 }
 
 /** Preflight every assignment before any model request or workspace write. */
-export function executableTeamPackages(plan, installedIds = [], mode = 'read-only', executionEnvironment = 'harness') {
-  const capabilities = new Map(officialToolExecutionCapabilities({ executionEnvironment }).map(item => [item.id, item]))
+export function executableTeamPackages(plan, installedIds = [], mode = 'read-only', executionEnvironment = 'harness',
+  executionCapabilities = officialToolExecutionCapabilities({ executionEnvironment })) {
+  if (!Array.isArray(executionCapabilities)) throw new TypeError('runtime capabilities must be an array')
+  const capabilities = new Map(executionCapabilities.map(item => [item.id, item]))
   const packages = Array.isArray(plan?.team?.workPackages) ? plan.team.workPackages : []
   const blocking = []
   const assigned = packages.map(item => {
@@ -427,7 +429,10 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   if (retry && mode !== 'read-only' && !(seedFrom && typeof seedFrom.workspace === 'string' && typeof seedFrom.baseCommit === 'string')) {
     throw new TypeError('an editable team retry needs the earlier isolated worktree (seedFrom)')
   }
-  const selected = executableTeamPackages(plan, installedIds, mode, executionEnvironment)
+  // An injected adapter can declare its own capabilities as well as readiness
+  // and execution. The Host supplies no runtime override and always checks the
+  // actual platform registry before launching any official CLI.
+  const selected = executableTeamPackages(plan, installedIds, mode, executionEnvironment, runtime?.capabilities)
   const assigned = retry ? selected.assigned.filter(item => onlyIds.includes(item.id)) : selected.assigned
   const blocking = retry ? selected.blocking.filter(item => onlyIds.includes(item.id)) : selected.blocking
   if (assigned.length === 0) return { status: 'blocked', blocking: [{ reason: '计划没有工作包。' }], results: [] }

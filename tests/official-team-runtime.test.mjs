@@ -689,7 +689,7 @@ test('retry accepts the exact Host source parent and legacy parent but rejects l
         },
       } })
     assert.equal(retry.status, 'incomplete')
-    assert.ok(samePath(retry.seeded.from, first.workspace))
+    assert.ok(samePath(await realpath(retry.seeded.from), await realpath(first.workspace)))
 
     const counterfeitParent = join(temporary, 'foreign', '.model-router-workspaces', basename(workspace))
     await mkdir(counterfeitParent, { recursive: true })
@@ -717,7 +717,7 @@ test('retry accepts the exact Host source parent and legacy parent but rejects l
         },
       } })
     assert.equal(resumed.status, 'cli-completed')
-    assert.ok(samePath(resumed.seeded.from, legacy))
+    assert.ok(samePath(await realpath(resumed.seeded.from), await realpath(legacy)))
     assert.equal((await readFile(join(workspace, 'legacy.txt'), 'utf8')).replace(/\r\n/g, '\n'), 'earlier release\n')
   })
 })
