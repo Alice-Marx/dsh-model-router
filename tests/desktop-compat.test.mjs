@@ -10,8 +10,8 @@ const appBootManifest = JSON.parse(readFileSync(
   'utf8',
 ))
 const DSH_PEER_PREFIX = '@deepseek-ai/dsh-'
-const SUPPORTED_DESKTOP_PEERS = '0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2'
-const SUPPORTED_DESKTOP_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.2']
+const SUPPORTED_DESKTOP_PEERS = '0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3'
+const SUPPORTED_DESKTOP_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.3']
 const dshPeerNames = Object.keys(manifest.peerDependencies)
   .filter(name => name.startsWith(DSH_PEER_PREFIX))
 
@@ -43,13 +43,13 @@ test('the release accepts the audited Desktop release candidates without exempti
     assert.equal(evaluatePluginCompatibility(manifest, {}, runtimeVersion), undefined)
   }
 
-  for (const runtimeVersion of ['0.2.0-rc.3', '0.2.0', '0.2.1-rc.1', '0.2.1', '0.2.2', '0.3.0', '1.0.0']) {
+  for (const runtimeVersion of ['0.2.0-rc.3', '0.2.0', '0.2.1-rc.1', '0.2.1-rc.4', '0.2.1', '0.2.2', '0.3.0', '1.0.0']) {
     assertRejected(manifest, runtimeVersion)
   }
 })
 
-test('the installed 0.2.1-rc.2 app-boot gate accepts the release manifest', () => {
-  assert.equal(appBootManifest.version, '0.2.1-rc.2')
+test('the installed 0.2.1-rc.3 app-boot gate accepts the release manifest', () => {
+  assert.equal(appBootManifest.version, '0.2.1-rc.3')
   assert.equal(evaluatePluginCompatibility(manifest, {}, appBootManifest.version), undefined)
 })
 
@@ -72,6 +72,15 @@ test('the original 0.20.0 manifest reproduces the Desktop 0.2.1-rc.2 rejection',
   const issue = assertRejected(oldManifest, '0.2.1-rc.2')
   assert.equal(issue.runtimeVersion, '0.2.1-rc.2')
   assert.deepEqual(Object.keys(issue.requirements).sort(), [...dshPeerNames].sort())
+})
+
+test('the original 0.25.0 manifest reproduces the Desktop 0.2.1-rc.3 rejection', () => {
+  const oldManifest = withDshPeers('0.25.0', '0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2')
+  const issue = assertRejected(oldManifest, '0.2.1-rc.3')
+  assert.equal(issue.runtimeVersion, '0.2.1-rc.3')
+  assert.deepEqual(Object.keys(issue.requirements).sort(), [...dshPeerNames].sort())
+  assert.equal(evaluatePluginCompatibility(oldManifest, {}, '0.2.1-rc.2'), undefined,
+    'the historical manifest remains valid on its audited host')
 })
 
 test('typed remote methods avoid 0.2 client namespace service members', () => {

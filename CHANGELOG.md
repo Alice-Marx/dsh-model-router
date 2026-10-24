@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.25.1 — 2026-10-24
+
+- Add DeepSeek Harness Desktop 0.2.1-rc.3 to the exact Host peer range while retaining the existing 0.2.0-rc.1, 0.2.0-rc.2 and 0.2.1-rc.2 declarations.
+- Pin the published 0.2.1-rc.3 SDK dependency graph for source installation and regenerate the Desktop client against that SDK. Compatibility validation covers the plugin's Host/client contracts in addition to the version declarations.
+- Refresh current installation examples and workbench documentation for 0.25.1. Existing API monetary budgets, independent subscription usage, progress/cancellation and schema v3 state remain in place.
+
+Validation evidence and limits are tracked in the [0.25.1 acceptance report](docs/releases/0.25.1-validation.md). Offline SDK/build tests do not establish installed-Desktop operation or real vendor inference; earlier execution evidence retains its original version and date.
+
 ## 0.25.0 — 2026-10-24
 
 - Separate API financial accounting from subscription usage. API costs and API reservations govern monetary budgets; subscriptions track calls and reported input/output/cache tokens, with incomplete or missing usage retained as unknown.
