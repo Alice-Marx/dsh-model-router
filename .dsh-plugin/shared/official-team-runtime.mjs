@@ -515,6 +515,11 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
       actualModel: reportedModel,
       ...(result.reportedModel !== undefined ? { reportedModel: result.reportedModel } : {}),
       ...(result.usageIncomplete === true ? { usageIncomplete: true } : {}),
+      ...(result.notStarted === true || result.status === 'unsupported' ? { notStarted: true } : {}),
+      ...(result.blocked === true ? { blocked: true } : {}),
+      ...(['api', 'subscription'].includes(result.billing) ? { billing: result.billing } : {}),
+      ...(['configured-api-key', 'process-environment', 'cli-session'].includes(result.credentialSource)
+        ? { credentialSource: result.credentialSource } : {}),
       ...(typeof result.source === 'string' ? { source: result.source } : {}),
       ...(typeof result.sandboxEnforcement === 'string' ? { sandboxEnforcement: result.sandboxEnforcement } : {}),
       executionEnvironment,

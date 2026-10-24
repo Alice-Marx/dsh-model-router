@@ -125,10 +125,13 @@ function sampleRuns() {
       { id: 'analyze', name: '分析架构', dependsOn: [], provider: 'deepseek', model: 'deepseek-chat',
         status: 'succeeded', ok: true, ran: true, channel: 'harness-llm', billing: 'api',
         type: 'research', finishedAt: Date.now() - 25 * 60_000,
+        subscriptionAttempts: [{ provider: 'openai', model: 'gpt-demo', toolId: 'codex',
+          finishedAt: Date.now() - 26 * 60_000, ran: true, usage: null, usageIncomplete: true }],
         difficulty: 'balanced', estimatedCost: 0.003, costUsd: 0.0028, answer: '演示结果：已梳理模块边界，建议补齐关键路径验证。', rating: 1 },
       { id: 'verify', name: '验证关键路径', dependsOn: ['analyze'], provider: 'openai', model: 'gpt-demo',
         status: 'failed', ok: false, ran: true, channel: 'official-cli', toolId: 'codex', billing: 'subscription',
         difficulty: 'complex', estimatedCost: 0.021, referenceCostUsd: 0.018,
+        usage: { inputTokens: 1200, outputTokens: 300, cacheReadTokens: 0 },
         error: '演示失败：模拟网络超时。可以测试“重跑此步”或改派路线。' },
       { id: 'report', name: '汇总验收清单', dependsOn: ['verify'], provider: 'anthropic', model: 'claude-sonnet-demo',
         status: 'blocked', ok: false, ran: false, difficulty: 'balanced', estimatedCost: 0.004 },
@@ -175,8 +178,17 @@ function createDemoSession(scenario) {
     const reserved = { today: reservations.length ? 1.5 : 0, month: reservations.length ? 1.5 : 0,
       reservedUsd: reservations.length ? 1.5 : 0, unknownReservations: reservations.length ? 1 : 0,
       activeCount: reservations.length ? 1 : 0, interruptedCount: reservations.length ? 1 : 0 }
+    const emptyUsage = { calls: 0, knownUsageCalls: 0, unknownUsageCalls: 0,
+      inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null }
+    const todayUsage = scenario === 'empty' ? emptyUsage : { calls: 2, knownUsageCalls: 1, unknownUsageCalls: 1,
+      inputTokens: 1200, outputTokens: 300, cacheReadTokens: 0, cacheWriteTokens: null }
+    const monthUsage = scenario === 'empty' ? emptyUsage : { calls: 8, knownUsageCalls: 6, unknownUsageCalls: 2,
+      inputTokens: 18000, outputTokens: 4500, cacheReadTokens: 2048, cacheWriteTokens: 100 }
+    const subscriptionUsage = { today: todayUsage, month: monthUsage, byRoute: scenario === 'empty' ? [] : [
+      { provider: 'openai', toolId: 'codex', model: 'gpt-demo', today: todayUsage, month: monthUsage },
+    ] }
     return { runs: structuredClone(runs).reverse(), settings: { ...settings }, spent,
-      reservations, reserved,
+      reservations, reserved, subscriptionUsage,
       budget: { ...budgetCheck({ spent, dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd }),
         dailyLimitUsd: settings.dailyBudgetUsd, monthlyLimitUsd: settings.monthlyBudgetUsd, action: settings.overBudgetAction },
       biases: {}, learning: buildFeedbackProfile(runs, {
@@ -214,11 +226,24 @@ function createDemoSession(scenario) {
     })) : [{ id: 'task', name: '演示任务', dependsOn: [], provider: plan.selected.provider,
       model: plan.selected.model, route: `${plan.selected.provider}/${plan.selected.model}`,
       estimatedCost: plan.estimatedCost, channel: 'harness-llm' }]
-    return { status: 'preview', selected: plan.selected, estimatedCost: plan.estimatedCost,
+    const accountingPackages = packages.map(item => {
+      const assigned = item.manualAssignment
+      const route = plan.availableRoutes.find(route => route.provider === item.provider && route.model === item.model)
+      const toolId = assigned?.kind === 'tool' ? assigned.toolId : toolForProvider(item.provider)?.id
+      const subscription = assigned?.kind !== 'api' && ['claude-code', 'codex'].includes(toolId)
+        && route?.billing !== 'api-only'
+      return { id: item.id, billing: subscription ? 'subscription' : 'api',
+        apiEstimatedCostUsd: subscription ? 0 : item.estimatedCost ?? null,
+        estimatedUsage: { inputTokens: Math.ceil(request.task.length / 4), outputTokens: 200 } }
+    })
+    const accounting = { packages: accountingPackages,
+      apiEstimatedCostUsd: accountingPackages.some(item => item.apiEstimatedCostUsd === null) ? null
+        : accountingPackages.reduce((sum, item) => sum + item.apiEstimatedCostUsd, 0) }
+    return { status: 'preview', selected: plan.selected, estimatedCost: plan.estimatedCost, accounting,
       assignmentMode: request.assignmentMode ?? 'algorithm', packagePlanKey: packagePlanKey(plan, request.task),
       routingBypassed: plan.routingBypassed, workspace: request.workspace || 'C:\\demo\\router-workspace',
       decision: { preset: plan.preset, complexity: plan.complexity, reason: plan.reason, estimatedCost: plan.estimatedCost, packages },
-      budget: budgetCheck({ ...ledger().budget, spent: ledger().spent, estimateUsd: plan.estimatedCost }),
+      budget: budgetCheck({ ...ledger().budget, spent: ledger().spent, estimateUsd: accounting.apiEstimatedCostUsd }),
       reasons: [{ code: 'demo-only', zh: '这是模拟执行：只在浏览器内生成示例记录，不会调用模型或读取工作区。' }] }
   }
   const jobSnapshot = job => {
@@ -331,7 +356,7 @@ function createDemoSession(scenario) {
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['budget-reservations', '预算预占与中断核对（模拟账本）'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
+const scenarios = [['populated', '完整示例'], ['billing-split', 'API 费用与订阅用量（模拟账本）'], ['budget-reservations', '预算预占与中断核对（模拟账本）'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')

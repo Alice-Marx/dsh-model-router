@@ -6,7 +6,7 @@ on:
       version:
         description: Existing stable release version
         required: true
-        default: '0.24.0'
+        default: '0.25.0'
         type: string
 
 jobs:

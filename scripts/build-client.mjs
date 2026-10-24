@@ -41,6 +41,9 @@ export async function generate({ check = false } = {}) {
     bundle: true,
     format: 'cjs',
     platform: 'browser',
+    // Keep readable names/lines while simplifying generated expressions as
+    // the router gains UI features; the standalone bundle remains under 1 MB.
+    minifySyntax: true,
     target: 'es2020',
     jsx: 'transform',
     jsxFactory: 'React.createElement',

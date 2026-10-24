@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildRunRecord } from '../.dsh-plugin/shared/run-ledger.mjs'
 import { estimateAssignedPackage } from '../.dsh-plugin/shared/router.mjs'
+import { healthCache } from '../.dsh-plugin/shared/tool-health.mjs'
 
 // Isolated receipts and inert streams/runners only: no network, CLI or model account.
 const home = await mkdtemp(join(tmpdir(), 'router-rerun-budget-'))
@@ -192,7 +193,11 @@ test('an explicit same-route retry retains the estimate for its planned reasonin
   assert.equal(ctx.calls.length, 0)
 })
 
-test('official team retries share the aggregate budget gate and the exact execution ids', async () => {
+test('official team retries share the aggregate budget gate and the exact execution ids', async t => {
+  const previousHealth = healthCache.report()
+  healthCache.remember({ checkedAt: Date.now(), tools: [{ id: 'codex', installed: true,
+    login: { state: 'logged-in', billing: 'api-key', accountLogin: false } }] })
+  t.after(() => healthCache.remember(previousHealth ?? { checkedAt: Date.now(), tools: [] }))
   const run = await stored([item('a', 0.2, [], 'failed'), item('b', 0.4, ['a']), item('c', 10, ['a'], 'succeeded')], { kind: 'team' })
   const ctx = context()
   const calls = []
@@ -213,7 +218,11 @@ test('official team retries share the aggregate budget gate and the exact execut
   assert.equal(ctx.calls.length, 0)
 })
 
-test('official team reassignment passes and retains the new estimate for a later retry', async () => {
+test('official team reassignment passes and retains the new estimate for a later retry', async t => {
+  const previousHealth = healthCache.report()
+  healthCache.remember({ checkedAt: Date.now(), tools: [{ id: 'codex', installed: true,
+    login: { state: 'logged-in', billing: 'api-key', accountLogin: false } }] })
+  t.after(() => healthCache.remember(previousHealth ?? { checkedAt: Date.now(), tools: [] }))
   const packages = [item('a', 0.000001, [], 'failed')]
   const run = await stored(packages, { kind: 'team' })
   const ctx = context()

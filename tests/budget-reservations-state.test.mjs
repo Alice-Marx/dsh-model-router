@@ -27,17 +27,17 @@ async function fixture(t, extra = {}) {
   return { directory, file, state, reservations }
 }
 
-test('v1 history upgrades to v2 on first write without losing prior spending', async t => {
+test('v1 history upgrades to v3 on first write without losing prior spending', async t => {
   const { file } = await fixture(t)
   const previous = { version: 1, runs: [{ ...run('legacy'), packages: [receipt('a', 0.3)] }],
     quota: { codex: { until: AT + 1000 } }, onboarding: { completedAt: AT } }
   await writeFile(file, JSON.stringify(previous))
   const state = createRouterState({ file, now: () => AT })
-  assert.equal((await state.read()).version, 2)
+  assert.equal((await state.read()).version, 3)
   const manager = createBudgetReservations({ state, now: () => AT })
   assert.equal((await manager.beginExecution({ run: run('new'), packageEstimates: estimates(0.2, 0.2), dailyLimitUsd: 1 })).accepted, true)
   const saved = JSON.parse(await readFile(file, 'utf8'))
-  assert.equal(saved.version, 2)
+  assert.equal(saved.version, 3)
   assert.equal(saved.runs[0].id, 'legacy')
   assert.equal(spending(saved.runs, AT, saved.archivedSpending).today, 0.3)
   assert.deepEqual(saved.quota, previous.quota)

@@ -1,6 +1,6 @@
 import React from 'react'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
-import { formatUsd, launchRequest, unwrapRemote } from './insights-state.mjs'
+import { apiPlanEstimate, formatUsd, launchRequest, packageAccounting, packageEstimateText, subscriptionEstimateText, unwrapRemote } from './insights-state.mjs'
 
 const text = value => typeof value === 'string' ? value.trim() : ''
 const STATUS_TEXT = Object.freeze({
@@ -390,6 +390,8 @@ const reasonText = value => typeof value === 'string' ? text(value) : text(value
 
 function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm, onCancel }) {
   const packages = value.decision?.packages ?? []
+  const estimate = apiPlanEstimate(value)
+  const subscriptionEstimate = subscriptionEstimateText(value)
   const reasons = value.reasons ?? []
   const officialTeam = (value.executor ?? request?.executor) === 'official-team'
   const native = (value.executionEnvironment ?? request?.executionEnvironment) === 'cli-native'
@@ -403,10 +405,11 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
       {blocked && <div className="mr-error" role="alert"><strong>当前无法启动执行。</strong>{blocking.length ? <ul>{blocking.map(message => <li key={message}>{message}</li>)}</ul> : <p>执行条件尚未满足，请检查所选权限、工作区和官方工具状态后重新预览。</p>}</div>}
       <div className="mr-result-grid">
         <div className="mr-metric"><div className="mr-metric-label">{officialTeam || manual ? '执行方式' : '路线'}</div><div className="mr-metric-value">{manual ? '手动分配 · 按包只读执行' : officialTeam ? '官方工具协作' : value.selected ? `${value.selected.provider}/${value.selected.model}` : '暂无路线'}{value.routingBypassed ? '（指定模型）' : ''}</div></div>
-        <div className="mr-metric"><div className="mr-metric-label">预估费用</div><div className="mr-metric-value">{value.estimatedCost === null || value.estimatedCost === undefined ? '价格待配置' : formatUsd(value.estimatedCost)}</div></div>
+        <div className="mr-metric"><div className="mr-metric-label">API 预估费用</div><div className="mr-metric-value">{estimate === null ? '价格待配置' : formatUsd(estimate)}</div></div>
         <div className="mr-metric"><div className="mr-metric-label">方案</div><div className="mr-metric-value">{ROUTING_PRESETS[value.decision?.preset]?.label ?? '—'}{value.budget?.downgraded ? '（超预算自动降级）' : ''}</div></div>
         <div className="mr-metric"><div className="mr-metric-label">工作区</div><div className="mr-metric-value mr-break"><code>{value.workspace}</code></div></div>
       </div>
+      {subscriptionEstimate && <p className="mr-caption">{subscriptionEstimate} 若改用 API，将重新估价并核验预算。</p>}
       {officialTeam && <p className="mr-caption">任务权限：{readOnly ? '只读检查，不修改工作区文件。使用受限工具集；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。' : <>编辑文件。编辑范围：所选工作区 <code>{value.workspace}</code> 内的任务文件。官方 CLI 使用自己的正常工具，在独立 Git 工作树中完成后整合回该工作区。</>}失败时不会自动替换为模型目录 API。</p>}
       {native && <p className="mr-caption">执行环境：厂商 CLI 正常环境，以当前用户权限运行，不经 Harness 进程沙箱。工作树不限制工具访问工作树外资源。</p>}
       {!officialTeam && !readOnly && <p className="mr-caption">编辑范围：所选工作区 <code>{value.workspace}</code> 内的任务文件；在独立 Git 工作树中完成后整合回该工作区。不会自动回退模型目录 API。</p>}
@@ -415,13 +418,13 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
         <ol className="mr-launch-packages">
           {packages.map(item => {
             const tool = item.manualAssignment?.kind === 'tool'
-            return <li key={item.id}><strong>{item.name}</strong>{(manual || item.selectionSource === 'manual') && <span className="mr-pill">手动</span>} → {tool ? `${item.toolLabel || item.toolId || item.manualAssignment.toolId} · 默认模型` : item.route || item.toolLabel || item.toolId || item.tool || '待分配路线'} <span className="mr-caption">（预估 {tool ? '费用未知' : item.estimatedCost === null || item.estimatedCost === undefined ? '价格待配置' : formatUsd(item.estimatedCost)}{item.channel === 'official-cli' ? ' · 官方 CLI' : item.channel ? ' · 模型目录 API' : ''}）</span>{item.channelDetail && <p className="mr-caption">{item.channelDetail}</p>}</li>
+            return <li key={item.id}><strong>{item.name}</strong>{(manual || item.selectionSource === 'manual') && <span className="mr-pill">手动</span>} → {tool ? `${item.toolLabel || item.toolId || item.manualAssignment.toolId} · 默认模型` : item.route || item.toolLabel || item.toolId || item.tool || '待分配路线'} <span className="mr-caption">（{packageAccounting(value, item.id) ? packageEstimateText(value, item) : `预估 ${tool ? '费用未知' : item.estimatedCost === null || item.estimatedCost === undefined ? '价格待配置' : formatUsd(item.estimatedCost)}`}{item.channel === 'official-cli' ? ' · 官方 CLI' : item.channel ? ' · 模型目录 API' : ''}）</span>{item.channelDetail && <p className="mr-caption">{item.channelDetail}</p>}</li>
           })}
         </ol>
       )}
       {reasons.length > 0
         ? <div className="mr-confirm-box"><p className="mr-section-title">执行前需要确认以下 {reasons.length} 项：</p><ol>{reasons.map(item => <li key={item.code}>{reasonText(item)}</li>)}</ol></div>
-        : <p className="mr-caption">当前没有额外确认项。{value.estimatedCost === null || value.estimatedCost === undefined ? '费用未知，无法确认本次费用是否在预算内。' : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? '按已提供单价估算，本次未超出预算；实际费用以执行记录和账单为准。' : '实际费用以执行记录和账单为准。'}</p>}
+        : <p className="mr-caption">当前没有额外确认项。{estimate === null ? '费用未知，无法确认本次费用是否在预算内。' : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? '按已提供单价估算，API 部分未超出预算；API 实际费用以执行记录和账单为准。' : 'API 实际费用以执行记录和账单为准，订阅仅记录用量。'}</p>}
       <div className="mr-actions">
         <button ref={confirmRef} className="mr-button" type="button" disabled={running || blocked} onClick={onConfirm}>{running ? '正在执行…' : reasons.length ? '全部确认并执行' : '确认执行'}</button>
         <button className="mr-button mr-button-secondary" type="button" disabled={running} onClick={onCancel}>取消</button>

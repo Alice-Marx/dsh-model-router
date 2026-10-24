@@ -6,6 +6,7 @@
 
 import { reasoningExecutionFields, unsupportedCliReasoning } from './reasoning-execution.mjs'
 import { packageSelectionFields } from './package-assignments.mjs'
+import { archiveSubscriptionUsage, sanitizeArchivedSubscriptionUsage, sanitizeSubscriptionAttempts } from './subscription-usage.mjs'
 
 export const MAX_STORED_ANSWER = 4_000
 export const MAX_STORED_TASK = 20_000
@@ -128,7 +129,7 @@ export function actualCost(result, pricing) {
 export function billingOf(result, { loginBilling = null, apiKeyPresent = false } = {}) {
   if (!result || result.blocked) return null
   // The subscription-first executor states the channel it billed explicitly.
-  if (result.billing === 'api' || result.billing === 'subscription') return result.billing
+  if (result.billing === 'api' || result.billing === 'subscription' || result.billing === 'unknown') return result.billing
   if (result.channel !== 'official-cli') return 'api'
   if (result.credentialSource === 'configured-api-key' || result.credentialSource === 'process-environment') return 'api'
   if (!result.credentialSource && apiKeyPresent) return 'api'
@@ -137,6 +138,7 @@ export function billingOf(result, { loginBilling = null, apiKeyPresent = false }
 
 /** Cost fields for storage: subscription runs keep the figure as `referenceCostUsd` only. */
 export function billedCost(result, pricing, billing) {
+  if (billing === 'unknown') return { costUsd: null, costSource: 'billing-unknown', billing, referenceCostUsd: null }
   const cost = actualCost(result, pricing)
   if (billing !== 'subscription') return { ...cost, billing: billing ?? 'api', referenceCostUsd: null }
   return { costUsd: null, costSource: cost.costSource, billing, referenceCostUsd: cost.costUsd }
@@ -373,6 +375,7 @@ function storedPackage(planned, result, pricing, finishedAt, billingFor = billin
     ...(result?.billingMode ? { billingMode: String(result.billingMode) } : {}),
     ...(result?.billingSwitch ? { billingSwitch: { ...result.billingSwitch } } : {}),
     ...(result?.subscriptionRoute ? { subscriptionRoute: { provider: String(result.subscriptionRoute.provider ?? ''), model: String(result.subscriptionRoute.model ?? '') } } : {}),
+    ...(result?.subscriptionAttempts !== undefined ? { subscriptionAttempts: sanitizeSubscriptionAttempts(result.subscriptionAttempts) } : {}),
     error: result?.ok ? null : (result?.error ?? null),
     ...(!result?.ok && result?.diagnostic ? { diagnostic: String(result.diagnostic).slice(0, 2_000) } : {}),
     ...(Number.isInteger(result?.exitCode) ? { exitCode: result.exitCode } : {}),
@@ -443,6 +446,8 @@ export function mergeRerun(run, execution, { rerunIds = [], pricingFor = () => n
   // Retrying replaces the visible result, but earlier attempts still incurred
   // charges (or unknown usage). Keep their calendar totals before replacement.
   const replaced = run.packages.filter(stored => retried.has(stored.id) && results.some(item => item.id === stored.id))
+  run.priorAttemptSubscriptionUsage = archiveSubscriptionUsage([{ createdAt: run.createdAt, packages: replaced }],
+    sanitizeArchivedSubscriptionUsage(run.priorAttemptSubscriptionUsage, { legacySpending: run.priorAttemptSpending }))
   run.priorAttemptSpending = archiveSpending([{ createdAt: run.createdAt, packages: replaced }], run.priorAttemptSpending)
   run.packages = run.packages.map(stored => {
     const result = results.find(item => item.id === stored.id)
@@ -460,6 +465,7 @@ export function storedResults(run) {
     id: item.id, name: item.name, ok: item.ok, provider: item.provider, model: item.model,
     channel: item.channel, answer: item.answer, error: item.error, fallback: item.fallback,
     blocked: item.blocked, finishedAt: item.finishedAt,
+    ...(item.subscriptionAttempts !== undefined ? { subscriptionAttempts: sanitizeSubscriptionAttempts(item.subscriptionAttempts) } : {}),
     ...packageSelectionFields(item),
     ...reasoningExecutionFields(item),
     ...(finite(item.durationMs) && item.durationMs >= 0 ? { durationMs: item.durationMs } : {}),
@@ -483,6 +489,10 @@ export function teamExecutionResults(plan, execution) {
     id: result.id,
     ok: result.status === 'succeeded',
     cancelled: result.status === 'cancelled',
+    ...(result.notStarted === true || result.status === 'unsupported' ? { notStarted: true } : {}),
+    ...(result.blocked === true ? { blocked: true } : {}),
+    ...(result.billing === 'api' || result.billing === 'subscription' || result.billing === 'unknown' ? { billing: result.billing } : {}),
+    ...(typeof result.credentialSource === 'string' ? { credentialSource: result.credentialSource } : {}),
     provider: result.provider,
     model: result.recommendedModel,
     ...unsupportedCliReasoning({ reasoningEffort: result.recommendedReasoningEffort }),
@@ -497,6 +507,7 @@ export function teamExecutionResults(plan, execution) {
     ...(typeof result.source === 'string' ? { source: result.source } : {}),
     ...(typeof result.sandboxEnforcement === 'string' ? { sandboxEnforcement: result.sandboxEnforcement } : {}),
     ...(result.usageIncomplete === true ? { usageIncomplete: true } : {}),
+    ...(result.subscriptionAttempts !== undefined ? { subscriptionAttempts: sanitizeSubscriptionAttempts(result.subscriptionAttempts) } : {}),
     ...(typeof result.executionEnvironment === 'string' ? { executionEnvironment: result.executionEnvironment } : {}),
     channel: 'official-cli',
     toolId: result.toolId ?? null,
@@ -545,6 +556,8 @@ export function buildToolRunRecord({ toolId, toolLabel, provider, model, cliMode
       id: packageId, ok: succeeded, cancelled: result?.status === 'cancelled',
       ...(result?.notStarted === true || result?.status === 'unsupported' ? { notStarted: true } : {}),
       ...(result?.blocked === true ? { blocked: true } : {}),
+      ...(result?.billing === 'api' || result?.billing === 'subscription' || result?.billing === 'unknown' ? { billing: result.billing } : {}),
+      ...(typeof result?.credentialSource === 'string' ? { credentialSource: result.credentialSource } : {}),
       provider: plan.directRoute.provider, model: plan.directRoute.model,
       channel: 'official-cli', toolId,
       requestedCliModel: Object.hasOwn(result ?? {}, 'requestedModel') ? result.requestedModel : cliModel,
@@ -554,6 +567,7 @@ export function buildToolRunRecord({ toolId, toolLabel, provider, model, cliMode
       ...(typeof result?.source === 'string' ? { source: result.source } : {}),
       ...(typeof result?.sandboxEnforcement === 'string' ? { sandboxEnforcement: result.sandboxEnforcement } : {}),
       ...(result?.usageIncomplete === true ? { usageIncomplete: true } : {}),
+      ...(result?.subscriptionAttempts !== undefined ? { subscriptionAttempts: sanitizeSubscriptionAttempts(result.subscriptionAttempts) } : {}),
       ...(receiptTimestamp(result?.finishedAt) ? { finishedAt: result.finishedAt } : {}),
       answer: String(result?.finalText ?? ''),
       error: succeeded ? null : String(result?.error ?? result?.reason ?? result?.status ?? '官方 CLI 未成功完成。'),

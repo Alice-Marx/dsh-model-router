@@ -14,9 +14,16 @@ const {
   buildRunRecord, teamExecutionResults, buildTeamRunRecord, buildToolRunRecord,
 } = await import('../.dsh-plugin/shared/run-ledger.mjs')
 const { createRouterState, MAX_RUNS } = await import('../.dsh-plugin/shared/router-state.mjs')
-const { checkLogin, apiKeyEnvPresent } = await import('../.dsh-plugin/shared/tool-health.mjs')
+const { checkLogin, apiKeyEnvPresent, healthCache } = await import('../.dsh-plugin/shared/tool-health.mjs')
 const { packageCost, runTotals, rerunSupport } = await import('../.dsh-plugin/client/insights-state.mjs')
 const host = await import('../.dsh-plugin/index.mjs')
+
+function confirmedSubscription(t) {
+  const previous = healthCache.report()
+  healthCache.remember({ checkedAt: Date.now(), tools: ['codex', 'claude-code'].map(id => ({ id, installed: true,
+    login: { state: 'logged-in', billing: 'subscription', accountLogin: true } })) })
+  t.after(() => healthCache.remember(previous ?? { checkedAt: 0, tools: [] }))
+}
 
 async function workspace(t) {
   const root = await mkdtemp(join(tmpdir(), 'model-router-billing-ws-'))
@@ -167,7 +174,8 @@ test('CLI usage never applies the recommended price without matching actual-mode
   assert.equal(incomplete.costSource, 'usage-incomplete')
 })
 
-test('Host CLI pricing uses the reported model or saved exact alias instead of the recommendation', async () => {
+test('Host CLI pricing uses the reported model or saved exact alias instead of the recommendation', async t => {
+  confirmedSubscription(t)
   const routes = [
     { provider: 'openai', model: 'catalog-model', pricing: { input: 10, output: 20 } },
     { provider: 'openai', model: 'actual-model', cliModel: 'actual-alias', pricing: { input: 2, output: 4 } },
@@ -216,6 +224,7 @@ function teamCtx() {
 }
 
 test('read-only team runs are recorded and one failed step re-runs with its downstream only', async t => {
+  confirmedSubscription(t)
   const cwd = await workspace(t)
   const config = { modelProfilesJson: JSON.stringify([{ provider: 'openai', model: 'gpt-x', quality: 80, pricing: { input: 1, output: 2 } }]) }
   const run = await host.recordTeamRun({ task: '团队任务', plan: teamPlan(), mode: 'read-only', workspace: cwd, routes: [], startedAt: Date.now(),
@@ -312,7 +321,8 @@ test('old editable team records without a base commit refuse rerun; failed tool 
   await assert.rejects(() => host.rerunRecordedStep(teamCtx(), {}, { runId: rerun.newRunId, packageId: 'direct' }), /已成功/)
 })
 
-test('an API key in the environment makes CLI spend count against the budget', () => {
+test('an API key in the environment makes CLI spend count against the budget', t => {
+  confirmedSubscription(t)
   process.env.ANTHROPIC_API_KEY = 'test-key'
   try {
     assert.equal(host.billingForResult({ ok: true, channel: 'official-cli', toolId: 'claude-code' }), 'api')

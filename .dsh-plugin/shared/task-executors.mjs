@@ -43,6 +43,24 @@ const BASE_ENV_KEYS = Object.freeze([
 ])
 
 const READ_ONLY_INSTRUCTION = 'Read the task supplied on standard input. Answer in the task language. Do not modify files.'
+const executionBoundaryFailure = error => ['ROUTER_CHECKPOINT_FAILED', 'ROUTER_BUDGET_CHANGED'].includes(error?.code)
+const usageFields = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']
+
+/** Subscription evidence contains reported usage only, never prices or secrets. */
+function subscriptionReceipt(result, { provider, model, toolId = null, channel = 'harness-llm', now = Date.now } = {}) {
+  const usage = result?.usage && typeof result.usage === 'object' && !Array.isArray(result.usage)
+    ? Object.fromEntries(usageFields.filter(key => typeof result.usage[key] === 'number'
+      && Number.isFinite(result.usage[key]) && result.usage[key] >= 0).map(key => [key, result.usage[key]])) : null
+  const notStarted = result?.notStarted === true || result?.blocked === true
+  const incomplete = result?.usageIncomplete === true || !usage
+    || !['inputTokens', 'outputTokens'].every(key => Object.hasOwn(usage, key))
+    || usageFields.some(key => result?.usage?.[key] !== undefined && !Object.hasOwn(usage ?? {}, key))
+  return { provider: String(provider ?? ''), model: String(reportedCliModel(result?.actualModel ?? result?.reportedModel) ?? model ?? ''),
+    toolId, channel, usage: usage && Object.keys(usage).length ? usage : null,
+    ...(incomplete ? { usageIncomplete: true } : {}), ...(notStarted ? { notStarted: true } : {}),
+    finishedAt: typeof result?.finishedAt === 'number' && Number.isFinite(result.finishedAt)
+      && result.finishedAt >= 0 ? result.finishedAt : now() }
+}
 
 function additionalApiFields(value) {
   if (!value || typeof value !== 'object') return {}
@@ -409,6 +427,7 @@ export function looksLikeLoginFailure(detail) {
 }
 
 const count = value => Number.isFinite(value) && value >= 0 ? Math.round(value) : 0
+const knownCount = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
 
 /** Token usage reported by the CLI, in the Harness TokenUsage shape (disjoint cache counts). */
 export function usageFromOutput(format, stdout = '') {
@@ -422,11 +441,14 @@ export function usageFromOutput(format, stdout = '') {
         ? Object.keys(result.modelUsage) : []
       return {
         usage: {
-          inputTokens: count(usage.input_tokens),
-          outputTokens: count(usage.output_tokens),
+          ...(knownCount(usage.input_tokens) ? { inputTokens: count(usage.input_tokens) } : {}),
+          ...(knownCount(usage.output_tokens) ? { outputTokens: count(usage.output_tokens) } : {}),
           cacheReadTokens: count(usage.cache_read_input_tokens),
           cacheWriteTokens: count(usage.cache_creation_input_tokens),
         },
+        ...(!knownCount(usage.input_tokens) || !knownCount(usage.output_tokens)
+          || ['cache_read_input_tokens', 'cache_creation_input_tokens'].some(key => usage[key] !== undefined && !knownCount(usage[key]))
+          ? { usageIncomplete: true } : {}),
         ...(Number.isFinite(reported) && reported >= 0 ? { reportedCostUsd: reported } : {}),
         ...(models.length === 1 && /^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,199}$/.test(models[0]) ? { reportedModel: models[0] } : {}),
       }
@@ -436,24 +458,33 @@ export function usageFromOutput(format, stdout = '') {
       if (!completed) return null
       const cached = count(completed.usage.cached_input_tokens)
       return { usage: {
-        inputTokens: Math.max(0, count(completed.usage.input_tokens) - cached),
-        outputTokens: count(completed.usage.output_tokens),
+        ...(knownCount(completed.usage.input_tokens) ? { inputTokens: Math.max(0, count(completed.usage.input_tokens) - cached) } : {}),
+        ...(knownCount(completed.usage.output_tokens) ? { outputTokens: count(completed.usage.output_tokens) } : {}),
         cacheReadTokens: cached,
         cacheWriteTokens: 0,
-      } }
+      }, ...(!knownCount(completed.usage.input_tokens) || !knownCount(completed.usage.output_tokens)
+        || completed.usage.cached_input_tokens !== undefined && (!knownCount(completed.usage.cached_input_tokens)
+          || completed.usage.cached_input_tokens > completed.usage.input_tokens) ? { usageIncomplete: true } : {}) }
     }
     if (format === 'gemini-json') {
       const models = JSON.parse(stdout)?.stats?.models
-      if (!models || typeof models !== 'object') return null
+      if (!models || typeof models !== 'object' || Array.isArray(models) || !Object.keys(models).length) return null
       let input = 0
       let output = 0
       let cached = 0
+      let inputKnown = true, outputKnown = true, incomplete = false
       for (const entry of Object.values(models)) {
+        inputKnown &&= knownCount(entry?.tokens?.prompt)
+        outputKnown &&= knownCount(entry?.tokens?.candidates)
+        incomplete ||= entry?.tokens?.cached !== undefined && (!knownCount(entry.tokens.cached)
+          || entry.tokens.cached > entry.tokens.prompt)
         input += count(entry?.tokens?.prompt)
         output += count(entry?.tokens?.candidates)
         cached += count(entry?.tokens?.cached)
       }
-      return { usage: { inputTokens: Math.max(0, input - cached), outputTokens: output, cacheReadTokens: cached, cacheWriteTokens: 0 } }
+      return { usage: { ...(inputKnown ? { inputTokens: Math.max(0, input - cached) } : {}),
+        ...(outputKnown ? { outputTokens: output } : {}), cacheReadTokens: cached, cacheWriteTokens: 0 },
+        ...(!inputKnown || !outputKnown || incomplete ? { usageIncomplete: true } : {}) }
     }
   } catch { /* usage is optional */ }
   return null
@@ -621,7 +652,7 @@ function captureProcess(spawnImpl, file, args, { cwd, env, stdin, timeoutMs, sig
   })
 }
 
-async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false, detail = '', raw = '', skipped = false, attempted = false }) {
+async function useApi(apiFallback, { route, task, signal, reason, adapter, preference, exitCode = null, timedOut = false, detail = '', raw = '', skipped = false, attempted = false, subscriptionResult = null }) {
   const provider = String(route?.provider ?? '')
   const model = String(route?.model ?? '')
   const fallback = {
@@ -637,7 +668,7 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
     }
   }
   try {
-    const api = await apiFallback({ route, task, signal, reason, detail, raw: String(raw ?? '').slice(-40_000), toolId: adapter?.id ?? null, attempted, timedOut, exitCode })
+    const api = await apiFallback({ route, task, signal, reason, detail, raw: String(raw ?? '').slice(-40_000), toolId: adapter?.id ?? null, attempted, timedOut, exitCode, subscriptionResult })
     // A billing-aware fallback can pause the step for the user's decision.
     if (api?.paused) {
       return {
@@ -646,6 +677,7 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
         pause: { ...api.pause, ...(detail ? { detail } : {}), ...(fallback.loginRequired ? { loginRequired: true } : {}) },
         ...reasoningExecutionFields(api),
         ...additionalApiFields(api),
+        ...(api?.billing ? { billing: api.billing } : {}),
         error: api.error,
       }
     }
@@ -674,6 +706,7 @@ async function useApi(apiFallback, { route, task, signal, reason, adapter, prefe
       error: api?.ok === true && answer.trim() ? undefined : (api?.error || reason),
     }
   } catch (error) {
+    if (executionBoundaryFailure(error)) throw error
     if (signal?.aborted) {
       return {
         ok: false, provider, model, preference, channel: 'harness-llm', toolId: adapter?.id ?? null,
@@ -833,6 +866,8 @@ export async function executeAssignedTask({
       return useApi(apiFallback, {
         route, task: prompt, signal, adapter, preference, exitCode: verified.exitCode ?? null,
         timedOut: verified.status === 'timed-out', attempted: true,
+        subscriptionResult: { usage: verified.usage, usageIncomplete: verified.usageIncomplete,
+          notStarted: verified.notStarted === true, actualModel: verified.actualModel, reportedModel: verified.reportedModel },
         reason: verified.error || verified.reason || '官方 CLI 执行失败，已回退模型目录 API。',
         detail: redactDiagnostic(verifiedDiagnostic(verified), childEnvironment(adapter, credentials, credentialMode).secret),
         raw: [verified.error, verified.reason, verified.detail, verified.stderrTail, verified.stdoutTail].filter(item => typeof item === 'string').join('\n'),
@@ -861,7 +896,7 @@ export async function executeAssignedTask({
         : probe.timedOut ? `${adapter.label} 检测超时，已回退模型目录 API。`
           : `${adapter.label} 无法运行，已回退模型目录 API。`
     if (probe.cancelled) {
-      return { ok: false, provider, model, preference, channel: 'official-cli', toolId: adapter.id, answer: '', fallback: null, timedOut: false, exitCode: null, error: reason, cancelled: true }
+      return { ok: false, provider, model, preference, channel: 'official-cli', toolId: adapter.id, answer: '', fallback: null, timedOut: false, exitCode: null, error: reason, cancelled: true, notStarted: true }
     }
     return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, reason })
   }
@@ -871,11 +906,14 @@ export async function executeAssignedTask({
     ...(Number.isSafeInteger(stopGraceMs) && stopGraceMs >= 10 && stopGraceMs <= STOP_GRACE_MS ? { stopGraceMs } : {}),
   })
   if (run.cancelled) {
-    return { ok: false, provider, model, preference, channel: 'official-cli', toolId: adapter.id, answer: '', fallback: null, timedOut: false, exitCode: run.exitCode, error: '执行已取消。', cancelled: true }
+    const usage = usageFromOutput(adapter.format, run.stdout)
+    return { ok: false, provider, model, preference, channel: 'official-cli', toolId: adapter.id, answer: '', fallback: null, timedOut: false, exitCode: run.exitCode, error: '执行已取消。', cancelled: true,
+      credentialSource, ...(usage?.usage ? { usage: usage.usage } : {}), ...(usage?.usageIncomplete ? { usageIncomplete: true } : {}) }
   }
   if (!run.ok) {
     return useApi(apiFallback, {
       route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, timedOut: run.timedOut, attempted: true,
+      subscriptionResult: usageFromOutput(adapter.format, run.stdout),
       reason: run.timedOut ? `${adapter.label} 执行超时，已回退模型目录 API。`
         : run.outputLimit ? `${adapter.label} 输出超过上限，已回退模型目录 API。`
           : `${adapter.label} 执行失败，已回退模型目录 API。`,
@@ -889,6 +927,7 @@ export async function executeAssignedTask({
   if (!parsed.ok) {
     return useApi(apiFallback, {
       route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, attempted: true,
+      subscriptionResult: usageFromOutput(adapter.format, run.stdout),
       reason: `${parsed.error} 已回退模型目录 API。`,
       detail: failureDetail(adapter.format, run.stdout, run.stderr, secret),
       raw: `${run.stdout.slice(-20_000)}\n${run.stderr.slice(-20_000)}`,
@@ -896,7 +935,8 @@ export async function executeAssignedTask({
   }
   const answer = redact(parsed.answer, secret)
   if (!answer.trim()) {
-    return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, attempted: true, reason: '官方 CLI 没有返回文本，已回退模型目录 API。' })
+    return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, exitCode: run.exitCode, attempted: true,
+      subscriptionResult: usageFromOutput(adapter.format, run.stdout), reason: '官方 CLI 没有返回文本，已回退模型目录 API。' })
   }
   return officialSuccess({
     route, adapter, preference, answer, exitCode: run.exitCode,
@@ -954,14 +994,26 @@ const failureSummary = text => `${String(text ?? '').replace(/，?已(?:回退�
  * - subscription-only: never fall back to an API key.
  * - api-only: never use the subscription.
  */
-export async function executeRouteWithBilling({ route, billing = null, apiFallback, ...options } = {}) {
+export async function executeRouteWithBilling({ route, billing = null, apiFallback, onSubscriptionResult, ...options } = {}) {
   const plan = billingPlan(route, billing?.routes ?? [])
+  const subscriptionAttempts = []
+  const recordSubscription = async receipt => {
+    // This executor attempts the subscription once, then may use its API
+    // fallback. Keep a bounded vector so unrelated result fields cannot grow it.
+    if (subscriptionAttempts.length >= 2) throw new Error('订阅尝试证据超过本步上限。')
+    subscriptionAttempts.push(receipt)
+    const event = { ...structuredClone(receipt), billing: 'subscription', subscriptionAttempts: structuredClone(subscriptionAttempts) }
+    await awaitExecutionCheckpoint(onSubscriptionResult, event,
+      () => ({ status: 'failed', packages: [{ ...event, ok: false, ran: !receipt.notStarted }] }), 'subscription-result')
+  }
   // Every result names the billing mode it ran under, whichever branch produced it.
-  const result = await routeWithBilling(plan, { route, billing, apiFallback, ...options })
-  return { ...result, billingMode: result?.billingMode ?? plan.mode }
+  const result = await routeWithBilling(plan, { route, billing, apiFallback, ...options, onSubscriptionResult: recordSubscription })
+  return { ...result, billingMode: result?.billingMode ?? plan.mode,
+    ...(subscriptionAttempts.length ? { subscriptionAttempts,
+      ...(result?.billing ? {} : { billing: 'subscription' }) } : {}) }
 }
 
-async function routeWithBilling(plan, { route, billing = null, apiFallback, ...options } = {}) {
+async function routeWithBilling(plan, { route, billing = null, apiFallback, onSubscriptionResult, ...options } = {}) {
   if (!billing) return executeAssignedTask({ ...options, route, apiFallback })
   const now = typeof billing.now === 'function' ? billing.now : Date.now
   const sub = plan.subscription
@@ -972,7 +1024,7 @@ async function routeWithBilling(plan, { route, billing = null, apiFallback, ...o
   const base = { provider, model, billingMode: plan.mode }
   const refuse = (error, extra = {}) => ({
     ok: false, ...base, preference: executionPreference(route), channel: sub?.kind === 'plan-key' ? 'harness-llm' : 'official-cli',
-    toolId: sub?.toolId ?? null, answer: '', fallback: null, error, ...extra,
+    toolId: sub?.toolId ?? null, answer: '', fallback: null, notStarted: true, error, ...extra,
   })
   const viaApi = async (reason, note, skipped = false) => {
     if (!apiRoute || (sub?.kind === 'plan-key' && apiRoute.provider === sub.route.provider && apiRoute.model === sub.route.model)) {
@@ -1016,11 +1068,16 @@ async function routeWithBilling(plan, { route, billing = null, apiFallback, ...o
   }
 
   if (sub.kind === 'plan-key') {
+    if (typeof apiFallback !== 'function') return refuse('编程套餐执行器不可用，此步骤未启动。', { notStarted: true, billing: 'subscription' })
     const reasoningRoute = routeForReasoningSwitch(route, sub.route)
     const originalEffort = typeof route?.reasoningEffort === 'string' && route.reasoningEffort ? route.reasoningEffort : null
     let attempt
     try { attempt = await apiFallback({ route: reasoningRoute, task: options.task, signal: options.signal, reason: '编程套餐（订阅）', subscription: true }) }
-    catch (error) { attempt = { ok: false, error: String(error?.message ?? error) } }
+    catch (error) {
+      if (executionBoundaryFailure(error)) throw error
+      attempt = { ok: false, error: String(error?.message ?? error) }
+    }
+    await onSubscriptionResult(subscriptionReceipt(attempt, { ...sub.route, now }))
     const droppedEffort = originalEffort && reasoningRoute.reasoningEffort !== originalEffort ? originalEffort : null
     if (attempt?.ok === true && String(attempt.answer ?? '').trim()) {
       return {
@@ -1083,8 +1140,15 @@ async function routeWithBilling(plan, { route, billing = null, apiFallback, ...o
     // No subscription login: the existing CLI-with-key / catalog API behaviour.
     return executeAssignedTask({ ...options, route, apiFallback })
   }
+  const confirmedSubscription = retrySubscription || login === 'subscription' || plan.mode === 'subscription-only'
   if (retrySubscription) options = { ...options, skipOfficial: null }
   const guarded = async args => {
+    if (args?.attempted === true && !confirmedSubscription) {
+      const pause = pauseFor('CLI 计费方式尚未核对，已暂停，未启动额外 API 调用。', '请先体检确认账号订阅或 API Key，再选择重试方式。')
+      return { ok: false, paused: true, billing: 'unknown', pause, error: pause.reason }
+    }
+    if (args?.attempted === true && confirmedSubscription) await onSubscriptionResult(subscriptionReceipt(args.subscriptionResult,
+      { provider, model, toolId: args.toolId ?? sub.toolId, channel: 'official-cli', now }))
     const vendor = vendorKey({ toolId: args?.toolId ?? sub.toolId })
     const info = classify(`${args?.detail ?? ''}
 ${args?.raw ?? ''}`, vendor)
@@ -1112,13 +1176,16 @@ ${args?.raw ?? ''}`, vendor)
       const pause = pauseFor(summary, args?.detail ?? '', { timedOut: args?.timedOut === true, exitCode: args?.exitCode ?? null })
       return { ok: false, paused: true, pause, error: pause.reason }
     }
-    return apiFallback(args)
+    return { ...await apiFallback(args), billing: 'api' }
   }
   const result = await executeAssignedTask({ ...options, route, apiFallback: guarded, credentialMode: 'session-only' })
+  if (confirmedSubscription && result.channel === 'official-cli' && (result.ok === true || result.cancelled && !result.notStarted)) {
+    await onSubscriptionResult(subscriptionReceipt(result, { provider, model, toolId: sub.toolId, channel: 'official-cli', now }))
+  }
   return {
     ...result,
     billingMode: plan.mode,
-    ...(result.ok && result.channel === 'official-cli' ? { billing: 'subscription' } : {}),
+    ...(result.channel === 'official-cli' && !result.billing ? { billing: confirmedSubscription ? 'subscription' : 'unknown' } : {}),
   }
 }
 
@@ -1233,6 +1300,7 @@ export async function observeExecutionProgress(hook, value) {
 export async function awaitExecutionCheckpoint(hook, value, partial, stage) {
   if (typeof hook !== 'function') return
   try { await hook(value) } catch (cause) {
+    if (executionBoundaryFailure(cause) && cause.execution) throw cause
     const budgetChanged = cause?.code === 'ROUTER_BUDGET_CHANGED'
     const error = new Error(budgetChanged ? String(cause.message) : `执行检查点保存失败：${String(cause?.message ?? cause)}`, { cause })
     error.code = budgetChanged ? 'ROUTER_BUDGET_CHANGED' : 'ROUTER_CHECKPOINT_FAILED'
@@ -1324,7 +1392,7 @@ async function runManualTool(target, prompt, options) {
  */
 async function runPackages({ packages, task, routingBypassed, routes, previous = [], targets = null, overrides = {}, choices = {}, options }) {
   const routeList = Array.isArray(routes) ? routes : []
-  const { credentialsFor, onPackageStart, onPackage, onStage, onCheckpointStart, onCheckpointResult, billing, ...runOptions } = options
+  const { credentialsFor, onPackageStart, onPackage, onStage, onCheckpointStart, onCheckpointResult, onSubscriptionResult, billing, ...runOptions } = options
   await observeExecutionProgress(onStage, 'preparing')
   const effectivePackages = checkedPackageSelections(packages, routeList, overrides, runOptions.runVerified, targets)
   const results = []
@@ -1406,6 +1474,11 @@ async function runPackages({ packages, task, routingBypassed, routes, previous =
     else {
       result = await executeRouteWithBilling({
         ...runOptions,
+        onSubscriptionResult: async event => {
+          event.id = item.id
+          await awaitExecutionCheckpoint(onSubscriptionResult, event,
+            () => ({ ...partial(), packages: [...results, { ...event, ok: false, ran: !event.notStarted }] }), 'subscription-result')
+        },
         billing: billing ? { ...billing, routes: billing.routes ?? routeList, ...(choices[item.id] ? { choice: choices[item.id] } : {}) } : null,
         credentials, route, task: promptText,
       })

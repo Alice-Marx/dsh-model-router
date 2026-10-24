@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.25.0 — 2026-10-24
+
+- Separate API financial accounting from subscription usage. API costs and API reservations govern monetary budgets; subscriptions track calls and reported input/output/cache tokens, with incomplete or missing usage retained as unknown.
+- Keep confirmed subscription execution independent of exhausted API budgets or missing API prices. Before an actual API call or subscription-to-API fallback, estimate the actual API route and acquire the applicable confirmation and atomic reservation. A CLI using an API key remains API-billed.
+- Preserve subscription-attempt receipts alongside API fallback results and retain both ledgers across retry replacement and history trimming. Old reference-dollar fields remain readable without converting them into current subscription money or fabricated token counts.
+- Show API money and subscription quantities separately in the workbench, execution preview and history. Subscription tokens do not imply vendor allowance, remaining quota or percentage. Additional API quality/review calls still incur API charges.
+- Upgrade persistent state to schema v3 while migrating readable v1/v2 histories and protected execution state. Fully stop all Hosts before updating and keep state backups before downgrading.
+
+Final validation and release evidence are tracked in the [0.25.0 acceptance report](docs/releases/0.25.0-validation.md). No new real vendor inference or installed-DSH end-to-end claim is made by these changes.
+
 ## 0.24.0 — 2026-10-24
 
 - Reserve remaining execution estimates in shared persistent state before admission. Daily/monthly checks account for recorded API spending plus other active or interrupted reservations, preventing concurrent tasks from independently admitting the same estimated capacity. Unknown estimates or unresolved costs under a finite budget require explicit confirmation.

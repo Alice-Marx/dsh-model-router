@@ -5,6 +5,57 @@
 import { budgetCheck, formatUsd as sharedFormatUsd, sanitizeArchivedSpending } from '../shared/run-ledger.mjs'
 import { OFFICIAL_TOOLS } from '../shared/official-tool-registry.mjs'
 import { parsePackageAssignments } from '../shared/package-assignments.mjs'
+import { subscriptionUsageForPackage, subscriptionUsageForRun } from '../shared/subscription-usage.mjs'
+
+export { subscriptionUsageForPackage, subscriptionUsageForRun }
+
+const tokenCounter = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
+const usageCount = value => Number.isSafeInteger(value) && value >= 0
+export const formatUsageTokens = value => usageCount(value) ? value.toLocaleString('zh-CN') : '未报告'
+
+/** Subscription counters describe observed usage, never a currency equivalent or quota balance. */
+export function subscriptionUsageText(period) {
+  if (!period || !usageCount(period.calls)) return '订阅用量摘要不可用'
+  return `订阅调用 ${period.calls} 次 · 已报告输入 ${formatUsageTokens(period.inputTokens)} / 输出 ${formatUsageTokens(period.outputTokens)} tokens`
+    + ` · 缓存读取 ${formatUsageTokens(period.cacheReadTokens)} / 写入 ${formatUsageTokens(period.cacheWriteTokens)} tokens`
+    + (usageCount(period.unknownUsageCalls) && period.unknownUsageCalls > 0 ? ` · ${period.unknownUsageCalls} 次调用用量不完整或未知` : '')
+}
+
+export function subscriptionUsageSummary(ledger) {
+  const usage = ledger?.subscriptionUsage
+  const available = Boolean(usage && usageCount(usage.today?.calls) && usageCount(usage.month?.calls))
+  return { available, today: available ? usage.today : null, month: available ? usage.month : null,
+    byRoute: available && Array.isArray(usage.byRoute) ? usage.byRoute.filter(item => item && typeof item.provider === 'string') : [] }
+}
+
+/** A new split-accounting estimate must never fall back to the old reference price. */
+export function apiPlanEstimate(value) {
+  const accounting = value?.accounting ?? value?.plan?.accounting
+  if (accounting && Object.hasOwn(accounting, 'apiEstimatedCostUsd')) return tokenCounter(accounting.apiEstimatedCostUsd) ? accounting.apiEstimatedCostUsd : null
+  return tokenCounter(value?.estimatedCost) ? value.estimatedCost : null
+}
+
+export function packageAccounting(value, id) {
+  const accounting = value?.accounting ?? value?.plan?.accounting
+  return (Array.isArray(accounting?.packages) ? accounting.packages : []).find(item => item.id === id) ?? null
+}
+
+const estimatedTokens = value => tokenCounter(value) ? formatUsageTokens(value) : '待估算'
+export function subscriptionEstimateText(value) {
+  const packages = (value?.accounting ?? value?.plan?.accounting)?.packages
+  const selected = Array.isArray(packages) ? packages.filter(item => item.billing === 'subscription') : []
+  if (!selected.length) return null
+  const total = key => selected.every(item => tokenCounter(item.estimatedUsage?.[key]))
+    ? selected.reduce((sum, item) => sum + item.estimatedUsage[key], 0) : null
+  return `订阅工作包 ${selected.length} 个 · 预估输入 ${estimatedTokens(total('inputTokens'))} / 输出 ${estimatedTokens(total('outputTokens'))} tokens；不计入 API 费用预算。`
+}
+
+export function packageEstimateText(value, item) {
+  const accounting = packageAccounting(value, item.id)
+  if (accounting?.billing === 'subscription') return `订阅预估输入 ${estimatedTokens(accounting.estimatedUsage?.inputTokens)} / 输出 ${estimatedTokens(accounting.estimatedUsage?.outputTokens)} tokens`
+  const amount = accounting && Object.hasOwn(accounting, 'apiEstimatedCostUsd') ? accounting.apiEstimatedCostUsd : item.estimatedCost
+  return `API 预估费用 ${tokenCounter(amount) ? money(amount) : '待核验'}`
+}
 
 export const PACKAGE_STATUS = Object.freeze({
   pending: Object.freeze({ label: '待执行', tone: 'pending' }),
@@ -20,7 +71,9 @@ export const PACKAGE_STATUS = Object.freeze({
 })
 
 export function packageStatus(item) {
+  if (item?.status === 'succeeded' && item.billing === 'subscription') return { label: '订阅调用完成', tone: 'ok' }
   if (item?.status === 'succeeded' && item.channel === 'harness-llm') return { label: 'API 完成', tone: 'ok' }
+  if (item?.status === 'interrupted' && item.billing === 'subscription') return { label: '执行中断，用量待核对', tone: 'warn' }
   return PACKAGE_STATUS[item?.status] ?? PACKAGE_STATUS.pending
 }
 
@@ -243,7 +296,7 @@ export function formatResetTime(at) {
   return `${date.getMonth() + 1}-${date.getDate()} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
-export const BILLING_CHANNEL_LABEL = Object.freeze({ subscription: '订阅', api: 'API Key' })
+export const BILLING_CHANNEL_LABEL = Object.freeze({ subscription: '订阅', api: 'API Key', unknown: '计费方式待核对' })
 
 /** Health-check billing rows in display form. */
 export function billingRows(billing) {

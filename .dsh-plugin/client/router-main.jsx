@@ -4,8 +4,8 @@ import { ModelProfileEditor } from './model-profile-editor.jsx'
 import { acceptedInstallJob, installClickRefusal, installSummaryMatchesSettings, mutateToolInstallSettings, retainToolInstallDrafts, savedToolInstallMethods, shouldApplyInstallStatus, toolInstallAction, toolInstallSettingsSignature, toolMaintenanceActions, validateToolInstallSetting } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
-import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, ToolLoginLine } from './router-insights.jsx'
-import { healthSummary, initialPackageAssignments, manualAssignmentOptions, planBudget, rerunConfirmations, rerunSupport, reservationSummary, unwrapRemote } from './insights-state.mjs'
+import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, SubscriptionUsageCard, ToolLoginLine } from './router-insights.jsx'
+import { apiPlanEstimate, healthSummary, initialPackageAssignments, manualAssignmentOptions, packageEstimateText, planBudget, rerunConfirmations, rerunSupport, reservationSummary, subscriptionEstimateText, unwrapRemote } from './insights-state.mjs'
 import { packagePlanKey } from '../shared/package-assignments.mjs'
 import { RunLauncher } from './run-launcher.jsx'
 import { CliTerminalCard } from './cli-terminal.jsx'
@@ -65,7 +65,9 @@ function ChannelBadge({ item }) {
 
 export function PlanResults({ plan, ledger, headingRef, assignmentMode = 'algorithm', packageAssignments = {}, assignmentOptions = [], manualAllowed = true, onAssignmentModeChange, onPackageAssignmentChange, onRestoreAssignments }) {
   const selected = plan.selected
-  const budget = planBudget(ledger, plan.estimatedCost)
+  const estimate = apiPlanEstimate(plan)
+  const budget = plan.accounting ? planBudget(ledger, estimate) : null
+  const subscriptionEstimate = subscriptionEstimateText(plan)
   const packageNames = new Map((plan.team?.workPackages ?? []).map(item => [item.id, item.name]))
   const purposeLabel = { analysis: '任务分析', execution: '任务实施', verification: '独立验证', synthesis: '结果整合' }
   return (
@@ -80,18 +82,20 @@ export function PlanResults({ plan, ledger, headingRef, assignmentMode = 'algori
         <div className="mr-result-grid">
           <div className="mr-metric"><div className="mr-metric-label">{assignmentMode === 'manual' ? '算法原推荐路线' : '推荐路线'}</div><div className="mr-metric-value">{selected ? `${selected.provider}/${selected.model}` : '暂无路线'}</div></div>
           <div className="mr-metric"><div className="mr-metric-label">任务复杂度 · 分值（0–1）</div><div className="mr-metric-value">{{ simple: '简单', balanced: '中等', complex: '复杂' }[plan.complexity.band] || plan.complexity.band} · {plan.complexity.value}</div></div>
-          <div className="mr-metric"><div className="mr-metric-label">{assignmentMode === 'manual' ? '调整前算法方案估算' : '估算总成本'}</div><div className="mr-metric-value">{money(plan.estimatedCost)}</div></div>
+          <div className="mr-metric"><div className="mr-metric-label">{assignmentMode === 'manual' ? '调整前 API 估算' : 'API 预估费用'}</div><div className="mr-metric-value">{plan.accounting ? money(estimate) : '以执行预览为准'}</div></div>
           <div className="mr-metric"><div className="mr-metric-label">路由方案</div><div className="mr-metric-value">{ROUTING_PRESETS[plan.preset]?.label ?? '均衡'}</div></div>
         </div>
         {budget?.exceeded && <p className="mr-error" role="alert">{assignmentMode === 'manual' ? '算法原方案预算提示：' : '执行前预算检查：'}{budget.message} {assignmentMode === 'manual' ? '手动方案将重新预览费用，超预算时暂停确认，不自动替换目标。' : '实际执行时将按设置自动降级或暂停询问。'}</p>}
-        {budget?.limited && !budget.exceeded && budget.estimateKnown && <p className="mr-caption">{assignmentMode === 'manual' ? '算法原方案：' : '执行前预算检查：本次预估 '}{money(plan.estimatedCost)}，剩余额度 {money(budget.remainingUsd)}。</p>}
+        {budget?.limited && !budget.exceeded && budget.estimateKnown && <p className="mr-caption">{assignmentMode === 'manual' ? '算法原方案：' : '执行前 API 预算检查：本次预估 '}{money(estimate)}，剩余额度 {money(budget.remainingUsd)}。</p>}
+        {subscriptionEstimate && <p className="mr-caption">{subscriptionEstimate} 这是工作包本地估算，不是厂商已使用或剩余额度。</p>}
+        {!plan.accounting && <p className="mr-caption">本地规划尚未核验实际计费渠道；API 费用与订阅预估用量以执行预览为准。</p>}
         {plan.loginRequired && <p className="mr-caption">推荐模型的官方 CLI 未登录，执行时按计费设置暂停或使用模型目录 API；可在“官方工具”卡片点“去登录”。</p>}
         <div className="mr-channel-line">
           <span className="mr-control-label">{assignmentMode === 'manual' ? '算法原推荐渠道' : '执行渠道'}</span>
           <ChannelBadge item={plan} />
         </div>
         <details className="mr-plan-explanation"><summary>查看规划依据与估算说明</summary><p className="mr-caption">{plan.reason}</p><p className="mr-caption">{plan.pricingNotice} {plan.qualityNotice} {plan.availabilityNotice} {plan.modalityNotice || ''}</p></details>
-        {plan.optimization.budgetExceeded && <p className="mr-error">按已提供单价估算，任务可能超过本次预算。预算只影响建议，不会阻止实际扣费。</p>}
+        {plan.accounting && Number.isFinite(estimate) && Number(plan.optimization.budgetUsd) > 0 && estimate > Number(plan.optimization.budgetUsd) && <p className="mr-error">按已提供单价估算，API 部分可能超过本次预算。预算只影响建议，不会阻止实际扣费。</p>}
         {!plan.routingBypassed && plan.team && (
           <>
             <h3 className="mr-section-title">{plan.mode === 'team' ? '团队工作包' : '任务工作包'}</h3>
@@ -122,7 +126,7 @@ export function PlanResults({ plan, ledger, headingRef, assignmentMode = 'algori
                   </div>}
                   {item.objective && <p className="mr-package-copy">具体目标：{item.objective}</p>}
                   <p className="mr-package-copy">{purposeLabel[item.purpose] ?? item.purpose}{item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.map(id => packageNames.get(id) ?? id).join('、')}` : ''}</p>
-                  <p className="mr-package-copy">难度：{{ simple: '简单', balanced: '中等', complex: '困难' }[item.difficulty] || item.difficulty || '待评估'} · {assignmentMode === 'manual' ? '原推荐费用' : '费用'}：{money(item.estimatedCost)}</p>
+                  <p className="mr-package-copy">难度：{{ simple: '简单', balanced: '中等', complex: '困难' }[item.difficulty] || item.difficulty || '待评估'} · {plan.accounting ? packageEstimateText(plan, item) : '费用与订阅用量待执行预览核验'}</p>
                   <p className="mr-package-copy">验收：{item.verificationChecklist.join('；')}</p>
                   <div className="mr-channel-line">{assignmentMode === 'manual' && <span className="mr-caption">原推荐渠道：</span>}<ChannelBadge item={item} />{item.loginRequired && <span className="mr-pill">CLI 未登录</span>}</div>
                   {item.channelDetail && <p className="mr-package-copy">渠道说明：{item.channelDetail}</p>}
@@ -1134,9 +1138,10 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         </div>
 
         <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-controls" aria-labelledby="mr-tab-controls" hidden={view !== 'controls'}>
-        <div className="mr-view-heading"><h2>预算与安全</h2><p>设置成本与质量策略，核对订阅计费和执行边界。</p></div>
+        <div className="mr-view-heading"><h2>预算与安全</h2><p>API 按金额管理预算，订阅单独核对用量与执行边界。</p></div>
         <CostControlCard ledger={workbench.ledger.value} error={workbench.ledger.error || workbench.ledger.value?.storageNotice || ''} refreshing={workbench.ledger.refreshing} settingsScope={settingsScope}
           onChanged={() => { invalidatePlan(); return workbench.refreshLedger() }} />
+        <SubscriptionUsageCard ledger={workbench.ledger.value} />
         <BillingCard billing={workbench.health.report?.billing ?? null} error={workbench.health.report ? '' : workbench.health.error}
           refreshing={workbench.health.refreshing} onRefresh={() => { void workbench.refreshHealth(true) }} />
         <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />

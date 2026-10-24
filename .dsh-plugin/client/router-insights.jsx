@@ -4,6 +4,7 @@ import { BILLING_MODE_LABEL } from '../shared/subscription-billing.mjs'
 import {
   BILLING_CHANNEL_LABEL, LOGIN_LABEL, RUN_KIND_LABEL, billingRows, billingSwitchText, RUN_STATUS_LABEL, UNTESTED_VERSION_NOTE, budgetOccupancyMeter, dagLayers, formatUsd, healthSummary,
   packageCost, packageStatus, priorAttemptTotals, rerunSupport, reservationSummary, runTotals, versionLine,
+  formatUsageTokens, subscriptionUsageForPackage, subscriptionUsageForRun, subscriptionUsageSummary, subscriptionUsageText,
 } from './insights-state.mjs'
 import {
   ADAPTIVE_NUMBER_FIELDS, adaptiveSettingValue, dynamicSourceView, feedbackRatingArguments,
@@ -63,7 +64,7 @@ export function ToolLoginLine({ entry }) {
     <div className="mr-login">
       <div className="mr-tool-status"><span className={`mr-tool-dot ${state === 'logged-in' ? 'installed' : state === 'logged-out' ? 'missing-strong' : ''}`} />{LOGIN_LABEL[state]} · {versionLine(entry)}</div>
       {entry.login?.detail && <p className="mr-caption mr-tool-detail">{entry.login.detail}</p>}
-      {state === 'logged-in' && entry.login?.billing === 'subscription' && <p className="mr-caption mr-tool-detail">订阅账号登录：费用只作参考显示，不计入预算。</p>}
+      {state === 'logged-in' && entry.login?.billing === 'subscription' && <p className="mr-caption mr-tool-detail">订阅账号登录：单独统计调用与 token 用量，不计入 API 费用预算。</p>}
       {state === 'logged-in' && entry.login?.billing === 'api-key' && <p className="mr-caption mr-tool-detail">API Key 计费：费用计入每日/每月预算。</p>}
       {state !== 'logged-in' && <button className="mr-button mr-button-secondary mr-tool-button mr-login-button" type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>去登录</button>}
       {open && (
@@ -283,22 +284,23 @@ export function CostControlCard({ ledger, settingsScope, onChanged, error, refre
   return (
     <section className="mr-card mr-cost" aria-label="成本控制">
       <div className="mr-card-head"><div>
-        <h2 className="mr-card-title">成本控制与路由方案</h2>
-        <p className="mr-card-copy">预算只计算走 API Key 或模型目录 API 的花费（CLI 自报金额或 token 用量 × 你配置的单价）。官方 CLI 用订阅账号登录、未注入 API Key 时，只显示按 API 价折算的“订阅参考费用”，不计入预算。缺少单价的调用计为“费用未知”。这是本机估算，不是厂商账单。</p>
+        <h2 className="mr-card-title">API 费用、预算与路由方案</h2>
+        <p className="mr-card-copy">API 按实际计费计算预算（CLI 自报金额或 token 用量 × 你配置的单价）。订阅调用单独统计用量，不折算金额、不占 API 预算。API 缺少单价或完整用量时，费用保持未知；本机记录不能替代厂商账单。</p>
       </div></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
         <div className="mr-meters">
-          <Meter label="今日预算占用" meter={budgetOccupancyMeter(spent.today, daily, reserved.today)} />
-          <Meter label="本月预算占用" meter={budgetOccupancyMeter(spent.month, monthly, reserved.month)} />
+          <Meter label="今日 API 预算占用" meter={budgetOccupancyMeter(spent.today, daily, reserved.today)} />
+          <Meter label="本月 API 预算占用" meter={budgetOccupancyMeter(spent.month, monthly, reserved.month)} />
         </div>
         <p className="mr-caption">预占是尚未结算的费用估算，不是实际账单；剩余额度已扣除已发生费用与已知预占。执行中 {reserved.activeCount} 项 · 待核对中断 {reserved.interruptedCount} 项。</p>
         {(reserved.unknownToday > 0 || reserved.unknownMonth > 0) && <p className="mr-caption mr-warn-text">预占金额未知：今日 {reserved.unknownToday} 项 · 本月 {reserved.unknownMonth} 项，未计入上方预占金额，不能视为零费用。请核对厂商账单与原任务记录。</p>}
         {reserved.interruptedCount > 0 && <p className="mr-error" role="alert">有中断任务尚未核对，预占继续保留，不能直接重跑。请先核对旧任务与厂商账单，保留原始状态文件和已保存结果；若记录损坏，从可信备份恢复完整状态。当前界面不支持手动结算或自动付费恢复。</p>}
         {reservations.length > 0 && <details className="mr-tool-log"><summary>查看未结算预占（{reservations.length} 项）</summary>
-          <ul className="mr-checklist">{reservations.map(item => <li key={item.id}>运行 <code>{item.runId || item.id}</code> · {item.status === 'interrupted' ? '执行中断，费用待核对' : '执行中'} · 剩余预占 {item.unknown || !Number.isFinite(item.remainingEstimateUsd) ? '金额未知' : formatUsd(item.remainingEstimateUsd)}{Number.isFinite(item.updatedAt) ? ` · 最近保存 ${new Date(item.updatedAt).toLocaleString()}` : ''}</li>)}</ul>
+          <ul className="mr-checklist">{reservations.map(item => <li key={item.id}>运行 <code>{item.runId || item.id}</code> · {item.billing === 'subscription'
+            ? item.status === 'interrupted' ? '订阅执行中断，用量待核对' : '订阅执行中，用量待回报'
+            : <>{item.status === 'interrupted' ? '执行中断，费用待核对' : '执行中'} · 剩余预占 {item.unknown || !Number.isFinite(item.remainingEstimateUsd) ? '金额未知' : formatUsd(item.remainingEstimateUsd)}</>}{Number.isFinite(item.updatedAt) ? ` · 最近保存 ${new Date(item.updatedAt).toLocaleString()}` : ''}</li>)}</ul>
         </details>}
-        {(spent.subscriptionRunsMonth ?? 0) > 0 && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：今日 {formatUsd(spent.subscriptionToday ?? 0)} · 本月 {formatUsd(spent.subscriptionMonth ?? 0)}，本月共 {spent.subscriptionRunsMonth} 次订阅登录调用。</p>}
         {(spent.unknownToday > 0 || spent.unknownMonth > 0) && <p className="mr-caption">本月有 {spent.unknownMonth} 次调用缺少单价或用量，未计入金额。请在“模型价格与能力”中补齐单价。</p>}
         {ledger?.budget?.exceeded && <p className="mr-error" role="alert">{ledger.budget.message} {ledger.budget.action === 'pause' ? '新的执行会先暂停并请求确认。' : '新的执行会尝试自动降级为“省钱优先”。'}</p>}
         <div className="mr-controls">
@@ -345,6 +347,45 @@ export function CostControlCard({ ledger, settingsScope, onChanged, error, refre
   )
 }
 
+function UsagePeriod({ label, period }) {
+  return <div className="mr-metric">
+    <div className="mr-metric-label">{label}</div>
+    <div className="mr-metric-value">{period.calls} 次调用</div>
+    <p className="mr-caption">已报告输入 {formatUsageTokens(period.inputTokens)} / 输出 {formatUsageTokens(period.outputTokens)} tokens</p>
+    <p className="mr-caption">缓存读取 {formatUsageTokens(period.cacheReadTokens)} / 写入 {formatUsageTokens(period.cacheWriteTokens)} tokens</p>
+    {period.unknownUsageCalls > 0 && <p className="mr-caption mr-warn-text">{period.unknownUsageCalls} 次调用用量不完整或未知</p>}
+  </div>
+}
+
+/** A separate quantity ledger: provider quota is not inferred from token counts. */
+export function SubscriptionUsageCard({ ledger }) {
+  const usage = subscriptionUsageSummary(ledger)
+  return <section className="mr-card mr-results" aria-label="订阅用量">
+    <div className="mr-card-head"><div>
+      <h2 className="mr-card-title">订阅用量</h2>
+      <p className="mr-card-copy">订阅只统计调用次数与厂商已报告的 token 用量，和 API 金额分开计算。未报告的用量保持未知，不按 API 价格折算。</p>
+    </div></div>
+    <div className="mr-card-body">
+      {!usage.available && <p className="mr-empty">订阅用量摘要不可用。旧版 Host 或历史记录可能只保存参考金额；不能从该金额还原 token 用量，请更新 Host 后刷新。</p>}
+      {usage.available && <>
+        <div className="mr-result-grid">
+          <UsagePeriod label="今日订阅用量" period={usage.today} />
+          <UsagePeriod label="本月订阅用量" period={usage.month} />
+        </div>
+        {usage.byRoute.length > 0 && <div className="mr-table-wrap"><table className="mr-table">
+          <thead><tr><th>订阅供应商 / 工具</th><th>今日已观察用量</th><th>本月已观察用量</th></tr></thead>
+          <tbody>{usage.byRoute.map(item => <tr key={`${item.provider}\u0000${item.toolId ?? ''}\u0000${item.model ?? ''}`}>
+            <td><strong>{item.provider || '未记录供应商'}</strong><div className="mr-caption">{[item.toolId, item.model].filter(Boolean).join(' · ') || '未记录工具或模型'}</div></td>
+            <td>{subscriptionUsageText(item.today)}</td><td>{subscriptionUsageText(item.month)}</td>
+          </tr>)}</tbody>
+        </table></div>}
+        {usage.month.calls === 0 && <p className="mr-caption">本月没有已记录的订阅调用。</p>}
+      </>}
+      <p className="mr-caption">这些数值是本机已记录用量，不代表订阅总额度或剩余额度。不同厂商的计量方式、窗口及缓存口径可能不同；未获得厂商配额时，不显示已用百分比。</p>
+    </div>
+  </section>
+}
+
 /** Layered dependency view: one column per depth, nodes in plan order. */
 export function DagView({ packages, renderNode, label = '子任务依赖图' }) {
   const layers = dagLayers(packages)
@@ -373,6 +414,7 @@ export function DagView({ packages, renderNode, label = '子任务依赖图' }) 
 
 function ChannelText({ item }) {
   if (!item.channel) return <span className="mr-pill">{item.status === 'running' ? '执行中' : item.status === 'interrupted' ? '执行中断' : '待执行'}</span>
+  if (item.billing === 'subscription') return <span className="mr-pill mr-pill-channel-ok">{item.channel === 'official-cli' ? `订阅 · 官方 CLI · ${item.toolId ?? ''}` : '编程套餐订阅'}</span>
   return <span className={item.channel === 'official-cli' ? 'mr-pill mr-pill-channel-ok' : 'mr-pill'}>{item.channel === 'official-cli' ? `官方 CLI · ${item.toolId ?? ''}` : '模型目录 API'}</span>
 }
 
@@ -381,6 +423,7 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun, ledg
   const rerun = rerunSupport(run, ledger)
   if (item.status === 'paused') return <PausedNode run={run} item={item} busy={busy} onRerun={onRerun} rerun={rerun} />
   const cost = packageCost(item)
+  const usage = subscriptionUsageForPackage(item)
   const canRerun = rerun.supported && !item.ok && !busy
   const others = routes.filter(route => `${route.provider}/${route.model}` !== `${item.provider}/${item.model}`)
   return (
@@ -390,8 +433,9 @@ function RunNode({ run, item, routes, allowReassign, busy, onRate, onRerun, ledg
         ? `官方工具 ${item.manualAssignment.toolId}（厂商默认模型）`
         : `模型 API ${item.manualAssignment.provider}/${item.manualAssignment.model}`}
         {item.algorithmRecommendation?.provider ? ` · 原推荐 ${item.algorithmRecommendation.provider}/${item.algorithmRecommendation.model}` : ''}</p>}
-      <div className="mr-channel-line"><ChannelText item={item} /><span className="mr-caption">预估 {formatUsd(item.estimatedCost)} · 实际 {cost.budget}{item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : ''}</span></div>
-      {cost.reference && <p className="mr-package-copy">{cost.reference}</p>}
+      <div className="mr-channel-line"><ChannelText item={item} /><span className="mr-caption">{item.billing === 'subscription' ? '订阅用量单独统计 · 不占 API 预算' : `API 预估 ${formatUsd(item.estimatedCost)} · 实际 ${cost.budget}`}{item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : ''}</span></div>
+      {usage.calls > 0 && <p className="mr-package-copy">{subscriptionUsageText(usage)}</p>}
+      {item.billing === 'subscription' && usage.calls === 0 && <p className="mr-package-copy">{item.inFlight ? '订阅调用执行中，用量待回报。' : '尚未记录订阅调用用量。'}</p>}
       {item.actualModel && <p className="mr-package-copy">CLI 回报模型：{item.actualModel}</p>}
       {(item.billing || item.billingMode) && <p className="mr-package-copy">计费：{BILLING_CHANNEL_LABEL[item.billing] ?? '—'}{item.subscriptionRoute ? ` · 套餐路线 ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : ''}{item.billingMode && item.billingMode !== 'subscription-first' ? ` · ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ''}</p>}
       {billingSwitchText(item) && <p className="mr-package-copy mr-warn-text">计费切换：{billingSwitchText(item)}</p>}
@@ -452,6 +496,7 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
   const unresolved = ['running', 'interrupted'].includes(current?.status)
     || (ledger?.reservations ?? []).some(item => item.runId === current?.id && ['active', 'interrupted'].includes(item.status))
   const totals = runTotals(current)
+  const subscriptionUsage = subscriptionUsageForRun(current)
   const prior = priorAttemptTotals(current)
   const unknownCalls = prior.unknownCalls + [...(current?.packages ?? []), ...(current?.reviews ?? [])]
     .filter(item => item.ran && item.billing !== 'subscription' && !Number.isFinite(item.costUsd)).length
@@ -476,12 +521,12 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
                 <div className="mr-result-grid">
                   <div className="mr-metric"><div className="mr-metric-label">方案</div><div className="mr-metric-value">{ROUTING_PRESETS[current.preset]?.label ?? current.preset}{current.budget?.downgraded ? '（超预算自动降级）' : ''}</div></div>
                   <div className="mr-metric"><div className="mr-metric-label">难度</div><div className="mr-metric-value">{BAND[current.decision?.complexity?.band] ?? '—'}{current.decision?.complexity?.value !== null && current.decision?.complexity?.value !== undefined ? ` · ${current.decision.complexity.value}` : ''}</div></div>
-                  <div className="mr-metric"><div className="mr-metric-label">预估 / {unknownCalls ? '已知实际' : '实际'}（计入预算）</div><div className="mr-metric-value">{formatUsd(current.decision?.estimatedCost)} / {formatUsd(totals.budgetUsd)}</div></div>
+                  <div className="mr-metric"><div className="mr-metric-label">API {unknownCalls ? '已知实际费用' : '实际费用'}（计入预算）</div><div className="mr-metric-value">{formatUsd(totals.budgetUsd)}</div></div>
                   <div className="mr-metric"><div className="mr-metric-label">类型</div><div className="mr-metric-value">{RUN_KIND_LABEL[current.kind ?? 'assign'] ?? current.kind}{current.kind === 'team' || current.kind === 'tool' ? ` · ${current.executionMode === 'workspace-write' ? '可编辑' : '只读'}` : ''}</div></div>
                 </div>
-                {totals.subscription && <p className="mr-caption">订阅参考费用（按 API 价折算，不计入预算）：{formatUsd(totals.referenceUsd)}</p>}
+                {subscriptionUsage.calls > 0 && <p className="mr-caption">{subscriptionUsageText(subscriptionUsage)}。订阅不计入 API 金额。</p>}
                 {unknownCalls > 0 && <p className="mr-caption">另有 {unknownCalls} 次调用费用未知，未计入上方金额。</p>}
-                {(prior.budgetUsd > 0 || prior.subscriptionRuns > 0 || prior.unknownCalls > 0) && <p className="mr-caption">累计包含此前重跑尝试：API {formatUsd(prior.budgetUsd)} · 订阅参考 {formatUsd(prior.referenceUsd)}{prior.unknownCalls > 0 ? ` · 费用未知 ${prior.unknownCalls} 次` : ''}。下方节点显示最近一次结果。</p>}
+                {(prior.budgetUsd > 0 || prior.subscriptionRuns > 0 || prior.unknownCalls > 0) && <p className="mr-caption">累计包含此前重跑尝试：API {formatUsd(prior.budgetUsd)}{prior.subscriptionRuns > 0 ? ` · 订阅 ${prior.subscriptionRuns} 次调用（用量见上方累计）` : ''}{prior.unknownCalls > 0 ? ` · API 费用未知 ${prior.unknownCalls} 次` : ''}。下方节点显示最近一次结果。</p>}
                 {current.kind === 'team' && <p className="mr-caption">执行环境：{current.executionEnvironment === 'cli-native'
                   ? '厂商 CLI 正常环境 · 当前用户权限 · 无 Harness 进程沙箱'
                   : current.executionEnvironment === 'harness' ? 'Harness 受限环境' : '历史记录未记录执行环境'}</p>}
@@ -506,7 +551,7 @@ export function BillingCard({ billing, error, onRefresh, refreshing }) {
     <section className="mr-card mr-results" aria-label="订阅与 API Key">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">订阅与 API Key</h2>
-        <p className="mr-card-copy">默认订阅优先：有订阅（官方 CLI 账号登录或编程套餐 Key 路线）就先用订阅；订阅额度用尽或限流时，同一步骤自动改用 API Key，并在执行记录中写明原因。订阅运行只显示参考费用，不计入预算。</p>
+        <p className="mr-card-copy">默认订阅优先：有订阅（官方 CLI 账号登录或编程套餐 Key 路线）就先用订阅；订阅额度用尽或限流时，同一步骤按预算规则改用 API Key，并在执行记录中写明原因。订阅统计用量，API 统计费用，两种通道分别记账。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={refreshing} onClick={onRefresh}>重新体检</button></div>
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}

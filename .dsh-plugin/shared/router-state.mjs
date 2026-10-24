@@ -18,10 +18,12 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { archiveSpending, sanitizeArchivedSpending } from './run-ledger.mjs'
 import { sanitizeBudgetReservations } from './budget-reservations.mjs'
+import { archiveSubscriptionUsage, invalidArchivedSubscriptionUsage, invalidSubscriptionAttempts,
+  sanitizeArchivedSubscriptionUsage } from './subscription-usage.mjs'
 
 export const MAX_RUNS = 200
-// Older Hosts must refuse v2 instead of dropping durable execution holds.
-const STATE_VERSION = 2
+// Older Hosts must refuse v3 instead of dropping the separate usage archive.
+const STATE_VERSION = 3
 
 /** Same DSH home rule as the Host: DSH_HOME (with ~ expansion) or ~/.dsh. */
 export function resolveStateHome(env = process.env, home = homedir(), cwd = process.cwd()) {
@@ -43,7 +45,10 @@ const LOCK_STALE_MS = 15_000
 const LOCK_TIMEOUT_MS = 10_000
 
 function emptyState() {
-  return { version: STATE_VERSION, historyIncomplete: false, onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], budgetReservations: {}, dynamicData: { liveBench: null, pricing: null, status: {}, revision: '' }, archivedSpending: sanitizeArchivedSpending(), notices: [], terminalSessions: [] }
+  return { version: STATE_VERSION, historyIncomplete: false, subscriptionUsageIncomplete: false,
+    onboarding: { completedAt: null }, health: null, quota: {}, authFailures: {}, runs: [], budgetReservations: {},
+    dynamicData: { liveBench: null, pricing: null, status: {}, revision: '' }, archivedSpending: sanitizeArchivedSpending(),
+    archivedSubscriptionUsage: sanitizeArchivedSubscriptionUsage(), notices: [], terminalSessions: [] }
 }
 
 function sanitizeNotices(value) {
@@ -63,6 +68,7 @@ function retainRuns(state, maxRuns) {
     return true
   })
   state.archivedSpending = archiveSpending(evicted, state.archivedSpending)
+  state.archivedSubscriptionUsage = archiveSubscriptionUsage(evicted, state.archivedSubscriptionUsage)
   return state
 }
 
@@ -103,7 +109,7 @@ function invalidRunSpending(run) {
 }
 
 function sanitize(value, maxRuns) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, STATE_VERSION].includes(value.version)
+  if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, 2, STATE_VERSION].includes(value.version)
     || !Array.isArray(value.runs)) {
     const error = new Error('模型路由状态版本或结构不受支持；原文件未修改，请先恢复或升级兼容版本。')
     error.code = 'ROUTER_STATE_UNSUPPORTED'
@@ -119,6 +125,11 @@ function sanitize(value, maxRuns) {
       || invalidArchivedSpending(value.archivedSpending) || runs.some(invalidRunSpending) || held.invalid
       || Object.values(held.reservations).some(entry => !runs.some(run => run.id === entry.runId))
       || sanitizeNotices(value.notices).some(notice => notice.kind === 'state-corrupt'),
+    subscriptionUsageIncomplete: value.subscriptionUsageIncomplete === true
+      || invalidArchivedSubscriptionUsage(value.archivedSubscriptionUsage)
+      || runs.some(run => invalidArchivedSubscriptionUsage(run.priorAttemptSubscriptionUsage)
+        || [...(Array.isArray(run.packages) ? run.packages : []), ...(Array.isArray(run.reviews) ? run.reviews : [])]
+          .some(item => invalidSubscriptionAttempts(item?.subscriptionAttempts))),
     onboarding: { completedAt: Number.isFinite(value.onboarding?.completedAt) ? value.onboarding.completedAt : null },
     health: value.health && Array.isArray(value.health.tools) ? value.health : null,
     quota: value.quota && typeof value.quota === 'object' && !Array.isArray(value.quota) ? value.quota : {},
@@ -128,6 +139,8 @@ function sanitize(value, maxRuns) {
     budgetReservations: held.reservations,
     dynamicData: value.dynamicData && typeof value.dynamicData === 'object' && !Array.isArray(value.dynamicData) ? value.dynamicData : { liveBench: null, pricing: null, status: {}, revision: '' },
     archivedSpending: sanitizeArchivedSpending(value.archivedSpending),
+    archivedSubscriptionUsage: sanitizeArchivedSubscriptionUsage(value.archivedSubscriptionUsage,
+      { legacySpending: value.archivedSpending }),
     notices: sanitizeNotices(value.notices),
     terminalSessions: sanitizeTerminalSessions(value.terminalSessions),
   }, maxRuns)

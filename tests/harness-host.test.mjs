@@ -282,7 +282,7 @@ test('Host team planning filters readiness for the requested execution mode', ()
   assert.deepEqual(executableTeamRoutes(routes, installed, [{ id: 'codex', ready: true, modes: ['read-only'] }], 'read-only', capabilities), [routes[0]], 'legacy readiness modes remain supported')
 })
 
-test('official team helpers share mode planning, CLI bindings and execution recording without an API fallback', async () => {
+test('official team helpers share mode planning, CLI bindings and execution recording without an API fallback', async t => {
   const { ctx, streamCalls } = createHarnessContext()
   ctx.sandbox = { confine() { throw new Error('the injected team runner does not spawn') } }
   const config = routerConfig({ modelProfilesJson: JSON.stringify([
@@ -321,6 +321,10 @@ test('official team helpers share mode planning, CLI bindings and execution reco
   assert.equal(result.run.kind, 'team')
   assert.ok(result.run.packages.every(pkg => pkg.channel === 'official-cli'))
   assert.equal(streamCalls.length, 0)
+  const { healthCache } = await import('../.dsh-plugin/shared/tool-health.mjs')
+  const previousHealth = healthCache.report()
+  healthCache.remember({ checkedAt: Date.now(), tools: [{ id: 'codex', installed: true, login: { state: 'logged-in', billing: 'api-key', accountLogin: false } }] })
+  t.after(() => healthCache.remember(previousHealth ?? { checkedAt: 0, tools: [] }))
   const budgetConfig = { ...config, dailyBudgetUsd: 0.000001 }
   const paused = await executeOfficialTeamPlan(ctx, budgetConfig, planned, {
     runTeam() { throw new Error('over-budget teams must not start') },

@@ -10,7 +10,7 @@ Want release notes only? Click **Watch → Custom → Releases** (you do not nee
 
 A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
 
-Current version: **0.24.0** (`@ljwei-stak/dsh-model-router`). Concurrent executions now reserve remaining estimated budget in shared persistent state. Required checkpoints save each package before launch and after its receipt; interrupted executions retain their budget hold and unresolved cost evidence. The workbench separates recorded spending from reserved estimates. Windows/Linux Node 24 CI runs the full test, client build and package-integrity checks. Workbench execution shows live elapsed time and per-package progress, supports cancellation with completed results and reported costs retained, and reconnects to the active job when the panel is reopened. Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
+Current version: **0.25.0** (`@ljwei-stak/dsh-model-router`). API calls use monetary accounting and daily/monthly budget reservations; subscriptions use a separate ledger of calls and reported tokens. Confirmed subscription execution is not blocked only because the API budget is exhausted or API prices are missing. A switch to an API must be priced and admitted before that API call; mixed results retain both channel receipts. The workbench separates API spending/reservations from subscription usage, with unknown counters kept unknown. Workbench execution shows live elapsed time and per-package progress, supports cancellation with completed results and reported costs retained, and reconnects to the active job when the panel is reopened. Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility remains **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
 
 Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
 
@@ -27,22 +27,22 @@ Both README versions describe the same interfaces, formulas, defaults and limits
 **Install (DSH Plugin Hub / web profile):** With the DSH CLI available, install the versioned npm package with:
 
 ```sh
-dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.24.0
+dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.25.0
 ```
 
 **Install in Harness Desktop:** Launch Desktop once to initialize its `desktop` profile, quit Desktop fully, then run:
 
 ```sh
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.24.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.0
 ```
 
 You can also paste the package spec into **Harness Desktop → Plugins → Add plugin**. Restart Desktop after installation. A global `npm install -g` by itself does not register a Desktop plugin.
 
-**Package and entry point:** [`@ljwei-stak/dsh-model-router@0.24.0` on npm](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router). The root [`package.json`](package.json) declares the package and bundle patch; [`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs) exports the required `apply(ctx)` entry point. License: [MIT](LICENSE).
+**Package and entry point:** [`@ljwei-stak/dsh-model-router@0.25.0` on npm](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router). The root [`package.json`](package.json) declares the package and bundle patch; [`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs) exports the required `apply(ctx)` entry point. License: [MIT](LICENSE).
 
 **Configuration:** There is no supported import of a user-authored JSON/YAML configuration file. Configure providers, models, and credentials on Harness's **Models** page; configure routing profiles and preferences in the plugin settings. Persistent router state is stored in `$DSH_HOME/model-router/state.json` (default: `~/.dsh/model-router/state.json`). Provider CLIs retain their own login and configuration. The router does not copy API keys into model profiles or terminal logs.
 
-**Screenshots and evidence:** The [workbench screenshot](docs/assets/workbench-task-preview.jpg) uses fixture models, prices, and health data; it is a simulated UI preview, not a live Harness or model run. See the [routing workflow diagram](docs/assets/routing-workflow.svg) for the execution flow. The [real Windows validation report](docs/releases/0.20.0-validation.md) documents specific 0.20.0 executions and their limits; 0.24.0 has no verified end-to-end vendor run. The [live progress screenshot](docs/assets/workbench-run-progress.png) is an offline simulation; see the [0.24.0 acceptance report](docs/releases/0.24.0-validation.md) for budget reservations, checkpoints and validation boundaries.
+**Screenshots and evidence:** The [workbench screenshot](docs/assets/workbench-task-preview.jpg) uses fixture models, prices, and health data; it is a simulated UI preview, not a live Harness or model run. See the [routing workflow diagram](docs/assets/routing-workflow.svg) for the execution flow. The [real Windows validation report](docs/releases/0.20.0-validation.md) documents specific 0.20.0 executions and their limits; 0.25.0 has no verified end-to-end vendor run. The [live progress screenshot](docs/assets/workbench-run-progress.png) is an offline simulation; see the [0.25.0 acceptance report](docs/releases/0.25.0-validation.md) for API/subscription separation, checkpoints and validation boundaries.
 
 **Permissions and risks:** Planning is local and makes no model call. Execution sends the selected task/context to the chosen model API or vendor CLI and may incur charges. The default Harness-restricted environment separates read-only runs from approved `workspace-write` runs. An explicitly selected `cli-native` editable team runs with the current OS user's permissions, outside the Harness process sandbox; a Git worktree collects changes but does not restrict OS access. External providers and CLI services apply their own data handling and billing terms.
 
@@ -63,7 +63,7 @@ You can also paste the package spec into **Harness Desktop → Plugins → Add p
 | Editable CLI execution | A sequential CLI team from the workbench, or one supported CLI from a session, using approved isolated Git worktrees and conditional patch integration. |
 | Official tools | Detect, install/update, check launch readiness and inspect login status for twelve registry tools; installation jobs have logs and cancellation. |
 | Interactive terminal | PowerShell/system shell and all twelve registry CLI targets (ZCode TUI on verified Windows desktop installs), including fixed login commands, live output and multiple sessions. |
-| Costs and subscriptions | Daily/monthly checks include persistent concurrent budget reservations; recorded spending and remaining estimates are separate. Subscription-first routing, quota cooldown and explicit handling of other subscription failures remain available. |
+| Costs and subscriptions | API money and concurrent budget reservations are separate from subscription calls/tokens. Unknown subscription usage stays unknown; API fallback is re-estimated and admitted before the paid call. |
 | History and quality | Per-package results, dependency views, failure details, rerun/reassignment, ratings and optional stronger-model review. |
 | Execution boundaries | Shows what each route can read/write and whether its process uses the Harness sandbox. |
 
@@ -78,16 +78,16 @@ Generating a route recommendation is local: it does not start a vendor CLI or ma
 Open **Plugins → Add plugin** and enter:
 
 ```text
-@ljwei-stak/dsh-model-router@0.24.0
+@ljwei-stak/dsh-model-router@0.25.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.24.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.25.0** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
 
 You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
 
 ### Upgrade from the old package name
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.24.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.25.0`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
 
 For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
 
@@ -102,7 +102,7 @@ The workbench groups the workflow into four navigation tabs. Its header summariz
 | **任务与执行** — Task and execution | Describe the task, generate advice, choose routed read-only execution or official CLI teamwork, preview and confirm, then inspect history. |
 | **模型配置** — Model configuration | Refresh/search the model directory and edit exact-route profiles. |
 | **官方工具** — Official tools | Complete onboarding checks, inspect/install tools and use the interactive terminal. |
-| **预算与安全** — Budget and security | Set routing/cost/review policies and inspect subscription status and execution boundaries. |
+| **预算与安全** — Budget and security | Manage API money/budgets and separate subscription usage; inspect subscription state and execution boundaries. |
 
 Switching tabs keeps the panels mounted, preserving in-progress installation and terminal state.
 
@@ -351,18 +351,21 @@ Implementation: [official-team-runtime.mjs](.dsh-plugin/shared/official-team-run
 
 ## Costs, subscriptions and quality
 
-- **Budgets:** per-run planning target plus daily/monthly checks. Admission atomically checks recorded API spending plus other executions' remaining reservations in the same DSH_HOME, then reserves the new execution. Each saved receipt replaces its estimate with actual accounting; remaining holds are released only after the executor settles. Over-budget routing can try the economy preset or pause for confirmation. A finite daily/monthly limit with unknown prices, unresolved actual costs or unknown reservations requires explicit confirmation. Each later paid call rechecks fresh actual spending and remaining reservations. If an earlier charge exceeds its estimate or becomes unknown under a finite budget, later calls pause. A budget stop retains completed receipts and releases unused reservations after worker cleanup; crash or storage failures retain their holds. These local estimates do not establish a hard provider billing cap.
+- **API budgets:** per-run planning targets and daily/monthly monetary checks apply to API-billed execution. Admission atomically checks recorded API spending plus other API reservations, then reserves the new API estimate. Unknown API prices, costs or reservations under a finite limit require explicit confirmation. Later API calls recheck fresh spending and holds. Confirmed subscriptions do not consume API money or fail only because its budget is full or its price is missing. Switching a subscription to API is a new monetary admission: estimate the actual API route, obtain any required confirmation, and reserve atomically before the call. Local estimates are not a hard provider billing cap.
 - **Checkpoints and interruption:** routed executions, retries/reassignment, official teams, single-tool runs and session consultations use the durable lifecycle. Optional reviews and quality upgrades reserve extra capacity before another call. Before a quality upgrade starts, the first receipt and the pending additional attempt are saved, so interruption cannot erase the first charge or imply the second attempt was free. The UI displays actual spending and reservations separately; a reservation is not an invoice. Confirmed dead owners retain interrupted holds and unknown usage evidence until reconciled; elapsed time alone does not free them, and no call is automatically replayed.
 - **Subscription-first:** the default is to prefer a detected CLI account subscription or a configured coding-plan route. API-key environment variables are removed for CLI subscription attempts. `billing` can be `subscription-first`, `api-only` or `subscription-only`; `subscription` can be `cli-login`, `plan-key` or `none`.
-- **Fallback:** detected quota exhaustion/rate limits mark a subscription in cooldown and can retry the routed step on its configured API route, subject to policy and availability. Other attempted subscription failures pause by default (`onSubscriptionFailure: "ask"`): choose API retry, subscription retry or cancel in history. A subscription-to-API route change must pass a fresh estimate and reservation check for that actual API route; a missing price or exceeded budget stops the call. Managed editable/single-tool/team runs do not automatically retry on the API.
-- **Accounting:** API costs count toward budgets. Subscription runs display a reference cost separately. A valid CLI-reported amount, including zero, takes precedence. Token-based CLI cost requires complete usage and an actual reported model matching a configured model or its explicit CLI mapping; unknown or mismatched identity keeps cost unknown. The recommendation's price alone cannot establish actual CLI cost. Provider bills remain authoritative. Version 0.15.0 retains spending from evicted detailed runs and replaced retry results, so trimming history or retrying a step does not erase earlier charges. Costs already discarded by older versions cannot be reconstructed.
+- **Fallback:** detected quota exhaustion/rate limits mark a subscription in cooldown and can retry the routed step on its configured API route, subject to policy and availability. Other attempted subscription failures pause by default (`onSubscriptionFailure: "ask"`): choose API retry, subscription retry or cancel in history. A subscription-to-API route change must pass a fresh estimate and reservation check for the actual API route. A missing price or exceeded finite budget requires the applicable confirmation; without it, the API call stops. Managed editable/single-tool/team runs do not automatically retry on the API.
+- **Subscription usage:** record daily/monthly calls, reported input/output/cache tokens and unknown/incomplete-usage counts, with provider/tool/model groups. Missing counters are not zero. A subscription-to-API attempt keeps the subscription usage receipt as well as the API financial result. Historical reference-dollar fields may remain in old records, but current subscription statistics do not convert them to money or fabricate missing token data. Token counts do not establish a vendor subscription allowance, remaining quota or percentage.
+- **API accounting:** valid CLI-reported money, including zero, takes precedence for API-billed results. Otherwise token-based CLI cost requires complete usage and an actual reported model matching configured pricing or an explicit CLI mapping. Unknown or mismatched identity keeps API cost unknown; the recommended price does not prove actual cost. A CLI using an API key still belongs to API accounting. Provider bills remain authoritative. Replaced retry receipts and evicted history retain prior accounting.
 - **Quality and preference:** optional `off`/`sample`/`always` stronger-model review can add paid calls; it is not treated as human feedback. Explicit ratings adjust separate subjective utility for the exact route and task type, using time decay and low-sample shrinkage (default limit ±0.04, configurable up to ±0.1). They do not change objective quality scores or their hard floors; learning can be disabled, ratings withdrawn, or its starting point reset.
 
 Coding-plan keys and endpoints stay in Harness provider settings. A `plan-key` profile may name an exact configured `apiRoute` as its fallback; the profile editor does not accept credentials or arbitrary commands. Vendor plan eligibility and terms must be checked with the vendor.
 
 ### Actual cost versus planning estimate
 
-A valid CLI-reported USD amount, including explicit zero, wins over token-price calculation. Otherwise, token-based CLI accounting requires complete normalized usage, known nonnegative prices, and a reported actual model matching the priced route or its explicit CLI mapping:
+The formula below applies to API-billed results. Algorithmic route-price comparisons are planning inputs; they do not turn a subscription into an API bill. The execution preview separates API money from estimated subscription tokens.
+
+For API-billed results, a valid CLI-reported USD amount, including explicit zero, wins over token-price calculation. Otherwise, token-based CLI accounting requires complete normalized usage, known nonnegative prices, and a reported actual model matching the priced route or its explicit CLI mapping:
 
 <!-- formula:actual-cost -->
 ```math
@@ -373,7 +376,7 @@ $`C_a`$ is `actualUsd`; $`I_u`$, $`O`$, $`R`$, and $`W`$ correspond to `inputTok
 
 These ledger counters are disjoint after adapter normalization; do not add cached tokens to an inclusive input count. Missing optional cache prices use the input price. Incomplete usage, absent prices or unknown/unmatched identity keep the amount `null`, not zero. Complete terminal evidence can survive a failed/cancelled/timed-out run; partial events are marked `usageIncomplete`.
 
-For example, a complete API result with 1,000 uncached input tokens at \$1/million and 500 output tokens at \$5/million costs \$0.0035. A subscription result can show that amount as `referenceCostUsd` while `costUsd` stays null; reference cost is not added to API spending. A provider-reported \$0 is explicit evidence for that attempt, not proof that earlier unknown attempts were free. Actual provider bills are authoritative. No automatic API fallback in official-team mode prevents a router fallback; a vendor CLI may still use its own configured API credentials.
+For example, a complete API result with 1,000 uncached input tokens at \$1/million and 500 output tokens at \$5/million costs \$0.0035. A subscription result instead records the reported tokens and call count; it is not converted to API money. A provider-reported \$0 for an API attempt is explicit evidence for that attempt, not proof that earlier unknown attempts were free. Actual provider bills are authoritative. Official-team mode does not automatically fall back to API, but a vendor CLI using its own API credentials still incurs API-billed usage.
 
 <a id="routing"></a>
 
@@ -452,13 +455,13 @@ Implementation: [router.mjs](.dsh-plugin/shared/router.mjs), [assignment-solver.
 
 ## Data and privacy
 
-Router profiles/preferences are held in the Harness plugin settings. Runtime state is stored in `<DSH_HOME>/model-router/state.json` (default `~/.dsh/model-router/state.json`): health/onboarding, subscription cooldown, ratings, up to 200 recent runs, up to 100 execution reservations, 50 terminal metadata records and opt-in public data snapshots. Runs referenced by a reservation are protected from history trimming. Applied rates and data/feedback policy versions are frozen in run records. Preferences are local to that shared DSH_HOME, not authenticated per-user accounts; public data requests do not upload tasks or feedback.
+Router profiles/preferences are held in the Harness plugin settings. Runtime state is stored in `<DSH_HOME>/model-router/state.json` (default `~/.dsh/model-router/state.json`): health/onboarding, subscription cooldown and separate usage aggregates, ratings, up to 200 recent runs, up to 100 execution reservations, 50 terminal metadata records and opt-in public data snapshots. Runs referenced by a reservation are protected from history trimming. Applied rates and data/feedback policy versions are frozen in run records. Preferences are local to that shared DSH_HOME, not authenticated per-user accounts; public data requests do not upload tasks or feedback.
 
 Version 0.15.0 also retains bounded spending aggregates for up to 90 populated calendar dates and 24 months. These contain amounts/counts, not task or response content.
 
 Run history includes task text, output excerpts, route/workspace, failures and costs. Stored task text is capped at 20,000 characters and each answer at 4,000; reruns can therefore depend on truncated stored context. The plugin does not store API keys in model profiles or terminal transcripts. Task execution still sends the selected task/context to the chosen provider or CLI.
 
-State writes use a lock and atomic replacement. State schema v2 preserves execution ownership, reservations and checkpoints, and upgrades readable v1 state without discarding its ledger. Older plugin versions reject v2 state; fully stop every Host process before upgrading and back up state before any downgrade. Unparseable state is preserved as a `state.json.corrupt-<timestamp>` backup and surfaced as a notice. Back up state/profile data before migrations and avoid sharing unredacted histories or logs.
+State writes use a lock and atomic replacement. Schema v3 preserves separate subscription usage and channel-aware reservations while migrating readable v1/v2 state without discarding API history, holds or old reference fields. Historical missing tokens stay unknown. Older plugin versions reject v3 state; fully stop every Host process before upgrading and back up state before downgrading. Unparseable state is preserved as a `state.json.corrupt-<timestamp>` backup and surfaced as a notice. Avoid sharing unredacted histories or logs.
 
 <a id="development"></a>
 
@@ -496,7 +499,8 @@ Open [the local preview](http://127.0.0.1:4173). It uses mock models, tools and 
 | `shared/official-tool-executor.mjs`, `official-team-runtime.mjs` | Trusted entry, permissions/process capture, dependency execution and patch integration. |
 | `shared/task-executors.mjs`, `subscription-billing.mjs` | Routed CLI/API execution, subscription policy and fallback. |
 | `shared/run-ledger.mjs`, `router-state.mjs` | Identity/usage/cost records, retained spending and locked atomic persistence. |
-| `shared/budget-reservations.mjs`, `execution-lifecycle.mjs` | Cross-process budget admission, remaining reservations, mandatory checkpoints and interrupted-owner evidence. |
+| `shared/budget-reservations.mjs`, `execution-lifecycle.mjs` | Cross-process API budget admission, channel-aware reservations, mandatory checkpoints and interrupted-owner evidence. |
+| `shared/subscription-usage.mjs` | Independent observed subscription usage, calendar aggregation and retry/history retention. |
 | Other `.dsh-plugin/shared/` modules | Terminal contracts, tool health, public snapshots and bounded feedback. |
 | `.dsh-plugin/client.js` | Generated Desktop client bundle; rebuild after client changes. |
 | `scripts/` and `tests/` | Build/package/verification helpers and regression tests. |
@@ -532,13 +536,14 @@ When maintaining these docs, update both languages in the same change: matching 
 | Symptom | Check |
 | --- | --- |
 | No routes or planning disabled | Configure Harness Models, refresh the directory and wait for tool detection. |
-| Cost unknown | Supply both input/output USD prices for each compared route. |
+| API cost unknown | Supply both input/output USD prices for each compared API route and inspect usage/model evidence. |
+| Subscription usage unknown | The vendor did not report complete counters, or the historical record lacks them. Do not infer tokens from old dollar references or invent remaining quota. |
 | CLI installed but not executable | Review launch-readiness reason, platform/mode support and installation source. |
 | Login/entitlement still fails | Check the vendor account, CLI login, network and actual model access; installation alone is insufficient. |
 | Frontend says Host is older | Fully quit Harness, including the tray process, then restart. |
 | Preview differs from old advice | Directory, login, quota or budget state changed; review the new preview. |
 | Budget remains reserved after interruption | Check the original task, retained worktree and provider bill. The hold is not automatically cleared or replayed, and this release has no manual reconciliation/release control. |
-| Older plugin cannot read state | Schema v2 contains protected reservations. Restore a compatible version; do not erase the ledger to bypass its checks. |
+| Older plugin cannot read state | Schema v3 preserves protected execution and separate subscription usage. Restore a compatible version; do not erase accounting to bypass checks. |
 | Terminal TUI does not render | Check whether the card reports PTY or pipe fallback. |
 | Logged in, but no executable team route | Check `readyModes`, platform, selected install and permission mode; terminal login alone does not establish managed capability. |
 | Skills/MCP missing in Claude read-only | Restricted mode disables them; editable/native choices have different permissions and require the corresponding confirmation. |

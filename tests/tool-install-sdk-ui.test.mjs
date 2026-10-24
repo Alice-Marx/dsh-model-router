@@ -353,11 +353,11 @@ test('launcher distinguishes a known estimate within limits from an unconfigured
   }, launcherOptions)
   t.after(() => ui.unmount())
   ui.button('预览执行计划').onClick(); await tick(); ui.render()
-  assert.match(ui.text(), /按已提供单价估算，本次未超出预算/)
+  assert.match(ui.text(), /按已提供单价估算，API 部分未超出预算/)
   ui.button('取消').onClick(); ui.render()
   preview = launchPreview({ estimatedCost: 0.002, budget: { estimateKnown: true, exceeded: null, limited: false } })
   ui.button('预览执行计划').onClick(); await tick(); ui.render()
-  assert.doesNotMatch(ui.text(), /本次未超出预算|费用未知/)
+  assert.doesNotMatch(ui.text(), /API 部分未超出预算|费用未知/)
 })
 
 test('official team entry requires team planning and starts with the requested read-only permission', async t => {

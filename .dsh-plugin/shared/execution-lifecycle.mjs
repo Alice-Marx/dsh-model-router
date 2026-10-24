@@ -10,7 +10,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
   const manager = createBudgetReservations({ state })
   await manager.recoverInterruptedExecutions()
   const started = new Map(), results = new Map(), completed = new Set()
-  const estimates = new Map(packageEstimates.map(item => [item.id, item.estimatedCostUsd ?? item.estimatedCost ?? null]))
+  const estimates = new Map(packageEstimates.map(item => [item.id, { estimatedCostUsd: item.estimatedCostUsd ?? item.estimatedCost ?? null, billing: item.billing ?? 'api' }]))
   let workspace = {}, poisoned = null, closed = false
   const current = (status = 'running') => {
     const receipts = [...started].map(([id, item]) => results.get(id) ?? {
@@ -24,6 +24,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
       for (const item of run.packages ?? []) {
         if (!started.has(item.id) || completed.has(item.id)) continue
         item.status = 'running'; item.inFlight = true
+        if (!results.has(item.id) || results.get(item.id)?.notStarted) item.billing = estimates.get(item.id)?.billing ?? 'api'
         if (!results.has(item.id)) Object.assign(item, { ran: false, costUsd: null, costSource: 'pending-receipt' })
       }
     }
@@ -65,6 +66,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     id: initial.id,
     current,
     results: () => [...results.values()],
+    reservationFor: id => estimates.get(id),
     activePackageId: () => [...started.keys()].findLast(id => !completed.has(id)),
     async onCheckpointStart(item) {
       const previous = started.get(item.id)
@@ -117,9 +119,9 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     },
     async reserveExtra(id, estimatedCostUsd, { confirmOverBudget: extraConfirmation = false } = {}) {
       return required(async () => {
-        const next = new Map(estimates); next.set(id, estimatedCostUsd)
+        const next = new Map(estimates); next.set(id, { estimatedCostUsd, billing: 'api' })
         const changed = await manager.resizeExecution({ ...identity,
-          packageEstimates: [...next].filter(([key]) => !completed.has(key)).map(([key, value]) => ({ id: key, estimatedCostUsd: value })),
+          packageEstimates: [...next].filter(([key]) => !completed.has(key)).map(([key, value]) => ({ id: key, ...value })),
           ...settings, confirmOverBudget: extraConfirmation === true })
         if (changed.accepted) { estimates.clear(); for (const [key, value] of next) estimates.set(key, value) }
         return changed

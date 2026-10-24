@@ -141,7 +141,7 @@ test('corrupt recovery rereads under the lock and preserves a concurrently resto
 
 test('unknown or malformed valid JSON schema is preserved exactly and never downgraded by updates', async t => {
   const { file, directory } = await fixture(t)
-  for (const payload of [{ version: 3, runs: [{ id: 'future-spend' }] }, { version: 1, runs: 'malformed' }, []]) {
+  for (const payload of [{ version: 4, runs: [{ id: 'future-spend' }] }, { version: 1, runs: 'malformed' }, []]) {
     const original = JSON.stringify(payload)
     await writeFile(file, original)
     const store = createRouterState({ file })

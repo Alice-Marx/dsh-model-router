@@ -25,6 +25,7 @@ export function sanitizeBudgetReservations(value) {
       || !Array.isArray(entry.packages) || !Array.isArray(entry.completedIds)
       || entry.completedIds.some(id => !identifier(id))
       || entry.packages.some(item => !record(item) || !identifier(item.id)
+        || (item.billing !== undefined && !['api', 'subscription'].includes(item.billing))
         || (item.estimatedCostUsd !== null && !amount(item.estimatedCostUsd)) || typeof item.started !== 'boolean')
       || new Set(entry.packages.map(item => item.id)).size !== entry.packages.length
       || entry.packages.some(item => entry.completedIds.includes(item.id))) {
@@ -35,7 +36,7 @@ export function sanitizeBudgetReservations(value) {
       id: key, runId: key, ownerToken: entry.ownerToken, ownerPid: entry.ownerPid,
       status: entry.status, createdAt: entry.createdAt, updatedAt: entry.updatedAt,
       ...(timestamp(entry.interruptedAt) ? { interruptedAt: entry.interruptedAt } : {}),
-      packages: entry.packages.map(item => ({ id: item.id, estimatedCostUsd: item.estimatedCostUsd, started: item.started })),
+      packages: entry.packages.map(item => ({ id: item.id, estimatedCostUsd: item.estimatedCostUsd, started: item.started, ...(item.billing ? { billing: item.billing } : {}) })),
       completedIds: [...new Set(entry.completedIds)],
     }
   }
@@ -49,6 +50,7 @@ export function reservationSpending(state, { excludeReservationId = null } = {})
   for (const entry of Object.values(state?.budgetReservations ?? {})) {
     if (!record(entry) || entry.id === excludeReservationId) continue
     for (const item of Array.isArray(entry.packages) ? entry.packages : []) {
+      if (item.billing === 'subscription') continue
       if (amount(item.estimatedCostUsd)) reservedUsd += item.estimatedCostUsd
       if (!amount(item.estimatedCostUsd) || (entry.status === 'interrupted' && item.started)) unknownReservations += 1
     }
@@ -68,7 +70,9 @@ function normalizedEstimates(value, run) {
     seen.add(item.id)
     const estimatedCostUsd = Object.hasOwn(item, 'estimatedCostUsd') ? item.estimatedCostUsd : item.estimatedCost ?? null
     if (estimatedCostUsd !== null && !amount(estimatedCostUsd)) throw new TypeError('工作包预估费用必须是非负有限数字或 null。')
-    return { id: item.id, estimatedCostUsd, started: item.started === true }
+    if (item.billing !== undefined && !['api', 'subscription'].includes(item.billing)) throw new TypeError('预占计费通道无效。')
+    return { id: item.id, estimatedCostUsd: item.billing === 'subscription' ? 0 : estimatedCostUsd,
+      started: item.started === true, ...(item.billing ? { billing: item.billing } : {}) }
   })
 }
 
@@ -96,6 +100,7 @@ function ownedReservation(current, reservationId, ownerToken) {
 }
 
 function estimateTotal(packages) {
+  packages = packages.filter(item => item.billing !== 'subscription')
   if (packages.some(item => item.estimatedCostUsd === null)) return null
   const total = packages.reduce((sum, item) => sum + item.estimatedCostUsd, 0)
   return Number.isFinite(total) ? total : null
@@ -108,7 +113,10 @@ function currentBudget(current, at, packages, options, excludeReservationId = nu
     unknownToday: recorded.unknownToday + holds.unknownToday, unknownMonth: recorded.unknownMonth + holds.unknownMonth }
   const budget = budgetCheck({ estimateUsd: estimateTotal(packages), spent,
     dailyLimitUsd: options.dailyLimitUsd, monthlyLimitUsd: options.monthlyLimitUsd })
-  const unknownBudget = budget.limited && (!budget.estimateKnown
+  const apiExposure = packages.some(item => item.billing !== 'subscription')
+  budget.apiExposure = apiExposure
+  if (!apiExposure) { budget.exceeded = null; budget.message = '订阅按用量单独统计，不占用 API 金额预算。' }
+  const unknownBudget = apiExposure && budget.limited && (!budget.estimateKnown
     || (options.dailyLimitUsd > 0 && spent.unknownToday > 0)
     || (options.monthlyLimitUsd > 0 && spent.unknownMonth > 0))
   if (unknownBudget && !budget.exceeded) budget.message = '存在未核对费用或缺少单价，无法保证本次执行符合预算；请先核对账单或明确确认继续。'
@@ -134,7 +142,7 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
     const packages = normalizedEstimates(options.packageEstimates, run)
     return state.update(current => {
       const checks = currentBudget(current, now(), packages, options)
-      if (current.historyIncomplete) return { accepted: false, reason: 'history-incomplete', ...checks }
+      if (current.historyIncomplete && checks.budget.apiExposure) return { accepted: false, reason: 'history-incomplete', ...checks }
       current.budgetReservations ??= {}
       if (current.budgetReservations[run.id]) return { accepted: false, reason: 'active-run', ...checks }
       if (Object.keys(current.budgetReservations).length >= maxReservations) return { accepted: false, reason: 'reservation-capacity', ...checks }
@@ -166,7 +174,15 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
         // this dispatch boundary without double-counting our previous hold.
         const prospective = { ...current, runs: current.runs.map(item => item.id === run.id ? budgetRun : item) }
         const checks = currentBudget(prospective, now(), remaining, options, entry.id)
-        if (current.historyIncomplete) return { accepted: false, reason: 'history-incomplete', ...checks }
+        const starting = entry.packages.filter(item => started.has(item.id) && !item.started)
+        if (starting.length && starting.every(item => item.billing === 'subscription')) {
+          // A later API step retains its hold and will be checked at its own
+          // dispatch boundary; it cannot make this subscription consume money.
+          Object.assign(checks.budget, { apiExposure: false, exceeded: null, estimateUsd: 0, estimateKnown: true,
+            message: '当前订阅步骤单独统计用量，不占用 API 金额预算。' })
+          checks.unknownBudget = false
+        }
+        if (current.historyIncomplete && checks.budget.apiExposure) return { accepted: false, reason: 'history-incomplete', ...checks }
         if (checks.budget.exceeded && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget', ...checks }
         if (checks.unknownBudget && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget-unknown', ...checks }
       }
@@ -182,7 +198,7 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
     return state.update(current => {
       const entry = ownedReservation(current, options.reservationId, options.ownerToken)
       const checks = currentBudget(current, now(), packages, options, entry.id)
-      if (current.historyIncomplete) return { accepted: false, reason: 'history-incomplete', ...checks }
+      if (current.historyIncomplete && checks.budget.apiExposure) return { accepted: false, reason: 'history-incomplete', ...checks }
       if (checks.budget.exceeded && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget', ...checks }
       if (checks.unknownBudget && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget-unknown', ...checks }
       if (packages.some(item => entry.completedIds.includes(item.id))) throw new TypeError('已完成工作包不能重新加入剩余预占。')
@@ -190,6 +206,9 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
       for (const previous of entry.packages.filter(item => item.started)) {
         const next = packages.find(item => item.id === previous.id)
         if (!next) throw new TypeError('执行中的工作包必须先保存结果，才能释放其预占。')
+        if (previous.billing !== 'subscription' && next.billing === 'subscription') {
+          throw new TypeError('执行中的 API 调用不能通过改为订阅释放金额预占；请先保存收据。')
+        }
         next.started = true
       }
       entry.packages = packages
@@ -224,7 +243,7 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
         item.ran = true
         item.costUsd = null
         item.costSource = 'interrupted-usage-unknown'
-        item.billing = item.billing === 'subscription' ? 'subscription' : 'api'
+        item.billing = pending.billing === 'subscription' || item.billing === 'subscription' ? 'subscription' : 'api'
         item.finishedAt = at
       }
       run.interruption = { at, unreconciled: true, pendingPackageIds: entry.packages.map(item => item.id),

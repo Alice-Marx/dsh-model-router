@@ -15,6 +15,8 @@ import { createRouterState } from './shared/router-state.mjs'
 import { createRunJobs } from './shared/run-jobs.mjs'
 import { createBudgetReservations, reservationSpending } from './shared/budget-reservations.mjs'
 import { beginExecutionLifecycle } from './shared/execution-lifecycle.mjs'
+import { attachPlanAccounting, accountingEstimates, initialFunding, planningFundingPrices } from './shared/execution-accounting.mjs'
+import { subscriptionUsage } from './shared/subscription-usage.mjs'
 import { applyFeedbackProfile, buildFeedbackProfile } from './shared/adaptive-feedback.mjs'
 import { buildRoutingEvidence, parseRoutingEvidenceJson } from './shared/routing-evidence.mjs'
 import { apiReasoningRequest } from './shared/reasoning-execution.mjs'
@@ -26,7 +28,7 @@ import {
   spending, storedResults, actualCost, hasStartedQualityAttempts, teamExecutionResults, plannedPackages,
 } from './shared/run-ledger.mjs'
 import { routeBoundaries } from './shared/security-boundaries.mjs'
-import { createPlanFromRoutes } from './shared/harness-plan.mjs'
+import { createPlanFromRoutes, channelForProvider } from './shared/harness-plan.mjs'
 import { applyManualPackagePlan } from './shared/manual-plan.mjs'
 import { parsePackageAssignments, packagePlanKey } from './shared/package-assignments.mjs'
 import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
@@ -379,9 +381,9 @@ function budgetSettings(config) {
   }
 }
 
-function budgetFor(config, saved, estimateUsd, { checkEstimate = true } = {}) {
+function budgetFor(config, saved, estimateUsd, { checkEstimate = true, apiExposure = true } = {}) {
   const settings = budgetSettings(config)
-  if ((saved.storageAvailable === false || saved.historyVerified === false) && (settings.dailyLimitUsd > 0 || settings.monthlyLimitUsd > 0)) {
+  if (apiExposure && (saved.storageAvailable === false || saved.historyVerified === false) && (settings.dailyLimitUsd > 0 || settings.monthlyLimitUsd > 0)) {
     throw new Error('无法读取费用历史，不能核验日/月预算；请恢复存储连接后再执行。')
   }
   const recorded = spending(saved.runs, undefined, saved.archivedSpending)
@@ -389,12 +391,13 @@ function budgetFor(config, saved, estimateUsd, { checkEstimate = true } = {}) {
   const spent = { ...recorded, today: recorded.today + reserved.today, month: recorded.month + reserved.month,
     unknownToday: recorded.unknownToday + reserved.unknownToday, unknownMonth: recorded.unknownMonth + reserved.unknownMonth }
   const check = budgetCheck({ estimateUsd, spent, ...settings })
-  if (check.limited && (checkEstimate && !check.estimateKnown || settings.dailyLimitUsd > 0 && spent.unknownToday > 0
+  if (!apiExposure) { check.exceeded = null; check.message = '订阅按用量单独统计，不占用 API 金额预算。' }
+  if (apiExposure && check.limited && (checkEstimate && !check.estimateKnown || settings.dailyLimitUsd > 0 && spent.unknownToday > 0
     || settings.monthlyLimitUsd > 0 && spent.unknownMonth > 0) && !check.exceeded) {
     check.exceeded = 'unknown'
     check.message = '存在未核对费用或缺少单价，无法核验预算；请先核对账单或明确确认继续。'
   }
-  return { ...check, spent, reserved, ...settings }
+  return { ...check, spent, reserved, ...settings, apiExposure }
 }
 
 function pausedExecutionBudget(lifecycle) {
@@ -405,21 +408,42 @@ function pausedExecutionBudget(lifecycle) {
   return { ...lifecycle.budget, paused: true, exceeded: lifecycle.budget?.exceeded ?? 'unknown' }
 }
 
+function accountingContext(billing = null, routes = [], officialCli = false) {
+  return { billing: billing ? { ...billing, routes } : null, officialCli,
+    loginBillingFor: id => subscriptionLoginOf(healthCache.loginState(id)), apiKeyFor: id => apiKeyEnvPresent(id) }
+}
+
 function packageEstimates(plan, task) {
+  if (plan.accounting) return accountingEstimates(plan)
   return plannedPackages(plan, task).map(item => ({ id: item.id, estimatedCostUsd: item.estimatedCost ?? null }))
 }
 
-/** Reprice a subscription fallback against the route that will actually bill. */
+/** Activate API money accounting only at the actual API dispatch boundary. */
 async function reserveChangedApiRoute(lifecycle, expected, route, task, config, confirmOverBudget) {
-  if (expected?.provider === route.provider && expected?.model === route.model) return null
   const id = lifecycle.activePackageId()
   if (!id) throw new Error('缺少执行检查点，不能启动 API 路线。')
+  const previous = lifecycle.results().find(item => item.id === id)
+  const held = lifecycle.reservationFor(id)
+  const unchanged = expected?.provider === route.provider && expected?.model === route.model
   const saved = await routingSavedState(config)
-  const estimate = createPlanFromRoutes(task, [route], { ...planDataOptions(saved, config),
-    mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost
+  const estimate = held?.billing === 'api' && unchanged ? held.estimatedCostUsd
+    : createPlanFromRoutes(task, [route], { ...planDataOptions(saved, config),
+      mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost
   const reserved = await lifecycle.reserveExtra(id, estimate, { confirmOverBudget: confirmOverBudget === true })
-  if (reserved.accepted) return null
-  return { ok: false, notStarted: true, error: `实际 API 路线预算未确认，已停止调用。${reserved.budget.message}` }
+  if (!reserved.accepted) return { ok: false, notStarted: true,
+    subscriptionAttempts: previous?.subscriptionAttempts ?? [],
+    error: `实际 API 路线预算未确认，已停止调用。${reserved.budget.message}` }
+  if (held?.billing === 'subscription' || previous?.billing === 'subscription') {
+    await lifecycle.partialResult({ id, provider: route.provider, model: route.model, billing: 'api',
+      channel: 'harness-llm', ok: false, notStarted: true, answer: '', usage: null,
+      subscriptionAttempts: previous?.subscriptionAttempts ?? [] }, { checkBudget: true })
+  }
+  return null
+}
+
+async function checkpointSubscription(lifecycle, event) {
+  await lifecycle.partialResult({ ...event, billing: 'subscription', channel: event.channel ?? 'harness-llm',
+    ok: false, answer: '', subscriptionAttempts: event.subscriptionAttempts ?? [event] })
 }
 
 /** A changed budget stops before dispatch; storage failures retain their hold. */
@@ -436,13 +460,18 @@ async function stopExecutionLifecycle(lifecycle, error, run = lifecycle.current(
 }
 
 /** The independent-opinion tool uses the same durable API budget boundary. */
-export async function executeBudgetedConsult(ctx, route, task, config = {}, { signal, limit = 12_000, confirmOverBudget = false } = {}) {
+export async function executeBudgetedConsult(ctx, route, task, config = {}, { signal, limit = 12_000, confirmOverBudget = false, routes = [] } = {}) {
   const problem = taskTextProblem(text(task))
   if (problem) throw new Error(problem)
+  const catalog = [route, ...routes.filter(item => item.provider !== route.provider || item.model !== route.model)]
+  const funding = initialFunding(route, { billing: { routes: catalog }, executionChannel: 'harness-llm' })
+  route = catalog.find(item => item.provider === funding.route?.provider && item.model === funding.route?.model) ?? funding.route
   const plan = createPlanFromRoutes(task, [route], { mode: 'direct', directProvider: route.provider, directModel: route.model })
+  plan.accounting = { apiExposure: funding.billing === 'api', apiEstimatedCostUsd: funding.billing === 'subscription' ? 0 : plan.estimatedCost,
+    packages: [{ id: 'direct', billing: funding.billing, apiEstimatedCostUsd: funding.billing === 'subscription' ? 0 : plan.estimatedCost }] }
   const id = randomUUID(), at = Date.now()
   const record = (status, results) => buildRunRecord({ id, createdAt: at, finishedAt: Date.now(), task, plan,
-    execution: { status, packages: results }, workspace: process.cwd(), pricingFor: () => route.pricing ?? null, billingFor: () => 'api' })
+    execution: { status, packages: results }, workspace: process.cwd(), pricingFor: () => route.pricing ?? null, billingFor: () => funding.billing })
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: ({ status, results }) => record(status, results),
     packageEstimates: packageEstimates(plan, task), settings: budgetSettings(config), confirmOverBudget })
   if (!lifecycle.accepted) return { status: 'paused-budget', paused: true, budget: pausedExecutionBudget(lifecycle), ok: false }
@@ -450,10 +479,13 @@ export async function executeBudgetedConsult(ctx, route, task, config = {}, { si
   try {
     await lifecycle.onCheckpointStart({ id: 'direct', provider: route.provider, model: route.model, channel: 'harness-llm' })
     result = await consultConfiguredModel(ctx, route, task, limit, signal)
-    await lifecycle.onCheckpointResult({ ...result, id: 'direct', provider: route.provider, model: route.model, channel: 'harness-llm' })
+    const receipt = { ...result, id: 'direct', provider: route.provider, model: route.model, channel: 'harness-llm', billing: funding.billing, finishedAt: Date.now() }
+    if (funding.billing === 'subscription') receipt.subscriptionAttempts = [{ provider: route.provider, model: route.model,
+      usage: result.usage ?? null, usageIncomplete: result.usageIncomplete === true, notStarted: result.notStarted === true, finishedAt: receipt.finishedAt }]
+    await lifecycle.onCheckpointResult(receipt)
     await lifecycle.finish(record(result.cancelled ? 'cancelled' : result.ok ? 'completed' : 'failed', lifecycle.results()))
   } catch (error) { await stopExecutionLifecycle(lifecycle, error); throw error }
-  return { ...result, runId: id }
+  return { ...result, billing: funding.billing, accounting: plan.accounting, runId: id }
 }
 
 /**
@@ -462,6 +494,11 @@ export async function executeBudgetedConsult(ctx, route, task, config = {}, { si
  */
 export function billingForResult(result) {
   const toolId = result?.toolId ?? null
+  if (result?.billing === 'unknown') return 'unknown'
+  const login = toolId ? subscriptionLoginOf(healthCache.loginState(toolId)) : 'unknown'
+  if (result?.channel === 'official-cli' && !result.billing
+    && !['configured-api-key', 'process-environment'].includes(result.credentialSource)
+    && !apiKeyEnvPresent(toolId) && !['api-key', 'subscription'].includes(login)) return 'unknown'
   return billingOf(result, {
     loginBilling: toolId ? healthCache.loginState(toolId)?.billing ?? null : null,
     apiKeyPresent: toolId ? apiKeyEnvPresent(toolId) : false,
@@ -566,14 +603,19 @@ export async function createRoutePlan(ctx, task, config = {}, options = {}) {
   const loggedOut = options.skipToolProbe === true
     ? (Array.isArray(options.loggedOutToolIds) ? options.loggedOutToolIds : [])
     : loggedOutIds(await currentHealth())
+  const planningBilling = await billingContext(config, options)
+  const context = accountingContext(planningBilling, availableRoutes)
+  const fundingPrices = planningFundingPrices(availableRoutes, context, route => channelForProvider(route.provider, installed, [...executable], route, loggedOut).kind)
   const plan = createPlanFromRoutes(taskText, availableRoutes, {
-    ...planDataOptions(saved, config),
+    ...planDataOptions(saved, config), pricing: fundingPrices.pricing,
     mode, budgetUsd, installedToolIds: installed,
     runnableToolIds: installed.filter(id => executable.has(id)),
     preset: routingPresetOf(config, options.preset),
     loggedOutToolIds: loggedOut,
   })
-  return { ...plan, packagePlanKey: packagePlanKey(plan, taskText), budgetStatus: budgetFor(config, saved, plan.estimatedCost) }
+  plan.subscriptionPricedRoutes = fundingPrices.subscriptionPricedRoutes
+  attachPlanAccounting(plan, taskText, availableRoutes, context)
+  return { ...plan, packagePlanKey: packagePlanKey(plan, taskText), budgetStatus: budgetFor(config, saved, plan.accounting.apiEstimatedCostUsd, { apiExposure: plan.accounting.apiExposure }) }
 }
 
 /** One bounded, independent call through the same official LLM service. */
@@ -821,6 +863,7 @@ function executionHooks(ctx, options) {
   return {
     onCheckpointStart: options.onCheckpointStart,
     onCheckpointResult: options.onCheckpointResult,
+    onSubscriptionResult: options.onSubscriptionResult,
     skipOfficial: options.skipOfficial ?? (request => healthCache.skipReason(request)),
     onStage: stage => reportRunProgress(options, { type: 'stage', stage }),
     onPackageStart: async item => {
@@ -882,32 +925,38 @@ export async function planAssignment(ctx, task, config = {}, options = {}) {
     ? (Array.isArray(options.loggedOutToolIds) ? options.loggedOutToolIds : [])
     : loggedOutIds(await currentHealth())
   const preset = routingPresetOf(config, options.preset)
-  const planWith = (presetId, budgetUsd) => direct
+  const planningBilling = await billingContext(config, options)
+  const fundingPrices = planningFundingPrices(routes, accountingContext(planningBilling, routes),
+    route => channelForProvider(route.provider, installed, runnableToolIds, route, loggedOut).kind)
+  const buildWith = (presetId, budgetUsd) => direct
     ? createPlanFromRoutes(taskText, routes, {
-      ...planDataOptions(saved, config),
+      ...planDataOptions(saved, config), pricing: fundingPrices.pricing,
       mode: 'direct', directProvider: options.provider, directModel: options.model,
       installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
     : createPlanFromRoutes(taskText, routes, {
-      ...planDataOptions(saved, config),
+      ...planDataOptions(saved, config), pricing: fundingPrices.pricing,
       mode: options.planMode === 'team' ? 'team' : 'single',
       budgetUsd, installedToolIds: installed, runnableToolIds, preset: presetId, loggedOutToolIds: loggedOut,
     })
+  const planWith = (...args) => { const result = buildWith(...args); result.subscriptionPricedRoutes = fundingPrices.subscriptionPricedRoutes; return result }
   let plan = planWith(preset, options.budgetUsd)
   if (manual) {
     plan = applyManualPackagePlan(plan, { task: taskText, packageAssignments: options.packageAssignments,
       packagePlanKey: options.packagePlanKey }, routes, planDataOptions(saved, config))
     await validateManualTools(ctx, plan.manualAssignments, { ...options, installedToolIds: installed, readiness })
   }
-  let budget = budgetFor(config, saved, plan.estimatedCost)
+  attachPlanAccounting(plan, taskText, routes, accountingContext(planningBilling, routes))
+  let budget = budgetFor(config, saved, plan.accounting.apiEstimatedCostUsd, { apiExposure: plan.accounting.apiExposure })
   const perRunLimit = Number(options.budgetUsd) || 0
-  if (manual && perRunLimit > 0 && (plan.estimatedCost === null || plan.estimatedCost > perRunLimit)) {
-    budget = { ...budget, exceeded: budget.exceeded || 'run', estimateUsd: plan.estimatedCost,
-      message: plan.estimatedCost === null ? '手动分配包含费用未知的目标，无法确认满足本次预算。' : '手动分配的预估费用超出本次预算。' }
+  if (manual && perRunLimit > 0 && (plan.accounting.apiEstimatedCostUsd === null || plan.accounting.apiEstimatedCostUsd > perRunLimit)) {
+    budget = { ...budget, exceeded: budget.exceeded || 'run', estimateUsd: plan.accounting.apiEstimatedCostUsd,
+      message: plan.accounting.apiEstimatedCostUsd === null ? '手动分配包含费用未知的目标，无法确认满足本次预算。' : '手动分配的预估费用超出本次预算。' }
   }
   if (budget.exceeded && budget.action === 'downgrade' && !direct && !manual) {
     const cheaper = planWith('economy', budget.remainingUsd > 0 ? budget.remainingUsd : options.budgetUsd)
-    const recheck = budgetFor(config, saved, cheaper.estimatedCost)
+    attachPlanAccounting(cheaper, taskText, routes, accountingContext(planningBilling, routes))
+    const recheck = budgetFor(config, saved, cheaper.accounting.apiEstimatedCostUsd, { apiExposure: cheaper.accounting.apiExposure })
     if (!recheck.exceeded) {
       budget = { ...recheck, downgraded: true, downgradedFrom: preset,
         message: `原方案${budget.message} 已自动降级为“省钱优先”方案（预估 ${cheaper.estimatedCost === null ? '价格待配置' : formatUsd(cheaper.estimatedCost)}）。` }
@@ -958,7 +1007,11 @@ function apiUpgradeEligible(route, routes) {
 
 /** Route, or honor one explicit model, then run each package through its adapter. */
 export async function executeConfiguredAssignment(ctx, task, config = {}, options = {}) {
-  const { taskText, direct, plan, budget, routes, preset } = options.preparedAssignment ?? await planAssignment(ctx, task, config, options)
+  const { taskText, direct, plan, budget: previewBudget, routes, preset } = options.preparedAssignment ?? await planAssignment(ctx, task, config, options)
+  const billing = await billingContext(config, options)
+  attachPlanAccounting(plan, taskText, routes, accountingContext(billing, routes))
+  const budget = { ...previewBudget, ...budgetFor(config, await savedState(), plan.accounting.apiEstimatedCostUsd, { apiExposure: plan.accounting.apiExposure }) }
+  if (plan.accounting.apiExposure && previewBudget.exceeded === 'run') Object.assign(budget, { exceeded: 'run', message: previewBudget.message })
   if (budget.exceeded && options.confirmOverBudget !== true) {
     return {
       plan, execution: null, paused: true,
@@ -971,7 +1024,6 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
     finished.push(result)
     if (typeof options.onPackage === 'function') await options.onPackage(result)
   } })
-  const billing = await billingContext(config, options)
   const limit = boundedInteger(valueOf(config, 'maxConsultOutputChars', 12_000), 12_000, 500, 50_000)
   const startedAt = Date.now()
   const runId = randomUUID()
@@ -1025,11 +1077,12 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
         if (!unknownProjection && (!Number.isFinite(projected) || perRunLimit > 0 && projected > perRunLimit)) return false
         const id = lifecycle.activePackageId()
         if (!id) return false
-        await lifecycle.partialResult({ ...attempts.at(-1), id, ok: false, qualityAttempts: attempts })
+        const subscriptionAttempts = lifecycle.results().find(item => item.id === id)?.subscriptionAttempts ?? []
+        await lifecycle.partialResult({ ...attempts.at(-1), id, ok: false, subscriptionAttempts, qualityAttempts: attempts })
         if (!(await lifecycle.reserveExtra(id, estimate)).accepted) return false
         // The extra request can be charged before its receipt arrives. Persist
         // both the first receipt and the unknown second attempt before dispatch.
-        await lifecycle.partialResult({ ...attempts.at(-1), id, ok: false, qualityAttempts: [...attempts, {
+        await lifecycle.partialResult({ ...attempts.at(-1), id, ok: false, subscriptionAttempts, qualityAttempts: [...attempts, {
           provider: to.provider, model: to.model, channel: 'harness-llm', ok: false,
           usage: null, usageIncomplete: true, pricingSnapshot: to.pricing ?? null, finishedAt: Date.now(),
         }] }, { checkBudget: true })
@@ -1048,7 +1101,8 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
       ...hooks,
       onCheckpointStart: item => lifecycle.onCheckpointStart(item),
       onCheckpointResult: result => lifecycle.onCheckpointResult(result),
-      billing,
+      onSubscriptionResult: event => checkpointSubscription(lifecycle, event),
+      billing: billing ? { ...billing, routes } : null,
       apiFallback: gatedApi,
     })
   } catch (error) {
@@ -1195,14 +1249,24 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   const retryIds = new Set([target.id, ...downstreamPackageIds(run.packages, target.id)
     .filter(id => run.packages.find(item => item.id === id)?.ok !== true)])
   const estimates = rerunEstimates(run, retryIds, target.id, override, routes, planDataOptions(refreshed, config))
-  const budget = budgetFor(config, saved, estimates.total)
+  const retryBilling = await billingContext(config, options)
+  const retryPlan = teamPlanFromRun(run, [...retryIds], override, target.id, estimates.byId)
+  if (run.kind !== 'team') for (const item of retryPlan.team.workPackages) {
+    const previous = run.packages.find(entry => entry.id === item.id)
+    if (!override || item.id !== target.id) { item.recommendedProvider = previous.provider ?? previous.recommendedProvider; item.recommendedModel = previous.model ?? previous.recommendedModel }
+  }
+  const retryContext = accountingContext(retryBilling, routes, run.kind === 'team')
+  retryContext.billingChoices = choice ? { [target.id]: choice } : {}
+  attachPlanAccounting(retryPlan, run.task, routes, retryContext)
+  estimates.reservations = accountingEstimates(retryPlan)
+  const budget = budgetFor(config, saved, retryPlan.accounting.apiEstimatedCostUsd, { apiExposure: retryPlan.accounting.apiExposure })
   if (budget.exceeded && confirmOverBudget !== true) {
     return { paused: true, budget: { ...budget, paused: true, message: `${budget.message} 已暂停重跑，请确认后再试。` }, run }
   }
   const cwd = text(workspace) || run.workspace
   if (!cwd || !(await fileExists(cwd))) throw new Error(`原运行的工作区 ${cwd || '(未记录)'} 不可用，无法重跑该步骤；请恢复该目录，或在原工作区的会话中调用 model_router_rerun_step。`)
   if (run.kind === 'team') return rerunTeamStep(ctx, { run, target, override, routes, budget,
-    ids: [...retryIds], estimates: estimates.byId, confirmOverBudget, cwd, root: text(root) || cwd, signal, options, config })
+    ids: [...retryIds], estimates: estimates.byId, reservations: estimates.reservations, confirmOverBudget, cwd, root: text(root) || cwd, signal, options, config })
   const manualRetries = Object.fromEntries(run.packages.filter(item => retryIds.has(item.id) && item.manualAssignment)
     .map(item => [item.id, item.id === target.id && override ? { kind: 'api', ...override } : item.manualAssignment]))
   if (Object.keys(manualRetries).length) {
@@ -1229,7 +1293,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     return next
   }
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: buildRetry,
-    packageEstimates: [...estimates.byId].map(([id, estimatedCostUsd]) => ({ id, estimatedCostUsd })),
+    packageEstimates: estimates.reservations,
     settings: budgetSettings(config), confirmOverBudget })
   if (!lifecycle.accepted) return { paused: true, run, budget: pausedExecutionBudget(lifecycle) }
   let execution
@@ -1255,7 +1319,8 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
     ...executionHooks(ctx, options),
     onCheckpointStart: item => lifecycle.onCheckpointStart(item),
     onCheckpointResult: result => lifecycle.onCheckpointResult(result),
-    billing: await billingContext(config, options),
+    onSubscriptionResult: event => checkpointSubscription(lifecycle, event),
+    billing: retryBilling,
     apiFallback: async ({ route, task: packageTask, signal: callSignal, subscription }) => {
       if (subscription) return consultConfiguredModel(ctx, route, packageTask, limit, callSignal)
       const id = lifecycle.activePackageId()
@@ -1311,7 +1376,7 @@ function teamPlanFromRun(run, ids, override, targetId, estimates) {
  * Read-only team retry: the failed step plus downstream steps that had not
  * succeeded run through the same signed runner; earlier answers are context.
  */
-async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, estimates, confirmOverBudget, cwd, root, signal, options, config = {} }) {
+async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, estimates, reservations, confirmOverBudget, cwd, root, signal, options, config = {} }) {
   const mode = run.executionMode === 'workspace-write' ? 'workspace-write' : 'read-only'
   const executionEnvironment = teamExecutionEnvironment(run.executionEnvironment, mode)
   const plan = teamPlanFromRun(run, ids, override, target.id, estimates)
@@ -1339,7 +1404,7 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, 
     return next
   }
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: buildRetry,
-    packageEstimates: [...estimates].map(([id, estimatedCostUsd]) => ({ id, estimatedCostUsd })), settings: budgetSettings(config), confirmOverBudget })
+    packageEstimates: reservations, settings: budgetSettings(config), confirmOverBudget })
   if (!lifecycle.accepted) return { paused: true, run, budget: pausedExecutionBudget(lifecycle) }
   let execution
   try { execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: root ?? cwd, mode, executionEnvironment,
@@ -1474,8 +1539,13 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
     modelId = text(args.cliModel)
   }
   const estimate = route ? createPlanFromRoutes(taskText, routes, { mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost : null
-  const budget = budgetFor(config, await savedState(), Number.isFinite(estimate) ? estimate : null)
-  return { toolId, tool, taskText, mode, modelId, route, routes, estimate: Number.isFinite(estimate) ? estimate : null, budget,
+  const funding = initialFunding(route ?? {}, { ...accountingContext(null, routes, true), toolId })
+  const apiEstimate = funding.billing === 'subscription' ? 0 : estimate
+  const budget = budgetFor(config, await savedState(), apiEstimate, { apiExposure: funding.billing === 'api' })
+  const resources = route ? estimateAssignedPackage(route, { id: 'direct', objective: taskText, type: 'general' }, taskText) : null
+  const accounting = { apiEstimatedCostUsd: apiEstimate, apiExposure: funding.billing === 'api', packages: [{ id: 'direct', billing: funding.billing,
+    apiEstimatedCostUsd: apiEstimate, estimatedUsage: { inputTokens: resources?.inputTokens ?? null, outputTokens: resources?.outputTokens ?? null } }] }
+  return { toolId, tool, taskText, mode, modelId, route, routes, accounting, funding: funding.billing, apiEstimate, estimate: Number.isFinite(estimate) ? estimate : null, budget,
     provider: route?.provider ?? '', model: route?.model ?? '', cliModel: modelId }
 }
 
@@ -1494,7 +1564,7 @@ async function runPlannedTool(ctx, config, planned, { cwd, root, signal, rerunOf
     return run
   }
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), settings: budgetSettings(config), confirmOverBudget,
-    packageEstimates: [{ id: 'direct', estimatedCostUsd: planned.estimate ?? null }],
+    packageEstimates: [{ id: 'direct', billing: planned.funding ?? 'api', estimatedCostUsd: planned.apiEstimate ?? planned.estimate ?? null }],
     buildRun: ({ status, results, workspace }) => makeToolRecord(results[0] ?? { status, notStarted: true }, workspace) })
   if (!lifecycle.accepted) {
     planned.budget = pausedExecutionBudget(lifecycle)
@@ -1567,9 +1637,11 @@ export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
         .map(item => ({ ...item, answer: text(item.answer).slice(0, 1_500) })),
     })),
     spent,
+    subscriptionUsage: { ...subscriptionUsage(saved.runs, Date.now(), saved.archivedSubscriptionUsage), historyIncomplete: saved.subscriptionUsageIncomplete === true },
     reserved,
     reservations: entries.map(entry => ({ id: entry.id, runId: entry.runId, status: entry.status, updatedAt: entry.updatedAt,
-      unknown: entry.packages.some(item => item.estimatedCostUsd === null || entry.status === 'interrupted' && item.started),
+      billing: entry.packages.every(item => item.billing === 'subscription') ? 'subscription' : entry.packages.some(item => item.billing === 'subscription') ? 'mixed' : 'api',
+      unknown: entry.packages.some(item => item.billing !== 'subscription' && (item.estimatedCostUsd === null || entry.status === 'interrupted' && item.started)),
       remainingEstimateUsd: entry.packages.every(item => Number.isFinite(item.estimatedCostUsd))
         ? entry.packages.reduce((sum, item) => sum + item.estimatedCostUsd, 0) : null })),
     budget: { ...budgetFor(config, saved, null, { checkEstimate: false }), historyVerified: saved.historyVerified !== false },
@@ -1699,10 +1771,12 @@ export async function planOfficialTeam(ctx, config = {}, args = {}, options = {}
   const supported = new Set(executableRoutes.map(route => toolForProvider(route.provider).id))
   const configuredBudget = valueOf(config, 'budgetUsd', DEFAULT_ROUTER_SETTINGS.budgetUsd)
   const budgetUsd = Math.max(0, finiteNumber(args.budgetUsd, finiteNumber(configuredBudget, 0)))
+  const fundingPrices = planningFundingPrices(executableRoutes, accountingContext(null, executableRoutes, true))
   const plan = createPlanFromRoutes(taskText, executableRoutes, {
-    ...planDataOptions(saved, config), mode: 'team', budgetUsd, installedToolIds: installed, forceOfficialCli: true,
+    ...planDataOptions(saved, config), pricing: fundingPrices.pricing, mode: 'team', budgetUsd, installedToolIds: installed, forceOfficialCli: true,
     runnableToolIds: installed.filter(id => supported.has(id)), preset: routingPresetOf(config, args.preset),
   })
+  plan.subscriptionPricedRoutes = fundingPrices.subscriptionPricedRoutes
   const bindingsText = text(args.cliModelsJson)
   if (bindingsText.length > 4_000) throw new Error('cliModelsJson 超过 4000 字符上限')
   let requestedModels = {}
@@ -1711,7 +1785,8 @@ export async function planOfficialTeam(ctx, config = {}, args = {}, options = {}
     catch { throw new Error('cliModelsJson 不是有效的 JSON 对象') }
   }
   const cliModels = resolveTeamCliModelBindings(plan, executableRoutes, requestedModels)
-  const budget = budgetFor(config, await savedState(), plan.estimatedCost)
+  attachPlanAccounting(plan, taskText, executableRoutes, accountingContext(null, executableRoutes, true))
+  const budget = budgetFor(config, await savedState(), plan.accounting.apiEstimatedCostUsd, { apiExposure: plan.accounting.apiExposure })
   return { ...base, status: 'planned', plan, cliModels, budget }
 }
 
@@ -1721,7 +1796,8 @@ export async function executeOfficialTeamPlan(ctx, config = {}, planned, options
   if (!planned?.plan || !['read-only', 'workspace-write'].includes(planned.mode)) throw new Error('缺少有效的官方 CLI 团队计划')
   const executionEnvironment = teamExecutionEnvironment(planned.executionEnvironment, planned.mode)
   const workspace = options.workspace ?? planned.workspace
-  const budget = budgetFor(config, await savedState(), planned.plan.estimatedCost)
+  attachPlanAccounting(planned.plan, planned.taskText, planned.routes, accountingContext(null, planned.routes, true))
+  const budget = budgetFor(config, await savedState(), planned.plan.accounting.apiEstimatedCostUsd, { apiExposure: planned.plan.accounting.apiExposure })
   const common = { plan: planned.plan, workspace, mode: planned.mode, executionEnvironment, budget }
   if (budget.exceeded && options.confirmOverBudget !== true) return { ...common, status: 'paused-budget',
     notice: `${budget.message} 已暂停团队执行。请向用户确认后再执行。` }
@@ -1784,7 +1860,8 @@ export function decisionSummary(plan) {
     preset: plan?.preset ?? DEFAULT_ROUTING_PRESET,
     complexity: plan?.complexity ?? null,
     reason: plan?.reason ?? '',
-    estimatedCost: plan?.estimatedCost ?? null,
+    accounting: plan?.accounting ?? null,
+    estimatedCost: plan?.accounting ? plan.accounting.apiEstimatedCostUsd : plan?.estimatedCost ?? null,
     packages: packages.map(item => ({
       id: item.id, name: item.name, route: `${item.recommendedProvider}/${item.recommendedModel}`,
       difficulty: item.difficulty ?? null, estimatedCost: item.estimatedCost ?? null,
@@ -1965,7 +2042,7 @@ async function prepareWorkbenchPreview(ctx, config, supplied = {}, options = {})
       executor: 'official-team', executionMode: mode, executionEnvironment: planned.executionEnvironment, workspace, status: planned.status,
       ...(planned.reason ? { reason: planned.reason } : {}),
       decision, selected: planned.plan?.selected ?? null, routingBypassed: false,
-      estimatedCost: planned.plan?.estimatedCost ?? null, budget: planned.budget,
+      accounting: planned.plan?.accounting ?? null, estimatedCost: planned.plan?.accounting ? planned.plan.accounting.apiEstimatedCostUsd : planned.plan?.estimatedCost ?? null, budget: planned.budget,
       reasons: confirmationReasons(codes, { sandboxAvailable: typeof ctx.sandbox?.confine === 'function', executionEnvironment: planned.executionEnvironment }),
       readOnly: mode === 'read-only',
     } }
@@ -1986,7 +2063,8 @@ async function prepareWorkbenchPreview(ctx, config, supplied = {}, options = {})
     decision: decisionSummary(planned.plan),
     selected: planned.plan.selected ?? null,
     routingBypassed: planned.plan.routingBypassed === true,
-    estimatedCost: planned.plan.estimatedCost ?? null,
+    accounting: planned.plan.accounting ?? null,
+    estimatedCost: planned.plan.accounting ? planned.plan.accounting.apiEstimatedCostUsd : planned.plan.estimatedCost ?? null,
     budget: planned.budget,
     reasons: confirmationReasons(codes, { sandboxAvailable: typeof ctx.sandbox?.confine === 'function' }),
     readOnly: true,
@@ -2252,7 +2330,7 @@ export function apply(ctx, config = {}) {
       const route = requested ?? chooseConsultRoute(plan, routes, exec.agent)
       const fallback = valueOf(config, 'maxConsultOutputChars', 12_000)
       const limit = boundedInteger(args.outputLimit, finiteNumber(fallback, 12_000), 500, 50_000)
-      return jsonValue(await executeBudgetedConsult(ctx, route, args.task, config, { limit, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true }))
+      return jsonValue(await executeBudgetedConsult(ctx, route, args.task, config, { routes, limit, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true }))
     },
   }))
   ctx.commands.register({
@@ -2469,14 +2547,14 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       const planned = await planToolRun(ctx, config, args, { signal: exec.signal })
       if (planned.mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑 CLI 执行')
       if (planned.budget.exceeded && args.confirmOverBudget !== true) {
-        return jsonValue({ status: 'paused-budget', budget: { ...planned.budget, paused: true }, estimateUsd: planned.estimate,
+        return jsonValue({ status: 'paused-budget', budget: { ...planned.budget, paused: true }, estimateUsd: planned.apiEstimate ?? (planned.funding === 'subscription' ? 0 : planned.estimate), accounting: planned.accounting ?? null,
           notice: `${planned.budget.message} 已暂停，未启动 ${planned.tool.label}。请向用户说明后，以 confirmOverBudget: true 重新调用。` })
       }
       const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true })
-      return jsonValue({ ...result, runId: recorded?.id ?? null, estimateUsd: planned.estimate, budget: planned.budget,
+      return jsonValue({ ...result, runId: recorded?.id ?? null, estimateUsd: planned.apiEstimate ?? (planned.funding === 'subscription' ? 0 : planned.estimate), accounting: planned.accounting ?? null, budget: planned.budget,
         ...(!planned.modelId && planned.model ? { modelNotice: result.modelNotice
           ?? 'Harness 模型 ID 未经此厂商 CLI 验证；本次使用厂商 CLI 已配置的默认模型。' } : {}),
-        ...(planned.estimate === null ? { costNotice: '未指定带单价的 provider/model 路线，无法预估费用；仅在预算已用尽时暂停。' } : {}),
+        ...(planned.funding === 'subscription' ? { costNotice: '订阅单独统计用量，不占用 API 金额预算；厂商未回报的用量保持未知。' } : planned.estimate === null ? { costNotice: '实际计费方式或 API 单价未知，请先核对后确认。' } : {}),
       })
     },
   }))

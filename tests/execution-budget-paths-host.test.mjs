@@ -8,6 +8,7 @@ import { createRouterState } from '../.dsh-plugin/shared/router-state.mjs'
 import { reservationSpending } from '../.dsh-plugin/shared/budget-reservations.mjs'
 import { createPlanFromRoutes } from '../.dsh-plugin/shared/harness-plan.mjs'
 import { createQuotaTracker } from '../.dsh-plugin/shared/subscription-billing.mjs'
+import { healthCache } from '../.dsh-plugin/shared/tool-health.mjs'
 
 // Exercise public Host entry points and real durable state. Streams and official
 // runners are inert fixtures; accidentally reaching a vendor is a test failure.
@@ -146,15 +147,21 @@ test('independent consultation never calls the model when its dispatch checkpoin
   assert.equal(Object.values(saved.budgetReservations)[0].status, 'interrupted')
 })
 
-function officialPlan() {
+function officialPlan(provider = route.provider) {
+  const value = plan([0.4])
+  value.team.workPackages[0].recommendedProvider = provider
   return { status: 'planned', mode: 'read-only', executionEnvironment: 'harness', workspace: home,
-    taskText: task, plan: plan([0.4]), routes: [route], installed: ['codex'], cliModels: {} }
+    taskText: task, plan: value, routes: [{ ...route, provider }], installed: ['codex'], cliModels: {} }
 }
 function cliReceipt(id = 'step-1') {
   return { id, status: 'succeeded', provider: route.provider, recommendedModel: route.model,
     toolId: 'codex', finalText: 'inert official receipt', reportedCostUsd: 0.02 }
 }
 test('official team admission rechecks concurrent reservations before calling the runner', async t => {
+  const previousHealth = healthCache.report()
+  healthCache.remember({ checkedAt: Date.now(), tools: [{ id: 'codex', installed: true,
+    login: { state: 'logged-in', billing: 'api-key', accountLogin: false } }] })
+  t.after(() => healthCache.remember(previousHealth ?? { checkedAt: Date.now(), tools: [] }))
   const release = deferred(), calls = [], completed = []
   const runTeam = async hooks => {
     await hooks.onWorkspace({ workspace: home, baseCommit: 'fixture-base' })
@@ -166,7 +173,7 @@ test('official team admission rechecks concurrent reservations before calling th
     return { status: 'completed', workspace: home, results: [result] }
   }
   const ctx = context(), config = settings({ dailyBudgetUsd: 0.5 })
-  const pending = [1, 2].map(() => host.executeOfficialTeamPlan(ctx, config, officialPlan(), { runTeam }))
+  const pending = [1, 2].map(() => host.executeOfficialTeamPlan(ctx, config, officialPlan('openai'), { runTeam }))
     .map(call => call.then(value => { completed.push(value); return value }))
   t.after(async () => { release.resolve(); await Promise.allSettled(pending) })
   await until(() => ({ calls, completed }), value => value.calls.length === 1 && value.completed.length === 1)
