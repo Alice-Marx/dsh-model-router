@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { chmod, lstat, mkdir, open, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { createGunzip } from 'node:zlib'
@@ -181,10 +181,21 @@ async function ownedRuntime(root, trustPath) {
 
 async function targetParent(installDir) {
   if (typeof installDir !== 'string' || !isAbsolute(installDir) || resolve(installDir) === dirname(resolve(installDir))) throw new Error('ZCode CLI 安装目标必须是独立的绝对目录。')
-  const root = resolve(installDir)
-  await mkdir(dirname(root), { recursive: true })
-  const parent = await realpath(dirname(root))
-  if (zcodeRootKey(parent) !== zcodeRootKey(dirname(root))) throw new Error('ZCode CLI 安装父目录不能经过目录联接或符号链接。')
+  const requestedRoot = resolve(installDir), requestedParent = dirname(requestedRoot)
+  // realpath expands ordinary Windows 8.3 names (including the runner TEMP
+  // directory). Check actual links in every ancestor instead of rejecting
+  // harmless textual aliases, then bind all writes/removal to canonical paths.
+  for (let cursor = requestedParent;; cursor = dirname(cursor)) {
+    const info = await lstat(cursor).catch(error => { if (error.code === 'ENOENT') return null; throw error })
+    if (info && (!info.isDirectory() || info.isSymbolicLink())) throw new Error('ZCode CLI 安装父目录不能经过目录联接或符号链接。')
+    if (cursor === dirname(cursor)) break
+  }
+  await mkdir(requestedParent, { recursive: true })
+  const parent = await realpath(requestedParent)
+  const candidate = join(parent, basename(requestedRoot))
+  const info = await lstat(candidate).catch(error => { if (error.code === 'ENOENT') return null; throw error })
+  const root = info?.isDirectory() && !info.isSymbolicLink() ? await realpath(candidate) : candidate
+  if (zcodeRootKey(dirname(root)) !== zcodeRootKey(parent)) throw new Error('ZCode CLI 安装目标离开了已核对的父目录。')
   return { root, parent }
 }
 

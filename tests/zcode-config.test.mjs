@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
@@ -26,7 +26,7 @@ function archive(entries = [tarEntry('zcode/package.json', packageJson), tarEntr
   return gzipSync(Buffer.concat([...entries, Buffer.alloc(1024)]))
 }
 async function scratch(t) {
-  const root = await mkdtemp(join(tmpdir(), 'router-zcode-cli-'))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'router-zcode-cli-')))
   t.after(() => rm(root, { recursive: true, force: true }))
   return { root, installDir: join(root, 'tools', 'zcode-cli'), trustPath: join(root, 'state', 'trust.json') }
 }
@@ -81,6 +81,31 @@ test('checksum mismatch and off-host redirects preserve the installed runtime', 
     await assert.rejects(installZCodeCli({ ...paths, latest, fetchImpl }), /SHA256 不匹配|离开了 GitHub/)
     assert.ok(await discoverZCodeBundle(paths))
   }
+})
+
+test('temporary path aliases use the same canonical runtime for install, discovery and uninstall', async t => {
+  const rawRoot = await mkdtemp(join(tmpdir(), 'router-zcode-alias-'))
+  const root = await realpath(rawRoot)
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const installDir = join(rawRoot, 'tools', 'zcode-cli'), trustPath = join(root, 'trust.json')
+  const installed = await installZCodeCli({ installDir, trustPath, latest, fetchImpl: distributionFetch(archive()) })
+  assert.equal(installed.installDir, join(root, 'tools', 'zcode-cli'))
+  const found = await discoverZCodeBundle({ installDir, trustPath })
+  assert.equal(found.root, installed.installDir)
+  assert.equal(found.version, version)
+  await uninstallZCodeCli({ installDir, trustPath })
+  assert.equal(await lstat(installed.installDir).catch(error => { if (error.code === 'ENOENT') return null; throw error }), null)
+})
+
+test('linked installation ancestors cannot redirect installation or removal into another directory', async t => {
+  const paths = await scratch(t), outside = join(paths.root, 'outside'), link = join(paths.root, 'linked')
+  await mkdir(outside)
+  await symlink(outside, link, process.platform === 'win32' ? 'junction' : 'dir')
+  const installDir = join(link, 'new-parent', 'zcode-cli')
+  const options = { ...paths, installDir, latest, fetchImpl: distributionFetch(archive()) }
+  await assert.rejects(installZCodeCli(options), /父目录不能经过目录联接或符号链接/)
+  await assert.rejects(uninstallZCodeCli(options), /父目录不能经过目录联接或符号链接/)
+  assert.equal(await lstat(join(outside, 'new-parent')).catch(error => { if (error.code === 'ENOENT') return null; throw error }), null)
 })
 
 test('an unmanaged destination and a forged incomplete ownership marker cannot be replaced or removed', async t => {
