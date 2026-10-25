@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![npm 版本](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/alice-marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/alice-marx/dsh-model-router?ref=badge) [![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![npm 版本](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
