@@ -66,9 +66,7 @@ const CAPABILITIES = Object.freeze({
   'grok-build': Object.freeze(IS_WINDOWS
     ? { supported: true, modes: Object.freeze(['read-only', 'workspace-write']) }
     : { supported: false, reason: 'Grok 原生执行入口目前仅在 Windows 完成适配。' }),
-  zcode: Object.freeze(IS_WINDOWS
-    ? { supported: true, modes: Object.freeze(['workspace-write']) }
-    : { supported: false, reason: 'ZCode 固定桌面发行版目前仅核验了 Windows x64。' }),
+  zcode: Object.freeze({ supported: true, modes: Object.freeze(['workspace-write']) }),
   gemini: Object.freeze({
     supported: false,
     reason: 'Gemini 由无界面适配器执行（gemini -p），不走签名沙箱入口；未安装或失败时回退模型目录 API。',
@@ -162,7 +160,8 @@ export function executionEnvironment(toolId, { sessionOnly = false, env: source 
     'minimax-code': ['MINIMAX_API_KEY', 'MINIMAX_BASE_URL'],
     'mimo-code': ['MIMO_API_KEY'],
     'grok-build': ['XAI_API_KEY', 'GROK_HOME'],
-    zcode: ['ZAI_API_KEY', 'ZCODE_HOME'],
+    zcode: ['ZCODE_DATA_BASE_DIR', 'ZCODE_PERSONAL_PROVIDER_CONFIG_FILE', 'ZCODE_STORAGE_DIR',
+      'ZCODE_SESSION_DB_PATH', 'ZCODE_LOG_DIR', 'ZCODE_HTTP_PROXY', 'ZCODE_NO_PROXY', 'ZCODE_AGENT_CA_CERT'],
   }
   const keys = [...ENVIRONMENT_KEYS, ...(vendorKeys[toolId] ?? [])]
     .filter(key => !sessionOnly || !API_KEY_VARIABLES.includes(key))
@@ -181,7 +180,7 @@ function pathDirectories() {
 /** The configured install location is authoritative even if another copy is newer. */
 export function officialToolEntrySelection(toolId, { preferences = installPreferences(), plan: selectedPlan, preferredDirs } = {}) {
   const tool = getOfficialTool(toolId)
-  if (!tool || tool.manager === 'signed-windows-installer') return { directories: pathDirectories(), plan: null, configured: false }
+  if (!tool) return { directories: pathDirectories(), plan: null, configured: false }
   // A saved script choice stays usable after future script installs are
   // disabled. Automatic selection still follows the same switch as installation.
   const selectedScript = installMethodFor(tool, preferences.methods?.[toolId])?.kind === 'script'
@@ -616,26 +615,38 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     }
   }
   if (toolId === 'zcode') {
-    const found = await discoverZCodeBundle({ installDir: (selectionOptions?.preferences ?? installPreferences()).zcodeInstallDir })
-    if (!found) return { unsupported: '未找到具有智谱有效签名、且 CLI 脚本与首次核验记录一致的 ZCode 桌面版。' }
-    const nodeExecutable = await findNodeExecutable(workspace, [24, 14, 0], version =>
-      Number(String(version).split('.')[0]) === 24)
-    if (!nodeExecutable) return { unsupported: '未找到工作区外的 Node.js 可执行文件。' }
-    if (Buffer.byteLength(task, 'utf8') > 16_000) {
-      return { unsupported: 'ZCode 单次 --prompt 参数超过 16 KB；请先拆分任务。' }
-    }
-    return {
-      file: nodeExecutable,
-      args: [found.cliEntry, '--prompt', task, '--cwd', workspace,
-        '--mode', mode === 'workspace-write' ? 'yolo' : 'plan', '--output-format', 'stream-json'],
-      format: 'zcode-stream-json', source: found.source, stdinTask: false,
-      requestedModel: null,
-      modelNotice: modelId
-        ? 'ZCode 的 CLI 没有 --model 参数；本次使用 ZCode 已配置的默认模型，不能保证与 Harness 建议模型一致。'
-        : '本次使用 ZCode 已配置的默认模型。',
-    }
+    const selection = officialToolEntrySelection(toolId, selectionOptions)
+    return resolveZCodeLaunch(workspace, mode, task, { installDir: selection.plan.installDir, modelId })
   }
   return { unsupported: CAPABILITIES[toolId]?.reason ?? '此官方工具尚无已核验的安全执行适配器。' }
+}
+
+/** Launch the verified standalone distribution; never use a desktop or PATH shim. */
+export async function resolveZCodeLaunch(workspace, mode, task, {
+  installDir, modelId = null, discoverBundle = discoverZCodeBundle, findNode = findNodeExecutable,
+} = {}) {
+  const found = await discoverBundle({ installDir })
+  if (!found) return { unsupported: '未找到通过 GitHub Release SHA256 核验的 ZCode CLI；请在官方工具中安装或修复。' }
+  if (inside(workspace, found.cliEntry) || resolve(workspace) === resolve(found.root)) {
+    return { unsupported: 'ZCode CLI 的执行入口必须位于任务工作区之外。' }
+  }
+  const nodeExecutable = await findNode(workspace, [24, 14, 0], version =>
+    Number(String(version).split('.')[0]) === 24)
+  if (!nodeExecutable) return { unsupported: 'ZCode CLI 需要工作区外的 Node.js 24.14.0 或更新的 Node 24。' }
+  if (Buffer.byteLength(task, 'utf8') > 16_000) {
+    return { unsupported: 'ZCode 单次 --prompt 参数超过 16 KB；请先拆分任务。' }
+  }
+  return {
+    file: nodeExecutable,
+    args: [found.cliEntry, '--prompt', task, '--cwd', workspace,
+      '--mode', mode === 'workspace-write' ? 'yolo' : 'plan', '--workflow-mode', 'disabled',
+      '--disallowed-tools', 'AskUserQuestion EnterPlanMode ExitPlanMode', '--output-format', 'stream-json', '--no-color'],
+    format: 'zcode-stream-json', source: found.source, stdinTask: false,
+    requestedModel: null,
+    modelNotice: modelId
+      ? 'ZCode CLI 没有 --model 参数；本次使用其已配置的默认模型，不能保证与 Harness 建议模型一致。'
+      : '本次使用 ZCode CLI 已配置的默认模型。',
+  }
 }
 
 /**

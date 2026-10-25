@@ -172,11 +172,7 @@ const INSTALL_SETTING_FIELDS = [
     hint: '按工具 ID 指定 https 镜像地址。脚本下载后仍会核对厂商标记，再执行本地副本。' },
 ]
 
-const ZCODE_SETTING_FIELDS = [{ key: 'zcodeInstallDir', label: 'ZCode 桌面安装目录', fallback: '',
-  placeholder: '例如 D:/Program Files/ZCode，留空自动检测',
-  hint: '已安装桌面版即可使用内置 TUI。保存目录后重新核验桌面程序和内置 CLI；无需独立 CLI 安装包。' }]
-
-function InstallSettings({ settingsScope, install, onPendingChange, onMutationStart, zcode = false }) {
+function InstallSettings({ settingsScope, install, onPendingChange, onMutationStart }) {
   const [snapshot, setSnapshot] = React.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false })
   const [drafts, setDrafts] = React.useState({})
   const [saving, setSaving] = React.useState(false)
@@ -198,7 +194,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
 
   const writable = snapshot.writable === true && !saving
   const shown = field => drafts[field.key] ?? String(snapshot.value?.[field.key] ?? field.fallback)
-  const fields = zcode ? ZCODE_SETTING_FIELDS : INSTALL_SETTING_FIELDS
+  const fields = INSTALL_SETTING_FIELDS
   const errors = Object.fromEntries(fields.map(field => [field.key, validateToolInstallSetting(field.key, shown(field))]))
   const invalid = Object.values(errors).some(Boolean)
   const edit = (key, value) => {
@@ -234,10 +230,10 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
   }
 
   return (
-    <div className="mr-install-settings" aria-label={zcode ? 'ZCode TUI 独立配置' : '统一安装设置'}>
+    <div className="mr-install-settings" aria-label="统一安装设置">
       <div className="mr-install-settings-head">
-        <strong>{zcode ? 'ZCode TUI 独立配置' : '统一安装设置'}</strong>
-        <span className="mr-caption">{zcode ? '内置 CLI 随桌面版更新。保存后在官方工具终端选择 ZCode TUI，自行配置登录、模型与插件。' : '保存后用于后续安装与更新。每个工具下方显示实际方式和目录，插件设置页里也能修改。'}</span>
+        <strong>统一安装设置</strong>
+        <span className="mr-caption">保存后用于后续安装与更新。每个工具下方显示实际方式和目录，插件设置页里也能修改。</span>
       </div>
       <div className="mr-install-grid">
         {fields.map(field => (
@@ -256,7 +252,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
               : <small>{field.hint}</small>}
           </label>
         ))}
-        {!zcode && <label className="mr-install-field">
+        <label className="mr-install-field">
           <span>安装脚本方式</span>
           <span className="mr-install-toggle-row">
             <input
@@ -269,16 +265,16 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
             />
             <span>允许 curl / irm 安装脚本</span>
           </span>
-          <small>关闭后只能使用 npm / pnpm 方式；脚本方式需要先下载并校验厂商标记再执行。</small>
-        </label>}
+          <small>关闭后仍可使用 npm / pnpm 和 ZCode CLI 发行包；脚本方式需先下载并核对厂商标记。</small>
+        </label>
       </div>
       <div className="mr-install-save-row">
-        <button className="mr-button mr-button-secondary" type="button" disabled={!writable || !dirty || invalid} onClick={() => { void apply() }}>{saving ? '保存中…' : zcode ? '保存并刷新 TUI 入口' : '保存安装设置'}</button>
+        <button className="mr-button mr-button-secondary" type="button" disabled={!writable || !dirty || invalid} onClick={() => { void apply() }}>{saving ? '保存中…' : '保存安装设置'}</button>
         {dirty && <button className="mr-button mr-button-secondary" type="button" disabled={saving} onClick={() => { setDrafts({}); setNotice(''); onPendingChange?.(false) }}>放弃更改</button>}
         {dirty && <span className="mr-caption">{invalid ? '请修正输入后保存。' : '更改尚未保存，安装与更新暂不可用。'}</span>}
       </div>
       <p className="mr-caption" style={{ marginTop: 8 }} role={notice ? 'status' : undefined}>
-        {zcode ? `当前 ZCode 目录：${install?.zcodeInstallDir || '（自动检测）'}` : `当前生效：安装目录 ${install?.installDir || '（各厂商默认）'} · npm 源 ${install?.registry || '（默认）'}`}{notice ? ` · ${notice}` : ''}
+        {`当前生效：安装目录 ${install?.installDir || '（各厂商默认）'} · npm 源 ${install?.registry || '（默认）'}`}{notice ? ` · ${notice}` : ''}
       </p>
     </div>
   )
@@ -306,18 +302,9 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
   const submitting = React.useRef(new Set())
   const polling = React.useRef(new Set())
   const jobsRef = React.useRef({})
-  const settingsPendingBySection = React.useRef({ shared: false, zcode: false })
   const handleSettingsPending = React.useCallback(value => {
-    settingsPendingBySection.current.shared = value
-    const pending = Object.values(settingsPendingBySection.current).some(Boolean)
-    settingsPendingRef.current = pending
-    setSettingsPending(pending)
-  }, [])
-  const handleZCodeSettingsPending = React.useCallback(value => {
-    settingsPendingBySection.current.zcode = value
-    const pending = Object.values(settingsPendingBySection.current).some(Boolean)
-    settingsPendingRef.current = pending
-    setSettingsPending(pending)
+    settingsPendingRef.current = value
+    setSettingsPending(value)
   }, [])
   const rememberJobs = updater => {
     setJobs(previous => {
@@ -431,8 +418,6 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
 
   const refreshInstallSettingsRef = React.useRef(refreshInstallSettings)
   refreshInstallSettingsRef.current = refreshInstallSettings
-  const refreshProbesRef = React.useRef(refresh)
-  refreshProbesRef.current = refresh
   const beginSettingsMutation = React.useCallback(operations => {
     const generation = ++mutationGeneration.current
     mutationPendingRef.current = { generation, operations }
@@ -451,15 +436,12 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
     if (typeof settingsScope?.subscribe !== 'function') return undefined
     const signature = snapshot => toolInstallSettingsSignature(snapshot?.value)
     let previous = signature(settingsScope.getSnapshot())
-    let previousZCode = settingsScope.getSnapshot()?.value?.zcodeInstallDir ?? ''
     return settingsScope.subscribe(() => {
       const snapshot = settingsScope.getSnapshot()
       setSettingsSnapshot(snapshot)
       const next = signature(snapshot)
       if (next === previous) return
       previous = next
-      const zcodeChanged = previousZCode !== (snapshot?.value?.zcodeInstallDir ?? '')
-      previousZCode = snapshot?.value?.zcodeInstallDir ?? ''
       request.current += 1
       setProbeSettingsStale(true)
       setProbeState(previous => ({ ...previous, status: 'ready', probes: [], readiness: [], error: '' }))
@@ -467,7 +449,6 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
       previewPendingRef.current = true
       setPreviewPending(true)
       void refreshInstallSettingsRef.current()
-      if (zcodeChanged) void refreshProbesRef.current()
     })
   }, [settingsScope])
 
@@ -627,7 +608,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
     <section className="mr-card" aria-label="官方工具">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">官方工具 · 体检</h2>
-        <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm 或厂商安装脚本方式，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode 会打开官方安装窗口供你选择目录；完成后重新体检。</p>
+        <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm、厂商安装脚本或经过校验的发行包，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode CLI 使用社区独立发行版，与其他工具共用安装目录设置。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新体检</button></div>
       <div className="mr-card-body">
         <InstallSettings settingsScope={settingsScope} install={probeState.install} onPendingChange={handleSettingsPending} onMutationStart={beginSettingsMutation} />
@@ -664,18 +645,15 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
               : job.postInstallProbe?.installed === true)
             const operation = job?.operation === 'uninstall' ? '卸载' : job?.operation === 'repair' ? '修复' : '安装'
             const status = running ? job.cancelRequested ? `正在取消${operation}…` : `${operation}中…`
-              : job?.status === 'installer-opened' ? '官方安装器已打开，请完成安装后重新检测'
-                : job?.status === 'cancelled' ? `${operation}已取消，请重新检测`
+              : job?.status === 'cancelled' ? `${operation}已取消，请重新检测`
                   : verified ? `${operation}成功并验证` : probe ? probeLabel(probe) : '所选安装目标尚未体检'
             return (
               <div className="mr-tool" role="listitem" key={tool.id}>
                 <div className="mr-tool-info">
                   <div className="mr-route-name" title={tool.purpose}>{tool.label}</div>
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
-                  <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{probe?.installed && probe.version ? ` · ${tool.id === 'zcode' ? '桌面版 ' : ''}${probe.version}` : ''}{healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ''}</div>
+                  <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{probe?.installed && probe.version ? ` · ${probe.version}` : ''}{healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ''}</div>
                   <ToolLoginLine entry={healthById[tool.id]} />
-                  {tool.id === 'zcode' && <InstallSettings zcode settingsScope={settingsScope} install={probeState.install}
-                    onPendingChange={handleZCodeSettingsPending} onMutationStart={beginSettingsMutation} />}
                   {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.headlessAdapter
                     ? '只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。'
                     : readiness?.ready
@@ -683,7 +661,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
                     : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || '执行入口尚未核验。'}`}</p>}
                   {command
                     ? <>
-                      <p className="mr-caption mr-tool-detail">安装方式：{methods.find(method => method.id === summary?.methodId)?.label ?? (tool.manager === 'signed-windows-installer' ? '官方桌面安装器' : tool.manager)} · 实际安装目录：{probe?.installDir || summary?.installDir || '各厂商默认目录'}</p>
+                      <p className="mr-caption mr-tool-detail">安装方式：{methods.find(method => method.id === summary?.methodId)?.label ?? tool.manager} · 实际安装目录：{probe?.installDir || summary?.installDir || '各厂商默认目录'}</p>
                       <code className="mr-tool-command" aria-label={`${tool.label} 安装命令`}>{command}</code>
                       {updateCommand !== command && <>
                         <p className="mr-caption mr-tool-detail">更新沿用原安装位置：{summary?.updateInstallDir || '各厂商默认目录'}</p>
@@ -737,7 +715,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
           })}
         </div>
         <p className="mr-caption" style={{ marginTop: 12 }}>
-          安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode 需在官方安装窗口完成安装。会话与 Agent 也可使用 <code>/tools</code>、<code>model_router_tool_install</code>、<code>model_router_tool_repair</code> 和 <code>model_router_tool_uninstall</code>。
+          安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode CLI 下载固定 GitHub 仓库的发行包并校验 SHA-256。会话与 Agent 也可使用 <code>/tools</code>、<code>model_router_tool_install</code>、<code>model_router_tool_repair</code> 和 <code>model_router_tool_uninstall</code>。
         </p>
       </div>
     </section>

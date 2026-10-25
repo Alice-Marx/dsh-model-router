@@ -1,11 +1,53 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createOfficialToolEvidenceCollector, finalizeOfficialProcessResult, officialToolTerminalEvidence,
+import { createOfficialToolEvidenceCollector, finalizeOfficialProcessResult, officialToolTerminalEvidence, resolveZCodeLaunch, executionEnvironment,
   parseClaudeProcessOutput } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 
 const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
 const failure = { type: 'result', subtype: 'error_during_execution', is_error: true,
   errors: ['Cannot connect to the configured endpoint'], usage, total_cost_usd: 0 }
+
+test('standalone ZCode launches the verified runner with bounded noninteractive arguments and its configured model', async () => {
+  const workspace = process.cwd(), root = (await import('node:os')).tmpdir()
+  const cliEntry = (await import('node:path')).join(root, 'zcode-cli', 'bin', 'zcode.mjs')
+  const requests = []
+  const options = { installDir: root, modelId: 'suggested-model',
+    discoverBundle: async request => { requests.push(request); return { root, cliEntry, source: 'github-release-sha256' } },
+    findNode: async (directory, minimum, accepted) => {
+      assert.equal(directory, workspace)
+      assert.deepEqual(minimum, [24, 14, 0])
+      assert.equal(accepted('24.20.0'), true)
+      assert.equal(accepted('25.0.0'), false)
+      return '/trusted/node'
+    } }
+  const spec = await resolveZCodeLaunch(workspace, 'workspace-write', 'offline task', options)
+  assert.deepEqual(requests, [{ installDir: root }])
+  assert.equal(spec.file, '/trusted/node')
+  assert.deepEqual(spec.args, [cliEntry, '--prompt', 'offline task', '--cwd', workspace,
+    '--mode', 'yolo', '--workflow-mode', 'disabled', '--disallowed-tools', 'AskUserQuestion EnterPlanMode ExitPlanMode',
+    '--output-format', 'stream-json', '--no-color'])
+  assert.equal(spec.format, 'zcode-stream-json')
+  assert.equal(spec.requestedModel, null)
+  assert.match(spec.modelNotice, /默认模型/)
+  assert.equal(spec.stdinTask, false)
+  assert.match((await resolveZCodeLaunch(workspace, 'workspace-write', 'task', { ...options, findNode: async () => null })).unsupported, /Node.js 24.14.0/)
+  assert.match((await resolveZCodeLaunch(workspace, 'workspace-write', 'task', { ...options, discoverBundle: async () => null })).unsupported, /SHA256/)
+  assert.match((await resolveZCodeLaunch(workspace, 'workspace-write', 'a'.repeat(16_001), options)).unsupported, /16 KB/)
+  assert.match((await resolveZCodeLaunch(workspace, 'workspace-write', 'task', { ...options,
+    discoverBundle: async () => ({ root: workspace, cliEntry: `${workspace}/bin/zcode.mjs` }) })).unsupported, /工作区之外/)
+})
+
+test('standalone ZCode retains its provider locations and proxy without undocumented key-based authentication', () => {
+  const env = executionEnvironment('zcode', { env: { PATH: '/bin', ZCODE_DATA_BASE_DIR: '/data/zcode',
+    ZCODE_PERSONAL_PROVIDER_CONFIG_FILE: '/data/provider_config.json', ZCODE_HTTP_PROXY: 'http://proxy.test',
+    NODE_OPTIONS: '--import=untrusted', ZAI_API_KEY: 'fixture', OPENAI_API_KEY: 'other' } })
+  assert.equal(env.ZCODE_DATA_BASE_DIR, '/data/zcode')
+  assert.equal(env.ZCODE_PERSONAL_PROVIDER_CONFIG_FILE, '/data/provider_config.json')
+  assert.equal(env.ZCODE_HTTP_PROXY, 'http://proxy.test')
+  assert.equal(env.ZAI_API_KEY, undefined)
+  assert.equal(env.OPENAI_API_KEY, undefined)
+  assert.equal(env.NODE_OPTIONS, undefined)
+})
 
 test('Claude nonzero terminal JSON retains its failure and explicit zero usage/cost', () => {
   const actual = parseClaudeProcessOutput(JSON.stringify(failure), 1)

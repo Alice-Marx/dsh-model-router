@@ -6,11 +6,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import {
-  LATEST_CACHE_MS, compareReleaseVersions, createLatestVersions, latestSourceFor, parseZCodeDownloadPage, updateAvailable,
+  LATEST_CACHE_MS, compareReleaseVersions, createLatestVersions, latestSourceFor, parseZCodeRelease, ZCODE_RELEASE_API, updateAvailable,
 } from '../.dsh-plugin/shared/latest-versions.mjs'
 import { createNpmAttestor, digestTarMembers, npmCacheContentPath } from '../.dsh-plugin/shared/npm-attestation.mjs'
 import { getOfficialTool, OFFICIAL_TOOLS } from '../.dsh-plugin/shared/official-tool-registry.mjs'
-import { checkZCodeCliRecord, zcodeSignatureVerdict, ZCODE_SIGNER } from '../.dsh-plugin/shared/zcode-bundle.mjs'
 import { zcodeInstallerRelease } from '../.dsh-plugin/shared/zcode-installer.mjs'
 import { OFFICIAL_SIGNERS, signatureAccepted } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { Readable } from 'node:stream'
@@ -24,10 +23,10 @@ async function scratch(t) {
 const json = (body, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => body, text: async () => JSON.stringify(body) })
 const html = body => ({ ok: true, status: 200, headers: new Headers(), text: async () => body })
 
-const ZCODE_PAGE = `<a href="https://cdn-zcode.z.ai/zcode/electron/releases/3.14.4/windows-x64/ZCode-3.14.4-win-x64.exe">Windows</a>
-<a href="https://cdn-zcode.z.ai/zcode/electron/releases/3.14.4/mac-arm64/ZCode-3.14.4-mac-arm64.dmg">mac</a>
-<a href="https://cdn-zcode.z.ai/zcode/electron/releases/3.14.2/windows-x64/ZCode-3.14.2-win-x64.exe">old</a>
-<a href="https://evil.example/zcode/electron/releases/9.9.9/windows-x64/ZCode-9.9.9-win-x64.exe">fake</a>`
+const ZCODE_RELEASE = { tag_name: 'v3.16.2', draft: false, prerelease: false, assets: [
+  { name: 'zcode-3.16.2.tar.gz', browser_download_url: 'https://github.com/Alice-Marx/zcode-cli/releases/download/v3.16.2/zcode-3.16.2.tar.gz' },
+  { name: 'sha256.txt', browser_download_url: 'https://github.com/Alice-Marx/zcode-cli/releases/download/v3.16.2/sha256.txt' },
+] }
 
 test('release versions compare numerically and prereleases sort below releases', () => {
   assert.equal(compareReleaseVersions('0.160.0', '0.157.1'), 1)
@@ -46,23 +45,22 @@ test('every supported tool has a cheap latest-version source', () => {
     assert.ok(latestSourceFor(tool), `${tool.id} has a latest source`)
   }
   assert.deepEqual(latestSourceFor(getOfficialTool('codex')), { kind: 'npm', package: '@openai/codex' })
-  assert.deepEqual(latestSourceFor(getOfficialTool('zcode')), { kind: 'zcode-download-page' })
+  assert.deepEqual(latestSourceFor(getOfficialTool('zcode')), { kind: 'zcode-github-release', url: ZCODE_RELEASE_API })
 })
 
-test('ZCode download page parsing only trusts the official CDN and picks the newest Windows build', () => {
-  assert.deepEqual(parseZCodeDownloadPage(ZCODE_PAGE), {
-    version: '3.14.4', url: 'https://cdn-zcode.z.ai/zcode/electron/releases/3.14.4/windows-x64/ZCode-3.14.4-win-x64.exe',
-  })
-  assert.equal(parseZCodeDownloadPage('<html>no links</html>'), null)
-  const release = zcodeInstallerRelease(parseZCodeDownloadPage(ZCODE_PAGE))
-  assert.equal(release.fileName, 'ZCode-3.14.4-win-x64.exe')
-  assert.equal(zcodeInstallerRelease({ version: '3.14.4', url: 'http://cdn-zcode.z.ai/zcode/electron/releases/3.14.4/windows-x64/ZCode-3.14.4-win-x64.exe' }), null)
-  assert.equal(zcodeInstallerRelease({ version: '3.14.5', url: release.url }), null, 'version must match the URL')
-  assert.equal(zcodeInstallerRelease({ version: '3.14.4', url: 'https://cdn-zcode.z.ai.evil/zcode/electron/releases/3.14.4/windows-x64/ZCode-3.14.4-win-x64.exe' }), null)
-  assert.equal(zcodeInstallerRelease(null), null)
+test('ZCode latest release requires matching assets from the standalone repository', () => {
+  const parsed = parseZCodeRelease(ZCODE_RELEASE)
+  assert.equal(parsed.version, '3.16.2')
+  assert.match(parsed.url, /Alice-Marx\/zcode-cli/)
+  assert.equal(parseZCodeRelease({ ...ZCODE_RELEASE, prerelease: true }), null)
+  assert.equal(parseZCodeRelease({ ...ZCODE_RELEASE, assets: [] }), null)
+  assert.equal(parseZCodeRelease({ ...ZCODE_RELEASE, assets: ZCODE_RELEASE.assets.map(asset => ({ ...asset, browser_download_url: asset.browser_download_url.replace('Alice-Marx', 'someone') })) }), null)
+  assert.equal(zcodeInstallerRelease(parsed).fileName, 'zcode-3.16.2.tar.gz')
+  assert.equal(zcodeInstallerRelease({ ...parsed, version: '3.16.1' }), null)
+  assert.equal(zcodeInstallerRelease({ ...parsed, sha256Url: 'https://evil.example/sha256.txt' }), null)
 })
 
-test('latest lookups use npm and the ZCode page, cache ~12 h and persist', async t => {
+test('latest lookups use npm and the ZCode standalone release, cache ~12 h and persist', async t => {
   const dir = await scratch(t)
   const cachePath = join(dir, 'latest-versions.json')
   let clock = 1_000
@@ -70,7 +68,7 @@ test('latest lookups use npm and the ZCode page, cache ~12 h and persist', async
   const fetchImpl = async url => {
     calls.push(url)
     if (url === 'https://registry.npmjs.org/@openai/codex/latest') return json({ name: '@openai/codex', version: '0.160.0' })
-    if (url === 'https://zcode.z.ai/en/docs/install') return html(ZCODE_PAGE)
+    if (url === ZCODE_RELEASE_API) return json(ZCODE_RELEASE)
     return json({}, 404)
   }
   const latest = createLatestVersions({ fetchImpl, now: () => clock, cachePath: () => cachePath })
@@ -78,8 +76,8 @@ test('latest lookups use npm and the ZCode page, cache ~12 h and persist', async
   assert.equal(codex.version, '0.160.0')
   assert.equal(codex.source, 'npm')
   const zcode = await latest.lookup(getOfficialTool('zcode'))
-  assert.equal(zcode.version, '3.14.4')
-  assert.match(zcode.url, /ZCode-3\.14\.4-win-x64\.exe$/)
+  assert.equal(zcode.version, '3.16.2')
+  assert.match(zcode.url, /zcode-3\.16\.2\.tar\.gz$/)
   assert.equal(calls.length, 2)
   clock += LATEST_CACHE_MS - 1
   await latest.lookup(getOfficialTool('codex'))
@@ -227,17 +225,6 @@ test('npm attestation prefers a verified npm cache entry and rejects integrity m
   await assert.rejects(attestor.attest(name, 'latest', 'bin/mimo.exe'), /无效/)
 })
 
-test('ZCode.exe acceptance is signer-only: any signed version, never an unsigned or foreign one', () => {
-  const signed = { signatureStatus: 'Valid', signerSubject: `CN=${ZCODE_SIGNER}, O=${ZCODE_SIGNER}, C=CN`, signerThumbprint: 'AB', productVersion: '3.14.4.7801', fileVersion: '3.14.4.7801' }
-  assert.equal(zcodeSignatureVerdict(signed).version, '3.14.4')
-  assert.equal(zcodeSignatureVerdict({ ...signed, productVersion: '3.15.0' }).version, '3.15.0')
-  assert.equal(zcodeSignatureVerdict({ ...signed, productVersion: '3.14.3.7762' }).version, '3.14.3')
-  assert.equal(zcodeSignatureVerdict({ ...signed, signatureStatus: 'NotSigned' }), null)
-  assert.equal(zcodeSignatureVerdict({ ...signed, signatureStatus: 'HashMismatch' }), null)
-  assert.equal(zcodeSignatureVerdict({ ...signed, signerSubject: 'CN=Someone Else' }), null)
-  assert.equal(zcodeSignatureVerdict({ ...signed, productVersion: 'dev', fileVersion: '' }), null)
-})
-
 test('Codex and Claude acceptance is signer-only and independent of the version', () => {
   assert.equal(signatureAccepted({ status: 'Valid', subject: 'CN="OpenAI OpCo, LLC", O="OpenAI OpCo, LLC"' }, OFFICIAL_SIGNERS.codex), true)
   assert.equal(signatureAccepted({ status: 'Valid', subject: 'CN=Evil Corp' }, OFFICIAL_SIGNERS.codex), false)
@@ -246,21 +233,11 @@ test('Codex and Claude acceptance is signer-only and independent of the version'
   assert.equal(signatureAccepted(null, OFFICIAL_SIGNERS.codex), false)
 })
 
-test('ZCode CLI script is trusted on first use per signed build and refused if it changes under that build', async t => {
-  const dir = await scratch(t)
-  const trustPath = join(dir, 'zcode-trust.json')
-  const base = { root: 'D:\\Program Files\\ZCode', buildVersion: '3.14.3.7762', signer: 'AB12', size: 100, trustPath, now: () => 5 }
-  const first = await checkZCodeCliRecord({ ...base, sha256: 'a'.repeat(64) })
-  assert.equal(first.ok, true)
-  assert.equal(first.recorded, true)
-  const again = await checkZCodeCliRecord({ ...base, root: 'd:\\program files\\zcode', sha256: 'a'.repeat(64), now: () => 9 })
-  assert.deepEqual(again, { ok: true, sha256: 'a'.repeat(64), firstSeen: 5 })
-  const swapped = await checkZCodeCliRecord({ ...base, sha256: 'b'.repeat(64) })
-  assert.equal(swapped.ok, false)
-  assert.match(swapped.reason, /首次核验/)
-  const updated = await checkZCodeCliRecord({ ...base, buildVersion: '3.14.4.7801', sha256: 'c'.repeat(64), size: 120 })
-  assert.equal(updated.ok, true, 'a new signed build re-records the script')
-  const saved = JSON.parse(await readFile(trustPath, 'utf8')).entries
-  assert.deepEqual(Object.keys(saved), ['d:\\program files\\zcode|3.14.4.7801|AB12'], 'old build records for the same root are replaced')
-  assert.equal((await checkZCodeCliRecord({ ...base, buildVersion: '3.14.4.7801', sha256: 'c'.repeat(64), size: 121 })).ok, false)
+test('the CLI upgrade discards cached desktop versions even while offline', async t => {
+  const dir = await scratch(t), cachePath = join(dir, 'cache.json')
+  await writeFile(cachePath, JSON.stringify({ entries: { zcode: { version: '3.99.0', source: 'zcode-download-page', checkedAt: Date.now(), url: 'https://cdn-zcode.z.ai/old.exe' } } }))
+  const latest = createLatestVersions({ cachePath: () => cachePath, fetchImpl: async () => { throw new Error('offline') } })
+  const result = await latest.lookup(getOfficialTool('zcode'))
+  assert.equal(result.version, null)
+  assert.equal(result.url, undefined)
 })

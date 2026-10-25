@@ -70,26 +70,6 @@ export function expandInstallDir(value, { home = '', env = {} } = {}) {
   return expanded
 }
 
-/** ZCode's existing desktop bundle is selected independently of npm's prefix. */
-export function normalizeZCodeInstallDir(value, options = {}) {
-  const input = String(value ?? '')
-  if (/[\x00-\x1f]/.test(input)) throw new Error('ZCode 安装位置包含无效字符。')
-  const raw = input.trim().replace(/^"(.*)"$/, '$1')
-  if (!raw) return ''
-  let path
-  try { path = expandInstallDir(raw, options) } catch (error) {
-    throw new Error(`ZCode 安装位置无效：${error.message}`)
-  }
-  // Discovery and Authenticode verification operate on local Windows files.
-  if (!/^[A-Za-z]:[\\/]/.test(path)) {
-    throw new Error('ZCode 安装位置必须是 Windows 本地绝对目录或 ZCode.exe 路径。')
-  }
-  if (/\.exe[\\/]*$/i.test(path) && !/[\\/]ZCode\.exe[\\/]*$/i.test(path)) {
-    throw new Error('ZCode 程序路径必须指向官方 ZCode.exe。')
-  }
-  return path.replace(/[\\/]+$/, '')
-}
-
 /** Only https mirrors are accepted; a plain-http script source can be tampered with in transit. */
 export function normalizeSourceUrl(value, subject) {
   const raw = String(value ?? '').trim()
@@ -136,7 +116,6 @@ function keepKnownToolIds(raw, known, subject) {
 export function parseInstallPreferences(config = {}, { tools = [], home = '', env = {} } = {}) {
   const known = new Set(tools.map(tool => tool.id))
   const installDir = expandInstallDir(valueOf(config, 'toolInstallDir', ''), { home, env })
-  const zcodeInstallDir = normalizeZCodeInstallDir(valueOf(config, 'zcodeInstallDir', ''), { home, env })
   const registry = normalizeSourceUrl(valueOf(config, 'toolNpmRegistry', DEFAULT_NPM_REGISTRY), 'npm 源') || DEFAULT_NPM_REGISTRY
   const methodRaw = keepKnownToolIds(
     parseJsonObject(valueOf(config, 'toolInstallMethodsJson', '{}'), '安装方式覆盖'), known, '安装方式覆盖')
@@ -155,7 +134,6 @@ export function parseInstallPreferences(config = {}, { tools = [], home = '', en
   }
   return {
     installDir,
-    zcodeInstallDir,
     registry,
     methods,
     scriptUrls,
@@ -258,12 +236,6 @@ function pickMethod(tool, methodId, preferences, platform) {
   return chosen
 }
 
-function unsupportedMethodError(tool) {
-  return tool?.manager === 'signed-windows-installer'
-    ? 'ZCode 使用官方签名桌面安装器，由用户在安装窗口选择目录。'
-    : `${tool?.label ?? '此工具'} 没有可用的安装方式。`
-}
-
 /**
  * One concrete plan for one tool and one method. A thrown Error means the user
  * asked for something this tool cannot do, with a reason they can act on.
@@ -271,13 +243,19 @@ function unsupportedMethodError(tool) {
 export function resolveInstallPlan(tool, methodId, preferences = {}, { platform = 'linux', home = '', env = {} } = {}) {
   if (!tool || tool.unsupported) throw new Error(tool?.unsupportedReason ?? '此工具不支持一键安装。')
   const method = pickMethod(tool, methodId, preferences, platform)
-  if (!method) throw new Error(unsupportedMethodError(tool))
+  if (!method) throw new Error(`${tool?.label ?? '此工具'} 没有可用的安装方式。`)
   const blocked = installMethodBlockReason(method, platform)
   if (blocked) throw new Error(`${tool.label}：${blocked}`)
   if (method.kind === 'script' && preferences?.allowScriptInstall === false) {
     throw new Error('安装脚本方式已在插件设置中关闭；请改用包管理器方式，或在设置里重新允许。')
   }
   const installDir = preferences?.installDir || ''
+  if (method.kind === 'archive') {
+    const target = installDir ? joinPath(installDir, 'zcode-cli') : joinPath(home, '.zcode', 'runtime')
+    return { toolId: tool.id, method, methodId: method.id, kind: 'archive', label: method.label,
+      installDir: target, binDir: joinPath(target, 'bin'), env: {},
+      notices: ['从固定的 Alice-Marx/zcode-cli GitHub Release 下载并校验 SHA256；社区维护版需要 Node 24.14.0 或更新的 Node 24。'] }
+  }
   if (method.kind === 'script') {
     const scriptUrl = preferences?.scriptUrls?.[tool.id] || method.scriptUrl
     const target = methodHonoursInstallDir(method) ? scriptInstallDir(tool, preferences, { home, env, method }) : ''
@@ -335,12 +313,11 @@ export function resolveInstallPlan(tool, methodId, preferences = {}, { platform 
 export function resolveUninstallPlan(tool, methodId, preferences = {}, options = {}) {
   const platform = options.platform ?? 'linux'
   const method = pickMethod(tool, methodId, preferences, platform)
-  if (!method) throw new Error(tool?.manager === 'signed-windows-installer'
-    ? 'ZCode 是桌面安装版，请在系统“应用”中卸载它。'
-    : `${tool?.label ?? '此工具'} 没有可用的卸载方式。`)
+  if (!method) throw new Error(`${tool?.label ?? '此工具'} 没有可用的卸载方式。`)
   const blocked = installMethodBlockReason(method, platform)
   if (blocked) throw new Error(`${tool.label}：${blocked}`)
   if (method.uninstallUnsupportedReason) throw new Error(method.uninstallUnsupportedReason)
+  if (method.kind === 'archive') return resolveInstallPlan(tool, method.id, preferences, options)
   if (method.kind === 'script') {
     return { toolId: tool.id, method, methodId: method.id, kind: 'script', label: method.label, ...resolveInstallLocation(tool, method, preferences, options) }
   }
@@ -364,6 +341,10 @@ export function resolveUninstallPlan(tool, methodId, preferences = {}, options =
 /** Where the tool's binary lives, so a later uninstall can find it. */
 export function resolveInstallLocation(tool, method, preferences = {}, { home = '', platform = 'linux', env = {} } = {}) {
   if (!method) return null
+  if (method.kind === 'archive') {
+    const plan = resolveInstallPlan(tool, method.id, preferences, { home, platform, env })
+    return { kind: 'archive', dir: plan.binDir, installDir: plan.installDir, binaries: ['zcode', 'zcode.cmd'] }
+  }
   if (method.kind === 'script') {
     // A method that cannot honour the configured directory always lands in the
     // vendor's own location, whatever the user typed.

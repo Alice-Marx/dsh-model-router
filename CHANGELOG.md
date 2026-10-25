@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.25.2 — 2026-10-25
+
+- Replace the Windows desktop-bundled ZCode entry with the standalone [Alice-Marx/zcode-cli](https://github.com/Alice-Marx/zcode-cli) distribution. The tool keeps its `zcode` route identity and now uses the common install directory and install/update/repair/uninstall controls.
+- Download the complete runtime from fixed GitHub Release assets, verify SHA256 before extraction, and check installed files before discovery or execution. Removal targets only the plugin-owned runtime; existing desktop installations, settings and sessions are preserved.
+- Launch TUI, login and managed execution through `bin/zcode.mjs` with Node 24.14.0 or a newer Node 24. Add `zcode login` / `zcode login bigmodel` guidance and retain the CLI's configured default model. Identify this distribution as a community extraction, not an official Z.AI release.
+
+Validation evidence and limits are tracked in the [0.25.2 acceptance report](docs/releases/0.25.2-validation.md).
+
 ## 0.25.1 — 2026-10-24
 
 - Add DeepSeek Harness Desktop 0.2.1-rc.3 to the exact Host peer range while retaining the existing 0.2.0-rc.1, 0.2.0-rc.2 and 0.2.1-rc.2 declarations.

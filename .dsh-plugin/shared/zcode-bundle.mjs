@@ -1,292 +1,93 @@
-/**
- * Locate the ZCode desktop bundle on Windows without trusting PATH.
- *
- * Discovery accepts a deliberate operator override, Windows uninstall records,
- * and the conventional installation directories. Any ZCode version is accepted
- * (the plugin follows the vendor's latest release), but an install is usable
- * only if:
- * - its canonical ZCode.exe has a valid Authenticode signature whose signer is
- *   the expected publisher (北京智谱华章科技股份有限公司);
- * - the bundled GLM entry (resources/glm/zcode.cjs) stays inside that same
- *   canonical root and the bundle metadata names it as the electron-node entry;
- * - zcode.cjs is unchanged since it was first verified for this signed build.
- *
- * zcode.cjs is plain JavaScript: it cannot carry a signature, and ZCode ships
- * no signed manifest of it, so the signature on ZCode.exe does not cover it.
- * Earlier releases compared it with a hash compiled in for exactly 3.14.3. That
- * cannot follow new releases, so the plugin now records the script's SHA-256
- * per (install root, signed build version, signer) the first time it verifies
- * the signed executable, and refuses to run the script if it later changes
- * while the signed build stays the same (an update changes the build and is
- * recorded afresh).
- */
-import { execFile } from 'node:child_process'
-import { createReadStream } from 'node:fs'
+/** Standalone ZCode CLI discovery. Desktop executables and Electron bundles are never used. */
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
-import { promisify } from 'node:util'
-import { dirname, isAbsolute, join, relative, sep, win32 } from 'node:path'
+import { createReadStream } from 'node:fs'
+import { lstat, mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { resolveStateHome } from './router-state.mjs'
 
-const execFileAsync = promisify(execFile)
+export const ZCODE_MARKER = '.model-router-zcode.json'
+export const ZCODE_REPOSITORY = 'Alice-Marx/zcode-cli'
+export const ZCODE_REQUIRED_NODE = '24.14.0'
 
-export const ZCODE_SIGNER = '北京智谱华章科技股份有限公司'
-export const ZCODE_INSTALL_ENV_VAR = 'MODEL_ROUTER_ZCODE_HOME'
-/** Upper bound for the GLM CLI script (3.14.3: 14.8 MB). */
-const ZCODE_CLI_MAX_SIZE = 200_000_000
-
-const REGISTRY_PATHS = Object.freeze([
-  'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
-  'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
-  'HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
-])
-
-function powershellPath(env) {
-  const systemRoot = env.SystemRoot || env.windir || 'C:\\Windows'
-  return join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+export function zcodeTrustPath(env = process.env) {
+  return join(resolveStateHome(env), 'model-router', 'zcode-cli-attestations.json')
 }
 
-/** PowerShell 7's module path can prevent Windows PowerShell 5.1 loading Security. */
-export function zcodeWindowsPowerShellEnvironment(env = process.env) {
-  return {
-    ...env,
-    PSModulePath: join(env.SystemRoot || env.windir || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'Modules'),
-  }
+export function zcodeRootKey(root) {
+  const value = resolve(root)
+  return process.platform === 'win32' ? value.toLowerCase() : value
 }
 
-async function powershellJson(script, env, extraEnv = {}) {
-  if (process.platform !== 'win32') return null
-  const command = Buffer.from(
-    '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); '
-      + '$ErrorActionPreference = "Stop"; ' + script,
-    'utf16le',
-  ).toString('base64')
-  try {
-    const { stdout } = await execFileAsync(powershellPath(env), [
-      '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', command,
-    ], {
-      windowsHide: true,
-      shell: false,
-      encoding: 'utf8',
-      timeout: 10_000,
-      maxBuffer: 256_000,
-      env: { ...zcodeWindowsPowerShellEnvironment(env), ...extraEnv },
-    })
-    const output = stdout.trim().replace(/^\uFEFF/, '')
-    return output ? JSON.parse(output) : null
-  } catch {
-    return null
-  }
-}
-
-async function uninstallRecords(env) {
-  const paths = REGISTRY_PATHS.map(path => `'${path}'`).join(',')
-  const script = `$records = @(Get-ItemProperty -Path @(${paths}) -ErrorAction SilentlyContinue |
-    Where-Object { [string]$_.DisplayName -match '^ZCode(?:\\s|$)' } |
-    ForEach-Object { [pscustomobject]@{
-      displayName = [string]$_.DisplayName
-      displayVersion = [string]$_.DisplayVersion
-      installLocation = [string]$_.InstallLocation
-      displayIcon = [string]$_.DisplayIcon
-      uninstallString = [string]$_.UninstallString
-    } }); ConvertTo-Json -InputObject $records -Compress -Depth 3`
-  const value = await powershellJson(script, env)
-  return Array.isArray(value) ? value : value ? [value] : []
-}
-
-function rootFromCommand(value) {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim()
-  const quoted = /^"([^"]+)"/.exec(trimmed)
-  const executable = quoted?.[1] ?? /^(.+?\.(?:exe|ico))(?=,|\s|$)/i.exec(trimmed)?.[1]
-  return executable && win32.isAbsolute(executable) ? win32.dirname(executable) : null
-}
-
-/** Explicit selection is authoritative, even when the selected bundle is missing. */
-export function zcodeDiscoveryCandidates({ installDir = '', env = process.env, records = [] } = {}) {
-  const candidates = []
-  const add = (path, source, registryVersion = null) => {
-    if (typeof path !== 'string' || !path.trim()) return
-    candidates.push({ path: path.trim().replace(/^"|"$/g, ''), source, registryVersion })
-  }
-  if (installDir != null && String(installDir).trim()) {
-    add(installDir, 'operator-config')
-    return candidates
-  }
-  if (env[ZCODE_INSTALL_ENV_VAR] != null && String(env[ZCODE_INSTALL_ENV_VAR]).trim()) {
-    add(env[ZCODE_INSTALL_ENV_VAR], 'operator-env')
-    return candidates
-  }
-  for (const record of records) {
-    const version = String(record.displayVersion || '') || null
-    add(record.installLocation, 'uninstall-registry', version)
-    add(rootFromCommand(record.displayIcon), 'uninstall-registry', version)
-    add(rootFromCommand(record.uninstallString), 'uninstall-registry', version)
-  }
-  for (const parent of [env.LOCALAPPDATA, env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432]) {
-    if (typeof parent !== 'string' || !win32.isAbsolute(parent)) continue
-    add(win32.join(parent, 'Programs', 'ZCode'), 'standard-directory')
-    add(win32.join(parent, 'ZCode'), 'standard-directory')
-  }
-  return candidates
-}
-
-function isWithin(root, child) {
+export function zcodeWithin(root, child) {
   const part = relative(root, child)
   return part !== '' && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
 }
 
-function localWindowsPath(path) {
-  if (typeof path !== 'string' || path.includes('\0')) return false
-  const local = path.startsWith('\\\\?\\') ? path.slice(4) : path
-  return /^[A-Za-z]:[\\/]/.test(local)
+export async function zcodeFileDigest(path) {
+  const hash = createHash('sha256')
+  let size = 0
+  for await (const chunk of createReadStream(path)) { hash.update(chunk); size += chunk.length }
+  return { sha256: hash.digest('hex'), size }
 }
 
-async function sha256Hex(path) {
-  const digest = createHash('sha256')
-  for await (const chunk of createReadStream(path)) digest.update(chunk)
-  return digest.digest('hex').toUpperCase()
-}
-
-export function zcodeTrustPath(env = process.env) {
-  return join(resolveStateHome(env), 'model-router', 'zcode-trust.json')
-}
-
-/**
- * Trust-on-first-use record of zcode.cjs per signed build. Returns
- * { ok, sha256, firstSeen } or { ok: false, reason }.
- */
-export async function checkZCodeCliRecord({ root, buildVersion, signer, sha256, size, trustPath = zcodeTrustPath(), now = Date.now }) {
-  let saved = {}
-  try { saved = JSON.parse(await readFile(trustPath, 'utf8'))?.entries ?? {} } catch { saved = {} }
-  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) saved = {}
-  const key = `${win32.normalize(root).toLowerCase()}|${buildVersion}|${signer}`
-  const known = saved[key]
-  if (known && typeof known.sha256 === 'string') {
-    return known.sha256 === sha256 && known.size === size
-      ? { ok: true, sha256, firstSeen: known.firstSeen ?? null }
-      : { ok: false, reason: `ZCode ${buildVersion} 的 CLI 脚本与首次核验时不同（签名程序未变），已拒绝执行；重新安装 ZCode 后再试。` }
+/** Runtime trees deliberately contain only regular files and directories, never links. */
+export async function zcodeTreeFiles(root) {
+  const files = {}
+  const walk = async (directory, prefix = '') => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const name = prefix ? `${prefix}/${entry.name}` : entry.name
+      if (!prefix && entry.name === ZCODE_MARKER) continue
+      const path = join(directory, entry.name)
+      if (entry.isSymbolicLink()) throw new Error(`ZCode CLI 运行目录含目录联接或符号链接：${name}`)
+      if (entry.isDirectory()) await walk(path, name)
+      else if (entry.isFile()) files[name] = await zcodeFileDigest(path)
+      else throw new Error(`ZCode CLI 运行目录含不支持的文件：${name}`)
+    }
   }
-  // A new build of the same install replaces the older records for that root.
-  const prefix = `${win32.normalize(root).toLowerCase()}|`
-  for (const name of Object.keys(saved)) if (name.startsWith(prefix)) delete saved[name]
-  saved[key] = { sha256, size, firstSeen: now() }
+  await walk(root)
+  return files
+}
+
+export async function recordZCodeInstall({ root, version, archiveSha256, files, trustPath = zcodeTrustPath() }) {
+  let entries = {}
+  try { entries = JSON.parse(await readFile(trustPath, 'utf8')).entries ?? {} } catch { /* empty */ }
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) entries = {}
+  entries[zcodeRootKey(root)] = { version, archiveSha256, files }
+  await mkdir(dirname(trustPath), { recursive: true })
+  const temporary = `${trustPath}.${process.pid}.tmp`
+  await writeFile(temporary, `${JSON.stringify({ version: 1, entries })}\n`, { mode: 0o600 })
+  await rename(temporary, trustPath)
+}
+
+export async function discoverZCodeBundle({ installDir = '', env = process.env, home = homedir(), trustPath = zcodeTrustPath(env), onRejected } = {}) {
+  const input = installDir || join(home, '.zcode', 'runtime')
   try {
-    await mkdir(dirname(trustPath), { recursive: true })
-    const temporary = `${trustPath}.${process.pid}.tmp`
-    await writeFile(temporary, `${JSON.stringify({ version: 1, entries: saved }, null, 2)}\n`, 'utf8')
-    await rename(temporary, trustPath)
-  } catch { /* unrecorded: verified again next time */ }
-  return { ok: true, sha256, firstSeen: saved[key].firstSeen, recorded: true }
-}
-
-async function bundleMetaNamesEntry(root) {
-  try {
-    const meta = JSON.parse(await readFile(join(root, 'resources', 'glm', '.node-bundle-meta.json'), 'utf8'))
-    return meta?.entry === 'zcode.cjs' && (meta.runtime === undefined || meta.runtime === 'electron-node')
-  } catch { return false }
-}
-
-async function signedExecutable(executable, env) {
-  const script = `$s = Get-AuthenticodeSignature -LiteralPath $env:MODEL_ROUTER_ZCODE_VERIFY_PATH;
-    $v = (Get-Item -LiteralPath $env:MODEL_ROUTER_ZCODE_VERIFY_PATH).VersionInfo;
-    [pscustomobject]@{
-      signatureStatus = [string]$s.Status
-      signerSubject = [string]$s.SignerCertificate.Subject
-      signerThumbprint = [string]$s.SignerCertificate.Thumbprint
-      productVersion = [string]$v.ProductVersion
-      fileVersion = [string]$v.FileVersion
-    } | ConvertTo-Json -Compress`
-  return zcodeSignatureVerdict(await powershellJson(script, env, { MODEL_ROUTER_ZCODE_VERIFY_PATH: executable }))
-}
-
-/**
- * Signer-only acceptance of ZCode.exe: valid Authenticode signature by Zhipu.
- * Any x.y.z build is accepted (no version gate); the version is read from the
- * signed file's version resource so it cannot be spoofed without breaking it.
- */
-export function zcodeSignatureVerdict(value) {
-  if (!value || value.signatureStatus !== 'Valid'
-    || typeof value.signerSubject !== 'string'
-    || !value.signerSubject.includes(ZCODE_SIGNER)) return null
-  const buildVersion = String(value.productVersion || value.fileVersion || '')
-  const version = /^(\d+\.\d+\.\d+)(?:\.\d+)?$/.exec(buildVersion)?.[1]
-  if (!version) return null
-  return { version, buildVersion, fileVersion: String(value.fileVersion || ''), publisher: value.signerSubject,
-    thumbprint: String(value.signerThumbprint || '') }
-}
-
-async function checkedBundle(candidate, env, trustPath) {
-  const input = candidate.path
-  if (!localWindowsPath(input)) return null
-  try {
-    const initial = /[\\/]zcode\.exe$/i.test(input) ? dirname(input) : input
-    const root = await realpath(initial)
-    if (!localWindowsPath(root) || !(await stat(root)).isDirectory()) return null
-    const executable = await realpath(join(root, 'ZCode.exe'))
-    const cliEntry = await realpath(join(root, 'resources', 'glm', 'zcode.cjs'))
-    if (!isWithin(root, executable) || !isWithin(root, cliEntry)
-      || !(await stat(executable)).isFile() || !(await stat(cliEntry)).isFile()) return null
-    const signature = await signedExecutable(executable, env)
-    if (!signature || !(await bundleMetaNamesEntry(root))) return null
-    const size = (await stat(cliEntry)).size
-    if (size <= 0 || size > ZCODE_CLI_MAX_SIZE) return null
-    const cliSha256 = await sha256Hex(cliEntry)
-    const record = await checkZCodeCliRecord({ root, buildVersion: signature.buildVersion,
-      signer: signature.thumbprint || signature.publisher, sha256: cliSha256, size, trustPath })
-    if (!record.ok) return { rejected: record.reason, root, version: signature.version }
-    return Object.freeze({
-      id: 'zcode',
-      version: signature.version,
-      buildVersion: signature.buildVersion,
-      fileVersion: signature.fileVersion,
-      registryVersion: candidate.registryVersion,
-      root,
-      executable,
-      cliEntry,
-      cliSha256,
-      cliFirstVerifiedAt: record.firstSeen,
-      publisher: signature.publisher,
-      signatureStatus: 'Valid',
-      source: candidate.source,
-    })
-  } catch {
+    if (!isAbsolute(input) || resolve(input) === dirname(resolve(input))) return null
+    const info = await lstat(input)
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('ZCode CLI 安装目录不能是目录联接或符号链接。')
+    const root = await realpath(input)
+    const marker = JSON.parse(await readFile(join(root, ZCODE_MARKER), 'utf8'))
+    const saved = JSON.parse(await readFile(trustPath, 'utf8')).entries?.[zcodeRootKey(root)]
+    if (marker.repository !== ZCODE_REPOSITORY || !/^\d+\.\d+\.\d+$/.test(marker.version ?? '')
+      || !/^[a-f0-9]{64}$/.test(marker.archiveSha256 ?? '') || marker.version !== saved?.version
+      || marker.archiveSha256 !== saved?.archiveSha256 || !saved.files || typeof saved.files !== 'object') {
+      throw new Error('ZCode CLI 未找到经过 GitHub Release SHA256 校验的安装记录，请从官方工具重新安装。')
+    }
+    const actual = await zcodeTreeFiles(root)
+    const names = Object.keys(actual)
+    if (names.length !== Object.keys(saved.files).length || names.some(name => actual[name].sha256 !== saved.files[name]?.sha256 || actual[name].size !== saved.files[name]?.size)) {
+      throw new Error('ZCode CLI 文件与已校验发行包不同，请修复安装。')
+    }
+    const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+    if (pkg.name !== 'zcode-runtime' || pkg.version !== marker.version || pkg.bin?.zcode !== './bin/zcode.mjs') throw new Error('ZCode CLI 发行包元数据不匹配。')
+    for (const name of ['bin/zcode.mjs', 'agent/zcode.cjs']) if (!actual[name]) throw new Error(`ZCode CLI 发行包缺少 ${name}。`)
+    return Object.freeze({ id: 'zcode', root, version: marker.version, buildVersion: marker.version,
+      cliEntry: join(root, 'bin', 'zcode.mjs'), agentEntry: join(root, 'agent', 'zcode.cjs'),
+      cliSha256: actual['bin/zcode.mjs'].sha256, archiveSha256: marker.archiveSha256,
+      source: 'github-release-sha256', repository: ZCODE_REPOSITORY })
+  } catch (error) {
+    if (error?.code !== 'ENOENT') onRejected?.({ root: input, rejected: String(error?.message ?? error) })
     return null
   }
-}
-
-/** A configured desktop location never falls back to a different installation. */
-export async function discoverZCodeBundle({ installDir = '', env = process.env, trustPath = zcodeTrustPath(env), onRejected } = {}) {
-  if (process.platform !== 'win32') return null
-  const explicit = Boolean(String(installDir || env[ZCODE_INSTALL_ENV_VAR] || '').trim())
-  const records = explicit ? [] : await uninstallRecords(env)
-  const seen = new Set()
-  for (const candidate of zcodeDiscoveryCandidates({ installDir, env, records })) {
-    const key = win32.normalize(candidate.path).toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    const bundle = await checkedBundle(candidate, env, trustPath)
-    if (bundle?.rejected) { onRejected?.(bundle); continue }
-    if (bundle) return bundle
-    if (explicit) onRejected?.({
-      root: candidate.path,
-      rejected: `指定的 ZCode 安装位置 ${candidate.path} 不存在，或未通过官方签名、桌面内置 CLI 和目录边界核验；请检查独立安装位置。`,
-    })
-  }
-  return null
-}
-
-/**
- * ZCode entries in the uninstall registry that did not pass verification (for
- * example an unsigned or modified copy). Only used to explain why the tool
- * shows as unavailable; nothing found here is ever executed.
- */
-export async function unverifiedZCodeInstalls({ env = process.env } = {}) {
-  if (process.platform !== 'win32') return []
-  const records = await uninstallRecords(env)
-  return records.map(record => ({
-    version: String(record.displayVersion || '') || null,
-    root: [record.installLocation, rootFromCommand(record.displayIcon), rootFromCommand(record.uninstallString)]
-      .find(value => typeof value === 'string' && value.trim()) ?? null,
-  }))
 }

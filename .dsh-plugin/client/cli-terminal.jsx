@@ -1,6 +1,6 @@
 /**
  * "官方工具终端" card: interactive sessions of the user's shell or a fixed
- * official registry CLI or ZCode's bundled TUI, rendered
+ * registry CLI, including standalone ZCode CLI, rendered
  * with xterm.js. The Host owns the process (PTY, or pipes as a fallback);
  * this card only shows output and forwards keystrokes.
  */
@@ -187,7 +187,7 @@ export function CliTerminalCard({ api, health, settingsSignature = '' }) {
       <style>{xtermCss}</style>
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">官方工具终端</h2>
-        <p className="mr-card-copy">在工作台里交互式运行 PowerShell、已安装的官方 CLI 或 ZCode 桌面版内置 TUI（多轮对话、实时输出，可用于 <code>codex login</code> 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。</p>
+        <p className="mr-card-copy">在工作台里交互式运行 PowerShell、已安装的 CLI（包括独立 ZCode CLI TUI）（多轮对话、实时输出，可用于 <code>codex login</code> 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。</p>
       </div><button className="mr-button mr-button-secondary" type="button" onClick={() => { void loadInfo() }}>刷新</button></div>
       <div className="mr-card-body">
         {info.status === 'error' && <div className="mr-error" role="alert">{info.error}</div>}

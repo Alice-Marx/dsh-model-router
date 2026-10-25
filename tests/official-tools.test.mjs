@@ -150,10 +150,10 @@ test('registry stays fail-closed and internally consistent', () => {
     if (tool.unsupported) {
       assert.ok(tool.unsupportedReason.length > 10, `${tool.id} needs an actionable reason`)
       assert.equal(installCommandLine(tool), null, `${tool.id} must not expose an install command`)
-    } else if (tool.manager === 'signed-windows-installer') {
+    } else if (tool.manager === 'github-release') {
       assert.equal(tool.version, undefined, `${tool.id} must not pin a version`)
       assert.deepEqual(tool.installArgs, [], `${tool.id} must not expose npm arguments`)
-      assert.match(installCommandLine(tool), /官方签名安装器/)
+      assert.match(installCommandLine(tool), /GitHub Release/)
     } else if (tool.manager === 'script-installer') {
       // No npm package exists for this vendor; its installer script is the only
       // official way in, so the tool declares script methods and nothing else.
@@ -177,6 +177,9 @@ test('registry stays fail-closed and internally consistent', () => {
           assert.ok(method.installArgs.length || method.installDirEnv, `${tool.id}/${method.id} needs its install-dir binding`)
           if (method.installDirEnv) assert.ok(method.env.includes(method.installDirEnv), `${tool.id}/${method.id} declares its directory environment`)
         }
+      } else if (method.kind === 'archive') {
+        assert.equal(method.repository, 'Alice-Marx/zcode-cli')
+        assert.equal(method.supportsRegistry, false)
       } else {
         assert.ok(method.uninstallArgs.length, `${tool.id}/${method.id} needs an uninstall command`)
       }
@@ -289,6 +292,8 @@ test('every tool declares installation and a safe removal strategy', () => {
     if (removal.kind === 'script') {
       assert.ok(removal.binaries.length, `${tool.id} names the files it may delete`)
       assert.ok(removal.dir, `${tool.id} knows where it installed`)
+    } else if (removal.kind === 'archive') {
+      assert.equal(removal.installDir, plan.installDir)
     } else {
       assert.match(removal.args.join(' '), /^uninstall -g /, `${tool.id} uninstalls through its package manager`)
     }
@@ -318,7 +323,7 @@ test('registry follows each vendor\'s latest release instead of pinning versions
   }
   assert.equal(getOfficialTool('minimax-code').package, '@minimax-ai/code')
   assert.equal(getOfficialTool('gemini').package, '@google/gemini-cli')
-  assert.match(installCommandLine(getOfficialTool('zcode')), /官方签名安装器/)
+  assert.match(installCommandLine(getOfficialTool('zcode')), /GitHub Release/)
 })
 
 test('provider keywords map conservatively to registry tools', () => {

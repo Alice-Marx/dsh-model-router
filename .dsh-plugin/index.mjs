@@ -110,7 +110,6 @@ export const Config = z.object({
   toolInstallMethodsJson: z.string().max(8_000).default('{}').volatile(),
   toolScriptUrlsJson: z.string().max(8_000).default('{}').volatile(),
   toolAllowScriptInstall: z.boolean().default(true).volatile(),
-  zcodeInstallDir: z.string().max(4_096).default('').volatile(),
 })
 
 const JSON_OUTPUT = {
@@ -2213,7 +2212,7 @@ export function apply(ctx, config = {}) {
       installPreferenceError = null
     } catch (error) { installPreferenceError = errorText(error) }
   }
-  const installFields = new Set(['toolInstallDir', 'toolNpmRegistry', 'toolInstallMethodsJson', 'toolScriptUrlsJson', 'toolAllowScriptInstall', 'zcodeInstallDir'])
+  const installFields = new Set(['toolInstallDir', 'toolNpmRegistry', 'toolInstallMethodsJson', 'toolScriptUrlsJson', 'toolAllowScriptInstall'])
   syncInstallPreferences()
   // Loader scopes this event to the fiber whose refs were committed.
   ctx.on('loader/volatile-update', paths => {
@@ -2237,7 +2236,6 @@ export function apply(ctx, config = {}) {
       ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences }),
       installSettingsError: () => installPreferenceError,
       installRequestedDirectory: () => valueOf(config, 'toolInstallDir', ''),
-      zcodeRequestedDirectory: () => valueOf(config, 'zcodeInstallDir', ''),
     })
   }
   ctx.on('tools/pre-execute', async (exec, next) => {
@@ -2252,30 +2250,23 @@ export function apply(ctx, config = {}) {
       const label = requested?.label ?? '官方 CLI'
       const method = installMethodFor(requested, text(exec.arguments?.method))
       const how = method ? `（${method.label}）` : ''
-      const desktopInstaller = requested?.manager === 'signed-windows-installer'
       const uninstalling = exec.name === 'model_router_tool_uninstall'
       const repairing = exec.name === 'model_router_tool_repair'
       const verb = uninstalling ? 'Uninstall' : repairing ? 'Reinstall to repair' : 'Install'
       return {
         kind: 'ask',
-        reason: desktopInstaller
-          ? `Download and open the verified official ${label} desktop installer`
-          : `${verb} ${label}${how} on this machine`,
+        reason: `${verb} ${label}${how} on this machine`,
         displayReason: {
-          en: desktopInstaller
-            ? `Download and open the verified ${label} installer? You can select the installation directory in its window.`
-            : uninstalling
+          en: uninstalling
               ? `Uninstall ${label}${how}? Its settings, login and history are kept; only the program is removed.`
               : repairing
                 ? `Reinstall ${label}${how} to repair a broken install?`
-                : `Install ${label}${how} using the plugin's fixed official source?`,
-          zh: desktopInstaller
-            ? `下载并打开已验签的 ${label} 安装器？安装窗口中可选择非 C 盘目录。`
-            : uninstalling
+                : `Install ${label}${how} using the plugin's fixed source?`,
+          zh: uninstalling
               ? `卸载 ${label}${how}？配置、登录信息和历史记录都会保留，只删除程序本身。`
               : repairing
                 ? `重新安装 ${label}${how} 以修复损坏的安装？`
-                : `使用插件固定的官方来源，在本机安装 ${label}${how}？`,
+                : `使用插件固定的来源，在本机安装 ${label}${how}？`,
         },
       }
     }
@@ -2371,7 +2362,7 @@ export function apply(ctx, config = {}) {
           kind: 'success',
           text: lines.length
             ? `${tool.label} 可用的安装方式：\n${lines.join('\n')}\n在“模型路由工作台 → 官方工具”里切换，或在插件设置里固定默认方式。`
-            : `${tool.label} 没有可切换的安装方式（${tool.manager === 'signed-windows-installer' ? '官方签名桌面安装器' : '不支持'}）。`,
+            : `${tool.label} 没有可切换的安装方式（不支持）。`,
         }
       }
       if (!matched) {
@@ -2414,9 +2405,6 @@ export function apply(ctx, config = {}) {
           if (settled.error) return { kind: 'success', text: `${tool.label} ${done}${suffix}。${settled.error}` }
           return { kind: 'success', text: `${tool.label} ${done}${suffix}。` }
         }
-        if (settled.status === 'installer-opened') {
-          return { kind: 'success', text: `${tool.label} 官方安装器已验证并打开。请在安装窗口选择非 C 盘目录并完成安装，然后运行 /tools 重新检测；当前尚未确认安装完成。` }
-        }
         return { kind: 'error', text: `${tool.label} ${action === 'uninstall' ? '卸载' : action === 'repair' ? '修复' : '安装'}失败：${settled.error ?? '未知原因'}\n${settled.outputTail.slice(-6).join('\n')}` }
       } catch (error) {
         return { kind: 'error', text: `无法开始${action === 'uninstall' ? '卸载' : '安装'}：${errorText(error)}` }
@@ -2443,7 +2431,7 @@ async function waitForInstall(toolId, signal) {
 function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   ctx.tools.register(defineTool({
     name: 'model_router_tools',
-    description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini CLI, OpenCode, Step Code, ZCode) and report which are installed with their versions, plus each tool\'s available install methods and the effective install directory and npm source. Never reads credentials.',
+    description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini CLI, OpenCode, Step Code, ZCode CLI) and report which are installed with their versions, plus each tool\'s available install methods and the effective install directory and npm source. Never reads credentials.',
     parameters: {},
     output: JSON_OUTPUT,
     async execute(_args, exec) {
@@ -2464,7 +2452,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_tool_install',
-    description: 'Install one official model tool by registry id from its fixed official source at the vendor latest release, using one of that tool\'s declared install methods (npm, pnpm, or the vendor installer script). ZCode opens the latest publisher-signed interactive desktop installer with a directory picker. Only registry ids and declared method ids are accepted; arbitrary packages, URLs or executables are refused. The install directory and download sources come from the user\'s own plugin settings.',
+    description: 'Install one official model tool by registry id from its fixed source at the latest release, using one of that tool\'s declared install methods (npm, pnpm, vendor installer script or verified GitHub release archive). ZCode CLI uses the community-maintained Alice-Marx/zcode-cli distribution and shares the install-directory setting. Only registry ids and declared method ids are accepted; arbitrary packages, URLs or executables are refused. The install directory and download sources come from the user\'s own plugin settings.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Registry tool id, e.g. kimi-code.' },
       method: { type: 'string', description: 'Install method id for this tool, e.g. npm, pnpm, script-bash or script-powershell. Omit to use the user\'s configured default.' },
@@ -2481,9 +2469,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       return jsonValue({
         ...settled,
         postInstallProbe: probe,
-        notice: settled.status === 'installer-opened'
-          ? '已打开 ZCode 官方安装窗口，请选择安装目录并完成安装，之后重新检测；此状态不代表安装完成。'
-          : '安装命令完全来自服务端注册表与用户设置；实际版本以探测横幅为准。',
+        notice: '安装命令完全来自服务端注册表与用户设置；实际版本以探测横幅为准。',
       })
     },
   }))

@@ -270,8 +270,9 @@ test('removal mirrors how the tool was installed', () => {
   assert.equal(stepcode.dir, 'D:/AI/tools/stepcode')
   assert.deepEqual(stepcode.binaries, ['step', 'step.exe'])
 
-  // The desktop installer is not this plugin's to remove.
-  assert.throws(() => resolveUninstallPlan(getOfficialTool('zcode'), undefined, clean, { platform: 'win32' }), /系统“应用”/)
+  const zcode = resolveUninstallPlan(getOfficialTool('zcode'), undefined, preferences, { platform: 'win32', home: 'C:/Users/test' })
+  assert.equal(zcode.kind, 'archive')
+  assert.equal(zcode.installDir, 'D:/AI/tools/zcode-cli')
 })
 
 test('deleting a vendor binary is bounded to the tool\'s own install directory', () => {

@@ -452,15 +452,22 @@ export const OFFICIAL_TOOLS = Object.freeze([
   }),
   Object.freeze({
     id: 'zcode',
-    label: 'ZCode',
-    vendor: 'Z.ai',
-    purpose: '智谱官方 ZCode 桌面版，内含可独立运行的 GLM CLI/TUI。可单独配置桌面目录，内置 CLI 随桌面版更新。',
-    manager: 'signed-windows-installer',
+    label: 'ZCode CLI',
+    vendor: 'Z.ai · Alice-Marx 社区抽取版',
+    purpose: 'ZCode 独立命令行发行版，包含 TUI、Web 和 Agent，无需 Electron；由 Alice-Marx/zcode-cli 社区维护。',
+    manager: 'github-release',
     installArgs: [],
     uninstallArgs: [],
-    probeExecutables: [],
-    probeNote: '检测经过有效签名的 ZCode.exe 和同目录 GLM CLI/TUI 资源；桌面安装器需人工选择安装位置。',
+    probeExecutables: ['zcode'],
+    probeNote: '使用 Alice-Marx/zcode-cli 的 GitHub Release 和 SHA256；需要 Node.js 24.14.0 或更新的 Node 24。',
     providerHints: ['zai', 'z.ai', 'zcode', 'glm', 'zhipu', 'bigmodel'],
+    installMethods: Object.freeze([Object.freeze({
+      id: 'github-release', label: 'GitHub Release · SHA256', kind: 'archive',
+      manager: 'github-release', repository: 'Alice-Marx/zcode-cli',
+      platforms: Object.freeze(['win32', 'linux', 'darwin']),
+      supportsInstallDir: true, supportsRegistry: false,
+      installArgs: Object.freeze([]), uninstallArgs: Object.freeze([]),
+    })]),
   }),
 ])
 
@@ -480,7 +487,7 @@ export function toolForProvider(provider) {
   return null
 }
 
-/** Every install method a tool declares, or an empty list for the desktop installer. */
+/** Every installation method declared by a tool. */
 export function installMethodsFor(tool) {
   return Array.isArray(tool?.installMethods) ? tool.installMethods : []
 }
@@ -517,8 +524,6 @@ export function methodHonoursInstallDir(method) {
 /** Human-readable install command line for one registry entry (default method). */
 export function installCommandLine(tool) {
   if (!tool || tool.unsupported) return null
-  // The signed desktop installer is not a command; it is its own thing.
-  if (tool.manager === 'signed-windows-installer') return '打开官方签名安装器（选择安装目录）'
   return installCommandLineFor(tool, defaultInstallMethod(tool))
 }
 
@@ -526,6 +531,7 @@ export function installCommandLine(tool) {
 export function installCommandLineFor(tool, method) {
   if (!tool || tool.unsupported) return null
   if (!method) return null
+  if (method.kind === 'archive') return '下载 Alice-Marx/zcode-cli 最新 GitHub Release（校验 SHA256 后安装）'
   if (method.kind === 'script') {
     if (method.extraArgs?.length) {
       const args = method.extraArgs.join(' ')
@@ -542,8 +548,8 @@ export function installCommandLineFor(tool, method) {
 /** Human-readable uninstall command line, or null when removal is not a command. */
 export function uninstallCommandLineFor(tool, method) {
   if (!tool || tool.unsupported || !method) return null
-  if (tool.manager === 'signed-windows-installer') return null
   if (method.uninstallUnsupportedReason) return method.uninstallUnsupportedReason
+  if (method.kind === 'archive') return '删除插件安装的 ZCode CLI 运行目录（保留配置与会话）'
   if (method.kind === 'script') return '删除官方安装的可执行文件（保留配置与登录信息）'
   return `${method.manager} ${method.uninstallArgs.join(' ')}`
 }

@@ -43,7 +43,9 @@ const blocked = async () => ({ ok: false, error: { message: '本地 UI 演示不
 function demoInstallSummary(settings) {
   const options = { platform: 'win32', home: 'C:/Users/demo', env: { LOCALAPPDATA: 'C:/Users/demo/AppData/Local' } }
   const preferences = parseInstallPreferences(settings, { tools: OFFICIAL_TOOLS, ...options })
-  const command = plan => plan.kind === 'script'
+  const command = plan => plan.kind === 'archive'
+    ? `下载并校验 SHA-256：https://github.com/Alice-Marx/zcode-cli/releases/latest → ${plan.installDir}`
+    : plan.kind === 'script'
     ? `下载并核验 ${plan.scriptUrl} → ${Object.entries(plan.env ?? {}).map(([name, value]) => `${name}=${JSON.stringify(value)}`).join(' ')} ${plan.shell}${plan.installDir && plan.installArg?.length ? ` ${plan.installArg.join(' ')} "${plan.installDir}"` : ''}${plan.extraArgs?.length ? ` ${plan.extraArgs.join(' ')}` : ''}`
     : `${plan.manager} ${plan.args.map(arg => /\s/.test(arg) ? JSON.stringify(arg) : arg).join(' ')}`
   return { ...preferences, tools: OFFICIAL_TOOLS.map(tool => {
@@ -53,22 +55,16 @@ function demoInstallSummary(settings) {
       try {
         const plan = resolveInstallPlan(tool, method.id, preferences, options)
         Object.assign(item, { command: command(plan), notices: plan.notices,
-          installDir: resolveInstallLocation(tool, method, preferences, options)?.dir ?? '' })
+          installDir: plan.kind === 'archive' ? plan.installDir : resolveInstallLocation(tool, method, preferences, options)?.dir ?? '' })
       } catch (error) { item.blocked = error.message }
       return item
     })
     const entry = { id: tool.id, methods, savedMethodId: preferences.methods[tool.id] ?? null,
       methodId: null, command: null, notices: [] }
-    if (tool.manager === 'signed-windows-installer') {
-      return { ...entry, command: installCommandLine(tool), methodId: 'signed-windows-installer',
-        installDir: preferences.zcodeInstallDir,
-        notices: ['桌面目录独立配置；内置 CLI 随桌面版更新，TUI 中自行配置登录、模型与插件。'],
-        uninstallError: '请在系统“应用”中卸载。' }
-    }
     try {
       const plan = resolveInstallPlan(tool, undefined, preferences, options)
       Object.assign(entry, { methodId: plan.methodId, command: command(plan), updateCommand: command(plan),
-        installDir: resolveInstallLocation(tool, plan.method, preferences, options)?.dir ?? '',
+        installDir: plan.kind === 'archive' ? plan.installDir : resolveInstallLocation(tool, plan.method, preferences, options)?.dir ?? '',
         notices: plan.notices })
       entry.updateInstallDir = entry.installDir
       entry.updateMethodId = entry.methodId
@@ -93,7 +89,7 @@ function createSettingsScope() {
     // The demo mirrors the real install settings so the panel renders exactly
     // as it does against a real Host, which always sends them in config.
     toolInstallDir: '', toolNpmRegistry: 'https://registry.npmjs.org/',
-    toolInstallMethodsJson: '{}', toolScriptUrlsJson: '{}', toolAllowScriptInstall: true, zcodeInstallDir: '',
+    toolInstallMethodsJson: '{}', toolScriptUrlsJson: '{}', toolAllowScriptInstall: true,
   } }
   const listeners = new Set()
   return {
@@ -356,7 +352,7 @@ function createDemoSession(scenario) {
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['billing-split', 'API 费用与订阅用量（模拟账本）'], ['budget-reservations', '预算预占与中断核对（模拟账本）'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode 配置']]
+const scenarios = [['populated', '完整示例'], ['billing-split', 'API 费用与订阅用量（模拟账本）'], ['budget-reservations', '预算预占与中断核对（模拟账本）'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode CLI']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')

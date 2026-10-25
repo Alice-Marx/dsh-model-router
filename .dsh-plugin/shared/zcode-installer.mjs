@@ -1,248 +1,263 @@
-/**
- * Fetch and open the latest official ZCode Windows installer.
- *
- * The version and URL come from ZCode's official download page (see
- * latest-versions.mjs); the URL must be on cdn-zcode.z.ai over HTTPS. The
- * downloaded installer must carry a valid Authenticode signature from the
- * expected publisher before it is opened; there is no per-version hash.
- *
- * This module does not perform an unattended install. The visible vendor
- * installer owns the destination picker and any UAC prompt. A successful
- * return means only that the verified installer process was opened.
- */
-import { spawn, execFile } from 'node:child_process'
+/** Install the complete standalone runtime from a fixed GitHub Release, never Electron. */
 import { randomUUID } from 'node:crypto'
-import { createWriteStream } from 'node:fs'
-import { mkdir, realpath, rename, stat, unlink } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { createReadStream, createWriteStream } from 'node:fs'
+import { chmod, lstat, mkdir, open, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { promisify } from 'node:util'
-import { ZCODE_SIGNER, zcodeWindowsPowerShellEnvironment } from './zcode-bundle.mjs'
-import { getOfficialTool } from './official-tool-registry.mjs'
-import { latestVersions } from './latest-versions.mjs'
+import { createGunzip } from 'node:zlib'
+import { ZCODE_MARKER, ZCODE_REPOSITORY, recordZCodeInstall, zcodeFileDigest, zcodeRootKey, zcodeTreeFiles, zcodeTrustPath, zcodeWithin } from './zcode-bundle.mjs'
 
-const execFileAsync = promisify(execFile)
-const INSTALLER_URL = /^https:\/\/cdn-zcode\.z\.ai\/zcode\/electron\/releases\/(\d+\.\d+\.\d+)\/windows-x64\/ZCode-\1-win-x64\.exe$/
+const MAX_DOWNLOAD_BYTES = 1_000_000_000
+const MAX_EXTRACT_BYTES = 3_000_000_000
+const MAX_FILES = 60_000
+const ASSET_HOSTS = new Set(['github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'])
 
-/** Validate a release { version, url } for the Windows x64 installer. */
+/** Only matching tarballs and checksum files from this repository can be downloaded. */
 export function zcodeInstallerRelease(latest) {
-  const match = INSTALLER_URL.exec(String(latest?.url ?? ''))
-  if (!match || match[1] !== latest?.version) return null
-  return { version: match[1], url: latest.url, fileName: `ZCode-${match[1]}-win-x64.exe` }
-}
-const DOWNLOAD_ENV_VAR = 'MODEL_ROUTER_ZCODE_DOWNLOAD_DIR'
-const MAX_DOWNLOAD_BYTES = 2_000_000_000
-const MAX_REDIRECTS = 4
-
-function drive(path) {
-  if (typeof path !== 'string' || path.includes('\0')) return null
-  const local = path.startsWith('\\\\?\\') ? path.slice(4) : path
-  const match = /^([A-Za-z]):[\\/]/.exec(local)
-  return match ? match[1].toUpperCase() : null
+  const version = String(latest?.version ?? '')
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return null
+  const pattern = new RegExp(`^https://github\\.com/Alice-Marx/zcode-cli/releases/download/(v?${version.replaceAll('.', '\\.')})/zcode-${version.replaceAll('.', '\\.') }\\.tar\\.gz$`)
+  const match = pattern.exec(String(latest?.url ?? ''))
+  if (!match) return null
+  const sha256Url = `https://github.com/Alice-Marx/zcode-cli/releases/download/${match[1]}/sha256.txt`
+  if (latest.sha256Url && latest.sha256Url !== sha256Url) return null
+  return { version, url: latest.url, sha256Url, fileName: `zcode-${version}.tar.gz` }
 }
 
-function nonCAbsolute(path) {
-  return typeof path === 'string' && isAbsolute(path)
-    && drive(path) !== null && drive(path) !== 'C'
-}
-
-function inside(root, child) {
-  const part = relative(root, child)
-  return part !== '' && part !== '..' && !part.startsWith(`..${sep}`) && !isAbsolute(part)
-}
-
-/**
- * Select a cache on a non-C local drive. The explicit download directory wins;
- * otherwise the caller's npm prefix drive is preferred, then a non-C TEMP.
- */
-export async function resolveZCodeDownloadDirectory({
-  downloadDir, npmPrefix, env = process.env, version = 'latest',
-} = {}) {
-  if (process.platform !== 'win32') throw new Error('ZCode 安装器仅支持 Windows。')
-  const explicit = downloadDir ?? env[DOWNLOAD_ENV_VAR]
-  if (explicit != null && !nonCAbsolute(explicit)) {
-    throw new TypeError(`${DOWNLOAD_ENV_VAR} 必须是非 C 盘的本地绝对目录。`)
-  }
-  const candidates = explicit != null
-    ? [{ path: explicit, source: 'operator-selected' }]
-    : [
-      { path: npmPrefix, source: 'npm-prefix' },
-      { path: env.npm_config_prefix ?? env.NPM_CONFIG_PREFIX, source: 'npm-prefix-env' },
-      { path: env.TEMP, source: 'system-temp' },
-      { path: env.TMP, source: 'system-temp' },
-      { path: tmpdir(), source: 'system-temp' },
-    ].filter(candidate => nonCAbsolute(candidate.path))
-  for (const candidate of candidates) {
-    try {
-      let ancestor = candidate.path
-      for (;;) {
-        try { await stat(ancestor); break } catch (error) {
-          if (error?.code !== 'ENOENT') throw error
-          const next = dirname(ancestor)
-          if (next === ancestor) throw error
-          ancestor = next
-        }
-      }
-      if (!nonCAbsolute(await realpath(ancestor))) continue
-      await mkdir(candidate.path, { recursive: true })
-      const parent = await realpath(candidate.path)
-      if (!nonCAbsolute(parent)) continue
-      const cache = join(parent, 'model-router-zcode', version)
-      await mkdir(cache, { recursive: true })
-      const canonical = await realpath(cache)
-      if (!nonCAbsolute(canonical) || !inside(parent, canonical)) continue
-      return { directory: canonical, source: candidate.source }
-    } catch {
-      // An unavailable prefix can fall back to another non-C directory.
-    }
-  }
-  throw new Error(`没有可写的非 C 盘下载目录；请设置 ${DOWNLOAD_ENV_VAR}。`)
-}
-
-async function verifyInstallerSignature(path, env) {
-  const systemRoot = env.SystemRoot || env.windir || 'C:\\Windows'
-  const powershell = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-  const script = '[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); '
-    + '$s=Get-AuthenticodeSignature -LiteralPath $env:MODEL_ROUTER_ZCODE_INSTALLER_PATH; '
-    + '@{status=[string]$s.Status;subject=[string]$s.SignerCertificate.Subject} '
-    + '| ConvertTo-Json -Compress'
-  const encoded = Buffer.from(script, 'utf16le').toString('base64')
-  try {
-    const { stdout } = await execFileAsync(powershell, [
-      '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded,
-    ], {
-      shell: false,
-      windowsHide: true,
-      encoding: 'utf8',
-      timeout: 120_000,
-      maxBuffer: 16_384,
-      env: { ...zcodeWindowsPowerShellEnvironment(env), MODEL_ROUTER_ZCODE_INSTALLER_PATH: path },
-    })
-    const signature = JSON.parse(stdout.trim().replace(/^\uFEFF/, ''))
-    return signature.status === 'Valid'
-      && typeof signature.subject === 'string'
-      && signature.subject.includes(ZCODE_SIGNER)
-  } catch { return false }
-}
-
-async function boundedResponse(url, signal) {
+async function responseFor(url, { fetchImpl, signal }) {
   let current = new URL(url)
-  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
-    if (current.protocol !== 'https:') throw new Error('ZCode 下载地址必须使用 HTTPS。')
-    const response = await fetch(current, { redirect: 'manual', signal })
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    if (current.protocol !== 'https:' || !ASSET_HOSTS.has(current.hostname) || current.username || current.password) throw new Error('ZCode CLI 下载重定向离开了 GitHub HTTPS 资源域名。')
+    const response = await fetchImpl(current.toString(), { redirect: 'manual', signal })
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      const location = response.headers.get('location')
-      await response.body?.cancel()
-      if (!location || redirects === MAX_REDIRECTS) throw new Error('ZCode 安装器重定向过多。')
+      const location = response.headers?.get?.('location')
+      await response.body?.cancel?.()
+      if (!location || redirects === 5) throw new Error('ZCode CLI 下载重定向过多。')
       current = new URL(location, current)
       continue
     }
-    if (!response.ok || !response.body) {
-      throw new Error(`ZCode 官方安装器下载失败：HTTP ${response.status}。`)
-    }
-    const length = Number(response.headers.get('content-length'))
-    if (Number.isFinite(length) && length > MAX_DOWNLOAD_BYTES) {
-      await response.body.cancel()
-      throw new Error('ZCode 安装器超出下载大小限制。')
-    }
+    if (!response.ok) throw new Error(`ZCode CLI 下载失败：HTTP ${response.status}。`)
     return response
   }
-  throw new Error('ZCode 安装器重定向过多。')
 }
 
-async function fetchVerifiedInstaller(path, url, { env, signal, onProgress } = {}) {
-  try {
-    const info = await stat(path)
-    const canonical = await realpath(path)
-    if (info.isFile() && info.size <= MAX_DOWNLOAD_BYTES
-      && nonCAbsolute(canonical) && inside(dirname(path), canonical)
-      && await verifyInstallerSignature(path, env)) return { path, reused: true }
-    throw new Error('已有 ZCode 安装器缓存未通过发布者签名校验；请处理该缓存文件后重试。')
-  } catch (error) {
-    if (error?.code !== 'ENOENT') throw error
+export function parseZCodeChecksum(text, fileName) {
+  const matches = String(text ?? '').trim().split(/\r?\n/).map(line => /^([a-fA-F0-9]{64})\s+\*?([^\s]+)$/.exec(line)).filter(match => match?.[2] === fileName)
+  if (matches.length !== 1) throw new Error('ZCode CLI SHA256 文件缺少唯一的运行包摘要。')
+  return matches[0][1].toLowerCase()
+}
+
+function memberPath(name) {
+  if (/[\\:\x00-\x1f]/.test(name) || !name.startsWith('zcode/')) throw new Error('ZCode CLI 运行包包含不安全路径。')
+  const relative = name.slice(6).replace(/\/$/, '')
+  if (relative.split('/').some(part => part === '..' || part === '.' || part === '')) {
+    if (!relative) return ''
+    throw new Error('ZCode CLI 运行包包含不安全路径。')
   }
-  // Authenticode's PE SIP is selected by the .exe extension on Windows.
-  const temporary = join(dirname(path), `.download-${randomUUID()}.exe`)
-  let created = false
+  // Avoid Windows device and alternate-stream aliases even while testing on Unix.
+  if (relative.split('/').some(part => /[. ]$/.test(part) || /^(?:con|prn|aux|nul|com\d|lpt\d)(?:\.|$)/i.test(part))) throw new Error('ZCode CLI 运行包包含不安全文件名。')
+  return relative
+}
+
+function headerField(header, start, length) {
+  const bytes = header.subarray(start, start + length)
+  const end = bytes.indexOf(0)
+  return bytes.subarray(0, end < 0 ? length : end).toString('utf8')
+}
+
+function paxName(body) {
+  let offset = 0, path = null
+  while (offset < body.length) {
+    const space = body.indexOf(32, offset)
+    const size = Number(body.subarray(offset, space).toString())
+    if (space < offset || !Number.isSafeInteger(size) || size <= space - offset + 1 || offset + size > body.length) throw new Error('ZCode CLI tar PAX 元数据无效。')
+    const record = body.subarray(space + 1, offset + size - 1).toString('utf8')
+    if (record.startsWith('path=')) path = record.slice(5)
+    if (/^(?:linkpath|size)=/.test(record)) throw new Error('ZCode CLI tar PAX 不允许链接或大小覆盖。')
+    offset += size
+  }
+  return path
+}
+
+/** Streaming tar extraction: checks checksums, sizes, paths and forbids links/devices. */
+export async function extractZCodeArchive(archive, destination, { signal } = {}) {
+  await mkdir(destination, { recursive: false })
+  const input = createReadStream(archive)
+  const stream = input.pipe(createGunzip())
+  input.on('error', error => stream.destroy(error))
+  let pending = Buffer.alloc(0), state = null, nextName = null, expanded = 0, count = 0, ended = false
+  const names = new Set()
+  let activeFile
   try {
-    const response = await boundedResponse(url, signal)
-    let receivedBytes = 0
-    const declaredBytes = Number(response.headers.get('content-length')) || null
-    const meter = new Transform({
-      transform(chunk, encoding, callback) {
-        receivedBytes += chunk.length
-        if (receivedBytes > MAX_DOWNLOAD_BYTES) {
-          callback(new Error('ZCode 安装器超出下载大小限制。'))
-          return
+    for await (const chunk of stream) {
+      signal?.throwIfAborted()
+      expanded += chunk.length
+      if (expanded > MAX_EXTRACT_BYTES) throw new Error('ZCode CLI 解压大小超出限制。')
+      pending = pending.length ? Buffer.concat([pending, chunk]) : chunk
+      for (;;) {
+        if (ended) break
+        if (!state) {
+          if (pending.length < 512) break
+          const header = pending.subarray(0, 512); pending = pending.subarray(512)
+          if (header.every(byte => byte === 0)) { ended = true; break }
+          const sum = [...header].reduce((total, value, index) => total + (index >= 148 && index < 156 ? 32 : value), 0)
+          if (sum !== Number.parseInt(headerField(header, 148, 8).trim(), 8)) throw new Error('ZCode CLI tar 头校验失败。')
+          const sizeText = headerField(header, 124, 12).trim()
+          if (!/^[0-7]+$/.test(sizeText)) throw new Error('ZCode CLI tar 大小无效。')
+          const size = Number.parseInt(sizeText, 8)
+          if (!Number.isSafeInteger(size) || size > MAX_DOWNLOAD_BYTES) throw new Error('ZCode CLI tar 文件超出限制。')
+          const type = String.fromCharCode(header[156] || 48)
+          let name = headerField(header, 0, 100)
+          const prefix = headerField(header, 345, 155)
+          if (prefix && headerField(header, 257, 6).startsWith('ustar')) name = `${prefix}/${name}`
+          name = nextName ?? name; nextName = null
+          state = { remaining: size, skip: (512 - size % 512) % 512, type, parts: [] }
+          if (['x', 'g', 'L'].includes(type)) {
+            if (size > 1_000_000) throw new Error('ZCode CLI tar 元数据超出限制。')
+          } else {
+            if (!['0', '5'].includes(type)) throw new Error('ZCode CLI 运行包不允许链接或特殊文件。')
+            const relative = memberPath(name)
+            if (!relative && type !== '5') throw new Error('ZCode CLI tar 根目录无效。')
+            if (relative) {
+              const key = process.platform === 'win32' ? relative.toLowerCase() : relative
+              if (names.has(key)) throw new Error('ZCode CLI tar 包含重复路径。')
+              names.add(key)
+              if (++count > MAX_FILES) throw new Error('ZCode CLI 运行包文件过多。')
+              const target = join(destination, ...relative.split('/'))
+              if (!zcodeWithin(destination, target)) throw new Error('ZCode CLI tar 路径离开目标目录。')
+              if (type === '5') await mkdir(target, { recursive: true })
+              else {
+                await mkdir(dirname(target), { recursive: true })
+                activeFile = await open(target, 'wx', Number.parseInt(headerField(header, 100, 8).trim() || '644', 8) & 0o777)
+                state.file = activeFile
+              }
+            }
+            if (type === '5' && size !== 0) throw new Error('ZCode CLI tar 目录带有无效数据。')
+          }
         }
-        try { onProgress?.({ receivedBytes, declaredBytes }) } catch { /* progress is advisory */ }
-        callback(null, chunk)
-      },
-    })
-    const output = createWriteStream(temporary, { flags: 'wx', mode: 0o600 })
-    output.once('open', () => { created = true })
-    await pipeline(Readable.fromWeb(response.body), meter,
-      output, { signal })
-    if (!(await verifyInstallerSignature(temporary, env))) {
-      throw new Error('ZCode 安装器未通过官方发布者 Authenticode 签名校验。')
+        if (state.remaining > 0) {
+          if (!pending.length) break
+          const take = Math.min(pending.length, state.remaining)
+          const piece = pending.subarray(0, take); pending = pending.subarray(take); state.remaining -= take
+          if (state.file) await state.file.writeFile(piece)
+          else if (['x', 'g', 'L'].includes(state.type)) state.parts.push(Buffer.from(piece))
+          if (state.remaining > 0) break
+        }
+        if (state.file) { await state.file.close(); activeFile = null; state.file = null }
+        if (state.parts) {
+          if (state.type === 'L') nextName = Buffer.concat(state.parts).toString().replace(/\0+$/, '')
+          if (state.type === 'x') nextName = paxName(Buffer.concat(state.parts))
+          if (state.type === 'g' && paxName(Buffer.concat(state.parts))) throw new Error('ZCode CLI tar 不支持全局路径覆盖。')
+          state.parts = null
+        }
+        const skip = Math.min(pending.length, state.skip); pending = pending.subarray(skip); state.skip -= skip
+        if (state.skip > 0) break
+        state = null
+      }
     }
-    const canonical = await realpath(temporary)
-    if (!nonCAbsolute(canonical) || !inside(dirname(path), canonical)) {
-      throw new Error('ZCode 安装器下载路径离开了非 C 盘缓存目录。')
-    }
-    await rename(temporary, path)
-    created = false
-    return { path, reused: false }
+    if (!ended || state?.remaining > 0) throw new Error('ZCode CLI 运行包不完整。')
   } finally {
-    if (created) await unlink(temporary).catch(() => {})
+    await activeFile?.close().catch(() => {})
+    input.destroy()
+    stream.destroy()
   }
 }
 
-function openVisibleInstaller(path) {
-  return new Promise((resolve, reject) => {
-    let child
-    try {
-      child = spawn(path, [], {
-        shell: false,
-        windowsHide: false,
-        detached: true,
-        stdio: 'ignore',
-      })
-    } catch (error) { reject(error); return }
-    child.once('error', reject)
-    child.once('spawn', () => {
-      child.unref()
-      resolve(child.pid ?? null)
-    })
-  })
+async function ownedRuntime(root, trustPath) {
+  const info = await lstat(root).catch(error => { if (error.code === 'ENOENT') return null; throw error })
+  if (!info) return null
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('ZCode CLI 目标不是独立目录，已停止操作。')
+  const canonical = await realpath(root)
+  const marker = JSON.parse(await readFile(join(canonical, ZCODE_MARKER), 'utf8').catch(() => '{}'))
+  const record = JSON.parse(await readFile(trustPath, 'utf8').catch(() => '{}')).entries?.[zcodeRootKey(canonical)]
+  if (marker.repository !== ZCODE_REPOSITORY || !/^\d+\.\d+\.\d+$/.test(marker.version ?? '')
+    || !/^[a-f0-9]{64}$/.test(marker.archiveSha256 ?? '') || !record?.files || typeof record.files !== 'object' || Array.isArray(record.files)
+    || marker.archiveSha256 !== record.archiveSha256 || marker.version !== record.version) throw new Error('目标目录并非插件安装的 ZCode CLI，已停止以保护已有文件。')
+  const files = await zcodeTreeFiles(canonical)
+  if (Object.keys(files).some(name => !record.files?.[name])) throw new Error('ZCode CLI 目录含发行包之外的文件，请先移出这些文件再重试。')
+  return { root: canonical, record }
 }
 
-/**
- * Download, verify, and visibly open the vendor installer. The return value
- * intentionally does not claim that installation or sign-in has completed.
- */
-export async function openZCodeInstaller({
-  downloadDir, npmPrefix, env = process.env, signal, onProgress, latest,
-} = {}) {
-  if (process.platform !== 'win32' || process.arch !== 'x64') {
-    throw new Error('ZCode 安装器下载目前仅适用于 Windows x64。')
+async function targetParent(installDir) {
+  if (typeof installDir !== 'string' || !isAbsolute(installDir) || resolve(installDir) === dirname(resolve(installDir))) throw new Error('ZCode CLI 安装目标必须是独立的绝对目录。')
+  const root = resolve(installDir)
+  await mkdir(dirname(root), { recursive: true })
+  const parent = await realpath(dirname(root))
+  if (zcodeRootKey(parent) !== zcodeRootKey(dirname(root))) throw new Error('ZCode CLI 安装父目录不能经过目录联接或符号链接。')
+  return { root, parent }
+}
+
+export async function installZCodeCli({ installDir, latest, env = process.env, signal, onProgress, fetchImpl = (...args) => fetch(...args), trustPath = zcodeTrustPath(env) } = {}) {
+  const release = zcodeInstallerRelease(latest)
+  if (!release || latest?.stale || latest?.error) throw new Error('无法核实 ZCode CLI 最新 GitHub Release；请检查网络后重试。')
+  const { root, parent } = await targetParent(installDir)
+  const previous = await ownedRuntime(root, trustPath)
+  const stage = join(parent, `.zcode-stage-${randomUUID()}`)
+  const archive = `${stage}.tar.gz`
+  const backup = join(parent, `.zcode-backup-${randomUUID()}`)
+  let moved = false, committed = false
+  const downloadSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(600_000)]) : AbortSignal.timeout(600_000)
+  try {
+    const checksumResponse = await responseFor(release.sha256Url, { fetchImpl, signal: downloadSignal })
+    if (!checksumResponse.body || Number(checksumResponse.headers?.get?.('content-length')) > 16_384) throw new Error('ZCode CLI SHA256 文件过大或无内容。')
+    const checksumParts = []
+    let checksumBytes = 0
+    for await (const part of Readable.fromWeb(checksumResponse.body)) {
+      checksumBytes += part.length
+      if (checksumBytes > 16_384) throw new Error('ZCode CLI SHA256 文件过大。')
+      checksumParts.push(part)
+    }
+    const checksumText = Buffer.concat(checksumParts).toString('utf8')
+    const expected = parseZCodeChecksum(checksumText, release.fileName)
+    const response = await responseFor(release.url, { fetchImpl, signal: downloadSignal })
+    if (!response.body || Number(response.headers?.get?.('content-length')) > MAX_DOWNLOAD_BYTES) throw new Error('ZCode CLI 运行包超出下载限制。')
+    let receivedBytes = 0
+    const meter = new Transform({ transform(chunk, encoding, callback) {
+      receivedBytes += chunk.length
+      if (receivedBytes > MAX_DOWNLOAD_BYTES) return callback(new Error('ZCode CLI 运行包超出下载限制。'))
+      onProgress?.({ receivedBytes, declaredBytes: Number(response.headers?.get?.('content-length')) || null })
+      callback(null, chunk)
+    } })
+    await pipeline(Readable.fromWeb(response.body), meter, createWriteStream(archive, { flags: 'wx', mode: 0o600 }), { signal: downloadSignal })
+    if ((await zcodeFileDigest(archive)).sha256 !== expected) throw new Error('ZCode CLI 运行包 SHA256 不匹配，已拒绝安装。')
+    signal?.throwIfAborted()
+    await extractZCodeArchive(archive, stage, { signal })
+    const pkg = JSON.parse(await readFile(join(stage, 'package.json'), 'utf8'))
+    if (pkg.name !== 'zcode-runtime' || pkg.version !== release.version || pkg.bin?.zcode !== './bin/zcode.mjs') throw new Error('ZCode CLI 运行包元数据与发布版本不一致。')
+    await lstat(join(stage, 'bin', 'zcode.mjs')); await lstat(join(stage, 'agent', 'zcode.cjs'))
+    // Keep runtime invocations relocatable; neither shim changes global PATH or runs an installer script.
+    await writeFile(join(stage, 'bin', 'zcode'), '#!/bin/sh\nexec node "$(dirname "$0")/zcode.mjs" "$@"\n', { mode: 0o755 })
+    await writeFile(join(stage, 'bin', 'zcode.cmd'), '@echo off\r\nnode "%~dp0zcode.mjs" %*\r\n')
+    await chmod(join(stage, 'bin', 'zcode.mjs'), 0o755)
+    const files = await zcodeTreeFiles(stage)
+    await writeFile(join(stage, ZCODE_MARKER), `${JSON.stringify({ repository: ZCODE_REPOSITORY, version: release.version, archiveSha256: expected })}\n`, { mode: 0o600 })
+    signal?.throwIfAborted()
+    if (previous) { await rename(root, backup); moved = true }
+    await rename(stage, root)
+    try { await recordZCodeInstall({ root, version: release.version, archiveSha256: expected, files, trustPath }) }
+    catch (error) {
+      // Only the newly installed, path-checked dedicated runtime may be removed here.
+      if (!zcodeWithin(parent, root)) throw error
+      await rm(root, { recursive: true, force: true })
+      if (moved) { await rename(backup, root); moved = false }
+      throw error
+    }
+    committed = true
+    return { status: 'succeeded', version: release.version, installDir: root, url: release.url, archiveSha256: expected }
+  } finally {
+    if (zcodeWithin(parent, archive)) await rm(archive, { force: true }).catch(() => {})
+    if (zcodeWithin(parent, stage)) await rm(stage, { recursive: true, force: true }).catch(() => {})
+    if (committed && moved && zcodeWithin(parent, backup)) await rm(backup, { recursive: true, force: true }).catch(() => {})
+    else if (moved) await rename(backup, root).catch(() => {})
   }
-  const release = zcodeInstallerRelease(latest ?? await latestVersions.lookup(getOfficialTool('zcode'), { fresh: true }))
-  if (!release) throw new Error('无法从 ZCode 官方下载页确定最新 Windows x64 安装包；请检查网络，或从 https://zcode.z.ai 手动下载。')
-  const cache = await resolveZCodeDownloadDirectory({ downloadDir, npmPrefix, env, version: release.version })
-  const installerPath = join(cache.directory, release.fileName)
-  const verified = await fetchVerifiedInstaller(installerPath, release.url, { env, signal, onProgress })
-  const pid = await openVisibleInstaller(verified.path)
-  return {
-    status: 'installer-opened',
-    version: release.version,
-    installerPath: verified.path,
-    url: release.url,
-    cacheSource: cache.source,
-    reusedDownload: verified.reused,
-    installerPid: pid,
-    destinationSelection: 'visible-vendor-installer',
-  }
+}
+
+export async function uninstallZCodeCli({ installDir, env = process.env, trustPath = zcodeTrustPath(env) } = {}) {
+  const { root, parent } = await targetParent(installDir)
+  const owned = await ownedRuntime(root, trustPath)
+  if (!owned) return { status: 'succeeded', installDir: root }
+  if (zcodeRootKey(owned.root) !== zcodeRootKey(root) || !zcodeWithin(parent, owned.root)) throw new Error('ZCode CLI 卸载路径离开了已核对的目标目录。')
+  await rm(owned.root, { recursive: true, force: true })
+  return { status: 'succeeded', installDir: root }
 }

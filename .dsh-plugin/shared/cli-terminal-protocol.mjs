@@ -11,9 +11,9 @@
  */
 import { getOfficialTool, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
 
-/** Follow the tool registry, including the TUI bundled with ZCode desktop. */
+/** Follow the tool registry, including the standalone ZCode CLI. */
 export const TERMINAL_TOOL_IDS = Object.freeze(OFFICIAL_TOOLS
-  .filter(tool => !tool.unsupported && (tool.probeExecutables?.length || tool.manager === 'signed-windows-installer'))
+  .filter(tool => !tool.unsupported && tool.probeExecutables?.length)
   .map(tool => tool.id))
 export const TERMINAL_SHELL_ID = 'shell'
 export const TERMINAL_TARGETS = Object.freeze([TERMINAL_SHELL_ID, ...TERMINAL_TOOL_IDS])
@@ -52,7 +52,7 @@ export const TERMINAL_LOGIN_ARGS = Object.freeze({
   stepcode: Object.freeze(['login']),
   hermes: Object.freeze(['auth']),
   pi: Object.freeze([]),
-  zcode: Object.freeze([]),
+  zcode: Object.freeze(['login']),
 })
 
 /** Tools without a separate login command authenticate from their TUI. */
@@ -94,7 +94,7 @@ export function terminalTargetLabel(target) {
 export function terminalCommandPreview(target, mode = 'interactive', platform = 'win32') {
   if (target === TERMINAL_SHELL_ID) return platform === 'win32' ? 'powershell.exe -NoLogo' : '$SHELL -l'
   const tool = getOfficialTool(target)
-  const executable = target === 'zcode' ? 'ZCode 桌面版内置 TUI' : tool?.probeExecutables?.[0] ?? String(target)
+  const executable = tool?.probeExecutables?.[0] ?? String(target)
   const args = mode === 'login' ? TERMINAL_LOGIN_ARGS[target] ?? [] : []
   return [executable, ...args].join(' ')
 }

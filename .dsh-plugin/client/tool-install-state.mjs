@@ -7,18 +7,17 @@ const INSTALL_DEFAULTS = Object.freeze({
   toolNpmRegistry: DEFAULT_NPM_REGISTRY,
   toolScriptUrlsJson: '{}',
   toolAllowScriptInstall: true,
-  zcodeInstallDir: '',
 })
 
 /** Compare the settings a command preview describes, independent of JSON order. */
 export function toolInstallSettingsSignature(value = {}) {
   try {
-    const preferences = parseInstallPreferences({ ...value, toolInstallDir: '', zcodeInstallDir: '' }, { tools: OFFICIAL_TOOLS })
+    const preferences = parseInstallPreferences({ ...value, toolInstallDir: '' }, { tools: OFFICIAL_TOOLS })
     const sorted = map => Object.entries(map).sort(([left], [right]) => left.localeCompare(right))
     return JSON.stringify([String(value.toolInstallDir ?? '').trim(), preferences.registry, sorted(preferences.methods),
-      sorted(preferences.scriptUrls), preferences.allowScriptInstall, String(value.zcodeInstallDir ?? '').trim()])
+      sorted(preferences.scriptUrls), preferences.allowScriptInstall])
   } catch { return JSON.stringify(['invalid', value.toolInstallDir, value.toolNpmRegistry,
-    value.toolInstallMethodsJson, value.toolScriptUrlsJson, value.toolAllowScriptInstall, value.zcodeInstallDir]) }
+    value.toolInstallMethodsJson, value.toolScriptUrlsJson, value.toolAllowScriptInstall]) }
 }
 
 export function installSummaryMatchesSettings(summary, value) {
@@ -28,7 +27,6 @@ export function installSummaryMatchesSettings(summary, value) {
     toolInstallMethodsJson: JSON.stringify(summary.methods ?? {}),
     toolScriptUrlsJson: JSON.stringify(summary.scriptUrls ?? {}),
     toolAllowScriptInstall: summary.allowScriptInstall !== false,
-    zcodeInstallDir: summary.requestedZCodeInstallDir ?? summary.zcodeInstallDir ?? '',
   })
 }
 
@@ -83,18 +81,13 @@ export function toolInstallAction({ tool, probe, readiness, job, probeStatus, la
   const running = job?.status === 'running'
   const installed = probe?.installed === true
   const order = installed && latestVersion ? compareReleaseVersions(probe.version, latestVersion) : null
-  const desktop = tool.manager === 'signed-windows-installer'
-  if (desktop) return {
-    label: running ? '桌面安装处理中…' : installed ? '检查并更新桌面版' : job?.status === 'failed' ? '重试桌面安装' : '安装 ZCode 桌面版',
-    disabled: !(probeStatus === 'ready' || probeStatus === 'refreshing') || running,
-  }
-  const noRunner = desktop || tool.headlessAdapter === true
+  const noRunner = tool.headlessAdapter === true
   // A CLI that is already the latest release stays on “已是最新版本”.
   // A missing hosted entry is explained on the row; it must not turn the card
   // into a reinstall that runs against every other tool's shared npm path.
   const repair = installed && !noRunner && readiness?.ready === false && order !== 0
   const label = running ? '安装中…'
-    : !installed ? job?.status === 'failed' ? '重试安装' : desktop ? '下载最新安装器' : '一键安装最新版'
+    : !installed ? job?.status === 'failed' ? '重试安装' : '一键安装最新版'
       : order === -1 ? `更新到最新版 ${latestVersion}`
         : order === 1 ? '已高于最新正式版'
           : repair ? '修复官方执行入口'
@@ -112,24 +105,23 @@ export function toolInstallAction({ tool, probe, readiness, job, probeStatus, la
  * Repair and uninstall are separate destructive-ish actions, so they get their
  * own labels and gates: repair is offered whenever a copy exists, uninstall
  * only once one is actually installed. Both wait for the probe to settle, and
- * neither is offered for the interactive signed desktop installer.
+ * uninstall also respects the Host's removal support.
  */
 export function toolMaintenanceActions({ tool, probe, job, probeStatus, summary }) {
   const running = job?.status === 'running'
   const installed = probe?.installed === true
   const interactive = probeStatus === 'ready' || probeStatus === 'refreshing'
-  const desktop = tool.manager === 'signed-windows-installer'
   const busy = running || !interactive
   return {
     repair: {
-      label: desktop ? '重新安装桌面版' : '一键修复',
-      title: desktop ? '打开已核验的官方桌面安装器；完成安装后重新体检，刷新内置 TUI' : '用同一条固定官方安装命令重新安装一遍，修复损坏或不完整的安装',
+      label: '一键修复',
+      title: '用同一条固定安装命令重新安装一遍，修复损坏或不完整的安装',
       disabled: busy || summary?.installable === false,
     },
     uninstall: {
       label: '一键卸载',
       title: '只删除程序本身；配置、登录信息和历史记录保留',
-      disabled: busy || desktop || !installed || summary?.removable === false,
+      disabled: busy || !installed || summary?.removable === false,
     },
   }
 }
@@ -138,9 +130,6 @@ export function toolMaintenanceActions({ tool, probe, job, probeStatus, summary 
 export function installClickRefusal({ tool, submitting = false, running = false, operation = 'install', pendingSettings = false, installError = '' } = {}) {
   if (!tool) return '未知官方工具，无法开始安装。'
   if (tool.unsupported) return String(tool.unsupportedReason ?? '').trim() || '此工具暂不支持一键安装。'
-  if (tool.manager === 'signed-windows-installer' && operation === 'uninstall') {
-    return `${tool.label} 由官方签名桌面安装器安装，请在系统“应用”中卸载它。`
-  }
   if (submitting || running) {
     return operation === 'uninstall' ? '该工具正在卸载，请等待当前任务结束。'
       : operation === 'repair' ? '该工具正在修复，请等待当前任务结束。'

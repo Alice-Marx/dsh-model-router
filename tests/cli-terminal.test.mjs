@@ -56,7 +56,7 @@ test('terminal start request: fixed targets only, absolute cwd, explicit confirm
   assert.throws(() => parseTerminalStart(startRequest({ confirmed: 'yes' })), /confirmation/)
   assert.throws(() => parseTerminalStart(startRequest({ target: 'cmd.exe' })), /target/)
   for (const target of ['opencode', 'stepcode', 'zcode']) assert.equal(parseTerminalStart(startRequest({ target })).target, target)
-  assert.throws(() => parseTerminalStart(startRequest({ target: 'zcode', mode: 'login' })), /no login mode/)
+  assert.equal(parseTerminalStart(startRequest({ target: 'zcode', mode: 'login' })).mode, 'login')
   assert.throws(() => parseTerminalStart(startRequest({ cwd: 'relative/dir' })), /absolute/)
   assert.throws(() => parseTerminalStart(startRequest({ mode: 'login' })), /no login mode/)
   assert.throws(() => parseTerminalStart(startRequest({ cols: 5000 })), /cols/)
@@ -117,7 +117,7 @@ test('Windows launch: native exe first, npm .cmd shims through cmd.exe, ps1 last
   const shell = await resolveTerminalLaunch('shell', 'interactive', { platform: 'win32', env, locate: async () => { throw new Error('not used') } })
   assert.equal(shell.file, 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
   await assert.rejects(resolveTerminalLaunch('grok-build', 'interactive', { platform: 'win32', env, locate: async () => [] }), /未在 PATH 中找到 grok/)
-  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { platform: 'win32', env, discoverBundle: async () => null }), /通过智谱签名/)
+  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { platform: 'win32', env, discoverBundle: async () => null }), /GitHub Release SHA256/)
 })
 
 test('OpenCode uses the V2 package in the selected directory when a legacy V1 copy also exists', async () => {
@@ -149,13 +149,14 @@ test('POSIX launch uses the absolute path which printed and the login shell', as
   assert.equal(shell.file, '/bin/zsh')
 })
 
-test('terminal targets follow every installed registry tool, including Step, OpenCode and desktop ZCode TUI', () => {
+test('terminal targets follow every installed registry tool, including Step, OpenCode and standalone ZCode CLI', () => {
   const tools = OFFICIAL_TOOLS.map(tool => ({ id: tool.id, installed: true }))
   assert.deepEqual(terminalTargets(tools).map(item => item.id), ['shell', ...TERMINAL_TOOL_IDS])
   assert.equal(terminalTargets(tools).find(item => item.id === 'stepcode').canLogin, true)
   assert.equal(terminalTargets(tools).find(item => item.id === 'opencode').canLogin, true)
-  assert.equal(terminalTargets(tools).find(item => item.id === 'zcode').canLogin, false)
-  assert.match(terminalCommandPreview('zcode'), /桌面版内置 TUI/)
+  assert.equal(terminalTargets(tools).find(item => item.id === 'zcode').canLogin, true)
+  assert.equal(terminalCommandPreview('zcode'), 'zcode')
+  assert.equal(terminalCommandPreview('zcode', 'login'), 'zcode login')
 })
 
 test('configured npm and pnpm terminal launches use their actual package entries instead of a stale shared shim', async () => {
@@ -206,23 +207,32 @@ test('Step terminal resolves its private install directory and refuses an old sh
     fileExists: async () => false, locate: async () => [join(root, 'step.exe')] }), /所选安装目录/)
 })
 
-test('ZCode terminal verifies the configured desktop bundle and can use its bundled Electron runtime', async () => {
-  const bundle = { root: 'D:/Program Files/ZCode', executable: 'D:/Program Files/ZCode/ZCode.exe', cliEntry: 'D:/Program Files/ZCode/resources/glm/zcode.cjs' }
-  const env = { PATH: 'test', ZAI_API_KEY: 'fixture' }
-  const preferences = { zcodeInstallDir: bundle.root }
-  let discovery
-  const options = { platform: 'win32', cwd: CWD, env, preferences,
-    locate: async () => { throw new Error('ZCode PATH shim must not be trusted') },
-    discoverBundle: async request => { discovery = request; return bundle }, findNode: async () => 'D:/node/node.exe' }
-  const node = await resolveTerminalLaunch('zcode', 'interactive', options)
-  assert.deepEqual(discovery, { installDir: bundle.root, env })
-  assert.equal(node.file, 'D:/node/node.exe')
-  assert.deepEqual(node.args, [bundle.cliEntry])
-  assert.equal(node.env, undefined)
-  const electron = await resolveTerminalLaunch('zcode', 'interactive', { ...options, findNode: async () => null })
-  assert.equal(electron.file, bundle.executable)
-  assert.deepEqual(electron.env, { ELECTRON_RUN_AS_NODE: '1' })
-  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { ...options, discoverBundle: async () => null }), /通过智谱签名/)
+test('ZCode standalone terminal uses the shared directory and a compatible Node runtime on every platform', async () => {
+  for (const platform of ['win32', 'linux', 'darwin']) {
+    const prefix = platform === 'win32' ? 'D:/AI/tools' : '/opt/ai-tools'
+    const bundle = { root: `${prefix}/zcode-cli`, cliEntry: `${prefix}/zcode-cli/bin/zcode.mjs` }
+    const env = { PATH: 'test' }, home = platform === 'win32' ? 'C:/Users/test' : '/home/test'
+    const preferences = { installDir: prefix, zcodeInstallDir: 'D:/legacy/ZCode' }
+    let discovery
+    const options = { platform, cwd: CWD, env, home, preferences,
+      locate: async () => { throw new Error('ZCode PATH shim must not be trusted') },
+      discoverBundle: async request => { discovery = request; return bundle },
+      findNode: async (_workspace, minimum, accepted) => {
+        assert.deepEqual(minimum, [24, 14, 0])
+        assert.equal(accepted('24.14.0'), true)
+        assert.equal(accepted('25.0.0'), false)
+        return '/trusted/node'
+      } }
+    const node = await resolveTerminalLaunch('zcode', 'interactive', options)
+    assert.equal(discovery.installDir.replaceAll('\\', '/'), bundle.root)
+    assert.deepEqual({ env: discovery.env, platform: discovery.platform, home: discovery.home }, { env, platform, home })
+    assert.equal(node.file, '/trusted/node')
+    assert.deepEqual(node.args, [bundle.cliEntry])
+    assert.equal(node.env, undefined)
+    assert.deepEqual((await resolveTerminalLaunch('zcode', 'login', options)).args, [bundle.cliEntry, 'login'])
+    await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { ...options, findNode: async () => null }), /Node.js 24.14.0/)
+    await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { ...options, discoverBundle: async () => null }), /GitHub Release SHA256/)
+  }
 })
 
 test('terminal environment is the login environment minus ELECTRON_RUN_AS_NODE', () => {

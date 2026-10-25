@@ -69,7 +69,9 @@ test('API-key variables count for Kimi/MiniMax/MiMo/Grok; MiniMax without a stat
   assert.equal(LOGIN_GUIDES['minimax-code'].command, 'mcode login')
   assert.equal(LOGIN_GUIDES['mimo-code'].command, 'mimo auth login')
   assert.equal(LOGIN_GUIDES['grok-build'].command, 'grok login')
-  assert.match(LOGIN_GUIDES.zcode.steps, /连接 BigModel|编程套餐/)
+  assert.equal(LOGIN_GUIDES.zcode.command, 'zcode login')
+  assert.match(LOGIN_GUIDES.zcode.steps, /zcode login bigmodel/)
+  assert.equal((await checkLogin('zcode', { home: '/h', env: { ZAI_API_KEY: 'fixture' } })).state, 'unknown')
   assert.match(LOGIN_GUIDES.zcode.steps, /coding\/paas\/v4/)
 })
 

@@ -39,10 +39,13 @@ test('install summary uses the host platform and reports the configured update d
   assert.equal(step.updateInstallDir, step.installDir)
   assert.equal(step.updateCommand, step.command)
   const zcode = windows.tools.find(tool => tool.id === 'zcode')
-  assert.match(zcode.command, /签名安装器/)
-  assert.equal(zcode.installError, undefined, 'desktop download remains available without a shell method')
-  assert.match(zcode.notices[0], /单独配置 ZCode/)
-  assert.match(zcode.notices[1], /独立于统一 npm/)
+  assert.match(zcode.command, /Alice-Marx\/zcode-cli/)
+  assert.equal(zcode.methodId, 'github-release')
+  assert.equal(zcode.installError, undefined)
+  assert.match(zcode.installDir.replaceAll('\\', '/'), /^D:\/AI\/tools\/zcode-cli(?:\/bin)?$/)
+  assert.match(zcode.notices.join(' '), /SHA256/)
+  assert.ok(zcode.uninstallCommand)
+  assert.equal(zcode.uninstallError, undefined)
   const linux = installSummary(preferences, { platform: 'linux', home: '/home/tester' })
   const unixStep = linux.tools.find(tool => tool.id === 'stepcode')
   assert.equal(unixStep.methods.find(method => method.id === 'script-bash').blocked, null)
@@ -55,6 +58,33 @@ test('install summary uses the host platform and reports the configured update d
   assert.equal(disabledStep.methodId, 'script-powershell')
   assert.match(disabledStep.uninstallCommand, /D:\/AI\/tools/)
   assert.equal(disabledStep.uninstallError, undefined, 'disabling remote scripts still permits local removal')
+  const zcodeArchive = disabled.tools.find(tool => tool.id === 'zcode')
+  assert.equal(zcodeArchive.installError, undefined, 'disabling scripts preserves the verified release archive method')
+})
+
+test('remote list descriptor preserves standalone archive controls without legacy desktop directory fields', () => {
+  const receiver = { services: { installRequestedDirectory: () => 'D:/AI/tools', zcodeRequestedDirectory: () => 'D:/legacy/ZCode' } }
+  const original = installPreferences()
+  try {
+    setInstallPreferences({ installDir: 'D:/AI/tools', registry: 'https://registry.npmjs.org/', methods: {}, scriptUrls: {}, allowScriptInstall: true })
+    const settings = OfficialToolsRemoteService.prototype.installSettings.call(receiver)
+    const descriptor = OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.find(item => item.method === 'list')
+    const payload = descriptor.result.create().parse({ tools: [], install: settings.install })
+    assert.equal(Object.hasOwn(payload.install, 'zcodeInstallDir'), false)
+    assert.equal(Object.hasOwn(payload.install, 'requestedZCodeInstallDir'), false)
+    const zcode = payload.install.tools.find(tool => tool.id === 'zcode')
+    assert.equal(zcode.installDir, 'D:/AI/tools/zcode-cli')
+    assert.equal(zcode.updateInstallDir, zcode.installDir)
+    assert.equal(zcode.methods.length, 1)
+    const archive = zcode.methods[0]
+    assert.equal(archive.id, 'github-release')
+    assert.equal(archive.kind, 'archive')
+    assert.equal(archive.installDir, zcode.installDir)
+    assert.match(archive.command, /Alice-Marx\/zcode-cli.*SHA256/)
+    assert.match(archive.uninstallCommand, /D:\/AI\/tools\/zcode-cli/)
+    assert.equal(archive.blocked, null)
+    assert.equal(zcode.uninstallError, undefined)
+  } finally { setInstallPreferences(original) }
 })
 
 test('invalid Host install settings reject previews and actions before any CLI is touched', async () => {
@@ -72,7 +102,7 @@ test('invalid Host install settings reject previews and actions before any CLI i
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.25.1')
+  assert.equal(manifest.version, '0.25.2')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)

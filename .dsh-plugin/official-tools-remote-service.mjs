@@ -1,7 +1,7 @@
 /** Host receiver for the official desktop's typed one-click installer RPC. */
 import { readFileSync } from 'node:fs'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { getOfficialTool, installCommandLine, installMethodBlockReason, OFFICIAL_TOOLS } from './shared/official-tool-registry.mjs'
+import { getOfficialTool, installMethodBlockReason, OFFICIAL_TOOLS } from './shared/official-tool-registry.mjs'
 import { resolveInstallLocation, resolveInstallPlan, resolveUninstallPlan } from './shared/tool-install-preferences.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness } from './shared/official-tool-executor.mjs'
 import {
@@ -44,7 +44,6 @@ const unavailable = () => { throw new Error('模型路由工作台服务尚未�
 export function installSummary(preferences = installPreferences(), options = currentInstallOptions()) {
   return {
     installDir: preferences.installDir ?? '',
-    zcodeInstallDir: preferences.zcodeInstallDir ?? '',
     registry: preferences.registry ?? '',
     allowScriptInstall: preferences.allowScriptInstall !== false,
     scriptUrls: { ...(preferences.scriptUrls ?? {}) },
@@ -60,20 +59,6 @@ export function installSummary(preferences = installPreferences(), options = cur
         savedMethodId: preferences.methods?.[tool.id] ?? null,
         notices: [],
       }
-      if (tool.manager === 'signed-windows-installer') {
-        entry.methodId = 'signed-windows-installer'
-        entry.installDir = preferences.zcodeInstallDir ?? ''
-        if (options.platform === 'win32') {
-          entry.command = installCommandLine(tool)
-          entry.updateCommand = entry.command
-          entry.notices = [preferences.zcodeInstallDir
-            ? `TUI 使用已保存的 ZCode 桌面目录 ${preferences.zcodeInstallDir}。更新时请在官方安装窗口选择同一目录，完成后重新体检。`
-            : '请在下方单独配置 ZCode 桌面目录，或留空自动检测。内置 CLI 随桌面版更新，TUI 的登录、模型和插件在终端中自行配置。']
-          entry.notices.push('ZCode 桌面目录独立于统一 npm 安装根；不会把桌面资源放进其他工具的共享目录。')
-        } else entry.installError = entry.error = 'ZCode 签名安装器仅支持 Windows。'
-        entry.uninstallError = 'ZCode 是桌面安装版，请在系统“应用”中卸载它。'
-        return entry
-      }
       for (const method of tool.installMethods ?? []) {
         const item = { id: method.id, label: method.label, kind: method.kind,
           supportsInstallDir: method.supportsInstallDir === true,
@@ -81,7 +66,7 @@ export function installSummary(preferences = installPreferences(), options = cur
         try {
           const plan = resolveInstallPlan(tool, method.id, preferences, options)
           item.command = planCommandLine(plan)
-          item.installDir = resolveInstallLocation(tool, method, preferences, options)?.dir ?? ''
+          item.installDir = plan.kind === 'archive' ? plan.installDir : resolveInstallLocation(tool, method, preferences, options)?.dir ?? ''
           item.notices = plan.notices ?? []
         } catch (error) {
           item.blocked = errorText(error).slice(0, 200)
@@ -96,7 +81,7 @@ export function installSummary(preferences = installPreferences(), options = cur
         const plan = resolveInstallPlan(tool, undefined, preferences, options)
         entry.methodId = plan.methodId
         entry.command = planCommandLine(plan)
-        entry.installDir = resolveInstallLocation(tool, plan.method, preferences, options)?.dir ?? ''
+        entry.installDir = plan.kind === 'archive' ? plan.installDir : resolveInstallLocation(tool, plan.method, preferences, options)?.dir ?? ''
         entry.updateMethodId = plan.methodId
         entry.updateCommand = entry.command
         entry.updateInstallDir = entry.installDir
@@ -107,7 +92,7 @@ export function installSummary(preferences = installPreferences(), options = cur
       try {
         const removal = resolveUninstallPlan(tool, undefined, preferences, options)
         entry.methodId ??= removal.methodId
-        entry.installDir ??= resolveInstallLocation(tool, removal.method, preferences, options)?.dir ?? ''
+        entry.installDir ??= removal.kind === 'archive' ? removal.installDir : resolveInstallLocation(tool, removal.method, preferences, options)?.dir ?? ''
         entry.uninstallCommand = planCommandLine(removal, 'uninstall')
       } catch (error) {
         entry.uninstallError = errorText(error).slice(0, 200)
@@ -196,7 +181,6 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
     // The saved input can contain Host-only home/environment expansions. Keep
     // it separate from the resolved directory used by the actual command.
     install.requestedInstallDir = this.services?.installRequestedDirectory?.() ?? install.installDir
-    install.requestedZCodeInstallDir = this.services?.zcodeRequestedDirectory?.() ?? install.zcodeInstallDir
     return { install, hostVersion: HOST_PLUGIN_VERSION }
   }
 

@@ -32,7 +32,7 @@ export function terminalTargets(healthTools = [], platform = 'win32') {
   return [
     { id: TERMINAL_SHELL_ID, label: platform === 'win32' ? 'PowerShell（系统终端）' : 'Shell（系统终端）', canLogin: false },
     ...TERMINAL_TOOL_IDS.filter(id => installed.has(id)).map(id => ({ id,
-      label: id === 'zcode' ? `${terminalTargetLabel(id)}（桌面版内置 TUI）` : terminalTargetLabel(id),
+      label: terminalTargetLabel(id),
       canLogin: terminalCanLogin(id) })),
   ]
 }

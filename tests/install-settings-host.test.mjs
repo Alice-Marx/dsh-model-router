@@ -116,23 +116,22 @@ test('Host summaries preserve the saved home path separately from its resolved d
   assert.match(summary.installDir.replaceAll('\\', '/'), /\/AI\/tools$/)
 })
 
-test('ZCode desktop directory applies live independently of the unified package directory', async t => {
+test('standalone ZCode follows live unified directory settings and exposes common maintenance commands', async t => {
   const { save, remote } = await mountedRouter(t, { toolInstallDir: 'D:/AI/tools' })
-  await save({ zcodeInstallDir: 'D:/Program Files/ZCode' })
-  assert.equal(installPreferences().installDir, 'D:/AI/tools')
-  assert.equal(installPreferences().zcodeInstallDir, 'D:/Program Files/ZCode')
+  const before = remote.installSettings().install.tools.find(tool => tool.id === 'zcode')
+  assert.match(before.installDir.replaceAll('\\', '/'), /^D:\/AI\/tools\/zcode-cli(?:\/bin)?$/)
+  assert.equal(before.methodId, 'github-release')
+  assert.match(before.command, /Alice-Marx\/zcode-cli/)
+  assert.ok(before.uninstallCommand)
+  assert.equal(before.installError, undefined)
+  await save({ toolInstallDir: 'D:/AI/updated-tools' })
   const summary = remote.installSettings().install
-  assert.equal(summary.zcodeInstallDir, 'D:/Program Files/ZCode')
-  assert.equal(summary.tools.find(tool => tool.id === 'zcode').installDir, summary.zcodeInstallDir)
   const zcode = summary.tools.find(tool => tool.id === 'zcode')
-  if (process.platform === 'win32') assert.match(zcode.notices[0], /TUI.*ZCode/)
-  else {
-    assert.match(zcode.installError, /ZCode 签名安装器仅支持 Windows/)
-    assert.equal(zcode.command, null)
-  }
-  await save({ zcodeInstallDir: '' })
-  assert.equal(installPreferences().zcodeInstallDir, '')
-  assert.equal(installPreferences().installDir, 'D:/AI/tools')
+  assert.equal(installPreferences().installDir, 'D:/AI/updated-tools')
+  assert.match(zcode.installDir.replaceAll('\\', '/'), /^D:\/AI\/updated-tools\/zcode-cli(?:\/bin)?$/)
+  assert.equal(zcode.updateInstallDir, zcode.installDir)
+  assert.equal(zcode.updateCommand, zcode.command)
+  assert.equal(zcode.uninstallError, undefined)
 })
 
 test('invalid live settings keep verified preferences and block all install command surfaces', async t => {

@@ -180,14 +180,14 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
   if (!TERMINAL_TOOL_IDS.includes(target)) throw new Error('只能启动系统终端或固定注册表中的官方 CLI。')
   const tool = getOfficialTool(target)
   if (target === 'zcode') {
-    if (platform !== 'win32') throw new Error('当前仅支持 Windows ZCode 桌面版内置 TUI。')
-    const bundle = await discoverBundle({ installDir: preferences.zcodeInstallDir, env })
-    if (!bundle) throw new Error('未找到通过智谱签名与组件核验的 ZCode 桌面版；请先配置 ZCode 独立安装目录并重新体检。')
+    const plan = resolveInstallPlan(tool, undefined, preferences, { platform, env, home })
+    const bundle = await discoverBundle({ installDir: plan.installDir, env, home, platform })
+    if (!bundle) throw new Error('未找到通过 GitHub Release SHA256 核验的 ZCode CLI；请先安装或修复。')
     const node = await findNode(cwd, [24, 14, 0], version => Number(String(version).split('.')[0]) === 24)
-    // The verified desktop's electron-node entry is usable independently of
-    // its GUI. It supplies its own runtime when external Node 24 is absent.
-    return { file: node || bundle.executable, args: [bundle.cliEntry], verbatim: false,
-      display: `ZCode TUI · ${bundle.cliEntry}`, ...(!node ? { env: { ELECTRON_RUN_AS_NODE: '1' } } : {}) }
+    if (!node) throw new Error('ZCode CLI 需要 Node.js 24.14.0 或更新的 Node 24；请安装后重新体检。')
+    const args = mode === 'login' ? [...TERMINAL_LOGIN_ARGS.zcode] : []
+    return { file: node, args: [bundle.cliEntry, ...args], verbatim: false,
+      display: ['zcode', ...args].join(' ') }
   }
   const executable = tool.probeExecutables[0]
   const args = mode === 'login' ? [...(TERMINAL_LOGIN_ARGS[target] ?? [])] : []
