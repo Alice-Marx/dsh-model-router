@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.4 — 2026-10-26
+
+- Fix Windows ZCode CLI npm installation failing with `EEXIST` when old desktop launchers occupy the selected npm prefix. Recognize the complete legacy launcher templates, preserve their original bytes in a unique backup directory and record its location before npm runs.
+- Restore missing legacy launchers when installation fails or is cancelled, while preserving newly created files and the backups. Unknown collisions and linked paths remain protected; installation never adds `--force`.
+
+Validation evidence and limits are tracked in the [0.25.4 acceptance report](docs/releases/0.25.4-validation.md).
+
 ## 0.25.3 — 2026-10-26
 
 - Add npm installation for ZCode CLI via the fixed `@ljwei-stak/zcode-cli@latest` package. Keep GitHub Release as the default alternative; the selected method controls detection, install/update/repair/uninstall, directory and download source.

@@ -32,6 +32,7 @@ import {
 } from './tool-install-preferences.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
 import { installZCodeCli, uninstallZCodeCli } from './zcode-installer.mjs'
+import { prepareZCodeNpmShims } from './zcode-npm-shims.mjs'
 import { compareReleaseVersions, latestVersions } from './latest-versions.mjs'
 import { versionStillOlder } from './version-order.mjs'
 
@@ -1495,122 +1496,134 @@ async function tryClaudeUpdate(job, latestVersion) {
 }
 
 async function runInstallJob(installPlan, job) {
-  const { manager, args } = installPlan
-  if (job.status !== 'running') return
-  job.phase = 'preflight'
-  await ensureNpmPrefixOnPath()
-  if (job.cancelRequested) { markCancelled(job); return }
-  probeCache.delete(job.tool.id)
-  const before = await probeToolWith(job.tool, defaultRunner, { plan: installPlan, preferences: job.preferences, cacheMs: 0 })
-  job.beforeProbe = before
-  if (job.cancelRequested) { markCancelled(job); return }
-  let latest = null
-  let order = null
-  if (before.installed) {
-    latest = await latestVersions.lookup(job.tool, { fresh: true, plan: job.plan, preferences: job.preferences }).catch(() => null)
+  let legacyShims = null
+  try {
+    const { manager, args } = installPlan
+    if (job.status !== 'running') return
+    job.phase = 'preflight'
+    await ensureNpmPrefixOnPath()
     if (job.cancelRequested) { markCancelled(job); return }
-    order = latest?.version ? compareReleaseVersions(before.version, latest.version) : null
-    if (order === 1) {
-      job.status = 'failed'
-      job.finishedAt = new Date().toISOString()
-      job.postInstallProbe = before
-      job.error = `已安装 ${before.version}，高于 npm 最新正式版 ${latest.version}；不会自动降级。`
-      return
-    }
-    if (order === 0) {
-      const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan })
+    probeCache.delete(job.tool.id)
+    const before = await probeToolWith(job.tool, defaultRunner, { plan: installPlan, preferences: job.preferences, cacheMs: 0 })
+    job.beforeProbe = before
+    if (job.cancelRequested) { markCancelled(job); return }
+    let latest = null
+    let order = null
+    if (before.installed) {
+      latest = await latestVersions.lookup(job.tool, { fresh: true, plan: job.plan, preferences: job.preferences }).catch(() => null)
       if (job.cancelRequested) { markCancelled(job); return }
-      // A repair re-runs the same command even when nothing looks stale: a
-      // broken install reports the right version, so "already current" is
-      // exactly the case the user pressed 修复 for.
-      if (job.repair) {
-        pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，按修复流程重新安装 —`)
-      } else if (readiness.ready || readiness.supported === false || !CAPABILITY_REPAIRABLE.has(job.tool.id)) {
-        job.status = 'succeeded'
+      order = latest?.version ? compareReleaseVersions(before.version, latest.version) : null
+      if (order === 1) {
+        job.status = 'failed'
         job.finishedAt = new Date().toISOString()
         job.postInstallProbe = before
-        job.executionReadiness = readiness
-        pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，无需重复安装 —`)
-        if (readiness.supported === false) pushLine(job, `— 受限执行未启用：${readiness.reason} —`)
+        job.error = `已安装 ${before.version}，高于 npm 最新正式版 ${latest.version}；不会自动降级。`
         return
-      } else {
-        pushLine(job, `— 已是最新版本 ${before.version}，但执行入口未就绪：${readiness.reason}；重新安装修复 —`)
+      }
+      if (order === 0) {
+        const readiness = await trustedExecutionReadiness(job.tool.id, { preferences: job.preferences, plan: job.plan })
+        if (job.cancelRequested) { markCancelled(job); return }
+        // A repair re-runs the same command even when nothing looks stale: a
+        // broken install reports the right version, so "already current" is
+        // exactly the case the user pressed 修复 for.
+        if (job.repair) {
+          pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，按修复流程重新安装 —`)
+        } else if (readiness.ready || readiness.supported === false || !CAPABILITY_REPAIRABLE.has(job.tool.id)) {
+          job.status = 'succeeded'
+          job.finishedAt = new Date().toISOString()
+          job.postInstallProbe = before
+          job.executionReadiness = readiness
+          pushLine(job, `— ${job.tool.label} ${before.version} 已是最新版本，无需重复安装 —`)
+          if (readiness.supported === false) pushLine(job, `— 受限执行未启用：${readiness.reason} —`)
+          return
+        } else {
+          pushLine(job, `— 已是最新版本 ${before.version}，但执行入口未就绪：${readiness.reason}；重新安装修复 —`)
+        }
       }
     }
-  }
-  const plan = officialUpdatePlan({
-    toolId: job.tool.id,
-    installed: before.installed === true,
-    order,
-    platform: process.platform,
-    configured: job.configured,
-  })
-  let triedClaudeUpdate = false
-  if (plan === 'claude-update-then-registry') {
-    triedClaudeUpdate = true
-    const finished = await tryClaudeUpdate(job, latest?.version)
-    if (finished || job.status !== 'running') return
-  } else if (plan === 'minimax-official-installer') {
-    await runOfficialMiniMaxInstaller(job, {
-      reason: '— 已安装的 MiniMax Code 由官方安装目录接管；直接运行官方 Windows 安装脚本以更新到最新版 —',
+    const plan = officialUpdatePlan({
+      toolId: job.tool.id,
+      installed: before.installed === true,
+      order,
+      platform: process.platform,
+      configured: job.configured,
     })
-    return
-  }
-  if (installPlan.binDir) await mkdir(installPlan.binDir, { recursive: true })
-  job.phase = 'installing'
-  const outcome = await runCapture(manager, args, {
-    timeoutMs: INSTALL_TIMEOUT_MS,
-    useShell: IS_WINDOWS,
-    signal: job.controller.signal,
-    onOutput: captureLines(job),
-    env: installEnvironment(installPlan),
-  })
-  if (job.status !== 'running') return
-  if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
-  job.exitCode = outcome.code
-  job.timedOut = outcome.timedOut
-  if (outcome.timedOut) {
-    job.status = 'failed'
-    job.finishedAt = new Date().toISOString()
-    job.error = `安装超时（${INSTALL_TIMEOUT_MS / 1000}s），已终止。`
-    return
-  }
-  if (!outcome.ok) {
-    if (IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
+    let triedClaudeUpdate = false
+    if (plan === 'claude-update-then-registry') {
+      triedClaudeUpdate = true
+      const finished = await tryClaudeUpdate(job, latest?.version)
+      if (finished || job.status !== 'running') return
+    } else if (plan === 'minimax-official-installer') {
+      await runOfficialMiniMaxInstaller(job, {
+        reason: '— 已安装的 MiniMax Code 由官方安装目录接管；直接运行官方 Windows 安装脚本以更新到最新版 —',
+      })
+      return
+    }
+    if (installPlan.binDir) await mkdir(installPlan.binDir, { recursive: true })
+    job.phase = 'installing'
+    if (job.tool.id === 'zcode' && manager === 'npm' && installPlan.kind === 'package-manager') {
+      legacyShims = await prepareZCodeNpmShims({ prefix: installPlan.installDir, platform: process.platform, signal: job.controller.signal })
+      if (legacyShims.backups.length) pushLine(job, `— 已备份旧 ZCode 桌面启动器：${legacyShims.backupDir}；本次 npm 安装不会使用 --force —`)
+    }
+    const outcome = await runCapture(manager, args, {
+      timeoutMs: INSTALL_TIMEOUT_MS,
+      useShell: IS_WINDOWS,
+      signal: job.controller.signal,
+      onOutput: captureLines(job),
+      env: installEnvironment(installPlan),
+    })
+    if (job.status !== 'running') return
+    if (outcome.cancelled || job.cancelRequested) { markCancelled(job); return }
+    job.exitCode = outcome.code
+    job.timedOut = outcome.timedOut
+    if (outcome.timedOut) {
+      job.status = 'failed'
+      job.finishedAt = new Date().toISOString()
+      job.error = `安装超时（${INSTALL_TIMEOUT_MS / 1000}s），已终止。`
+      return
+    }
+    if (!outcome.ok) {
+      if (IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
+        await runOfficialMiniMaxInstaller(job)
+        return
+      }
+      job.status = 'failed'
+      job.finishedAt = new Date().toISOString()
+      job.error = `安装命令失败（退出码 ${outcome.code ?? '信号终止'}）。${outcome.stderr.split('\n').find(Boolean)?.slice(0, 200) ?? ''}`
+      return
+    }
+    job.phase = 'verifying'
+    await ensureNpmPrefixOnPath()
+    probeCache.delete(job.tool.id)
+    const probe = await probeToolWith(job.tool, defaultRunner, { plan: installPlan, preferences: job.preferences, cacheMs: 0 })
+    if (job.cancelRequested) { markCancelled(job); return }
+    job.postInstallProbe = probe
+    const latestAfter = (await latestVersions.lookup(job.tool, { plan: job.plan, preferences: job.preferences }).catch(() => null)) ?? latest
+    const stillOlder = Boolean(latestAfter?.version && versionStillOlder(probe.version, latestAfter.version))
+    if (stillOlder && job.tool.id === 'claude-code' && !triedClaudeUpdate && !job.configured) {
+      triedClaudeUpdate = true
+      const finished = await tryClaudeUpdate(job, latestAfter.version)
+      if (finished || job.status !== 'running') return
+      failBecauseStillOlder(job, job.postInstallProbe ?? probe, latestAfter.version)
+      return
+    }
+    if (stillOlder && IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
+      pushLine(job, `— npm 完成后 ${job.tool.label} 仍是 ${probe.version}，低于最新 ${latestAfter.version}；改用官方安装脚本 —`)
       await runOfficialMiniMaxInstaller(job)
       return
     }
-    job.status = 'failed'
-    job.finishedAt = new Date().toISOString()
-    job.error = `安装命令失败（退出码 ${outcome.code ?? '信号终止'}）。${outcome.stderr.split('\n').find(Boolean)?.slice(0, 200) ?? ''}`
-    return
+    if (stillOlder) {
+      pushLine(job, `— 注意：PATH 上的 ${job.tool.label} 仍是 ${probe.version}，低于最新 ${latestAfter.version} —`)
+      failBecauseStillOlder(job, probe, latestAfter.version)
+      return
+    }
+    await finishVerifiedInstall(job, probe)
+  } finally {
+    if (legacyShims?.backups.length && job.status !== 'succeeded') {
+      const restored = await legacyShims.restoreMissing()
+      pushLine(job, `— npm 安装未完成，已恢复 ${restored.restored.length} 个缺失的旧启动器；新建文件未覆盖，备份保留于 ${legacyShims.backupDir} —`)
+    }
   }
-  job.phase = 'verifying'
-  await ensureNpmPrefixOnPath()
-  probeCache.delete(job.tool.id)
-  const probe = await probeToolWith(job.tool, defaultRunner, { plan: installPlan, preferences: job.preferences, cacheMs: 0 })
-  if (job.cancelRequested) { markCancelled(job); return }
-  job.postInstallProbe = probe
-  const latestAfter = (await latestVersions.lookup(job.tool, { plan: job.plan, preferences: job.preferences }).catch(() => null)) ?? latest
-  const stillOlder = Boolean(latestAfter?.version && versionStillOlder(probe.version, latestAfter.version))
-  if (stillOlder && job.tool.id === 'claude-code' && !triedClaudeUpdate && !job.configured) {
-    triedClaudeUpdate = true
-    const finished = await tryClaudeUpdate(job, latestAfter.version)
-    if (finished || job.status !== 'running') return
-    failBecauseStillOlder(job, job.postInstallProbe ?? probe, latestAfter.version)
-    return
-  }
-  if (stillOlder && IS_WINDOWS && job.tool.id === 'minimax-code' && !job.configured) {
-    pushLine(job, `— npm 完成后 ${job.tool.label} 仍是 ${probe.version}，低于最新 ${latestAfter.version}；改用官方安装脚本 —`)
-    await runOfficialMiniMaxInstaller(job)
-    return
-  }
-  if (stillOlder) {
-    pushLine(job, `— 注意：PATH 上的 ${job.tool.label} 仍是 ${probe.version}，低于最新 ${latestAfter.version} —`)
-    failBecauseStillOlder(job, probe, latestAfter.version)
-    return
-  }
-  await finishVerifiedInstall(job, probe)
 }
 
 export async function runZCodeInstallJob(job, {

@@ -10,7 +10,7 @@
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
-当前版本：**0.25.3**（`@ljwei-stak/dsh-model-router`）。本次为独立的社区 ZCode CLI 增加 npm 安装选项，保留原有 GitHub Release 方式，与其他工具使用相同的安装、更新、修复和卸载操作。沿用 **0.2.1-rc.3** SDK 与已有 Host peer 范围。API 按金额核算并检查日/月预算和预占；订阅独立统计调用次数与已报告 token 用量。已确认的订阅通道不会仅因 API 预算用满或缺少 API 单价而被阻止；真正转 API 前须对实际路线重新估价并通过预算预占，混合结果分别保留两个通道的收据。工作台把 API 支出/预占与订阅用量分开，缺失用量保持未知。工作台支持实时耗时、逐工作包进度和取消，保留已完成结果与已报告费用；关闭重开面板可接管原任务。支持“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
+当前版本：**0.25.4**（`@ljwei-stak/dsh-model-router`）。本次修复旧桌面版启动脚本占用命令入口时的 ZCode npm 安装冲突：先备份识别出的旧脚本，保留无关文件。独立社区 ZCode CLI 继续提供 npm 和 GitHub Release 两种安装方式。沿用 **0.2.1-rc.3** SDK 与已有 Host peer 范围。API 按金额核算并检查日/月预算和预占；订阅独立统计调用次数与已报告 token 用量。已确认的订阅通道不会仅因 API 预算用满或缺少 API 单价而被阻止；真正转 API 前须对实际路线重新估价并通过预算预占，混合结果分别保留两个通道的收据。工作台把 API 支出/预占与订阅用量分开，缺失用量保持未知。工作台支持实时耗时、逐工作包进度和取消，保留已完成结果与已报告费用；关闭重开面板可接管原任务。支持“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
 
 官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
 
@@ -27,22 +27,22 @@
 **安装（DSH Plugin Hub / web profile）：** 确保 DSH CLI 可用，然后安装已发布的 npm 包：
 
 ```sh
-dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.25.3
+dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.25.4
 ```
 
 **安装到 Harness Desktop：** 首次先启动一次 Desktop 初始化 `desktop` 配置，再彻底退出 Desktop，运行：
 
 ```sh
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.3
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.4
 ```
 
 也可以在 **Harness Desktop → 插件 → 添加插件** 中粘贴包名。安装后重启 Desktop。单独运行全局 `npm install -g` 不会注册 Desktop 插件。
 
-**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.25.3`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router)。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
+**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.25.4`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router)。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
 
 **配置文件与配置入口：** 当前不支持导入用户编写的 JSON/YAML 配置文件。Provider、模型和凭据在 Harness **模型**页面配置；路由档案与偏好在插件设置中配置。路由器持久状态存于 `$DSH_HOME/model-router/state.json`（默认：`~/.dsh/model-router/state.json`）。Provider CLI 沿用各自的登录和配置；路由器不会把 API 密钥复制进模型档案或终端日志。
 
-**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.25.3 尚无经过验证的端到端厂商运行。[实时进度截图](docs/assets/workbench-run-progress.png)是离线模拟；API/订阅分开计算与检查点见[0.25.0 验收报告](docs/releases/0.25.0-validation.md)，SDK 兼容与验证边界见[0.25.1 验收报告](docs/releases/0.25.1-validation.md)。
+**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.25.4 尚无经过验证的端到端厂商运行。[实时进度截图](docs/assets/workbench-run-progress.png)是离线模拟；API/订阅分开计算与检查点见[0.25.0 验收报告](docs/releases/0.25.0-validation.md)，SDK 兼容与验证边界见[0.25.1 验收报告](docs/releases/0.25.1-validation.md)。
 
 **权限与风险：** 任务规划在本地完成，不调用模型。实际执行会把选定任务和上下文发送到所选模型 API 或厂商 CLI，并可能产生费用。默认使用 Harness 受限环境；只读运行不修改工作区，`workspace-write` 需要用户明确批准。明确选择 `cli-native` 的可编辑团队会在 Harness 进程沙箱之外，以当前操作系统用户权限运行；Git worktree 只收集修改，不限制操作系统访问。外部 Provider 和 CLI 服务各自适用其数据处理及计费规则。
 
@@ -78,16 +78,16 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.3
 打开 **插件 → 添加插件**，输入：
 
 ```text
-@ljwei-stak/dsh-model-router@0.25.3
+@ljwei-stak/dsh-model-router@0.25.4
 ```
 
-镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.25.3**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
+镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.25.4**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
 
 也可以通过插件管理器安装本地 `.tgz` 压缩包，或解压后的内部 `package` 目录。两者都必须包含 `package.json` 和 `.dsh-plugin`。历史构建见 [Releases](https://github.com/Alice-Marx/dsh-model-router/releases)，也可按下文从源码构建。
 
 ### 从旧包名升级
 
-旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.25.3`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
+旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.25.4`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
 
 从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
 
@@ -276,6 +276,8 @@ Hermes 使用[官方源码安装器](https://hermes-agent.nousresearch.com/docs/
 
 
 **更新目标。** 修改统一目录或来源后，点击 **保存安装设置**。工具操作会等待保存和命令刷新完成。npm 使用 `--prefix`；pnpm 使用自己的 `global-dir`、`global-bin-dir` 与 store 设置。即使其他设置页在任务排队期间修改了配置，安装任务仍保留当时选择的配置。更新会检查所选命令目录，PATH 上其他位置的现有副本不会让缺失的目标被误判为已安装。固定路径的厂商脚本会说明真实目标。ZCode CLI 的 GitHub Release 方式使用统一根目录下专属的 `zcode-cli` 子目录；npm 方式与其他 npm 工具共用 prefix。先选择方式，再核对该方式的命令与目标目录；切换方式不会迁移或卸载另一份副本。
+
+**Windows 旧 ZCode 启动入口。** npm 安装前，插件会备份识别出的旧桌面版 `zcode`、`zcode.cmd` 和 `zcode.ps1` 启动脚本，并在安装日志中记录备份位置，再让 npm 创建自己的命令入口。安装失败时会尝试安全恢复旧入口。无法识别的冲突文件保持原样并报错，插件不会添加 `--force`。桌面程序资源、账号配置、登录和会话历史均保留。
 
 [工作台指南](./docs/WORKBENCH_USER_GUIDE.zh.md#厂商安装渠道)列出各厂商的实际渠道与原生安装执行限制。
 
