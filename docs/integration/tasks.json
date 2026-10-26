@@ -82,7 +82,8 @@
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
         "docs/integration/evidence/20261027_m0_security.json",
         "docs/integration/evidence/20261027_m0_broker_bridge.json",
-        "docs/integration/evidence/20261027_security_project_checks.json"
+        "docs/integration/evidence/20261027_security_project_checks.json",
+        "docs/integration/evidence/20261027_m0_legacy_policy.json"
       ],
       "steps": [
         {
@@ -110,7 +111,8 @@
           "status": "completed",
           "evidence": [
             "docs/integration/evidence/20261026_m0_tool_boundaries.json",
-            "docs/integration/evidence/20261027_m0_security.json"
+            "docs/integration/evidence/20261027_m0_security.json",
+            "docs/integration/evidence/20261027_m0_legacy_policy.json"
           ]
         },
         {
@@ -493,7 +495,8 @@
         "docs/integration/evidence/20261026_m0_ds_full.json",
         "docs/integration/evidence/20261026_m0_llm_admission.json",
         "docs/integration/evidence/20261027_m0_combined_host.json",
-        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+        "docs/integration/evidence/20261027_m0_remote_platforms.json",
+        "docs/integration/evidence/20261027_m0_legacy_policy.json"
       ]
     },
     {
@@ -503,7 +506,8 @@
       "evidence": [
         "docs/integration/evidence/20261026_m0_tool_boundaries.json",
         "docs/integration/evidence/20261027_m0_combined_host.json",
-        "docs/integration/evidence/20261027_m0_security.json"
+        "docs/integration/evidence/20261027_m0_security.json",
+        "docs/integration/evidence/20261027_m0_legacy_policy.json"
       ]
     },
     {
@@ -556,12 +560,13 @@
       "id": "T05",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_security.json"
+        "docs/integration/evidence/20261027_m0_security.json",
+        "docs/integration/evidence/20261027_m0_legacy_policy.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
       "environment": "Isolated prototype and synthetic fixtures; not installed product",
-      "notes": "Prototype authority and actual PTC tool checks only. Existing product MR/RPC/commands/retries remain unwired."
+      "notes": "Optional real MR adapter checks all 13 tools, both commands and all 23 Remote receivers; real multi-Session grant removal and bound planning pass. Automatic DS lifecycle, positive Gateway RPC, authorized execution/retry ownership and all product paths remain incomplete."
     },
     {
       "id": "T06",

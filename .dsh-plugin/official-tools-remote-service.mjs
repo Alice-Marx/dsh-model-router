@@ -1,5 +1,6 @@
 /** Host receiver for the official desktop's typed one-click installer RPC. */
 import { readFileSync } from 'node:fs'
+import { legacyPolicy } from './shared/legacy-policy.mjs'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { getOfficialTool, installMethodBlockReason, OFFICIAL_TOOLS } from './shared/official-tool-registry.mjs'
 import { resolveInstallLocation, resolveInstallPlan, resolveUninstallPlan } from './shared/tool-install-preferences.mjs'
@@ -20,6 +21,7 @@ import {
 } from './shared/official-tools-runtime.mjs'
 import {
   OFFICIAL_TOOLS_HOST_TYPERT,
+  OFFICIAL_TOOLS_REMOTE_DESCRIPTORS,
   OFFICIAL_TOOLS_REMOTE_NAMESPACE,
 } from './shared/official-tools-remote.mjs'
 
@@ -235,6 +237,20 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   }
 
 
+}
+
+// Cover the exported contract, including installer/terminal methods that do not
+// delegate through routerRemoteServices. RPC identity comes only from the Gateway.
+for (const { method } of OFFICIAL_TOOLS_REMOTE_DESCRIPTORS) {
+  const original = OfficialToolsRemoteService.prototype[method]
+  if (typeof original !== 'function') throw new Error(`Missing Remote receiver: ${method}`)
+  Object.defineProperty(OfficialToolsRemoteService.prototype, method, { configurable: true, writable: true,
+    value: function (...args) {
+      const policy = legacyPolicy(this.ctx, this.services?.requireBotPolicy?.() === true)
+      if (!policy) return original.apply(this, args)
+      return policy.run({ kind: 'remote', name: method, invocation: this.ctx.invocation }, () => original.apply(this, args))
+    },
+  })
 }
 
 /** Registration follows the Host plugin fiber; unload withdraws all endpoints. */

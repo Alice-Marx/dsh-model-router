@@ -42,7 +42,7 @@ async function unusedPort() {
   return port
 }
 
-export async function runCombinedHost({ dsRoot, hostRoot, serve = false, security = false }) {
+export async function runCombinedHost({ dsRoot, hostRoot, serve = false, security = false, legacyPolicy = false }) {
   const baseline = JSON.parse(await readFile(join(ROOT, 'docs/integration/baseline.json'), 'utf8'))
   const revision = (await execute('git', ['-C', dsRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true })).stdout.trim()
   assert.equal(revision, baseline.repositories.DS.commit, 'DS must be the frozen source')
@@ -69,6 +69,17 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
     await copyFile(join(ROOT, 'tests/fixtures/integration-combined/security-plugin.mjs'), plugin)
     overlay.push({ insert: [{ id: 'integration-security', name: pathToFileURL(plugin).href,
       config: { authorityModule: pathToFileURL(join(ROOT, 'packages/capability-broker/src/authority.mjs')).href } }] })
+  }
+  if (legacyPolicy) {
+    const plugin = join(anchor, 'legacy-policy-probe.mjs')
+    await copyFile(join(ROOT, 'tests/fixtures/integration-combined/legacy-policy-plugin.mjs'), plugin)
+    const localModule = path => pathToFileURL(join(ROOT, path)).href
+    overlay.push({ insert: [{ id: 'integration-legacy-policy', name: pathToFileURL(plugin).href, config: {
+      authorityModule: localModule('packages/capability-broker/src/authority.mjs'),
+      principalsModule: localModule('packages/orchestration/src/principals.mjs'),
+      policyModule: localModule('packages/orchestration/src/bot-policy.mjs'),
+      remoteContractModule: localModule('.dsh-plugin/shared/official-tools-remote.mjs'),
+    } }] })
   }
   await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(overlay, null, 2))
   const requireHost = createRequire(join(hostRoot, 'package.json'))
@@ -203,6 +214,11 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       await writeFile(join(run, 'security.json'), JSON.stringify(summary.security, null, 2))
       assert.equal(summary.security.status, 'passed-for-described-checks', summary.security.error)
     }
+    if (legacyPolicy) {
+      summary.legacyPolicy = await request('integration-legacy-policy', { mainId: main.id, workerId: worker.id })
+      await writeFile(join(run, 'legacy-policy.json'), JSON.stringify(summary.legacyPolicy, null, 2))
+      assert.equal(summary.legacyPolicy.status, 'passed-for-described-checks', summary.legacyPolicy.error)
+    }
     await stop('host-before-restart')
     launch()
     loginUrl = await login()
@@ -233,12 +249,14 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
 }
 
 async function main(args) {
+  const legacyPolicy = args.includes('--legacy-policy')
+  args = args.filter(arg => arg !== '--legacy-policy')
   const security = args.includes('--security')
   args = args.filter(arg => arg !== '--security')
   const serve = args.at(-1) === '--serve'
   if (serve) args = args.slice(0, -1)
-  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--security] [--serve]')
-  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve, security })
+  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--security] [--legacy-policy] [--serve]')
+  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve, security, legacyPolicy })
   process.stdout.write(JSON.stringify(result, null, 2) + '\n')
 }
 

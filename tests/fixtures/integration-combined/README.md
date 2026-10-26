@@ -42,6 +42,16 @@ ignored run directory's `security.json`. Local Win11 sandbox setup is currently
 blocked; real Win10 passes the tool checks but reports partial file enforcement.
 Do not relax the sandbox or count either observation as private-state isolation.
 
+Add `--legacy-policy` to activate the optional shared policy during a later
+probe, after the legacy coexistence baseline. It binds actual resolved Agents,
+checks all 12 ungranted MR tools with valid required arguments, permits the bound
+route tool, hides ungranted schemas, exercises both real slash commands, checks
+all 23 Remote receivers without invocation context, and binds a second real
+Session before revoking the Bot grant. These bindings are a trusted fixture;
+automatic DS lifecycle binding and authenticated Gateway RPC positive calls are
+not claimed. Strict production composition must set `requireBotPolicy: true`;
+missing policy/guard support then refuses operations instead of opening access.
+
 The command reports existing legacy MR tool exposure separately. It does not
 install the future Bot policy, unified ledger, CLI bridge or remote agent, and
 does not prove browser, Electron, GUI control or real-model acceptance. Browser

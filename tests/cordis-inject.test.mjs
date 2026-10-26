@@ -122,7 +122,12 @@ const CORDIS_BUILTINS = new Set(['root', 'events', 'registry', 'reflect', 'logge
   'get', 'set', 'provide', 'accessor', 'mixin', 'runtime', 'effect', 'inject', 'plugin',
   'on', 'once', 'parallel', 'emit', 'serial', 'bail', 'waterfall'])
 // Reviewed exceptions: read inside try/catch after ctx.get(), for lightweight callers.
-const GUARDED = new Map([['shared/watcher.mjs', new Set(['sessionProjections'])]])
+const GUARDED = new Map([
+  ['shared/watcher.mjs', new Set(['sessionProjections'])],
+  // Public TypertRemoteService constructs a root accessor, shadowed by the
+  // Gateway's call-derived Context. It is not an injected Cordis service.
+  ['official-tools-remote-service.mjs', new Set(['invocation'])],
+])
 
 async function hostSources() {
   const files = []

@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { isAbsolute } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { legacyPolicy, policyRequired, registerPolicyTool, registerPolicyCommand, guardLegacyTools } from './shared/legacy-policy.mjs'
 import { DEFAULT_ROUTER_SETTINGS, estimateAssignedPackage, modelMetadata } from './shared/router.mjs'
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
 import { HEALTH_CACHE_MS, apiKeyEnvPresent, healthCache, runHealthCheck, subscriptionLoginOf } from './shared/tool-health.mjs'
@@ -77,6 +78,7 @@ export const name = 'model-router-galgame'
 export const inject = ['commands', 'llm', 'tools', 'typert', 'sandboxPolicy', 'sandbox']
 
 export const Config = z.object({
+  requireBotPolicy: z.boolean().default(false),
   budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
   maxConsultOutputChars: z.number().step(1).min(500).max(50_000).default(12_000).volatile(),
   modelProfilesJson: z.string().max(32_000).default('[]').volatile(),
@@ -197,7 +199,9 @@ export async function discoverConfiguredRoutes(ctx, signal) {
       routes.set(routeKey(route), route)
     }
   }
-  return [...routes.values()].sort((left, right) => routeKey(left).localeCompare(routeKey(right)))
+  const listed = [...routes.values()].sort((left, right) => routeKey(left).localeCompare(routeKey(right)))
+  const policy = legacyPolicy(ctx)
+  return policy ? policy.filterRoutes(listed) : listed
 }
 
 // ---------------------------------------------------------------------------
@@ -2202,6 +2206,7 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
 
 /** Register model-facing tools and the human /router command. */
 export function apply(ctx, config = {}) {
+  guardLegacyTools(ctx, config)
   // Install addresses (directory, npm source, per-tool method and script source)
   // are volatile refs: Loader changes them without re-applying the plugin.
   // Read them after the owning fiber's live update, before a saved view is sent.
@@ -2235,11 +2240,18 @@ export function apply(ctx, config = {}) {
     }, 'model-router-galgame: interactive terminals')
     registerOfficialToolsRemote(ctx, {
       ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences }),
+      requireBotPolicy: () => policyRequired(config),
       installSettingsError: () => installPreferenceError,
       installRequestedDirectory: () => valueOf(config, 'toolInstallDir', ''),
     })
   }
   ctx.on('tools/pre-execute', async (exec, next) => {
+    // Refuse before installation/write approval prompts; the monotonic guard and
+    // body wrapper repeat this check after asynchronous admission.
+    if (exec.name.startsWith('model_router_')) {
+      try { legacyPolicy(ctx, policyRequired(config))?.check({ kind: 'tool', name: exec.name, agent: exec.agent }) }
+      catch (error) { return { kind: 'deny', reason: error.message } }
+    }
     const decision = await next()
     if (decision.kind !== 'allow') return decision
     if (exec.name === 'model_router_rate') {
@@ -2280,7 +2292,7 @@ export function apply(ctx, config = {}) {
     return decision
   })
   registerOfficialToolModels(ctx, config, assertInstallPreferences)
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_routes',
     description: 'List provider/model routes registered in the official DeepSeek Harness model directory. Credential and network availability are not verified. No API keys or endpoints are returned.',
     parameters: {},
@@ -2290,7 +2302,7 @@ export function apply(ctx, config = {}) {
       return jsonValue({ routes, count: routes.length, availabilityNotice: '目录记录不证明账号凭据和网络当前可用。' })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_plan',
     description: 'Analyze task difficulty, recommend only configured Harness model routes, and optionally split compound work into dependent packages. Cost estimates require user-supplied USD prices for the exact routes.',
     parameters: {
@@ -2303,7 +2315,7 @@ export function apply(ctx, config = {}) {
       return jsonValue(await createRoutePlan(ctx, args.task, config, { mode: args.mode, budgetUsd: args.budgetUsd, signal: exec.signal }))
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_consult',
     description: 'Ask one already configured Harness model for an independent opinion. Supply both provider and model for an explicit route, or omit both for a recommended route different from the current model when available.',
     parameters: {
@@ -2325,7 +2337,7 @@ export function apply(ctx, config = {}) {
       return jsonValue(await executeBudgetedConsult(ctx, route, args.task, config, { routes, limit, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true }))
     },
   }))
-  ctx.commands.register({
+  registerPolicyCommand(ctx, config, {
     name: 'router',
     description: 'Show an official-model route recommendation for a task.',
     input: { hint: 'Describe the task to plan' },
@@ -2339,7 +2351,7 @@ export function apply(ctx, config = {}) {
       }
     },
   })
-  ctx.commands.register({
+  registerPolicyCommand(ctx, config, {
     name: 'tools',
     description: 'Show official model CLI install status, or install/uninstall/repair one registry tool.',
     input: { hint: '留空查看状态；或输入 install/cancel/uninstall/repair/method <工具id> [安装方式]' },
@@ -2430,7 +2442,7 @@ async function waitForInstall(toolId, signal) {
 
 /** Register the model-facing official-tool probes and installer. */
 function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_tools',
     description: 'Probe the fixed registry of official model tools (Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini CLI, OpenCode, Step Code, ZCode CLI) and report which are installed with their versions, plus each tool\'s available install methods and the effective install directory and npm source. Never reads credentials.',
     parameters: {},
@@ -2451,7 +2463,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_tool_install',
     description: 'Install one official model tool by registry id from its fixed source at the latest release, using one of that tool\'s declared install methods (npm, pnpm, vendor installer script or verified GitHub release archive). ZCode CLI offers the fixed @ljwei-stak/zcode-cli npm package (complete runtime, no separate GitHub download) and the default community-maintained Alice-Marx/zcode-cli GitHub Release archive; each uses the selected method and saved directory/source settings. Recognized legacy ZCode desktop launchers are backed up before npm installation; unrecognized conflicting files are preserved without --force. Only registry ids and declared method ids are accepted; arbitrary packages, URLs or executables are refused. The install directory and download sources come from the user\'s own plugin settings.',
     parameters: {
@@ -2474,7 +2486,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_tool_repair',
     description: 'Reinstall one official model tool by registry id, even when it already reports the latest version, to repair a broken or incomplete install. Settings and login are kept. Only registry ids and declared method ids are accepted.',
     parameters: {
@@ -2497,7 +2509,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_tool_uninstall',
     description: 'Remove one official model tool by registry id. Package-manager installs are removed with the same manager; vendor-script installs delete only the executable the vendor installer placed, plus that install\'s own PATH entry in the shell profile. Configuration, credentials and session history are always kept. Only registry ids and declared method ids are accepted.',
     parameters: {
@@ -2516,7 +2528,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_tool_run',
     description: 'Run one supported official model CLI in the current Harness session workspace. Claude, Codex, MiMo and Grok support read-only; Kimi, MiniMax and ZCode require workspace-write. Write mode needs approval and a clean Git repository. Optional provider/model must match a configured Harness route and selected vendor; cliModel can specify that vendor CLI’s own configured model name. Every CLI uses its own default unless an explicit cliModel or saved route mapping is configured.',
     parameters: {
@@ -2545,7 +2557,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_execute',
     description: 'Run a task on configured models and aggregate the results. Omit provider and model to route first. Supply both to use that one model and skip routing. With assignmentMode manual, use the packagePlanKey from model_router_plan and packageAssignmentsJson to pin each package to an exact API route or registered official tool. Manual tool failures do not fall back to API. Automatic profiles retain CLI/API billing policy. This call is read-only and does not apply file edits.',
     parameters: {
@@ -2600,7 +2612,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_health',
     description: 'Onboarding health check: for each official CLI in the fixed registry, report installed version, the latest published version when it can be looked up cheaply (update hint only), and login state (cheap status commands only; never starts a login), plus a per-provider billing table: billing mode (subscription-first by default), subscription state (logged in / coding-plan key route / exhausted until a time) and whether an API-key route is available for fallback. Logged-out tools are skipped by routing until re-checked.',
     parameters: {
@@ -2613,7 +2625,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       return jsonValue({ ...report, notices: recentNotices(await savedState()), billing: await billingHealth(ctx, config, { signal: exec.signal }) })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_rerun_step',
     description: 'Re-run one failed work package of a recorded model_router_execute or model_router_team_execute run without restarting finished packages; unfinished downstream packages follow. An editable (workspace-write) team run that stopped at a failed step continues in a fresh isolated Git worktree seeded with the earlier changes (needs approval, a clean repository at the same commit). A failed model_router_tool_run call (packageId "direct") is repeated as a new linked run. Supply provider and model to reassign a routed or team package to another configured route (if the user allows manual reassignment).',
     parameters: {
@@ -2642,7 +2654,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_rate',
     description: 'Record only the user\'s explicitly stated rating of one recorded result (up, down, clear). Requires approval; never self-rate. Feedback adjusts bounded local subjective utility, not objective quality.',
     parameters: {
@@ -2657,7 +2669,7 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
       return jsonValue({ ok: true, runId: run.id, packageId: args.packageId, rating: args.rating })
     },
   }))
-  ctx.tools.register(defineTool({
+  registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_team_execute',
     description: 'Plan a complex task into dependent work packages, route among configured providers with ready official CLIs, and run each package sequentially. Every CLI uses its own default unless a saved cliModel mapping or cliModelsJson supplies exact CLI names. Editable runs use one isolated Git worktree and integrate source changes after CLI success. Confirm the actual model from vendor records.',
     parameters: {

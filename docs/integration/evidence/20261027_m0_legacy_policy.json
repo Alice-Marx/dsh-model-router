@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "0c79a601a72418f6ef3715992853fd9fa6713804",
+  "level": "opt-in-host-integration",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "131386b43c04c19c9d48ccb6bd5989d0422fe7f8",
+    ".dsh-plugin/official-tools-remote-service.mjs": "b2d382c2099a7b3c7f2a95491b08c9f4a37eedd0",
+    ".dsh-plugin/shared/legacy-policy.mjs": "d2d9c83f504c74682785a7f9d69d195f840ecd8b",
+    "packages/orchestration/src/principals.mjs": "24319ab16624c001762f2b3469cf503562d69070",
+    "packages/orchestration/src/bot-policy.mjs": "18d90189cca7627009d4fbf059c562de125957d2",
+    "scripts/integration-combined-host.mjs": "c88fa69a3da5d51cfc3777d84d6126c403fe5a23",
+    "tests/bot-policy.test.mjs": "5b3014cb19bffbbab37241803a0e3525f46b0fec",
+    "tests/legacy-policy.test.mjs": "ff34580202c15489ebd7abce5359f9cbf3b591fb",
+    "tests/cordis-inject.test.mjs": "0160c2368a1bdc6e8c3f8a67458288fb493a8b8a",
+    "tests/fixtures/integration-combined/legacy-policy-plugin.mjs": "575f30f7f431cbdc2a15305729264c547a92d46e"
+  },
+  "remoteOverlaySha256": "367e777583ed8e3e7cf47d6ca9f8c4cc4ec9396666d83f65e20d3321755028a8",
+  "newChecks": {
+    "tests": 12,
+    "pass": 12,
+    "fail": 0
+  },
+  "engineeringChecks": {
+    "tests": 54,
+    "pass": 54,
+    "fail": 0,
+    "skipped": 0
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "rootTests": {
+        "tests": 1285,
+        "pass": 1282,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "90242f8536de473be3fbd7cc97c6e22cd5887b4e78ddc3aa9e320bde51940b3b",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "combinedHostChecks": 9,
+      "legacyPolicy": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "All 12 ungranted legacy tools, including install, native execution and retry, refuse at policy",
+          "Granted real legacy route tool still runs and projects only bound models",
+          "Actual worker schema hides the 12 ungranted legacy tools",
+          "Actual command registry permits bound planning and refuses ungranted installer commands",
+          "All 23 actual RPC receiver methods refuse in-process calls without authenticated invocation",
+          "A second real Session shares its Bot principal; grant removal reaches both and leaves Main usable"
+        ],
+        "legacyTools": [
+          "model_router_tools",
+          "model_router_tool_install",
+          "model_router_tool_repair",
+          "model_router_tool_uninstall",
+          "model_router_tool_run",
+          "model_router_execute",
+          "model_router_health",
+          "model_router_rerun_step",
+          "model_router_rate",
+          "model_router_team_execute",
+          "model_router_routes",
+          "model_router_plan",
+          "model_router_consult"
+        ],
+        "rpcReceivers": 23,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Manual trusted fixture Session bindings; frozen DS lifecycle not migrated",
+          "No authenticated Gateway RPC positive call in this probe",
+          "Bot CLI/team/retry/install remain closed pending Execution facade",
+          "No unified receipts, budget writer or OS worker; CLI private bootstrap remains open"
+        ]
+      }
+    },
+    {
+      "machineAlias": "ubuntu-test",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "arch": "x64",
+      "rootTests": {
+        "tests": 1285,
+        "pass": 1262,
+        "fail": 0,
+        "skipped": 23
+      },
+      "rootTestsSha256": "824718546a562e77d5b7385d0a62491f00c544071689de0592c4987958447ce7",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "combinedHostChecks": 9,
+      "legacyPolicy": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "All 12 ungranted legacy tools, including install, native execution and retry, refuse at policy",
+          "Granted real legacy route tool still runs and projects only bound models",
+          "Actual worker schema hides the 12 ungranted legacy tools",
+          "Actual command registry permits bound planning and refuses ungranted installer commands",
+          "All 23 actual RPC receiver methods refuse in-process calls without authenticated invocation",
+          "A second real Session shares its Bot principal; grant removal reaches both and leaves Main usable"
+        ],
+        "legacyTools": [
+          "model_router_tools",
+          "model_router_tool_install",
+          "model_router_tool_repair",
+          "model_router_tool_uninstall",
+          "model_router_tool_run",
+          "model_router_execute",
+          "model_router_health",
+          "model_router_rerun_step",
+          "model_router_rate",
+          "model_router_team_execute",
+          "model_router_routes",
+          "model_router_plan",
+          "model_router_consult"
+        ],
+        "rpcReceivers": 23,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Manual trusted fixture Session bindings; frozen DS lifecycle not migrated",
+          "No authenticated Gateway RPC positive call in this probe",
+          "Bot CLI/team/retry/install remain closed pending Execution facade",
+          "No unified receipts, budget writer or OS worker; CLI private bootstrap remains open"
+        ]
+      },
+      "ptcChecks": 7,
+      "outsideSyntheticFileReadable": true
+    },
+    {
+      "machineAlias": "win10-test",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "arch": "x64",
+      "rootTests": {
+        "tests": 1285,
+        "pass": 1282,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "19d4021bef1ca76e21cef65d7383c247a67014e8f6a7ff640277074fedaddaf8",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "combinedHostChecks": 9,
+      "legacyPolicy": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "All 12 ungranted legacy tools, including install, native execution and retry, refuse at policy",
+          "Granted real legacy route tool still runs and projects only bound models",
+          "Actual worker schema hides the 12 ungranted legacy tools",
+          "Actual command registry permits bound planning and refuses ungranted installer commands",
+          "All 23 actual RPC receiver methods refuse in-process calls without authenticated invocation",
+          "A second real Session shares its Bot principal; grant removal reaches both and leaves Main usable"
+        ],
+        "legacyTools": [
+          "model_router_tools",
+          "model_router_tool_install",
+          "model_router_tool_repair",
+          "model_router_tool_uninstall",
+          "model_router_tool_run",
+          "model_router_execute",
+          "model_router_health",
+          "model_router_rerun_step",
+          "model_router_rate",
+          "model_router_team_execute",
+          "model_router_routes",
+          "model_router_plan",
+          "model_router_consult"
+        ],
+        "rpcReceivers": 23,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Manual trusted fixture Session bindings; frozen DS lifecycle not migrated",
+          "No authenticated Gateway RPC positive call in this probe",
+          "Bot CLI/team/retry/install remain closed pending Execution facade",
+          "No unified receipts, budget writer or OS worker; CLI private bootstrap remains open"
+        ]
+      },
+      "ptcChecks": 7,
+      "outsideSyntheticFileReadable": true
+    }
+  ],
+  "limitations": [
+    "No default profile activates the optional service",
+    "Strict deployment requires requireBotPolicy=true and trusted Session lifecycle bindings; fixture bindings are manual",
+    "All 23 receiver negative checks are actual host methods, not a positive authenticated Gateway RPC test",
+    "Bot native/team/retry/install/rating operations and strict RPC background launch remain closed pending their execution/task contracts",
+    "Model guard validates admission and chunks; quiet auxiliary requests do not yet receive active grant-revocation cancellation",
+    "No persistent Task/Policy, unified budget/receipts, CLI grandchild bootstrap, DSH OS worker or Windows account isolation"
+  ]
+}

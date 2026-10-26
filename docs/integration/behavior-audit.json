@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
   "updatedOn": "2026-10-27",
-  "coverageMeaning": "Nine entry-level partial observations, including three prototype entries; no F group or whole product declared fully audited",
+  "coverageMeaning": "Ten entry-level partial observations; optional legacy policy is implemented but no whole F group or product is declared fully audited",
   "evidence": [
     "docs/integration/evidence/20261027_m0_combined_host.json",
     "docs/integration/evidence/20261027_m0_remote_platforms.json",
     "docs/integration/evidence/20261027_m0_security.json",
-    "docs/integration/evidence/20261027_m0_broker_bridge.json"
+    "docs/integration/evidence/20261027_m0_broker_bridge.json",
+    "docs/integration/evidence/20261027_m0_legacy_policy.json"
   ],
   "entries": [
     {
@@ -242,6 +243,53 @@
         "Bridge startup through Codex",
         "Verified CLI model identity",
         "Remote CLI and other vendors"
+      ]
+    },
+    {
+      "id": "E10",
+      "featureIds": [
+        "F01",
+        "F24",
+        "F31",
+        "F33",
+        "F39"
+      ],
+      "entry": "Optional legacy policy: 13 tools / 2 commands / 23 Remote receivers / trusted multi-Session mapping",
+      "contract": "Real Agent object or authenticated Gateway context; payload actor claims are never trusted. requireBotPolicy=true refuses missing service.",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/index.mjs",
+          "gitBlob": "131386b43c04c19c9d48ccb6bd5989d0422fe7f8"
+        },
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/official-tools-remote-service.mjs",
+          "gitBlob": "b2d382c2099a7b3c7f2a95491b08c9f4a37eedd0"
+        },
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/shared/legacy-policy.mjs",
+          "gitBlob": "d2d9c83f504c74682785a7f9d69d195f840ecd8b"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/principals.mjs",
+          "gitBlob": "24319ab16624c001762f2b3469cf503562d69070"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/bot-policy.mjs",
+          "gitBlob": "18d90189cca7627009d4fbf059c562de125957d2"
+        }
+      ],
+      "observed": "Three actual hosts: 12 ungranted tools refused, bound route/planning usable, hidden schemas, all receiver calls without authenticated invocation refused, two Sessions share revoked grant while Main stays usable.",
+      "level": "opt-in actual host integration / offline",
+      "remaining": [
+        "Frozen DS lifecycle automatic binding",
+        "Authenticated Gateway positive RPC",
+        "Authorized CLI/team/retry ownership, task lifetime and accounting",
+        "CLI private bootstrap and OS worker"
       ]
     }
   ]
