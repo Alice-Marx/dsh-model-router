@@ -49,16 +49,24 @@ test('standalone ZCode retains its provider locations and proxy without undocume
   assert.equal(env.NODE_OPTIONS, undefined)
 })
 
-test('ZCode managed readiness cannot substitute an archive when the selected npm package is absent', async t => {
-  const { mkdtemp, realpath, rm } = await import('node:fs/promises')
+test('ZCode npm readiness and probes reject adjacent packages when the selected npm module is absent', async t => {
+  const { mkdir, mkdtemp, realpath, rm, writeFile } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os'), { join } = await import('node:path')
   const prefix = await realpath(await mkdtemp(join(tmpdir(), 'router-zcode-missing-npm-')))
   t.after(() => rm(prefix, { recursive: true, force: true }))
+  await mkdir(join(prefix, 'bin'))
+  await writeFile(join(prefix, 'package.json'), JSON.stringify({ name: '@ljwei-stak/zcode-cli', version: '3.16.2', bin: { zcode: 'bin/zcode.mjs' } }))
+  await writeFile(join(prefix, 'bin', 'zcode.mjs'), 'throw new Error("adjacent package must not execute")')
+  const preferences = { installDir: prefix, methods: { zcode: 'npm' } }
   const result = await officialToolReadiness('zcode', process.cwd(), {
-    preferences: { installDir: prefix, methods: { zcode: 'npm' } }, executionEnvironment: 'cli-native',
+    preferences, executionEnvironment: 'cli-native',
   })
   assert.equal(result.ready, false)
   assert.match(result.reason, /所选 npm.*不会改用 GitHub/)
+  const { probeToolWith, defaultRunner } = await import('../.dsh-plugin/shared/official-tools-runtime.mjs')
+  const { getOfficialTool } = await import('../.dsh-plugin/shared/official-tool-registry.mjs')
+  const probe = await probeToolWith(getOfficialTool('zcode'), defaultRunner, { preferences, cacheMs: 0 })
+  assert.equal(probe.installed, false)
 })
 
 test('Claude nonzero terminal JSON retains its failure and explicit zero usage/cost', () => {

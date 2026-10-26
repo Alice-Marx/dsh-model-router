@@ -870,6 +870,12 @@ export async function loginLaunchForProbe(probe, {
 
 async function selectedPackageEntries(tool, { plan, preferences: selectedPreferences }) {
   const { findGlobalPackageEntries, officialToolEntrySelection } = await import('./official-tool-executor.mjs')
+  if (tool.id === 'zcode' && plan.kind === 'package-manager') {
+    plan = plan.installDir || Array.isArray(plan.packageModuleRoots) ? plan
+      : await resolvePackageJobPlan(tool, plan, selectedPreferences)
+    const moduleRoots = plan.packageModuleRoots ?? [IS_WINDOWS ? join(plan.installDir, 'node_modules') : join(plan.installDir, 'lib', 'node_modules')]
+    return findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.mjs', process.cwd(), { moduleRoots, manager: 'npm' })
+  }
   const selection = officialToolEntrySelection(tool.id, { preferences: selectedPreferences, plan })
   const entries = []
   for (const executable of tool.probeExecutables) {

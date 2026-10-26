@@ -623,7 +623,8 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
         const plan = selection.plan.installDir || Array.isArray(selection.plan.packageModuleRoots) ? selection.plan
           : await resolvePackageJobPlan(tool, selection.plan, selectionOptions.preferences ?? installPreferences())
         const bound = { ...selection, plan, preferred: true, directories: plan.binDir ? [plan.binDir] : selection.directories }
-        const entries = await findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.mjs', workspace, { selection: bound })
+        const moduleRoots = plan.packageModuleRoots ?? [IS_WINDOWS ? join(plan.installDir, 'node_modules') : join(plan.installDir, 'lib', 'node_modules')]
+        const entries = await findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.mjs', workspace, { selection: bound, moduleRoots })
         const entry = newestFirst(entries)[0]
         if (!entry) return { unsupported: '未在所选 npm 安装目录中找到 @ljwei-stak/zcode-cli；请安装或修复该方式，不会改用 GitHub 安装副本。' }
         const bundle = await resolveZCodeNpmBundle(entry)

@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { Readable } from 'node:stream'
-import { digestTarMembers } from '../.dsh-plugin/shared/npm-attestation.mjs'
+import { digestTarMembers, npmAttestor } from '../.dsh-plugin/shared/npm-attestation.mjs'
+import { officialToolReadiness } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 import { extractZCodeArchive } from '../.dsh-plugin/shared/zcode-installer.mjs'
 import { resolveZCodeNpmBundle, ZCODE_NPM_PACKAGE } from '../.dsh-plugin/shared/zcode-npm.mjs'
 
@@ -31,7 +32,8 @@ function member(name, text) {
 async function fixture(t, { packageRuntime = false, packageVersion = runtimeVersion } = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'router-zcode-npm-')))
   t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }))
-  const packageRoot = join(root, 'prefix', 'node_modules', '@ljwei-stak', 'zcode-cli')
+  const prefix = join(root, 'prefix')
+  const packageRoot = join(prefix, ...(process.platform === 'win32' ? ['node_modules'] : ['lib', 'node_modules']), '@ljwei-stak', 'zcode-cli')
   const runtimeFiles = {
     'package.json': JSON.stringify({ name: 'zcode-runtime', version: runtimeVersion, bin: { zcode: './bin/zcode.mjs' } }),
     'bin/zcode.mjs': 'throw new Error("runtime must only execute in the real launch")',
@@ -67,8 +69,19 @@ async function fixture(t, { packageRuntime = false, packageVersion = runtimeVers
     await extractZCodeArchive(join(packageRoot, payload.file), join(packageRoot, 'runtime'))
     await writeFile(join(packageRoot, 'runtime', '.zcode-npm-runtime.json'), JSON.stringify({ schemaVersion: 1, version: runtimeVersion, sha256 }))
   }
-  return { root, packageRoot, found, options, attested, payload, runtimeFiles, archive }
+  return { root, prefix, packageRoot, found, options, attested, payload, runtimeFiles, archive }
 }
+
+test('managed readiness accepts the attested package at the exact platform npm module root', { skip: Number(process.versions.node.split('.')[0]) !== 24 }, async t => {
+  const f = await fixture(t, { packageRuntime: true })
+  t.mock.method(npmAttestor, 'attestPackage', (...args) => f.options.attestor.attestPackage(...args))
+  const actual = await officialToolReadiness('zcode', process.cwd(), {
+    preferences: { installDir: f.prefix, methods: { zcode: 'npm' } }, executionEnvironment: 'cli-native',
+  })
+  assert.equal(actual.ready, true, actual.reason)
+  assert.equal(actual.source, 'npm-registry-sha256')
+  assert.deepEqual(actual.readyModes, ['workspace-write'])
+})
 
 test('npm package runtime is fully verified and resolves directly without executing either bootstrap', async t => {
   const f = await fixture(t, { packageRuntime: true })
