@@ -62,7 +62,7 @@ test('install summary uses the host platform and reports the configured update d
   assert.equal(zcodeArchive.installError, undefined, 'disabling scripts preserves the verified release archive method')
 })
 
-test('remote list descriptor preserves standalone archive controls without legacy desktop directory fields', () => {
+test('remote list descriptor preserves ZCode archive and npm controls without legacy desktop directory fields', () => {
   const receiver = { services: { installRequestedDirectory: () => 'D:/AI/tools', zcodeRequestedDirectory: () => 'D:/legacy/ZCode' } }
   const original = installPreferences()
   try {
@@ -75,8 +75,8 @@ test('remote list descriptor preserves standalone archive controls without legac
     const zcode = payload.install.tools.find(tool => tool.id === 'zcode')
     assert.equal(zcode.installDir, 'D:/AI/tools/zcode-cli')
     assert.equal(zcode.updateInstallDir, zcode.installDir)
-    assert.equal(zcode.methods.length, 1)
-    const archive = zcode.methods[0]
+    assert.equal(zcode.methods.length, 2)
+    const archive = zcode.methods.find(method => method.id === 'github-release')
     assert.equal(archive.id, 'github-release')
     assert.equal(archive.kind, 'archive')
     assert.equal(archive.installDir, zcode.installDir)
@@ -84,7 +84,40 @@ test('remote list descriptor preserves standalone archive controls without legac
     assert.match(archive.uninstallCommand, /D:\/AI\/tools\/zcode-cli/)
     assert.equal(archive.blocked, null)
     assert.equal(zcode.uninstallError, undefined)
+    const npm = zcode.methods.find(method => method.id === 'npm')
+    assert.equal(npm.kind, 'package-manager')
+    assert.match(npm.command, /npm install -g @ljwei-stak\/zcode-cli@latest/)
+    assert.match(npm.command, /--registry=https:\/\/registry\.npmjs\.org\//)
+    assert.match(npm.uninstallCommand, /npm uninstall -g @ljwei-stak\/zcode-cli/)
+    assert.equal(npm.blocked, null)
+    assert.equal(npm.installDir, process.platform === 'win32' ? 'D:/AI/tools' : 'D:/AI/tools/bin')
+    assert.notEqual(npm.installDir, archive.installDir)
   } finally { setInstallPreferences(original) }
+})
+
+test('selecting ZCode npm changes install and uninstall previews to the saved npm prefix and registry', () => {
+  const base = { installDir: 'D:/AI/npm-tools', registry: 'https://registry.npmmirror.com/',
+    methods: { zcode: 'npm' }, scriptUrls: {}, allowScriptInstall: false }
+  for (const platform of ['win32', 'linux', 'darwin']) {
+    const summary = installSummary(base, { platform, home: '/home/tester' })
+    const zcode = summary.tools.find(tool => tool.id === 'zcode')
+    assert.equal(zcode.savedMethodId, 'npm')
+    assert.equal(zcode.methodId, 'npm')
+    assert.equal(zcode.installDir, platform === 'win32' ? base.installDir : base.installDir + '/bin')
+    assert.equal(zcode.updateInstallDir, zcode.installDir)
+    assert.match(zcode.command, /npm install -g @ljwei-stak\/zcode-cli@latest/)
+    assert.match(zcode.command, /--prefix(?:=| )D:\/AI\/npm-tools/)
+    assert.match(zcode.command, /--registry=https:\/\/registry\.npmmirror\.com\//)
+    assert.equal(zcode.updateCommand, zcode.command)
+    assert.match(zcode.uninstallCommand, /npm uninstall -g @ljwei-stak\/zcode-cli/)
+    assert.match(zcode.uninstallCommand, /--prefix(?:=| )D:\/AI\/npm-tools/)
+    assert.doesNotMatch(zcode.command + zcode.uninstallCommand, /GitHub Release|npm-tools\/zcode-cli/)
+    assert.equal(zcode.installError, undefined)
+    assert.equal(zcode.uninstallError, undefined)
+    const archive = zcode.methods.find(method => method.id === 'github-release')
+    assert.equal(archive.installDir, base.installDir + '/zcode-cli')
+    assert.equal(archive.blocked, null, 'npm selection retains the default release archive as an alternative')
+  }
 })
 
 test('invalid Host install settings reject previews and actions before any CLI is touched', async () => {
@@ -102,7 +135,7 @@ test('invalid Host install settings reject previews and actions before any CLI i
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.25.2')
+  assert.equal(manifest.version, '0.25.3')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)

@@ -89,13 +89,16 @@ function paxPath(buffer) {
  * Stream a .tgz and return a Map of every regular member below `package/`
  * (path relative to the package root) to { sha256: 'sha256-<base64>', size }.
  */
-export async function digestTarMembers(tgzStream) {
+export async function digestTarMembers(tgzStream, { maxExpandedBytes = Infinity, maxFiles = Infinity } = {}) {
   const gunzip = tgzStream.pipe(createGunzip())
   const members = new Map()
   let pending = Buffer.alloc(0)
   let state = { kind: 'header' }
   let nextName = null
+  let expandedBytes = 0
   for await (const chunk of gunzip) {
+    expandedBytes += chunk.length
+    if (expandedBytes > maxExpandedBytes) throw new Error('npm tarball 解压大小超出上限')
     pending = pending.length ? Buffer.concat([pending, chunk]) : chunk
     for (;;) {
       if (state.kind === 'done') break
@@ -133,6 +136,7 @@ export async function digestTarMembers(tgzStream) {
           // npm packs every file under one top-level directory (usually "package/").
           const relativePath = state.name.replace(/^\.?\/?[^/]+\//, '')
           if (relativePath && !relativePath.split('/').includes('..')) {
+            if (!members.has(relativePath) && members.size >= maxFiles) throw new Error('npm tarball 文件数量超出上限')
             members.set(relativePath, { sha256: `sha256-${state.hash.digest('base64')}`, size: state.size })
           }
         }

@@ -48,6 +48,57 @@ test('every supported tool has a cheap latest-version source', () => {
   assert.deepEqual(latestSourceFor(getOfficialTool('zcode')), { kind: 'zcode-github-release', url: ZCODE_RELEASE_API })
 })
 
+test('ZCode latest source follows its selected method and a concrete plan wins over settings', () => {
+  const zcode = getOfficialTool('zcode')
+  const npm = { kind: 'npm', package: '@ljwei-stak/zcode-cli' }
+  assert.deepEqual(latestSourceFor(zcode, { methodId: 'npm' }), npm)
+  assert.deepEqual(latestSourceFor(zcode, { preferences: { methods: { zcode: 'npm' } } }), npm)
+  assert.deepEqual(latestSourceFor(zcode, { plan: { kind: 'package-manager', methodId: 'npm', manager: 'npm' }, methodId: 'github-release' }), npm)
+  assert.deepEqual(latestSourceFor(zcode, { plan: { kind: 'archive', methodId: 'github-release' }, preferences: { methods: { zcode: 'npm' } } }),
+    { kind: 'zcode-github-release', url: ZCODE_RELEASE_API })
+})
+
+test('ZCode npm and GitHub metadata have separate in-flight, persistent and offline caches', async t => {
+  const dir = await scratch(t), cachePath = join(dir, 'channels.json')
+  const zcode = getOfficialTool('zcode'), calls = []
+  let online = true
+  const latest = createLatestVersions({ cachePath: () => cachePath, fetchImpl: async url => {
+    calls.push(url)
+    if (!online) throw new Error('offline')
+    if (url === ZCODE_RELEASE_API) return json(ZCODE_RELEASE)
+    if (url === 'https://registry.npmjs.org/@ljwei-stak/zcode-cli/latest') return json({ name: '@ljwei-stak/zcode-cli', version: '3.17.0' })
+    throw new Error('wrong channel')
+  } })
+  const [archive, npm] = await Promise.all([latest.lookup(zcode), latest.lookup(zcode, { methodId: 'npm' })])
+  assert.equal(archive.version, '3.16.2'); assert.equal(archive.source, 'zcode-github-release'); assert.ok(archive.sha256Url)
+  assert.equal(npm.version, '3.17.0'); assert.equal(npm.source, 'npm'); assert.equal(npm.url, undefined)
+  assert.equal(calls.length, 2, 'two channels must not share an in-flight request')
+  await latest.lookup(zcode); await latest.lookup(zcode, { methodId: 'npm' })
+  assert.equal(calls.length, 2)
+  const saved = JSON.parse(await readFile(cachePath, 'utf8')).entries
+  assert.equal(saved['zcode:npm'].version, '3.17.0')
+  assert.equal(saved['zcode:zcode-github-release'].version, '3.16.2')
+  online = false
+  const offline = await latest.lookup(zcode, { methodId: 'npm', fresh: true })
+  assert.equal(offline.version, '3.17.0'); assert.equal(offline.stale, true); assert.equal(offline.url, undefined)
+  assert.equal((await latest.lookup(zcode)).version, '3.16.2', 'a failed npm lookup cannot poison the archive cache')
+  const reloaded = createLatestVersions({ cachePath: () => cachePath, fetchImpl: async () => assert.fail('cache should serve both channels') })
+  const restored = await Promise.all([reloaded.lookup(zcode), reloaded.lookup(zcode, { preferences: { methods: { zcode: 'npm' } } })])
+  assert.equal(restored[0].version, '3.16.2')
+  assert.equal(restored[1].version, '3.17.0')
+})
+
+test('cold npm lookup failure backs off independently without borrowing an archive version', async t => {
+  const dir = await scratch(t), cachePath = join(dir, 'legacy.json')
+  await writeFile(cachePath, JSON.stringify({ entries: { zcode: { ...parseZCodeRelease(ZCODE_RELEASE), source: 'zcode-github-release', checkedAt: Date.now() } } }))
+  let calls = 0
+  const latest = createLatestVersions({ cachePath: () => cachePath, fetchImpl: async () => { calls++; throw new Error('offline') } })
+  assert.equal((await latest.lookup(getOfficialTool('zcode'))).version, '3.16.2', 'verified legacy archive cache remains usable')
+  assert.equal((await latest.lookup(getOfficialTool('zcode'), { methodId: 'npm' })).version, null)
+  assert.equal((await latest.lookup(getOfficialTool('zcode'), { methodId: 'npm' })).version, null)
+  assert.equal(calls, 1, 'a cold npm failure keeps the retry backoff')
+})
+
 test('ZCode latest release requires matching assets from the standalone repository', () => {
   const parsed = parseZCodeRelease(ZCODE_RELEASE)
   assert.equal(parsed.version, '3.16.2')

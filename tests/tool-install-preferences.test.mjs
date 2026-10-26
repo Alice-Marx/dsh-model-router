@@ -275,6 +275,21 @@ test('removal mirrors how the tool was installed', () => {
   assert.equal(zcode.installDir, 'D:/AI/tools/zcode-cli')
 })
 
+test('ZCode npm can use the shared prefix and registry while GitHub retains its independent default', () => {
+  const tool = getOfficialTool('zcode')
+  const preferences = parseInstallPreferences({ toolInstallDir: 'D:/AI/tools', toolNpmRegistry: 'https://registry.npmmirror.com/', toolInstallMethodsJson: '{"zcode":"npm"}' }, { tools: OFFICIAL_TOOLS })
+  for (const platform of ['win32', 'linux', 'darwin']) {
+    const options = { platform, home: '/home/test' }
+    const plan = resolveInstallPlan(tool, undefined, preferences, options)
+    assert.equal(plan.kind, 'package-manager'); assert.equal(plan.manager, 'npm'); assert.equal(plan.installDir, 'D:/AI/tools')
+    assert.deepEqual(plan.args, ['install', '-g', '@ljwei-stak/zcode-cli@latest', '--registry=https://registry.npmmirror.com/', '--prefix', 'D:/AI/tools'])
+    const remove = resolveUninstallPlan(tool, undefined, preferences, options)
+    assert.deepEqual(remove.args, ['uninstall', '-g', '@ljwei-stak/zcode-cli', '--registry=https://registry.npmmirror.com/', '--prefix', 'D:/AI/tools'])
+    assert.equal(resolveInstallPlan(tool, 'github-release', preferences, options).installDir, 'D:/AI/tools/zcode-cli')
+    assert.equal(resolveInstallPlan(tool, undefined, {}, options).kind, 'archive')
+  }
+})
+
 test('deleting a vendor binary is bounded to the tool\'s own install directory', () => {
   const home = homedir()
   const tool = getOfficialTool('stepcode')

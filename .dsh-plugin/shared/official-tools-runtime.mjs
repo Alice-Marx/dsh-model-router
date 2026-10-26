@@ -391,7 +391,7 @@ async function runOfficialMiniMaxInstaller(job, { reason } = {}) {
     if (!probe.installed || !readiness.ready) {
       throw new Error(`官方安装器完成，但执行入口未通过 npm registry 摘要核验：${readiness.reason ?? probe.detail}`)
     }
-    const latest = await latestVersions.lookup(job.tool).catch(() => null)
+    const latest = await latestVersions.lookup(job.tool, { plan: job.plan, preferences: job.preferences }).catch(() => null)
     if (latest?.version && versionStillOlder(probe.version, latest.version)) {
       throw new Error(staleInstallMessage(job.tool.label, probe.version, latest.version))
     }
@@ -630,7 +630,7 @@ async function runVendorScriptInstallJob(job, plan) {
     await assertVendorInstallDirectory(job.tool, plan, job.preferences)
     const before = await probeToolWith(job.tool, defaultRunner, { plan, preferences: job.preferences, cacheMs: 0 })
     job.beforeProbe = before
-    const latestBefore = before.installed ? await latestVersions.lookup(job.tool, { fresh: true }).catch(() => null) : null
+    const latestBefore = before.installed ? await latestVersions.lookup(job.tool, { fresh: true, plan: job.plan, preferences: job.preferences }).catch(() => null) : null
     if (job.cancelRequested) { markCancelled(job); return }
     if (latestBefore?.version && compareReleaseVersions(before.version, latestBefore.version) === 1) {
       throw new Error(`已安装 ${before.version}，高于最新正式版 ${latestBefore.version}；不会自动降级。`)
@@ -672,7 +672,7 @@ async function runVendorScriptInstallJob(job, plan) {
     if (!probe.installed) {
       throw new Error(`官方安装脚本已完成，但 PATH 上仍找不到 ${job.tool.probeExecutables?.[0] ?? job.tool.label}：${probe.detail}`)
     }
-    const latest = await latestVersions.lookup(job.tool).catch(() => null)
+    const latest = await latestVersions.lookup(job.tool, { plan: job.plan, preferences: job.preferences }).catch(() => null)
     if (latest?.version && versionStillOlder(probe.version, latest.version)) {
       throw new Error(staleInstallMessage(job.tool.label, probe.version, latest.version))
     }
@@ -823,7 +823,7 @@ async function stripPathProfileBlocks(tool) {
 
 /** Tools whose ready-check failure can be repaired by reinstalling the same version. */
 const CAPABILITY_REPAIRABLE = new Set([
-  'claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build', 'opencode', 'stepcode', 'hermes', 'pi',
+  'claude-code', 'codex', 'kimi-code', 'minimax-code', 'mimo-code', 'grok-build', 'opencode', 'stepcode', 'hermes', 'pi', 'zcode',
 ])
 
 /** Extract the first version-looking token from a CLI banner. */
@@ -884,17 +884,6 @@ async function probeUncached(tool, runner, { selectedPreferences, plan, fileExis
   if (tool.unsupported) {
     return { id: tool.id, installed: false, version: null, status: 'unsupported', detail: tool.unsupportedReason }
   }
-  if (tool.manager === 'github-release') {
-    const selectedPlan = plan ?? resolveInstallPlan(tool, undefined, selectedPreferences, currentInstallOptions())
-    let rejected = null
-    const bundle = await discoverZCodeBundle({ installDir: selectedPlan.installDir,
-      onRejected: value => { rejected ??= value } })
-    if (bundle) return { id: tool.id, installed: true, version: bundle.version, status: 'installed',
-      detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} ${bundle.version}`,
-      installDir: bundle.root, cliEntry: bundle.cliEntry, packageEntry: bundle.cliEntry, source: bundle.source }
-    return { id: tool.id, installed: false, version: null, status: 'not-installed',
-      detail: rejected?.rejected || `未找到经过 GitHub Release SHA256 校验的 ZCode CLI：${selectedPlan.installDir}` }
-  }
   let selectedPlan = plan
   if (!selectedPlan) {
     try {
@@ -908,6 +897,17 @@ async function probeUncached(tool, runner, { selectedPreferences, plan, fileExis
           detail: `无法检查所选安装方式或目录：${String(error?.message ?? error).slice(0, 200)}` }
       }
     }
+  }
+  if (selectedPlan?.kind === 'archive') {
+    const location = { methodId: selectedPlan.methodId, manager: selectedPlan.manager, binDir: selectedPlan.binDir }
+    let rejected = null
+    const bundle = await discoverZCodeBundle({ installDir: selectedPlan.installDir,
+      onRejected: value => { rejected ??= value } })
+    if (bundle) return { id: tool.id, installed: true, version: bundle.version, status: 'installed', ...location,
+      detail: `${tool.probeNote} 安装目录：${bundle.root}`, bannerLine: `${tool.label} ${bundle.version}`,
+      installDir: bundle.root, cliEntry: bundle.cliEntry, packageEntry: bundle.cliEntry, source: bundle.source }
+    return { id: tool.id, installed: false, version: null, status: 'not-installed', ...location,
+      detail: rejected?.rejected || `未找到经过 GitHub Release SHA256 校验的 ZCode CLI：${selectedPlan.installDir}` }
   }
   // npm and pnpm can write the same shim into a unified bin directory. Its
   // banner belongs to whichever manager wrote it last, not the selected copy.
@@ -1115,10 +1115,10 @@ export async function probeToolSafely(tool, runner, options) {
   }
 }
 
-export async function probeAllTools({ fresh = false } = {}) {
+export async function probeAllTools({ fresh = false, preferences: selectedPreferences = installPreferences() } = {}) {
   await ensureNpmPrefixOnPath()
   return Promise.all(OFFICIAL_TOOLS.map(tool => probeToolSafely(tool, defaultRunner,
-    fresh ? { cacheMs: 0 } : {})))
+    { preferences: selectedPreferences, ...(fresh ? { cacheMs: 0 } : {}) })))
 }
 
 function probeBanner(attempt) {
@@ -1409,7 +1409,7 @@ export function installEnvironment(plan, base = process.env) {
 
 /** Installation and version must pass; verify execution only where an adapter supports it. */
 export async function finishVerifiedInstall(job, probe, {
-  lookupLatest = tool => latestVersions.lookup(tool), readinessFor = trustedExecutionReadiness,
+  lookupLatest = (tool, selection) => latestVersions.lookup(tool, selection), readinessFor = trustedExecutionReadiness,
 } = {}) {
   job.postInstallProbe = probe
   if (job.cancelRequested) { markCancelled(job); return true }
@@ -1419,7 +1419,7 @@ export async function finishVerifiedInstall(job, probe, {
     job.error = `安装命令已完成，但重探测失败：${probe.detail}`
     return true
   }
-  const latest = await lookupLatest(job.tool).catch(() => null)
+  const latest = await lookupLatest(job.tool, { plan: job.plan, preferences: job.preferences }).catch(() => null)
   if (latest?.version && versionStillOlder(probe.version, latest.version)) {
     failBecauseStillOlder(job, probe, latest.version)
     return true
@@ -1501,7 +1501,7 @@ async function runInstallJob(installPlan, job) {
   let latest = null
   let order = null
   if (before.installed) {
-    latest = await latestVersions.lookup(job.tool, { fresh: true }).catch(() => null)
+    latest = await latestVersions.lookup(job.tool, { fresh: true, plan: job.plan, preferences: job.preferences }).catch(() => null)
     if (job.cancelRequested) { markCancelled(job); return }
     order = latest?.version ? compareReleaseVersions(before.version, latest.version) : null
     if (order === 1) {
@@ -1585,7 +1585,7 @@ async function runInstallJob(installPlan, job) {
   const probe = await probeToolWith(job.tool, defaultRunner, { plan: installPlan, preferences: job.preferences, cacheMs: 0 })
   if (job.cancelRequested) { markCancelled(job); return }
   job.postInstallProbe = probe
-  const latestAfter = (await latestVersions.lookup(job.tool).catch(() => null)) ?? latest
+  const latestAfter = (await latestVersions.lookup(job.tool, { plan: job.plan, preferences: job.preferences }).catch(() => null)) ?? latest
   const stillOlder = Boolean(latestAfter?.version && versionStillOlder(probe.version, latestAfter.version))
   if (stillOlder && job.tool.id === 'claude-code' && !triedClaudeUpdate && !job.configured) {
     triedClaudeUpdate = true
@@ -1619,7 +1619,7 @@ export async function runZCodeInstallJob(job, {
     job.plan = plan
     const before = await probe(job.tool, defaultRunner, { preferences: job.preferences, plan, cacheMs: 0 })
     if (job.cancelRequested) { markCancelled(job); return }
-    const latest = await lookup(job.tool, { fresh: true }).catch(() => null)
+    const latest = await lookup(job.tool, { fresh: true, plan, preferences: job.preferences }).catch(() => null)
     if (job.cancelRequested) { markCancelled(job); return }
     const order = before.installed && latest?.version ? compareReleaseVersions(before.version, latest.version) : null
     if (before.installed && (order === null || latest?.stale || latest?.error)) throw new Error('无法核实 ZCode CLI 最新版本；保留当前安装，网络恢复后重试。')

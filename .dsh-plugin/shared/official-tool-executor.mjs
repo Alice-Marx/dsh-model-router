@@ -20,10 +20,11 @@ import { StringDecoder } from 'node:string_decoder'
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { getOfficialTool, installMethodFor, OFFICIAL_TOOLS } from './official-tool-registry.mjs'
-import { currentInstallOptions, ensureNpmPrefixOnPath, installPreferences, preferredToolDirectories, usesConfiguredInstallPlan } from './official-tools-runtime.mjs'
+import { currentInstallOptions, ensureNpmPrefixOnPath, installPreferences, preferredToolDirectories, resolvePackageJobPlan, usesConfiguredInstallPlan } from './official-tools-runtime.mjs'
 import { resolveInstallPlan } from './tool-install-preferences.mjs'
 import { buildMiniMaxInvocation, createMiniMaxStreamParser } from './vendor-minimax-adapter.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
+import { resolveZCodeNpmBundle } from './zcode-npm.mjs'
 import { CODE_FILE, npmAttestor } from './npm-attestation.mjs'
 import { compareReleaseVersions, isReleaseVersion } from './latest-versions.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser, installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
@@ -616,6 +617,21 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
   }
   if (toolId === 'zcode') {
     const selection = officialToolEntrySelection(toolId, selectionOptions)
+    if (selection.plan.kind === 'package-manager') {
+      try {
+        const tool = getOfficialTool(toolId)
+        const plan = selection.plan.installDir || Array.isArray(selection.plan.packageModuleRoots) ? selection.plan
+          : await resolvePackageJobPlan(tool, selection.plan, selectionOptions.preferences ?? installPreferences())
+        const bound = { ...selection, plan, preferred: true, directories: plan.binDir ? [plan.binDir] : selection.directories }
+        const entries = await findGlobalPackageEntries(tool.package, 'zcode', 'bin/zcode.mjs', workspace, { selection: bound })
+        const entry = newestFirst(entries)[0]
+        if (!entry) return { unsupported: '未在所选 npm 安装目录中找到 @ljwei-stak/zcode-cli；请安装或修复该方式，不会改用 GitHub 安装副本。' }
+        const bundle = await resolveZCodeNpmBundle(entry)
+        return resolveZCodeLaunch(workspace, mode, task, { modelId, discoverBundle: async () => bundle })
+      } catch (error) {
+        return { unsupported: `ZCode CLI npm 入口核验失败：${redactDiagnostic(error?.message ?? error).slice(0, 240)}` }
+      }
+    }
     return resolveZCodeLaunch(workspace, mode, task, { installDir: selection.plan.installDir, modelId })
   }
   return { unsupported: CAPABILITIES[toolId]?.reason ?? '此官方工具尚无已核验的安全执行适配器。' }

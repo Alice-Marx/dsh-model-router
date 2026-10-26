@@ -535,11 +535,12 @@ var OFFICIAL_TOOLS = Object.freeze([
     label: "ZCode CLI",
     vendor: "Z.ai \xB7 Alice-Marx \u793E\u533A\u62BD\u53D6\u7248",
     purpose: "ZCode \u72EC\u7ACB\u547D\u4EE4\u884C\u53D1\u884C\u7248\uFF0C\u5305\u542B TUI\u3001Web \u548C Agent\uFF0C\u65E0\u9700 Electron\uFF1B\u7531 Alice-Marx/zcode-cli \u793E\u533A\u7EF4\u62A4\u3002",
+    package: "@ljwei-stak/zcode-cli",
     manager: "github-release",
     installArgs: [],
     uninstallArgs: [],
     probeExecutables: ["zcode"],
-    probeNote: "\u4F7F\u7528 Alice-Marx/zcode-cli \u7684 GitHub Release \u548C SHA256\uFF1B\u9700\u8981 Node.js 24.14.0 \u6216\u66F4\u65B0\u7684 Node 24\u3002",
+    probeNote: "\u652F\u6301 GitHub Release\uFF08SHA256\uFF09\u6216 npm \u5B89\u88C5\uFF1B\u9700\u8981 Node.js 24.14.0 \u6216\u66F4\u65B0\u7684 Node 24\u3002",
     providerHints: ["zai", "z.ai", "zcode", "glm", "zhipu", "bigmodel"],
     installMethods: Object.freeze([Object.freeze({
       id: "github-release",
@@ -552,7 +553,7 @@ var OFFICIAL_TOOLS = Object.freeze([
       supportsRegistry: !1,
       installArgs: Object.freeze([]),
       uninstallArgs: Object.freeze([])
-    })])
+    }), packageManagerMethod("npm", "npm", "npm", "@ljwei-stak/zcode-cli@latest")])
   })
 ]), TOOL_BY_ID = new Map(OFFICIAL_TOOLS.map((tool) => [tool.id, tool]));
 function getOfficialTool(id2) {
@@ -12417,7 +12418,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.25.2", STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
+var ROUTER_CLIENT_VERSION = "0.25.3", STALE_HOST_MESSAGE = "\u63D2\u4EF6\u540E\u53F0\u7248\u672C\u8F83\u65E7\uFF0C\u8BF7\u5B8C\u5168\u9000\u51FA\u5E76\u91CD\u542F Harness\uFF08\u5305\u62EC\u6258\u76D8\u56FE\u6807\uFF09\u540E\u518D\u4F7F\u7528\u3002";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -13255,7 +13256,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
         edit("toolAllowScriptInstall", event.target.checked);
       }
     }
-  ), /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5141\u8BB8 curl / irm \u5B89\u88C5\u811A\u672C")), /* @__PURE__ */ import_react5.default.createElement("small", null, "\u5173\u95ED\u540E\u4ECD\u53EF\u4F7F\u7528 npm / pnpm \u548C ZCode CLI \u53D1\u884C\u5305\uFF1B\u811A\u672C\u65B9\u5F0F\u9700\u5148\u4E0B\u8F7D\u5E76\u6838\u5BF9\u5382\u5546\u6807\u8BB0\u3002"))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-save-row" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || !dirty || invalid, onClick: () => {
+  ), /* @__PURE__ */ import_react5.default.createElement("span", null, "\u5141\u8BB8 curl / irm \u5B89\u88C5\u811A\u672C")), /* @__PURE__ */ import_react5.default.createElement("small", null, "\u5173\u95ED\u540E\u4ECD\u53EF\u4F7F\u7528 npm / pnpm \u548C GitHub Release \u53D1\u884C\u5305\uFF1B\u811A\u672C\u65B9\u5F0F\u9700\u5148\u4E0B\u8F7D\u5E76\u6838\u5BF9\u5382\u5546\u6807\u8BB0\u3002"))), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-install-save-row" }, /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || !dirty || invalid, onClick: () => {
     apply2();
   } }, saving ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58\u5B89\u88C5\u8BBE\u7F6E"), dirty && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: saving, onClick: () => {
     setDrafts({}), setNotice(""), onPendingChange?.(!1);
@@ -13464,7 +13465,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       }
     }
   }, byId = Object.fromEntries(probeState.probes.map((probe) => [probe.id, probe])), capabilitiesById = Object.fromEntries(probeState.capabilities.map((item) => [item.id, item])), readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item])), installById = Object.fromEntries((probeState.install?.tools ?? []).map((item) => [item.id, item])), savedMethods = savedToolInstallMethods(settingsSnapshot.value);
-  return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u3001\u7248\u672C\u548C\u767B\u5F55\u72B6\u6001\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u5B89\u88C5\u6216\u66F4\u65B0\u5230\u5404\u5382\u5546\u6700\u65B0\u7248\uFF08\u65B0\u7248\u672C\u672A\u7ECF\u63D2\u4EF6\u6D4B\u8BD5\uFF09\u3002\u53EF\u6309\u5DE5\u5177\u9009\u62E9 npm\u3001pnpm\u3001\u5382\u5546\u5B89\u88C5\u811A\u672C\u6216\u7ECF\u8FC7\u6821\u9A8C\u7684\u53D1\u884C\u5305\uFF0C\u5E76\u7EDF\u4E00\u8BBE\u7F6E\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF1B\u5378\u8F7D\u53EA\u5220\u9664\u7A0B\u5E8F\uFF0C\u914D\u7F6E\u4E0E\u767B\u5F55\u4FDD\u7559\u3002\u672A\u767B\u5F55\u7684\u5DE5\u5177\u70B9\u201C\u53BB\u767B\u5F55\u201D\u67E5\u770B\u767B\u5F55\u547D\u4EE4\u3002ZCode CLI \u4F7F\u7528\u793E\u533A\u72EC\u7ACB\u53D1\u884C\u7248\uFF0C\u4E0E\u5176\u4ED6\u5DE5\u5177\u5171\u7528\u5B89\u88C5\u76EE\u5F55\u8BBE\u7F6E\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
+  return /* @__PURE__ */ import_react5.default.createElement("section", { className: "mr-card", "aria-label": "\u5B98\u65B9\u5DE5\u5177" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("h2", { className: "mr-card-title" }, "\u5B98\u65B9\u5DE5\u5177 \xB7 \u4F53\u68C0"), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-card-copy" }, "\u68C0\u6D4B\u672C\u673A\u5B98\u65B9\u5DE5\u5177\u7684\u5B89\u88C5\u3001\u7248\u672C\u548C\u767B\u5F55\u72B6\u6001\uFF0C\u5E76\u4ECE\u56FA\u5B9A\u6CE8\u518C\u8868\u4E00\u952E\u5B89\u88C5\u6216\u66F4\u65B0\u5230\u5404\u5382\u5546\u6700\u65B0\u7248\uFF08\u65B0\u7248\u672C\u672A\u7ECF\u63D2\u4EF6\u6D4B\u8BD5\uFF09\u3002\u53EF\u6309\u5DE5\u5177\u9009\u62E9 npm\u3001pnpm\u3001\u5382\u5546\u5B89\u88C5\u811A\u672C\u6216\u7ECF\u8FC7\u6821\u9A8C\u7684\u53D1\u884C\u5305\uFF0C\u5E76\u7EDF\u4E00\u8BBE\u7F6E\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\uFF1B\u5378\u8F7D\u53EA\u5220\u9664\u7A0B\u5E8F\uFF0C\u914D\u7F6E\u4E0E\u767B\u5F55\u4FDD\u7559\u3002\u672A\u767B\u5F55\u7684\u5DE5\u5177\u70B9\u201C\u53BB\u767B\u5F55\u201D\u67E5\u770B\u767B\u5F55\u547D\u4EE4\u3002ZCode CLI \u53EF\u9009\u62E9 npm \u793E\u533A\u5305\u6216 GitHub Release \u53D1\u884C\u5305\uFF0C\u6309\u6240\u9009\u65B9\u5F0F\u4F7F\u7528\u5B89\u88C5\u76EE\u5F55\u8BBE\u7F6E\u3002")), /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     refresh();
   } }, "\u91CD\u65B0\u4F53\u68C0")), /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react5.default.createElement(InstallSettings, { settingsScope, install: probeState.install, onPendingChange: handleSettingsPending, onMutationStart: beginSettingsMutation }), previewPending && /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", role: "status" }, "\u5B89\u88C5\u8BBE\u7F6E\u5DF2\u53D8\u66F4\uFF0C\u6B63\u5728\u5237\u65B0\u5B9E\u9645\u5B89\u88C5\u547D\u4EE4\uFF1B\u4ECD\u53EF\u5207\u6362\u65B9\u5F0F\uFF0C\u5237\u65B0\u5B8C\u6210\u540E\u53EF\u5B89\u88C5\u4E0E\u66F4\u65B0\u3002", !previewError && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     refreshInstallSettings();
@@ -13503,7 +13504,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
     } }, maintenance.uninstall.label), running && /* @__PURE__ */ import_react5.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
       cancel(tool.id);
     } }, job.cancelRequested ? "\u6B63\u5728\u53D6\u6D88\u2026" : `\u53D6\u6D88${operation}`)));
-  })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u4F7F\u7528\u5DF2\u4FDD\u5B58\u8BBE\u7F6E\uFF0C\u547D\u4EE4\u4E0A\u65B9\u663E\u793A\u5B9E\u9645\u6267\u884C\u65B9\u5F0F\u3002\u53EF\u70B9\u201C\u53D6\u6D88\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u7248\u672C\u3002\u5378\u8F7D\u4FDD\u7559\u914D\u7F6E\u3001\u767B\u5F55\u4FE1\u606F\u548C\u5386\u53F2\u8BB0\u5F55\uFF1B\u811A\u672C\u65B9\u5F0F\u53EA\u79FB\u9664\u767B\u8BB0\u7684\u547D\u4EE4\u5165\u53E3\uFF0C\u53EF\u80FD\u4FDD\u7559\u5382\u5546\u7248\u672C\u76EE\u5F55\u3002\u4E0D\u652F\u6301\u5B89\u5168\u5378\u8F7D\u7684\u65B9\u5F0F\u4F1A\u8BF4\u660E\u539F\u56E0\u3002ZCode CLI \u4E0B\u8F7D\u56FA\u5B9A GitHub \u4ED3\u5E93\u7684\u53D1\u884C\u5305\u5E76\u6821\u9A8C SHA-256\u3002\u4F1A\u8BDD\u4E0E Agent \u4E5F\u53EF\u4F7F\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "/tools"), "\u3001", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_install"), "\u3001", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_repair"), " \u548C ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_uninstall"), "\u3002")));
+  })), /* @__PURE__ */ import_react5.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "\u5B89\u88C5\u76EE\u5F55\u4E0E\u4E0B\u8F7D\u6E90\u4F7F\u7528\u5DF2\u4FDD\u5B58\u8BBE\u7F6E\uFF0C\u547D\u4EE4\u4E0A\u65B9\u663E\u793A\u5B9E\u9645\u6267\u884C\u65B9\u5F0F\u3002\u53EF\u70B9\u201C\u53D6\u6D88\u201D\u7EC8\u6B62\u4E0B\u8F7D\u4EFB\u52A1\uFF0C\u968F\u540E\u91CD\u65B0\u68C0\u6D4B\u7248\u672C\u3002\u5378\u8F7D\u4FDD\u7559\u914D\u7F6E\u3001\u767B\u5F55\u4FE1\u606F\u548C\u5386\u53F2\u8BB0\u5F55\uFF1B\u811A\u672C\u65B9\u5F0F\u53EA\u79FB\u9664\u767B\u8BB0\u7684\u547D\u4EE4\u5165\u53E3\uFF0C\u53EF\u80FD\u4FDD\u7559\u5382\u5546\u7248\u672C\u76EE\u5F55\u3002\u4E0D\u652F\u6301\u5B89\u5168\u5378\u8F7D\u7684\u65B9\u5F0F\u4F1A\u8BF4\u660E\u539F\u56E0\u3002ZCode CLI \u53EF\u4ECE\u5DF2\u4FDD\u5B58\u7684 npm \u6E90\u5B89\u88C5\u5B8C\u6574\u8FD0\u884C\u5305\uFF0C\u6216\u4E0B\u8F7D\u56FA\u5B9A GitHub Release \u5E76\u6821\u9A8C SHA-256\u3002\u4F1A\u8BDD\u4E0E Agent \u4E5F\u53EF\u4F7F\u7528 ", /* @__PURE__ */ import_react5.default.createElement("code", null, "/tools"), "\u3001", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_install"), "\u3001", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_repair"), " \u548C ", /* @__PURE__ */ import_react5.default.createElement("code", null, "model_router_tool_uninstall"), "\u3002")));
 }
 var HEADLESS_TOOLS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]), WORKSPACE_VIEWS = [
   { id: "plan", label: "\u4EFB\u52A1\u4E0E\u6267\u884C", number: "01" },
@@ -14335,7 +14336,7 @@ function RouterSettingsCard(props) {
     {
       id: "model-router-tool-install-methods",
       label: "\u9ED8\u8BA4\u5B89\u88C5\u65B9\u5F0F\uFF08JSON\uFF0C\u53EF\u9009\uFF09",
-      hint: "\u6309\u5DE5\u5177 ID \u56FA\u5B9A\u4E00\u79CD\u5B89\u88C5\u65B9\u5F0F\uFF0C\u4F8B\u5982\u56FA\u5B9A Step Code \u5728 Windows \u4E0A\u7528 irm | iex\u3002\u7559\u7A7A\u81EA\u52A8\u9009\u62E9\u9002\u5408\u672C\u673A\u7684\u65B9\u5F0F\u3002\u53EF\u9009\u503C\u4EE5\u5DE5\u5177\u4E0B\u62C9\u6846\u4E3A\u51C6\uFF1Anpm\u3001pnpm\u3001script-bash\uFF08curl | bash\uFF09\u3001script-sh\uFF08curl | sh\uFF09\u3001script-powershell\uFF08irm | iex\uFF09\u3002",
+      hint: "\u6309\u5DE5\u5177 ID \u56FA\u5B9A\u4E00\u79CD\u5B89\u88C5\u65B9\u5F0F\uFF0C\u4F8B\u5982\u56FA\u5B9A Step Code \u5728 Windows \u4E0A\u7528 irm | iex\u3002\u7559\u7A7A\u81EA\u52A8\u9009\u62E9\u9002\u5408\u672C\u673A\u7684\u65B9\u5F0F\u3002\u53EF\u9009\u503C\u4EE5\u5DE5\u5177\u4E0B\u62C9\u6846\u4E3A\u51C6\uFF1Anpm\u3001pnpm\u3001script-bash\uFF08curl | bash\uFF09\u3001script-sh\uFF08curl | sh\uFF09\u3001script-powershell\uFF08irm | iex\uFF09\u3001github-release\uFF08ZCode CLI\uFF0CSHA256\uFF09\u3002",
       disabled,
       ...state.toolInstallMethodsJson,
       overriddenLabel: FIELD_COPY.overridden,

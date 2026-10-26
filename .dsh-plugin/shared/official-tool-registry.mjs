@@ -455,11 +455,12 @@ export const OFFICIAL_TOOLS = Object.freeze([
     label: 'ZCode CLI',
     vendor: 'Z.ai · Alice-Marx 社区抽取版',
     purpose: 'ZCode 独立命令行发行版，包含 TUI、Web 和 Agent，无需 Electron；由 Alice-Marx/zcode-cli 社区维护。',
+    package: '@ljwei-stak/zcode-cli',
     manager: 'github-release',
     installArgs: [],
     uninstallArgs: [],
     probeExecutables: ['zcode'],
-    probeNote: '使用 Alice-Marx/zcode-cli 的 GitHub Release 和 SHA256；需要 Node.js 24.14.0 或更新的 Node 24。',
+    probeNote: '支持 GitHub Release（SHA256）或 npm 安装；需要 Node.js 24.14.0 或更新的 Node 24。',
     providerHints: ['zai', 'z.ai', 'zcode', 'glm', 'zhipu', 'bigmodel'],
     installMethods: Object.freeze([Object.freeze({
       id: 'github-release', label: 'GitHub Release · SHA256', kind: 'archive',
@@ -467,7 +468,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
       platforms: Object.freeze(['win32', 'linux', 'darwin']),
       supportsInstallDir: true, supportsRegistry: false,
       installArgs: Object.freeze([]), uninstallArgs: Object.freeze([]),
-    })]),
+    }), packageManagerMethod('npm', 'npm', 'npm', '@ljwei-stak/zcode-cli@latest')]),
   }),
 ])
 

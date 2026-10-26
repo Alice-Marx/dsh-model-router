@@ -1,10 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import * as host from '../.dsh-plugin/index.mjs'
 import { OFFICIAL_TOOLS_REMOTE_NAMESPACE } from '../.dsh-plugin/shared/official-tools-remote.mjs'
-import { installPreferences, installStatus, resetForTests } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
+import { installPreferences, installStatus, resetForTests, setInstallPreferences } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
 
 async function mountedRouter(t, initial = {}) {
   resetForTests()
@@ -132,6 +135,15 @@ test('standalone ZCode follows live unified directory settings and exposes commo
   assert.equal(zcode.updateInstallDir, zcode.installDir)
   assert.equal(zcode.updateCommand, zcode.command)
   assert.equal(zcode.uninstallError, undefined)
+  await save({ toolInstallMethodsJson: '{"zcode":"npm"}', toolNpmRegistry: 'https://registry.npmmirror.com/' })
+  const npm = remote.installSettings().install.tools.find(tool => tool.id === 'zcode')
+  assert.equal(installPreferences().methods.zcode, 'npm')
+  assert.equal(npm.methodId, 'npm')
+  assert.equal(npm.installDir, process.platform === 'win32' ? 'D:/AI/updated-tools' : 'D:/AI/updated-tools/bin')
+  assert.match(npm.command, /@ljwei-stak\/zcode-cli@latest/)
+  assert.match(npm.command, /--registry=https:\/\/registry\.npmmirror\.com\//)
+  assert.match(npm.uninstallCommand, /npm uninstall -g @ljwei-stak\/zcode-cli/)
+  assert.equal(npm.uninstallError, undefined)
 })
 
 test('invalid live settings keep verified preferences and block all install command surfaces', async t => {
@@ -158,4 +170,43 @@ test('invalid live settings keep verified preferences and block all install comm
   assert.equal(remote.services.installSettingsError(), null, 'a valid replacement clears the error')
   assert.deepEqual(installPreferences().methods, { codex: 'npm' })
   assert.equal(installPreferences().allowScriptInstall, false)
+})
+
+
+test('health probes and latest lookup use one captured installation preference snapshot', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'zcode-health-preferences-'))
+  const previousHome = process.env.DSH_HOME
+  const original = installPreferences()
+  process.env.DSH_HOME = directory
+  t.after(async () => {
+    setInstallPreferences(original)
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    await rm(directory, { recursive: true, force: true })
+  })
+  // A separate Host module instance gives this check an isolated persistent store.
+  const isolatedHost = await import('../.dsh-plugin/index.mjs?health-preferences-test')
+  const expected = { installDir: 'D:/selected/npm-tools', registry: 'https://registry.npmmirror.com/',
+    methods: { zcode: 'npm' }, scriptUrls: {}, allowScriptInstall: false }
+  setInstallPreferences(expected)
+  let probed, lookup
+  const report = await isolatedHost.toolHealthReport({ fresh: true,
+    runner: async () => { throw new Error('this isolated preference check must not launch a CLI') },
+    probeTools: async options => {
+      probed = options
+      setInstallPreferences({ ...expected, installDir: 'D:/changed/later', methods: { zcode: 'github-release' } })
+      return [{ id: 'zcode', installed: false, status: 'not-installed', version: null }]
+    },
+    latest: { async lookupAll(tools, options) {
+      lookup = options
+      assert.ok(tools.some(tool => tool.id === 'zcode'))
+      return { zcode: { version: '3.16.3' } }
+    } },
+  })
+  assert.equal(probed.fresh, true)
+  assert.deepEqual(probed.preferences, expected)
+  assert.equal(lookup.preferences, probed.preferences, 'both asynchronous operations use the same captured object')
+  assert.deepEqual(lookup.preferences, expected)
+  assert.equal(installPreferences().methods.zcode, 'github-release', 'the later global change did not rewrite the captured snapshot')
+  assert.equal(report.tools.find(tool => tool.id === 'zcode').latestVersion, '3.16.3')
 })

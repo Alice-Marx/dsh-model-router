@@ -362,7 +362,7 @@ export function RouterSettingsCard(props) {
         <SettingsValueField
           id="model-router-tool-install-methods"
           label="默认安装方式（JSON，可选）"
-          hint="按工具 ID 固定一种安装方式，例如固定 Step Code 在 Windows 上用 irm | iex。留空自动选择适合本机的方式。可选值以工具下拉框为准：npm、pnpm、script-bash（curl | bash）、script-sh（curl | sh）、script-powershell（irm | iex）。"
+          hint="按工具 ID 固定一种安装方式，例如固定 Step Code 在 Windows 上用 irm | iex。留空自动选择适合本机的方式。可选值以工具下拉框为准：npm、pnpm、script-bash（curl | bash）、script-sh（curl | sh）、script-powershell（irm | iex）、github-release（ZCode CLI，SHA256）。"
           disabled={disabled}
           {...state.toolInstallMethodsJson}
           overriddenLabel={FIELD_COPY.overridden}

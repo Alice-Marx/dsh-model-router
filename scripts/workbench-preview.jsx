@@ -78,7 +78,7 @@ function demoInstallSummary(settings) {
   }) }
 }
 
-function createSettingsScope() {
+function createSettingsScope(initial = {}) {
   let snapshot = { status: 'ready', writable: true, revision: 1, value: {
     ...ADAPTIVE_DEFAULTS,
     budgetUsd: 0.1, dailyBudgetUsd: 5, monthlyBudgetUsd: 50,
@@ -90,6 +90,7 @@ function createSettingsScope() {
     // as it does against a real Host, which always sends them in config.
     toolInstallDir: '', toolNpmRegistry: 'https://registry.npmjs.org/',
     toolInstallMethodsJson: '{}', toolScriptUrlsJson: '{}', toolAllowScriptInstall: true,
+    ...initial,
   } }
   const listeners = new Set()
   return {
@@ -136,7 +137,7 @@ function sampleRuns() {
 }
 
 function createDemoSession(scenario) {
-  const settingsScope = createSettingsScope()
+  const settingsScope = createSettingsScope(scenario === 'zcode-npm' ? { toolInstallDir: 'D:/AI/tools', toolInstallMethodsJson: '{"zcode":"npm"}' } : {})
   let toolInspections = 0
   let runs = scenario === 'empty' ? [] : sampleRuns()
   if (scenario === 'budget-reservations') {
@@ -150,7 +151,7 @@ function createDemoSession(scenario) {
   }
   const jobs = new Map()
   let completedAt = scenario === 'onboarding' ? null : Date.now()
-  const installed = new Set(scenario === 'terminal-all' ? OFFICIAL_TOOLS.map(tool => tool.id) : ['claude-code', 'codex', 'gemini'])
+  const installed = new Set(scenario === 'terminal-all' ? OFFICIAL_TOOLS.map(tool => tool.id) : scenario === 'zcode-npm' ? ['zcode'] : ['claude-code', 'codex', 'gemini'])
   let statusRequests = 0, cancelRequests = 0
   const hangTransport = signal => new Promise((_, reject) => signal?.addEventListener('abort', () => reject(signal.reason), { once: true }))
   const source = () => scenario === 'empty' ? { groups: [], routableProviders: [], failures: [] } : catalog
@@ -160,7 +161,7 @@ function createDemoSession(scenario) {
     status: installed.has(tool.id) ? 'installed' : 'not-installed',
     version: installed.has(tool.id) ? '0.0.0-demo' : null,
     latestVersion: null, versionStatus: 'unknown',
-    login: { state: tool.id === 'gemini' ? 'logged-out' : installed.has(tool.id) ? 'logged-in' : 'unknown',
+    login: { state: tool.id === 'zcode' ? 'unknown' : tool.id === 'gemini' ? 'logged-out' : installed.has(tool.id) ? 'logged-in' : 'unknown',
       command: `${tool.probeExecutables?.[0] ?? tool.id} login`, detail: '仅示例登录状态，不读取本机凭据。' },
   }))
   const ledger = () => {
@@ -273,8 +274,8 @@ function createDemoSession(scenario) {
       // delaying config persistence or the independent install summary.
       if (++toolInspections > 1 && scenario === 'tools-hanging') await new Promise(() => {})
       return ok({ hostVersion: __WORKBENCH_PREVIEW_VERSION__, tools: structuredClone(tools),
-      executionCapabilities: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, mode: 'headless', modes: installed.has(tool.id) ? ['read-only'] : [], available: installed.has(tool.id) })),
-      executionReadiness: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ready: tool.id !== 'gemini' && installed.has(tool.id), readyModes: tool.id !== 'gemini' && installed.has(tool.id) ? ['read-only'] : [] })),
+      executionCapabilities: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, mode: 'headless', modes: installed.has(tool.id) ? [tool.id === 'zcode' ? 'workspace-write' : 'read-only'] : [], available: installed.has(tool.id) })),
+      executionReadiness: OFFICIAL_TOOLS.map(tool => ({ id: tool.id, ready: tool.id !== 'gemini' && installed.has(tool.id), readyModes: tool.id !== 'gemini' && installed.has(tool.id) ? [tool.id === 'zcode' ? 'workspace-write' : 'read-only'] : [] })),
       install: demoInstallSummary(settingsScope.getSnapshot().value),
       })
     },
@@ -352,7 +353,7 @@ function createDemoSession(scenario) {
   }
 }
 
-const scenarios = [['populated', '完整示例'], ['billing-split', 'API 费用与订阅用量（模拟账本）'], ['budget-reservations', '预算预占与中断核对（模拟账本）'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode CLI']]
+const scenarios = [['populated', '完整示例'], ['billing-split', 'API 费用与订阅用量（模拟账本）'], ['budget-reservations', '预算预占与中断核对（模拟账本）'], ['run-progress', '实时进度与取消（模拟执行）'], ['run-hanging', '进度与取消超时恢复（模拟执行）'], ['empty', '空目录与空记录'], ['error', '目录读取失败'], ['onboarding', '首次开箱体检'], ['slow', '预览延迟（输入变化检查）'], ['tools-hanging', '工具体检挂起（方式切换检查）'], ['terminal-all', '全部工具终端与 ZCode CLI'], ['zcode-npm', 'ZCode CLI · npm 安装方式']]
 function Preview() {
   const initial = new URLSearchParams(window.location.search).get('scenario')
   const [scenario, setScenario] = React.useState(scenarios.some(([id]) => id === initial) ? initial : 'populated')

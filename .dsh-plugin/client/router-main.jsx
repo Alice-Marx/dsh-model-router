@@ -265,7 +265,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
             />
             <span>允许 curl / irm 安装脚本</span>
           </span>
-          <small>关闭后仍可使用 npm / pnpm 和 ZCode CLI 发行包；脚本方式需先下载并核对厂商标记。</small>
+          <small>关闭后仍可使用 npm / pnpm 和 GitHub Release 发行包；脚本方式需先下载并核对厂商标记。</small>
         </label>
       </div>
       <div className="mr-install-save-row">
@@ -608,7 +608,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
     <section className="mr-card" aria-label="官方工具">
       <div className="mr-card-head"><div>
         <h2 className="mr-card-title">官方工具 · 体检</h2>
-        <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm、厂商安装脚本或经过校验的发行包，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode CLI 使用社区独立发行版，与其他工具共用安装目录设置。</p>
+        <p className="mr-card-copy">检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm、厂商安装脚本或经过校验的发行包，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode CLI 可选择 npm 社区包或 GitHub Release 发行包，按所选方式使用安装目录设置。</p>
       </div><button className="mr-button mr-button-secondary" type="button" disabled={probeState.status === 'loading'} onClick={() => { void refresh() }}>重新体检</button></div>
       <div className="mr-card-body">
         <InstallSettings settingsScope={settingsScope} install={probeState.install} onPendingChange={handleSettingsPending} onMutationStart={beginSettingsMutation} />
@@ -715,7 +715,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
           })}
         </div>
         <p className="mr-caption" style={{ marginTop: 12 }}>
-          安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode CLI 下载固定 GitHub 仓库的发行包并校验 SHA-256。会话与 Agent 也可使用 <code>/tools</code>、<code>model_router_tool_install</code>、<code>model_router_tool_repair</code> 和 <code>model_router_tool_uninstall</code>。
+          安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode CLI 可从已保存的 npm 源安装完整运行包，或下载固定 GitHub Release 并校验 SHA-256。会话与 Agent 也可使用 <code>/tools</code>、<code>model_router_tool_install</code>、<code>model_router_tool_repair</code> 和 <code>model_router_tool_uninstall</code>。
         </p>
       </div>
     </section>

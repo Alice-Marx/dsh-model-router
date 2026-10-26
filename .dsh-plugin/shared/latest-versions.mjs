@@ -75,10 +75,15 @@ export function parseStepCodeManifest(text) {
 }
 
 /** Where to look up a tool's latest release; null when there is no cheap source. */
-export function latestSourceFor(tool) {
+export function latestSourceFor(tool, { plan, methodId, method, preferences } = {}) {
   if (!tool || tool.unsupported) return null
   if (tool.manager === 'npm' && typeof tool.package === 'string') return { kind: 'npm', package: tool.package }
-  if (tool.id === 'zcode') return { kind: 'zcode-github-release', url: ZCODE_RELEASE_API }
+  if (tool.id === 'zcode') {
+    // A concrete operation plan wins over live settings and a UI's saved method.
+    const selected = plan?.methodId ?? methodId ?? method ?? preferences?.methods?.[tool.id]
+    const npm = plan?.kind ? plan.kind === 'package-manager' && plan.manager === 'npm' : selected === 'npm'
+    return npm ? { kind: 'npm', package: tool.package } : { kind: 'zcode-github-release', url: ZCODE_RELEASE_API }
+  }
   if (tool.id === 'stepcode') return { kind: 'stepcode-release-manifest' }
   if (tool.id === 'hermes') return { kind: 'hermes-github-release', url: 'https://api.github.com/repos/NousResearch/hermes-agent/releases/latest' }
   return null
@@ -123,32 +128,43 @@ export function createLatestVersions({
   persist = true,
 } = {}) {
   let entries = null
+  let loading = null
+  let saving = Promise.resolve()
   const inflight = new Map()
 
   async function load() {
     if (entries) return entries
-    entries = {}
-    if (!persist) return entries
-    try {
-      const saved = JSON.parse(await readFile(cachePath(), 'utf8'))
-      if (saved && typeof saved.entries === 'object' && !Array.isArray(saved.entries)) {
-        for (const [id, entry] of Object.entries(saved.entries)) {
-          if (entry && typeof entry === 'object' && (entry.version === null || isReleaseVersion(entry.version))) entries[id] = entry
-        }
+    if (loading) return loading
+    loading = (async () => {
+      const loaded = {}
+      if (persist) {
+        try {
+          const saved = JSON.parse(await readFile(cachePath(), 'utf8'))
+          if (saved && typeof saved.entries === 'object' && !Array.isArray(saved.entries)) {
+            for (const [id, entry] of Object.entries(saved.entries)) {
+              if (entry && typeof entry === 'object' && (entry.version === null || isReleaseVersion(entry.version))) loaded[id] = entry
+            }
+          }
+        } catch { /* first run or unreadable cache: start empty */ }
       }
-    } catch { /* first run or unreadable cache: start empty */ }
-    return entries
+      entries = loaded
+      return entries
+    })()
+    return loading
   }
 
   async function save() {
     if (!persist) return
-    try {
-      const path = cachePath()
-      await mkdir(dirname(path), { recursive: true })
-      const temporary = `${path}.${process.pid}.tmp`
-      await writeFile(temporary, `${JSON.stringify({ version: 1, entries }, null, 2)}\n`, 'utf8')
-      await rename(temporary, path)
-    } catch { /* the in-memory cache still serves this process */ }
+    saving = saving.then(async () => {
+      try {
+        const path = cachePath()
+        await mkdir(dirname(path), { recursive: true })
+        const temporary = `${path}.${process.pid}.tmp`
+        await writeFile(temporary, `${JSON.stringify({ version: 1, entries }, null, 2)}\n`, 'utf8')
+        await rename(temporary, path)
+      } catch { /* the in-memory cache still serves this process */ }
+    })
+    await saving
   }
 
   const view = (entry, stale = false) => entry ? {
@@ -161,35 +177,40 @@ export function createLatestVersions({
     ...(stale ? { stale: true } : {}),
   } : null
 
-  async function lookup(tool, { fresh = false } = {}) {
-    const source = latestSourceFor(tool)
+  async function lookup(tool, { fresh = false, ...selection } = {}) {
+    const source = latestSourceFor(tool, selection)
     if (!source) return null
     const cache = await load()
-    const entry = tool.id === 'zcode' && cache[tool.id]?.source !== 'zcode-github-release' ? null : cache[tool.id]
+    // The two ZCode channels can publish at different times. Never reuse either
+    // channel's in-flight request, cached version, failure or asset URL for the other.
+    const key = tool.id === 'zcode' ? `${tool.id}:${source.kind}` : tool.id
+    const legacy = tool.id === 'zcode' && source.kind === 'zcode-github-release' ? cache[tool.id] : null
+    const candidate = cache[key] ?? legacy
+    const entry = tool.id === 'zcode' && candidate?.source !== source.kind ? null : candidate
     const at = now()
     if (!fresh && entry) {
       if (!entry.error && at - (entry.checkedAt ?? 0) < ttlMs) return view(entry)
       if (entry.error && at - (entry.failedAt ?? 0) < failureRetryMs) return view(entry, true)
     }
-    if (inflight.has(tool.id)) return inflight.get(tool.id)
+    if (inflight.has(key)) return inflight.get(key)
     const pending = (async () => {
       try {
         const found = await lookupSource(source, { fetchImpl, timeoutMs })
-        cache[tool.id] = { version: found.version, checkedAt: now(), source: found.source, ...(found.url ? { url: found.url } : {}), ...(found.sha256Url ? { sha256Url: found.sha256Url } : {}) }
+        cache[key] = { version: found.version, checkedAt: now(), source: found.source, ...(found.url ? { url: found.url } : {}), ...(found.sha256Url ? { sha256Url: found.sha256Url } : {}) }
         await save()
-        return view(cache[tool.id])
+        return view(cache[key])
       } catch (error) {
         const message = String(error?.name === 'TimeoutError' ? '查询超时' : error?.message ?? error).slice(0, 160)
         // Keep the last good version; remember the failure to avoid retrying every call offline.
-        cache[tool.id] = { version: entry?.version ?? null, checkedAt: entry?.checkedAt ?? null, source: entry?.source ?? null,
+        cache[key] = { version: entry?.version ?? null, checkedAt: entry?.checkedAt ?? null, source: entry?.source ?? source.kind,
           ...(entry?.url ? { url: entry.url } : {}), ...(entry?.sha256Url ? { sha256Url: entry.sha256Url } : {}), error: message, failedAt: now() }
         await save()
-        return view(cache[tool.id], true)
+        return view(cache[key], true)
       } finally {
-        inflight.delete(tool.id)
+        inflight.delete(key)
       }
     })()
-    inflight.set(tool.id, pending)
+    inflight.set(key, pending)
     return pending
   }
 
@@ -204,7 +225,7 @@ export function createLatestVersions({
     },
     /** Test helper and cache inspection. */
     async snapshot() { return { ...(await load()) } },
-    reset() { entries = null; inflight.clear() },
+    reset() { entries = null; loading = null; inflight.clear() },
   }
 }
 

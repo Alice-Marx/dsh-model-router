@@ -190,6 +190,43 @@ test('an installed current npm copy cannot disable installation or enable uninst
   assert.match(ui.text(), /所选安装目标尚未体检/)
 })
 
+test('ZCode can switch from the default GitHub archive to npm using the shared settings controls', async t => {
+  const fixture = await sdkSettings()
+  const previews = []
+  const zcodeSummary = () => {
+    const value = fixture.scope.getSnapshot().value
+    const preferences = parseInstallPreferences(value, { tools: OFFICIAL_TOOLS })
+    const methodId = preferences.methods.zcode ?? 'github-release'
+    const npm = methodId === 'npm'
+    return { ...preferences, requestedInstallDir: value.toolInstallDir,
+      tools: [{ id: 'zcode', savedMethodId: preferences.methods.zcode ?? null, methodId,
+        command: npm ? 'npm install -g @ljwei-stak/zcode-cli@latest --registry=https://registry.npmjs.org/' : 'GitHub Release archive → ~/.zcode/runtime',
+        installDir: npm ? '/shared/npm/bin' : '/home/tester/.zcode/runtime', uninstallCommand: npm ? 'npm uninstall -g @ljwei-stak/zcode-cli' : 'remove archive runtime',
+        methods: installMethodsFor(getOfficialTool('zcode')).map(method => ({ id: method.id, label: method.label })) }] }
+  }
+  const ui = await cardHarness({ settingsScope: fixture.scope, onProbes() {},
+    listOfficialTools: async () => ({ ok: true, value: { tools: [{ id: 'zcode', installed: true, version: '3.16.2' }], install: zcodeSummary() } }),
+    loadOfficialInstallSettings() { const gate = deferred(); previews.push({ gate, install: zcodeSummary() }); return gate.promise },
+  })
+  t.after(() => ui.unmount())
+  previews[0].gate.resolve({ ok: true, value: { install: previews[0].install } })
+  await tick(); ui.render()
+  assert.match(ui.command('zcode'), /GitHub Release archive/)
+  assert.equal(ui.uninstall('zcode').disabled, false)
+  ui.select('zcode').onChange({ target: { value: 'npm' } })
+  await tick(); ui.render()
+  assert.equal(fixture.writes.length, 1)
+  assert.deepEqual(JSON.parse(fixture.writes[0].operations[0].value), { zcode: 'npm' })
+  fixture.accept(0); await tick(); ui.render()
+  previews.at(-1).gate.resolve({ ok: true, value: { install: previews.at(-1).install } })
+  await tick(); ui.render()
+  assert.equal(ui.select('zcode').value, 'npm')
+  assert.match(ui.command('zcode'), /npm install -g @ljwei-stak\/zcode-cli@latest/)
+  assert.equal(ui.install('zcode').disabled, false)
+  assert.equal(ui.uninstall('zcode').disabled, true, 'an archive probe must not authorize uninstalling the new npm target')
+  assert.match(ui.text(), /所选安装目标尚未体检/)
+})
+
 test('real SDK delayed mutation times out visibly, then late ACK follows actual saved state', async () => {
   const fixture = await sdkSettings()
   let settlements = 0

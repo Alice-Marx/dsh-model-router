@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getOfficialTool } from '../.dsh-plugin/shared/official-tool-registry.mjs'
-import { finishVerifiedInstall, runZCodeInstallJob, setInstallPreferences, resetForTests } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
+import { finishVerifiedInstall, probeToolWith, resolvePackageJobPlan, runZCodeInstallJob, setInstallPreferences, resetForTests } from '../.dsh-plugin/shared/official-tools-runtime.mjs'
+import { resolveInstallPlan, resolveUninstallPlan } from '../.dsh-plugin/shared/tool-install-preferences.mjs'
 
 function job(operation = 'install') {
   return { tool: getOfficialTool('zcode'), status: 'running', operation,
@@ -66,4 +67,50 @@ test('a current or newer CLI still requires a ready Node 24 execution entry', as
     assert.equal(request.status, 'failed')
     assert.match(request.error, /需要 Node 24/)
   }
+})
+
+test('a selected npm probe inspects its package instead of the archive or a command shim', async () => {
+  const tool = getOfficialTool('zcode')
+  const preferences = { installDir: 'D:/Apps/tools', methods: { zcode: 'npm' } }
+  const plan = resolveInstallPlan(tool, 'npm', preferences, { platform: 'win32' })
+  const inspect = async (_tool, selection) => {
+    assert.equal(selection.plan.kind, 'package-manager'); assert.equal(selection.plan.installDir, 'D:/Apps/tools')
+    return [{ version: '3.17.0', entry: 'D:/Apps/tools/node_modules/@ljwei-stak/zcode-cli/bin/zcode.mjs', packageRoot: 'D:/Apps/tools/node_modules/@ljwei-stak/zcode-cli', source: 'verified-npm-package' }]
+  }
+  const probe = await probeToolWith(tool, () => assert.fail('version detection must not run a shim'), { preferences, plan, packageEntries: inspect, cache: new Map() })
+  assert.equal(probe.installed, true); assert.equal(probe.version, '3.17.0'); assert.equal(probe.manager, 'npm'); assert.equal(probe.methodId, 'npm')
+  assert.equal(probe.source, 'verified-npm-package')
+  const missing = await probeToolWith(tool, null, { preferences, plan, packageEntries: async () => [], cache: new Map() })
+  assert.equal(missing.installed, false); assert.match(missing.detail, /npm 安装的 @ljwei-stak\/zcode-cli/)
+  const archivePlan = resolveInstallPlan(tool, 'github-release', preferences, { platform: 'win32' })
+  const archive = await probeToolWith(tool, null, { preferences, plan: archivePlan, packageEntries: () => assert.fail('archive probe must not inspect npm'), cache: new Map() })
+  assert.equal(archive.methodId, 'github-release'); assert.equal(archive.manager, 'github-release')
+})
+
+test('npm ZCode install, repair and removal bind the npm prefix rather than its archive subdirectory', async () => {
+  const tool = getOfficialTool('zcode'), preferences = { methods: { zcode: 'npm' } }
+  const options = { platform: 'win32', home: 'C:/Users/test' }
+  for (const operation of ['install', 'repair', 'uninstall']) {
+    const original = operation === 'uninstall' ? resolveUninstallPlan(tool, 'npm', preferences, options) : resolveInstallPlan(tool, 'npm', preferences, options)
+    const plan = await resolvePackageJobPlan(tool, original, preferences, { operation, options,
+      runner: async (manager, args) => { assert.equal(manager, 'npm'); assert.deepEqual(args, ['config', 'get', 'prefix']); return { ok: true, stdout: 'D:/npm-prefix' } },
+    })
+    assert.equal(plan.kind, 'package-manager'); assert.equal(plan.installDir, 'D:/npm-prefix')
+    assert.deepEqual(plan.args.slice(-2), ['--prefix', 'D:/npm-prefix'])
+    assert.ok(plan.args.includes(operation === 'uninstall' ? '@ljwei-stak/zcode-cli' : '@ljwei-stak/zcode-cli@latest'))
+    assert.ok(plan.args.includes(operation === 'uninstall' ? 'uninstall' : 'install'))
+    assert.equal(plan.args.some(arg => /github\.com|zcode-cli$/.test(arg) && arg !== '@ljwei-stak/zcode-cli'), false)
+  }
+})
+
+test('installation completion forwards the concrete npm channel for latest-version verification', async () => {
+  const request = job()
+  request.plan = resolveInstallPlan(request.tool, 'npm', request.preferences, { platform: 'win32' })
+  await finishVerifiedInstall(request, { installed: true, version: '3.17.0' }, {
+    lookupLatest: async (tool, selection) => {
+      assert.equal(tool.id, 'zcode'); assert.equal(selection.plan.methodId, 'npm'); assert.equal(selection.preferences, request.preferences)
+      return { version: '3.17.0', source: 'npm' }
+    }, readinessFor: async () => ({ supported: true, ready: true }),
+  })
+  assert.equal(request.status, 'succeeded')
 })

@@ -344,11 +344,12 @@ const readAuthState = async path => {
 }
 
 /** 开箱体检: install, version and login state for every registry tool. */
-export async function toolHealthReport({ fresh = false, runner = defaultRunner, latest = latestVersions } = {}) {
+export async function toolHealthReport({ fresh = false, runner = defaultRunner, latest = latestVersions, probeTools = probeAllTools } = {}) {
   // Latest-version lookups run alongside the probes; failures are non-fatal (offline-safe).
+  const preferences = installPreferences()
   const [probes, latestById] = await Promise.all([
-    probeAllTools({ fresh }),
-    latest.lookupAll(OFFICIAL_TOOLS).catch(() => ({})),
+    probeTools({ fresh, preferences }),
+    latest.lookupAll(OFFICIAL_TOOLS, { preferences }).catch(() => ({})),
   ])
   const report = await runHealthCheck(probes, { runner, home: homedir(), exists: fileExists, readAuthState, latest: latestById })
   healthCache.remember(report)
@@ -2452,10 +2453,10 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   }))
   ctx.tools.register(defineTool({
     name: 'model_router_tool_install',
-    description: 'Install one official model tool by registry id from its fixed source at the latest release, using one of that tool\'s declared install methods (npm, pnpm, vendor installer script or verified GitHub release archive). ZCode CLI uses the community-maintained Alice-Marx/zcode-cli distribution and shares the install-directory setting. Only registry ids and declared method ids are accepted; arbitrary packages, URLs or executables are refused. The install directory and download sources come from the user\'s own plugin settings.',
+    description: 'Install one official model tool by registry id from its fixed source at the latest release, using one of that tool\'s declared install methods (npm, pnpm, vendor installer script or verified GitHub release archive). ZCode CLI offers the fixed @ljwei-stak/zcode-cli npm package (complete runtime, no separate GitHub download) and the default community-maintained Alice-Marx/zcode-cli GitHub Release archive; each uses the selected method and saved directory/source settings. Only registry ids and declared method ids are accepted; arbitrary packages, URLs or executables are refused. The install directory and download sources come from the user\'s own plugin settings.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Registry tool id, e.g. kimi-code.' },
-      method: { type: 'string', description: 'Install method id for this tool, e.g. npm, pnpm, script-bash or script-powershell. Omit to use the user\'s configured default.' },
+      method: { type: 'string', description: 'Install method id for this tool, e.g. npm, pnpm, script-bash, script-powershell or github-release. Omit to use the user\'s configured default.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {

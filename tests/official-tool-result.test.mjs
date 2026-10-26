@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createOfficialToolEvidenceCollector, finalizeOfficialProcessResult, officialToolTerminalEvidence, resolveZCodeLaunch, executionEnvironment,
+import { createOfficialToolEvidenceCollector, finalizeOfficialProcessResult, officialToolTerminalEvidence, officialToolReadiness, resolveZCodeLaunch, executionEnvironment,
   parseClaudeProcessOutput } from '../.dsh-plugin/shared/official-tool-executor.mjs'
 
 const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
@@ -47,6 +47,18 @@ test('standalone ZCode retains its provider locations and proxy without undocume
   assert.equal(env.ZAI_API_KEY, undefined)
   assert.equal(env.OPENAI_API_KEY, undefined)
   assert.equal(env.NODE_OPTIONS, undefined)
+})
+
+test('ZCode managed readiness cannot substitute an archive when the selected npm package is absent', async t => {
+  const { mkdtemp, realpath, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os'), { join } = await import('node:path')
+  const prefix = await realpath(await mkdtemp(join(tmpdir(), 'router-zcode-missing-npm-')))
+  t.after(() => rm(prefix, { recursive: true, force: true }))
+  const result = await officialToolReadiness('zcode', process.cwd(), {
+    preferences: { installDir: prefix, methods: { zcode: 'npm' } }, executionEnvironment: 'cli-native',
+  })
+  assert.equal(result.ready, false)
+  assert.match(result.reason, /所选 npm.*不会改用 GitHub/)
 })
 
 test('Claude nonzero terminal JSON retains its failure and explicit zero usage/cost', () => {

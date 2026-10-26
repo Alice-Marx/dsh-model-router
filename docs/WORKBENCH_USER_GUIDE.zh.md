@@ -1,6 +1,6 @@
 # 模型路由工作台：配置、规划与实际执行
 
-适用版本：`@ljwei-stak/dsh-model-router@0.25.2`。声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3`。源码构建使用固定的 0.2.1-rc.3 SDK；兼容验证与边界见[0.25.1 验收记录](releases/0.25.1-validation.md)。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
+适用版本：`@ljwei-stak/dsh-model-router@0.25.3`。声明兼容 DeepSeek Harness Desktop `0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3`。源码构建使用固定的 0.2.1-rc.3 SDK；兼容验证与边界见[0.25.1 验收记录](releases/0.25.1-validation.md)。安装与开发见[中文 README](../README.zh.md)，旧包迁移见[迁移说明](archive/MIGRATION.md)。
 
 0.22.0 新增“按算法推荐分配 / 手动调整分配”：生成任务建议后，可为每个工作包选择模型 API 或官方工具；修改后重新预览费用与渠道，再确认执行。任务依赖与重跑目标保留。手动混合执行当前只读，官方工具使用自身默认模型；编辑文件继续选择官方工具协作。详见[手动分配说明](MANUAL_TASK_ASSIGNMENT.zh.md)。Hermes 自定义程序目录、原配置/登录/历史位置，以及工具页顶部终端的行为继续保留。
 
@@ -131,7 +131,7 @@ CLI 记录分别保留 Harness 推荐模型、显式请求 CLI 模型和 CLI 回
 3. 有更新时可更新；已安装版本比查询结果更高时不会降级。
 4. 已安装但未就绪时点**一键修复**，用同一条固定命令重新安装一遍。
 5. 不再需要时点**一键卸载**。包管理器安装走同一个管理器；脚本安装只移除登记的命令入口，可能保留厂商版本目录。配置、登录信息和历史记录保留。不支持安全卸载的方式会说明原因。
-6. ZCode CLI 与其他工具使用相同的安装、更新、修复和卸载操作；安装方式为 `github-release`（GitHub Release · SHA256），需要 Node 24.14.0 或更新的 Node 24。它使用 [Alice-Marx/zcode-cli](https://github.com/Alice-Marx/zcode-cli) 社区独立发行版，不依赖桌面版，也不是 Z.AI 官方发行版。
+6. ZCode CLI 与其他工具使用相同的安装、更新、修复和卸载操作；安装方式默认保留 `github-release`（GitHub Release · SHA256），也可在该行下拉框选择 `npm`，需要 Node 24.14.0 或更新的 Node 24。它使用 [Alice-Marx/zcode-cli](https://github.com/Alice-Marx/zcode-cli) 社区独立发行版，不依赖桌面版，也不是 Z.AI 官方发行版。
 7. 按**去登录**提示，在对应 CLI/终端完成厂商授权，然后用小任务验证权限。
 
 ### 统一安装设置
@@ -172,9 +172,9 @@ MiniMax 官方 Windows 脚本的 `<# ... #>` 是 PowerShell 帮助注释。0.18.
 | Step Code | — | bash | PowerShell | 脚本使用根目录/stepcode |
 | Hermes Agent | — | bash | PowerShell | 源码放统一根/hermes-agent；配置和数据仍保留原位置 |
 | Pi | npm/pnpm | — | — | `@earendil-works/pi-coding-agent`；Node.js ≥22.19，安装带 `--ignore-scripts` |
-| ZCode CLI | — | — | — | GitHub Release · SHA256；统一根/zcode-cli，留空 ~/.zcode/runtime |
+| ZCode CLI | npm：`@ljwei-stak/zcode-cli` | — | — | npm 使用统一 prefix；GitHub Release 使用统一根/zcode-cli，留空 ~/.zcode/runtime |
 
-“—”表示插件未使用相应渠道。ZCode CLI 通过独立的 `github-release` 方式下载固定仓库最新发行包，并核对同一发行版的 SHA-256；启动前检查已安装文件摘要。每个工具的安装方式下拉框保留所有声明方式，并说明本机不适用的原因。MiniMax 官方脚本只接受官方 npm 源或 npmmirror；其他 npm 镜像请选 npm/pnpm 方式。
+“—”表示插件未使用相应渠道。ZCode CLI 默认通过 `github-release` 下载固定仓库最新发行包，并核对同一发行版的 SHA-256；启动前检查已安装文件摘要。也可选择 `npm` 安装固定的 `@ljwei-stak/zcode-cli@latest`，使用已保存的 npm 源与 prefix。该 npm 包包含完整 TUI、Web 和 Agent 运行资源，安装时不另行从 GitHub 下载。每个工具的安装方式下拉框保留所有声明方式，并说明本机不适用的原因。MiniMax 官方脚本只接受官方 npm 源或 npmmirror；其他 npm 镜像请选 npm/pnpm 方式。
 
 安装成功只表示所选目录的命令入口和版本已确认，不代表工具支持受限执行。Gemini 使用核验后的 npm/pnpm 包入口无界面执行；OpenCode、Step 当前可安装和在终端中使用，尚不支持受限任务。缺少这类能力不再报安装失败。Kimi、MiMo、Grok 的独立原生脚本安装目前没有插件需要的 npm 文件摘要证明，会显示执行入口未就绪；模型路由可按策略使用 API，官方工具协作则不选用该入口且不自动回退。npm/pnpm 安装保留可核验的执行路径。Windows Codex 脚本使用目录联接，插件不提供通用文件删除卸载；请按官方方式移除原生安装。
 
@@ -207,7 +207,7 @@ MiniMax 官方 Windows 脚本的 `<# ... #>` 是 PowerShell 帮助注释。0.18.
 
 Hermes 安装后运行 `hermes auth`；Pi 启动后输入 `/login`，没有独立的 `pi login` 命令。两者的登录状态显示为未知，插件不读取凭据。Hermes 的 Windows 命令目录默认为 `%LOCALAPPDATA%/hermes/bin`（配置 `HERMES_HOME` 时使用其 `bin` 子目录），POSIX 使用 `~/.local/bin`；未设置统一目录时沿用这些厂商命令目录；设置后，源码安装到统一根/hermes-agent，插件绑定其中的 `.hermes/bin` 入口，不迁移现有配置与历史。卸载 Hermes 源码安装请在终端使用 `hermes uninstall`，桌面/MSIX 版使用系统应用管理。
 
-在统一安装设置中选择安装根目录后，ZCode CLI 会使用其 `zcode-cli` 子目录；留空使用 `~/.zcode/runtime`。核验成功后在官方工具终端选择 **ZCode CLI** 启动独立 TUI，或选择登录模式。`zcode login` 登录 Z.AI，`zcode login bigmodel` 登录 Coding Plan；登录、模型和插件由用户自行配置。工具行显示独立 CLI 的发行版版本，更新与修复使用固定仓库的最新发行包。卸载只移除插件管理的运行目录，保留配置、登录和会话历史。旧的桌面安装目录设置不再影响 CLI。
+ZCode CLI 的默认 GitHub Release 方式在统一根目录下使用 `zcode-cli` 子目录，留空使用 `~/.zcode/runtime`；选择 npm 方式时，与其他 npm 工具共用已保存的 npm 源和 prefix。可在工具行选择 `npm`，也可运行 `/tools method zcode npm` 后安装，或直接运行 `npm install --global @ljwei-stak/zcode-cli@latest --registry=https://registry.npmjs.org/`。核验成功后在官方工具终端选择 **ZCode CLI** 启动独立 TUI，或选择登录模式。`zcode login` 登录 Z.AI，`zcode login bigmodel` 登录 Coding Plan；登录、模型和插件由用户自行配置。工具行显示独立 CLI 的发行版版本，更新与修复使用当前选择方式的最新版本。GitHub Release 方式只卸载插件管理的运行目录；npm 方式使用相同包管理器卸载固定包；插件在 `<DSH_HOME>/model-router/zcode-npm/cache` 中准备的已核验运行缓存可能保留。切换方式不会迁移或移除另一份副本，保留配置、登录和会话历史。旧的桌面安装目录设置不再影响 CLI。
 
 终端**不经过 Harness 沙箱**，保留用户登录环境、代理和 API Key 变量；输入的命令可按用户权限修改文件。它与上面的只读路由执行分别处理，不共享“只读”的承诺。
 

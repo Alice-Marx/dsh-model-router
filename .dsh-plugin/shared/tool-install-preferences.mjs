@@ -252,7 +252,7 @@ export function resolveInstallPlan(tool, methodId, preferences = {}, { platform 
   const installDir = preferences?.installDir || ''
   if (method.kind === 'archive') {
     const target = installDir ? joinPath(installDir, 'zcode-cli') : joinPath(home, '.zcode', 'runtime')
-    return { toolId: tool.id, method, methodId: method.id, kind: 'archive', label: method.label,
+    return { toolId: tool.id, method, methodId: method.id, kind: 'archive', manager: method.manager, label: method.label,
       installDir: target, binDir: joinPath(target, 'bin'), env: {},
       notices: ['从固定的 Alice-Marx/zcode-cli GitHub Release 下载并校验 SHA256；社区维护版需要 Node 24.14.0 或更新的 Node 24。'] }
   }

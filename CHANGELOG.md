@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.25.3 — 2026-10-26
+
+- Add npm installation for ZCode CLI via the fixed `@ljwei-stak/zcode-cli@latest` package. Keep GitHub Release as the default alternative; the selected method controls detection, install/update/repair/uninstall, directory and download source.
+- Keep npm and GitHub latest-version lookups, cached results and concurrent requests separate. Health checks use one captured settings snapshot for probing and version lookup.
+- Resolve the selected npm package to its verified runtime for TUI, login and managed tasks. Verify npm metadata, the embedded archive and actual runtime files; prepare a bounded runtime cache when install scripts are disabled, without an extra GitHub download or fallback to another installation.
+
+Validation evidence and limits are tracked in the [0.25.3 acceptance report](docs/releases/0.25.3-validation.md).
+
 ## 0.25.2 — 2026-10-26
 
 - Replace the Windows desktop-bundled ZCode entry with the standalone [Alice-Marx/zcode-cli](https://github.com/Alice-Marx/zcode-cli) distribution. The tool keeps its `zcode` route identity and now uses the common install directory and install/update/repair/uninstall controls.

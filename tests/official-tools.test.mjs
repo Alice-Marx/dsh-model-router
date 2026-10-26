@@ -326,6 +326,17 @@ test('registry follows each vendor\'s latest release instead of pinning versions
   assert.match(installCommandLine(getOfficialTool('zcode')), /GitHub Release/)
 })
 
+test('ZCode offers its published npm package alongside the default GitHub archive', () => {
+  const tool = getOfficialTool('zcode')
+  assert.equal(tool.manager, 'github-release')
+  assert.equal(tool.package, '@ljwei-stak/zcode-cli')
+  assert.deepEqual(installMethodsFor(tool).map(method => method.id), ['github-release', 'npm'])
+  const npm = installMethodFor(tool, 'npm')
+  assert.equal(npm.kind, 'package-manager')
+  assert.equal(npm.supportsRegistry, true); assert.equal(npm.supportsInstallDir, true)
+  assert.equal(installCommandLineFor(tool, npm), 'npm install -g @ljwei-stak/zcode-cli@latest')
+})
+
 test('provider keywords map conservatively to registry tools', () => {
   assert.equal(toolForProvider('moonshot-main').id, 'kimi-code')
   assert.equal(toolForProvider('kimi-account').id, 'kimi-code')

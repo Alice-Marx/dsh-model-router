@@ -235,6 +235,27 @@ test('ZCode standalone terminal uses the shared directory and a compatible Node 
   }
 })
 
+test('ZCode npm terminal binds the selected package and never substitutes an archive copy', async () => {
+  const entry = { packageRoot: '/selected/node_modules/@ljwei-stak/zcode-cli', entry: '/selected/node_modules/@ljwei-stak/zcode-cli/bin/zcode.mjs', version: '3.16.2' }
+  const verified = { root: '/verified/npm-runtime', cliEntry: '/verified/npm-runtime/bin/zcode.mjs', source: 'npm-registry-sha256' }
+  const preferences = { installDir: '/selected', methods: { zcode: 'npm' } }
+  const calls = []
+  const options = { platform: 'linux', env: {}, home: '/home/test', cwd: '/workspace', preferences,
+    packageEntry: async (tool, plan) => { calls.push({ tool: tool.id, kind: plan.kind, installDir: plan.installDir }); return entry },
+    npmBundle: async found => { assert.equal(found, entry); return verified },
+    discoverBundle: async () => assert.fail('npm selection cannot use the GitHub archive'),
+    findNode: async (_cwd, minimum, accepted) => {
+      assert.deepEqual(minimum, [24, 14, 0]); assert.equal(accepted('25.0.0'), false); return '/node24'
+    } }
+  const launch = await resolveTerminalLaunch('zcode', 'interactive', options)
+  assert.deepEqual(calls, [{ tool: 'zcode', kind: 'package-manager', installDir: '/selected' }])
+  assert.equal(launch.file, '/node24')
+  assert.deepEqual(launch.args, [verified.cliEntry])
+  assert.deepEqual((await resolveTerminalLaunch('zcode', 'login', options)).args, [verified.cliEntry, 'login'])
+  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { ...options, packageEntry: async () => null }), /所选 npm.*不会改用 GitHub/)
+  await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { ...options, npmBundle: async () => { throw new Error('payload mismatch') } }), /payload mismatch/)
+})
+
 test('terminal environment is the login environment minus ELECTRON_RUN_AS_NODE', () => {
   const env = terminalEnvironment({ PATH: '/bin', OPENAI_API_KEY: 'sk-test', HTTPS_PROXY: 'http://proxy', ELECTRON_RUN_AS_NODE: '1', electron_run_as_node: '1' })
   assert.equal(env.PATH, '/bin')

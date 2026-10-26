@@ -1,8 +1,8 @@
 # DeepSeek Harness Desktop · 独立插件安装与验证
 
-模型路由从 **0.12.0** 起独立发布；GAL 是独立的 **0.1.0** 插件。路由 **0.25.2** 声明支持官方 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3**。GAL 的兼容范围以其自身安装包为准。
+模型路由从 **0.12.0** 起独立发布；GAL 是独立的 **0.1.0** 插件。路由 **0.25.3** 声明支持官方 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3**。GAL 的兼容范围以其自身安装包为准。
 
-当前路由版本为 **0.25.2**，ZCode 已改为独立的社区 ZCode CLI，共用工具卡片的安装、更新、修复和卸载；沿用 0.2.1-rc.3 SDK 与已有 Host peer 兼容声明。API 费用与订阅用量分开计算，沿用实时进度、取消和中断记录。0.22.0 新增算法推荐与手动工作包分配二选一，可逐包选择模型 API 或官方工具，并改进证据驱动规划与依赖搜索。手动混合执行目前只读；编辑文件继续走官方工具协作。沿用 Hermes/Pi 安装与终端支持、OpenCode 官方 V2 包和现有兼容声明。保留原插件 id、配置与运行记录；安装后完全退出 Harness（包括托盘）再重启。公开数据默认关闭，自动质量升级默认关闭。
+当前路由版本为 **0.25.3**，ZCode CLI 新增 npm 安装选项并保留 GitHub Release 默认方式，共用工具卡片的安装、更新、修复和卸载；沿用 0.2.1-rc.3 SDK 与已有 Host peer 兼容声明。API 费用与订阅用量分开计算，沿用实时进度、取消和中断记录。0.22.0 新增算法推荐与手动工作包分配二选一，可逐包选择模型 API 或官方工具，并改进证据驱动规划与依赖搜索。手动混合执行目前只读；编辑文件继续走官方工具协作。沿用 Hermes/Pi 安装与终端支持、OpenCode 官方 V2 包和现有兼容声明。保留原插件 id、配置与运行记录；安装后完全退出 Harness（包括托盘）再重启。公开数据默认关闭，自动质量升级默认关闭。
 
 [路由 README](../README.zh.md) · [迁移说明](archive/MIGRATION.md) · [独立 GAL README](https://github.com/Alice-Marx/deepseek-harness-galgame#readme)
 
@@ -10,7 +10,7 @@
 
 | 需求 | 添加插件输入框 | 安装后的入口 |
 | --- | --- | --- |
-| 分析复杂度、按质量和费用选模型、调用官方工具 | `@ljwei-stak/dsh-model-router@0.25.2` | 模型路由 |
+| 分析复杂度、按质量和费用选模型、调用官方工具 | `@ljwei-stak/dsh-model-router@0.25.3` | 模型路由 |
 | 剧情、立绘、音乐、存档、自由对话 | `@ljwei-stak/dsh-galgame@0.1.0` | Gal 模块 |
 | 两者都要 | 分别安装上面两个包 | 模型路由 + Gal 模块 |
 
@@ -24,7 +24,7 @@
 2. 在“包名、GitHub 仓库地址或本地目录路径”输入框填一个完整包名，例如：
 
    ```text
-   @ljwei-stak/dsh-model-router@0.25.2
+   @ljwei-stak/dsh-model-router@0.25.3
    ```
 
    只想安装 GAL 时填写：
@@ -40,7 +40,7 @@
    ```
 
 4. 核对预览的包名、版本和宿主兼容信息，安装并启用。完全退出 Harness（包括托盘进程）再启动，确保 Host 加载新代码。
-5. 检查插件详情与侧边栏：路由应为 **0.25.2 / 模型路由**；GAL 应为 **0.1.0 / Gal 模块**。仅装路由时没有 GAL 入口是预期行为。
+5. 检查插件详情与侧边栏：路由应为 **0.25.3 / 模型路由**；GAL 应为 **0.1.0 / Gal 模块**。仅装路由时没有 GAL 入口是预期行为。
 
 普通用户无需 `npm install -g`，该命令不会把插件注册到当前 Harness profile。
 
@@ -48,13 +48,13 @@
 
 进入对应 Release 下载 `.tgz`：
 
-- [模型路由 Releases](https://github.com/Alice-Marx/dsh-model-router/releases)（也可运行 `npm pack @ljwei-stak/dsh-model-router@0.25.2` 获取同一安装包）
+- [模型路由 Releases](https://github.com/Alice-Marx/dsh-model-router/releases)（也可运行 `npm pack @ljwei-stak/dsh-model-router@0.25.3` 获取同一安装包）
 - [独立 GAL v0.1.0](https://github.com/Alice-Marx/deepseek-harness-galgame/releases/tag/v0.1.0)
 
 在“添加插件”填写下载文件的**绝对路径**，例如：
 
 ```text
-D:\Plugins\ljwei-stak-dsh-model-router-0.25.2.tgz
+D:\Plugins\ljwei-stak-dsh-model-router-0.25.3.tgz
 ```
 
 ```text
@@ -64,7 +64,7 @@ D:\Plugins\ljwei-stak-dsh-galgame-0.1.0.tgz
 如附有 `.sha256` 文件，用 PowerShell 计算并比较摘要：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.25.2.tgz'
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-model-router-0.25.3.tgz'
 Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-galgame-0.1.0.tgz'
 ```
 
@@ -74,7 +74,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Plugins\ljwei-stak-dsh-galgame-0
 
 1. 在旧合并插件的 GAL 播放器导出需要保留的剧情进度，并备份整个 Harness profile。每份 JSON 仅保存**当前剧情状态**，不含所有手动槽、设置、已读记录或本地音乐；重要槽位可依次读档再导出。
 2. 在**同一个 profile**安装独立 `@ljwei-stak/dsh-galgame@0.1.0`。
-3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`（旧包名最后版本为 0.13.0，内容相同，之后不再更新）：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.25.2`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
+3. 0.13.0 起包名改为 `@ljwei-stak/dsh-model-router`（旧包名最后版本为 0.13.0，内容相同，之后不再更新）：在插件管理器卸载原 `@ljwei-stak/model-router-galgame`（保留 profile 与应用数据），再添加 `@ljwei-stak/dsh-model-router@0.25.3`。不要两个同时安装（条目 id 与工具名相同）；条目 id 未变，路由设置与执行记录会保留。完成两项更新后再玩剧情，避免同时操作旧合并入口和新入口。
 4. 现在路由与 GAL 各有一个入口。独立 GAL 沿用旧存档 localStorage 键，核对当前进度和三槽；更换 profile 或进度未恢复时，先切换到匹配剧目，再导入 JSON 备份。
 5. 后续分别更新需要的插件；只用路由可以不启用或不安装 GAL。保留 profile 与应用数据，卸载插件时不要清理故事数据。
 
@@ -82,14 +82,14 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 
 ## 5. 模型路由第一次使用
 
-工作台自 0.15.0 起分成**任务与执行、模型配置、官方工具、预算与安全**四页；0.25.2 沿用该布局。切换页面保留安装任务、终端会话和未完成的输入。
+工作台自 0.15.0 起分成**任务与执行、模型配置、官方工具、预算与安全**四页；0.25.3 沿用该布局。切换页面保留安装任务、终端会话和未完成的输入。
 
 1. 在 Harness 官方**模型**页配置供应商、模型与凭据。插件读取准确的 `provider/model` 目录，模型档案不保存 API Key。
 2. 在**模型配置**刷新目录，逐条填写自报质量评分、核对过的输入/输出单价（USD / 百万 token）和擅长方向；缺价留空。可选 `cliModel` 必须是该厂商 CLI 已验证接受的名字。可选 LiveBench 名称须准确对应版本与推理档位；它是用户确认的映射，不自动证明实际执行档位。
 3. 在**任务与执行 → 任务规划**输入目标、步骤和验收标准。单任务推荐一条路线，团队模式为足够复杂的任务拆依赖工作包，指定模型跳过其他路线比较。预算是本地估价目标，`0` 表示不设本次估价约束，不限制厂商账单。
 4. 点**生成路由建议**。建议直接显示在规划之后；规划计算在本机完成，不启动模型或 CLI。若已明确启用动态公开数据，读取账本/规划时可按检查间隔请求公开源，但不会把任务或反馈发送给这些源。
 5. 需要真实只读执行时，使用**在工作台执行**，填写存在的工作区绝对路径（留空沿用上次运行）。先**预览执行计划**、核对路线/费用和全部确认原因，再明确确认执行。宿主启动前会重查；确认后才发生真实调用，结果写入执行记录。
-6. 在**官方工具**检测、安装/更新工具并核对入口与登录。ZCode CLI 与其他工具共用安装、更新、修复和卸载操作，使用独立社区发行包；先准备 Node 24.14.0 或更新的 Node 24。可信入口就绪不等于账号和模型有权限。
+6. 在**官方工具**检测、安装/更新工具并核对入口与登录。ZCode CLI 与其他工具共用安装、更新、修复和卸载操作，可选择 npm 或 GitHub Release 安装独立社区版本；先准备 Node 24.14.0 或更新的 Node 24。可信入口就绪不等于账号和模型有权限。
 7. 在**预算与安全**查看每日/月度预算、订阅失败策略及可读/写边界；**持续反馈与本地偏好**可设置学习启停、半衰期、收缩强度和调整上限，**动态公共数据**需自行启用。官方工具终端不经过 Harness 沙箱，继承用户登录环境，需单独确认启动。
 8. 需要 CLI 修改文件时进入官方会话、选择工作区，明确请求 `model_router_tool_run` 或 `model_router_team_execute` 的 `workspace-write` 模式。可编辑托管执行要求干净 Git 仓库、宿主审批和进程沙箱。`model_router_execute` 用于只读路由执行，`model_router_consult` 用于模型 API 意见。
 
@@ -101,7 +101,7 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 
 注册表包含 Kimi、Claude、Codex、MiniMax、MiMo、Grok、Gemini 和 ZCode。Claude、Codex、MiMo、Grok 支持单工具/团队只读或可编辑执行；Kimi、MiniMax、ZCode 仅支持获批的可编辑托管执行。Gemini 有路由无界面适配器，不进入单工具/团队托管执行器。详见[官方工具与托管模式](README.zh.md#官方工具与托管模式)。CLI 模型名可能不同于 Harness 目录；多数 CLI 不提供可核验的实际模型 ID，要看厂商记录与账单。
 
-安装使用固定官方 npm 包的 `@latest`、厂商脚本或 [Alice-Marx/zcode-cli](https://github.com/Alice-Marx/zcode-cli) 的 GitHub Release 发行包。ZCode CLI 是社区维护的独立版本，不是 Z.AI 官方发行版；统一目录设置为它选择 `<根目录>/zcode-cli`，留空使用 `~/.zcode/runtime`，无需桌面版。希望 npm 工具安装在非 C 盘时，先按自己的空间规划配置全局前缀；Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，仅检查大小和基本内容结构后原样执行，**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex Windows 入口验证发布者签名。ZCode CLI 从固定 GitHub 仓库下载发行包，核对该发行版的 SHA-256，并在启动前检查已安装文件摘要；本地校验记录也属于信任边界。可在官方工具终端使用 `zcode login` 或 `zcode login bigmodel` 完成登录。具体规则见[执行器](.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](.dsh-plugin/shared/npm-attestation.mjs)。
+安装使用固定官方 npm 包的 `@latest`、厂商脚本或 [Alice-Marx/zcode-cli](https://github.com/Alice-Marx/zcode-cli) 的 GitHub Release 发行包。ZCode CLI 是社区维护的独立版本，不是 Z.AI 官方发行版。默认 `github-release` 方式使用 `<根目录>/zcode-cli`，统一目录留空时使用 `~/.zcode/runtime`；选择 `npm` 则安装固定包 [`@ljwei-stak/zcode-cli@latest`](https://www.npmjs.com/package/@ljwei-stak/zcode-cli)，使用已保存的 npm 源和其他 npm 工具相同的 prefix。npm 包包含完整 TUI、Web 和 Agent 运行资源，安装时不另行从 GitHub 下载；需要准备运行资源时使用 `<DSH_HOME>/model-router/zcode-npm/cache` 中的已核验缓存，npm 卸载可能保留该缓存。两种方式均无需桌面版。希望 npm 工具安装在非 C 盘时，先按自己的空间规划配置全局前缀；Grok 数据目录与登录应使用一致的 `GROK_HOME`。MiniMax Windows 原生依赖失败时，从固定官方 HTTPS 来源下载最新版安装脚本，仅检查大小和基本内容结构后原样执行，**没有锁定该安装脚本的哈希**。安装后的 MiniMax CLI 代码另按已安装版本的官方 npm tarball 摘要核验。MiMo/Grok 同样使用官方 npm 内容证明；适用的 Claude/Codex Windows 入口验证发布者签名。ZCode CLI 的 GitHub Release 方式从固定仓库下载发行包，核对该发行版的 SHA-256，并在启动前检查已安装文件摘要；npm 方式核对固定包与其注册表发布版本。本地校验记录也属于信任边界。可在官方工具终端使用 `zcode login` 或 `zcode login bigmodel` 完成登录。具体规则见[执行器](.dsh-plugin/shared/official-tool-executor.mjs)和[npm 内容核验](.dsh-plugin/shared/npm-attestation.mjs)。
 
 ## 6. GAL 第一次使用
 
@@ -114,7 +114,7 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 | 检查 | 预期 |
 | --- | --- |
 | 路由宿主版本 | 0.2.0-rc.1、0.2.0-rc.2、0.2.1-rc.2 或 0.2.1-rc.3；包括 `rc` 后缀。 |
-| 路由独立安装 | 0.25.2 详情、模型路由入口、目录和模型档案可用；不出现旧合并 GAL 入口。 |
+| 路由独立安装 | 0.25.3 详情、模型路由入口、目录和模型档案可用；不出现旧合并 GAL 入口。 |
 | GAL 独立安装 | 0.1.0 详情、Gal 模块入口、标题与两部核心剧情可用；不要求安装路由。 |
 | 共同安装 | 两个入口各一份，路由工具和 GAL 播放器均能使用。 |
 | 存档迁移 | 同 profile 可读旧键；跨 profile 用匹配剧目 JSON 导入；旧篇目的数据不覆盖。 |
@@ -129,7 +129,7 @@ GAL 核心只包含**《回声之城·正篇》**与**《旧城迁移篇：未�
 
 ## 8. 开发者从完整源码构建
 
-路由需要 Node.js **22.19+** 与 **pnpm 10.34.6**。从完整源码仓库根目录构建；当前源码版本为 0.25.2，DSH SDK 固定为 0.2.1-rc.3；复现已发布版本时检出对应发布标签。旧版（如 0.15.0）标签保留其当时内容。运行：
+路由需要 Node.js **22.19+** 与 **pnpm 10.34.6**。从完整源码仓库根目录构建；当前源码版本为 0.25.3，DSH SDK 固定为 0.2.1-rc.3；复现已发布版本时检出对应发布标签。旧版（如 0.15.0）标签保留其当时内容。运行：
 
 ```powershell
 pnpm install --frozen-lockfile --strict-peer-dependencies
