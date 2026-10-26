@@ -42,10 +42,30 @@ Legacy profiles without the policy service keep their current behavior.
 
 These are application permissions, not OS file/process isolation. CLI private
 bootstrap, OS workers, persistent Task/Policy, budget reservations and receipts
-are still pending. The combined-host fixture activates the service only during
-its probe and binds real Sessions manually; it does not migrate production data.
+are still pending. The `--legacy-policy` probe retains its manual trusted test
+bindings. The separate `--lifecycle` composition loads policy from startup and
+uses the frozen DS `createRuntime` export to maintain bindings automatically.
+Neither command migrates production data.
+
+`src/ds-lifecycle.mjs` wraps that runtime's load/save/refresh/resolveAgent methods.
+Successful saves commit the captured ownership snapshot; `required: true` prevents
+the read-only store's no-write return from granting memory-only changes. Initial
+load/refresh reads committed state (bounded at 32 MiB). Active own-chat and
+group-member Sessions bind; archived segments do not. Failed persistence suspends
+grants and aborts their leases, while successful refresh/save can recover from
+committed state. A missing committed file after hydration also suspends access.
+Stale revisions cannot restore older grants, conflicting equal
+revisions and reassigned Session ownership are refused. Disposal restores only
+its own wrappers; a late save completion cannot recreate grants after close.
+
+The strict fixture covers actual DS creation, group-member Sessions, folder/part
+transition, deletion, cold-process reconstruction and authenticated Gateway RPC
+allow/deny checks. Read-only takeover, scheduling, hot reload and every crash
+interleaving remain outside this evidence. Grants still come from trusted host
+configuration; a model-supplied role, instruction or payload is never a grant.
 
 ```sh
 node --test tests/bot-policy.test.mjs tests/legacy-policy.test.mjs
 node scripts/integration-combined-host.mjs --ds-root <frozen-DS> --host-root tests/fixtures/integration-host --legacy-policy
+node scripts/integration-combined-host.mjs --ds-root <frozen-DS> --host-root tests/fixtures/integration-host --lifecycle
 ```

@@ -83,7 +83,8 @@
         "docs/integration/evidence/20261027_m0_security.json",
         "docs/integration/evidence/20261027_m0_broker_bridge.json",
         "docs/integration/evidence/20261027_security_project_checks.json",
-        "docs/integration/evidence/20261027_m0_legacy_policy.json"
+        "docs/integration/evidence/20261027_m0_legacy_policy.json",
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
       ],
       "steps": [
         {
@@ -140,7 +141,8 @@
           "status": "completed",
           "evidence": [
             "docs/integration/evidence/20261027_m0_combined_host.json",
-            "docs/integration/evidence/20261027_m0_remote_platforms.json"
+            "docs/integration/evidence/20261027_m0_remote_platforms.json",
+            "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
           ]
         },
         {
@@ -496,7 +498,8 @@
         "docs/integration/evidence/20261026_m0_llm_admission.json",
         "docs/integration/evidence/20261027_m0_combined_host.json",
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
-        "docs/integration/evidence/20261027_m0_legacy_policy.json"
+        "docs/integration/evidence/20261027_m0_legacy_policy.json",
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
       ]
     },
     {
@@ -507,7 +510,8 @@
         "docs/integration/evidence/20261026_m0_tool_boundaries.json",
         "docs/integration/evidence/20261027_m0_combined_host.json",
         "docs/integration/evidence/20261027_m0_security.json",
-        "docs/integration/evidence/20261027_m0_legacy_policy.json"
+        "docs/integration/evidence/20261027_m0_legacy_policy.json",
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
       ]
     },
     {
@@ -534,12 +538,13 @@
       "status": "partial",
       "evidence": [
         "docs/integration/evidence/20261027_m0_combined_host.json",
-        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+        "docs/integration/evidence/20261027_m0_remote_platforms.json",
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Isolated DSH rc.3 with offline model; Win11/Ubuntu24.04/Win10",
-      "notes": "Host/Session/registry/UI/native runtime observations only; remaining lifecycle, product policy, installed agent and sleep topology criteria are not passed."
+      "environment": "Isolated strict DS factory composition; Win11/Win10 Node24 and Ubuntu Node22; offline fixture model",
+      "notes": "Automatic committed-state lifecycle, group/part/delete/cold reconstruction and real authenticated Gateway allow/deny verified. Default product composition, remaining lifecycle, execution/task accounting and remote/OS deployment criteria remain incomplete."
     },
     {
       "id": "T02",
@@ -561,12 +566,13 @@
       "status": "partial",
       "evidence": [
         "docs/integration/evidence/20261027_m0_security.json",
-        "docs/integration/evidence/20261027_m0_legacy_policy.json"
+        "docs/integration/evidence/20261027_m0_legacy_policy.json",
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Isolated prototype and synthetic fixtures; not installed product",
-      "notes": "Optional real MR adapter checks all 13 tools, both commands and all 23 Remote receivers; real multi-Session grant removal and bound planning pass. Automatic DS lifecycle, positive Gateway RPC, authorized execution/retry ownership and all product paths remain incomplete."
+      "environment": "Isolated strict DS factory composition; Win11/Win10 Node24 and Ubuntu Node22; offline fixture model",
+      "notes": "Automatic committed-state lifecycle, group/part/delete/cold reconstruction and real authenticated Gateway allow/deny verified. Default product composition, remaining lifecycle, execution/task accounting and remote/OS deployment criteria remain incomplete."
     },
     {
       "id": "T06",
@@ -840,12 +846,13 @@
       "status": "partial",
       "evidence": [
         "docs/integration/evidence/20261027_m0_combined_host.json",
-        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+        "docs/integration/evidence/20261027_m0_remote_platforms.json",
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Isolated DSH rc.3 with offline model; Win11/Ubuntu24.04/Win10",
-      "notes": "Host/Session/registry/UI/native runtime observations only; remaining lifecycle, product policy, installed agent and sleep topology criteria are not passed."
+      "environment": "Isolated strict DS factory composition; Win11/Win10 Node24 and Ubuntu Node22; offline fixture model",
+      "notes": "Automatic committed-state lifecycle, group/part/delete/cold reconstruction and real authenticated Gateway allow/deny verified. Default product composition, remaining lifecycle, execution/task accounting and remote/OS deployment criteria remain incomplete."
     },
     {
       "id": "T58",

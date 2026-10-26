@@ -6,6 +6,24 @@
 
 按 [方案1.1](plan/20261026_master_plan.md) 完成 Main 私聊派活、两仓功能并集、按 Bot 绑定模型/官方工具、Linux 与 Windows 远程电脑，以及迁移、安装和发布。分期仅安排先后，不缩减最终范围。实际模型调用仅使用 GPT。
 
+## 2026-10-27：DS自动生命周期与真实Gateway
+
+- 用冻结DS公开导出的`createRuntime`组合严格宿主，在启动时提供权限服务，不修改DS/SDK源码。`load/save/refresh/resolveAgent`外层适配器自动维护活动私聊、群成员Session与稳定Bot主体；换段解绑旧Agent，删除撤销全部身份，冷启动从保存状态重建。
+- 保存必须真正写入，等待成功提交后才应用捕获的归属。未保存的后续内存变更不获权；保存/读取失败、已加载后的提交文件缺失均收紧权限；旧修订不回滚，冲突修订/跨Bot重新归属拒绝；关闭后的迟到保存不重新授予权限。
+- 严格组合通过既有9项Main/工种/派活/用量/重启检查，以及5项自动生命周期、2项冷启动检查。实际群成员Session、DS自身文件夹换段与删除均经原运行时执行，没有测试代码手动补绑定。
+- 真实HTTP/Gateway另通过3项检查：已登录owner获准方法成功、未获准方法拒绝、缺认证不能取得owner权限。cookie和临时URL不入库、不归档。
+- 新增12项针对检查，工程检查累计66项。三机固定strict依赖、完整回归与客户端检查通过，真实模型请求0。生命周期只使用固定模型/有限MR能力的隔离组合，尚未迁移用户默认入口。
+
+| 环境 | 总数 | 通过 | 失败 | 跳过 |
+|---|---:|---:|---:|---:|
+| 本机 Win11 / Node24.20.0 | 1297 | 1294 | 0 | 3 |
+| 远程 Win10 LTSC / Node24.18.0 | 1297 | 1294 | 0 | 3 |
+| 远程 Ubuntu24.04 / Node22.22.1 | 1297 | 1274 | 0 | 23 |
+
+实现与复现见[自动生命周期说明](20261027_ds_lifecycle.md)，平台及代码摘要见[本轮证据](evidence/20261027_m0_ds_lifecycle.json)。CI两平台保留原检查，新增`--lifecycle`严格组合与Gateway步骤。
+
+锁接管/只读宿主、调度和Capabilities全生命周期、热重载、完整中断矩阵仍待验证；执行/重跑归属、持久Task/预算/receipt、CLI私有引导、真正DSH OS worker与Windows边界仍未完成。Win11原生PTC ACL受阻和普通PTC的partial文件隔离没有改写。M0仍9/12个记录子步骤，四个总门禁未结项，没有新增产品场景passed。
+
 ## 2026-10-27：稳定主体与旧入口权限接入
 
 - MR源码新增可选`botIntegrationPolicy`权限接缝，覆盖13个旧工具、两条命令、23个RPC接收器。严格profile配置`requireBotPolicy: true`后，服务缺失/无效或单调guard不可用会拒绝；默认旧profile保持既有行为。
@@ -22,7 +40,7 @@
 
 远程两机还继续通过前一轮7项实际PTC工具检查；其partial文件隔离和Win11原生ACL阻塞均未改写。代码/证据见[入口接入说明](20261027_legacy_policy.md)、[实测记录](evidence/20261027_m0_legacy_policy.json)。CI两平台组合任务加入`--legacy-policy`。
 
-当前fixture仍由可信宿主手动绑定Session，冻结DS生命周期自动映射和真实Gateway正向RPC待接。Bot的CLI/团队/重跑/安装等路径在严格模式暂时拒绝，需Execution facade完成程序身份、原运行归属、审批、预算和收据后开放；严格RPC后台启动等待持久Task租约。没有删减这些最终功能。CLI私有引导与真正DSH OS worker尚未完成；M0仍9/12子步骤，没有新增产品场景passed。
+本段记录的062df18临时fixture由可信宿主手动绑定Session，自动生命周期和Gateway正向调用当时待接；本页上方的新检查点已加入独立严格组合。Bot的CLI/团队/重跑/安装等路径仍需Execution facade完成程序身份、原运行归属、审批、预算和收据后开放；严格RPC后台启动等待持久Task租约。没有删减这些最终功能。CLI私有引导与真正DSH OS worker尚未完成。
 
 ## 2026-10-27：授权内核、真实 PTC 与 MCP 桥
 
@@ -83,8 +101,8 @@
 
 | 门禁 | 已有依据 | 仍需验证 |
 |---|---|---|
-| G1 宿主/会话 | rc.3组合宿主、真实Session/AgentLoop、浏览器UI、三机运行与重启恢复 | MCP/search/审批/schedule等完整生命周期、产品模型准入/任务预算接入与部署拓扑 |
-| G2 权限边界 | 稳定主体/多Session目录；13工具/2命令/23RPC权限接缝；实际PTC及Linux合成容器边界 | DS生命周期自动绑定、Gateway正向RPC、执行/重跑所有权与Task合同、真实DSH OS worker；Win11沙箱ACL受阻 |
+| G1 宿主/会话 | rc.3真实Session/AgentLoop、浏览器UI、三机自动创建/群成员/换段/删除/冷启动，Gateway正向调用 | MCP/search/审批/schedule、锁接管/热重载等完整生命周期；默认产品配置迁移、任务预算与部署拓扑 |
+| G2 权限边界 | 自动提交快照/多Session主体；13工具/2命令/23RPC接缝；真实Gateway allow/deny；实际PTC及Linux合成容器 | 执行/重跑归属与Task合同、默认入口迁移、真正DSH OS worker；Win11沙箱ACL受阻 |
 | G3 CLI/bridge | Codex独立配置实际解析；真实MCP子进程按授权列/调工具、撤权与取消 | CLI孙进程私有引导、真实CLI模型身份、远程路径、原生进程树取消与产品执行接入 |
 | G4 安装/存储 | Ubuntu/Node22、Win10/Node24、Win11/Node24原生驱动与事务探针 | Electron ABI、PTY、GUI helper、干净安装/升级/卸载 |
 
@@ -92,8 +110,8 @@
 
 ## 下一步
 
-1. 继续W01逐入口行为核对：已有十组部分记录，含可选旧入口权限接入；完整40组功能审查未结束。
-2. 继续W02/G2可信DS生命周期映射、Gateway正向RPC、执行/重跑所有权与持久Task合同、真正DSH OS worker；保留Win11原生沙箱失败依据。
+1. 继续W01逐入口行为核对：已有十一组部分记录，含严格自动生命周期/Gateway；完整40组功能审查未结束。
+2. 继续W02/G2执行/重跑所有权与持久Task合同、默认配置迁移、真正DSH OS worker；保留Win11原生沙箱失败依据。
 3. 继续W02/G3 CLI孙进程私有引导、CLI模型身份、原生进程树取消与远程路径契约；补齐G1其余生命周期。
 4. 以已有真实测试目标验证常开部署与休眠拓扑；冻结Bot/任务/授权/收据契约。
 5. G1–G4达到所需证据后进入M1，迁入DS Bot运行时并保留MR兼容入口。

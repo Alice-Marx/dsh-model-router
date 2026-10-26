@@ -98,6 +98,8 @@ jobs:
           pnpm --dir tests/fixtures/integration-host install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
       - name: Exercise real combined Sessions with an offline model
         run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --legacy-policy ${{ matrix.security }}
+      - name: Verify strict automatic Bot lifecycle and authenticated Gateway RPC
+        run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --lifecycle
       - name: Pull the immutable Linux boundary fixture
         if: runner.os == 'Linux'
         run: docker pull --platform linux/amd64 node@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d

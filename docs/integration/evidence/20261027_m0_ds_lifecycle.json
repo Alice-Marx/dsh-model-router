@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "062df18c16964bccf75e573f1d6005204017fbc8",
+  "level": "strict-isolated-ds-factory-integration",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "packages/orchestration/src/ds-lifecycle.mjs": "2b674ce8ecc2b82e501106690487e6e05ee3a468",
+    "tests/ds-lifecycle.test.mjs": "6f2190b94cd445164c18bf5dc51038b2bf5ab9ac",
+    "tests/fixtures/integration-combined/lifecycle-plugin.mjs": "1235a1269a333a8d113a3fa588e1aebfa4cc981b",
+    "scripts/integration-combined-host.mjs": "c45b637270b24146499fa9b8ce4ff7e177f5fbd2"
+  },
+  "remoteOverlaySha256": "7bf37ea0b3d9a8cc317b15022a5115d3062cd367556751fa140982c834cb451e",
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "manualDirectoryBindingsInLifecycleProbe": false,
+  "newChecks": {
+    "tests": 12,
+    "pass": 12,
+    "fail": 0
+  },
+  "engineeringChecks": {
+    "tests": 66,
+    "pass": 66,
+    "fail": 0,
+    "skipped": 0
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1297,
+        "pass": 1294,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "600839dc752bb496c4984bcf692e4884017bb7406c0ea674985f14d3ee81d46a",
+      "baselineChecks": 9,
+      "legacyExposureInWorkerRequest": [
+        "model_router_routes"
+      ],
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "afterColdRestart": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Fresh host process rebuilds live Agent bindings from persisted Bot ownership"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "mockAdapterDispatchesBeforeRestart": 16,
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "ubuntu-test",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1297,
+        "pass": 1274,
+        "fail": 0,
+        "skipped": 23
+      },
+      "rootTestsSha256": "c6f3274cb509cd2274322247d9ba2e84584d764e27d284c9cd35ed3ff137444c",
+      "baselineChecks": 9,
+      "legacyExposureInWorkerRequest": [
+        "model_router_routes"
+      ],
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "afterColdRestart": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Fresh host process rebuilds live Agent bindings from persisted Bot ownership"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "mockAdapterDispatchesBeforeRestart": 16,
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "win10-test",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1297,
+        "pass": 1294,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "4d24058c986464fe776e8969bfd0843cd375d229167bbaa2892b34466d8a8cbd",
+      "baselineChecks": 9,
+      "legacyExposureInWorkerRequest": [
+        "model_router_routes"
+      ],
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "afterColdRestart": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Fresh host process rebuilds live Agent bindings from persisted Bot ownership"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "mockAdapterDispatchesBeforeRestart": 16,
+      "actualModelCalls": 0
+    }
+  ],
+  "limitations": [
+    "Strict fixture composition only; default user profile/data migration not implemented",
+    "Read-only/lock takeover, hot reload, schedules, capabilities and all recovery interleavings remain to verify",
+    "Execution/retry run ownership, persistent Task/budget/receipts, quiet auxiliary inference cancellation remain open",
+    "CLI private bootstrap, actual isolated DSH worker and Windows account/GUI boundaries are not implemented",
+    "Existing Win11 PTC ACL blocker and partial ordinary PTC file isolation remain unchanged"
+  ]
+}

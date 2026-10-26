@@ -52,6 +52,15 @@ automatic DS lifecycle binding and authenticated Gateway RPC positive calls are
 not claimed. Strict production composition must set `requireBotPolicy: true`;
 missing policy/guard support then refuses operations instead of opening access.
 
+Use `--lifecycle` as a separate strict composition from startup. It replaces the
+standalone DS entry with the same frozen `createRuntime` factory wrapped by the
+ownership adapter, verifies real group/part/delete/cold-restart transitions, and
+calls actual authenticated Gateway RPC allow/deny paths. It never repairs the
+test by manually binding Agent identities. The temporary Bot/group are removed
+through DS itself; test homes remain isolated. `--lifecycle` and `--legacy-policy`
+cannot be combined. The fixture's fixed grants and test lifecycle are not a
+default product rollout or complete execution/OS-isolation acceptance.
+
 The command reports existing legacy MR tool exposure separately. It does not
 install the future Bot policy, unified ledger, CLI bridge or remote agent, and
 does not prove browser, Electron, GUI control or real-model acceptance. Browser

@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
   "updatedOn": "2026-10-27",
-  "coverageMeaning": "Ten entry-level partial observations; optional legacy policy is implemented but no whole F group or product is declared fully audited",
+  "coverageMeaning": "Eleven entry-level partial observations; strict DS factory composition verified without declaring a whole F group or product accepted",
   "evidence": [
     "docs/integration/evidence/20261027_m0_combined_host.json",
     "docs/integration/evidence/20261027_m0_remote_platforms.json",
     "docs/integration/evidence/20261027_m0_security.json",
     "docs/integration/evidence/20261027_m0_broker_bridge.json",
-    "docs/integration/evidence/20261027_m0_legacy_policy.json"
+    "docs/integration/evidence/20261027_m0_legacy_policy.json",
+    "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
   ],
   "entries": [
     {
@@ -290,6 +291,49 @@
         "Authenticated Gateway positive RPC",
         "Authorized CLI/team/retry ownership, task lifetime and accounting",
         "CLI private bootstrap and OS worker"
+      ]
+    },
+    {
+      "id": "E11",
+      "featureIds": [
+        "F01",
+        "F04",
+        "F06",
+        "F07",
+        "F08",
+        "F39"
+      ],
+      "entry": "Strict frozen createRuntime composition: committed own/group/part/delete/restart mapping and HTTP Gateway owner RPC",
+      "contract": "Resolved live Agent objects map only after a committed state snapshot; failure suspends grants; owner principal comes only from authenticated Gateway.",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/ds-lifecycle.mjs",
+          "gitBlob": "2b674ce8ecc2b82e501106690487e6e05ee3a468"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/ds-lifecycle.test.mjs",
+          "gitBlob": "6f2190b94cd445164c18bf5dc51038b2bf5ab9ac"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/fixtures/integration-combined/lifecycle-plugin.mjs",
+          "gitBlob": "1235a1269a333a8d113a3fa588e1aebfa4cc981b"
+        },
+        {
+          "repository": "integration",
+          "path": "scripts/integration-combined-host.mjs",
+          "gitBlob": "c45b637270b24146499fa9b8ce4ff7e177f5fbd2"
+        }
+      ],
+      "observed": "Three real hosts: startup-only MR route exposure, automatic Bot creation/group Session/part rollover/deletion and cold binding reconstruction. Actual authenticated RPC allow/deny and missing-auth HTTP refusal.",
+      "level": "strict isolated host / offline model",
+      "remaining": [
+        "Default product composition and configuration migration",
+        "Read-only takeover, schedules/capability lifecycle and complete interruption matrix",
+        "Execution/retry ownership and Task/budget/receipt integration",
+        "CLI bootstrap and OS workers"
       ]
     }
   ]

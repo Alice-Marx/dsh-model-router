@@ -42,7 +42,8 @@ async function unusedPort() {
   return port
 }
 
-export async function runCombinedHost({ dsRoot, hostRoot, serve = false, security = false, legacyPolicy = false }) {
+export async function runCombinedHost({ dsRoot, hostRoot, serve = false, security = false, legacyPolicy = false, lifecycle = false }) {
+  assert.ok(!(lifecycle && legacyPolicy), 'Lifecycle and temporary legacy-policy probes use separate compositions')
   const baseline = JSON.parse(await readFile(join(ROOT, 'docs/integration/baseline.json'), 'utf8'))
   const revision = (await execute('git', ['-C', dsRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true })).stdout.trim()
   assert.equal(revision, baseline.repositories.DS.commit, 'DS must be the frozen source')
@@ -80,6 +81,19 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       policyModule: localModule('packages/orchestration/src/bot-policy.mjs'),
       remoteContractModule: localModule('.dsh-plugin/shared/official-tools-remote.mjs'),
     } }] })
+  }
+  if (lifecycle) {
+    const plugin = join(anchor, 'lifecycle-probe.mjs')
+    await copyFile(join(ROOT, 'tests/fixtures/integration-combined/lifecycle-plugin.mjs'), plugin)
+    const localModule = path => pathToFileURL(join(ROOT, path)).href
+    overlay.push({ id: 'bot', disabled: true }, { id: 'model-router-galgame', config: { requireBotPolicy: true } },
+      { insert: [{ id: 'integration-owned-ds', name: pathToFileURL(plugin).href, config: {
+        dsEntry: pathToFileURL(join(dsRoot, 'ds-bot/index.js')).href,
+        authorityModule: localModule('packages/capability-broker/src/authority.mjs'),
+        principalsModule: localModule('packages/orchestration/src/principals.mjs'),
+        policyModule: localModule('packages/orchestration/src/bot-policy.mjs'),
+        lifecycleModule: localModule('packages/orchestration/src/ds-lifecycle.mjs'),
+      } }] })
   }
   await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(overlay, null, 2))
   const requireHost = createRequire(join(hostRoot, 'package.json'))
@@ -219,12 +233,53 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       await writeFile(join(run, 'legacy-policy.json'), JSON.stringify(summary.legacyPolicy, null, 2))
       assert.equal(summary.legacyPolicy.status, 'passed-for-described-checks', summary.legacyPolicy.error)
     }
+    if (lifecycle) {
+      const rpc = async (method, authenticated = true) => {
+        const endpoint = `modelRouterOfficialTools/${method}`
+        const response = await fetch(`${base}/api/${endpoint}`, { method: 'POST', redirect: 'manual',
+          headers: { 'content-type': 'application/json', ...(authenticated ? { cookie } : {}) },
+          body: JSON.stringify({ type: 'client-request', rpcId: `lifecycle-${method}`, method: endpoint, payload: { args: {} } }),
+          signal: AbortSignal.timeout(10_000) })
+        return { status: response.status, body: response.status === 200 ? await response.json() : null }
+      }
+      const allowedRpc = await rpc('boundaries')
+      assert.equal(allowedRpc.status, 200)
+      assert.equal(allowedRpc.body.result.ok, true, JSON.stringify(allowedRpc.body))
+      assert.equal(allowedRpc.body.result.value.ok, true, JSON.stringify(allowedRpc.body))
+      const deniedRpc = await rpc('ledger')
+      assert.equal(deniedRpc.status, 200)
+      assert.equal(deniedRpc.body.result.ok, false, JSON.stringify(deniedRpc.body))
+      assert.match(JSON.stringify(deniedRpc.body), /TOOL_DENIED/)
+      const unauthenticatedRpc = await rpc('boundaries', false)
+      assert.ok([401, 403].includes(unauthenticatedRpc.status), `Unauthenticated RPC status ${unauthenticatedRpc.status}`)
+      summary.gateway = { status: 'passed', checks: ['Authenticated owner reaches an explicitly granted actual Gateway RPC',
+        'Authenticated owner cannot call an ungranted RPC', 'Missing browser authentication cannot acquire owner RPC authority'],
+        actualModelCalls: 0 }
+      await writeFile(join(run, 'gateway.json'), JSON.stringify(summary.gateway, null, 2))
+    }
+    if (lifecycle) {
+      summary.lifecycle = await request('integration-lifecycle', { action: 'probe', mainId: main.id, workerId: worker.id })
+      await writeFile(join(run, 'lifecycle.json'), JSON.stringify(summary.lifecycle, null, 2))
+      assert.equal(summary.lifecycle.status, 'passed-for-described-checks', summary.lifecycle.error)
+      summary.level = 'strict-host-lifecycle-offline'
+      summary.limitations = ['Strict isolated fixture composition, not a default product migration', 'No live model, persisted Task/receipt facade, CLI bootstrap or OS worker']
+      const finalDiagnostic = await request('integration-probe')
+      summary.mockAdapterDispatches = finalDiagnostic.calls.length
+      summary.auxiliaryModelCalls = finalDiagnostic.calls.filter(call => !call.agentLoop).length
+      await writeFile(join(run, 'diagnostics-final.json'), JSON.stringify(finalDiagnostic, null, 2))
+      summary.finalDiagnosticSha256 = createHash('sha256').update(await readFile(join(run, 'diagnostics-final.json'))).digest('hex')
+    }
     await stop('host-before-restart')
     launch()
     loginUrl = await login()
     state = await api('state')
     const restoredExchange = await api('exchange', { a: main.id, b: worker.id })
     record('Fresh host process restores Bot identities, exact models and exchange history', state.mainBotId === main.id && state.bots.length === 2 && state.bots.every(bot => bot.model === FIXTURE_ROUTE) && state.bots.some(bot => bot.id === worker.id) && restoredExchange.length === exchange.length)
+    if (lifecycle) {
+      summary.lifecycleAfterRestart = await request('integration-lifecycle', { action: 'restored', mainId: main.id, workerId: worker.id })
+      await writeFile(join(run, 'lifecycle-restored.json'), JSON.stringify(summary.lifecycleAfterRestart, null, 2))
+      assert.equal(summary.lifecycleAfterRestart.status, 'passed-for-described-checks', summary.lifecycleAfterRestart.error)
+    }
     if (serve) {
       await writeFile(join(run, 'browser-access.json'), JSON.stringify({ base, loginUrl, home, pid: child.pid }))
       process.stdout.write(JSON.stringify({ status: 'ready-for-browser', run: relative(ROOT, run), checks: checks.length }) + '\n')
@@ -249,14 +304,16 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
 }
 
 async function main(args) {
+  const lifecycle = args.includes('--lifecycle')
+  args = args.filter(arg => arg !== '--lifecycle')
   const legacyPolicy = args.includes('--legacy-policy')
   args = args.filter(arg => arg !== '--legacy-policy')
   const security = args.includes('--security')
   args = args.filter(arg => arg !== '--security')
   const serve = args.at(-1) === '--serve'
   if (serve) args = args.slice(0, -1)
-  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--security] [--legacy-policy] [--serve]')
-  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve, security, legacyPolicy })
+  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--security] [--legacy-policy | --lifecycle] [--serve]')
+  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve, security, legacyPolicy, lifecycle })
   process.stdout.write(JSON.stringify(result, null, 2) + '\n')
 }
 
