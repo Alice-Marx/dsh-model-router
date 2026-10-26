@@ -1,0 +1,34 @@
+DSH Bot integration · plan 1.1 · active M0
+Work packages completed: 0/20; acceptance scenarios passed: 1/63
+Passed evidence levels: document 1
+Recorded M0 steps completed: 9/12
+Work-package counts do not imply product completion or release readiness.
+
+M0: W01 in_progress | W02 in_progress
+M1: W03 planned | W04 planned
+M2: W05 planned | W06 planned
+M3: W07 planned | W08 planned
+M4: W09 planned | W10 planned
+M5: W11 planned | W12 planned
+M6: W13 planned | W14 planned
+M7: W15 planned | W16 planned
+M8: W17 planned | W18 planned
+M9: W19 planned | W20 planned
+
+M0 gates: G1 in_progress | G2 in_progress | G3 in_progress | G4 in_progress
+
+W01 功能清单
+  W01.1 completed 方案1.1和来源随项目保存
+  W01.2 completed 建立32R/40F/63T目录
+  W01.3 completed 固定源码及40组功能出处
+  W01.4 in_progress 逐入口/参数/用户行为展开并核对
+
+W02 DSH/CLI/存储兼容验证
+  W02.1 completed 现有依赖/测试/客户端基线
+  W02.2 completed DS完整套件使用rc.3 SDK验证
+  W02.3 completed 真实SDK的作用域与执行拦截探针
+  W02.4 completed SQLite驱动ABI和事务/重启探针
+  W02.5 in_progress CLI配置隔离/bridge试验
+  W02.6 completed 同宿主真实挂载与UI验证
+  W02.7 in_progress 实际机器拓扑与休眠验证
+  W02.8 completed 真实LLM调用前置拦截与用量探针

@@ -33,6 +33,15 @@ private `browser-access.json` stays under the run directory. Write `stop` to a
 file named `stop` in that same directory to finish; a bounded timeout also stops
 the host. Never copy login URLs, cookies or private machine settings into Git.
 
+Add `--security` to run actual Node PTC calls with the experimental authority
+kernel: nested dispatch, hidden bindings, sibling grants, live grant changes and
+cancellation. The synthetic outside-workspace file check reports the measured
+result even when the file is readable; passing the tool checks does not imply OS
+isolation. A native sandbox setup error fails the command and is retained in the
+ignored run directory's `security.json`. Local Win11 sandbox setup is currently
+blocked; real Win10 passes the tool checks but reports partial file enforcement.
+Do not relax the sandbox or count either observation as private-state isolation.
+
 The command reports existing legacy MR tool exposure separately. It does not
 install the future Bot policy, unified ledger, CLI bridge or remote agent, and
 does not prove browser, Electron, GUI control or real-model acceptance. Browser

@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
   "updatedOn": "2026-10-27",
-  "coverageMeaning": "Six entry-level partial observations; no F group or whole product is declared fully audited",
+  "coverageMeaning": "Nine entry-level partial observations, including three prototype entries; no F group or whole product declared fully audited",
   "evidence": [
     "docs/integration/evidence/20261027_m0_combined_host.json",
-    "docs/integration/evidence/20261027_m0_remote_platforms.json"
+    "docs/integration/evidence/20261027_m0_remote_platforms.json",
+    "docs/integration/evidence/20261027_m0_security.json",
+    "docs/integration/evidence/20261027_m0_broker_bridge.json"
   ],
   "entries": [
     {
@@ -171,6 +173,75 @@
       "level": "host integration / offline model; browser observation where stated",
       "remaining": [
         "Unified single-product sidebar/configuration, Desktop and narrow viewport"
+      ]
+    },
+    {
+      "id": "E07",
+      "featureIds": [
+        "F32",
+        "F39"
+      ],
+      "entry": "Actual run_code PTC and nested tool dispatch",
+      "contract": "Experimental trusted-host path only; no product acceptance implied",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": "tests/fixtures/integration-combined/security-plugin.mjs",
+          "gitBlob": "16e505b44ca8a09c9b175690695bd85bdcd83f70"
+        }
+      ],
+      "observed": "Ubuntu/Win10: 7 checks pass with shared authority; outside fixture readable on both, partial enforcement; Win11 sandbox setup blocked",
+      "level": "prototype / actual SDK and runtime / offline",
+      "remaining": [
+        "All product entry points",
+        "Stable Session principal mapping",
+        "Real DSH OS worker and Windows account isolation"
+      ]
+    },
+    {
+      "id": "E08",
+      "featureIds": [
+        "F40",
+        "F31"
+      ],
+      "entry": "Prototype managed MCP stdio list/call/cancel",
+      "contract": "Experimental trusted-host path only; no product acceptance implied",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": "packages/capability-broker/src/managed-bridge.mjs",
+          "gitBlob": "1773888f8c72cf3207afe48a8366478bef69d8b3"
+        }
+      ],
+      "observed": "Real SDK legacy/modern clients isolate grants, reject spoofed arguments and revoked calls, propagate cancellation and close owned child",
+      "level": "prototype / actual SDK and runtime / offline",
+      "remaining": [
+        "Official CLI grandchild bootstrap",
+        "Native process-tree cleanup",
+        "Persisted product Policy/budget/accounting"
+      ]
+    },
+    {
+      "id": "E09",
+      "featureIds": [
+        "F28",
+        "F40"
+      ],
+      "entry": "Installed Codex mcp list/get --json with isolated CODEX_HOME",
+      "contract": "Experimental trusted-host path only; no product acceptance implied",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": "scripts/integration-codex-profile.mjs",
+          "gitBlob": "068a1a46da506bc3303d1a3b5a393978c7cd12f4"
+        }
+      ],
+      "observed": "Codex0.163.0 parses distinct profiles; existing user config remains unchanged",
+      "level": "prototype / actual SDK and runtime / offline",
+      "remaining": [
+        "Bridge startup through Codex",
+        "Verified CLI model identity",
+        "Remote CLI and other vendors"
       ]
     }
   ]

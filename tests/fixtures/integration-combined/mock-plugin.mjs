@@ -35,7 +35,7 @@ export function apply(ctx) {
       }
       const block = name
         ? { type: 'tool-call', id: `integration-call-${calls.length}`, name, arguments: JSON.stringify(args) }
-        : { type: 'text', text: isAgentLoopRequest(options) ? 'integration:fixture-reply' : '[]' }
+        : { type: 'text', text: isAgentLoopRequest(options) ? 'integration:fixture-reply' : '{"changes":[]}' }
       yield { type: 'block-start', index: 0, blockType: block.type }
       if (name) yield { type: 'tool-call-delta', index: 0, id: block.id, name, argumentsDelta: block.arguments }
       else yield { type: 'text-delta', index: 0, text: block.text }

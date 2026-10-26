@@ -42,7 +42,7 @@ async function unusedPort() {
   return port
 }
 
-export async function runCombinedHost({ dsRoot, hostRoot, serve = false }) {
+export async function runCombinedHost({ dsRoot, hostRoot, serve = false, security = false }) {
   const baseline = JSON.parse(await readFile(join(ROOT, 'docs/integration/baseline.json'), 'utf8'))
   const revision = (await execute('git', ['-C', dsRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true })).stdout.trim()
   assert.equal(revision, baseline.repositories.DS.commit, 'DS must be the frozen source')
@@ -63,7 +63,14 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false }) {
   await symlink(join(dsRoot, 'ds-bot'), join(profile, 'node_modules/ds-bot'), process.platform === 'win32' ? 'junction' : 'dir')
   await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'integration-combined-profile', private: true,
     dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'ds-bot', '@ljwei-stak/dsh-model-router'] } } }, null, 2))
-  await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(combinedOverlay(mockPlugin), null, 2))
+  const overlay = combinedOverlay(mockPlugin)
+  if (security) {
+    const plugin = join(anchor, 'security-probe.mjs')
+    await copyFile(join(ROOT, 'tests/fixtures/integration-combined/security-plugin.mjs'), plugin)
+    overlay.push({ insert: [{ id: 'integration-security', name: pathToFileURL(plugin).href,
+      config: { authorityModule: pathToFileURL(join(ROOT, 'packages/capability-broker/src/authority.mjs')).href } }] })
+  }
+  await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(overlay, null, 2))
   const requireHost = createRequire(join(hostRoot, 'package.json'))
   const manifestPath = requireHost.resolve('@deepseek-ai/dsh/package.json')
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
@@ -191,6 +198,11 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false }) {
       limitations: ['No actual model provider request', 'No browser or Desktop UI assertion in this command',
         'No product Bot policy, unified task ledger or CLI bridge installed', 'Legacy MR tools remain visible to an ordinary DS Bot; authorization integration remains required'],
       diagnosticSha256: createHash('sha256').update(await readFile(join(run, 'diagnostics.json'))).digest('hex') }
+    if (security) {
+      summary.security = await request('integration-security', { mainId: main.id, workerId: worker.id })
+      await writeFile(join(run, 'security.json'), JSON.stringify(summary.security, null, 2))
+      assert.equal(summary.security.status, 'passed-for-described-checks', summary.security.error)
+    }
     await stop('host-before-restart')
     launch()
     loginUrl = await login()
@@ -221,10 +233,12 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false }) {
 }
 
 async function main(args) {
+  const security = args.includes('--security')
+  args = args.filter(arg => arg !== '--security')
   const serve = args.at(-1) === '--serve'
   if (serve) args = args.slice(0, -1)
-  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--serve]')
-  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve })
+  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--security] [--serve]')
+  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve, security })
   process.stdout.write(JSON.stringify(result, null, 2) + '\n')
 }
 

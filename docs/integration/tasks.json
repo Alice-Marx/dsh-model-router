@@ -79,7 +79,10 @@
       "evidence": [
         "docs/integration/evidence/20261026_m0_baseline.json",
         "docs/integration/evidence/20261027_m0_combined_host.json",
-        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+        "docs/integration/evidence/20261027_m0_remote_platforms.json",
+        "docs/integration/evidence/20261027_m0_security.json",
+        "docs/integration/evidence/20261027_m0_broker_bridge.json",
+        "docs/integration/evidence/20261027_security_project_checks.json"
       ],
       "steps": [
         {
@@ -106,7 +109,8 @@
           "title": "真实SDK的作用域与执行拦截探针",
           "status": "completed",
           "evidence": [
-            "docs/integration/evidence/20261026_m0_tool_boundaries.json"
+            "docs/integration/evidence/20261026_m0_tool_boundaries.json",
+            "docs/integration/evidence/20261027_m0_security.json"
           ]
         },
         {
@@ -122,8 +126,10 @@
           "id": "W02.5",
           "key": "cli",
           "title": "CLI配置隔离/bridge试验",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_broker_bridge.json"
+          ]
         },
         {
           "id": "W02.6",
@@ -496,14 +502,17 @@
       "status": "in_progress",
       "evidence": [
         "docs/integration/evidence/20261026_m0_tool_boundaries.json",
-        "docs/integration/evidence/20261027_m0_combined_host.json"
+        "docs/integration/evidence/20261027_m0_combined_host.json",
+        "docs/integration/evidence/20261027_m0_security.json"
       ]
     },
     {
       "id": "G3",
       "title": "CLI隔离配置与能力桥接",
-      "status": "planned",
-      "evidence": []
+      "status": "in_progress",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_broker_bridge.json"
+      ]
     },
     {
       "id": "G4",
@@ -545,8 +554,14 @@
     },
     {
       "id": "T05",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_security.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Isolated prototype and synthetic fixtures; not installed product",
+      "notes": "Prototype authority and actual PTC tool checks only. Existing product MR/RPC/commands/retries remain unwired."
     },
     {
       "id": "T06",
@@ -645,8 +660,14 @@
     },
     {
       "id": "T25",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_security.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Isolated prototype and synthetic fixtures; not installed product",
+      "notes": "Synthetic Linux container denies another Bot fixture. Ordinary Ubuntu/Win10 PTC can read it; Win11 setup blocked. Real DSH worker and Windows account isolation are unverified."
     },
     {
       "id": "T26",
@@ -685,8 +706,14 @@
     },
     {
       "id": "T33",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_broker_bridge.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Isolated prototype and synthetic fixtures; not installed product",
+      "notes": "Real standalone MCP SDK bridge and Codex config parser verified separately. CLI-launched bridge, remote paths and live GPT calls are not connected."
     },
     {
       "id": "T34",

@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "level": "integration-prototype",
+  "actualModelCalls": 0,
+  "description": "Actual rc.3 Node PTC with the shared experimental authority; synthetic privacy fixture only",
+  "ptc": [
+    {
+      "sdkVersion": "0.2.1-rc.3",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "arch": "x64",
+      "actualModelCalls": 0,
+      "machineAlias": "ubuntu-test",
+      "combinedHostChecks": 9,
+      "security": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "PTC presentation blocks direct native calls",
+          "Actual Node PTC process dispatches an allowed host binding",
+          "PTC nested dispatch obeys guard despite permissive pre-execute hooks",
+          "Hidden binding is absent inside the PTC program",
+          "Worker restriction does not mutate sibling Main authority",
+          "Revocation affects a later binding in an already running PTC program",
+          "Actual PTC busy program settles after cancellation"
+        ],
+        "executions": [
+          {
+            "name": "integration_private_write",
+            "nested": false,
+            "error": true
+          },
+          {
+            "name": "integration_public_read",
+            "nested": true,
+            "error": false
+          },
+          {
+            "name": "integration_private_write",
+            "nested": true,
+            "error": true
+          },
+          {
+            "name": "integration_private_write",
+            "nested": false,
+            "error": false
+          },
+          {
+            "name": "integration_wait",
+            "nested": true,
+            "error": false
+          },
+          {
+            "name": "integration_public_read",
+            "nested": true,
+            "error": true
+          }
+        ],
+        "runtime": {
+          "language": "typescript",
+          "isolation": "process",
+          "sandboxMode": "workspace-write"
+        },
+        "outsideFileReadable": true,
+        "outsideFileResult": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "landlock-run: partial enforcement (older Landlock ABI)\n\nfixture-only-not-user-data\nFile sandbox enforcement is partial on this host."
+            }
+          ],
+          "value": {
+            "logs": [
+              "landlock-run: partial enforcement (older Landlock ABI)\n"
+            ],
+            "sandbox": {
+              "mode": "workspace-write",
+              "denied": false,
+              "enforcement": "partial"
+            },
+            "result": "fixture-only-not-user-data"
+          }
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "In-process tool guard prototype, not product Policy",
+          "Only a synthetic file was read",
+          "No OS-level private-state isolation claimed",
+          "Existing MR RPC and CLI paths still require shared authorization"
+        ]
+      }
+    },
+    {
+      "sdkVersion": "0.2.1-rc.3",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "arch": "x64",
+      "actualModelCalls": 0,
+      "machineAlias": "win10-test",
+      "combinedHostChecks": 9,
+      "security": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "PTC presentation blocks direct native calls",
+          "Actual Node PTC process dispatches an allowed host binding",
+          "PTC nested dispatch obeys guard despite permissive pre-execute hooks",
+          "Hidden binding is absent inside the PTC program",
+          "Worker restriction does not mutate sibling Main authority",
+          "Revocation affects a later binding in an already running PTC program",
+          "Actual PTC busy program settles after cancellation"
+        ],
+        "executions": [
+          {
+            "name": "integration_private_write",
+            "nested": false,
+            "error": true
+          },
+          {
+            "name": "integration_public_read",
+            "nested": true,
+            "error": false
+          },
+          {
+            "name": "integration_private_write",
+            "nested": true,
+            "error": true
+          },
+          {
+            "name": "integration_private_write",
+            "nested": false,
+            "error": false
+          },
+          {
+            "name": "integration_wait",
+            "nested": true,
+            "error": false
+          },
+          {
+            "name": "integration_public_read",
+            "nested": true,
+            "error": true
+          }
+        ],
+        "runtime": {
+          "language": "typescript",
+          "isolation": "process",
+          "sandboxMode": "workspace-write"
+        },
+        "outsideFileReadable": true,
+        "outsideFileResult": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "fixture-only-not-user-data\nFile sandbox enforcement is partial on this host."
+            }
+          ],
+          "value": {
+            "logs": [],
+            "sandbox": {
+              "mode": "workspace-write",
+              "denied": false,
+              "enforcement": "partial"
+            },
+            "result": "fixture-only-not-user-data"
+          }
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "In-process tool guard prototype, not product Policy",
+          "Only a synthetic file was read",
+          "No OS-level private-state isolation claimed",
+          "Existing MR RPC and CLI paths still require shared authorization"
+        ]
+      }
+    }
+  ],
+  "localWin11": {
+    "node": "v24.20.0",
+    "status": "blocked",
+    "operation": "workspace-write native sandbox setup",
+    "error": "SetNamedSecurityInfoW failed (Win32 5): grantWrite(<isolated-workspace>)",
+    "rawEvidenceSha256": "c663fa5a73fb5ca299c8726f89eb7764905105595ba41a40348981c950464d72",
+    "policyRelaxed": false
+  },
+  "linuxContainer": {
+    "status": "passed-for-described-checks",
+    "platform": "linux",
+    "hostNode": "v22.22.1",
+    "imageDigest": "node@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d",
+    "imageId": "sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d",
+    "observations": {
+      "uid": 65532,
+      "pid": 1,
+      "node": "v22.22.1",
+      "workspaceRead": true,
+      "workspaceWrite": true,
+      "privateReadDenied": true,
+      "rootWriteDenied": true,
+      "noNewPrivileges": true,
+      "noCapabilities": true,
+      "noInheritedCredentials": true,
+      "networkDenied": true
+    },
+    "actualModelCalls": 0,
+    "limitations": [
+      "Synthetic container workload, not DSH or a product remote agent",
+      "Linux only; no Windows isolation evidence",
+      "Docker daemon and host remain trusted; no privileged/socket mounts",
+      "No task cancellation, managed worker restart or file-transfer protocol implemented"
+    ]
+  },
+  "limitations": [
+    "Neither ordinary PTC host protects the synthetic other-Bot file; both report partial sandbox enforcement",
+    "Win11 sandbox setup remains blocked; Win10 success is not a Win11 pass",
+    "Container workload is synthetic; no DSH worker, remote product agent or Windows account isolation is installed",
+    "Old MR tools/RPC/commands/retries still require product-wide shared authorization",
+    "No real user file or provider request used"
+  ]
+}

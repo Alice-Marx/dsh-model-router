@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "level": "prototype-sdk-integration",
+  "actualModelCalls": 0,
+  "authorityAndBridge": {
+    "authorityTests": 10,
+    "bridgeTests": 3,
+    "pass": 13,
+    "protocolModes": [
+      "legacy",
+      "modern"
+    ],
+    "sdkPackages": {
+      "@modelcontextprotocol/client": "2.4.0",
+      "@modelcontextprotocol/server": "2.4.0"
+    },
+    "testedPlatforms": [
+      "Win11 Node24.20.0",
+      "Win10 LTSC Node24.18.0",
+      "Ubuntu24.04 Node22.22.1"
+    ],
+    "observed": [
+      "Host object identity cannot be copied through JSON",
+      "Exact model components reject slash collisions",
+      "Lease is bounded to task/attempt/machine/workspace/location; grants can only narrow",
+      "Expired, changed, released, revoked, tampered and another-process tickets fail",
+      "Revocation aborts cooperative handlers and discards late success",
+      "Real MCP list/call shows each Bot grant only; forged arguments never reach backend",
+      "MCP cancellation reaches parent handler; normal close ends its owned child without forced termination"
+    ]
+  },
+  "codexConfig": {
+    "status": "passed-config-only",
+    "packageVersion": "0.163.0",
+    "cliVersion": "codex-cli 0.163.0",
+    "entrySha256": "61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70",
+    "configs": [
+      {
+        "name": "bot_a",
+        "configSha256": "699d5e9811d5ea655a2ac366ea60e7b13dc504e6f909ca8d57449d044f61d4a5",
+        "listedServers": [
+          "bot_a"
+        ],
+        "allowedTools": [
+          "ping_bot_a"
+        ]
+      },
+      {
+        "name": "bot_b",
+        "configSha256": "b8a256f1b8df43f3bfca234574096a587bea23e34ac8b149fbc731addc6aca01",
+        "listedServers": [
+          "bot_b"
+        ],
+        "allowedTools": [
+          "ping_bot_b"
+        ]
+      }
+    ],
+    "existingUserConfigUnchanged": true,
+    "actualModelCalls": 0,
+    "limitations": [
+      "Only installed Codex mcp list/get parsing and CODEX_HOME isolation verified",
+      "No Codex model execution or bridge startup through Codex tested",
+      "Managed bridge currently requires a direct private parent IPC channel; CLI-grandchild bootstrap remains to implement",
+      "Per-CLI homes alone are not OS isolation",
+      "Other official CLIs and remote CLI launch remain unverified"
+    ]
+  },
+  "sourceGitBlobs": {
+    "packages/capability-broker/src/authority.mjs": "3ed4ba0d7409999263d87ea9b4c5f68e02ba0914",
+    "packages/capability-broker/src/managed-bridge.mjs": "1773888f8c72cf3207afe48a8366478bef69d8b3",
+    "packages/capability-broker/src/stdio-bridge.mjs": "23c9a86d492ba722ceffa69f2287c11974b6ca03",
+    "tests/capability-authority.test.mjs": "14421b9762d2987d60eae1d59f8d0861971974f3",
+    "tests/capability-bridge.test.mjs": "b9ee022322b008cc3c61f0a2addca81c40f3b7f5",
+    "tests/fixtures/integration-combined/security-plugin.mjs": "16e505b44ca8a09c9b175690695bd85bdcd83f70",
+    "scripts/integration-codex-profile.mjs": "068a1a46da506bc3303d1a3b5a393978c7cd12f4",
+    "scripts/integration-linux-isolation.mjs": "ba5c673fe9eece0e28bb765bab36735629baac40",
+    "scripts/integration-combined-host.mjs": "03190a25130fdd2937c1063467dc5c61b5f02b1b",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "0dff93b7a2819d20d0d9ad7e8c3c74f144b83417"
+  },
+  "limitations": [
+    "Prototype only; not activated in the published plugin",
+    "Stable Bot principal mapping across all Sessions remains to implement",
+    "Direct parent IPC works; official CLI grandchild private bootstrap is not yet connected",
+    "No actual Codex MCP execution, CLI model identity or remote CLI path has passed",
+    "No persisted Policy, audit/approvals, budget writer or receipt projection implemented"
+  ]
+}

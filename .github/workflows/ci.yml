@@ -68,8 +68,10 @@ jobs:
         include:
           - os: ubuntu-latest
             node: '22'
+            security: '--security'
           - os: windows-latest
             node: '24'
+            security: ''
     steps:
       - name: Checkout integration source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -95,7 +97,13 @@ jobs:
           pnpm install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
           pnpm --dir tests/fixtures/integration-host install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
       - name: Exercise real combined Sessions with an offline model
-        run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host
+        run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host ${{ matrix.security }}
+      - name: Pull the immutable Linux boundary fixture
+        if: runner.os == 'Linux'
+        run: docker pull --platform linux/amd64 node@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d
+      - name: Verify the Linux container boundary with synthetic files
+        if: runner.os == 'Linux'
+        run: node scripts/integration-linux-isolation.mjs
       - name: Install the isolated native database probe
         run: npm install --prefix tmp/integration/probes/sqlite --ignore-scripts --no-audit --no-fund --strict-peer-deps --registry=https://registry.npmjs.org better-sqlite3@13.0.3
       - name: Verify native load, transactions and interruption recovery

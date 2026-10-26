@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "actualModelCalls": 0,
+  "platforms": {
+    "local-win11": {
+      "rootTests": {
+        "tests": 1273,
+        "pass": 1270,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rawRootTestsSha256": "176f1778c839b84981a85e26ea9c7adff7a2354574a2b5cfb7575940ea4c3fbd",
+      "clientCheck": "passed",
+      "frozenStrictInstall": "passed"
+    },
+    "ubuntu-test": {
+      "rootTests": {
+        "tests": 1273,
+        "pass": 1250,
+        "fail": 0,
+        "skipped": 23
+      },
+      "rawRootTestsSha256": "9a6f9b4de31983560acaa1bcc1e44c916c8593970cc28bd656a2965f1ff523c6",
+      "clientCheck": "passed",
+      "frozenStrictInstall": "passed"
+    },
+    "win10-test": {
+      "rootTests": {
+        "tests": 1273,
+        "pass": 1270,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rawRootTestsSha256": "212918c4d14ed0f79944650ffee2c2d9088579af631aca1b2fd9b1603bab2445",
+      "clientCheck": "passed",
+      "frozenStrictInstall": "passed"
+    }
+  },
+  "engineeringChecks": {
+    "tests": 42,
+    "pass": 42,
+    "fail": 0,
+    "skipped": 0
+  },
+  "sourceGitBlobs": {
+    "packages/capability-broker/src/authority.mjs": "3ed4ba0d7409999263d87ea9b4c5f68e02ba0914",
+    "packages/capability-broker/src/managed-bridge.mjs": "1773888f8c72cf3207afe48a8366478bef69d8b3",
+    "packages/capability-broker/src/stdio-bridge.mjs": "23c9a86d492ba722ceffa69f2287c11974b6ca03",
+    "tests/capability-authority.test.mjs": "14421b9762d2987d60eae1d59f8d0861971974f3",
+    "tests/capability-bridge.test.mjs": "b9ee022322b008cc3c61f0a2addca81c40f3b7f5",
+    "tests/fixtures/integration-combined/security-plugin.mjs": "16e505b44ca8a09c9b175690695bd85bdcd83f70",
+    "scripts/integration-codex-profile.mjs": "068a1a46da506bc3303d1a3b5a393978c7cd12f4",
+    "scripts/integration-linux-isolation.mjs": "ba5c673fe9eece0e28bb765bab36735629baac40",
+    "scripts/integration-combined-host.mjs": "03190a25130fdd2937c1063467dc5c61b5f02b1b",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "0dff93b7a2819d20d0d9ad7e8c3c74f144b83417"
+  },
+  "testedRemoteOverlaySha256": "002a97d5495e4e67e137a36274e19988afbcf2440753b514389d8db48911a413",
+  "notes": [
+    "All root suites include the new authority and real MCP child-process tests",
+    "Win11 PTC setup failure is a separate measured blocker, not a root-suite failure",
+    "No new npm version, tag or Release; CI is tracked by its GitHub run"
+  ]
+}
