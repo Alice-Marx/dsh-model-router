@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "timezone": "Asia/Shanghai",
+  "actualModelCalls": 0,
+  "level": "real OS/Node native probes + host integration with offline model",
+  "targets": [
+    {
+      "alias": "ubuntu-test-01",
+      "os": "Ubuntu 24.04.4 LTS",
+      "release": "6.8.0-101-generic",
+      "arch": "x64",
+      "role": "isolated test target, not a production deployment",
+      "host": {
+        "status": "passed",
+        "level": "host-integration-offline",
+        "sdkVersion": "0.2.1-rc.3",
+        "node": "v22.22.1",
+        "platform": "linux",
+        "arch": "x64",
+        "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+        "checks": [
+          "MR and DS tools registered in one official rc.3 profile",
+          "Main Bot created on a real DSH Session and fixture model advertised",
+          "Main AgentLoop creates worker using the actual create_bot tool",
+          "Worker AgentLoop calls MR route tool through real DSH registry",
+          "Main message_bot dispatch reaches worker and its reply returns",
+          "Main and worker use real AgentLoops; every call keeps the exact offline route",
+          "DS usage projection attributes positive mock token usage to both Bots",
+          "Fresh host process restores Bot identities, exact models and exchange history",
+          "Owned host process exited and test state stays in isolated DSH_HOME"
+        ],
+        "actualModelCalls": 0,
+        "mockAdapterDispatches": 11,
+        "auxiliaryModelCalls": 1,
+        "observedLegacyExposure": [
+          "model_router_consult",
+          "model_router_execute",
+          "model_router_health",
+          "model_router_plan",
+          "model_router_rate",
+          "model_router_rerun_step",
+          "model_router_routes",
+          "model_router_team_execute",
+          "model_router_tool_install",
+          "model_router_tool_repair",
+          "model_router_tool_run",
+          "model_router_tool_uninstall",
+          "model_router_tools"
+        ],
+        "limitations": [
+          "No actual model provider request",
+          "No browser or Desktop UI assertion in this command",
+          "No product Bot policy, unified task ledger or CLI bridge installed",
+          "Legacy MR tools remain visible to an ordinary DS Bot; authorization integration remains required"
+        ],
+        "diagnosticSha256": "2a9278de9b6402052522931791caa6de1ec5f39e29a2f2bf73f6b346109a24b6"
+      },
+      "nativeDatabase": {
+        "status": "passed",
+        "driver": "better-sqlite3",
+        "version": "13.0.3",
+        "platform": "linux",
+        "arch": "x64",
+        "node": "v22.22.1",
+        "nodeAbi": "127",
+        "nativeSha256": "6fd4292c6c5f352436cd85c9e1cb286978efa43c20ae350973f83414ced9991d",
+        "checks": [
+          "native module loads",
+          "WAL",
+          "atomic rollback",
+          "two connections enforce budget",
+          "idempotent admission",
+          "changed-content conflict",
+          "reopen after process interruption"
+        ],
+        "limitations": [
+          "Only the reported Node/OS/architecture checked in this invocation",
+          "No Electron ABI or installer/upgrade validation",
+          "Fixture tables, not the product ledger or migration",
+          "Offline database probe without model requests"
+        ]
+      },
+      "rootTests": {
+        "tests": 1260,
+        "pass": 1237,
+        "fail": 0,
+        "skipped": 23
+      },
+      "clientCheck": "passed",
+      "dependencyInstall": "frozen lockfiles + strict peer dependencies + isolated test host",
+      "sourceBaseCommit": "1035e860cd33b8935a9d0e3224f5a49f31cdbecd",
+      "sourceOverlay": {
+        "package.json": "215b9b76398af5532a56ce1b3523985488be5764882a1b0fc8cac0783de95bf8",
+        ".github/workflows/ci.yml": "6deea3be0dcf05ca24ef1ae9985ba85cf6e8eaefc3cd15eeab964b6cae2a3d3c",
+        "scripts/integration-combined-host.mjs": "3c7a7fb4e6f4db1ec15537c9a5ce45fc2b5a348669f21624c2ed7338aa1a535b",
+        "scripts/integration-progress.mjs": "e4f9abe7cceb13ed71a45e405fa26aa858bbe04f461e95c51e8e5de2909f82e2",
+        "scripts/integration-sqlite-probe.mjs": "1f965d2d4a3a0423a44e512281bf9b49b1f1ef65677124cc8e536ea5ade20410",
+        "scripts/integration-upstream-tests.mjs": "c52ab5b44b6ec12c5af43cbcfca7cbe02dab5dccc61807608569dd97358be11d",
+        "tests/integration-combined-host.test.mjs": "e0bfd4ad5b4a318d34f76b418c98fea71b6ad55c661beac390c80cb32f0282c6",
+        "tests/integration-progress.test.mjs": "f91d6f5ebaa5b1f39d2ab73239d200cc4278a222388971e6fd51d4648da0a385",
+        "tests/fixtures/integration-combined/mock-plugin.mjs": "279c9516da98f2aa3287e2d8bd27972d54aa5a53bf664e9dea16a9aa207d8eb2",
+        "tests/fixtures/integration-combined/offline-preload.mjs": "64eaa4198d0333cf57c6d2837cf1608c2ad9a6de158db605f11b07ac602a8fe1",
+        "tests/fixtures/integration-combined/README.md": "b7ac4a66a72a3d351f41290c650eaa40885a0e902f0f4dcec1aa2e85171587cb"
+      },
+      "rawLogSha256": {
+        "root-install.log": "de1ab5774f035e7934c650558a159790ecb0ae48ab6248d960d164811983c673",
+        "host-install.log": "6cb9a3e9a9734b9d77bd9f848913d9b15678d0c77d5e671ae0683b31ddeb16e2",
+        "tool-boundaries.json": "5818c5d03ae165d96491290a658fb364a51284bdc2212d74d18d7b783e38325f",
+        "llm-admission.json": "92f9ab4f205d21e493574729746cbc8af0ebb4d0a4b81a11b2050c11911cf15a",
+        "client-check.log": "ca8244480107d88a23fc1667171ac38c7039eeff8a1170be5e3f462aeaf6d919",
+        "sqlite-install.log": "baff4ed17ede730e0c2693b23c3a7589f4568049f49a7c1f415d3c6138e46a26",
+        "payload-manifest.json": "83dd7de7c736fff24cea4830d7948f2599fe22cf8945cd18d8eaef5a4dbf141e",
+        "combined-host-final.json": "f6a5773e57cc8c9a0144804674e55d13cd07ed518f143f138d74cb5a06dbe015",
+        "root-tests-final.log": "d6106578a3d925ba2f77fa7b61063f2445e534a173a22a6a458c45ea93c95dce",
+        "sqlite-probe-final.json": "12ec9ac88a2417c29f9856295a9cff0fa1ffdbeb6a34514f465f44279246f7c1",
+        "final-payload-manifest.json": "169c373ebe463479bc6fb71b4a99374d25a9babb62e3db8f19ec6cafa701e6bc"
+      },
+      "processCleanup": "combined host runner confirmed owned process exit"
+    },
+    {
+      "alias": "win10-test-01",
+      "os": "Windows 10 IoT Enterprise LTSC",
+      "release": "10.0.19044",
+      "arch": "x64",
+      "role": "isolated test target, not a production deployment",
+      "host": {
+        "status": "passed",
+        "level": "host-integration-offline",
+        "sdkVersion": "0.2.1-rc.3",
+        "node": "v24.18.0",
+        "platform": "win32",
+        "arch": "x64",
+        "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+        "checks": [
+          "MR and DS tools registered in one official rc.3 profile",
+          "Main Bot created on a real DSH Session and fixture model advertised",
+          "Main AgentLoop creates worker using the actual create_bot tool",
+          "Worker AgentLoop calls MR route tool through real DSH registry",
+          "Main message_bot dispatch reaches worker and its reply returns",
+          "Main and worker use real AgentLoops; every call keeps the exact offline route",
+          "DS usage projection attributes positive mock token usage to both Bots",
+          "Fresh host process restores Bot identities, exact models and exchange history",
+          "Owned host process exited and test state stays in isolated DSH_HOME"
+        ],
+        "actualModelCalls": 0,
+        "mockAdapterDispatches": 11,
+        "auxiliaryModelCalls": 1,
+        "observedLegacyExposure": [
+          "model_router_consult",
+          "model_router_execute",
+          "model_router_health",
+          "model_router_plan",
+          "model_router_rate",
+          "model_router_rerun_step",
+          "model_router_routes",
+          "model_router_team_execute",
+          "model_router_tool_install",
+          "model_router_tool_repair",
+          "model_router_tool_run",
+          "model_router_tool_uninstall",
+          "model_router_tools"
+        ],
+        "limitations": [
+          "No actual model provider request",
+          "No browser or Desktop UI assertion in this command",
+          "No product Bot policy, unified task ledger or CLI bridge installed",
+          "Legacy MR tools remain visible to an ordinary DS Bot; authorization integration remains required"
+        ],
+        "diagnosticSha256": "e70b59c4eaf40eeec24bc290f15db1befdd4756d52ee13a5e474106cc9579c78"
+      },
+      "nativeDatabase": {
+        "status": "passed",
+        "driver": "better-sqlite3",
+        "version": "13.0.3",
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.18.0",
+        "nodeAbi": "137",
+        "nativeSha256": "e21e5efd71fba66578e95b62554d9028064a80dafd7221bf8a8ef155de8d240a",
+        "checks": [
+          "native module loads",
+          "WAL",
+          "atomic rollback",
+          "two connections enforce budget",
+          "idempotent admission",
+          "changed-content conflict",
+          "reopen after process interruption"
+        ],
+        "limitations": [
+          "Only the reported Node/OS/architecture checked in this invocation",
+          "No Electron ABI or installer/upgrade validation",
+          "Fixture tables, not the product ledger or migration",
+          "Offline database probe without model requests"
+        ]
+      },
+      "rootTests": {
+        "tests": 1260,
+        "pass": 1257,
+        "fail": 0,
+        "skipped": 3
+      },
+      "clientCheck": "passed",
+      "dependencyInstall": "frozen lockfiles + strict peer dependencies + isolated test host",
+      "sourceBaseCommit": "1035e860cd33b8935a9d0e3224f5a49f31cdbecd",
+      "sourceOverlay": {
+        "package.json": "215b9b76398af5532a56ce1b3523985488be5764882a1b0fc8cac0783de95bf8",
+        ".github/workflows/ci.yml": "6deea3be0dcf05ca24ef1ae9985ba85cf6e8eaefc3cd15eeab964b6cae2a3d3c",
+        "scripts/integration-combined-host.mjs": "3c7a7fb4e6f4db1ec15537c9a5ce45fc2b5a348669f21624c2ed7338aa1a535b",
+        "scripts/integration-progress.mjs": "e4f9abe7cceb13ed71a45e405fa26aa858bbe04f461e95c51e8e5de2909f82e2",
+        "scripts/integration-sqlite-probe.mjs": "1f965d2d4a3a0423a44e512281bf9b49b1f1ef65677124cc8e536ea5ade20410",
+        "scripts/integration-upstream-tests.mjs": "c52ab5b44b6ec12c5af43cbcfca7cbe02dab5dccc61807608569dd97358be11d",
+        "tests/integration-combined-host.test.mjs": "e0bfd4ad5b4a318d34f76b418c98fea71b6ad55c661beac390c80cb32f0282c6",
+        "tests/integration-progress.test.mjs": "f91d6f5ebaa5b1f39d2ab73239d200cc4278a222388971e6fd51d4648da0a385",
+        "tests/fixtures/integration-combined/mock-plugin.mjs": "279c9516da98f2aa3287e2d8bd27972d54aa5a53bf664e9dea16a9aa207d8eb2",
+        "tests/fixtures/integration-combined/offline-preload.mjs": "64eaa4198d0333cf57c6d2837cf1608c2ad9a6de158db605f11b07ac602a8fe1",
+        "tests/fixtures/integration-combined/README.md": "b7ac4a66a72a3d351f41290c650eaa40885a0e902f0f4dcec1aa2e85171587cb"
+      },
+      "rawLogSha256": {
+        "root-install.log": "7d9fe1b5b4d32bbd0b9b60f6994d19a94ca941941b50667a666b29ed9d109306",
+        "host-install.log": "aa950f91b451987ccc044095eb83b3b5804af1c7b79852ec7be553888f774b08",
+        "tool-boundaries.json": "9a75ca5c6dd71c683fd68a762444a6e16ca4018edfc11fcb2a18fc3c83bdb33b",
+        "llm-admission.json": "14e244dcbb95b2e48518d8515a082fc0194da91c12c8cba287786f9064e6e14b",
+        "client-check.log": "c331b40554d2729ff05494924f094cdf26bc8dadd4b1e2a9a1a66f78e0217979",
+        "sqlite-install.log": "4dab275e1c024c58c0b0f908d2b345df7d8dfc19115e211ee9033e821928a29e",
+        "payload-manifest.json": "83dd7de7c736fff24cea4830d7948f2599fe22cf8945cd18d8eaef5a4dbf141e",
+        "combined-host-final.json": "425b9e73714b07039cf0fcfb9ac5465875773fced27afdcd72e8a5166d0d15cd",
+        "root-tests-final.log": "26b813db90528a7ee8a1d5b2cfc321612dd3478a43315a6a97a6946e62b71426",
+        "sqlite-probe-final.json": "9aa65a8abdf35050b4f8afdc4c6187c0d20cb3f0fabe6803509e07d968fe4acf",
+        "final-payload-manifest.json": "169c373ebe463479bc6fb71b4a99374d25a9babb62e3db8f19ec6cafa701e6bc"
+      },
+      "processCleanup": "combined host runner confirmed owned process exit"
+    }
+  ],
+  "transferIntegrity": {
+    "initialPayloadSha256": "ec954f3c2a7f2c554650c4fc2799e2c836c3d9ff556ef2123c09f7f51fc6dfc1",
+    "initialPayloadBytes": 16398050,
+    "finalOverlaySha256": "85ab88597fa47fb9eeb4c953bb3619a460d9beee1a55b38f0066b0bcb93cb3ed",
+    "lineEndingFailure": "Ubuntu rejected the copied Windows CRLF DS worktree before launch. A new private checkout was constructed from the frozen Git objects; the unchanged-source guard was retained."
+  },
+  "limitations": [
+    "No remote product agent installed or paired",
+    "No real Win10 GUI/interactive-session control tested",
+    "No Electron ABI or installer/upgrade/uninstall verification",
+    "No persistent production DSH service or laptop-sleep topology test",
+    "Skipped tests remain skipped and do not count as passing",
+    "Remote credentials/endpoints/accounts are deliberately excluded"
+  ]
+}

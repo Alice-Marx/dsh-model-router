@@ -16,4 +16,4 @@
 
 提交简洁、脱敏的结果、版本、命令、日志摘要和校验值。完整本机日志、测试数据库、下载源码及机器配置放在已忽略的 `tmp/integration/`；用户真实 DSH 数据、端点和凭据不放进本目录。
 
-机器记录使用 `not_configured` 等真实状态。推荐 Ubuntu/Win10 拓扑不代表机器已部署，Node/Windows 的一次驱动探针不代表 Linux/Electron/Win10 实机验证通过。
+机器记录区分已连通的测试目标和生产部署。`deployment-status.json` 当前登记了已实测的Ubuntu与Win10别名；产品agent、常开宿主与休眠拓扑尚未完成。平台证据只覆盖报告中的Node/OS/架构，不能外推到Electron或其他组合。

@@ -70,7 +70,7 @@ export async function probeSqlite(driverFile = resolve(ROOT, DEFAULT_DRIVER)) {
       platform: process.platform, arch: process.arch, node: process.version, nodeAbi: process.versions.modules,
       nativeSha256: createHash('sha256').update(await readFile(native)).digest('hex'),
       checks: ['native module loads', 'WAL', 'atomic rollback', 'two connections enforce budget', 'idempotent admission', 'changed-content conflict', 'reopen after process interruption'],
-      limitations: ['Windows current Node runtime only', 'No Node 22/Electron ABI or Linux installation checked', 'Fixture tables, not the product ledger or migration', 'No paid call or external machine'],
+      limitations: ['Only the reported Node/OS/architecture checked in this invocation', 'No Electron ABI or installer/upgrade validation', 'Fixture tables, not the product ledger or migration', 'Offline database probe without model requests'],
     }
   } finally {
     b?.close()

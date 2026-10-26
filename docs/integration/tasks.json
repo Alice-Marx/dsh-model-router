@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "planVersion": "1.1",
   "startedOn": "2026-10-26",
-  "updatedOn": "2026-10-26",
+  "updatedOn": "2026-10-27",
   "activeMilestone": "M0",
   "statusMeaning": "Task/step completion is separate from product R/T verification; no percentage implies release readiness",
   "tasks": [
@@ -17,7 +17,9 @@
         "T63"
       ],
       "evidence": [
-        "docs/integration/feature-inventory.json"
+        "docs/integration/feature-inventory.json",
+        "docs/integration/evidence/20261027_m0_combined_host.json",
+        "docs/integration/evidence/20261027_m0_remote_platforms.json"
       ],
       "steps": [
         {
@@ -52,7 +54,10 @@
           "key": "behavior-audit",
           "title": "逐入口/参数/用户行为展开并核对",
           "status": "in_progress",
-          "evidence": []
+          "evidence": [
+            "docs/integration/behavior-audit.json",
+            "docs/integration/evidence/20261027_m0_combined_host.json"
+          ]
         }
       ]
     },
@@ -72,7 +77,9 @@
         "T57"
       ],
       "evidence": [
-        "docs/integration/evidence/20261026_m0_baseline.json"
+        "docs/integration/evidence/20261026_m0_baseline.json",
+        "docs/integration/evidence/20261027_m0_combined_host.json",
+        "docs/integration/evidence/20261027_m0_remote_platforms.json"
       ],
       "steps": [
         {
@@ -122,15 +129,21 @@
           "id": "W02.6",
           "key": "host-ui",
           "title": "同宿主真实挂载与UI验证",
-          "status": "planned",
-          "evidence": []
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_combined_host.json",
+            "docs/integration/evidence/20261027_m0_remote_platforms.json"
+          ]
         },
         {
           "id": "W02.7",
           "key": "deployment",
           "title": "实际机器拓扑与休眠验证",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_remote_platforms.json",
+            "docs/integration/deployment-status.json"
+          ]
         },
         {
           "id": "W02.8",
@@ -472,7 +485,9 @@
       "evidence": [
         "docs/integration/evidence/20261026_m0_baseline.json",
         "docs/integration/evidence/20261026_m0_ds_full.json",
-        "docs/integration/evidence/20261026_m0_llm_admission.json"
+        "docs/integration/evidence/20261026_m0_llm_admission.json",
+        "docs/integration/evidence/20261027_m0_combined_host.json",
+        "docs/integration/evidence/20261027_m0_remote_platforms.json"
       ]
     },
     {
@@ -480,7 +495,8 @@
       "title": "真实工具约束与OS边界",
       "status": "in_progress",
       "evidence": [
-        "docs/integration/evidence/20261026_m0_tool_boundaries.json"
+        "docs/integration/evidence/20261026_m0_tool_boundaries.json",
+        "docs/integration/evidence/20261027_m0_combined_host.json"
       ]
     },
     {
@@ -494,15 +510,23 @@
       "title": "运行时/SQLite/PTY/安装",
       "status": "in_progress",
       "evidence": [
-        "docs/integration/evidence/20261026_m0_sqlite.json"
+        "docs/integration/evidence/20261026_m0_sqlite.json",
+        "docs/integration/evidence/20261027_m0_remote_platforms.json"
       ]
     }
   ],
   "acceptanceResults": [
     {
       "id": "T01",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_combined_host.json",
+        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Isolated DSH rc.3 with offline model; Win11/Ubuntu24.04/Win10",
+      "notes": "Host/Session/registry/UI/native runtime observations only; remaining lifecycle, product policy, installed agent and sleep topology criteria are not passed."
     },
     {
       "id": "T02",
@@ -781,8 +805,15 @@
     },
     {
       "id": "T57",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_combined_host.json",
+        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Isolated DSH rc.3 with offline model; Win11/Ubuntu24.04/Win10",
+      "notes": "Host/Session/registry/UI/native runtime observations only; remaining lifecycle, product policy, installed agent and sleep topology criteria are not passed."
     },
     {
       "id": "T58",

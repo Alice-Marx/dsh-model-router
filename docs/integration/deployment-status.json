@@ -1,13 +1,40 @@
 {
   "schemaVersion": 1,
-  "status": "not_configured",
+  "status": "test_targets_verified",
   "recommendedRoles": [
     "Ubuntu DSH Web controller",
     "Ubuntu remote agent",
     "Laptop UI / isolated Desktop profile",
     "Windows 10 desktop through WireGuard"
   ],
-  "actualTargets": [],
+  "actualTargets": [
+    {
+      "alias": "ubuntu-test-01",
+      "os": "Ubuntu 24.04.4 LTS",
+      "release": "6.8.0-101-generic",
+      "node": "v22.22.1",
+      "arch": "x64",
+      "sshReachable": true,
+      "purpose": "isolated tests only",
+      "productionControllerInstalled": false,
+      "productAgentInstalled": false,
+      "evidence": "docs/integration/evidence/20261027_m0_remote_platforms.json"
+    },
+    {
+      "alias": "win10-test-01",
+      "os": "Windows 10 IoT Enterprise LTSC",
+      "release": "10.0.19044",
+      "node": "v24.18.0",
+      "arch": "x64",
+      "sshReachable": true,
+      "purpose": "isolated tests only",
+      "productionControllerInstalled": false,
+      "productAgentInstalled": false,
+      "evidence": "docs/integration/evidence/20261027_m0_remote_platforms.json"
+    }
+  ],
   "privateConfigPolicy": "No real endpoint, account, credential or secret material in Git",
-  "verifiedSleepTopology": false
+  "verifiedSleepTopology": false,
+  "updatedOn": "2026-10-27",
+  "productionTopology": "not_configured"
 }

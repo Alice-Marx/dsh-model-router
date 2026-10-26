@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "updatedOn": "2026-10-27",
+  "coverageMeaning": "Six entry-level partial observations; no F group or whole product is declared fully audited",
+  "evidence": [
+    "docs/integration/evidence/20261027_m0_combined_host.json",
+    "docs/integration/evidence/20261027_m0_remote_platforms.json"
+  ],
+  "entries": [
+    {
+      "id": "E01",
+      "featureIds": [
+        "F01",
+        "F02"
+      ],
+      "entry": "POST /api/bot: state; update-bot",
+      "contract": "Authenticated user API; state bootstraps the first Main; update-bot accepts id and exact model ref",
+      "sources": [
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/channel.js",
+          "gitBlob": "83064f3f29f45ac521fd813c2c0498797ddbf48a"
+        },
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/roster.js",
+          "gitBlob": "b4b79a9d652ce1e2334fe9ea4ccf4ea9ebb6f8fc"
+        },
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/models.js",
+          "gitBlob": "3bb8474aeca4c2767ee129da14111cdff1e3285b"
+        }
+      ],
+      "observed": "Bootstrap once, choose the fixture model, retain identity/model after host restart",
+      "level": "host integration / offline model; browser observation where stated",
+      "remaining": [
+        "Remaining Bot CRUD, avatar/duplicate/archive, narrow viewport"
+      ]
+    },
+    {
+      "id": "E02",
+      "featureIds": [
+        "F01",
+        "F02"
+      ],
+      "entry": "create_bot(name, role, instructions, model)",
+      "contract": "Actor derives from exec.agent.id; the Main check precedes creation",
+      "sources": [
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/tools.js",
+          "gitBlob": "7a7942f83de9b1ecc87a8c80fd46ae95070b0e56"
+        }
+      ],
+      "observed": "Real Main AgentLoop creates worker with createdBy=Main and exact fixture model",
+      "level": "host integration / offline model; browser observation where stated",
+      "remaining": [
+        "Ordinary-Bot denial matrix and every management action"
+      ]
+    },
+    {
+      "id": "E03",
+      "featureIds": [
+        "F03"
+      ],
+      "entry": "message_bot(to, message, request_id)",
+      "contract": "Target is resolved by name; default reply returns to sender; this test sends once",
+      "sources": [
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/tools.js",
+          "gitBlob": "7a7942f83de9b1ecc87a8c80fd46ae95070b0e56"
+        },
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/handoffs.js",
+          "gitBlob": "2cd5d199f49059e6534ce859e66826a86758f256"
+        },
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/delivery.js",
+          "gitBlob": "962202447a3e851a8723b3b68b3fd49748e557c5"
+        }
+      ],
+      "observed": "Worker receives Main request; exchange and Main UI contain returning reply",
+      "level": "host integration / offline model; browser observation where stated",
+      "remaining": [
+        "Repeated request id, queue/interrupt, disconnect replay, full Task DAG"
+      ]
+    },
+    {
+      "id": "E04",
+      "featureIds": [
+        "F07",
+        "F39"
+      ],
+      "entry": "model_router_routes({}) from a worker AgentLoop",
+      "contract": "Legacy route-list tool shares the model catalog; no product per-Bot whitelist installed",
+      "sources": [
+        {
+          "repository": "MR",
+          "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+          "path": ".dsh-plugin/index.mjs",
+          "gitBlob": "72e2206ecaa414f35fe2f0da8e7c9783654e4b42"
+        },
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/models.js",
+          "gitBlob": "3bb8474aeca4c2767ee129da14111cdff1e3285b"
+        }
+      ],
+      "observed": "Registered tool executes from worker; exact fixture route appears in result and both UIs",
+      "level": "host integration / offline model; browser observation where stated",
+      "remaining": [
+        "Strict-model removal/credentials failures, route filtering, RPC and command authorization"
+      ]
+    },
+    {
+      "id": "E05",
+      "featureIds": [
+        "F20"
+      ],
+      "entry": "POST /api/bot: usage; DS usage UI",
+      "contract": "Session log usage and auxiliary calls are separate observed sources",
+      "sources": [
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/host/usage.js",
+          "gitBlob": "d19c0f8cbb4f323cbbabc84efb4bbd171d63b895"
+        }
+      ],
+      "observed": "Both Bot identities own positive fixture token totals; UI groups by Bot/model",
+      "level": "host integration / offline model; browser observation where stated",
+      "remaining": [
+        "Real provider/CLI receipts, unified accounting, money and subscription metering"
+      ]
+    },
+    {
+      "id": "E06",
+      "featureIds": [
+        "F21",
+        "F39"
+      ],
+      "entry": "DS Bot / classic Agent mode / MR model configuration",
+      "contract": "Separate bootstrap plugins; existing mode switch exposes MR advanced UI",
+      "sources": [
+        {
+          "repository": "DS",
+          "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "path": "ds-bot/src/client/surface.js",
+          "gitBlob": "5644b8875ee899c922708a6b285bf2010ea5172f"
+        },
+        {
+          "repository": "MR",
+          "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+          "path": ".dsh-plugin/client/official-harness.jsx",
+          "gitBlob": "165c3f4175a28ff0e2979190da3fd3d5278ccc77"
+        }
+      ],
+      "observed": "Both UIs load; MR model selector lists the same fixture route",
+      "level": "host integration / offline model; browser observation where stated",
+      "remaining": [
+        "Unified single-product sidebar/configuration, Desktop and narrow viewport"
+      ]
+    }
+  ]
+}

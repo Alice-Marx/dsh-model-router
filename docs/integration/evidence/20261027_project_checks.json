@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "rootTests": {
+    "tests": 1260,
+    "pass": 1257,
+    "fail": 0,
+    "skipped": 3
+  },
+  "rootTestsSha256": "7323e0c71cd9df02bba9ce3827926b8e3eb19df5dfac14042a729eb0de935f14",
+  "engineeringChecks": {
+    "tests": 29,
+    "pass": 29,
+    "fail": 0
+  },
+  "clientCheck": "passed",
+  "actualModelCalls": 0,
+  "limitations": [
+    "CI for this new checkpoint is recorded by its GitHub run; local tests do not imply product acceptance"
+  ]
+}

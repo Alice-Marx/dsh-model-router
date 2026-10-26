@@ -24,7 +24,7 @@ for (const [name, mutate, expected] of [
   ['dependency cycle', value => { value.board.tasks[0].dependsOn = ['W03'] }, /dependency cycle/],
   ['missing dependency', value => { value.board.tasks[0].dependsOn = ['W99'] }, /Unknown task dependency/],
   ['completion without proof', value => { value.board.tasks[0].status = 'completed'; value.board.tasks[0].evidence = [] }, /completion needs evidence/],
-  ['passing acceptance without proof', value => { value.board.acceptanceResults[0].status = 'passed' }, /passing needs evidence/],
+  ['passing acceptance without proof', value => { value.board.acceptanceResults[0].status = 'passed'; value.board.acceptanceResults[0].evidence = [] }, /passing needs evidence/],
   ['incomplete acceptance', value => {
     const task = value.board.tasks[0]
     task.status = 'completed'
@@ -68,7 +68,8 @@ test('integration: a sibling junction cannot turn external evidence into project
 
 test('integration: progress distinguishes work completed from product acceptance', () => {
   const text = statusText(project.board, project.scope)
-  assert.match(text, /Work packages completed: \d+\/20; product acceptance passed: \d+\/63/)
+  assert.match(text, /Work packages completed: \d+\/20; acceptance scenarios passed: \d+\/63/)
+  assert.match(text, /Passed evidence levels:/)
   assert.match(text, /do not imply product completion or release readiness/)
   assert.match(text, /M0 gates:/)
 })

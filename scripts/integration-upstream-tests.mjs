@@ -11,7 +11,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const execute = promisify(execFile)
 
 /** Only public package.json resolution is used; installed SDK files are never edited. */
-async function resolverAnchor(hostRoot) {
+export async function resolverAnchor(hostRoot) {
   const requireHost = createRequire(join(hostRoot, 'package.json'))
   const entry = await realpath(requireHost.resolve('@deepseek-ai/dsh/package.json'))
   const queue = [entry]

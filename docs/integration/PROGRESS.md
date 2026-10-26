@@ -1,12 +1,32 @@
 # 一体化工程进度
 
-更新日期：2026-10-26。当前阶段：**M0 基线与兼容**。研发分支：`feat/bot-integration`。
+更新日期：2026-10-27。当前阶段：**M0 基线与兼容**。研发分支：`feat/bot-integration`。
 
 ## 目标与已确认约束
 
 按 [方案1.1](plan/20261026_master_plan.md) 完成 Main 私聊派活、两仓功能并集、按 Bot 绑定模型/官方工具、Linux 与 Windows 远程电脑，以及迁移、安装和发布。分期仅安排先后，不缩减最终范围。实际模型调用仅使用 GPT。
 
-## 已完成的启动工作
+## 2026-10-27：组合宿主与实机验证
+
+- 使用官方 `dsh` CLI，在独立 profile 中实际挂载 DS 与 MR，没有修改 DSH 或冻结 DS 源码。
+- 9项组合检查通过：Main/工种 Bot 的真实 Session 与 AgentLoop、Main 工具创建 Bot、工种 Bot 调用 MR 路由工具、派活与结果回传、按 Bot 归属的用量，以及新宿主进程恢复身份/模型/消息历史。
+- 本机浏览器已检查 Main/工种私聊、DS 用量、经典模式中的 MR 工作台和两边共享的模型目录；[截图与边界](evidence/20261027_m0_combined_host.json)已保存。
+- 用户授权的 Ubuntu 与 Win10 已用于隔离实机测试。两机的组合宿主、工具/模型拦截探针、SQLite 原生加载/WAL/事务/中断恢复和客户端检查均通过。
+- 新增2项环境隔离检查；工程检查现为29项。以下是本检查点完整 MR 套件的结果，跳过项没有计为通过：
+
+| 环境 | Node | 总数 | 通过 | 失败 | 跳过 |
+|---|---|---:|---:|---:|---:|
+| 本机 Win11 x64 | 24.20.0 | 1260 | 1257 | 0 | 3 |
+| 远程 Win10 LTSC x64 | 24.18.0 | 1260 | 1257 | 0 | 3 |
+| 远程 Ubuntu 24.04 x64 | 22.22.1 | 1260 | 1237 | 0 | 23 |
+
+证据：[远程平台](evidence/20261027_m0_remote_platforms.json)、[本轮工程检查](evidence/20261027_project_checks.json)、[六个入口的部分行为审查](behavior-audit.json)。Ubuntu 的额外跳过主要是既有 Windows 专项测试；没有据此宣称对应能力已在 Linux 验收。
+
+发现的关键缺口：普通 DS Bot 能看到13个旧 MR 工具；记忆复查还有 AgentLoop 之外的模型调用；DS 用量和 MR 费用仍由各自旧账本管理。它们分别进入统一授权、模型准入与账本迁移，不能把同宿主能运行当成这些功能已完成。详见 [M0 验证结论](M0_FINDINGS.md)。
+
+首次传输到 Ubuntu 的 DS 工作树带入 Windows 换行，冻结源码检查在启动前拒绝；已从原冻结 Git 对象新建干净测试副本后通过，没有放宽检查。实际机器端点与凭据只留在本机，项目仅记录测试别名。
+
+## 2026-10-26 启动检查点
 
 - 方案、来源材料和评审处理记录已放入项目，全部本地文档引用为相对路径。
 - 建立32项需求、40组功能、63个验收场景、20个施工包的机器可读台账。
@@ -25,21 +45,22 @@
 
 | 门禁 | 已有依据 | 仍需验证 |
 |---|---|---|
-| G1 宿主/会话 | MR现有回归、DS全套使用rc.3、真实LLM钩子探针 | 真实同宿主挂载、UI、完整会话/调度与产品预算接入 |
-| G2 权限边界 | 真实工具registry/restrict/guard探针 | 实际PTC VM、所有旧入口、OS强隔离、撤权中的运行进程 |
+| G1 宿主/会话 | rc.3组合宿主、真实Session/AgentLoop、浏览器UI、三机运行与重启恢复 | MCP/search/审批/schedule等完整生命周期、产品模型准入/任务预算接入与部署拓扑 |
+| G2 权限边界 | 真实registry/restrict/guard探针；已复现普通Bot可见旧MR工具 | 产品白名单接入、实际PTC VM、所有旧入口、OS强隔离、撤权中的运行进程 |
 | G3 CLI/bridge | Codex可执行版本可读 | 独立配置、短期能力桥接、远程路径和取消契约 |
-| G4 安装/存储 | 当前Windows/Node24驱动ABI与事务探针 | Node22/宿主/Electron、Linux与实际Win10、PTY和完整安装 |
+| G4 安装/存储 | Ubuntu/Node22、Win10/Node24、Win11/Node24原生驱动与事务探针 | Electron ABI、PTY、GUI helper、干净安装/升级/卸载 |
 
-实际日常宿主、常开agent与Win10/WireGuard目标尚未登记。公共台账不存真实端点/密钥；机器拓扑与笔记本休眠验收尚未进行。现有测试的3个跳过项涉及PTY或进程树，不能计为通过。
+已登记并使用两台真实测试目标，但生产常开宿主和产品agent尚未部署。SSH可达不能替代产品配对/鉴权、WireGuard拓扑或笔记本休眠验收。现有Windows测试的3个跳过项涉及PTY或进程树，不能计为通过。
 
 ## 下一步
 
-1. 继续W01逐入口行为核对，补齐动态工具/RPC与UI路径，区分静态发现和已复现行为。
-2. 继续W02同宿主组合测试、模型调用准入钩子和CLI配置/bridge探针。
-3. 在已确认的隔离环境验证M0剩余项，冻结Bot/任务/授权/收据契约。
-4. G1–G4达到所需证据后进入M1，迁入DS Bot运行时并保留MR兼容入口。
+1. 继续W01逐入口行为核对：目前只有六个入口有部分行为记录，完整40组功能审查未结束。
+2. 继续W02/G2实际PTC、旧MR工具/RPC/重跑入口与强隔离试验；根据边界冻结Policy/worker契约。
+3. 继续W02/G3 Codex独立profile、短期能力bridge、取消与远程路径契约；补齐G1其余生命周期。
+4. 以已有真实测试目标验证常开部署与休眠拓扑；冻结Bot/任务/授权/收据契约。
+5. G1–G4达到所需证据后进入M1，迁入DS Bot运行时并保留MR兼容入口。
 
-T63（便携方案文档）已在document级通过；其余产品场景尚未验收。M0已完成8个启动子步骤，W01/W02及四个总门禁仍在进行，不能按“测试很多”提前结项。
+T63（便携方案文档）已在document级通过；T01/T57为partial，其余产品场景尚未验收。M0已完成9/12个记录子步骤；W01/W02及四个总门禁仍未完成，不换算为整个项目的完成比例。
 
 ## 复现与环境说明
 
@@ -51,6 +72,7 @@ node scripts/integration-host-probe.mjs
 node scripts/integration-sqlite-probe.mjs
 node scripts/integration-inventory.mjs --ds-root tmp/integration/upstream/ds-bot-frozen
 node scripts/integration-host-probe.mjs --llm
+node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host
 ```
 
 SQLite探针需要先在隔离的 `tmp/integration/probes/sqlite` 安装锁定的13.0.3驱动，命令见证据文件；不修改用户DSH数据。源文件静态清单中的Git blob来自冻结提交，不依赖本机换行符。
@@ -58,6 +80,8 @@ SQLite探针需要先在隔离的 `tmp/integration/probes/sqlite` 安装锁定�
 本机Corepack pnpm启动器曾报缓存目录错误，本轮改用项目既有 `tmp/pnpm-10.34.6/package/bin/pnpm.cjs` 执行固定版本安装，未修改全局Node、pnpm或代理配置。其他环境使用正常的pnpm 10.34.6入口。
 
 完整测试宿主最初的严格peer检查发现遥测依赖选到不兼容的API1.10.0；已仅在独立测试fixture内锁为1.9.0并通过frozen/strict/offline安装。pnpm顶层不暴露全部peer包导致的测试解析问题通过公共package.json解析锚点解决，没有修改DSH或冻结DS源码。复现完整套件的方法见[测试宿主说明](../../tests/fixtures/integration-host/README.md)。
+
+组合宿主的隔离、离线适配器和浏览器检查方式见[组合fixture说明](../../tests/fixtures/integration-combined/README.md)。CI新增Ubuntu/Node22与Windows/Node24组合宿主及原生数据库检查。远程机的连接凭据、实际目录和完整日志均不提交。
 
 ## 接手规则
 

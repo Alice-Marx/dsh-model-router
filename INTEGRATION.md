@@ -7,6 +7,8 @@
 - [机器可读任务台账](docs/integration/tasks.json)
 - [需求、功能与验收目录](docs/integration/scope.json)
 - [冻结源码与功能出处](docs/integration/feature-inventory.json)
+- [M0 实机/组合结论与后续缺口](docs/integration/M0_FINDINGS.md)
+- [逐入口行为审查](docs/integration/behavior-audit.json)
 
 在项目根目录运行：
 

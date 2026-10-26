@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "timezone": "Asia/Shanghai",
+  "level": "host-integration-offline + browser-ui-offline",
+  "status": "passed-for-described-checks",
+  "sourceBaseCommit": "1035e860cd33b8935a9d0e3224f5a49f31cdbecd",
+  "environment": {
+    "os": "Windows 11 Pro for Workstations",
+    "release": "10.0.26200",
+    "node": "v24.20.0",
+    "arch": "x64",
+    "surface": "DSH Web 0.2.1-rc.3 in the in-app browser"
+  },
+  "command": "node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --serve",
+  "host": {
+    "status": "passed",
+    "level": "host-integration-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "node": "v24.20.0",
+    "platform": "win32",
+    "arch": "x64",
+    "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+    "checks": [
+      "MR and DS tools registered in one official rc.3 profile",
+      "Main Bot created on a real DSH Session and fixture model advertised",
+      "Main AgentLoop creates worker using the actual create_bot tool",
+      "Worker AgentLoop calls MR route tool through real DSH registry",
+      "Main message_bot dispatch reaches worker and its reply returns",
+      "Main and worker use real AgentLoops; every call keeps the exact offline route",
+      "DS usage projection attributes positive mock token usage to both Bots",
+      "Fresh host process restores Bot identities, exact models and exchange history",
+      "Owned host process exited and test state stays in isolated DSH_HOME"
+    ],
+    "actualModelCalls": 0,
+    "mockAdapterDispatches": 11,
+    "auxiliaryModelCalls": 1,
+    "observedLegacyExposure": [
+      "model_router_consult",
+      "model_router_execute",
+      "model_router_health",
+      "model_router_plan",
+      "model_router_rate",
+      "model_router_rerun_step",
+      "model_router_routes",
+      "model_router_team_execute",
+      "model_router_tool_install",
+      "model_router_tool_repair",
+      "model_router_tool_run",
+      "model_router_tool_uninstall",
+      "model_router_tools"
+    ],
+    "limitations": [
+      "No actual model provider request",
+      "No browser or Desktop UI assertion in this command",
+      "No product Bot policy, unified task ledger or CLI bridge installed",
+      "Legacy MR tools remain visible to an ordinary DS Bot; authorization integration remains required"
+    ],
+    "diagnosticSha256": "c25b4fdf0773c7aa7a7fea43ca47ee912bd822be049452eb3c93ac1722b7d24a"
+  },
+  "uiObservations": [
+    "Main private chat displays worker creation and returning worker message",
+    "Worker chat displays the MR route probe and incoming Main messages",
+    "DS usage page displays two Bot owners and the exact offline model with nonzero fixture tokens",
+    "Switching to classic Agent mode exposes the existing MR workbench",
+    "MR model configuration and DS Bot selection share integration-gpt-fixture/gpt-fixture",
+    "Returning to DS Bot mode and Main chat succeeds"
+  ],
+  "screenshots": [
+    {
+      "path": "docs/integration/evidence/20261027_combined_bot_ui.png",
+      "sha256": "d702dec4a0fb0b1ffb1f0936e4fdfa96d3fdbde0e5ad0af0fd45c59cce237622"
+    },
+    {
+      "path": "docs/integration/evidence/20261027_combined_usage_ui.png",
+      "sha256": "5062c222db941944d7801589b7ed81badb299a6758d9540041a3684146e5282e"
+    },
+    {
+      "path": "docs/integration/evidence/20261027_combined_router_ui.png",
+      "sha256": "7d7af2c0d26ac4f89209669635107c95077b194267f65b4f58859fec75699d7d"
+    }
+  ],
+  "scopeLimits": [
+    "The scripted adapter is an offline fixture, not a real GPT/provider call",
+    "No Electron or remote interactive desktop assertion",
+    "No narrow viewport assertion",
+    "MR and DS retain separate accounting stores in this bootstrap profile",
+    "MR tool discovery may inspect installed CLI versions/login status; no CLI inference was launched",
+    "No product Policy/Task/Ledger/Bridge or remote agent installed"
+  ],
+  "findings": [
+    "G2: the worker sees 13 legacy model_router tools; strict Bot policy must hide and authorize these paths before product acceptance",
+    "G1/M6: memory review calls exist outside AgentLoop and must pass admission and accounting too",
+    "G1/M1: Bot UI and advanced MR UI coexist via a mode switch; this is not the future unified single-product navigation"
+  ]
+}

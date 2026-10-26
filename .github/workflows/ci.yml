@@ -57,3 +57,46 @@ jobs:
         run: npm pack --pack-destination dist
       - name: Verify runtime closure and every packaged byte against Git
         run: node scripts/check-package.mjs
+
+  integration-host:
+    name: Combined host / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: '22'
+          - os: windows-latest
+            node: '24'
+    steps:
+      - name: Checkout integration source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Checkout the frozen DS source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Alice-Marx/DS-Bot-model-router
+          ref: de55888a93983fc51c94f7d22bc94b4f8293205d
+          path: tmp/integration/upstream/ds-bot-frozen
+          persist-credentials: false
+      - name: Setup the target Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Enable the pinned pnpm
+        run: |
+          corepack enable
+          corepack install
+      - name: Install fixed root and isolated host dependencies
+        run: |
+          pnpm install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
+          pnpm --dir tests/fixtures/integration-host install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
+      - name: Exercise real combined Sessions with an offline model
+        run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host
+      - name: Install the isolated native database probe
+        run: npm install --prefix tmp/integration/probes/sqlite --ignore-scripts --no-audit --no-fund --strict-peer-deps --registry=https://registry.npmjs.org better-sqlite3@13.0.3
+      - name: Verify native load, transactions and interruption recovery
+        run: node scripts/integration-sqlite-probe.mjs
