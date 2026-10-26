@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.25.4",
+  "version": "0.25.5",
   "type": "module",
   "description": "Model Router for official DeepSeek Harness Desktop: cost-aware task routing, dependent work packages and official vendor CLI discovery, installation and execution. GAL is available separately as @ljwei-stak/dsh-galgame.",
   "repository": {
@@ -120,7 +120,8 @@
     "docs/releases/0.25.3-validation.md",
     "docs/assets/workbench-subscription-usage.png",
     ".dsh-plugin/shared/zcode-npm-shims.mjs",
-    "docs/releases/0.25.4-validation.md"
+    "docs/releases/0.25.4-validation.md",
+    "docs/releases/0.25.5-validation.md"
   ],
   "scripts": {
     "build:client": "node scripts/build-client.mjs",

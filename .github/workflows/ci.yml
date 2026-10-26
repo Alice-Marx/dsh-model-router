@@ -38,6 +38,9 @@ jobs:
         run: pnpm install --frozen-lockfile --strict-peer-dependencies
       - name: Run the complete test suite
         run: npm test
+      - name: Exercise native Windows UTF-8 terminal
+        if: runner.os == 'Windows'
+        run: node scripts/check-terminal-utf8.mjs
       - name: Test package verification failures
         run: node --test tests/ci-contract.test.mjs
       - name: Verify the committed client before rebuilding

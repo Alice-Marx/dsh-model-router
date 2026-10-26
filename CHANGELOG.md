@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.25.5 — 2026-10-26
+
+- Fix ZCode TUI mojibake and damaged VT color sequences in Windows embedded terminals. Initialize UTF-8 input/output encoding in each new ZCode ConPTY before Node starts, using a profile-free PowerShell bootstrap and literal arguments.
+- Preserve the verified npm/GitHub runtime entry, Unicode and special-character paths, Unicode input, resizing and native exit status. Linux/macOS, other tools and pipe fallback keep their existing launch paths; no global code page setting changes.
+- Add a real Windows ConPTY regression and CI check for UTF-8 box/CJK output, truecolor VT, special paths/arguments, Unicode input, resize, exit status and process cleanup.
+
+Validation evidence and limits are tracked in the [0.25.5 acceptance report](docs/releases/0.25.5-validation.md).
+
 ## 0.25.4 — 2026-10-26
 
 - Fix Windows ZCode CLI npm installation failing with `EEXIST` when old desktop launchers occupy the selected npm prefix. Recognize the complete legacy launcher templates, preserve their original bytes in a unique backup directory and record its location before npm runs.

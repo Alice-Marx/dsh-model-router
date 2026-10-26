@@ -30,6 +30,7 @@ import {
   resolveTerminalLaunch,
   spawnPipeProcess,
   terminalEnvironment,
+  utf8ConsoleLaunch,
 } from '../.dsh-plugin/shared/cli-terminal.mjs'
 import { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS } from '../.dsh-plugin/shared/official-tools-remote.mjs'
 import {
@@ -118,6 +119,22 @@ test('Windows launch: native exe first, npm .cmd shims through cmd.exe, ps1 last
   assert.equal(shell.file, 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
   await assert.rejects(resolveTerminalLaunch('grok-build', 'interactive', { platform: 'win32', env, locate: async () => [] }), /未在 PATH 中找到 grok/)
   await assert.rejects(resolveTerminalLaunch('zcode', 'interactive', { platform: 'win32', env, discoverBundle: async () => null }), /GitHub Release SHA256/)
+})
+
+test('ZCode Windows PTY sets its own UTF-8 console before Node starts with literal arguments', () => {
+  const launch = { file: "D:\\Node & tools\\node.exe", args: ["D:\\用户 %PATH% & O'Brien\\zcode.mjs", 'login'], utf8Console: true, display: 'zcode login' }
+  const prepared = utf8ConsoleLaunch(launch, { platform: 'win32', env: { SystemRoot: 'C:\\Windows' } })
+  assert.match(prepared.file, /WindowsPowerShell.*powershell\.exe$/)
+  assert.deepEqual(prepared.args.slice(0, 4), ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand'])
+  const script = Buffer.from(prepared.args[4], 'base64').toString('utf16le')
+  assert.match(script, /InputEncoding = \[System.Text.UTF8Encoding\]::new\(\$false\)/)
+  assert.match(script, /OutputEncoding = \[System.Text.UTF8Encoding\]::new\(\$false\)/)
+  assert.ok(script.includes("& 'D:\\Node & tools\\node.exe' @('D:\\用户 %PATH% & O''Brien\\zcode.mjs', 'login')"))
+  assert.ok(script.indexOf('OutputEncoding') < script.indexOf('& '))
+  assert.ok(script.endsWith('exit $LASTEXITCODE'))
+  assert.equal(utf8ConsoleLaunch(launch, { platform: 'linux', env: {} }), launch)
+  const other = { ...launch, utf8Console: false }
+  assert.equal(utf8ConsoleLaunch(other, { platform: 'win32', env: {} }), other)
 })
 
 test('OpenCode uses the V2 package in the selected directory when a legacy V1 copy also exists', async () => {
@@ -224,6 +241,7 @@ test('ZCode standalone terminal uses the shared directory and a compatible Node 
         return '/trusted/node'
       } }
     const node = await resolveTerminalLaunch('zcode', 'interactive', options)
+    assert.equal(node.utf8Console, true)
     assert.equal(discovery.installDir.replaceAll('\\', '/'), bundle.root)
     assert.deepEqual({ env: discovery.env, platform: discovery.platform, home: discovery.home }, { env, platform, home })
     assert.equal(node.file, '/trusted/node')
@@ -248,6 +266,7 @@ test('ZCode npm terminal binds the selected package and never substitutes an arc
       assert.deepEqual(minimum, [24, 14, 0]); assert.equal(accepted('25.0.0'), false); return '/node24'
     } }
   const launch = await resolveTerminalLaunch('zcode', 'interactive', options)
+  assert.equal(launch.utf8Console, true)
   assert.deepEqual(calls, [{ tool: 'zcode', kind: 'package-manager', installDir: '/selected' }])
   assert.equal(launch.file, '/node24')
   assert.deepEqual(launch.args, [verified.cliEntry])

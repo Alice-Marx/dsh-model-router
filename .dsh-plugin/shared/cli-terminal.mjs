@@ -195,7 +195,7 @@ export async function resolveTerminalLaunch(target, mode = 'interactive', {
     const node = await findNode(cwd, [24, 14, 0], version => Number(String(version).split('.')[0]) === 24)
     if (!node) throw new Error('ZCode CLI 需要 Node.js 24.14.0 或更新的 Node 24；请安装后重新体检。')
     const args = mode === 'login' ? [...TERMINAL_LOGIN_ARGS.zcode] : []
-    return { file: node, args: [bundle.cliEntry, ...args], verbatim: false,
+    return { file: node, args: [bundle.cliEntry, ...args], verbatim: false, utf8Console: true,
       display: ['zcode', ...args].join(' ') }
   }
   const executable = tool.probeExecutables[0]
@@ -260,8 +260,28 @@ export function defaultLocate(executable, { platform = process.platform, env = p
 }
 
 /** PTY-backed process adapter. */
-function spawnPtyProcess(pty, launch, { cwd, cols, rows, env }) {
-  const proc = pty.spawn(launch.file, launch.args, { name: 'xterm-256color', cols, rows, cwd, env })
+export function utf8ConsoleLaunch(launch, { platform, env }) {
+  if (platform !== 'win32' || launch.utf8Console !== true) return launch
+  // Node remembers the console code page during startup. Set it in the same
+  // new ConPTY before Node starts, so native OpenTUI WriteFile output stays
+  // UTF-8 throughout rendering. PS literals preserve spaces, %, &, and quotes;
+  // no user path or argument is evaluated as script or a command-line tail.
+  const literal = value => `'${String(value).replace(/'/g, "''")}'`
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    '[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)',
+    '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
+    `& ${literal(launch.file)} @(${launch.args.map(literal).join(', ')})`,
+    'exit $LASTEXITCODE',
+  ].join('; ')
+  const root = env.SystemRoot || env.SYSTEMROOT || 'C:\\Windows'
+  return { ...launch, file: join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], verbatim: false }
+}
+
+function spawnPtyProcess(pty, launch, { cwd, cols, rows, env, platform }) {
+  const prepared = utf8ConsoleLaunch(launch, { platform, env })
+  const proc = pty.spawn(prepared.file, prepared.args, { name: 'xterm-256color', cols, rows, cwd, env })
   return {
     pid: proc.pid,
     onData: listener => { proc.onData(listener) },
