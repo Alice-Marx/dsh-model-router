@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-10-26",
+  "command": "node scripts/integration-host-probe.mjs --llm",
+  "status": "passed",
+  "scope": "real LlmRuntime + offline GPT-named fixture, no network",
+  "checks": [
+    "middleware refuses before dispatch",
+    "admission precedes adapter",
+    "session attribution and usage visible"
+  ],
+  "actualModelCalls": 0,
+  "mockAdapterDispatches": 1,
+  "limitations": [
+    "No product budget implementation",
+    "No live Session/Agent loop",
+    "No proof against arbitrary privileged host plugins"
+  ]
+}

@@ -48,3 +48,7 @@
 /docs/releases/0.25.4-validation.md -text
 
 /docs/releases/0.25.5-validation.md -text
+
+# Preserve immutable approved source snapshots, including their original whitespace.
+/docs/integration/plan/** -text -whitespace
+/tests/fixtures/integration-host/pnpm-lock.yaml text eol=lf

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-10-26",
+  "subject": "Initial M0 developer tooling and approved plan import; no integrated product release",
+  "environment": "Windows x64, Node 24.20.0, root SDK rc.3",
+  "integrationTests": {
+    "command": "npm run test:integration",
+    "tests": 27,
+    "pass": 27,
+    "fail": 0,
+    "skipped": 0,
+    "rawLogSha256": "cdc479eb6bed0d3363601cd5e6e345fc94387aaccedcfa6594f401902e9d5cee"
+  },
+  "fullRegression": {
+    "command": "npm test",
+    "tests": 1258,
+    "pass": 1255,
+    "fail": 0,
+    "skipped": 3,
+    "rawLogSha256": "7f31cd572853e99948dceb28cfbf6bb6e1ded53bc0ab43dd9fb722d6bec4453a"
+  },
+  "client": {
+    "command": "npm run check:client",
+    "status": "passed"
+  },
+  "inventory": {
+    "command": "node scripts/integration-inventory.mjs --ds-root <frozen-DS-checkout>",
+    "status": "passed",
+    "featureGroups": 40,
+    "existingGroupsWithSources": 39,
+    "newGroups": 1,
+    "staticToolRegistrations": 37
+  },
+  "portableDocuments": {
+    "status": "passed",
+    "scope": "Relative links contained in plan bundle; source proposal/image SHA-256 intact; combined R/F/T entries unique",
+    "evidenceLevel": "document"
+  },
+  "actualModelCalls": 0,
+  "limitations": [
+    "No live combined DSH UI",
+    "No product Bot/CLI capability bridge",
+    "No OS isolation or remote Linux/Windows GUI acceptance",
+    "No product migration or Release validation"
+  ]
+}

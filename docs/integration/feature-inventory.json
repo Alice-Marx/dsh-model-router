@@ -1,0 +1,1376 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "MR": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+    "DS": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+  },
+  "coverageMeaning": "Static provenance mapping and named registrations; not a completed behavior or UI audit",
+  "features": [
+    {
+      "id": "F01",
+      "title": "Bot 创建、重命名、职责、颜色/头像、复制和归档",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/roster.js",
+          "gitBlob": "b4b79a9d652ce1e2334fe9ea4ccf4ea9ebb6f8fc",
+          "bytes": 32354
+        },
+        {
+          "path": "ds-bot/src/client/bot-settings.js",
+          "gitBlob": "21d287c5818816f1871f739798d64d3db194363c",
+          "bytes": 19939
+        }
+      ],
+      "destination": "迁入；Bot 列表/详情与 Main 管理工具",
+      "acceptanceIds": [
+        "T02",
+        "T04"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F02",
+      "title": "Main 管理 Bot 和群，直接对话配置",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/prompt.js",
+          "gitBlob": "39f4383ba771ab177071b0a73066ef8fb422b953",
+          "bytes": 10794
+        },
+        {
+          "path": "ds-bot/src/host/tools.js",
+          "gitBlob": "7a7942f83de9b1ecc87a8c80fd46ae95070b0e56",
+          "bytes": 57363
+        }
+      ],
+      "destination": "改；保留管理体验，机器授权另经 Policy",
+      "acceptanceIds": [
+        "T06",
+        "T17"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F03",
+      "title": "私聊派活、追加信息、排队和回传",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/handoffs.js",
+          "gitBlob": "2cd5d199f49059e6534ce859e66826a86758f256",
+          "bytes": 13732
+        },
+        {
+          "path": "ds-bot/src/host/delivery.js",
+          "gitBlob": "962202447a3e851a8723b3b68b3fd49748e557c5",
+          "bytes": 9524
+        },
+        {
+          "path": "ds-bot/src/host/requests.js",
+          "gitBlob": "d153e4742d78d73de4122ed4ecdc76a50ded5e05",
+          "bytes": 6665
+        }
+      ],
+      "destination": "改；消息与统一任务记录关联",
+      "acceptanceIds": [
+        "T06",
+        "T07",
+        "T15"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F04",
+      "title": "群创建、成员、管理员、@ 与工作状态",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/groups.js",
+          "gitBlob": "223913d897a564551cfc090beeacaa3e63dc635c",
+          "bytes": 58838
+        },
+        {
+          "path": "ds-bot/src/client/group-settings.js",
+          "gitBlob": "e1ff07ce86f9154476d8b83f2d32c9a94e0bbd49",
+          "bytes": 14484
+        }
+      ],
+      "destination": "迁入；群界面复用同一任务系统",
+      "acceptanceIds": [
+        "T43"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F05",
+      "title": "Bot/群记忆编辑、清理、持久化",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/memory.js",
+          "gitBlob": "de583e918e5a9d8f57764eab9a074ff2a601244f",
+          "bytes": 99980
+        },
+        {
+          "path": "ds-bot/src/host/memory-pending.js",
+          "gitBlob": "61b815214c6fd1a83256d51eb914e64f23f7b1ed",
+          "bytes": 4540
+        }
+      ],
+      "destination": "留/改；访问主体与操作审计统一",
+      "acceptanceIds": [
+        "T04",
+        "T44"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F06",
+      "title": "长对话分段、压缩、历史检索与恢复",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/parts.js",
+          "gitBlob": "5ec7222c3c57f233ae2cdcab4364c6637c5a32d1",
+          "bytes": 76268
+        },
+        {
+          "path": "ds-bot/src/host/chat-index.js",
+          "gitBlob": "e7c3067b5814b89defaf59b1b9d4724a1211ac4c",
+          "bytes": 13845
+        },
+        {
+          "path": "ds-bot/src/host/resume.js",
+          "gitBlob": "e8b44c65e196b8e922e67b0ca835b6eae7051ab2",
+          "bytes": 19162
+        }
+      ],
+      "destination": "留；换 Session 保持稳定 Bot 身份",
+      "acceptanceIds": [
+        "T13",
+        "T44"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F07",
+      "title": "每 Bot 模型与思考级别",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/models.js",
+          "gitBlob": "3bb8474aeca4c2767ee129da14111cdff1e3285b",
+          "bytes": 10624
+        },
+        {
+          "path": "ds-bot/src/client/model-menu.js",
+          "gitBlob": "6980767a8b7989ea90d717e9602f6ff1507538d2",
+          "bytes": 21640
+        }
+      ],
+      "destination": "改；严格模型与可见兼容策略",
+      "acceptanceIds": [
+        "T03",
+        "T32"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F08",
+      "title": "工作目录、文件夹和权限 preset",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/folders.js",
+          "gitBlob": "f3691f9fe054620fdbe5ccf3859937fe63d62622",
+          "bytes": 11288
+        },
+        {
+          "path": "ds-bot/src/host/permissions.js",
+          "gitBlob": "c59a584bc94de1f735f10582deed745c6a341fe4",
+          "bytes": 3637
+        }
+      ],
+      "destination": "改；统一 workspaceRef 和策略交集",
+      "acceptanceIds": [
+        "T05",
+        "T20",
+        "T25"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F09",
+      "title": "MCP/skill/pack 的保存、启用和状态",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/capabilities.js",
+          "gitBlob": "8807be25dec7c04daf5d850976df13445a5d0ee1",
+          "bytes": 22471
+        }
+      ],
+      "destination": "迁入/改；设置→Capabilities",
+      "acceptanceIds": [
+        "T33",
+        "T47"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F10",
+      "title": "秘密申请、输入卡、范围与替换",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/secrets.js",
+          "gitBlob": "05f46ebe2dbd43efbbde0d4bbb6955dad7eb69a1",
+          "bytes": 25805
+        },
+        {
+          "path": "ds-bot/src/client/secret-card.js",
+          "gitBlob": "13419cbecb6405f08a2daf2bedd8b5f820ee0ca8",
+          "bytes": 27022
+        }
+      ],
+      "destination": "留/改；机器凭据也走同一秘密入口",
+      "acceptanceIds": [
+        "T16",
+        "T17",
+        "T47"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F11",
+      "title": "GitHub 连接器与登录/断开状态",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/connectors.js",
+          "gitBlob": "65c431bd02a3e27ffeaa65c0375626e9939efa77",
+          "bytes": 6684
+        }
+      ],
+      "destination": "留/改；Bot 授权及 token 脱敏",
+      "acceptanceIds": [
+        "T47"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F12",
+      "title": "浏览器会话、profile 与浏览器面板",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/browser.js",
+          "gitBlob": "5b9cc6135ba5747fd44ea90ef3a8be2fe7b4aeba",
+          "bytes": 13716
+        },
+        {
+          "path": "ds-bot/src/host/browser/session.js",
+          "gitBlob": "b3cf0c61034ca2724d9d56443f0f9e3f5e731175",
+          "bytes": 30833
+        },
+        {
+          "path": "ds-bot/src/client/browser-pane.js",
+          "gitBlob": "a273d4dd3deafec1becc1442b1577f0b45e538e0",
+          "bytes": 58298
+        }
+      ],
+      "destination": "迁入；本机与远程位置清楚区分",
+      "acceptanceIds": [
+        "T26",
+        "T27"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F13",
+      "title": "浏览器 refs/script/task 插件及下载控制",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/browser-plugins.js",
+          "gitBlob": "2f6abd4cdbf5af6731d3918ed47d7dd4d9e0979f",
+          "bytes": 7229
+        },
+        {
+          "path": "browser-plugins/",
+          "kind": "directory",
+          "fileCount": 22,
+          "treeFingerprintSha256": "6605454076024d2832e119e690019fec218bca23f458101a32c94728df9e7414"
+        }
+      ],
+      "destination": "留/改；可执行脚本独立授权",
+      "acceptanceIds": [
+        "T27"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F14",
+      "title": "网页搜索 provider 与出错恢复",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/web-search.js",
+          "gitBlob": "1d56111aae5937028b27e6689fc33f2457db42ff",
+          "bytes": 41873
+        },
+        {
+          "path": "ds-bot/src/host/providers.js",
+          "gitBlob": "49814dd17526f40dedc15c5317fa8a93ebe985e7",
+          "bytes": 11931
+        }
+      ],
+      "destination": "留；保留宿主/插件兼容配置",
+      "acceptanceIds": [
+        "T01",
+        "T56"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F15",
+      "title": "计划任务与会话归属",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/schedules.js",
+          "gitBlob": "469d8134e8ca00881e9db7af2543382a0c1e517a",
+          "bytes": 7227
+        }
+      ],
+      "destination": "留/改；每次触发重新准入，绑定稳定 Bot",
+      "acceptanceIds": [
+        "T45"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F16",
+      "title": "侧聊、旁路讨论、对话引用",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/side.js",
+          "gitBlob": "a68a2e4c9f402ae4110b993a8464b2ba00c9d262",
+          "bytes": 17259
+        },
+        {
+          "path": "ds-bot/src/host/btw.js",
+          "gitBlob": "ab0303bac208693dcc39212d26b457808d9e3303",
+          "bytes": 14746
+        },
+        {
+          "path": "ds-bot/src/client/read-page.js",
+          "gitBlob": "4c56e070447ed5ec3258ee19a70881c79b68e78b",
+          "bytes": 15735
+        }
+      ],
+      "destination": "迁入；上下文访问与额外费用可追踪",
+      "acceptanceIds": [
+        "T44",
+        "T46"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F17",
+      "title": "语音输入/语音模式",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/client/voice.js",
+          "gitBlob": "d68e6b6ffce888e1e4955560f8e1a6efa00c46f0",
+          "bytes": 11013
+        },
+        {
+          "path": "ds-bot/src/client/speech.js",
+          "gitBlob": "bd9b7efc90388835c7562d6829ef8ca03de84976",
+          "bytes": 5222
+        },
+        {
+          "path": "ds-bot/src/client/composer.js",
+          "gitBlob": "08d3b669a091a91b5458c061ec857c956a4694c6",
+          "bytes": 8484
+        }
+      ],
+      "destination": "留；沿用宿主或浏览器可用引擎",
+      "acceptanceIds": [
+        "T46",
+        "T56"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F18",
+      "title": "问答卡、交互图表/视图与内联展示",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/tools.js",
+          "gitBlob": "7a7942f83de9b1ecc87a8c80fd46ae95070b0e56",
+          "bytes": 57363
+        },
+        {
+          "path": "ds-bot/src/shared/views.js",
+          "gitBlob": "37f3250eb564b1f5194e54218a00046e9dd7f7d3",
+          "bytes": 36259
+        },
+        {
+          "path": "ds-bot/src/client/widget-cell.js",
+          "gitBlob": "25e6e9c48d1ba3e42d0bdf5f8bd9bb4476ff1698",
+          "bytes": 37749
+        },
+        {
+          "path": "ds-bot/src/client/widget-chart.js",
+          "gitBlob": "b65d6baf854fc9e500b9ff5929adf183abcf3487",
+          "bytes": 24995
+        },
+        {
+          "path": "ds-bot/src/client/widget-html.js",
+          "gitBlob": "b5fc009d595da6dd8c2165fe7d037fee43dc866f",
+          "bytes": 4659
+        }
+      ],
+      "destination": "留；受认证用户输入与工具调用分开",
+      "acceptanceIds": [
+        "T46",
+        "T53"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F19",
+      "title": "图片、附件、长消息与文件引用",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/images.js",
+          "gitBlob": "df263088e4c0f7b581c38b26cbf261d55c0a81ee",
+          "bytes": 9047
+        },
+        {
+          "path": "ds-bot/src/host/delivery.js",
+          "gitBlob": "962202447a3e851a8723b3b68b3fd49748e557c5",
+          "bytes": 9524
+        },
+        {
+          "path": "ds-bot/src/host/links.js",
+          "gitBlob": "c2e4728f008512295be7db3bba3f49c9e5c086b5",
+          "bytes": 2161
+        }
+      ],
+      "destination": "留/改；接统一产物访问检查",
+      "acceptanceIds": [
+        "T23",
+        "T44",
+        "T46"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F20",
+      "title": "按 Bot/模型/时间查看 Token 用量",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/host/usage.js",
+          "gitBlob": "d19c0f8cbb4f323cbbabc84efb4bbd171d63b895",
+          "bytes": 27087
+        },
+        {
+          "path": "ds-bot/src/client/usage-page.js",
+          "gitBlob": "0d705b24cb00b1d77a9eb1615176ad84c98d8379",
+          "bytes": 52038
+        }
+      ],
+      "destination": "改；从唯一 receipt 投影，避免重复",
+      "acceptanceIds": [
+        "T40"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F21",
+      "title": "主题、语言、侧栏、审批提示与诊断",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "ds-bot/src/client/themes.js",
+          "gitBlob": "82c3b3b930a74688357773d890e229cb6eecc9a5",
+          "bytes": 7511
+        },
+        {
+          "path": "ds-bot/src/client/i18n.js",
+          "gitBlob": "3eb93caa5eebe3996c0f5a3a4acf033359026709",
+          "bytes": 58597
+        },
+        {
+          "path": "ds-bot/src/host/diagnostics.js",
+          "gitBlob": "1d27d5c0e788546a3f5a76927aced4ad3256d3c4",
+          "bytes": 11496
+        }
+      ],
+      "destination": "迁入；统一设置和任务提示",
+      "acceptanceIds": [
+        "T02",
+        "T53"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F22",
+      "title": "独立桌面、Docker/Web 与数据位置配置",
+      "repository": "DS",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "sources": [
+        {
+          "path": "app/",
+          "kind": "directory",
+          "fileCount": 86,
+          "treeFingerprintSha256": "c7786a65341d1c15a65d353c6a0a4044cb34de08ce6905addbe016490b8e5c56"
+        },
+        {
+          "path": "docker/",
+          "kind": "directory",
+          "fileCount": 7,
+          "treeFingerprintSha256": "27a5bd6cac4f8de217f6d8723fe6f64f094a5b673eab8327e7eb70d3bbca55dc"
+        }
+      ],
+      "destination": "迁入发行能力；同一业务插件的可选载体",
+      "acceptanceIds": [
+        "T50",
+        "T51"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F23",
+      "title": "本地任务分析、复杂度与单/团队计划",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/router.mjs",
+          "gitBlob": "fc691359d24a84f7b2056b5307480c702b7e52bf",
+          "bytes": 70990
+        },
+        {
+          "path": ".dsh-plugin/shared/harness-plan.mjs",
+          "gitBlob": "3cf33dd9bc035404ffeaf3c2537cdad92e5635a2",
+          "bytes": 10782
+        }
+      ],
+      "destination": "留/改；Main 计划与高级工作台共用",
+      "acceptanceIds": [
+        "T06",
+        "T08",
+        "T55"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F24",
+      "title": "精确路线档案、价格/质量/思考/计费偏好",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/model-profiles.mjs",
+          "gitBlob": "a944983e079512e8e0cc62becb5fb7ba04059cf1",
+          "bytes": 8629
+        },
+        {
+          "path": ".dsh-plugin/shared/reasoning-execution.mjs",
+          "gitBlob": "e4a154d616b35be45933ac3bd008e7e6080ed1de",
+          "bytes": 4421
+        }
+      ],
+      "destination": "留；设置→模型/路线",
+      "acceptanceIds": [
+        "T03",
+        "T32",
+        "T38"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F25",
+      "title": "省钱/均衡/质量预设、搜索与质量下限",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/assignment-solver.mjs",
+          "gitBlob": "66b0a4009f31047e90b88df31ad447f0e52440b0",
+          "bytes": 12868
+        },
+        {
+          "path": ".dsh-plugin/shared/routing-presets.mjs",
+          "gitBlob": "1b22a64d2eeaa16c06d8e3679ffc881ff58cd72b",
+          "bytes": 2143
+        }
+      ],
+      "destination": "留/改；在合法 Bot 候选中推荐",
+      "acceptanceIds": [
+        "T06",
+        "T38",
+        "T41"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F26",
+      "title": "动态价格/质量数据与数据来源状态",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/dynamic-data.mjs",
+          "gitBlob": "d52559e90aeaf0ae7c8f3857d6810f5b73f94862",
+          "bytes": 19733
+        },
+        {
+          "path": ".dsh-plugin/shared/livebench.mjs",
+          "gitBlob": "fb88b6b760c9b509299642ede73384c50bb0682e",
+          "bytes": 12999
+        }
+      ],
+      "destination": "留；高级→路由数据",
+      "acceptanceIds": [
+        "T55",
+        "T56"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F27",
+      "title": "手动工作包分配、显式 API 或 CLI 选择",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/package-assignments.mjs",
+          "gitBlob": "46c5fe01ba54fa86f380937297d20feca0a05e2b",
+          "bytes": 3726
+        },
+        {
+          "path": ".dsh-plugin/shared/manual-plan.mjs",
+          "gitBlob": "552b330aa39cb02e6f6748ad46e7d3ff28144d9f",
+          "bytes": 9619
+        }
+      ],
+      "destination": "留；高级手动计划，Bot 路径受白名单",
+      "acceptanceIds": [
+        "T05",
+        "T32",
+        "T55"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F28",
+      "title": "十二工具检测/安装/更新/修复/卸载与日志",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/official-tool-registry.mjs",
+          "gitBlob": "f77b5d29b62f39d78e76ba85cc2ff323f02668ee",
+          "bytes": 28328
+        },
+        {
+          "path": ".dsh-plugin/shared/official-tools-runtime.mjs",
+          "gitBlob": "1a13ea235e2d2565aea08f4d27b082c62bac7d47",
+          "bytes": 87749
+        }
+      ],
+      "destination": "留；工具页，远程位置独立登记",
+      "acceptanceIds": [
+        "T35",
+        "T36"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F29",
+      "title": "安装来源、可信入口、原生发行校验",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/npm-attestation.mjs",
+          "gitBlob": "e547df454dd1c31d8ab250ee0e327f07f3277729",
+          "bytes": 14008
+        },
+        {
+          "path": ".dsh-plugin/shared/zcode-bundle.mjs",
+          "gitBlob": "9ebd852c9926c50eb3c40bfc9358d88ceb1b2bc2",
+          "bytes": 5134
+        },
+        {
+          "path": ".dsh-plugin/shared/tool-install-preferences.mjs",
+          "gitBlob": "ea3da30c8cf40f60f29307db355fcbf20d43b4c8",
+          "bytes": 20036
+        }
+      ],
+      "destination": "留；继续保留当前信任边界的真实说明",
+      "acceptanceIds": [
+        "T36",
+        "T52",
+        "T56"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F30",
+      "title": "本机 shell/CLI 终端、登录、多会话",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/cli-terminal.mjs",
+          "gitBlob": "f42cc3bda334faf315fdedb884acdbf1e43c8b69",
+          "bytes": 26309
+        },
+        {
+          "path": ".dsh-plugin/client/cli-terminal.jsx",
+          "gitBlob": "a4d20d6cd5eecb74843757108a99456106aa68a3",
+          "bytes": 14068
+        }
+      ],
+      "destination": "留；高级终端，保持人工独立通道",
+      "acceptanceIds": [
+        "T37"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F31",
+      "title": "只读路由、咨询与官方 CLI 任务执行",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/task-executors.mjs",
+          "gitBlob": "8b110dd55a2fd8b731a1a6e1d7b793bf6ccdc0ee",
+          "bytes": 83273
+        },
+        {
+          "path": ".dsh-plugin/index.mjs",
+          "gitBlob": "72e2206ecaa414f35fe2f0da8e7c9783654e4b42",
+          "bytes": 171243
+        }
+      ],
+      "destination": "留/改；统一执行 facade 和账本",
+      "acceptanceIds": [
+        "T32",
+        "T38",
+        "T55"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F32",
+      "title": "可编辑 CLI 团队、沙箱/原生环境和 worktree 合入",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/official-team-runtime.mjs",
+          "gitBlob": "591aeeae4ed1c435b1c5afaebb8b4d1bf7431df6",
+          "bytes": 37650
+        },
+        {
+          "path": ".dsh-plugin/shared/security-boundaries.mjs",
+          "gitBlob": "7886b470803e6d078ced0be2388d21440f97b41b",
+          "bytes": 2520
+        }
+      ],
+      "destination": "留/改；按 Bot/机器授权，保留高级模式",
+      "acceptanceIds": [
+        "T25",
+        "T35",
+        "T42"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F33",
+      "title": "后台进度、取消和任务结果读取",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/run-jobs.mjs",
+          "gitBlob": "cd94fb2d59e7c9d61a9afada9b2c53c8bcdd8abe",
+          "bytes": 7062
+        },
+        {
+          "path": ".dsh-plugin/client/run-launcher.jsx",
+          "gitBlob": "cb90620bcfcb17ced9e3b01a4a9603988f393c20",
+          "bytes": 34320
+        }
+      ],
+      "destination": "改；关联持久 Task，兼容旧 job 响应",
+      "acceptanceIds": [
+        "T12",
+        "T13",
+        "T53"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F34",
+      "title": "历史、失败详情、重跑/改派和执行检查点",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/execution-lifecycle.mjs",
+          "gitBlob": "8df3490c5cfccfb1e2092dc3fded437557bbd756",
+          "bytes": 7708
+        },
+        {
+          "path": ".dsh-plugin/shared/run-ledger.mjs",
+          "gitBlob": "8265e49f7aa62418bde886546668136cfcf2d555",
+          "bytes": 35730
+        }
+      ],
+      "destination": "留/改；旧历史可读，新 attempt 不覆盖旧费用",
+      "acceptanceIds": [
+        "T13",
+        "T14",
+        "T15",
+        "T40"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F35",
+      "title": "API 金额预算、预占与并发准入",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/budget-reservations.mjs",
+          "gitBlob": "3867ea71cc9cb68c8bed029104ca07410dc6ab2a",
+          "bytes": 16613
+        },
+        {
+          "path": ".dsh-plugin/shared/execution-accounting.mjs",
+          "gitBlob": "84d507f8610f8ea513b006119acfc51a33d7b1df",
+          "bytes": 4318
+        }
+      ],
+      "destination": "改持久适配；逻辑与未知语义保留",
+      "acceptanceIds": [
+        "T38",
+        "T39",
+        "T40"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F36",
+      "title": "订阅优先/only、次数/token、冷却与回退选择",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/subscription-billing.mjs",
+          "gitBlob": "2daf482011447fdd932943c2c7ed42a059e9925e",
+          "bytes": 17115
+        },
+        {
+          "path": ".dsh-plugin/shared/subscription-usage.mjs",
+          "gitBlob": "64cc9692966d622787be626a519ef94447c88b1b",
+          "bytes": 11548
+        }
+      ],
+      "destination": "留/改；严格 Bot 默认暂停，高级显式策略保留",
+      "acceptanceIds": [
+        "T39",
+        "T40"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F37",
+      "title": "用户评分、自适应偏好、复核与质量升级",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/adaptive-feedback.mjs",
+          "gitBlob": "3f5ef02949333362dfda55854e610294e49f6fe8",
+          "bytes": 13303
+        },
+        {
+          "path": ".dsh-plugin/shared/quality-gates.mjs",
+          "gitBlob": "f6c8a55c8d49a9792256725d4790d13ff35d42a6",
+          "bytes": 8645
+        }
+      ],
+      "destination": "留；复核费用纳入预算和独立证据",
+      "acceptanceIds": [
+        "T41"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F38",
+      "title": "安装向导、健康/诊断与执行边界展示",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/shared/tool-health.mjs",
+          "gitBlob": "064d28261fddd3ee934137fe2910ea3556ea726e",
+          "bytes": 24403
+        },
+        {
+          "path": ".dsh-plugin/shared/error-diagnostics.mjs",
+          "gitBlob": "01ba0d6560206c1a20261373f83d783d1cdc4a01",
+          "bytes": 821
+        },
+        {
+          "path": ".dsh-plugin/client/official-harness.jsx",
+          "gitBlob": "165c3f4175a28ff0e2979190da3fd3d5278ccc77",
+          "bytes": 25823
+        }
+      ],
+      "destination": "留/改；统一引导，位置与权限可读",
+      "acceptanceIds": [
+        "T19",
+        "T36",
+        "T53"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F39",
+      "title": "会话命令、model_router 工具与客户端 RPC",
+      "repository": "MR",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "sources": [
+        {
+          "path": ".dsh-plugin/index.mjs",
+          "gitBlob": "72e2206ecaa414f35fe2f0da8e7c9783654e4b42",
+          "bytes": 171243
+        },
+        {
+          "path": ".dsh-plugin/shared/official-tools-remote.mjs",
+          "gitBlob": "daf2c1305839e01e1b4d219f4225ccff0d80d6ab",
+          "bytes": 15502
+        }
+      ],
+      "destination": "留 facade；所有入口统一鉴权和计量",
+      "acceptanceIds": [
+        "T05",
+        "T55"
+      ],
+      "reviewStatus": "source-mapped",
+      "behaviorVerified": false
+    },
+    {
+      "id": "F40",
+      "title": "新增机器、远程 agent、CLI 能力桥接与 Windows 控机",
+      "repository": "new",
+      "commit": null,
+      "sources": [],
+      "destination": "新建；机器页与 Bot 授权、同仓发行",
+      "acceptanceIds": [
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18",
+        "T19",
+        "T20",
+        "T21",
+        "T22",
+        "T23",
+        "T24",
+        "T25",
+        "T26",
+        "T27",
+        "T28",
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34",
+        "T35",
+        "T50",
+        "T52"
+      ],
+      "reviewStatus": "new-component",
+      "behaviorVerified": false
+    }
+  ],
+  "namedToolRegistrations": [
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2283,
+      "name": "model_router_routes",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2293,
+      "name": "model_router_plan",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2306,
+      "name": "model_router_consult",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2433,
+      "name": "model_router_tools",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2454,
+      "name": "model_router_tool_install",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2477,
+      "name": "model_router_tool_repair",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2500,
+      "name": "model_router_tool_uninstall",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2519,
+      "name": "model_router_tool_run",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2548,
+      "name": "model_router_execute",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2603,
+      "name": "model_router_health",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2616,
+      "name": "model_router_rerun_step",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2645,
+      "name": "model_router_rate",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "MR",
+      "path": ".dsh-plugin/index.mjs",
+      "line": 2660,
+      "name": "model_router_team_execute",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/browser.js",
+      "line": 257,
+      "name": "read_browser",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/groups.js",
+      "line": 558,
+      "name": "group_relay",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/groups.js",
+      "line": 659,
+      "name": "read_own_chat",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/groups.js",
+      "line": 714,
+      "name": "read_group_chat",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/memory.js",
+      "line": 1097,
+      "name": "remember",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/memory.js",
+      "line": 1131,
+      "name": "forget",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/memory.js",
+      "line": 1166,
+      "name": "recall",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/secrets.js",
+      "line": 419,
+      "name": "request_secret",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/secrets.js",
+      "line": 468,
+      "name": "list_secrets",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 57,
+      "name": "list_bots",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 141,
+      "name": "message_bot",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 269,
+      "name": "stop_bot",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 296,
+      "name": "create_bot",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 331,
+      "name": "update_bot",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 406,
+      "name": "list_models",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 448,
+      "name": "create_group",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 477,
+      "name": "update_group",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 538,
+      "name": "delete_group",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 555,
+      "name": "post_to_group",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 609,
+      "name": "ask_user",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 666,
+      "name": "show_view",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 775,
+      "name": "list_capabilities",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 799,
+      "name": "save_capability",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    },
+    {
+      "repository": "DS",
+      "path": "ds-bot/src/host/tools.js",
+      "line": 829,
+      "name": "delete_capability",
+      "kind": "static-tool-registration",
+      "behaviorVerified": false
+    }
+  ]
+}

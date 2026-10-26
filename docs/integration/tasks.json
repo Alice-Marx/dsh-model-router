@@ -1,0 +1,823 @@
+{
+  "schemaVersion": 1,
+  "planVersion": "1.1",
+  "startedOn": "2026-10-26",
+  "updatedOn": "2026-10-26",
+  "activeMilestone": "M0",
+  "statusMeaning": "Task/step completion is separate from product R/T verification; no percentage implies release readiness",
+  "tasks": [
+    {
+      "id": "W01",
+      "milestone": "M0",
+      "title": "功能清单",
+      "status": "in_progress",
+      "dependsOn": [],
+      "acceptanceIds": [
+        "T61",
+        "T63"
+      ],
+      "evidence": [
+        "docs/integration/feature-inventory.json"
+      ],
+      "steps": [
+        {
+          "id": "W01.1",
+          "key": "approved-plan",
+          "title": "方案1.1和来源随项目保存",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/plan/20261026_master_plan.md"
+          ]
+        },
+        {
+          "id": "W01.2",
+          "key": "scope-catalog",
+          "title": "建立32R/40F/63T目录",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/scope.json"
+          ]
+        },
+        {
+          "id": "W01.3",
+          "key": "source-map",
+          "title": "固定源码及40组功能出处",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/feature-inventory.json"
+          ]
+        },
+        {
+          "id": "W01.4",
+          "key": "behavior-audit",
+          "title": "逐入口/参数/用户行为展开并核对",
+          "status": "in_progress",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "id": "W02",
+      "milestone": "M0",
+      "title": "DSH/CLI/存储兼容验证",
+      "status": "in_progress",
+      "dependsOn": [],
+      "acceptanceIds": [
+        "T01",
+        "T05",
+        "T19",
+        "T25",
+        "T32",
+        "T33",
+        "T57"
+      ],
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_baseline.json"
+      ],
+      "steps": [
+        {
+          "id": "W02.1",
+          "key": "baseline",
+          "title": "现有依赖/测试/客户端基线",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261026_m0_baseline.json"
+          ]
+        },
+        {
+          "id": "W02.2",
+          "key": "ds-core",
+          "title": "DS完整套件使用rc.3 SDK验证",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261026_m0_ds_full.json"
+          ]
+        },
+        {
+          "id": "W02.3",
+          "key": "tool-guards",
+          "title": "真实SDK的作用域与执行拦截探针",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261026_m0_tool_boundaries.json"
+          ]
+        },
+        {
+          "id": "W02.4",
+          "key": "sqlite",
+          "title": "SQLite驱动ABI和事务/重启探针",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261026_m0_sqlite.json"
+          ]
+        },
+        {
+          "id": "W02.5",
+          "key": "cli",
+          "title": "CLI配置隔离/bridge试验",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "W02.6",
+          "key": "host-ui",
+          "title": "同宿主真实挂载与UI验证",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "W02.7",
+          "key": "deployment",
+          "title": "实际机器拓扑与休眠验证",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "W02.8",
+          "key": "llm-admission",
+          "title": "真实LLM调用前置拦截与用量探针",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261026_m0_llm_admission.json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "W03",
+      "milestone": "M1",
+      "title": "迁入 DS Bot 运行时",
+      "status": "planned",
+      "dependsOn": [
+        "W01",
+        "W02"
+      ],
+      "acceptanceIds": [
+        "T02",
+        "T04",
+        "T44"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W04",
+      "milestone": "M1",
+      "title": "保留 MR 兼容入口",
+      "status": "planned",
+      "dependsOn": [
+        "W03"
+      ],
+      "acceptanceIds": [
+        "T55"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W05",
+      "milestone": "M2",
+      "title": "Bot 身份与严格模型策略",
+      "status": "planned",
+      "dependsOn": [
+        "W03",
+        "W04"
+      ],
+      "acceptanceIds": [
+        "T03",
+        "T04",
+        "T05",
+        "T32"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W06",
+      "milestone": "M2",
+      "title": "事务账本与数据迁移",
+      "status": "planned",
+      "dependsOn": [
+        "W04"
+      ],
+      "acceptanceIds": [
+        "T13",
+        "T38",
+        "T40",
+        "T48",
+        "T49"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W07",
+      "milestone": "M3",
+      "title": "Planner 选择目标 Bot",
+      "status": "planned",
+      "dependsOn": [
+        "W05",
+        "W06"
+      ],
+      "acceptanceIds": [
+        "T06",
+        "T08"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W08",
+      "milestone": "M3",
+      "title": "依赖调度、取消与恢复",
+      "status": "planned",
+      "dependsOn": [
+        "W07"
+      ],
+      "acceptanceIds": [
+        "T07",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T15"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W09",
+      "milestone": "M4",
+      "title": "远程 agent 与配对",
+      "status": "planned",
+      "dependsOn": [
+        "W01",
+        "W02"
+      ],
+      "acceptanceIds": [
+        "T16",
+        "T17",
+        "T18",
+        "T19",
+        "T24"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W10",
+      "milestone": "M4",
+      "title": "Linux 命令、文件与工作区",
+      "status": "planned",
+      "dependsOn": [
+        "W09",
+        "W06"
+      ],
+      "acceptanceIds": [
+        "T14",
+        "T20",
+        "T21",
+        "T22",
+        "T23",
+        "T24",
+        "T25",
+        "T42"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W11",
+      "milestone": "M5",
+      "title": "CLI 绑定与能力桥接",
+      "status": "planned",
+      "dependsOn": [
+        "W05",
+        "W08"
+      ],
+      "acceptanceIds": [
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W12",
+      "milestone": "M5",
+      "title": "本机与远程 CLI 执行",
+      "status": "planned",
+      "dependsOn": [
+        "W10",
+        "W11"
+      ],
+      "acceptanceIds": [
+        "T35",
+        "T36",
+        "T37"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W13",
+      "milestone": "M6",
+      "title": "本机/远程浏览器",
+      "status": "planned",
+      "dependsOn": [
+        "W10",
+        "W11"
+      ],
+      "acceptanceIds": [
+        "T26",
+        "T27"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W14",
+      "milestone": "M6",
+      "title": "功能并集与完整 UI",
+      "status": "planned",
+      "dependsOn": [
+        "W08",
+        "W12",
+        "W13"
+      ],
+      "acceptanceIds": [
+        "T40",
+        "T43",
+        "T44",
+        "T45",
+        "T46",
+        "T47",
+        "T53",
+        "T60"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W15",
+      "milestone": "M7",
+      "title": "Windows helper 与安装",
+      "status": "planned",
+      "dependsOn": [
+        "W09",
+        "W10"
+      ],
+      "acceptanceIds": [
+        "T28",
+        "T30",
+        "T50"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W16",
+      "milestone": "M7",
+      "title": "DPI、会话变化与桌面互斥",
+      "status": "planned",
+      "dependsOn": [
+        "W15"
+      ],
+      "acceptanceIds": [
+        "T29",
+        "T30",
+        "T31"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W17",
+      "milestone": "M8",
+      "title": "隔离、性能与升级",
+      "status": "planned",
+      "dependsOn": [
+        "W14",
+        "W16"
+      ],
+      "acceptanceIds": [
+        "T12",
+        "T17",
+        "T25",
+        "T54"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W18",
+      "milestone": "M8",
+      "title": "Desktop、Docker 与运维文档",
+      "status": "planned",
+      "dependsOn": [
+        "W14",
+        "W16"
+      ],
+      "acceptanceIds": [
+        "T48",
+        "T49",
+        "T50",
+        "T51",
+        "T57"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W19",
+      "milestone": "M9",
+      "title": "全量验收与证据审计",
+      "status": "planned",
+      "dependsOn": [
+        "W17",
+        "W18"
+      ],
+      "acceptanceIds": [
+        "T56",
+        "T61",
+        "T62",
+        "T63"
+      ],
+      "evidence": [],
+      "steps": []
+    },
+    {
+      "id": "W20",
+      "milestone": "M9",
+      "title": "发布与下载字节核对",
+      "status": "planned",
+      "dependsOn": [
+        "W19"
+      ],
+      "acceptanceIds": [
+        "T52",
+        "T58"
+      ],
+      "evidence": [],
+      "steps": []
+    }
+  ],
+  "gates": [
+    {
+      "id": "G1",
+      "title": "宿主兼容/模型调用/部署拓扑",
+      "status": "in_progress",
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_baseline.json",
+        "docs/integration/evidence/20261026_m0_ds_full.json",
+        "docs/integration/evidence/20261026_m0_llm_admission.json"
+      ]
+    },
+    {
+      "id": "G2",
+      "title": "真实工具约束与OS边界",
+      "status": "in_progress",
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_tool_boundaries.json"
+      ]
+    },
+    {
+      "id": "G3",
+      "title": "CLI隔离配置与能力桥接",
+      "status": "planned",
+      "evidence": []
+    },
+    {
+      "id": "G4",
+      "title": "运行时/SQLite/PTY/安装",
+      "status": "in_progress",
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_sqlite.json"
+      ]
+    }
+  ],
+  "acceptanceResults": [
+    {
+      "id": "T01",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T02",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T03",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T04",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T05",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T06",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T07",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T08",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T09",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T10",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T11",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T12",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T13",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T14",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T15",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T16",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T17",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T18",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T19",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T20",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T21",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T22",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T23",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T24",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T25",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T26",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T27",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T28",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T29",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T30",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T31",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T32",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T33",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T34",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T35",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T36",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T37",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T38",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T39",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T40",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T41",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T42",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T43",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T44",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T45",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T46",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T47",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T48",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T49",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T50",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T51",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T52",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T53",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T54",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T55",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T56",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T57",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T58",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T59",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T60",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T61",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T62",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "T63",
+      "status": "passed",
+      "evidence": [
+        "docs/integration/evidence/20261026_project_checks.json"
+      ],
+      "level": "document",
+      "verifiedOn": "2026-10-26",
+      "environment": "Repository plan bundle; actual relative-link and SHA-256 checks on Windows Node24"
+    }
+  ]
+}

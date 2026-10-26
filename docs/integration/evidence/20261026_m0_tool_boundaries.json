@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-10-26",
+  "command": "node scripts/integration-host-probe.mjs",
+  "status": "passed",
+  "scope": "real Cordis + DSH tools registry; offline tool bodies",
+  "checks": [
+    "per-agent visibility",
+    "direct invocation denied",
+    "sibling unaffected",
+    "guard after allow waterfall",
+    "nested dispatch denied",
+    "read still usable",
+    "guard disposal restores access"
+  ],
+  "limitations": [
+    "No live DSH Desktop/Web session",
+    "No actual PTC VM",
+    "No OS sandbox or machine tested",
+    "No product Bot policy installed"
+  ]
+}

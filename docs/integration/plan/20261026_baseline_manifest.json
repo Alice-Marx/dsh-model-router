@@ -1,0 +1,13 @@
+{
+  "documentVersion": "1.1",
+  "frozenAt": "2026-10-26",
+  "repositories": {
+    "Alice-Marx/dsh-model-router": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+    "Alice-Marx/DS-Bot-model-router": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+    "Fei2411/DS-Bot": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+  },
+  "deploymentStatus": "Recommended topology only; actual machines not selected or configured",
+  "originalProposalSha256": "874b164aca3a04cc9a029a27163d7761fc36fc3935efed851d6a23853a41034f",
+  "reviewScreenshotSha256": "6fecd6d8361fb6810bc39e38fcc2441d82b3bef50f5f63efac6becda1c4b6c26",
+  "scope": "Baseline documentation; no new product implementation or external agent delegation"
+}

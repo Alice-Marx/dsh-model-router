@@ -1,5 +1,21 @@
 # Release Synchronization
 
+## Bot integration continuity
+
+- The approved implementation plan is in `docs/integration/plan/20261026_master_plan.md`.
+- Before integration work, read `docs/integration/PROGRESS.md` and run
+  `npm run integration:status`. Track work packages in `docs/integration/tasks.json`;
+  the frozen R/F/T catalog is `docs/integration/scope.json`.
+- Record completed steps, remaining gates, evidence and the next action in the
+  project before ending a work session. Run `npm run integration:check` after
+  updating tracking data. Do not equate a passing probe with product acceptance.
+- Keep test homes, upstream checkouts, real machine settings and credentials out
+  of user DSH data and Git. Use isolated `tmp/integration/` directories.
+- Preserve the approved full scope, frozen upstream baselines and GPT-only model
+  invocation policy. Do not publish an incomplete integration as a stable release.
+
+## Existing release requirements
+
 - Update both README translations together. Render formulas with anchored GitHub
   `math` fences; keep currency dollar signs escaped. Run `npm run check:readme`
   and inspect the actual GitHub MathJax output after formula changes, including

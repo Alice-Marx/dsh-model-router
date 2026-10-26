@@ -36,6 +36,8 @@ jobs:
           corepack install
       - name: Install the exact dependency graph
         run: pnpm install --frozen-lockfile --strict-peer-dependencies
+      - name: Verify the integration scope, task dependencies and evidence
+        run: npm run integration:check
       - name: Run the complete test suite
         run: npm test
       - name: Exercise native Windows UTF-8 terminal

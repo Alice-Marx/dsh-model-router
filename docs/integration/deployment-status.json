@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "status": "not_configured",
+  "recommendedRoles": [
+    "Ubuntu DSH Web controller",
+    "Ubuntu remote agent",
+    "Laptop UI / isolated Desktop profile",
+    "Windows 10 desktop through WireGuard"
+  ],
+  "actualTargets": [],
+  "privateConfigPolicy": "No real endpoint, account, credential or secret material in Git",
+  "verifiedSleepTopology": false
+}

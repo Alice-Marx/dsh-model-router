@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-10-26",
+  "phase": "M0",
+  "status": "partial",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.20.0",
+    "pnpm": "10.34.6",
+    "dshSdk": "0.2.1-rc.3",
+    "codexVersionProbe": "0.163.0",
+    "modelCalls": 0
+  },
+  "frozenRepositories": {
+    "MR": {
+      "name": "Alice-Marx/dsh-model-router",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b"
+    },
+    "DS": {
+      "name": "Alice-Marx/DS-Bot-model-router",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+    }
+  },
+  "dependencies": {
+    "status": "passed",
+    "command": "pnpm install --frozen-lockfile --strict-peer-dependencies",
+    "note": "Used existing project-local pnpm 10.34.6 because the system Corepack cache entry failed. No global setting changed.",
+    "rawLogSha256": "210dcb841a91c1560cf4a19c84c49c9da06700bae56477ae35cab82bffcf10f0"
+  },
+  "mrTests": {
+    "command": "npm test",
+    "scope": "Existing complete MR regression suite",
+    "tests": 1231,
+    "pass": 1228,
+    "fail": 0,
+    "skipped": 3,
+    "rawLog": {
+      "path": "tmp/integration/m0/baseline-tests.log",
+      "sha256": "74806d35fab8f26651e4f38d373eab4d5ad7e06aeb873283c555ac043cde3be5",
+      "availability": "local ignored output; rerun commands for fresh evidence"
+    },
+    "skippedNames": [
+      "﹣ pipe process echoes input, maps Enter and turns Ctrl+C into a kill (0.3317ms)",
+      "﹣ the bundled PTY loads and runs a real shell when available (0.1541ms)",
+      "﹣ M1: cancelling a CLI kills its whole process tree quickly (0.4331ms)"
+    ]
+  },
+  "client": {
+    "command": "npm run check:client",
+    "status": "passed",
+    "rawLogSha256": "5376d74902e1903da7d004f1e4333591c953b90b13f069ca15d47f5eeb66929e"
+  },
+  "dsCoreTests": {
+    "command": "DSH_HARNESS=<repository-root> node --import ./test/harness-resolve.mjs --test --test-reporter=spec test/models.test.js test/capabilities.test.js test/handoff-results.test.js test/agents.test.js test/requests.test.js",
+    "scope": "Frozen upstream unit tests; fake context, actual rc.3 SDK exports",
+    "tests": 53,
+    "pass": 53,
+    "fail": 0,
+    "skipped": 0,
+    "rawLog": {
+      "path": "tmp/integration/m0/ds-rc3-core-tests.log",
+      "sha256": "a83b4ed6edcca452fc7e0c287e9548eba7ffbfbf455c918902cbb31463f35cb7",
+      "availability": "local ignored output; rerun commands for fresh evidence"
+    },
+    "skippedNames": []
+  },
+  "toolBoundaries": "20261026_m0_tool_boundaries.json",
+  "sqlite": "20261026_m0_sqlite.json",
+  "notValidated": [
+    "Live DSH Web/Desktop combined mount and UI",
+    "Actual PTC VM",
+    "Product Bot policy/OS isolation",
+    "Other Node/OS/ABI combinations",
+    "CLI bridge and per-Bot config",
+    "Real Linux/Win10 machines and sleep/network topology",
+    "Product migrations and release readiness"
+  ]
+}

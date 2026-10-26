@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-10-26",
+  "setup": "npm install --prefix tmp/integration/probes/sqlite --ignore-scripts --no-audit --no-fund --save-exact better-sqlite3@13.0.3",
+  "command": "node scripts/integration-sqlite-probe.mjs",
+  "status": "passed",
+  "driver": "better-sqlite3",
+  "version": "13.0.3",
+  "platform": "win32",
+  "arch": "x64",
+  "node": "v24.20.0",
+  "nodeAbi": "137",
+  "nativeSha256": "e21e5efd71fba66578e95b62554d9028064a80dafd7221bf8a8ef155de8d240a",
+  "checks": [
+    "native module loads",
+    "WAL",
+    "atomic rollback",
+    "two connections enforce budget",
+    "idempotent admission",
+    "changed-content conflict",
+    "reopen after process interruption"
+  ],
+  "limitations": [
+    "Windows current Node runtime only",
+    "No Node 22/Electron ABI or Linux installation checked",
+    "Fixture tables, not the product ledger or migration",
+    "No paid call or external machine"
+  ]
+}

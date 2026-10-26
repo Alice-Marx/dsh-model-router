@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "tests": 1062,
+  "pass": 1061,
+  "fail": 0,
+  "skipped": 1,
+  "frozenCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "sdkVersion": "0.2.1-rc.3",
+  "sdkPackages": 282,
+  "rawLogSha256": "033314ce43edf21cfffffa14b91a28f72f79477e9f79ba53bbbc47d7c56b0298",
+  "limitations": [
+    "Upstream unit/UI component tests, not a running integrated application",
+    "No actual model calls or remote machines",
+    "No frozen source or installed SDK files patched"
+  ],
+  "schemaVersion": 1,
+  "recordedOn": "2026-10-26",
+  "command": "node scripts/integration-upstream-tests.mjs --ds-root <frozen-DS-checkout> --host-root tests/fixtures/integration-host",
+  "fixturePackage": "tests/fixtures/integration-host/package.json",
+  "fixtureLock": "tests/fixtures/integration-host/pnpm-lock.yaml",
+  "fixtureLockSha256": "ea8d69febdb237f90671adc445c8e36d984e17d60ed8d2384c91a0eac743a490",
+  "dependencyAdmission": "Frozen lockfile, strict peers, ignored scripts, offline install passed",
+  "compatibilityFix": "Fixture-only @opentelemetry/api=1.9.0; public metadata resolver anchor exposes transitive SDK peers. No source/SDK files patched.",
+  "skippedReason": "Windows filesystem drops trailing spaces from names."
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "planVersion": "1.1",
+  "repositories": {
+    "MR": {
+      "name": "Alice-Marx/dsh-model-router",
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b"
+    },
+    "DS": {
+      "name": "Alice-Marx/DS-Bot-model-router",
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+    }
+  },
+  "sdkCandidate": "0.2.1-rc.3",
+  "dsOriginalTestSdk": "0.2.1-rc.2",
+  "productPackage": "@ljwei-stak/dsh-model-router",
+  "productVersion": "0.25.5",
+  "pluginId": "model-router-galgame",
+  "policy": "Frozen baseline. Upstream changes require an explicit impact review. No private endpoint or credential belongs here."
+}
