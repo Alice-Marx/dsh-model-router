@@ -1,14 +1,15 @@
 {
   "schemaVersion": 1,
   "updatedOn": "2026-10-27",
-  "coverageMeaning": "Eleven entry-level partial observations; strict DS factory composition verified without declaring a whole F group or product accepted",
+  "coverageMeaning": "Twelve partial entry observations; isolated ownership/lifecycle/Task checks do not accept a whole F group or product",
   "evidence": [
     "docs/integration/evidence/20261027_m0_combined_host.json",
     "docs/integration/evidence/20261027_m0_remote_platforms.json",
     "docs/integration/evidence/20261027_m0_security.json",
     "docs/integration/evidence/20261027_m0_broker_bridge.json",
     "docs/integration/evidence/20261027_m0_legacy_policy.json",
-    "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
+    "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
+    "docs/integration/evidence/20261027_m0_managed_tasks.json"
   ],
   "entries": [
     {
@@ -334,6 +335,85 @@
         "Read-only takeover, schedules/capability lifecycle and complete interruption matrix",
         "Execution/retry ownership and Task/budget/receipt integration",
         "CLI bootstrap and OS workers"
+      ]
+    },
+    {
+      "id": "E12",
+      "featureIds": [
+        "F27",
+        "F32",
+        "F33",
+        "F34",
+        "F39"
+      ],
+      "entry": "SDK managed Task tools, actual MR API execute/rerun, native journal and hard-crash recovery",
+      "contract": "Live Agent-derived stable owner; immutable target/input; idempotent submit; new retry attempt/operation; fence writes; cancellation waits for quiescence; unknown never replays. Legacy ledger remains money writer.",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": "packages/capability-broker/src/authority.mjs",
+          "gitBlob": "99c0087fab9dd5a1167e566284c0a35a66e16981"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/bot-policy.mjs",
+          "gitBlob": "f26692e9dff2d2151adcba738c3a5ba7b989da26"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/principals.mjs",
+          "gitBlob": "d912d6c92644752877ab43313879564674da4219"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-contract.mjs",
+          "gitBlob": "c8b7e5a63e4561d3d2688713b4b1deaaf31ee1e2"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-journal.mjs",
+          "gitBlob": "61c5dc88abc96fd0f4fc57d246515edc3d83699c"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-service.mjs",
+          "gitBlob": "5e071a1b2245664638057e4d07f745ac3cbba409"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-tools.mjs",
+          "gitBlob": "1a5ef456510d87aa349ebe64dcc55d61f6675eb9"
+        },
+        {
+          "repository": "integration",
+          "path": "scripts/integration-task-probe.mjs",
+          "gitBlob": "f22695f78463c135fc9ef5ffb399ade77563d594"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/fixtures/integration-combined/tasks-plugin.mjs",
+          "gitBlob": "4f9c18ad1c7dc0dd78ee93d489c192f005de97d8"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/task-contract.test.mjs",
+          "gitBlob": "a2767a3b12de099105fa2691fb3c8ef756feefdf"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/task-journal.native.mjs",
+          "gitBlob": "8010913e8c734917694011e08577b067777fa6d1"
+        }
+      ],
+      "observed": "Three real machines: 5 pure contract tests, 17 native checks, actual SDK cross-Bot denial, owner MR recorded rerun, cleanup cancellation, owned-host hard crash and restored unknown state with no backend replay.",
+      "level": "strict isolated host / native SQLite / offline model",
+      "remaining": [
+        "Opt-in strict fixture composition; no default product profile/data migration",
+        "One fixed read-only package, no complete DAG/planning/approval/acceptance protocol",
+        "No unified reservation/usage receipt migration; cross-ledger crash window remains unknown",
+        "No reconciliation resolution API/UI; unresolved Bot cannot run more work",
+        "No CLI private bootstrap, native/remote process-tree cancellation, actual DSH OS worker or product remote agent",
+        "Previous ordinary PTC partial file boundary and Win11 ACL failure remain open"
       ]
     }
   ]

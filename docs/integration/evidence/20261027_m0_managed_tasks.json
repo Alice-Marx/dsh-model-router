@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "716a8196c5aeb42e31154ab8cd244260b67f7ebd",
+  "level": "strict-isolated-managed-task-integration",
+  "sourceGitBlobs": {
+    ".github/workflows/ci.yml": "c9853a1c92aaf5f70f2026eb39efcf29256a75d5",
+    "package.json": "0ffbdb4421596ca277ee060ac5a64ea8a00d8b97",
+    "packages/capability-broker/src/authority.mjs": "99c0087fab9dd5a1167e566284c0a35a66e16981",
+    "packages/orchestration/src/bot-policy.mjs": "f26692e9dff2d2151adcba738c3a5ba7b989da26",
+    "packages/orchestration/src/principals.mjs": "d912d6c92644752877ab43313879564674da4219",
+    "packages/orchestration/src/task-contract.mjs": "c8b7e5a63e4561d3d2688713b4b1deaaf31ee1e2",
+    "packages/orchestration/src/task-journal.mjs": "61c5dc88abc96fd0f4fc57d246515edc3d83699c",
+    "packages/orchestration/src/task-service.mjs": "5e071a1b2245664638057e4d07f745ac3cbba409",
+    "packages/orchestration/src/task-tools.mjs": "1a5ef456510d87aa349ebe64dcc55d61f6675eb9",
+    "scripts/integration-combined-host.mjs": "fbe74bc58e79c114980785ef1ecb719afdd711ee",
+    "scripts/integration-task-probe.mjs": "f22695f78463c135fc9ef5ffb399ade77563d594",
+    "tests/fixtures/integration-combined/lifecycle-plugin.mjs": "a9e30431538cdd39a4ccd10a11a8f86fb686f79d",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "f5fa7d1f1076c7e0f4864b88866d2814437cfb10",
+    "tests/fixtures/integration-combined/tasks-plugin.mjs": "4f9c18ad1c7dc0dd78ee93d489c192f005de97d8",
+    "tests/task-contract.test.mjs": "a2767a3b12de099105fa2691fb3c8ef756feefdf",
+    "tests/task-journal.native.mjs": "8010913e8c734917694011e08577b067777fa6d1"
+  },
+  "remoteFinalOverlaySha256": "8719b3e24a23ffe9a741fc3ada3a8766f4a29e3851dc2d6fe686d48de598f7b0",
+  "overlayMeaning": "Initial exact source overlay plus runner hard-crash fix uploaded separately; this archive consolidates final tested source bytes",
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "newChecks": {
+    "contract": 5,
+    "nativeJournalAndService": 17
+  },
+  "engineeringChecks": {
+    "tests": 71,
+    "pass": 71,
+    "fail": 0,
+    "skipped": 0
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1302,
+        "pass": 1299,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "44cd63a4b8871600a48374ad04bd6cfa87f5bd3450f8fef18e901abb7169363c",
+      "nativeTaskSuite": {
+        "status": "passed",
+        "driverVersion": "13.0.3",
+        "node": "v24.20.0",
+        "platform": "win32",
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Single-package read-only task foundation; not complete Task DAG or money accounting",
+          "Fixture backends and intentional process exit; no native CLI or remote agent execution"
+        ]
+      },
+      "baselineChecks": 9,
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "managedTasks": {
+        "status": "passed",
+        "checks": [
+          "Actual SDK Task tools submit once; first real MR execution fails and persists an owner-linked legacy run",
+          "Cross-Bot task/cancel/legacy retry and unowned old-run adoption fail before MR entry; metadata cannot override route",
+          "Owner retry uses actual rerunRecordedStep, keeps target/input/package, adds linked attempt/operation and updates original MR run",
+          "Actual MR stream cancellation remains cancelling through cleanup; terminal state retains legacy receipt reference",
+          "Persisted running Task is left for an actual owned-host process interruption"
+        ],
+        "recoveryTaskId": "task-209f64bf-1e53-47f8-9bb2-58804ca07d5b",
+        "operationId": "operation-4b3c96ed-7e31-4a97-a454-255b186026ad",
+        "backendCalls": 4,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Fixed read-only API backend in isolated strict profile; default product migration still open",
+          "Legacy MR remains the money writer; Task database stores references, not costs",
+          "No DAG, approval/budget protocol, native CLI, remote agent, OS worker or reconciliation resolution UI"
+        ]
+      },
+      "afterHardCrash": {
+        "status": "passed",
+        "checks": [
+          "Fresh host restores stable Bot ownership, preserves interrupted operation and does not replay unknown work",
+          "Unknown outcome blocks owner retry/new execution until reconciliation; no fabricated completion"
+        ],
+        "backendCalls": 0,
+        "actualModelCalls": 0
+      },
+      "mockAdapterDispatchesBeforeRestart": 20,
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "ubuntu-test",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1302,
+        "pass": 1279,
+        "fail": 0,
+        "skipped": 23
+      },
+      "rootTestsSha256": "fd965ff4aecf748472a2d6ebbf6d8dcebb32dd07ccdbd8d94e65a30e2e9d6e60",
+      "nativeTaskSuite": {
+        "status": "passed",
+        "driverVersion": "13.0.3",
+        "node": "v22.22.1",
+        "platform": "linux",
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Single-package read-only task foundation; not complete Task DAG or money accounting",
+          "Fixture backends and intentional process exit; no native CLI or remote agent execution"
+        ]
+      },
+      "baselineChecks": 9,
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "managedTasks": {
+        "status": "passed",
+        "checks": [
+          "Actual SDK Task tools submit once; first real MR execution fails and persists an owner-linked legacy run",
+          "Cross-Bot task/cancel/legacy retry and unowned old-run adoption fail before MR entry; metadata cannot override route",
+          "Owner retry uses actual rerunRecordedStep, keeps target/input/package, adds linked attempt/operation and updates original MR run",
+          "Actual MR stream cancellation remains cancelling through cleanup; terminal state retains legacy receipt reference",
+          "Persisted running Task is left for an actual owned-host process interruption"
+        ],
+        "recoveryTaskId": "task-aa45f826-9962-4345-962b-5d0b662c3d37",
+        "operationId": "operation-855f9ab6-519f-4503-8ee2-74c8acbe6ed3",
+        "backendCalls": 4,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Fixed read-only API backend in isolated strict profile; default product migration still open",
+          "Legacy MR remains the money writer; Task database stores references, not costs",
+          "No DAG, approval/budget protocol, native CLI, remote agent, OS worker or reconciliation resolution UI"
+        ]
+      },
+      "afterHardCrash": {
+        "status": "passed",
+        "checks": [
+          "Fresh host restores stable Bot ownership, preserves interrupted operation and does not replay unknown work",
+          "Unknown outcome blocks owner retry/new execution until reconciliation; no fabricated completion"
+        ],
+        "backendCalls": 0,
+        "actualModelCalls": 0
+      },
+      "mockAdapterDispatchesBeforeRestart": 20,
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "win10-test",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1302,
+        "pass": 1299,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "61eaa40ee664f33d5bd81e84489a5b2e8bd5e0e14bb90d48efaa7546acf1f014",
+      "nativeTaskSuite": {
+        "status": "passed",
+        "driverVersion": "13.0.3",
+        "node": "v24.18.0",
+        "platform": "win32",
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Single-package read-only task foundation; not complete Task DAG or money accounting",
+          "Fixture backends and intentional process exit; no native CLI or remote agent execution"
+        ]
+      },
+      "baselineChecks": 9,
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "managedTasks": {
+        "status": "passed",
+        "checks": [
+          "Actual SDK Task tools submit once; first real MR execution fails and persists an owner-linked legacy run",
+          "Cross-Bot task/cancel/legacy retry and unowned old-run adoption fail before MR entry; metadata cannot override route",
+          "Owner retry uses actual rerunRecordedStep, keeps target/input/package, adds linked attempt/operation and updates original MR run",
+          "Actual MR stream cancellation remains cancelling through cleanup; terminal state retains legacy receipt reference",
+          "Persisted running Task is left for an actual owned-host process interruption"
+        ],
+        "recoveryTaskId": "task-41a1dfb9-eaed-4b97-8d03-d98ec1eec04c",
+        "operationId": "operation-fe55ca51-ca53-4c62-b11d-d030fabfac2d",
+        "backendCalls": 4,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Fixed read-only API backend in isolated strict profile; default product migration still open",
+          "Legacy MR remains the money writer; Task database stores references, not costs",
+          "No DAG, approval/budget protocol, native CLI, remote agent, OS worker or reconciliation resolution UI"
+        ]
+      },
+      "afterHardCrash": {
+        "status": "passed",
+        "checks": [
+          "Fresh host restores stable Bot ownership, preserves interrupted operation and does not replay unknown work",
+          "Unknown outcome blocks owner retry/new execution until reconciliation; no fabricated completion"
+        ],
+        "backendCalls": 0,
+        "actualModelCalls": 0
+      },
+      "mockAdapterDispatchesBeforeRestart": 20,
+      "actualModelCalls": 0
+    }
+  ],
+  "moneyWriter": "Legacy MR run ledger only; Task journal stores run references, no money columns or second budget writer",
+  "failureAndCorrection": "Ubuntu initial SIGTERM completed cooperative cancellation; crash test now SIGKILLs only its own detached group and recovers unknown without replay",
+  "limitations": [
+    "Opt-in strict fixture composition; no default product profile/data migration",
+    "One fixed read-only package, no complete DAG/planning/approval/acceptance protocol",
+    "No unified reservation/usage receipt migration; cross-ledger crash window remains unknown",
+    "No reconciliation resolution API/UI; unresolved Bot cannot run more work",
+    "No CLI private bootstrap, native/remote process-tree cancellation, actual DSH OS worker or product remote agent",
+    "Previous ordinary PTC partial file boundary and Win11 ACL failure remain open"
+  ]
+}

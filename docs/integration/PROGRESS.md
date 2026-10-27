@@ -6,6 +6,24 @@
 
 按 [方案1.1](plan/20261026_master_plan.md) 完成 Main 私聊派活、两仓功能并集、按 Bot 绑定模型/官方工具、Linux 与 Windows 远程电脑，以及迁移、安装和发布。分期仅安排先后，不缩减最终范围。实际模型调用仅使用 GPT。
 
+## 2026-10-27：持久任务与旧运行归属
+
+- 新增闭合Task合同、原生SQLite journal、generation租约/outbox和有界只读runner。真实Agent对象决定Bot归属，输入不能覆盖执行者或模型/机器；相同请求去重，重跑生成新attempt/operation，保留原输入、目标与总期限。
+- 严格宿主接入`bot_task_start/status/cancel/retry`，实际调用原MR执行器及`rerunRecordedStep`。原run必须存在Task→Bot关联；跨Bot或无归属的旧run拒绝。费用仍由原MR账本写入，Task仅保存引用，没有宣称统一资金迁移。
+- 取消保持cancelling直到实际执行体清理结束；未启动attempt记skipped。新宿主接管后，旧running/cancelling保留operation并进入needs-reconciliation，不自动重放，同时阻止该Bot继续提交或重跑。核对解除API/UI仍待实现。
+- Ubuntu第一次中断用了SIGTERM，得到正常cancelled；已明确区分正常退出与崩溃，崩溃测试改为仅SIGKILL自身创建的进程组，并在三机重新验证。没有通过接受错误状态来放宽断言。
+- 新增5项合同检查进入根套件，17项真实原生检查单独执行；工程检查累计71项。三机固定strict安装、完整回归和客户端检查通过，真实模型请求0。
+
+| 环境 | 总数 | 通过 | 失败 | 跳过 | 原生Task检查 |
+|---|---:|---:|---:|---:|---:|
+| 本机 Win11 / Node24.20.0 | 1302 | 1299 | 0 | 3 | 17通过 |
+| 远程 Win10 LTSC / Node24.18.0 | 1302 | 1299 | 0 | 3 | 17通过 |
+| 远程 Ubuntu24.04 / Node22.22.1 | 1302 | 1279 | 0 | 23 | 17通过 |
+
+实现、复现与后续顺序见[任务合同](20261027_managed_tasks.md)，平台和代码摘要见[本轮证据](evidence/20261027_m0_managed_tasks.json)。CI两平台增加原生Task suite和真实MR执行/取消/宿主崩溃步骤。新增T12/T13 partial，没有新增产品passed；M0仍9/12子步骤。
+
+当前只是单包只读执行基础。完整DAG/审批/核对、统一预算/receipt与跨库中断、默认产品迁移、CLI私有引导、真实进程树取消、远程agent及DSH OS worker仍未完成。原有Windows边界失败与PTC partial不变。
+
 ## 2026-10-27：DS自动生命周期与真实Gateway
 
 - 用冻结DS公开导出的`createRuntime`组合严格宿主，在启动时提供权限服务，不修改DS/SDK源码。`load/save/refresh/resolveAgent`外层适配器自动维护活动私聊、群成员Session与稳定Bot主体；换段解绑旧Agent，删除撤销全部身份，冷启动从保存状态重建。
@@ -102,7 +120,7 @@
 | 门禁 | 已有依据 | 仍需验证 |
 |---|---|---|
 | G1 宿主/会话 | rc.3真实Session/AgentLoop、浏览器UI、三机自动创建/群成员/换段/删除/冷启动，Gateway正向调用 | MCP/search/审批/schedule、锁接管/热重载等完整生命周期；默认产品配置迁移、任务预算与部署拓扑 |
-| G2 权限边界 | 自动提交快照/多Session主体；13工具/2命令/23RPC接缝；真实Gateway allow/deny；实际PTC及Linux合成容器 | 执行/重跑归属与Task合同、默认入口迁移、真正DSH OS worker；Win11沙箱ACL受阻 |
+| G2 权限边界 | 自动提交快照/多Session主体；旧入口接缝/Gateway；只读Task与原run归属、新attempt、撤权前置；实际PTC及Linux合成容器 | 默认入口迁移、完整审批/预算/receipt、原生CLI与真正DSH OS worker；Win11沙箱ACL受阻 |
 | G3 CLI/bridge | Codex独立配置实际解析；真实MCP子进程按授权列/调工具、撤权与取消 | CLI孙进程私有引导、真实CLI模型身份、远程路径、原生进程树取消与产品执行接入 |
 | G4 安装/存储 | Ubuntu/Node22、Win10/Node24、Win11/Node24原生驱动与事务探针 | Electron ABI、PTY、GUI helper、干净安装/升级/卸载 |
 
@@ -110,13 +128,13 @@
 
 ## 下一步
 
-1. 继续W01逐入口行为核对：已有十一组部分记录，含严格自动生命周期/Gateway；完整40组功能审查未结束。
-2. 继续W02/G2执行/重跑所有权与持久Task合同、默认配置迁移、真正DSH OS worker；保留Win11原生沙箱失败依据。
+1. 继续W01逐入口行为核对：已有十二组部分记录，含严格自动生命周期/Gateway及持久Task；完整40组功能审查未结束。
+2. 继续W02/G2统一预算/receipt单写合同、Task核对解除和完整中断矩阵，再接默认配置迁移与真正DSH OS worker；保留Win11原生沙箱失败依据。
 3. 继续W02/G3 CLI孙进程私有引导、CLI模型身份、原生进程树取消与远程路径契约；补齐G1其余生命周期。
 4. 以已有真实测试目标验证常开部署与休眠拓扑；冻结Bot/任务/授权/收据契约。
 5. G1–G4达到所需证据后进入M1，迁入DS Bot运行时并保留MR兼容入口。
 
-T63（便携方案文档）已在document级通过；T01/T05/T25/T33/T57为partial，其余产品场景尚未验收。M0已完成9/12个记录子步骤；W01/W02及四个总门禁仍未完成，不换算为整个项目的完成比例。
+T63（便携方案文档）已在document级通过；T01/T05/T12/T13/T25/T33/T57为partial，其余产品场景尚未验收。M0已完成9/12个记录子步骤；W01/W02及四个总门禁仍未完成，不换算为整个项目的完成比例。
 
 ## 复现与环境说明
 

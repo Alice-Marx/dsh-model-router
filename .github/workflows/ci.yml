@@ -110,3 +110,7 @@ jobs:
         run: npm install --prefix tmp/integration/probes/sqlite --ignore-scripts --no-audit --no-fund --strict-peer-deps --registry=https://registry.npmjs.org better-sqlite3@13.0.3
       - name: Verify native load, transactions and interruption recovery
         run: node scripts/integration-sqlite-probe.mjs
+      - name: Verify durable task ownership, retries and runner fencing
+        run: node scripts/integration-task-probe.mjs
+      - name: Verify real MR managed execution, cancellation and host interruption
+        run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --tasks

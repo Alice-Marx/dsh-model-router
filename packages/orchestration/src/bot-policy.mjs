@@ -35,6 +35,10 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
   }
   return Object.freeze({
     check,
+    executionContext(subject, signal, operation) {
+      authority.assertTool(subject, 'task/execute')
+      return current.run({ subject, owner: false, signal }, operation)
+    },
     async run(call, operation) {
       const who = check(call)
       const binding = { taskId: `legacy-${randomUUID()}`, attemptId: 'attempt-1', machineId, workspaceId, location: 'local' }

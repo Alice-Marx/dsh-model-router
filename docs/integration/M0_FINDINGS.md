@@ -30,10 +30,14 @@
 
 ## 边界
 
+本轮新增的持久Task已在三机通过17项原生检查和真实MR执行/原run重跑/取消/宿主强制中断：稳定Bot拥有Task与run关联，新重跑生成attempt/operation；恢复unknown不重放。Ubuntu最初的SIGTERM触发正常取消，崩溃场景已改为仅强制结束自建进程组后重新验证。费用仍由MR旧账本单写，Task不复制金额；MR完成与Task完成之间的跨库窗口只可记为待核对。详见[合同与限制](20261027_managed_tasks.md)。
+
+默认产品配置、完整DAG、Task核对解除、统一预算/receipt、CLI私有引导和实际OS/远程进程树仍未完成。T12/T13新增partial，未记为passed；当前完整回归1302项，三机0失败，原有平台跳过保留。
+
 - 没有修改用户自己的 DSH home、既有远程服务、全局 Node/pnpm、WireGuard 或防火墙。
 - 远程工作位于本次独立测试目录；所有测试宿主进程已由启动器结束。
 - Node/OS/架构证据仅覆盖报告列出的组合；Electron、PTY、GUI helper、安装/升级/卸载仍待验证。
 - 本机UI截图不等于Win10远程交互桌面验收；一次干净重启不等于T13全部中断点恢复。
 - 只确认同宿主组成与有限入口行为。MCP/search/审批/schedule完整生命周期、G2强隔离与G3桥接仍在M0门禁中。
 
-完整需求和验收范围保持不变。T01/T05/T25/T33/T57只记录partial，T63仍是唯一passed的文档场景；当前9/12是M0子步骤计数。新增实现与证据见[授权/桥实验契约](20261027_security_bridge.md)。
+完整需求和验收范围保持不变。T01/T05/T12/T13/T25/T33/T57只记录partial，T63仍是唯一passed的文档场景；当前9/12是M0子步骤计数。新增实现与证据见[任务合同](20261027_managed_tasks.md)及[授权/桥实验契约](20261027_security_bridge.md)。

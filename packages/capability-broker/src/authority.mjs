@@ -78,6 +78,10 @@ export function createAuthority({ now = () => performance.now(), maxTtlMs = 300_
     assertTool(subject, name) {
       if (!subjectOf(subject).tools.has(name)) refuse('TOOL_DENIED')
     },
+    describe(subject) {
+      const value = subjectOf(subject)
+      return Object.freeze({ botId: value.botId, revision: value.revision })
+    },
     assertModel(subject, provider, model) {
       if (typeof provider !== 'string' || typeof model !== 'string' || !subjectOf(subject).models.has(routeKey(provider, model))) refuse('MODEL_DENIED')
     },

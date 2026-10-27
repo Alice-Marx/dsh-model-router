@@ -41,6 +41,7 @@ export function createPrincipalDirectory(authority) {
       }
     },
     forAgent(agent) { return subject(agent && typeof agent === 'object' ? agents.get(agent) : undefined) },
+    forBot(botId) { return record(botId).subject },
     // This lookup is for trusted LlmRuntime auxiliary-call metadata, never JSON RPC arguments.
     forSession(sessionId) { return subject(sessions.get(sessionId)) },
     replaceGrant(botId, grant) { authority.replaceGrant(record(botId).subject, grant) },

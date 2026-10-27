@@ -69,3 +69,19 @@ node --test tests/bot-policy.test.mjs tests/legacy-policy.test.mjs
 node scripts/integration-combined-host.mjs --ds-root <frozen-DS> --host-root tests/fixtures/integration-host --legacy-policy
 node scripts/integration-combined-host.mjs --ds-root <frozen-DS> --host-root tests/fixtures/integration-host --lifecycle
 ```
+
+## Durable managed Task foundation
+
+`task-contract.mjs`, `task-journal.mjs`, `task-service.mjs` and `task-tools.mjs`
+provide closed commands, a native SQLite journal, one fenced bounded runner and
+SDK Agent-derived command ownership. They currently support one fixed read-only
+package per Task. Retry creates a new attempt/operation and retains the original
+deadline. Cancellation waits for backend quiescence. Restart marks interrupted
+operations unknown and refuses replay; no resolution API exists yet.
+
+The `--tasks` strict composition executes the actual MR API executor and recorded
+step rerun. Only journal-linked legacy runs can be retried by their owner. The
+legacy MR ledger remains the money writer; this journal stores references and
+does not claim unified receipts, budgets or a cross-database atomic commit.
+This foundation is opt-in and does not open the old direct Bot execution tools.
+See [contract, reproduction and remaining limits](../../docs/integration/20261027_managed_tasks.md).

@@ -84,7 +84,8 @@
         "docs/integration/evidence/20261027_m0_broker_bridge.json",
         "docs/integration/evidence/20261027_security_project_checks.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
-        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
+        "docs/integration/evidence/20261027_m0_managed_tasks.json"
       ],
       "steps": [
         {
@@ -499,7 +500,8 @@
         "docs/integration/evidence/20261027_m0_combined_host.json",
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
-        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
+        "docs/integration/evidence/20261027_m0_managed_tasks.json"
       ]
     },
     {
@@ -511,7 +513,8 @@
         "docs/integration/evidence/20261027_m0_combined_host.json",
         "docs/integration/evidence/20261027_m0_security.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
-        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
+        "docs/integration/evidence/20261027_m0_managed_tasks.json"
       ]
     },
     {
@@ -528,7 +531,8 @@
       "status": "in_progress",
       "evidence": [
         "docs/integration/evidence/20261026_m0_sqlite.json",
-        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+        "docs/integration/evidence/20261027_m0_remote_platforms.json",
+        "docs/integration/evidence/20261027_m0_managed_tasks.json"
       ]
     }
   ],
@@ -567,12 +571,13 @@
       "evidence": [
         "docs/integration/evidence/20261027_m0_security.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
-        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
+        "docs/integration/evidence/20261027_m0_managed_tasks.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Isolated strict DS factory composition; Win11/Win10 Node24 and Ubuntu Node22; offline fixture model",
-      "notes": "Automatic committed-state lifecycle, group/part/delete/cold reconstruction and real authenticated Gateway allow/deny verified. Default product composition, remaining lifecycle, execution/task accounting and remote/OS deployment criteria remain incomplete."
+      "environment": "Isolated strict DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; native SQLite13.0.3, offline model",
+      "notes": "Stable-owner Task tools and recorded-run retry refuse cross-Bot/unknown ownership; fixed route/input persist across new attempt. Full default configuration, CLI and accounting remain incomplete."
     },
     {
       "id": "T06",
@@ -606,13 +611,25 @@
     },
     {
       "id": "T12",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Isolated strict DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; native SQLite13.0.3, offline model",
+      "notes": "Queued cancellation records skipped; actual read-only MR stream stays cancelling through cleanup. Native CLI/remote process tree, full DAG cancellation and uncertain-stop reconciliation remain unverified."
     },
     {
       "id": "T13",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Isolated strict DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; native SQLite13.0.3, offline model",
+      "notes": "Actual native child exit and hard-killed strict host retain operation identity and recover needs-reconciliation without replay. Full crash-point matrix, cost/artifact reconciliation and resolution UI remain unimplemented."
     },
     {
       "id": "T14",

@@ -10,6 +10,7 @@ import { promisify } from 'node:util'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { resolverAnchor } from './integration-upstream-tests.mjs'
 import { killProcessTree } from '../.dsh-plugin/shared/task-executors.mjs'
+import {DEFAULT_TASK_DRIVER,verifyTaskDriver} from './integration-task-probe.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const execute = promisify(execFile)
@@ -42,7 +43,8 @@ async function unusedPort() {
   return port
 }
 
-export async function runCombinedHost({ dsRoot, hostRoot, serve = false, security = false, legacyPolicy = false, lifecycle = false }) {
+export async function runCombinedHost({ dsRoot, hostRoot, serve = false, security = false, legacyPolicy = false, lifecycle = false, tasks = false }) {
+  lifecycle ||= tasks
   assert.ok(!(lifecycle && legacyPolicy), 'Lifecycle and temporary legacy-policy probes use separate compositions')
   const baseline = JSON.parse(await readFile(join(ROOT, 'docs/integration/baseline.json'), 'utf8'))
   const revision = (await execute('git', ['-C', dsRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true })).stdout.trim()
@@ -93,7 +95,19 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
         principalsModule: localModule('packages/orchestration/src/principals.mjs'),
         policyModule: localModule('packages/orchestration/src/bot-policy.mjs'),
         lifecycleModule: localModule('packages/orchestration/src/ds-lifecycle.mjs'),
+        enableTasks:tasks,
       } }] })
+  }
+  if(tasks){
+    await verifyTaskDriver(DEFAULT_TASK_DRIVER)
+    const plugin=join(anchor,'tasks-probe.mjs')
+    await copyFile(join(ROOT,'tests/fixtures/integration-combined/tasks-plugin.mjs'),plugin)
+    const localModule=path=>pathToFileURL(join(ROOT,path)).href
+    overlay.push({insert:[{id:'integration-managed-tasks',name:pathToFileURL(plugin).href,config:{
+      driver:DEFAULT_TASK_DRIVER,driverModule:localModule('scripts/integration-task-probe.mjs'),
+      journalModule:localModule('packages/orchestration/src/task-journal.mjs'),serviceModule:localModule('packages/orchestration/src/task-service.mjs'),
+      toolsModule:localModule('packages/orchestration/src/task-tools.mjs'),contractModule:localModule('packages/orchestration/src/task-contract.mjs'),mrModule:localModule('.dsh-plugin/index.mjs'),
+    }}]})
   }
   await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(overlay, null, 2))
   const requireHost = createRequire(join(hostRoot, 'package.json'))
@@ -133,9 +147,14 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
     timer = setTimeout(() => killProcessTree(child), serve ? 15 * 60_000 : 150_000)
   }
   const text = () => Buffer.concat(logs).toString('utf8')
-  const stop = async label => {
+  const stop = async (label,{crash=false}={}) => {
     clearTimeout(timer)
-    if (!closed) killProcessTree(child)
+    if (!closed) {
+      // Only the detached process group created by this runner; SIGTERM permits
+      // graceful shutdown and therefore cannot exercise unknown crash recovery.
+      if(crash&&process.platform!=='win32')process.kill(-child.pid,'SIGKILL')
+      else killProcessTree(child)
+    }
     await Promise.race([exit, sleep(10_000).then(() => { throw new Error('Owned host process did not exit') })])
     await writeFile(join(run, `${label}.log`), text().replace(/(\?token=)[^\s]+/g, '$1[redacted]'))
   }
@@ -269,7 +288,20 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       await writeFile(join(run, 'diagnostics-final.json'), JSON.stringify(finalDiagnostic, null, 2))
       summary.finalDiagnosticSha256 = createHash('sha256').update(await readFile(join(run, 'diagnostics-final.json'))).digest('hex')
     }
-    await stop('host-before-restart')
+    if(tasks){
+      summary.tasks=await request('integration-tasks',{action:'probe',mainId:main.id,workerId:worker.id})
+      await writeFile(join(run,'tasks.json'),JSON.stringify(summary.tasks,null,2))
+      assert.equal(summary.tasks.status,'passed',summary.tasks.error)
+      summary.level='strict-host-managed-tasks-offline'
+      summary.limitations=summary.tasks.limitations
+      const diagnostic=await request('integration-probe')
+      summary.mockAdapterDispatches=diagnostic.calls.length
+      summary.auxiliaryModelCalls=diagnostic.calls.filter(call=>!call.agentLoop).length
+      await writeFile(join(run,'diagnostics-final.json'),JSON.stringify(diagnostic,null,2))
+      summary.finalDiagnosticSha256=createHash('sha256').update(await readFile(join(run,'diagnostics-final.json'))).digest('hex')
+    }
+    await stop('host-before-restart',{crash:tasks})
+    if(tasks)await sleep(5200)
     launch()
     loginUrl = await login()
     state = await api('state')
@@ -279,6 +311,11 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       summary.lifecycleAfterRestart = await request('integration-lifecycle', { action: 'restored', mainId: main.id, workerId: worker.id })
       await writeFile(join(run, 'lifecycle-restored.json'), JSON.stringify(summary.lifecycleAfterRestart, null, 2))
       assert.equal(summary.lifecycleAfterRestart.status, 'passed-for-described-checks', summary.lifecycleAfterRestart.error)
+    }
+    if(tasks){
+      summary.tasksAfterRestart=await request('integration-tasks',{action:'restored',mainId:main.id,workerId:worker.id,recoveryTaskId:summary.tasks.recoveryTaskId,operationId:summary.tasks.operationId})
+      await writeFile(join(run,'tasks-restored.json'),JSON.stringify(summary.tasksAfterRestart,null,2))
+      assert.equal(summary.tasksAfterRestart.status,'passed',summary.tasksAfterRestart.error)
     }
     if (serve) {
       await writeFile(join(run, 'browser-access.json'), JSON.stringify({ base, loginUrl, home, pid: child.pid }))
@@ -304,6 +341,8 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
 }
 
 async function main(args) {
+  const tasks=args.includes('--tasks')
+  args=args.filter(arg=>arg!=='--tasks')
   const lifecycle = args.includes('--lifecycle')
   args = args.filter(arg => arg !== '--lifecycle')
   const legacyPolicy = args.includes('--legacy-policy')
@@ -312,8 +351,8 @@ async function main(args) {
   args = args.filter(arg => arg !== '--security')
   const serve = args.at(-1) === '--serve'
   if (serve) args = args.slice(0, -1)
-  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--security] [--legacy-policy | --lifecycle] [--serve]')
-  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve, security, legacyPolicy, lifecycle })
+  if (args.length !== 4 || args[0] !== '--ds-root' || args[2] !== '--host-root') throw new Error('Usage: node scripts/integration-combined-host.mjs --ds-root <frozen-DS-checkout> --host-root <installed-fixture> [--security] [--legacy-policy | --lifecycle | --tasks] [--serve]')
+  const result = await runCombinedHost({ dsRoot: resolve(args[1]), hostRoot: resolve(args[3]), serve, security, legacyPolicy, lifecycle, tasks })
   process.stdout.write(JSON.stringify(result, null, 2) + '\n')
 }
 
