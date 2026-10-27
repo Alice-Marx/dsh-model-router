@@ -208,6 +208,13 @@ export async function discoverConfiguredRoutes(ctx, signal) {
 // Router runtime state: health cache, run ledger, budget and ratings.
 
 let routerState = null
+let stateAuthorityInstalled = false
+
+/** Trusted bootstrap migration only; never accepts a store from a wire request. */
+export function installRouterStateStore(store) {
+  if(stateAuthorityInstalled||store?.kind!=='sqlite-router-state'||!['read','update','saveQuota','saveHealth','appendRun','updateRun'].every(key=>typeof store[key]==='function'))throw new Error('ROUTER_STATE_AUTHORITY_ALREADY_SET_OR_INVALID')
+  routerState=store;stateAuthorityInstalled=true
+}
 
 /** Persistent Host state (DSH home). Tests point DSH_HOME at a temp dir before the first call. */
 export function routerStateStore() {

@@ -17,6 +17,11 @@ export async function apply(ctx,config) {
   const mr=await import(config.mrModule)
   const Database=await verifyTaskDriver(config.driver)
   await rt.load()
+  const {openSqliteRouterState}=await import(config.financeModule)
+  const {createRouterState}=await import(config.stateModule)
+  const legacyFile=mr.routerStateStore().file
+  const finance=await openSqliteRouterState({Database,file:join(rt.dshHome,'orchestration.sqlite'),legacyFile})
+  mr.installRouterStateStore(finance)
   const workspace=join(dirname(rt.dshHome),'managed-read-workspace');await mkdir(workspace,{recursive:true})
   const model={provider:'integration-gpt-fixture',model:'gpt-fixture'}
   let backendCalls=0,observationCalls=0,postReceiptReady=false
@@ -36,7 +41,7 @@ export async function apply(ctx,config) {
     backends:[backend,budgetBackend]})
   service.start()
   const releaseTools=registerTaskTools(ctx,defineTool,{service,directory})
-  ctx.effect(()=>async()=>{releaseTools();await service.close()},'integration: managed Task runner')
+  ctx.effect(()=>async()=>{releaseTools();await service.close();await finance.close()},'integration: managed Task runner')
   const wait=async read=>{
     const deadline=Date.now()+20_000
     while(Date.now()<deadline){const value=await read();if(value)return value;await sleep(25)}
@@ -49,6 +54,8 @@ export async function apply(ctx,config) {
       const {action,mainId,workerId,recoveryTaskId,operationId,committedTaskId}=await request.json()
       const main=await rt.resolveAgent(rt.chatOf(mainId)),worker=await rt.resolveAgent(rt.chatOf(workerId))
       const a=directory.forAgent(worker),b=directory.forAgent(main)
+      assert.equal(mr.routerStateStore().kind,'sqlite-router-state')
+      assert.equal(JSON.parse(await readFile(legacyFile,'utf8')).version,4)
       const call=async(agent,name,args)=>{
         const result=await ctx.tools.execute({agent,name,arguments:args,callId:`task-${name}`,signal:new AbortController().signal})
         assert.notEqual(result.isError,true,JSON.stringify(result));return result.value
@@ -61,7 +68,7 @@ export async function apply(ctx,config) {
         assert.equal(backendCalls,0)
         assert.equal(task.executionRef.runId,task.legacyRunIds[0])
         const source=async()=>{
-          const state=JSON.parse(await readFile(mr.routerStateStore().file,'utf8'))
+          const state=await mr.routerStateStore().read()
           return JSON.stringify({runs:state.runs,budgetReservations:state.budgetReservations,archivedSpending:state.archivedSpending})
         }
         const before=await source()
@@ -83,9 +90,12 @@ export async function apply(ctx,config) {
         checks.push('Live SDK reconciliation denies another Bot; interrupted in-flight receipt/hold stays unknown without release')
         checks.push('A receipt committed before Task completion restores the original attempt/operation to success, without model dispatch or another invoice')
         checks.push('Observation keys are durable and idempotent; verified completion unblocks its Bot while the other Bot stays blocked')
-        return Response.json({status:'passed',checks,backendCalls,observationCalls,ledgerChangedByReconciliation:false,actualModelCalls:0})
+        checks.push('Fresh host uses the existing SQLite ledger authority and original monetary records; JSON remains a blocked migration marker')
+        return Response.json({status:'passed',checks,backendCalls,observationCalls,ledgerChangedByReconciliation:false,financialAuthority:finance.status(),actualModelCalls:0})
       }
       assert.equal(action,'probe')
+      await assert.rejects(createRouterState({file:legacyFile}).saveHealth({tools:[]}),e=>e.code==='ROUTER_STATE_UNSUPPORTED')
+      checks.push('Actual MR runtime uses one SQLite money/hold authority; an original JSON writer refuses the migration marker')
       const runsBeforeBudget=JSON.stringify((await mr.routerStateStore().read()).runs)
       const budgetWait=await call(main,'bot_task_start',{backend:'mr-api-budget',requestKey:'budget-wait',input:{task:'integration:budget-wait'}})
       await settle(b,budgetWait,'waiting-budget')
@@ -138,8 +148,8 @@ export async function apply(ctx,config) {
       assert.equal(service.get(a,{taskId:recovery.taskId}).state,'running')
       checks.push('Persisted running Task is left for an actual owned-host process interruption')
       checks.push('A second Bot has a real nonzero fixture receipt durably saved while Task completion is deliberately held for the same hard crash')
-      return Response.json({status:'passed',checks,recoveryTaskId:recovery.taskId,operationId:recovery.operationId,committedTaskId:committed.taskId,backendCalls,actualModelCalls:0,
-        limitations:['Fixed read-only API backend in isolated strict profile; default product migration still open','Legacy MR remains the money writer; Task database stores references and proof hashes, not costs','No DAG, unified SQLite money migration, native CLI, remote agent, OS worker or manual unknown-receipt resolution UI']})
+      return Response.json({status:'passed',checks,recoveryTaskId:recovery.taskId,operationId:recovery.operationId,committedTaskId:committed.taskId,backendCalls,financialAuthority:finance.status(),actualModelCalls:0,
+        limitations:['Fixed read-only API backend in isolated strict profile; default product migration still open','MR budget algorithms use one SQLite ledger/hold authority; Task initial admission and funding are not yet one transaction','No front-channel Bot/auxiliary accounting, full DAG, native CLI, remote agent, OS worker or manual unknown-receipt resolution UI']})
     }catch(error){return Response.json({status:'failed',checks,error:error.stack,actualModelCalls:0})}
   }}),'integration: managed Task verification route')
 }

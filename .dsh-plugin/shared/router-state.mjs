@@ -151,6 +151,17 @@ export function inspectRouterState(value) {
   return sanitize(structuredClone(value),Number.MAX_SAFE_INTEGER)
 }
 
+export const initialRouterState = () => emptyState()
+export const prepareRouterState = (value,maxRuns=MAX_RUNS) => sanitize(structuredClone(value),Number.isInteger(maxRuns)&&maxRuns>0?Math.min(maxRuns,MAX_RUNS):MAX_RUNS)
+
+/** Migration uses the same lock as every legacy writer, including stale-owner rules. */
+export async function withRouterStateLock(file,operation,{staleMs=LOCK_STALE_MS,timeoutMs=LOCK_TIMEOUT_MS}={}) {
+  if(![staleMs,timeoutMs].every(value=>Number.isFinite(value)&&value>=1&&value<=3_600_000))throw new RangeError('Invalid lock timing')
+  await mkdir(dirname(file),{recursive:true})
+  const release=await acquireLock(`${file}.lock`,{now:Date.now,timeoutMs,staleMs})
+  try{return await operation()}finally{await release()}
+}
+
 function sanitizeTerminalSessions(value) {
   return Array.isArray(value)
     ? value.filter(item => item && typeof item.id === 'string' && typeof item.target === 'string' && Number.isFinite(item.startedAt)).slice(-MAX_TERMINAL_SESSIONS)
@@ -345,14 +356,20 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
     }
     return structuredClone(state)
   }
+  return createRouterStateAPI({file,read,update,now})
+}
+
+/** Business operations shared by the JSON and transactional SQLite drivers. */
+export function createRouterStateAPI({file,read,update,now=Date.now}) {
+  const pure=change=>update(change,{retrySafe:true})
   return {
     file,
     read,
     update,
-    completeOnboarding: at => update(current => { current.onboarding.completedAt = at; return current.onboarding }),
-    saveHealth: report => update(current => { current.health = report; return report }),
+    completeOnboarding: at => pure(current => { current.onboarding.completedAt = at; return current.onboarding }),
+    saveHealth: report => pure(current => { current.health = report; return report }),
     /** Subscription exhaustion snapshot (`createQuotaTracker().snapshot()`). */
-    saveQuota: (snapshot, { removed = [] } = {}) => update(current => {
+    saveQuota: (snapshot, { removed = [] } = {}) => pure(current => {
       // Merge: keep other processes' unexpired entries, apply this process's marks and clears.
       const at = now()
       const merged = Object.fromEntries(Object.entries(current.quota ?? {}).filter(([, entry]) => Number.isFinite(entry?.until) && entry.until > at))
@@ -362,17 +379,17 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
       return current.quota
     }),
     /** A CLI failed authentication while running on its subscription (null clears it). */
-    saveAuthFailure: (toolId, entry) => update(current => {
+    saveAuthFailure: (toolId, entry) => pure(current => {
       if (entry) current.authFailures[toolId] = { at: entry.at, detail: String(entry.detail ?? '').slice(0, 200) }
       else delete current.authFailures[toolId]
       return current.authFailures
     }),
-    appendTerminalSession: record => update(current => {
+    appendTerminalSession: record => pure(current => {
       const entry = terminalSessionRecord(record)
       current.terminalSessions = [...(current.terminalSessions ?? []), entry]
       return entry
     }),
-    appendRun: run => update(current => { current.runs.push(run); return run }),
+    appendRun: run => pure(current => { current.runs.push(run); return run }),
     updateRun: (id, change) => update(async current => {
       const run = current.runs.find(item => item.id === id)
       if (!run) throw new Error(`未找到运行记录 ${id}`)
@@ -380,6 +397,6 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
       return structuredClone(run)
     }),
     /** Remove one notice (for example after the user read the corrupt-file warning). */
-    dismissNotice: at => update(current => { current.notices = current.notices.filter(item => item.at !== at); return current.notices }),
+    dismissNotice: at => pure(current => { current.notices = current.notices.filter(item => item.at !== at); return current.notices }),
   }
 }

@@ -150,6 +150,7 @@
     "integration:inventory": "node scripts/integration-inventory.mjs",
     "integration:probe-combined": "node scripts/integration-combined-host.mjs",
     "integration:probe-linux-isolation": "node scripts/integration-linux-isolation.mjs",
+    "integration:probe-finance": "node scripts/integration-finance-probe.mjs",
     "integration:probe-tasks": "node scripts/integration-task-probe.mjs",
     "integration:probe-codex-profile": "node scripts/integration-codex-profile.mjs"
   },

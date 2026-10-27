@@ -132,6 +132,9 @@ function processAlive(pid) {
 export function createBudgetReservations({ state, now = Date.now, pid = process.pid, isProcessAlive = processAlive,
   maxReservations = MAX_EXECUTION_RESERVATIONS } = {}) {
   if (!state || typeof state.update !== 'function' || typeof state.read !== 'function') throw new TypeError('需要持久状态存储。')
+  // These callbacks mutate candidate state only. CAS storage may recompute them
+  // against a newer revision; no provider dispatch occurs inside a callback.
+  const update=change=>state.update(change,{retrySafe:true})
   if (!Number.isSafeInteger(pid) || pid < 1) throw new TypeError('需要有效的执行进程 ID。')
   if (!Number.isInteger(maxReservations) || maxReservations < 1 || maxReservations > MAX_EXECUTION_RESERVATIONS) throw new RangeError('执行预占数量上限无效。')
   const snapshot = async () => reservationSpending(await state.read())
@@ -140,7 +143,7 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
     const ownerToken = options.ownerToken ?? randomUUID()
     if (!identifier(ownerToken)) throw new TypeError('需要有效的执行所有权标记。')
     const packages = normalizedEstimates(options.packageEstimates, run)
-    return state.update(current => {
+    return update(current => {
       const checks = currentBudget(current, now(), packages, options)
       if (current.historyIncomplete && checks.budget.apiExposure) return { accepted: false, reason: 'history-incomplete', ...checks }
       current.budgetReservations ??= {}
@@ -161,7 +164,7 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
     const run = checkedRun(nextRun, reservationId)
     const budgetRun = affordabilityRun === undefined ? run : checkedRun(affordabilityRun, reservationId)
     if (![completedIds, startedIds].every(ids => Array.isArray(ids) && ids.every(identifier))) throw new TypeError('检查点工作包 ID 无效。')
-    return state.update(current => {
+    return update(current => {
       const entry = ownedReservation(current, reservationId, ownerToken)
       const completed = new Set([...entry.completedIds, ...completedIds])
       const started = new Set(startedIds)
@@ -195,7 +198,7 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
   }
   const resizeExecution = options => {
     const packages = normalizedEstimates(options.packageEstimates)
-    return state.update(current => {
+    return update(current => {
       const entry = ownedReservation(current, options.reservationId, options.ownerToken)
       const checks = currentBudget(current, now(), packages, options, entry.id)
       if (current.historyIncomplete && checks.budget.apiExposure) return { accepted: false, reason: 'history-incomplete', ...checks }
@@ -218,7 +221,7 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
   }
   const finishExecution = ({ reservationId, ownerToken, run: nextRun }) => {
     const run = checkedRun(nextRun, reservationId)
-    return state.update(current => {
+    return update(current => {
       ownedReservation(current, reservationId, ownerToken)
       upsertRun(current, run)
       delete current.budgetReservations[reservationId]
@@ -252,14 +255,14 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
   }
   const interruptExecution = ({ reservationId, ownerToken, run: nextRun }) => {
     const run = checkedRun(nextRun, reservationId)
-    return state.update(current => {
+    return update(current => {
       const entry = ownedReservation(current, reservationId, ownerToken)
       markInterrupted(current, entry, run, now())
       upsertRun(current, run)
       return { reservationId, run, ...reservationSpending(current) }
     })
   }
-  const recoverInterruptedExecutions = () => state.update(async current => {
+  const recoverInterruptedExecutions = () => update(async current => {
     const recovered = []
     for (const entry of Object.values(current.budgetReservations ?? {})) {
       if (entry.status !== 'active' || await isProcessAlive(entry.ownerPid) !== false) continue

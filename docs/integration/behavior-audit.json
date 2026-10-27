@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedOn": "2026-10-27",
-  "coverageMeaning": "Thirteen partial entry observations; lifecycle, Task and receipt evidence do not accept a whole F group or product",
+  "coverageMeaning": "Fourteen partial entry observations; controlled SQLite money authority does not accept whole-product migration or budget scope",
   "evidence": [
     "docs/integration/evidence/20261027_m0_combined_host.json",
     "docs/integration/evidence/20261027_m0_remote_platforms.json",
@@ -10,7 +10,8 @@
     "docs/integration/evidence/20261027_m0_legacy_policy.json",
     "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
     "docs/integration/evidence/20261027_m0_managed_tasks.json",
-    "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+    "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+    "docs/integration/evidence/20261027_m0_sqlite_finance.json"
   ],
   "entries": [
     {
@@ -514,6 +515,85 @@
         "Pre-marker old tasks cannot fabricate evidence; target revision/configuration migration and rollback UI remain open",
         "Fixed read-only API backend only; no CLI private bootstrap, native/remote process tree, actual DSH OS worker or product remote agent",
         "Trusted source file is not tamper-proof against arbitrary local code; ordinary PTC partial file boundary and Win11 ACL blocker remain"
+      ]
+    },
+    {
+      "id": "E14",
+      "featureIds": [
+        "F34",
+        "F35",
+        "F36",
+        "F39"
+      ],
+      "entry": "SQLite MR state driver, normalized run/hold/archive CAS, JSON cutover marker and latest-data rollback",
+      "contract": "One active money writer per epoch; old JSON writers refuse version4; pure callbacks re-evaluate only before approval, no model dispatch inside CAS; unknown holds and committed receipts survive process crashes.",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/index.mjs",
+          "gitBlob": "be2f802624687dbe59a76c529474fb9a5bd91f52"
+        },
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/shared/budget-reservations.mjs",
+          "gitBlob": "6b12b50b009ad3ad73f4d515fe3a75454d468ccd"
+        },
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/shared/router-state.mjs",
+          "gitBlob": "ab4077a3e5835893b90711833afc1b6fe24f38d6"
+        },
+        {
+          "repository": "integration",
+          "path": ".github/workflows/ci.yml",
+          "gitBlob": "67b3d447ec9f0b70c6f55297902d181a066e942d"
+        },
+        {
+          "repository": "integration",
+          "path": "package.json",
+          "gitBlob": "68ee335479ea3ed300ba4688aadf687a540fef5f"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/mr-read-backend.mjs",
+          "gitBlob": "6b284574e2815c27ffcdde9120e0a0a4b397bbce"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/sqlite-router-state.mjs",
+          "gitBlob": "6453003e2d1736ee789f28e9b84d6fc8294246c0"
+        },
+        {
+          "repository": "integration",
+          "path": "scripts/integration-combined-host.mjs",
+          "gitBlob": "c05a93a5108076867d85c79f0ab0627500646153"
+        },
+        {
+          "repository": "integration",
+          "path": "scripts/integration-finance-probe.mjs",
+          "gitBlob": "0fd2b064dc82d72d9da955d2609b7f6014345f24"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/fixtures/integration-combined/tasks-plugin.mjs",
+          "gitBlob": "f7bc685583b8ee36293c80e8ab549939e06a4aad"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/sqlite-router-state.native.mjs",
+          "gitBlob": "88b26f7b8c0025c50f1ee61ca7435f9dff00b333"
+        }
+      ],
+      "observed": "Three machines: 19 native finance checks, 26 Task checks and 1311 root cases; actual strict MR runtime/restart uses SQLite money authority, with repeated observation leaving financial records unchanged.",
+      "level": "strict isolated host / native SQLite / offline model",
+      "remaining": [
+        "Isolated controlled homes only; default user profile migration and migration/rollback UI are not implemented",
+        "MR run/hold/archive money authority is SQLite; front-channel Bot and auxiliary inference budgets remain open",
+        "Initial Task/outbox and funding admission are not yet one transaction; per-source receipt protocol, full DAG/approval/artifact acceptance remain open",
+        "Migration requires old execution quiescence; no safe takeover of arbitrary live legacy/native work is claimed",
+        "Whole Bot/group/memory/session migration, complete Task export and rollback UI are incomplete",
+        "CLI private bootstrap, real process-tree cancellation, product remote agent, OS worker, Electron ABI and physical power-loss tests remain open",
+        "Trusted store does not resist arbitrary local code; existing PTC partial file isolation and Win11 ACL blocker remain"
       ]
     }
   ]

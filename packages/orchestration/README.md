@@ -97,3 +97,18 @@ blocked; revocation rejects late observations. Schema2 preserves schema1 task
 identities and refuses future versions. Actual budget refusals become
 `waiting-budget`, with explicit retry/cancel and the original deadline.
 See [receipt reconciliation contract](../../docs/integration/20261027_receipt_reconciliation.md).
+
+## SQLite MR money authority
+
+The strict `--tasks` composition now installs `sqlite-router-state.mjs` as the
+single MR ledger/hold writer. Normalized run/hold tables and archived metadata
+commit under one revision; only explicitly pure callbacks recompute on CAS
+conflicts. The original budget and archival algorithms are shared with JSON.
+Cutover preserves a byte-verified backup and leaves a version4 marker that old
+writers refuse. Rollback exports the latest receipts, blocks unsettled holds and
+active tasks, and invalidates the old epoch. Migration/rollback interruption
+requires matching evidence, never an empty-state fallback.
+This supersedes the earlier JSON-authority checkpoint for this isolated profile.
+Front-channel Bot/auxiliary admission, complete Task/funding atomic admission,
+per-source receipts and default product migration remain open. See
+[money cutover, rollback and reproduction](../../docs/integration/20261027_sqlite_finance.md).

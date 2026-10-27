@@ -58,6 +58,12 @@ export async function observeMrTask(file,context,signal) {
   finally{await handle?.close()}
 }
 
+export async function observeMrTaskStore(store,context,signal) {
+  if(store.kind!=='sqlite-router-state')return observeMrTask(store.file,context,signal)
+  try{signal?.throwIfAborted();const state=await store.read();signal?.throwIfAborted();return inspectMrTaskEvidence(state,context)}
+  catch(e){if(signal?.aborted)throw signal.reason;return unknown('LEDGER_UNREADABLE')}
+}
+
 /** Host-configured API-only adapter; no executable, route or workspace comes from Task input. */
 export function createMrReadBackend({ctx,mr,model,workspace,machineId,workspaceId,pricing,dailyBudgetUsd=1}) {
   model=JSON.parse(canonicalTaskJson(model));pricing=JSON.parse(canonicalTaskJson(pricing))
@@ -93,11 +99,11 @@ export function createMrReadBackend({ctx,mr,model,workspace,machineId,workspaceI
         }
         if(value.paused)return {outcome:'waiting-budget',summary:{code:'MR_WAITING_BUDGET',notStarted:true}}
         const task={taskId:binding.taskId,attemptId:binding.attemptId,operationId,input:{targetHash}}
-        const verdict=value.stored===false?unknown('MR_SAVE_UNCONFIRMED'):await observeMrTask(mr.routerStateStore().file,{task,reference,model,pricing})
+        const verdict=value.stored===false?unknown('MR_SAVE_UNCONFIRMED'):await observeMrTaskStore(mr.routerStateStore(),{task,reference,model,pricing})
         return {outcome:verdict.outcome,...(reference?{legacyRunId:reference.runId}:{}),summary:{code:verdict.reason}}
       }catch(error){return {outcome:reference?'unknown':signal.aborted?'cancelled':'failed',...(reference?{legacyRunId:reference.runId}:{}),summary:{code:reference?'MR_OUTCOME_UNCONFIRMED':'MR_NOT_ADMITTED'}}}
     },
-    reconcile:({task,reference,signal})=>observeMrTask(mr.routerStateStore().file,{task,reference,model,pricing},signal),
+    reconcile:({task,reference,signal})=>observeMrTaskStore(mr.routerStateStore(),{task,reference,model,pricing},signal),
   }
   return Object.freeze(backend)
 }

@@ -86,7 +86,8 @@
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
       ],
       "steps": [
         {
@@ -503,7 +504,8 @@
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
       ]
     },
     {
@@ -517,7 +519,8 @@
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
       ]
     },
     {
@@ -536,7 +539,8 @@
         "docs/integration/evidence/20261026_m0_sqlite.json",
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
       ]
     }
   ],
@@ -631,12 +635,13 @@
       "status": "partial",
       "evidence": [
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
-      "notes": "Two hard-crash windows verified: in-flight work preserves unknown hold; committed nonzero fixture receipt before Task completion settles original operation without replay or another ledger write. Full crash matrix, real vendor/artifact and product recovery UI remain open."
+      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
+      "notes": "Strict MR runtime keeps SQLite ledger/holds across hard host exit; original receipt reconciliation does not reexecute. WAL and migration/rollback process-exit windows verified; complete vendor/artifact/physical-power-loss matrix remains open."
     },
     {
       "id": "T14",
@@ -774,12 +779,13 @@
       "id": "T38",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
-      "notes": "Actual MR budget refusal creates waiting-budget with zero model dispatch/run/receipt writes; explicit retry/cancel and original deadline tested. Unified SQLite atomic admission, Bot/auxiliary calls and concurrent product budget UI remain unimplemented."
+      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
+      "notes": "Original budget algorithms now atomically commit normalized SQLite run/hold/archive revisions; two connections and two actual child processes cannot consume the same balance. Front-channel Bot/auxiliary and initial Task/funding transaction/UI remain open."
     },
     {
       "id": "T39",
@@ -790,12 +796,13 @@
       "id": "T40",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
-      "notes": "Original nonzero MR receipt is read without mutation; repeated observations are durable/idempotent, cancelled/failed evidence retained and no extra model/invoice occurs. Unified Bot/CLI/review receipt migration and vendor reconciliation remain open."
+      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
+      "notes": "Nonzero receipts, known/unknown holds, API money and subscription archive/unknown-token dimensions survive cutover, retention and latest-data rollback. Duplicate settlement does not double count; complete per-source Bot/CLI receipts remain open."
     },
     {
       "id": "T41",
@@ -834,13 +841,25 @@
     },
     {
       "id": "T48",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
+      "notes": "MR API history, archive dimensions, unknown quantities, quota/auth metadata and held run IDs preserve across controlled SQLite migration. Bot/group/memory/session and entire product import are not migrated."
     },
     {
       "id": "T49",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
+      "notes": "Raw backup, old-writer marker refusal, CAS conflicts, forward-schema refusal and five real migration/rollback exit stages preserve current data; rollback exports latest MR receipts. Complete Task export/profile/rollback UI and live-legacy takeover remain unverified."
     },
     {
       "id": "T50",

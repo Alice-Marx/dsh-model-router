@@ -2,6 +2,8 @@
 
 接续 `610940c` 的单包只读 Task 基础。本阶段接通原 MR 入场前关联、实际 API backend、预算等待和只读收据核对。冻结 DS 与 SDK 源码不改，默认用户 profile 不启用这些实验模块。真实模型调用仍只允许 GPT；本阶段测试全部使用离线适配器。
 
+本页记录a6df6cb检查点的JSON权威边界；后续严格profile已切到[SQLite资金权威](20261027_sqlite_finance.md)，仍不等于全部产品预算接入。
+
 ## 入场前关联与执行前检查
 
 MR 的 `beginExecutionLifecycle` 增加仅供可信宿主调用的 `managedExecution` 接缝，原工具/RPC wire 参数不接受这个对象或回调。实际执行器和原记录重跑均传递这条接缝；没有启用接缝的旧执行保持原协议。

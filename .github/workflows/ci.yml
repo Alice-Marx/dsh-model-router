@@ -112,5 +112,7 @@ jobs:
         run: node scripts/integration-sqlite-probe.mjs
       - name: Verify durable task ownership, retries and runner fencing
         run: node scripts/integration-task-probe.mjs
+      - name: Verify SQLite money authority, concurrent budgets and cutover rollback recovery
+        run: node scripts/integration-finance-probe.mjs
       - name: Verify real MR managed execution, cancellation and host interruption
         run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --tasks
