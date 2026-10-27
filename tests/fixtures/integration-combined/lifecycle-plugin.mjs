@@ -20,7 +20,7 @@ export async function apply(ctx,config) {
   const rt=createRuntime(ctx,{updateCheck:false})
   ctx.provide('integrationLifecycle',Object.freeze({rt,authority,directory,policy}))
   const lifecycle=attachDsLifecycle({runtime:rt,directory,
-    grantFor:bot=>({tools:['tool/model_router_routes','command/router',...(config.enableTasks?['task/submit','task/read','task/cancel','task/retry','task/execute','execution/mr-api','execution/mr-retry']:[])],modelRoutes:bot.model==='integration-gpt-fixture/gpt-fixture'?[{provider:'integration-gpt-fixture',model:'gpt-fixture'}]:[]}),
+    grantFor:bot=>({tools:['tool/model_router_routes','command/router',...(config.enableTasks?['task/submit','task/read','task/cancel','task/retry','task/reconcile','task/execute','execution/mr-api','execution/mr-retry','execution/mr-observe']:[])],modelRoutes:bot.model==='integration-gpt-fixture/gpt-fixture'?[{provider:'integration-gpt-fixture',model:'gpt-fixture'}]:[]}),
     onBind:(agent,grant)=>{
       const scoped=agent.ctx.get('tools')
       let key,release=()=>{}

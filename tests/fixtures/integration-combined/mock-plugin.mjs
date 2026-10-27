@@ -10,7 +10,7 @@ export function apply(ctx) {
   const calls = []
   let taskFailures=0
   const taskWaits={entered:0,cleaned:0}
-  ctx.provide('integrationOfflineDiagnostics',Object.freeze({taskWaits}))
+  ctx.provide('integrationOfflineDiagnostics',Object.freeze({taskWaits,calls}))
   const toolResults = []
   class OfflineAdapter extends LlmAdapter {
     providerInfo(id) { return { id, name: 'Offline integration fixture' } }
@@ -26,7 +26,10 @@ export function apply(ctx) {
       calls.push({ sessionId: options.sessionId ?? null, provider: options.provider, model: options.model,
         agentLoop: isAgentLoopRequest(options), tools: options.tools?.map(tool => tool.name) ?? [],
         marker: /integration:[a-z-]+/.exec(userText)?.[0] ?? null })
-      if(!isAgentLoopRequest(options)&&userText.includes('integration:task-failure')&&taskFailures++===0)throw new Error('Offline task fixture first-attempt failure')
+      if(!isAgentLoopRequest(options)&&userText.includes('integration:task-failure')&&taskFailures++===0){
+        yield {type:'usage',usage:{inputTokens:11,outputTokens:0}}
+        throw new Error('Offline task fixture first-attempt failure after a reported receipt')
+      }
       if(!isAgentLoopRequest(options)&&userText.includes('integration:task-wait')){
         taskWaits.entered++
         yield {type:'usage',usage:{inputTokens:11,outputTokens:0}}

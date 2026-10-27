@@ -85,7 +85,8 @@
         "docs/integration/evidence/20261027_security_project_checks.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
-        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
       ],
       "steps": [
         {
@@ -501,7 +502,8 @@
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
-        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
       ]
     },
     {
@@ -514,7 +516,8 @@
         "docs/integration/evidence/20261027_m0_security.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
-        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
       ]
     },
     {
@@ -532,7 +535,8 @@
       "evidence": [
         "docs/integration/evidence/20261026_m0_sqlite.json",
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
-        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
       ]
     }
   ],
@@ -572,12 +576,13 @@
         "docs/integration/evidence/20261027_m0_security.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
-        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Isolated strict DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; native SQLite13.0.3, offline model",
-      "notes": "Stable-owner Task tools and recorded-run retry refuse cross-Bot/unknown ownership; fixed route/input persist across new attempt. Full default configuration, CLI and accounting remain incomplete."
+      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
+      "notes": "Pre-admission run/attempt/operation linkage and SDK owner-only read reconciliation verified; request metadata cannot provide result or proof. Default product/CLI/OS boundaries remain open."
     },
     {
       "id": "T06",
@@ -613,23 +618,25 @@
       "id": "T12",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Isolated strict DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; native SQLite13.0.3, offline model",
-      "notes": "Queued cancellation records skipped; actual read-only MR stream stays cancelling through cleanup. Native CLI/remote process tree, full DAG cancellation and uncertain-stop reconciliation remain unverified."
+      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
+      "notes": "Task cancellation waits for cleanup, request dispatch rechecks current running/fence/deadline; cancel intent survives crash/reconciliation. Full native/remote task-tree cancellation is unverified."
     },
     {
       "id": "T13",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_managed_tasks.json"
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
-      "environment": "Isolated strict DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; native SQLite13.0.3, offline model",
-      "notes": "Actual native child exit and hard-killed strict host retain operation identity and recover needs-reconciliation without replay. Full crash-point matrix, cost/artifact reconciliation and resolution UI remain unimplemented."
+      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
+      "notes": "Two hard-crash windows verified: in-flight work preserves unknown hold; committed nonzero fixture receipt before Task completion settles original operation without replay or another ledger write. Full crash matrix, real vendor/artifact and product recovery UI remain open."
     },
     {
       "id": "T14",
@@ -765,8 +772,14 @@
     },
     {
       "id": "T38",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
+      "notes": "Actual MR budget refusal creates waiting-budget with zero model dispatch/run/receipt writes; explicit retry/cancel and original deadline tested. Unified SQLite atomic admission, Bot/auxiliary calls and concurrent product budget UI remain unimplemented."
     },
     {
       "id": "T39",
@@ -775,8 +788,14 @@
     },
     {
       "id": "T40",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+      ],
+      "level": "integration",
+      "verifiedOn": "2026-10-27",
+      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
+      "notes": "Original nonzero MR receipt is read without mutation; repeated observations are durable/idempotent, cancelled/failed evidence retained and no extra model/invoice occurs. Unified Bot/CLI/review receipt migration and vendor reconciliation remain open."
     },
     {
       "id": "T41",

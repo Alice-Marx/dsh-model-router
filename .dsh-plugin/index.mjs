@@ -1038,6 +1038,7 @@ export async function executeConfiguredAssignment(ctx, task, config = {}, option
       confirmed: options.confirmOverBudget === true } })
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(),
     packageEstimates: packageEstimates(plan, taskText), settings: budgetSettings(config),
+    managedExecution: options.managedExecution,
     confirmOverBudget: options.confirmOverBudget === true,
     buildRun: ({ status, results }) => makeRecord({ status, packages: results }) })
   if (!lifecycle.accepted) return { plan, execution: null, paused: true, budget: pausedExecutionBudget(lifecycle) }
@@ -1298,6 +1299,7 @@ export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, pr
   }
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: buildRetry,
     packageEstimates: estimates.reservations,
+    managedExecution: options.managedExecution,
     settings: budgetSettings(config), confirmOverBudget })
   if (!lifecycle.accepted) return { paused: true, run, budget: pausedExecutionBudget(lifecycle) }
   let execution

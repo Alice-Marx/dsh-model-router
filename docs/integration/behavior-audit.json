@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedOn": "2026-10-27",
-  "coverageMeaning": "Twelve partial entry observations; isolated ownership/lifecycle/Task checks do not accept a whole F group or product",
+  "coverageMeaning": "Thirteen partial entry observations; lifecycle, Task and receipt evidence do not accept a whole F group or product",
   "evidence": [
     "docs/integration/evidence/20261027_m0_combined_host.json",
     "docs/integration/evidence/20261027_m0_remote_platforms.json",
@@ -9,7 +9,8 @@
     "docs/integration/evidence/20261027_m0_broker_bridge.json",
     "docs/integration/evidence/20261027_m0_legacy_policy.json",
     "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
-    "docs/integration/evidence/20261027_m0_managed_tasks.json"
+    "docs/integration/evidence/20261027_m0_managed_tasks.json",
+    "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
   ],
   "entries": [
     {
@@ -414,6 +415,105 @@
         "No reconciliation resolution API/UI; unresolved Bot cannot run more work",
         "No CLI private bootstrap, native/remote process-tree cancellation, actual DSH OS worker or product remote agent",
         "Previous ordinary PTC partial file boundary and Win11 ACL failure remain open"
+      ]
+    },
+    {
+      "id": "E13",
+      "featureIds": [
+        "F33",
+        "F34",
+        "F35",
+        "F39"
+      ],
+      "entry": "MR managed pre-admission callback, fixed API request fence, read-only receipt observation, budget waiting and schema2 journal",
+      "contract": "Live Bot owner, current attempt/operation/target marker, pre-admission durable linkage; observe only original terminal complete receipts; unknown holds never clear; money remains single-writer in the original ledger.",
+      "sources": [
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/index.mjs",
+          "gitBlob": "d9cc1333f123238a57be4c796f985779e342cbb8"
+        },
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/shared/execution-lifecycle.mjs",
+          "gitBlob": "37b3b17bd335ff3bdd84d897f52f0713e4d5c2da"
+        },
+        {
+          "repository": "integration",
+          "path": ".dsh-plugin/shared/router-state.mjs",
+          "gitBlob": "8450c929a5506cda4220fddc0f56c20ad476814f"
+        },
+        {
+          "repository": "integration",
+          "path": "package.json",
+          "gitBlob": "90eccf64146e7d161db0d01c0932c5b185e71432"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/mr-read-backend.mjs",
+          "gitBlob": "90f047da19058c6b06613dc5dc7243c03597ca96"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-contract.mjs",
+          "gitBlob": "0d1f925294756c670b13589c1015383856c3ca06"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-journal.mjs",
+          "gitBlob": "cc664920c4fd8aead07c9c4a180812774baa23ef"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-service.mjs",
+          "gitBlob": "053eeab88fdfe290b16e6f83d00e299bd80bafe5"
+        },
+        {
+          "repository": "integration",
+          "path": "packages/orchestration/src/task-tools.mjs",
+          "gitBlob": "09508ae7ee2a9a1703f975f4559846ea36c9fe61"
+        },
+        {
+          "repository": "integration",
+          "path": "scripts/integration-combined-host.mjs",
+          "gitBlob": "c45fc357b2fe2715af6ca97d6e6163a906fd929b"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/fixtures/integration-combined/lifecycle-plugin.mjs",
+          "gitBlob": "b534b9b2701741eb85cc843e202888c360b41d2f"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/fixtures/integration-combined/mock-plugin.mjs",
+          "gitBlob": "6ab18075ebc61fb273cff15629d76364f8576819"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/fixtures/integration-combined/tasks-plugin.mjs",
+          "gitBlob": "222929a3d2e8b9f7f8a82cec433e130c24b386ae"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/task-journal.native.mjs",
+          "gitBlob": "d96c02ad647e8f298d18de3ede993935df2d977d"
+        },
+        {
+          "repository": "integration",
+          "path": "tests/task-reconciliation.test.mjs",
+          "gitBlob": "0f0dbcc83d05d2fc32b0e5b0ccca6a30d882a1a0"
+        }
+      ],
+      "observed": "Three machines: 9 new contracts and 26 native checks; actual SDK cross-owner observation refusal, budget wait with zero dispatch, two host hard-crash windows, terminal receipt resolution and unchanged monetary source.",
+      "level": "strict isolated host / native SQLite / offline nonzero-rate model fixture",
+      "remaining": [
+        "Opt-in strict fixture composition; no default product/data migration",
+        "Legacy MR remains sole money writer; no unified SQLite funds/reservation/receipt migration or cross-database atomic commit",
+        "Front-channel Bot and auxiliary LLM budget admission, full DAG/approval/artifact acceptance and missing-vendor-receipt resolution UI remain open",
+        "Budget waiting supports explicit retry/cancel; automatic waiting-state deadline closure and product UI remain open",
+        "Pre-marker old tasks cannot fabricate evidence; target revision/configuration migration and rollback UI remain open",
+        "Fixed read-only API backend only; no CLI private bootstrap, native/remote process tree, actual DSH OS worker or product remote agent",
+        "Trusted source file is not tamper-proof against arbitrary local code; ordinary PTC partial file boundary and Win11 ACL blocker remain"
       ]
     }
   ]

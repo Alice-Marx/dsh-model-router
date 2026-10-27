@@ -6,6 +6,7 @@ export function registerTaskTools(ctx,defineTool,{service,directory}) {
     ['bot_task_status',{taskId:text('Persisted Task ID')},'get'],
     ['bot_task_cancel',{taskId:text('Persisted Task ID')},'cancel'],
     ['bot_task_retry',{taskId:text('Persisted Task ID'),requestKey:text('Idempotency key')},'retry'],
+    ['bot_task_reconcile',{taskId:text('Persisted Task ID'),requestKey:text('Observation idempotency key')},'reconcile'],
   ]
   const releases=[]
   for(const [name,parameters,method] of commands)releases.push(ctx.tools.register(defineTool({

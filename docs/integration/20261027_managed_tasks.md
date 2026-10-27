@@ -2,6 +2,8 @@
 
 本阶段在隔离的严格 DS/MR 组合中接入可复用的 Task 合同、SQLite journal、runner 和 DSH 工具适配器。冻结 DS 和 SDK 源码没有改动。生产 profile 尚未迁移，默认旧 MR 工具行为没有扩大授权。完整范围仍以方案1.1为准。
 
+本页记录610940c时的阶段边界；后续新增入场前关联、schema2和只读核对接口，见[收据核对合同](20261027_receipt_reconciliation.md)。
+
 ## 调用和归属
 
 `bot_task_start/status/cancel/retry` 从 SDK 执行上下文中的真实 Agent 对象获取稳定 Bot 主体。请求不能携带执行者、模型、机器、工作区、命令或状态。start 只接受 `requestKey/backend/input`；retry 只接受 `taskId/requestKey`。backend 由可信宿主注册，固定版本、只读效果、机器/工作区、能力和准确 provider/model，并在提交、重跑及派发前核对。角色描述和模型输出不授予权限。

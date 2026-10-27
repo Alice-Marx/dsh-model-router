@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { PolicyError } from '../../capability-broker/src/authority.mjs'
-import { canonicalTaskJson, taskHash, taskRef, parseTaskSubmit, parseTaskReference, parseTaskRetry, parseLegacyTaskRetry } from './task-contract.mjs'
+import { canonicalTaskJson, taskHash, taskRef, parseTaskSubmit, parseTaskReference, parseTaskRetry, parseTaskReconcile, parseLegacyTaskRetry } from './task-contract.mjs'
 
 const fail=code=>{throw new PolicyError(code)}
 
@@ -11,12 +11,14 @@ export function createTaskService({journal,authority,directory,backends,within=(
   for(const backend of backends) {
     taskRef(backend.id);taskRef(backend.version);taskRef(backend.machineId);taskRef(backend.workspaceId)
     for(const key of ['capability','retryCapability'])if(typeof backend[key]!=='string'||!backend[key]||backend[key].length>256)fail('INVALID_TASK_BACKEND')
+    if((backend.reconcile!==undefined||backend.reconcileCapability!==undefined)&&(typeof backend.reconcile!=='function'||typeof backend.reconcileCapability!=='string'||!backend.reconcileCapability||backend.reconcileCapability.length>256))fail('INVALID_TASK_BACKEND')
     if(registry.has(backend.id)||backend.effect!=='read'||!['local','remote'].includes(backend.location)||typeof backend.parse!=='function'||typeof backend.run!=='function')fail('INVALID_TASK_BACKEND')
     registry.set(backend.id,backend)
   }
-  const target=backend=>({backend:backend.id,version:backend.version,effect:backend.effect,machineId:backend.machineId,workspaceId:backend.workspaceId,location:backend.location,capability:backend.capability,retryCapability:backend.retryCapability,model:backend.model??null})
+  const target=backend=>({backend:backend.id,version:backend.version,effect:backend.effect,machineId:backend.machineId,workspaceId:backend.workspaceId,location:backend.location,capability:backend.capability,retryCapability:backend.retryCapability,model:backend.model??null,...(backend.reconcileCapability?{reconcileCapability:backend.reconcileCapability}:{})})
   const owner=(subject,capability)=>{authority.assertTool(subject,capability);return authority.describe(subject).botId}
   const active=new Map()
+  const observations=new Map()
   let identity,heartbeat,stopped=false,pumping=false,scheduled=false,closing
   const writable=()=>{if(stopped||!identity)fail('TASK_RUNNER_UNAVAILABLE')}
   const admit=(subject,payload,retry=false)=>{
@@ -32,6 +34,7 @@ export function createTaskService({journal,authority,directory,backends,within=(
   const stopRunner=()=>{
     stopped=true;clearInterval(heartbeat)
     for(const entry of active.values())entry.controller.abort(new PolicyError('STALE_TASK_RUNNER'))
+    for(const entry of observations.values())entry.controller.abort(new PolicyError('STALE_TASK_RUNNER'))
   }
   const execute=async(subject,task,backend,controller)=>{
     const binding={taskId:task.taskId,attemptId:task.attemptId,machineId:task.input.target.machineId,workspaceId:task.input.target.workspaceId,location:task.input.target.location}
@@ -44,16 +47,20 @@ export function createTaskService({journal,authority,directory,backends,within=(
         input:JSON.parse(canonicalTaskJson(task.input.input)),signal,binding,attemptNumber:task.attemptNumber,
         previous:task.attemptNumber>1?journal.get(task.ownerBotId,task.taskId).attempts.at(-2):null,
         legacyRunIds:task.legacyRunIds,
+        operationId:task.operationId,targetHash:task.input.targetHash,
+        checkpoint:reference=>journal.linkExecution(identity,task.ownerBotId,task.taskId,task.attemptId,reference,now()),
+        beforeRequest:()=>journal.assertDispatch(identity,task.ownerBotId,task.taskId,task.attemptId,now()),
         })
         canonicalTaskJson(value)
         observedResult=value
         return value
       }),{signal:controller.signal})
-      if(!result||!['succeeded','failed','cancelled'].includes(result.outcome))fail('INVALID_TASK_BACKEND_RESULT')
+      if(!result||!['succeeded','failed','cancelled','unknown','waiting-budget'].includes(result.outcome))fail('INVALID_TASK_BACKEND_RESULT')
       canonicalTaskJson(result)
       outcome=result.outcome
     } catch(error) {
       outcome=controller.signal.aborted||['GRANT_CHANGED','SUBJECT_REVOKED','LEASE_EXPIRED','AUTHORITY_CLOSED'].includes(error.code)?'cancelled':'failed'
+      if(observedResult?.outcome==='unknown'||!observedResult&&journal.get(task.ownerBotId,task.taskId).executionRef)outcome='unknown'
       result={code:error instanceof PolicyError?error.code:'TASK_BACKEND_FAILED',
         ...(observedResult?.legacyRunId?{legacyRunId:observedResult.legacyRunId}:{}),
         ...(observedResult?.summary?{summary:observedResult.summary}:{})}
@@ -126,11 +133,39 @@ export function createTaskService({journal,authority,directory,backends,within=(
       const previous=journal.fromLegacy(id,parsed.runId)
       return service.retry(subject,{taskId:previous.taskId,requestKey:parsed.requestKey})
     },
+    async reconcile(subject,request) {
+      writable();const id=owner(subject,'task/reconcile'),parsed=parseTaskReconcile(request)
+      const hash=taskHash({kind:'reconcile',taskId:parsed.taskId})
+      const replay=journal.reconciliationReplay(identity,id,parsed.taskId,parsed.requestKey,hash,now())
+      if(replay)return replay
+      const task=journal.get(id,parsed.taskId),backend=registry.get(task.input.backend)
+      if(task.state!=='needs-reconciliation')fail('TASK_RECONCILE_NOT_ALLOWED')
+      if(!backend||taskHash(target(backend))!==task.input.targetHash||typeof backend.reconcile!=='function'||!backend.reconcileCapability)fail('TASK_RECONCILER_UNAVAILABLE')
+      authority.assertTool(subject,backend.reconcileCapability)
+      const existing=observations.get(task.taskId)
+      if(existing){if(existing.key!==parsed.requestKey)fail('TASK_RECONCILIATION_BUSY');return existing.work}
+      if(observations.size>=4)fail('TASK_RECONCILIATION_BUSY')
+      const controller=new AbortController()
+      const work=(async()=>{
+        const binding={taskId:task.taskId,attemptId:task.attemptId,machineId:task.input.target.machineId,workspaceId:task.input.target.workspaceId,location:task.input.target.location}
+        let lease
+        try{
+          lease=authority.issue(subject,{binding,tools:['task/reconcile',backend.reconcileCapability],ttlMs:5000})
+          const snapshot={taskId:task.taskId,attemptId:task.attemptId,operationId:task.operationId,input:{targetHash:task.input.targetHash}}
+          const verdict=await authority.run(lease.token,binding,backend.reconcileCapability,({signal})=>backend.reconcile({task:snapshot,reference:task.executionRef,signal}),{signal:controller.signal})
+          canonicalTaskJson(verdict)
+          return journal.reconcile(identity,id,task.taskId,task.attemptId,parsed.requestKey,hash,verdict,now())
+        }finally{if(lease)authority.release(lease.token);observations.delete(task.taskId)}
+      })()
+      observations.set(task.taskId,{key:parsed.requestKey,controller,work})
+      return work
+    },
     async close() {
       if(closing)return closing
       stopped=true;clearInterval(heartbeat)
       for(const entry of active.values())entry.controller.abort(new PolicyError('TASK_HOST_STOPPED'))
-      closing=(async()=>{await Promise.allSettled([...active.values()].map(entry=>entry.work));if(identity)journal.release(identity,now());journal.close()})()
+      for(const entry of observations.values())entry.controller.abort(new PolicyError('TASK_HOST_STOPPED'))
+      closing=(async()=>{await Promise.allSettled([...active.values(),...observations.values()].map(entry=>entry.work));if(identity)journal.release(identity,now());journal.close()})()
       return closing
     },
   })

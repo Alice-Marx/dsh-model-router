@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {join,dirname} from 'node:path'
-import {mkdir} from 'node:fs/promises'
+import {mkdir,readFile} from 'node:fs/promises'
 import {setTimeout as sleep} from 'node:timers/promises'
 import {defineTool} from '@deepseek-ai/dsh-tools'
 
@@ -12,39 +12,28 @@ export async function apply(ctx,config) {
   const {openTaskJournal}=await import(config.journalModule)
   const {createTaskService}=await import(config.serviceModule)
   const {registerTaskTools}=await import(config.toolsModule)
-  const {canonicalTaskJson}=await import(config.contractModule)
+  const {createMrReadBackend}=await import(config.backendModule)
   const {verifyTaskDriver}=await import(config.driverModule)
   const mr=await import(config.mrModule)
   const Database=await verifyTaskDriver(config.driver)
   await rt.load()
   const workspace=join(dirname(rt.dshHome),'managed-read-workspace');await mkdir(workspace,{recursive:true})
   const model={provider:'integration-gpt-fixture',model:'gpt-fixture'}
-  const settings={dynamicDataEnabled:false,reviewMode:'off',modelProfilesJson:JSON.stringify([{...model,quality:95,execution:'api',billing:'api-only',subscription:'none',pricing:{input:0,output:0}}])}
-  const parse=input=>{
-    const v=JSON.parse(canonicalTaskJson(input))
-    if(!v||Object.keys(v).length!==1||typeof v.task!=='string'||!v.task.trim()||v.task.length>2000)throw new Error('INVALID_TASK_INPUT')
-    return v
-  }
-  let backendCalls=0
+  let backendCalls=0,observationCalls=0,postReceiptReady=false
+  const baseBackend=createMrReadBackend({ctx,mr,model,workspace,machineId:'fixture-host',workspaceId:'managed-read',pricing:{input:1,output:2}})
+  const backend={...baseBackend,async run(args){
+    backendCalls++
+    const value=await baseBackend.run(args)
+    if(args.input.task==='integration:task-committed'){
+      assert.equal(value.outcome,'succeeded');postReceiptReady=true
+      await new Promise(resolve=>{if(args.signal.aborted)resolve();else args.signal.addEventListener('abort',resolve,{once:true})})
+    }
+    return value
+  },reconcile(args){observationCalls++;return baseBackend.reconcile(args)}}
+  const budgetBackend={...createMrReadBackend({ctx,mr,model,workspace,machineId:'fixture-host',workspaceId:'managed-read',pricing:{input:1,output:2},dailyBudgetUsd:0.000000001}),id:'mr-api-budget'}
   const service=createTaskService({journal:openTaskJournal(Database,join(rt.dshHome,'orchestration.sqlite')),authority,directory,runnerTtlMs:5000,taskTtlMs:60_000,
     within:(subject,signal,work)=>policy.executionContext(subject,signal,work),
-    backends:[{id:'mr-api',version:'v1',effect:'read',machineId:'fixture-host',workspaceId:'managed-read',location:'local',capability:'execution/mr-api',retryCapability:'execution/mr-retry',model,parse,
-      async run({input,signal,attemptNumber,legacyRunIds}){
-        backendCalls++
-        const options={...model,workspace,signal,billing:false,skipToolProbe:true,installedToolIds:[],runnableToolIds:[],skipOfficial:()=> 'offline task fixture'}
-        try{
-          let value
-          if(attemptNumber===1)value=await mr.executeConfiguredAssignment(ctx,input.task,settings,options)
-          else{
-            const run=(await mr.routerStateStore().read()).runs.find(row=>row.id===legacyRunIds.at(-1))
-            const target=run?.packages.find(row=>row.ok!==true)
-            if(!target)throw new Error('NO_RECORDED_FAILED_PACKAGE')
-            value=await mr.rerunRecordedStep(ctx,settings,{...options,runId:run.id,packageId:target.id})
-          }
-          const success=value.stored!==false&&!value.paused&&value.run?.packages.length>0&&value.run.packages.every(row=>row.ok===true)
-          return {outcome:signal.aborted?'cancelled':success?'succeeded':'failed',...(value.run?.id?{legacyRunId:value.run.id}:{}),summary:{stored:value.stored!==false,packages:value.run?.packages.length??0}}
-        }catch(error){return {outcome:signal.aborted?'cancelled':'failed',...(error.runId?{legacyRunId:error.runId}:{}),summary:{code:signal.aborted?'ABORTED':'MR_EXECUTION_FAILED'}}}
-      }}]})
+    backends:[backend,budgetBackend]})
   service.start()
   const releaseTools=registerTaskTools(ctx,defineTool,{service,directory})
   ctx.effect(()=>async()=>{releaseTools();await service.close()},'integration: managed Task runner')
@@ -57,7 +46,7 @@ export async function apply(ctx,config) {
   ctx.effect(()=>ctx.connection.fetch.register({path:'/api/integration-tasks',methods:['POST'],requestBody:'buffered',fetch:async request=>{
     const checks=[]
     try{
-      const {action,mainId,workerId,recoveryTaskId,operationId}=await request.json()
+      const {action,mainId,workerId,recoveryTaskId,operationId,committedTaskId}=await request.json()
       const main=await rt.resolveAgent(rt.chatOf(mainId)),worker=await rt.resolveAgent(rt.chatOf(workerId))
       const a=directory.forAgent(worker),b=directory.forAgent(main)
       const call=async(agent,name,args)=>{
@@ -70,11 +59,40 @@ export async function apply(ctx,config) {
         assert.throws(()=>service.retry(a,{taskId:task.taskId,requestKey:'unsafe-replay'}),/TASK_RECONCILIATION_REQUIRED/)
         assert.throws(()=>service.submit(a,{backend:'mr-api',requestKey:'after-unknown',input:{task:'integration:managed-next'}}),/TASK_RECONCILIATION_REQUIRED/)
         assert.equal(backendCalls,0)
+        assert.equal(task.executionRef.runId,task.legacyRunIds[0])
+        const source=async()=>{
+          const state=JSON.parse(await readFile(mr.routerStateStore().file,'utf8'))
+          return JSON.stringify({runs:state.runs,budgetReservations:state.budgetReservations,archivedSpending:state.archivedSpending})
+        }
+        const before=await source()
+        const denied=await ctx.tools.execute({agent:main,name:'bot_task_reconcile',arguments:{taskId:task.taskId,requestKey:'cross-owner'},callId:'deny-observe',signal:new AbortController().signal})
+        assert.equal(denied.isError,true);assert.match(JSON.stringify(denied),/TASK_NOT_FOUND/);assert.equal(observationCalls,0)
+        const pending=await call(worker,'bot_task_reconcile',{taskId:task.taskId,requestKey:'observe-unknown'})
+        assert.equal(pending.state,'needs-reconciliation');assert.equal(pending.reconciliation.evidence.reason,'RESERVATION_UNRECONCILED')
+        assert.equal((await call(worker,'bot_task_reconcile',{taskId:task.taskId,requestKey:'observe-unknown'})).replayed,true)
+        assert.equal(observationCalls,1)
+        const completed=service.get(b,{taskId:committedTaskId});assert.equal(completed.state,'needs-reconciliation')
+        const settled=await call(main,'bot_task_reconcile',{taskId:committedTaskId,requestKey:'observe-committed'})
+        assert.equal(settled.state,'succeeded');assert.equal(settled.operationId,completed.operationId);assert.equal(settled.attempts.length,1)
+        assert.equal((await call(main,'bot_task_reconcile',{taskId:committedTaskId,requestKey:'observe-committed'})).replayed,true)
+        assert.equal(observationCalls,2);assert.equal(backendCalls,0)
+        assert.equal(await source(),before)
+        const next=service.submit(b,{backend:'mr-api',requestKey:'after-reconciled',input:{task:'integration:new-task'}})
+        assert.equal(service.cancel(b,{taskId:next.taskId}).attempts[0].state,'skipped')
         checks.push('Fresh host restores stable Bot ownership, preserves interrupted operation and does not replay unknown work')
-        checks.push('Unknown outcome blocks owner retry/new execution until reconciliation; no fabricated completion')
-        return Response.json({status:'passed',checks,backendCalls,actualModelCalls:0})
+        checks.push('Live SDK reconciliation denies another Bot; interrupted in-flight receipt/hold stays unknown without release')
+        checks.push('A receipt committed before Task completion restores the original attempt/operation to success, without model dispatch or another invoice')
+        checks.push('Observation keys are durable and idempotent; verified completion unblocks its Bot while the other Bot stays blocked')
+        return Response.json({status:'passed',checks,backendCalls,observationCalls,ledgerChangedByReconciliation:false,actualModelCalls:0})
       }
       assert.equal(action,'probe')
+      const runsBeforeBudget=JSON.stringify((await mr.routerStateStore().read()).runs)
+      const budgetWait=await call(main,'bot_task_start',{backend:'mr-api-budget',requestKey:'budget-wait',input:{task:'integration:budget-wait'}})
+      await settle(b,budgetWait,'waiting-budget')
+      assert.equal(ctx.integrationOfflineDiagnostics.calls.filter(row=>row.marker==='integration:budget-wait').length,0)
+      assert.equal(JSON.stringify((await mr.routerStateStore().read()).runs),runsBeforeBudget)
+      assert.equal((await call(main,'bot_task_cancel',{taskId:budgetWait.taskId})).state,'cancelled')
+      checks.push('Actual MR budget refusal produces waiting-budget with zero model dispatch or run/receipt writes; the owner can cancel it')
       const requestOne={backend:'mr-api',requestKey:'first',input:{task:'integration:task-failure'}}
       const first=await call(worker,'bot_task_start',requestOne)
       const replay=await call(worker,'bot_task_start',requestOne)
@@ -112,12 +130,16 @@ export async function apply(ctx,config) {
       assert.equal(stopped.legacyRunIds.length,1)
       assert.equal(waits.cleaned,1)
       checks.push('Actual MR stream cancellation remains cancelling through cleanup; terminal state retains legacy receipt reference')
+      const committed=await call(main,'bot_task_start',{backend:'mr-api',requestKey:'committed',input:{task:'integration:task-committed'}})
+      await wait(()=>postReceiptReady)
+      assert.ok(service.get(b,{taskId:committed.taskId}).executionRef)
       const recovery=await call(worker,'bot_task_start',{backend:'mr-api',requestKey:'interrupt',input:{task:'integration:task-wait'}})
-      await wait(()=>backendCalls===4&&waits.entered===2)
+      await wait(()=>backendCalls===5&&waits.entered===2)
       assert.equal(service.get(a,{taskId:recovery.taskId}).state,'running')
       checks.push('Persisted running Task is left for an actual owned-host process interruption')
-      return Response.json({status:'passed',checks,recoveryTaskId:recovery.taskId,operationId:recovery.operationId,backendCalls,actualModelCalls:0,
-        limitations:['Fixed read-only API backend in isolated strict profile; default product migration still open','Legacy MR remains the money writer; Task database stores references, not costs','No DAG, approval/budget protocol, native CLI, remote agent, OS worker or reconciliation resolution UI']})
+      checks.push('A second Bot has a real nonzero fixture receipt durably saved while Task completion is deliberately held for the same hard crash')
+      return Response.json({status:'passed',checks,recoveryTaskId:recovery.taskId,operationId:recovery.operationId,committedTaskId:committed.taskId,backendCalls,actualModelCalls:0,
+        limitations:['Fixed read-only API backend in isolated strict profile; default product migration still open','Legacy MR remains the money writer; Task database stores references and proof hashes, not costs','No DAG, unified SQLite money migration, native CLI, remote agent, OS worker or manual unknown-receipt resolution UI']})
     }catch(error){return Response.json({status:'failed',checks,error:error.stack,actualModelCalls:0})}
   }}),'integration: managed Task verification route')
 }

@@ -77,7 +77,8 @@ provide closed commands, a native SQLite journal, one fenced bounded runner and
 SDK Agent-derived command ownership. They currently support one fixed read-only
 package per Task. Retry creates a new attempt/operation and retains the original
 deadline. Cancellation waits for backend quiescence. Restart marks interrupted
-operations unknown and refuses replay; no resolution API exists yet.
+operations unknown and refuses replay. The read-only reconciliation API described
+below can settle only a verified original execution record.
 
 The `--tasks` strict composition executes the actual MR API executor and recorded
 step rerun. Only journal-linked legacy runs can be retried by their owner. The
@@ -85,3 +86,14 @@ legacy MR ledger remains the money writer; this journal stores references and
 does not claim unified receipts, budgets or a cross-database atomic commit.
 This foundation is opt-in and does not open the old direct Bot execution tools.
 See [contract, reproduction and remaining limits](../../docs/integration/20261027_managed_tasks.md).
+
+`mr-read-backend.mjs` now owns the fixed API adapter. Before dispatch, the actual
+MR lifecycle durably links its run and stamps task/attempt/operation/target ids;
+each model request rechecks the current journal fence. `bot_task_reconcile`
+reads bounded original ledger snapshots and accepts only matching terminal
+receipts with no unresolved hold or amount. It does not dispatch, release holds,
+repair the source or create another invoice. A missing/unknown receipt remains
+blocked; revocation rejects late observations. Schema2 preserves schema1 task
+identities and refuses future versions. Actual budget refusals become
+`waiting-budget`, with explicit retry/cancel and the original deadline.
+See [receipt reconciliation contract](../../docs/integration/20261027_receipt_reconciliation.md).

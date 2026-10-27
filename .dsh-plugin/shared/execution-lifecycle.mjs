@@ -5,7 +5,9 @@ import { createBudgetReservations } from './budget-reservations.mjs'
 const receiptTimestamp = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
   && Number.isFinite(new Date(value).getTime())
 
-export async function beginExecutionLifecycle({ state, buildRun, packageEstimates, settings = {}, confirmOverBudget = false }) {
+export async function beginExecutionLifecycle({ state, buildRun, packageEstimates, settings = {}, confirmOverBudget = false, managedExecution }) {
+  // Host-only seam. Wire commands never accept this binding or callback.
+  const managed=prepareManagedExecution(managedExecution)
   const ownerToken = randomUUID()
   const manager = createBudgetReservations({ state })
   await manager.recoverInterruptedExecutions()
@@ -17,7 +19,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
       ...item, id, ok: false, notStarted: true, answer: '', channel: item.channel ?? null,
     })
     for (const [id, result] of results) if (!started.has(id)) receipts.push(result)
-    const run = buildRun({ status, results: receipts, workspace })
+    const run = managed.stamp(buildRun({ status, results: receipts, workspace }))
     if (status === 'running' || status === 'interrupted') {
       run.status = status
       if (status === 'running') run.finishedAt = null
@@ -32,6 +34,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     return run
   }
   const initial = current()
+  await managed.prepared(initial.id)
   const accepted = await manager.beginExecution({ run: initial, packageEstimates, ownerToken, ...settings, confirmOverBudget })
   if (!accepted.accepted) return accepted
   const identity = { reservationId: accepted.reservationId, ownerToken }
@@ -105,6 +108,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
       }
     },
     async saveRun(run, { completedIds = [], startedIds = [] } = {}) {
+      managed.stamp(run)
       const previousCompleted = new Set(completed), previousStarted = new Map(started)
       for (const id of completedIds) completed.add(id)
       for (const id of startedIds) if (!started.has(id)) started.set(id, { id })
@@ -129,15 +133,29 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     },
     async finish(run) {
       if (poisoned) throw poisoned
+      managed.stamp(run)
       const value = await required(() => manager.finishExecution({ ...identity, run: preserveReceiptTimes(run) }))
       closed = true
       return value
     },
     async interrupt(run) {
       if (closed) return
+      managed.stamp(run)
       // Keep the reservation when storage itself remains unavailable. It is
       // never safe to turn an unconfirmed paid receipt into free capacity.
       try { await manager.interruptExecution({ ...identity, run: preserveReceiptTimes(run) }) } catch { /* original hold stays durable */ }
     },
   }
+}
+
+export function prepareManagedExecution(value) {
+  if(value===undefined)return {stamp:run=>run,prepared:async()=>{}}
+  const binding=value?.binding
+  const keys=['taskId','attemptId','operationId','targetHash']
+  if(!binding||Object.keys(binding).length!==keys.length||keys.some(key=>typeof binding[key]!=='string')
+    ||keys.slice(0,3).some(key=>!/^[A-Za-z0-9_-]{1,128}$/.test(binding[key]))
+    ||!/^([a-f0-9]{64})$/.test(binding.targetHash)||typeof value.onPrepared!=='function')throw new Error('INVALID_MANAGED_EXECUTION')
+  const marker=Object.freeze({schemaVersion:1,...Object.fromEntries(keys.map(key=>[key,binding[key]]))})
+  const onPrepared=value.onPrepared
+  return {stamp:run=>{run.managedExecution={...marker};return run},prepared:runId=>onPrepared({kind:'mr-run',runId,marker:{...marker}})}
 }

@@ -55,6 +55,8 @@ export function parseTaskRetry(value) {
   const v = closed(value,['taskId','requestKey'])
   return {taskId:taskRef(v.taskId),requestKey:taskRef(v.requestKey)}
 }
+// Reconciliation accepts references only; outcome/evidence are supplied by the host observer.
+export const parseTaskReconcile = parseTaskRetry
 export function parseLegacyTaskRetry(value) {
   const v = closed(value,['runId','requestKey'])
   return {runId:taskRef(v.runId),requestKey:taskRef(v.requestKey)}

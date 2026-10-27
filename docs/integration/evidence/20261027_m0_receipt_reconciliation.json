@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "610940c6ed2156419570ae64cb7ede8bbac8bc16",
+  "level": "strict-isolated-receipt-reconciliation",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "d9cc1333f123238a57be4c796f985779e342cbb8",
+    ".dsh-plugin/shared/execution-lifecycle.mjs": "37b3b17bd335ff3bdd84d897f52f0713e4d5c2da",
+    ".dsh-plugin/shared/router-state.mjs": "8450c929a5506cda4220fddc0f56c20ad476814f",
+    "package.json": "90eccf64146e7d161db0d01c0932c5b185e71432",
+    "packages/orchestration/src/mr-read-backend.mjs": "90f047da19058c6b06613dc5dc7243c03597ca96",
+    "packages/orchestration/src/task-contract.mjs": "0d1f925294756c670b13589c1015383856c3ca06",
+    "packages/orchestration/src/task-journal.mjs": "cc664920c4fd8aead07c9c4a180812774baa23ef",
+    "packages/orchestration/src/task-service.mjs": "053eeab88fdfe290b16e6f83d00e299bd80bafe5",
+    "packages/orchestration/src/task-tools.mjs": "09508ae7ee2a9a1703f975f4559846ea36c9fe61",
+    "scripts/integration-combined-host.mjs": "c45fc357b2fe2715af6ca97d6e6163a906fd929b",
+    "tests/fixtures/integration-combined/lifecycle-plugin.mjs": "b534b9b2701741eb85cc843e202888c360b41d2f",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "6ab18075ebc61fb273cff15629d76364f8576819",
+    "tests/fixtures/integration-combined/tasks-plugin.mjs": "222929a3d2e8b9f7f8a82cec433e130c24b386ae",
+    "tests/task-journal.native.mjs": "d96c02ad647e8f298d18de3ede993935df2d977d",
+    "tests/task-reconciliation.test.mjs": "0f0dbcc83d05d2fc32b0e5b0ccca6a30d882a1a0"
+  },
+  "remoteFinalOverlaySha256": "7c84c78f989c37430aaa31f4d20cfedecc612a3b8b0d46ae675ac6e8294e47a0",
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "newChecks": {
+    "contract": 9,
+    "nativeAdded": 9,
+    "nativeTotal": 26
+  },
+  "engineeringChecks": {
+    "tests": 80,
+    "pass": 80,
+    "fail": 0,
+    "skipped": 0
+  },
+  "storageSchema": {
+    "version": 2,
+    "schema1TaskIdentityPreserved": true,
+    "futureVersionRefused": true
+  },
+  "moneyWriter": "Original MR JSON ledger only; SQLite stores execution references, observations and proof hashes, not duplicate costs",
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1311,
+        "pass": 1308,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "617e16c3c0f8454ada0681f617e1e9b8a6ea16bea281340326c3e8ec986c79d3",
+      "nativeTaskSuite": {
+        "status": "passed",
+        "driverVersion": "13.0.3",
+        "node": "v24.20.0",
+        "platform": "win32",
+        "tests": 26,
+        "pass": 26,
+        "fail": 0,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Single-package read-only task foundation; not complete Task DAG or money accounting",
+          "Fixture backends and intentional process exit; no native CLI or remote agent execution"
+        ]
+      },
+      "baselineChecks": 9,
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "managedTasks": {
+        "status": "passed",
+        "checks": [
+          "Actual MR budget refusal produces waiting-budget with zero model dispatch or run/receipt writes; the owner can cancel it",
+          "Actual SDK Task tools submit once; first real MR execution fails and persists an owner-linked legacy run",
+          "Cross-Bot task/cancel/legacy retry and unowned old-run adoption fail before MR entry; metadata cannot override route",
+          "Owner retry uses actual rerunRecordedStep, keeps target/input/package, adds linked attempt/operation and updates original MR run",
+          "Actual MR stream cancellation remains cancelling through cleanup; terminal state retains legacy receipt reference",
+          "Persisted running Task is left for an actual owned-host process interruption",
+          "A second Bot has a real nonzero fixture receipt durably saved while Task completion is deliberately held for the same hard crash"
+        ],
+        "recoveryTaskId": "task-55b89a4f-3e84-47eb-9762-22d0187307d8",
+        "operationId": "operation-34113d25-90d2-4d3d-998f-8328393b2f01",
+        "committedTaskId": "task-ecc6b859-4226-421a-be5d-e298d7584185",
+        "backendCalls": 5,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Fixed read-only API backend in isolated strict profile; default product migration still open",
+          "Legacy MR remains the money writer; Task database stores references and proof hashes, not costs",
+          "No DAG, unified SQLite money migration, native CLI, remote agent, OS worker or manual unknown-receipt resolution UI"
+        ]
+      },
+      "afterHardCrash": {
+        "status": "passed",
+        "checks": [
+          "Fresh host restores stable Bot ownership, preserves interrupted operation and does not replay unknown work",
+          "Live SDK reconciliation denies another Bot; interrupted in-flight receipt/hold stays unknown without release",
+          "A receipt committed before Task completion restores the original attempt/operation to success, without model dispatch or another invoice",
+          "Observation keys are durable and idempotent; verified completion unblocks its Bot while the other Bot stays blocked"
+        ],
+        "backendCalls": 0,
+        "observationCalls": 2,
+        "ledgerChangedByReconciliation": false,
+        "actualModelCalls": 0
+      },
+      "mockAdapterDispatchesBeforeRestart": 21,
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "ubuntu-test",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1311,
+        "pass": 1288,
+        "fail": 0,
+        "skipped": 23
+      },
+      "rootTestsSha256": "dd631e8dd3fb1994ae0032ded06b1949dbb1d0d48932ed04cbcaa09fe2e4a7c5",
+      "nativeTaskSuite": {
+        "status": "passed",
+        "driverVersion": "13.0.3",
+        "node": "v22.22.1",
+        "platform": "linux",
+        "tests": 26,
+        "pass": 26,
+        "fail": 0,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Single-package read-only task foundation; not complete Task DAG or money accounting",
+          "Fixture backends and intentional process exit; no native CLI or remote agent execution"
+        ]
+      },
+      "baselineChecks": 9,
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "managedTasks": {
+        "status": "passed",
+        "checks": [
+          "Actual MR budget refusal produces waiting-budget with zero model dispatch or run/receipt writes; the owner can cancel it",
+          "Actual SDK Task tools submit once; first real MR execution fails and persists an owner-linked legacy run",
+          "Cross-Bot task/cancel/legacy retry and unowned old-run adoption fail before MR entry; metadata cannot override route",
+          "Owner retry uses actual rerunRecordedStep, keeps target/input/package, adds linked attempt/operation and updates original MR run",
+          "Actual MR stream cancellation remains cancelling through cleanup; terminal state retains legacy receipt reference",
+          "Persisted running Task is left for an actual owned-host process interruption",
+          "A second Bot has a real nonzero fixture receipt durably saved while Task completion is deliberately held for the same hard crash"
+        ],
+        "recoveryTaskId": "task-fd0c5257-14a4-4121-9cd2-1aa8c8c6d841",
+        "operationId": "operation-b05728d1-69b5-4670-83c4-6eee4f165396",
+        "committedTaskId": "task-0c6cf035-6a01-4ada-9ec0-4623d0579a93",
+        "backendCalls": 5,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Fixed read-only API backend in isolated strict profile; default product migration still open",
+          "Legacy MR remains the money writer; Task database stores references and proof hashes, not costs",
+          "No DAG, unified SQLite money migration, native CLI, remote agent, OS worker or manual unknown-receipt resolution UI"
+        ]
+      },
+      "afterHardCrash": {
+        "status": "passed",
+        "checks": [
+          "Fresh host restores stable Bot ownership, preserves interrupted operation and does not replay unknown work",
+          "Live SDK reconciliation denies another Bot; interrupted in-flight receipt/hold stays unknown without release",
+          "A receipt committed before Task completion restores the original attempt/operation to success, without model dispatch or another invoice",
+          "Observation keys are durable and idempotent; verified completion unblocks its Bot while the other Bot stays blocked"
+        ],
+        "backendCalls": 0,
+        "observationCalls": 2,
+        "ledgerChangedByReconciliation": false,
+        "actualModelCalls": 0
+      },
+      "mockAdapterDispatchesBeforeRestart": 21,
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "win10-test",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "arch": "x64",
+      "strictFrozenInstall": "passed",
+      "clientCheck": "passed",
+      "rootTests": {
+        "tests": 1311,
+        "pass": 1308,
+        "fail": 0,
+        "skipped": 3
+      },
+      "rootTestsSha256": "3f3b1f4c675168be4418a8b39673ad9d6a7eaf26899562887e39fc30fab1bf3e",
+      "nativeTaskSuite": {
+        "status": "passed",
+        "driverVersion": "13.0.3",
+        "node": "v24.18.0",
+        "platform": "win32",
+        "tests": 26,
+        "pass": 26,
+        "fail": 0,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Single-package read-only task foundation; not complete Task DAG or money accounting",
+          "Fixture backends and intentional process exit; no native CLI or remote agent execution"
+        ]
+      },
+      "baselineChecks": 9,
+      "gateway": {
+        "status": "passed",
+        "checks": [
+          "Authenticated owner reaches an explicitly granted actual Gateway RPC",
+          "Authenticated owner cannot call an ungranted RPC",
+          "Missing browser authentication cannot acquire owner RPC authority"
+        ],
+        "actualModelCalls": 0
+      },
+      "lifecycle": {
+        "status": "passed-for-described-checks",
+        "checks": [
+          "Original Main and worker acquire exact grants automatically from committed DS ownership",
+          "Real DS createBot/save/resolve automatically binds a new Bot without manual directory calls",
+          "Real group-member Session inherits the same stable Bot subject from saved room ownership",
+          "Actual DS folder/part transition binds the fresh Agent and removes its archived predecessor",
+          "Real DS deletion revokes own/group identities while surviving Main and worker remain usable"
+        ],
+        "lifecycle": {
+          "healthy": true,
+          "closed": false,
+          "revision": 32,
+          "bots": 2,
+          "activeSessions": 2,
+          "boundAgents": 2
+        },
+        "actualModelCalls": 0,
+        "limitations": [
+          "Strict test composition only; no default user profile migration",
+          "Only exact fixture model and limited MR capabilities granted",
+          "No task ledger, CLI bootstrap or OS worker verified",
+          "Read-only/lock-takeover and every schedule/recovery interleaving remain open"
+        ]
+      },
+      "managedTasks": {
+        "status": "passed",
+        "checks": [
+          "Actual MR budget refusal produces waiting-budget with zero model dispatch or run/receipt writes; the owner can cancel it",
+          "Actual SDK Task tools submit once; first real MR execution fails and persists an owner-linked legacy run",
+          "Cross-Bot task/cancel/legacy retry and unowned old-run adoption fail before MR entry; metadata cannot override route",
+          "Owner retry uses actual rerunRecordedStep, keeps target/input/package, adds linked attempt/operation and updates original MR run",
+          "Actual MR stream cancellation remains cancelling through cleanup; terminal state retains legacy receipt reference",
+          "Persisted running Task is left for an actual owned-host process interruption",
+          "A second Bot has a real nonzero fixture receipt durably saved while Task completion is deliberately held for the same hard crash"
+        ],
+        "recoveryTaskId": "task-7f04358d-df70-44b6-a189-44fd90ac4b00",
+        "operationId": "operation-27067a0e-b132-465a-94e2-ec33a4bebe11",
+        "committedTaskId": "task-7164ff5b-cf5d-4877-bc3f-0f4e1e2cb599",
+        "backendCalls": 5,
+        "actualModelCalls": 0,
+        "limitations": [
+          "Fixed read-only API backend in isolated strict profile; default product migration still open",
+          "Legacy MR remains the money writer; Task database stores references and proof hashes, not costs",
+          "No DAG, unified SQLite money migration, native CLI, remote agent, OS worker or manual unknown-receipt resolution UI"
+        ]
+      },
+      "afterHardCrash": {
+        "status": "passed",
+        "checks": [
+          "Fresh host restores stable Bot ownership, preserves interrupted operation and does not replay unknown work",
+          "Live SDK reconciliation denies another Bot; interrupted in-flight receipt/hold stays unknown without release",
+          "A receipt committed before Task completion restores the original attempt/operation to success, without model dispatch or another invoice",
+          "Observation keys are durable and idempotent; verified completion unblocks its Bot while the other Bot stays blocked"
+        ],
+        "backendCalls": 0,
+        "observationCalls": 2,
+        "ledgerChangedByReconciliation": false,
+        "actualModelCalls": 0
+      },
+      "mockAdapterDispatchesBeforeRestart": 21,
+      "actualModelCalls": 0
+    }
+  ],
+  "observedFormatCorrections": [
+    "MR enriches frozen prices with currency/provider/model/source/version/asOf; numeric rates and route identity remain checked",
+    "API-only route reason may use fallback status without a route change; only reason-only metadata with the exact API route is recognized"
+  ],
+  "limitations": [
+    "Opt-in strict fixture composition; no default product/data migration",
+    "Legacy MR remains sole money writer; no unified SQLite funds/reservation/receipt migration or cross-database atomic commit",
+    "Front-channel Bot and auxiliary LLM budget admission, full DAG/approval/artifact acceptance and missing-vendor-receipt resolution UI remain open",
+    "Budget waiting supports explicit retry/cancel; automatic waiting-state deadline closure and product UI remain open",
+    "Pre-marker old tasks cannot fabricate evidence; target revision/configuration migration and rollback UI remain open",
+    "Fixed read-only API backend only; no CLI private bootstrap, native/remote process tree, actual DSH OS worker or product remote agent",
+    "Trusted source file is not tamper-proof against arbitrary local code; ordinary PTC partial file boundary and Win11 ACL blocker remain"
+  ]
+}

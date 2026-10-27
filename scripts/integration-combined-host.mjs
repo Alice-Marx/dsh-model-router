@@ -107,6 +107,7 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       driver:DEFAULT_TASK_DRIVER,driverModule:localModule('scripts/integration-task-probe.mjs'),
       journalModule:localModule('packages/orchestration/src/task-journal.mjs'),serviceModule:localModule('packages/orchestration/src/task-service.mjs'),
       toolsModule:localModule('packages/orchestration/src/task-tools.mjs'),contractModule:localModule('packages/orchestration/src/task-contract.mjs'),mrModule:localModule('.dsh-plugin/index.mjs'),
+      backendModule:localModule('packages/orchestration/src/mr-read-backend.mjs'),
     }}]})
   }
   await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(overlay, null, 2))
@@ -313,7 +314,7 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       assert.equal(summary.lifecycleAfterRestart.status, 'passed-for-described-checks', summary.lifecycleAfterRestart.error)
     }
     if(tasks){
-      summary.tasksAfterRestart=await request('integration-tasks',{action:'restored',mainId:main.id,workerId:worker.id,recoveryTaskId:summary.tasks.recoveryTaskId,operationId:summary.tasks.operationId})
+      summary.tasksAfterRestart=await request('integration-tasks',{action:'restored',mainId:main.id,workerId:worker.id,recoveryTaskId:summary.tasks.recoveryTaskId,operationId:summary.tasks.operationId,committedTaskId:summary.tasks.committedTaskId})
       await writeFile(join(run,'tasks-restored.json'),JSON.stringify(summary.tasksAfterRestart,null,2))
       assert.equal(summary.tasksAfterRestart.status,'passed',summary.tasksAfterRestart.error)
     }

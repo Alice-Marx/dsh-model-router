@@ -146,6 +146,11 @@ function sanitize(value, maxRuns) {
   }, maxRuns)
 }
 
+/** Inspect a snapshot without file recovery, writes or bounded-history eviction. */
+export function inspectRouterState(value) {
+  return sanitize(structuredClone(value),Number.MAX_SAFE_INTEGER)
+}
+
 function sanitizeTerminalSessions(value) {
   return Array.isArray(value)
     ? value.filter(item => item && typeof item.id === 'string' && typeof item.target === 'string' && Number.isFinite(item.startedAt)).slice(-MAX_TERMINAL_SESSIONS)

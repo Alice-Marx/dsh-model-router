@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { PolicyError } from '../../capability-broker/src/authority.mjs'
-import { canonicalTaskJson, taskRef } from './task-contract.mjs'
+import { canonicalTaskJson, taskRef, taskHash } from './task-contract.mjs'
 
 const fail = code => { throw new PolicyError(code) }
 const makeId = kind => `${kind}-${randomUUID()}`
-const terminalRetry = new Set(['failed','cancelled','blocked'])
+const terminalRetry = new Set(['failed','cancelled','blocked','waiting-budget'])
 
 /** SQLite journal for one-package managed tasks. Database is the verified native constructor. */
 export function openTaskJournal(Database, path) {
@@ -14,7 +14,7 @@ export function openTaskJournal(Database, path) {
     if(db.pragma('journal_mode = WAL',{simple:true})!=='wal')fail('TASK_WAL_REQUIRED')
     db.pragma('synchronous = FULL')
     const version = db.pragma('user_version',{simple:true})
-    if (![0,1].includes(version)) fail('TASK_SCHEMA_UNSUPPORTED')
+    if (![0,1,2].includes(version)) fail('TASK_SCHEMA_UNSUPPORTED')
     db.transaction(()=>{
       db.exec(`
         CREATE TABLE IF NOT EXISTS task_runner(scope TEXT PRIMARY KEY, owner TEXT NOT NULL, generation INTEGER NOT NULL, until_ms INTEGER NOT NULL);
@@ -25,9 +25,11 @@ export function openTaskJournal(Database, path) {
         CREATE TABLE IF NOT EXISTS task_outbox(operation_id TEXT PRIMARY KEY REFERENCES operations(id), delivered_ms INTEGER);
         CREATE TABLE IF NOT EXISTS task_commands(owner_bot TEXT NOT NULL, request_key TEXT NOT NULL, kind TEXT NOT NULL, request_hash TEXT NOT NULL, task_id TEXT NOT NULL REFERENCES tasks(id), attempt_id TEXT NOT NULL REFERENCES attempts(id), PRIMARY KEY(owner_bot,request_key));
         CREATE TABLE IF NOT EXISTS legacy_task_runs(run_id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), owner_bot TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS task_execution_refs(attempt_id TEXT PRIMARY KEY REFERENCES attempts(id), reference TEXT NOT NULL, reference_hash TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS task_reconciliations(id INTEGER PRIMARY KEY AUTOINCREMENT, attempt_id TEXT NOT NULL REFERENCES attempts(id), at_ms INTEGER NOT NULL, outcome TEXT NOT NULL, evidence TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS task_events(seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL REFERENCES tasks(id), attempt_id TEXT REFERENCES attempts(id), kind TEXT NOT NULL, at_ms INTEGER NOT NULL, detail TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS task_ready ON tasks(state,created_ms);
-        PRAGMA user_version = 1;
+        PRAGMA user_version = 2;
       `)
     }).immediate()
   } catch(error) { db.close();throw error }
@@ -52,6 +54,8 @@ export function openTaskJournal(Database, path) {
     return {taskId:task.id,ownerBotId:task.owner_bot,state:task.state,packageId:current.package_id,attemptId:current.id,operationId:current.operation_id,
       attemptNumber:current.number,deadlineAt:task.deadline_ms,createdAt:task.created_ms,updatedAt:task.updated_ms,
       input:JSON.parse(task.payload),result:current.result?JSON.parse(current.result):null,
+      executionRef:(()=>{const row=stmt('SELECT reference FROM task_execution_refs WHERE attempt_id=?').get(current.id);return row?JSON.parse(row.reference):null})(),
+      reconciliation:(()=>{const row=stmt('SELECT * FROM task_reconciliations WHERE attempt_id=? ORDER BY id DESC LIMIT 1').get(current.id);return row?{at:row.at_ms,outcome:row.outcome,evidence:JSON.parse(row.evidence)}:null})(),
       legacyRunIds:stmt('SELECT run_id FROM legacy_task_runs WHERE task_id=? ORDER BY rowid').all(id).map(row=>row.run_id),
       attempts:stmt('SELECT a.id,a.number,a.parent_id,a.state,a.started_ms,a.finished_ms,o.id AS operation_id FROM attempts a JOIN operations o ON o.attempt_id=a.id WHERE a.package_id=? ORDER BY a.number').all(current.package_id),
       ...(command?{replayed:true,acceptedAttemptId:command.attempt_id}:{replayed:false})}
@@ -102,7 +106,7 @@ export function openTaskJournal(Database, path) {
         fence(identity,now)
         const rows=stmt("SELECT t.id AS task_id,a.*,p.id AS package_id,o.id AS operation_id FROM tasks t JOIN packages p ON p.task_id=t.id JOIN attempts a ON a.id=p.current_attempt JOIN operations o ON o.attempt_id=a.id WHERE o.state IN ('running','cancelling') AND (o.generation IS NULL OR o.generation<>?)").all(identity.generation)
         for(const row of rows) {
-          updateAll(row.task_id,row,'needs-reconciliation',now,{code:'HOST_INTERRUPTED',outcome:'unknown'})
+          updateAll(row.task_id,row,'needs-reconciliation',now,{code:'HOST_INTERRUPTED',outcome:'unknown',cancelRequested:row.state==='cancelling'})
           event(row.task_id,row.id,'interrupted',now,{previousGeneration:row.generation,operationId:row.operation_id})
         }
         return rows.length
@@ -114,7 +118,7 @@ export function openTaskJournal(Database, path) {
         const old=replay(owner,key,'submit',hash)
         if(old)return view(owner,old.task_id,old)
         if(stmt("SELECT 1 FROM tasks WHERE owner_bot=? AND state='needs-reconciliation'").get(owner))fail('TASK_RECONCILIATION_REQUIRED')
-        if(stmt("SELECT COUNT(*) AS n FROM tasks WHERE state IN ('ready','running','cancelling')").get().n>=128)fail('TASK_QUEUE_LIMIT')
+        if(stmt("SELECT COUNT(*) AS n FROM tasks WHERE state IN ('ready','running','cancelling','waiting-budget')").get().n>=128)fail('TASK_QUEUE_LIMIT')
         if(!Number.isSafeInteger(deadline)||deadline<=now||deadline-now>300_000)fail('INVALID_TASK_DEADLINE')
         const taskId=makeId('task'),packageId=makeId('package')
         stmt('INSERT INTO tasks VALUES(?,?,?,?,?,?,?)').run(taskId,owner,canonicalTaskJson(payload),'ready',deadline,now,now)
@@ -132,6 +136,13 @@ export function openTaskJournal(Database, path) {
     },
     ready() { return stmt("SELECT id,owner_bot,payload,deadline_ms FROM tasks WHERE state='ready' ORDER BY created_ms,id LIMIT 128").all().map(row=>({...row,payload:JSON.parse(row.payload)})) },
     ownerBlocked(owner) {return !!stmt("SELECT 1 FROM tasks WHERE owner_bot=? AND state='needs-reconciliation'").get(taskRef(owner))},
+    assertDispatch(identity,owner,id,attemptId,now) {
+      return transact(()=>{
+        fence(identity,now);const task=owned(owner,id),current=latest(id)
+        if(current.id!==attemptId||current.generation!==identity.generation||task.state!=='running')fail('STALE_TASK_ATTEMPT')
+        if(task.deadline_ms<=now)fail('TASK_DEADLINE')
+      })
+    },
     claim(identity,owner,id,now) {
       return transact(()=>{
         fence(identity,now);const task=owned(owner,id),current=latest(id)
@@ -164,6 +175,10 @@ export function openTaskJournal(Database, path) {
           stmt('UPDATE tasks SET updated_ms=? WHERE id=?').run(now,id)
           event(id,current.id,'cancel-requested',now)
         }
+        else if(task.state==='waiting-budget'){
+          updateAll(id,current,'cancelled',now,{code:'BUDGET_WAIT_CANCELLED',notStarted:true})
+          event(id,current.id,'cancelled-while-waiting-budget',now)
+        }
         return view(owner,id)
       })
     },
@@ -171,14 +186,62 @@ export function openTaskJournal(Database, path) {
       return transact(()=>{
         fence(identity,now);const task=owned(owner,id),current=latest(id)
         if(current.id!==attemptId||current.generation!==identity.generation||!['running','cancelling'].includes(task.state))fail('STALE_TASK_ATTEMPT')
-        if(!['succeeded','failed','cancelled'].includes(outcome))fail('INVALID_TASK_OUTCOME')
-        const final=task.state==='cancelling'?'cancelled':outcome
+        if(!['succeeded','failed','cancelled','unknown','waiting-budget'].includes(outcome))fail('INVALID_TASK_OUTCOME')
+        const final=outcome==='unknown'?'needs-reconciliation':task.state==='cancelling'?'cancelled':outcome
         if(result?.legacyRunId) {
           const runId=taskRef(result.legacyRunId),old=stmt('SELECT * FROM legacy_task_runs WHERE run_id=?').get(runId)
           if(old&&(old.task_id!==id||old.owner_bot!==owner))fail('LEGACY_RUN_OWNER_CONFLICT')
           stmt('INSERT OR IGNORE INTO legacy_task_runs VALUES(?,?,?)').run(runId,id,owner)
         }
-        updateAll(id,current,final,now,result);event(id,current.id,'settled',now,{outcome:final})
+        updateAll(id,current,final,now,{...result,...(outcome==='unknown'?{cancelRequested:task.state==='cancelling'}:{})});event(id,current.id,'settled',now,{outcome:final})
+        return view(owner,id)
+      })
+    },
+    linkExecution(identity,owner,id,attemptId,reference,now) {
+      return transact(()=>{
+        fence(identity,now);const task=owned(owner,id),current=latest(id)
+        if(current.id!==attemptId||current.generation!==identity.generation||!['running','cancelling'].includes(task.state))fail('STALE_TASK_ATTEMPT')
+        const marker=reference?.marker,payload=JSON.parse(task.payload)
+        if(reference?.kind!=='mr-run'||marker?.schemaVersion!==1||marker.taskId!==id||marker.attemptId!==attemptId||marker.operationId!==current.operation_id||marker.targetHash!==payload.targetHash)fail('INVALID_TASK_EXECUTION_REFERENCE')
+        const runId=taskRef(reference.runId),hash=taskHash(reference)
+        const old=stmt('SELECT * FROM task_execution_refs WHERE attempt_id=?').get(attemptId)
+        if(old&&old.reference_hash!==hash)fail('TASK_EXECUTION_REFERENCE_CONFLICT')
+        const link=stmt('SELECT * FROM legacy_task_runs WHERE run_id=?').get(runId)
+        if(link&&(link.task_id!==id||link.owner_bot!==owner))fail('LEGACY_RUN_OWNER_CONFLICT')
+        if(!old){
+          stmt('INSERT INTO task_execution_refs VALUES(?,?,?)').run(attemptId,canonicalTaskJson(reference),hash)
+          stmt('INSERT OR IGNORE INTO legacy_task_runs VALUES(?,?,?)').run(runId,id,owner)
+          event(id,attemptId,'execution-linked-before-admission',now,{runId,referenceHash:hash})
+        }
+        return view(owner,id)
+      })
+    },
+    reconciliationReplay(identity,owner,id,key,hash,now) {
+      fence(identity,now);owned(owner,id)
+      const old=replay(owner,key,'reconcile',hash)
+      if(old)return view(owner,old.task_id,old)
+      const current=latest(id)
+      if(stmt('SELECT COUNT(*) AS n FROM task_reconciliations WHERE attempt_id=? AND at_ms>?').get(current.id,now-60_000).n>=64)fail('TASK_RECONCILIATION_RATE_LIMIT')
+      return null
+    },
+    reconcile(identity,owner,id,attemptId,key,hash,verdict,now) {
+      return transact(()=>{
+        fence(identity,now);const task=owned(owner,id),old=replay(owner,key,'reconcile',hash)
+        if(old)return view(owner,old.task_id,old)
+        const current=latest(id)
+        if(current.id!==attemptId||task.state!=='needs-reconciliation')fail('TASK_RECONCILE_NOT_ALLOWED')
+        if(!['unknown','succeeded','failed','cancelled'].includes(verdict?.outcome))fail('INVALID_TASK_RECONCILIATION')
+        if(stmt('SELECT COUNT(*) AS n FROM task_reconciliations WHERE attempt_id=? AND at_ms>?').get(current.id,now-60_000).n>=64)fail('TASK_RECONCILIATION_RATE_LIMIT')
+        const ref=stmt('SELECT reference_hash FROM task_execution_refs WHERE attempt_id=?').get(attemptId)
+        if(verdict.outcome!=='unknown'&&(!ref||ref.reference_hash!==verdict.referenceHash||!/^[a-f0-9]{64}$/.test(verdict.evidenceHash??'')))fail('INVALID_TASK_RECONCILIATION_PROOF')
+        canonicalTaskJson(verdict)
+        if(verdict.outcome!=='unknown'){
+          const cancelled=JSON.parse(current.result??'{}').cancelRequested===true
+          updateAll(id,current,cancelled?'cancelled':verdict.outcome,now,{code:'RECONCILED_FROM_EXECUTION_RECORD',evidenceHash:verdict.evidenceHash})
+        }
+        stmt('INSERT INTO task_reconciliations(attempt_id,at_ms,outcome,evidence) VALUES(?,?,?,?)').run(attemptId,now,verdict.outcome,canonicalTaskJson(verdict))
+        stmt('INSERT INTO task_commands VALUES(?,?,?,?,?,?)').run(owner,key,'reconcile',hash,id,attemptId)
+        event(id,attemptId,'reconciled',now,verdict)
         return view(owner,id)
       })
     },
@@ -189,7 +252,7 @@ export function openTaskJournal(Database, path) {
         if(old)return view(owner,old.task_id,old)
         if(!terminalRetry.has(task.state))fail(task.state==='needs-reconciliation'?'TASK_RECONCILIATION_REQUIRED':'TASK_RETRY_NOT_ALLOWED')
         if(stmt("SELECT 1 FROM tasks WHERE owner_bot=? AND state='needs-reconciliation'").get(owner))fail('TASK_RECONCILIATION_REQUIRED')
-        if(stmt("SELECT COUNT(*) AS n FROM tasks WHERE state IN ('ready','running','cancelling')").get().n>=128)fail('TASK_QUEUE_LIMIT')
+        if(stmt("SELECT COUNT(*) AS n FROM tasks WHERE state IN ('ready','running','cancelling','waiting-budget') AND id<>?").get(id).n>=128)fail('TASK_QUEUE_LIMIT')
         if(task.deadline_ms<=now)fail('TASK_DEADLINE')
         const previous=latest(id)
         if(previous.number>=3)fail('TASK_RETRY_LIMIT')
