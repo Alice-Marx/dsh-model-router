@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E114 T17 授权撤销与配置变化验收闭合
+
+[E114](evidence/20261101_grant_revocation_acceptance.json) 复验 **49/49**：旧 grant/审批/预览不能启动新动作；在途请求取消或保持 unknown，迟到成功不能越权；只允许显式新授权的只读对账。机器 revision CAS 与 roots-generation 变化 fail-closed，主体身份不能冒充。T17 以 integration 级别 passed，正式为 **0/20、10/63、M0 11/12**。无产品代码变化，最近全量根回归为 E113 的 1961 项、0 失败，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E114.md](HANDOFF-20261101-E114.md)。
+
 ## 2026-11-01：E113 T16 凭据失败与诊断脱敏闭合
 
 [E113](evidence/20261101_machine_secret_redaction.json) 修复真实泄漏：`resolveSecret` 抛出含端点/token 的错误时，`openRemoteMachines` 原样外传，可能进入模型消息。现统一为 `MACHINE_SECRET_UNAVAILABLE`，配对/吊销共用脱敏读取。新增测试断言零工具动作、零 operation，错误文本/公开投影/SQLite 均无 token；既有 401、审计脱敏与 host-only secret UI 证据覆盖其余判据。相关组合 **36/36**；完整两阶段根回归 **1961 项：1876 通过、0 失败、83 跳过**，`check:client` OK。T16 以 integration 级别 passed，正式为 **0/20、9/63、M0 11/12**。未推送/发布，当前交接为 [HANDOFF-20261101-E113.md](HANDOFF-20261101-E113.md)。

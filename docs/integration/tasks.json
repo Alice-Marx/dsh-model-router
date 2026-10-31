@@ -1531,7 +1531,7 @@
     },
     {
       "id": "T17",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_remote_agent.json",
         "docs/integration/evidence/20261027_m4_product_machines.json",
@@ -1539,10 +1539,11 @@
         "docs/integration/evidence/20261028_auth_rotation_body_race.json",
         "docs/integration/evidence/20261029_agent_controller_ownership.json",
         "docs/integration/evidence/20261030_workspace_admission_mount.json",
-        "docs/integration/evidence/20261030_windows_job_creation.json"
+        "docs/integration/evidence/20261030_windows_job_creation.json",
+        "docs/integration/evidence/20261101_grant_revocation_acceptance.json"
       ],
-      "notes": "Active grant revocation stops owned subprocesses and cross-owner access is denied at the agent. Product-level grant/approval/preview invalidation and in-flight cancel evidence remain open. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E43 closes the header/body rotation race: old client rows cannot issue/revoke newer grants, paused old requests fail after rotation, revoked tickets cannot list capabilities, and clock rollback keeps cooling finite. New10-check auth suite plus full1446/three-machine native44/defaultHost36 pass. A previous-code negative witness has exactly four expected failures. E57: old stale-PID double-start reproduced on all3OS; fixed native ownership9/9 each, kernel lifetime semaphore and identity-safe close preserve live tickets and original operations. Six simultaneous starters yield one owner; SIGKILL releases ownership. Root1696/0fail and actual Linux container24 pass. Actual root admission/pinning, complete command Task facade and mixed-version installer coordination remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E59: deterministic old suspended-child orphan reproduced and cleaned; actual Windows Job atomic creation/creator death/Unicode suite11 passes on both Windows. The separate CLI native-peer supervisor still needs its analogous creation-death fix; no account/AppContainer acceptance.",
-      "verifiedOn": "2026-10-30",
+      "notes": "Revoked grants, stale approvals and outdated machine/workspace revisions cannot admit new actions. In-flight requests abort or remain unknown rather than accepting late success; status-only observation is allowed only with an explicit new grant. Workspace roots-generation changes fence unsettled writes without blocking reads or impersonating a subject. Current revalidation passes 49/49 across capability authority, remote machines/auth, remote write and workspace generation. T17 criteria are covered without claiming every external launcher or deployment boundary.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
     },
