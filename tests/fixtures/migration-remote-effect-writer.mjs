@@ -13,7 +13,7 @@ import { createTaskService } from '../../packages/orchestration/src/task-service
 import { createRemoteWriteBackend } from '../../packages/orchestration/src/remote-execution.mjs'
 const { TOOL_NAMES } = await import('../../remote-computer-agent/dist/index.mjs')
 
-const [dir, readyFile] = process.argv.slice(2)
+const [dir, readyFile, attachFile] = process.argv.slice(2)
 const owner = { kind: 'owner' }
 const all = ['task/submit', 'task/execute', 'task/read', 'task/cancel', 'task/retry', 'task/reconcile', ...TOOL_NAMES.map(tool => `remote/${tool}`)]
 async function wait(check) {
@@ -29,8 +29,8 @@ async function main() {
   const project = join(dir, 'project')
   await mkdir(project, { recursive: true })
   const agentFixture = fileURLToPath(new URL('./migration-remote-effect-agent.mjs', import.meta.url))
-  spawn(process.execPath, [agentFixture, dir, join(dir, 'agent-ready.json')], { cwd: dir, stdio: 'ignore', windowsHide: true })
-  const pair = await wait(() => readFile(join(dir, 'agent-ready.json'), 'utf8').then(value => JSON.parse(value)).catch(() => null))
+  if (!attachFile) spawn(process.execPath, [agentFixture, dir, join(dir, 'agent-ready.json')], { cwd: dir, stdio: 'ignore', windowsHide: true })
+  const pair = await wait(() => readFile(attachFile ?? join(dir, 'agent-ready.json'), 'utf8').then(value => JSON.parse(value)).catch(() => null))
   const authority = createAuthority()
   const directory = createPrincipalDirectory(authority)
   directory.register('bot-a', { tools: all, modelRoutes: [] })

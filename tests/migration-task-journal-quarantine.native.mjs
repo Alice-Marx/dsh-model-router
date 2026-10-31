@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -32,9 +33,18 @@ async function wait(fn, ms = 12000) {
   }
   throw new Error('Owned Task journal fixture did not reach the expected state')
 }
-const outbox = file => {
-  const db = new Database(file, { readonly: true })
+async function outbox(dir) {
+  const scratch = await mkdtemp(join(dir, 'store-'))
+  for (const name of ['journal.sqlite', 'journal.sqlite-wal']) {
+    try { await copyFile(join(dir, name), join(scratch, name)) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
+  const db = new Database(join(scratch, 'journal.sqlite'))
   try { return db.prepare('SELECT count(*) AS n FROM task_outbox').get().n } finally { db.close() }
+}
+async function journalFingerprint(dir) {
+  const names = (await readdir(dir)).filter(name => name.startsWith('journal.sqlite')).sort(), hash = createHash('sha256')
+  for (const name of names) hash.update(name).update('\0').update(await readFile(join(dir, name))).update('\0')
+  return { names, sha256: hash.digest('hex') }
 }
 
 test('migration Task journal quarantine: non-Windows platforms are explicitly unsupported', { skip: enabled }, async () => {
@@ -42,16 +52,17 @@ test('migration Task journal quarantine: non-Windows platforms are explicitly un
 })
 
 real('migration Task journal quarantine: real plans and outbox keep committing under a pending gate until the Job closes them', async t => {
-  const { runner } = await compiled(), dir = await mkdtemp(join(parent, 'case-')), ready = join(dir, 'ready.json'), file = join(dir, 'journal.sqlite')
+  const { runner } = await compiled(), dir = await mkdtemp(join(parent, 'case-')), ready = join(dir, 'ready.json')
   await writeFile(join(dir, 'migration-gate.json'), JSON.stringify({ schemaVersion: 1, kind: 'profile-migration-gate', phase: 'maintenance' }))
   const handle = await launch({ runner, executable: process.execPath, args: [writer, dir, ready], cwd: dir, operationId: 'op-task-journal' })
   t.after(async () => { if (!handle.snapshot().wrapperClosed) await handle.stop().catch(() => {}) })
   await wait(() => json(ready))
-  await wait(async () => (await outbox(file)) > 1)
+  await wait(async () => (await outbox(dir)) > 1)
   const result = await handle.stop()
   assert.equal(result.treeStopped, true)
   assert.equal(result.stopWriteProvable, false)
-  const stopped = await outbox(file)
+  const stopped = await outbox(dir), stoppedFiles = await journalFingerprint(dir)
   await sleep(500)
-  assert.equal(await outbox(file), stopped, 'no new Task, operation or outbox row is committed after the journal closes')
+  assert.equal(await outbox(dir), stopped, 'no new Task, operation or outbox row is committed after the journal closes')
+  assert.deepEqual(await journalFingerprint(dir), stoppedFiles, 'no journal, WAL or shm byte changes after the journal closes')
 })

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -41,8 +41,12 @@ const rows = db => ({
   attempts: db.prepare('SELECT count(*) AS n FROM attempts').get().n,
   events: db.prepare('SELECT coalesce(max(seq),0) AS n FROM task_events').get().n,
 })
-async function snapshot(file) {
-  const db = new Database(file, { readonly: true })
+async function snapshot(dir) {
+  const scratch = await mkdtemp(join(dir, 'store-'))
+  for (const name of ['journal.sqlite', 'journal.sqlite-wal']) {
+    try { await copyFile(join(dir, name), join(scratch, name)) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
+  const db = new Database(join(scratch, 'journal.sqlite'))
   try {
     return { ...rows(db), states: db.prepare('SELECT a.id,a.state,a.result,a.finished_ms,o.state AS operation,o.finished_ms AS operation_finished FROM attempts a JOIN operations o ON o.attempt_id=a.id ORDER BY a.id').all() }
   } finally { db.close() }
@@ -65,13 +69,15 @@ real('migration in-flight Task quarantine: executing attempts keep committing, t
   const handle = await launch({ runner, executable: process.execPath, args: [writer, dir, ready], cwd: dir, operationId: 'op-task-inflight' })
   t.after(async () => { if (!handle.snapshot().wrapperClosed) await handle.stop().catch(() => {}) })
   const started = await wait(() => readJson(ready))
-  const first = await wait(async () => { const current = await snapshot(file); return current.outbox >= 1 ? current : null })
-  const grown = await wait(async () => { const current = await snapshot(file); return current.attempts >= first.attempts + 3 && current.outbox >= first.outbox + 3 && current.events > first.events ? current : null }, 12000)
+  const first = await wait(async () => { const current = await snapshot(dir); return current.outbox >= 1 ? current : null })
+  const grown = await wait(async () => { const current = await snapshot(dir); return current.attempts >= first.attempts + 3 && current.outbox >= first.outbox + 3 && current.events > first.events ? current : null }, 12000)
   assert.equal(await readJson(join(dir, 'writer-error.json')), null, 'the fixture commits without a journal error')
   assert.equal(grown.states.find(row => row.id === started.attemptId).state, 'running', 'the rows grow while the subject attempt is still executing')
   const beatTick = (await readJson(beat)).tick
   t.diagnostic(`under a pending gate: attempts ${first.attempts}->${grown.attempts}, outbox ${first.outbox}->${grown.outbox}, task_events max seq ${first.events}->${grown.events}`)
 
+  const pinned = observer(file)
+  t.after(() => pinned.close())
   const result = await handle.stop()
   assert.equal(result.treeStopped, true)
   assert.equal(result.stopEvidence, 'windows-job-close')
@@ -81,7 +87,7 @@ real('migration in-flight Task quarantine: executing attempts keep committing, t
   await wait(() => dead(started.pid))
   assert.equal(dead(started.pid), true, 'the executing writer process is gone, observed through the OS')
 
-  const stopped = await snapshot(file)
+  const stopped = await snapshot(dir)
   const subject = stopped.states.find(row => row.id === started.attemptId)
   assert.equal(subject.state, 'running')
   assert.equal(subject.result, null)
@@ -91,8 +97,6 @@ real('migration in-flight Task quarantine: executing attempts keep committing, t
   for (const terminal of ['succeeded', 'failed', 'cancelled']) assert.notEqual(subject.state, terminal, `the stop is never read from a ${terminal} row`)
   assert.ok(stopped.attempts > first.attempts, 'the stopped rows are the rows that were growing')
 
-  const pinned = observer(file)
-  t.after(() => pinned.close())
   const before = pinned.read(), beatBefore = await readJson(beat), beatStat = await stat(beat)
   assert.ok(before.attempts >= stopped.attempts)
   await sleep(500)

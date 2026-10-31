@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -32,12 +33,21 @@ async function wait(fn, ms = 12000) {
   }
   throw new Error('Owned SQLite fixture did not reach the expected state')
 }
-function revision(file) {
-  const db = new Database(file, { readonly: true })
+async function snapshot(dir) {
+  const scratch = await mkdtemp(join(dir, 'store-'))
+  for (const name of ['orchestration.sqlite', 'orchestration.sqlite-wal']) {
+    try { await copyFile(join(dir, name), join(scratch, name)) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
+  const db = new Database(join(scratch, 'orchestration.sqlite'))
   try {
     const row = db.prepare('SELECT revision,payload FROM router_meta WHERE singleton=1').get()
     return { revision: row.revision, syntheticTick: JSON.parse(row.payload).health?.syntheticTick ?? 0 }
   } finally { db.close() }
+}
+async function storeFingerprint(dir) {
+  const names = (await readdir(dir)).filter(name => name.startsWith('orchestration.sqlite')).sort(), hash = createHash('sha256')
+  for (const name of names) hash.update(name).update('\0').update(await readFile(join(dir, name))).update('\0')
+  return { names, sha256: hash.digest('hex') }
 }
 
 test('migration SQLite quarantine: non-Windows platforms are explicitly unsupported', { skip: enabled }, async () => {
@@ -45,16 +55,17 @@ test('migration SQLite quarantine: non-Windows platforms are explicitly unsuppor
 })
 
 real('migration SQLite quarantine: the real WAL writer keeps committing under a pending gate until the Job closes it', async t => {
-  const { runner } = await compiled(), dir = await mkdtemp(join(parent, 'case-')), ready = join(dir, 'ready.json'), file = join(dir, 'orchestration.sqlite')
+  const { runner } = await compiled(), dir = await mkdtemp(join(parent, 'case-')), ready = join(dir, 'ready.json')
   await writeFile(join(dir, 'migration-gate.json'), JSON.stringify({ schemaVersion: 1, kind: 'profile-migration-gate', phase: 'maintenance' }))
   const handle = await launch({ runner, executable: process.execPath, args: [writer, dir, ready], cwd: dir, operationId: 'op-sqlite-writer' })
   t.after(async () => { if (!handle.snapshot().wrapperClosed) await handle.stop().catch(() => {}) })
   const observed = await wait(() => json(ready))
-  await wait(async () => (await revision(file)).syntheticTick > observed.syntheticTick)
+  await wait(async () => (await snapshot(dir)).syntheticTick > observed.syntheticTick)
   const result = await handle.stop()
   assert.equal(result.treeStopped, true)
   assert.equal(result.stopWriteProvable, false)
-  const stopped = await revision(file)
+  const stopped = await snapshot(dir), stoppedFiles = await storeFingerprint(dir)
   await sleep(500)
-  assert.deepEqual(await revision(file), stopped, 'no new SQLite commit or metadata revision appears after the process and handles close')
+  assert.deepEqual(await snapshot(dir), stopped, 'no new SQLite commit or metadata revision appears after the process and handles close')
+  assert.deepEqual(await storeFingerprint(dir), stoppedFiles, 'no SQLite, WAL or shm byte changes after the process and handles close')
 })
