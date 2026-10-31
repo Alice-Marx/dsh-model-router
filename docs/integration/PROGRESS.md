@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-11-01：E103 受限 unknown 文件效果对账
+
+[E103](evidence/20261101_migration_remote_file_reconciliation.json) 新增显式对账：重算原 operation 的 client/Bot/Task/attempt/tool/args 摘要，要求已吊销 client 与 unknown fs_write，并独立读取实际文件与原始 content 全字节比对。证明只写独立 `migration_operation_resolutions`，原 operation 保持 unknown；drain 每次重验当前文件，篡改、错误参数或错误摘要继续阻断。真实 E102 崩溃场景先两次 UNRESOLVED，再经显式对账恢复 capture，未伪造 Agent 成功回执。组合 **40 项：39 通过、0 失败、1 跳过**；完整两阶段根回归 **1953 项：1871 通过、0 失败、84 跳过**，`check:client` OK。
+
+该证明不自动结算 Host Task，不是跨域或全域对账；三标志仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E103.md](HANDOFF-20261101-E103.md)。
+
 ## 2026-11-01：E102 真实崩溃后的 unknown 原效果负例
 
 [E102](evidence/20261101_migration_remote_unknown_effect.json) 在真实文件落盘后 SIGKILL Agent 与 Host，再以正常 Agent 恢复同一 dataDir，产品把原 operation 标为 `unknown` / `OUTCOME_UNKNOWN`、result 为 NULL。完整 orchestration 两次均 `MIGRATION_REMOTE_OPERATION_UNRESOLVED`，没有 capture，第二次不重复扩展同一 blocked 判定，原收据保持 unknown；文件存在不能自动结案。专项连续三轮通过，组合 **37 项：36 通过、0 失败、1 跳过**；完整两阶段根回归 **1950 项：1868 通过、0 失败、84 跳过**，`check:client` OK。首次重启失败为旧 fixture 重复 pair 同一 client 的主键冲突，改用专用恢复 fixture 后通过，未改产品行为。

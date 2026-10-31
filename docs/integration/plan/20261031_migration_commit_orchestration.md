@@ -92,6 +92,8 @@ E101 用真实 Agent/Host 补效果层证据：测试夹具先调用产品原 `e
 
 E102 延长同一真实写路径到崩溃负例：文件落盘后同时 SIGKILL Agent 与 Host，再以不重复 pair 的正常恢复夹具启动同一 Agent dataDir。产品 `Store` 恢复把原 operation 标为 `unknown` / `OUTCOME_UNKNOWN`、result 为 NULL。完整 orchestration 两次均回答 `MIGRATION_REMOTE_OPERATION_UNRESOLVED`，没有 capture，第二次不重复扩展同一 blocked 判定，原收据仍 unknown。文件存在不构成对账，不得自动改写为成功或无效果。初次重启因旧 fixture 重复 `pair('host')` 触发 `SQLITE_CONSTRAINT_PRIMARYKEY`，改用专用不重复 pair 恢复 fixture 后，专项连续三轮通过；这不是产品恢复失败。
 
+E103 新增受限的显式文件效果对账：owner 提供原 `{clientId,botId,taskId,attemptId,tool,args}`，重算并与原 operation digest 比对；client 必须已吊销、operation 必须为 unknown fs_write，且独立读取的实际文件必须与原始 content 完全一致。通过后仅在独立 `migration_operation_resolutions` 写 `{operationId,operationDigest,machineId,clientId,rootPath,relativePath,sha256,size,resolvedAt}`，不改写原 operation，也不伪造 `in-process-write` 回执。drain 对每个 unknown 重新核对证明身份和当前文件字节；篡改、错误参数、错误摘要或缺失证明均继续 UNRESOLVED。真实 E102 场景先两次阻断，再显式对账后恢复 capture，原 operation 仍 unknown。此证明不自动结算 Host Task，不代表跨域或全域对账。
+
 ### 3.4 `capture`
 
 | 项 | 定义 |

@@ -10,6 +10,7 @@ import { inspectMigrationSources } from '../packages/orchestration/src/migration
 import { abandonMigrationIntent, acquireMigrationShared, beginMigrationExclusive, readMigrationFence } from '../packages/orchestration/src/migration-fence.mjs'
 import { readMigrationStartupGate } from '../packages/orchestration/src/migration-startup-gate.mjs'
 import { inspectMigrationConfigurationCommit, resumeMigrationConfigurationCommit } from '../packages/orchestration/src/migration-configuration-commit.mjs'
+import { reconcileMigrationRemoteFileEffect } from '../packages/orchestration/src/migration-remote-file-reconciliation.mjs'
 import {
   beginMigrationCommitOperation as beginOperation,
   inspectMigrationCommitOperation,
@@ -518,6 +519,27 @@ test('orchestration drain: a real crashed Agent leaves a landed file unknown and
   assert.equal(repeated.journal.length, count, 'repeating the same unresolved verdict does not rewrite or extend the chain')
   assert.equal(repeated.journal.some(row => row.step === 'capture-started'), false)
   const finalDb = new Database(join(agentDir, 'agent/agent.sqlite'), { readonly: true })
-  assert.equal(finalDb.prepare('SELECT status FROM operations WHERE id=?').get(operation.id).status, 'unknown')
+  const unresolved = finalDb.prepare('SELECT status,context FROM operations WHERE id=?').get(operation.id)
+  assert.equal(unresolved.status, 'unknown')
   finalDb.close()
+  const context = JSON.parse(unresolved.context)
+  const resolution = await reconcileMigrationRemoteFileEffect({
+    Database,
+    client: { configPath, machineId: started.machineId, clientId: 'host' },
+    operationId: operation.id,
+    botId: context.botId,
+    taskId: context.taskId,
+    attemptId: context.attemptId,
+    args: { rootId: 'project.v1', relativePath: 'slow.txt', content: 'unknown physical effect\n', encoding: 'utf8', expectedHash: null },
+    rootPath: project,
+  })
+  assert.equal(resolution.resolved, true)
+  assert.equal(resolution.originalOperationStatus, 'unknown')
+  assert.equal((await resume(input())).status, 'blocked-activation')
+  const settled = await steps(f)
+  assert.ok(settled.indexOf('remote-operation-drain-completed') < settled.indexOf('capture-started'))
+  const resolvedDb = new Database(join(agentDir, 'agent/agent.sqlite'), { readonly: true })
+  assert.equal(resolvedDb.prepare('SELECT status FROM operations WHERE id=?').get(operation.id).status, 'unknown', 'reconciliation adds separate proof rather than forging an Agent success')
+  assert.equal(resolvedDb.prepare('SELECT operation_id FROM migration_operation_resolutions WHERE operation_id=?').get(operation.id).operation_id, operation.id)
+  resolvedDb.close()
 })
