@@ -1603,12 +1603,13 @@
     },
     {
       "id": "T22",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_remote_agent.json"
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261101_write_crash_consistency.json"
       ],
-      "notes": "expectedHash mismatch is refused, replacement is atomic via temp+rename with parent inode checks, and duplicate operation IDs return the original record. Physical power-loss windows are not tested.",
-      "verifiedOn": "2026-10-27",
+      "notes": "expectedHash mismatch is refused and duplicate operation IDs return the original record. Real fs_write crash injection exits 86 immediately before and immediately after rename: before-rename keeps the old complete file, after-rename leaves the new complete file, never a partial payload. Restart turns the interrupted operation into OUTCOME_UNKNOWN with NULL result, not success. This covers the process-interruption criterion; physical power loss remains outside the claim.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },

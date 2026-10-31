@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "6aad57a6ceee0c1cfdc756ae98c178b21a1df252",
+  "parentEvidence": "docs/integration/evidence/20261030_write_cancel_effects.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "Real fs_write crash injection exits 86 immediately before and immediately after rename. Before-rename preserves the old complete file; after-rename leaves the new complete file. No partial payload is visible in either case. Restart marks the interrupted operation OUTCOME_UNKNOWN with NULL result, never a success receipt. Both cases pass three consecutive runs, the related combination is 17/17 and the full root regression has zero failures.",
+  "productAcceptance": "T22 passes at integration level: expectedHash mismatch is refused and a process interruption leaves either the old or new complete file without half-written success. This is not a physical power-loss test. Formal scores are 0/20 work packages, 15/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/write-crash-consistency.native.mjs": "852bbfc8ff55c0d05ab2bf74651d7c7981083909",
+    "tests/fixtures/migration-write-crash.mjs": "0aa4724b4a37f876d0d97363b9ee90309eed4b2e",
+    "package.json": "d3908048e82a3a6424c6ebd8cb426ce62883986a"
+  },
+  "testRuns": [
+    "write-crash-consistency: three consecutive runs, each 2 tests / 2 pass / 0 fail.",
+    "write-crash-consistency + remote-write: 17 tests / 17 pass / 0 fail.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1590/1586/0/4 and phase two 385/302/0/83; total 1976 tests, 1891 pass, 0 fail, 83 skipped."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "The evidence uses deliberate process exits on Windows, not physical power loss or every filesystem's durability semantics.",
+    "Existing-target overwrite on Linux remains disabled; this is not a claim of universal overwrite support.",
+    "No real model inference, production process, push or release was used."
+  ]
+}

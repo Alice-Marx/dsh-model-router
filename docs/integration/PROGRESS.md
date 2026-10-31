@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E119 T22 写文件并发与中断验收闭合
+
+[E119](evidence/20261101_write_crash_consistency.json) 在真实 `fs_write` 的 rename 前后分别 `exit(86)`：前者保留旧完整文件，后者得到新完整文件，不出现半写内容；重启后原 operation 均为 `OUTCOME_UNKNOWN`、result 为 NULL，不生成成功回执。专项连续三轮通过，相关组合 **17/17**；完整两阶段根回归 **1976 项：1891 通过、0 失败、83 跳过**，`check:client` OK。T22 以 integration 级别 passed，正式为 **0/20、15/63、M0 11/12**。这证明进程中断，不冒充物理断电测试。未推送/发布，当前交接为 [HANDOFF-20261101-E119.md](HANDOFF-20261101-E119.md)。
+
 ## 2026-11-01：E118 T21 外部修改与哈希冲突验收闭合
 
 [E118](evidence/20261101_external_hash_conflict.json) 复验真实 CAS：外部修改导致 `FILE_CHANGED` 时原字节不变；即使哈希匹配也返回 `OVERWRITE_UNSUPPORTED`，不强制替换，外部创建者获胜。真实停止回执与 create-only/dedup 语义保持。相关组合 **56 项：24 通过、0 失败、32 个 Linux-only 跳过**，既有 Linux 证据覆盖。T21 以 integration 级别 passed，正式为 **0/20、14/63、M0 11/12**。无产品代码变化，最近全量根回归为 E116 的 1974 项、0 失败，未推送/发布。当前交接为 [HANDOFF-20261101-E118.md](HANDOFF-20261101-E118.md)。
