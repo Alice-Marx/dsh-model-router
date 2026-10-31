@@ -90,6 +90,8 @@ E100 在吊销完成后追加 `remote-operation-drain-requested` → 只读检�
 
 E101 用真实 Agent/Host 补效果层证据：测试夹具先调用产品原 `execute()` 让 `slow.txt` 真正落盘，再把 operation 收据保持在 running（仅为确定性测试暂停 auth sweep），随后运行完整 orchestration。client 吊销后操作仍 running，`MIGRATION_REMOTE_OPERATION_ACTIVE` 阻断且没有 `capture-started`，文件仍在但不被视为已结算。释放夹具屏障后，原 Agent 写回收据为 succeeded、Host remote-write 也 succeeded；resume 才追加唯一 `remote-operation-drain-completed` 并进入 capture。连续三轮专项及最终组合 36 项、35 通过、0 失败、1 跳过通过。该证据不覆盖未知写者、跨机生产网络或全域 OS 句柄关闭。
 
+E102 延长同一真实写路径到崩溃负例：文件落盘后同时 SIGKILL Agent 与 Host，再以不重复 pair 的正常恢复夹具启动同一 Agent dataDir。产品 `Store` 恢复把原 operation 标为 `unknown` / `OUTCOME_UNKNOWN`、result 为 NULL。完整 orchestration 两次均回答 `MIGRATION_REMOTE_OPERATION_UNRESOLVED`，没有 capture，第二次不重复扩展同一 blocked 判定，原收据仍 unknown。文件存在不构成对账，不得自动改写为成功或无效果。初次重启因旧 fixture 重复 `pair('host')` 触发 `SQLITE_CONSTRAINT_PRIMARYKEY`，改用专用不重复 pair 恢复 fixture 后，专项连续三轮通过；这不是产品恢复失败。
+
 ### 3.4 `capture`
 
 | 项 | 定义 |

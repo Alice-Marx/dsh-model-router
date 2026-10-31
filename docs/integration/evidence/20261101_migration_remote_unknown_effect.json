@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "63cd11015073e8c8a819db13cbd73fea39e482c5",
+  "parentEvidence": "docs/integration/evidence/20261101_migration_remote_effect_drain.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 5 negative, real landed effect becomes unknown after an Agent crash and remains blocked from capture; component evidence only",
+  "componentAcceptance": "Win11: after the real Agent writes slow.txt, both Agent and Host are SIGKILLed. A normal Agent restart on the same dataDir preserves machineId and the product Store marks the original operation unknown with OUTCOME_UNKNOWN and NULL result. Full orchestration rejects MIGRATION_REMOTE_OPERATION_UNRESOLVED twice, never starts capture, does not append a duplicate blocked verdict on the second attempt and leaves the original receipt unknown. The real file remains present but is never treated as proof of success or no-effect. The focused test passes three consecutive runs; the related combination is 37 tests / 36 pass / 0 fail / 1 skipped.",
+  "productAcceptance": "None. This proves fail-closed behavior for one crashed declared Agent. Independent reconciliation of an unknown physical effect is not implemented. Scores remain 0/20, 1/63 and M0 11/12; stopWriteProvable, activationSupported and postActivationRollbackSupported remain false.",
+  "design": "docs/integration/plan/20261031_migration_commit_orchestration.md section 3.3 E102",
+  "sourceGitBlobs": {
+    "tests/fixtures/migration-remote-restart-agent.mjs": "0a4b6b2fc12642865f34f6d016204485181f40f8",
+    "tests/migration-commit-orchestration.native.mjs": "925e34babc9561e42c6cdd4f1a7046f09eec2d0d"
+  },
+  "implementation": [
+    "The slow fixture first performs the real product write and then holds the receipt. Once the file is observed, both real processes are killed with SIGKILL.",
+    "A dedicated restart fixture creates the normal production Agent without pairing the same client ID again. The normal Store recovery path converts the running operation to unknown.",
+    "The complete default orchestration path performs client revocation and settlement checks. Unknown blocks capture on the first attempt and on resume; the same blocked verdict is not appended twice.",
+    "The test rereads the original operation after both attempts and confirms it remains unknown. No product source behavior changed."
+  ],
+  "testRuns": [
+    "Focused crashed-Agent unknown test: three consecutive runs, each 1 test / 1 pass / 0 fail.",
+    "Real Store drain tests plus orchestration, landed effect, default real Agent and crash 12/13: 37 tests / 36 pass / 0 fail / 1 skipped.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1590/1586/0/4 and phase two 361/281/0/80; total 1950 tests, 1868 pass, 0 fail, 84 skipped."
+  ],
+  "preservedFailures": [
+    "The first restart attempt used the initial pairing fixture, which called pair('host') on an existing client and failed with SQLITE_CONSTRAINT_PRIMARYKEY before the drain assertions. A dedicated non-pairing restart fixture corrected the test setup; product recovery was not changed."
+  ],
+  "limitations": [
+    "This is a negative test, not an unknown-effect reconciliation implementation. An operator or a future verified reconciler must establish the original outcome before capture can proceed.",
+    "Only one loopback Agent and one landed file are covered. Unknown writers, cross-machine production, other domains and all-domain OS-handle closure remain open.",
+    "No real user profile, model inference, production process, push or release was used."
+  ]
+}

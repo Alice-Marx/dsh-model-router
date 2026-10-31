@@ -510,7 +510,8 @@
             "docs/integration/evidence/20261031_product_migration_admission.json",
             "docs/integration/evidence/20261101_migration_remote_client_drain.json",
             "docs/integration/evidence/20261101_migration_remote_operation_drain.json",
-            "docs/integration/evidence/20261101_migration_remote_effect_drain.json"
+            "docs/integration/evidence/20261101_migration_remote_effect_drain.json",
+            "docs/integration/evidence/20261101_migration_remote_unknown_effect.json"
           ]
         },
         {
@@ -537,7 +538,8 @@
             "docs/integration/evidence/20261101_migration_remote_client_recovery.json",
             "docs/integration/evidence/20261101_migration_remote_client_drain.json",
             "docs/integration/evidence/20261101_migration_remote_operation_drain.json",
-            "docs/integration/evidence/20261101_migration_remote_effect_drain.json"
+            "docs/integration/evidence/20261101_migration_remote_effect_drain.json",
+            "docs/integration/evidence/20261101_migration_remote_unknown_effect.json"
           ]
         }
       ]
