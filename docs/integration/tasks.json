@@ -1487,14 +1487,18 @@
     },
     {
       "id": "T14",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261029_remote_write_tasks.json",
         "docs/integration/evidence/20261030_operation_cancel_evidence.json",
-        "docs/integration/evidence/20261031_command_combined_host.json"
+        "docs/integration/evidence/20261031_command_combined_host.json",
+        "docs/integration/evidence/20261101_remote_network_reconnect.json"
       ],
-      "verifiedOn": "2026-10-31",
-      "notes": "undefined E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open. E62: cancellation reports external process stop only with strict original evidence; missing or ambiguous evidence remains unconfirmed. Five native checks pass on each of Win11, Win10 and Ubuntu. E77: default-product AgentLoop command acceptance passes42 checks on Win11 (never-started/no native fallback) and Ubuntu (real fixed-image Docker exit0/confirmed stop). grantFor publishes container capability only with write/status/cancel scope. Windows OS-isolated command and full product acceptance remain open."
+      "level": "integration",
+      "verifiedOn": "2026-11-01",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; real independent Agent process killed after a successful write and restarted on a new loopback port",
+      "notes": "The real Agent commits the file and succeeded receipt before its process is killed. The Host then loses the reply and becomes needs-reconciliation with outcome unknown. After a normal Agent restart and endpoint re-pair, the Host reconciles the original operation to succeeded with exactly one fs_write call and one operation row; the file is unchanged. This covers the real network break/restore criterion without replaying the action. Other command and deployment scenarios remain separate."
+
     },
     {
       "id": "T15",

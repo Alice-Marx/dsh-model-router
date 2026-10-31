@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E111 T14 真实远程断网与重连验收闭合
+
+[E111](evidence/20261101_remote_network_reconnect.json) 新增真实独立 Agent 断网测试：文件与 succeeded 收据先落盘，再 SIGKILL Agent 并切断 Host 回复，Host 为 needs-reconciliation/unknown；正常 Agent 同 dataDir 重启后重新配对新端口，只读对账原 operation 为 succeeded，`fs_write` 仍恰好一次、操作库仍一行、文件不变。专项连续三轮通过，相关组合 **15/15**；完整两阶段根回归 **1959 项：1874 通过、0 失败、87 跳过**，`check:client` OK。T14 以 integration 级别 passed，正式为 **0/20、7/63、M0 11/12**。两次 fixture 等待与 revision 错误已留痕修正，未改产品行为。未推送/发布，当前交接为 [HANDOFF-20261101-E111.md](HANDOFF-20261101-E111.md)。
+
 ## 2026-11-01：E110 T13 Host 崩溃与重启验收闭合
 
 [E110](evidence/20261101_host_crash_recovery_acceptance.json) 复验真实断进程恢复：派发前/后和收据落盘边界均保留原 attempt/operation，unknown 不重放；已提交收据恢复成功且无第二次模型调用或重复发票，产物不丢，默认 Host 冷启动重建身份/授权/机器绑定。恢复相关 **67 项全绿**（journal 按标准 `integration-task-probe` 驱动入口 29/29）。T13 以 integration 级别 passed，正式为 **0/20、6/63、M0 11/12**；W08 仍待 T12。首轮直接运行 journal 的驱动入口错误已留痕，未计为产品失败。无产品代码变化，最近全量根回归为 E108 的 1958 项、0 失败，未推送/发布。当前交接为 [HANDOFF-20261101-E110.md](HANDOFF-20261101-E110.md)。
