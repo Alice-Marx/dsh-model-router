@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "1382d208618a9ace62b1281e364dc57b639b6b2b",
+  "parentEvidence": "docs/integration/evidence/20261030_workspace_admission_mount.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T11 criteria are covered by current real Agent and journal evidence. A second write on the same physical root or an alias is excluded while independent roots and reads proceed. Real synchronous terminal fs_write receipts release the root for a successor; unknown outcomes retain it across restart until original-operation reconciliation. Cross-connection admission, parent/child exclusion and idempotent replay are also covered. Current revalidation is 44 tests / 40 pass / 0 fail / 4 Linux-only skips; earlier three-platform evidence covers those Linux root-lock paths.",
+  "productAcceptance": "T11 passes at integration level. This does not claim complete OS containment, unknown external-writer exclusion or production deployment. W08 remains open for T12. Formal scores are 0/20 work packages, 5/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/workspace-agent.native.mjs": "8c1ab5917fdbdd06d0396f6f79083b52965f11d9",
+    "tests/workspace-admission.native.mjs": "b45b27f344ed2f73b24a3cf8babdde29a222f201",
+    "tests/remote-write-tasks.native.mjs": "002ca49d81d08ab895582c27c77a0c17824f34ae",
+    "remote-computer-agent/src/workspace-admission.ts": "60517116b86cc5d4ed636c0c0d0d3612a96e5f1a"
+  },
+  "testRuns": [
+    "node --test tests/workspace-agent.native.mjs tests/workspace-admission.native.mjs tests/workspace-root-lock.native.mjs tests/remote-write-tasks.native.mjs: 44 tests / 40 pass / 0 fail / 4 skipped.",
+    "No product source changed. The latest full root regression remains E108: 1958 tests, 1873 pass, 0 fail, 87 skipped."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "This closes the T11 worktree mutex scenario, not full OS isolation, unknown external-writer CAS or mixed command-tree cancellation.",
+    "No real model inference, production process, push or release was used."
+  ]
+}

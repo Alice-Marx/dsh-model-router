@@ -1421,7 +1421,7 @@
     },
     {
       "id": "T11",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261028_dependency_scheduler.json",
         "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
@@ -1429,12 +1429,13 @@
         "docs/integration/evidence/20261030_workspace_admission_mount.json",
         "docs/integration/evidence/20261030_bound_stop_proof.json",
         "docs/integration/evidence/20261030_stop_proof_regression.json",
-        "docs/integration/evidence/20261030_write_cancel_effects.json"
+        "docs/integration/evidence/20261030_write_cancel_effects.json",
+        "docs/integration/evidence/20261101_workspace_mutex_acceptance.json"
       ],
-      "notes": "Native SQLite protocol tests verify exclusive locks for the same machine/workspace, parallel independent workspace keys, unaffected reads, lock retention during cancellation/recovered unknown outcome and release only after an accepted trusted reconciliation proof. The write execution facade remains refused. Real worktree writer exit/OS containment is not verified, so this is partial only. E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open.",
-      "level": "native SQLite journal protocol",
-      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; isolated test homes",
-      "verifiedOn": "2026-10-30"
+      "notes": "Real Agent writes on the same physical root or alias are rejected while independent roots and reads proceed. Workspace admission is visible across connections, a real terminal fs_write receipt releases the root for a successor, and unknown outcomes retain it until original-operation reconciliation. Current revalidation passes 40 of 44 with four Linux-only root-lock cases skipped on Windows; earlier three-platform evidence covers those paths. This satisfies the T11 worktree mutex criteria without claiming full OS or deployment acceptance.",
+      "level": "integration",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; real Agent physical roots and native journal",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T12",
