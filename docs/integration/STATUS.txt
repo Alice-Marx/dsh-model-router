@@ -62,7 +62,7 @@ W06 事务账本与数据迁移
   W06.12 completed 停写栅栏切片2：单机共享准入与迁移独占栅栏原型（guard原子检查+创建、持久intent跨协调者死亡阻断、排空、崩溃接管验证；仅协议参与方，非停写证明）
   W06.13 completed 停写栅栏切片3：只读最新回退准备诊断（活跃/unknown/可重试blocked/已启动skipped、未决操作、未投递outbox、开放hold为阻断；not-started skipped仅提示；归档绑定活库比对私有导出；资金rollback guard不动）
   W06.14 completed 停写栅栏切片5：可恢复提交编排与门控判据（activation 保持 false）
-  W06.15 in_progress 停写栅栏切片4：OS/launcher隔离适配器（Windows Job、Linux cgroup、systemd、DS/MR JSON、SDK、SQLite与Task journal负例已验；执行中操作、机器重启与全域停写未验）
+  W06.15 in_progress 停写栅栏切片4：OS/launcher隔离适配器（Windows Job、Linux cgroup、systemd、DS/MR JSON、SDK、SQLite、Task journal与真实Agent loopback效果已验；跨机效果、机器重启与全域停写未验）
 
 W07 Planner 选择目标 Bot
   W07.1 completed 私聊 Main 建 Bot、派活、结果回原会话

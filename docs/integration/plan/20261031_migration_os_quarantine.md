@@ -115,4 +115,16 @@ E83 增加非 root 委托合同：`cgroupRoot` 默认 `/sys/fs/cgroup`，也可�
 - 对同一 attempt 补提 `succeeded` / `cancelled` 结案（附伪 stopProof）被 `reconcile` 拒绝，记为 `unknown` + `TASK_STOP_UNCONFIRMED`，证明既不冒充成功，也不冒充取消或回滚。
 - `possiblyApplied` 语义由真实 `createRemoteWriteBackend()` 钉住：派遣已发出而未确认 → `unknown` + `stopConfirmed:false` + `possiblyApplied:true`；从未派遣 → `notStarted:true` + `possiblyApplied:false`。
 
-已知边界：journal 没有针对单个执行中 attempt 的进度行 API，增长只能来自新提交的 attempt 与 runner lease 续约；quarantine handle 只暴露 wrapper 的 PID 与关闭，子进程存活必须由 fixture 自报 PID 后另行探测。未覆盖：机器重启矩阵、远程 Agent 真实外部效果、全数据域写句柄、其他 launcher/账户，以及 Linux 真机（本轮 Linux 通道不可用，Linux 侧只有设计与负例）。
+已知边界：journal 没有针对单个执行中 attempt 的进度行 API，增长只能来自新提交的 attempt 与 runner lease 续约；quarantine handle 只暴露 wrapper 的 PID 与关闭，子进程存活必须由 fixture 自报 PID 后另行探测。未覆盖：机器重启矩阵、跨机远程 Agent 真实外部效果、全数据域写句柄、其他 launcher/账户，以及 Linux 真机（本轮 Linux 通道不可用，Linux 侧只有设计与负例）。
+
+## 14. 真实 Agent loopback 外部效果与 Windows Job 隔离（E94）
+
+新增 `migration-remote-effect-quarantine.native.mjs` 与 owned fixture，使用真实 `remote-write`、Host Task service/journal 和经 loopback HTTP 提供服务的真实 Agent。合成 workspace 内不手写目标效果：每次写入都由 Agent `fs_write` 完成，Host 逐项确认前三次成功。第四次真实文件和 Agent succeeded 操作收据已产生后，fixture 确定性保持 Host HTTP 回复，使 Host attempt 保持 running 且效果未确认；合成 home 同时放置 pending migration gate。
+
+- 停止前直接读回四个效果文件，并在 Agent `operations` 表观察到四条 succeeded `fs_write`，排除仅增长 Host journal 或模拟写入。
+- `launchMigrationProcessTree().stop()` 返回 `treeStopped:true` / `windows-job-close`；fixture PID 随后为 `ESRCH`。500ms 窗口内，排序文件名与全部内容 SHA-256、Agent 操作状态/结果/完成时间、另一连接的 `PRAGMA data_version`、heartbeat/active 内容与 mtime 均不变。
+- Host 冷恢复走产品 `recover()`，第四次 attempt 为 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，`possiblyApplied` 不被错误清除。真实效果已存在也不允许 Host 把未确认结果写成成功或回滚。
+
+专项连续三轮 1/1，相关 remote-write + in-flight + 新套件组合 18 项、17 通过、0 失败、1 跳过；完整两阶段根回归 1935 项、1851 通过、0 失败、84 跳过。初版两次失败均保留：合成恢复时钟落后于真实 service runner 导致 `TASK_RUNNER_BUSY`；修正后又因停止竞态使目标已结束、`recover()` 返回 0。第四次回复保持屏障用于消除该测试竞态，不改变产品代码。
+
+边界：Host 和 Agent 位于同一受控测试进程，HTTP 仅 loopback；这不是独立 Agent OS 进程、跨机网络、生产账户或机器重启证据。它只补齐真实 Agent 写路径及未确认效果的 Windows 组件证据，`stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 继续 false，W06.15 不销项。

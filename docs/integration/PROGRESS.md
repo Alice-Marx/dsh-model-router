@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-10-31：E94 真实 Agent loopback 外部效果停止证据
+
+[E94](evidence/20261031_migration_remote_effect_quarantine.json) 以真实 `remote-write`、Task service/journal 和 loopback HTTP Agent 连续完成四次合成文件写入；第四次 Agent 操作已成功但 Host 回复被确定性保持。Windows Job 停止后，500ms 内全部文件内容摘要、Agent 操作/收据与 `data_version`、heartbeat/active 内容及 mtime 均不变；冷恢复保持 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，不把已存在效果误判为成功或回滚。专项连续三轮 1/1，相关组合 **18 项：17 通过、0 失败、1 跳过**；完整两阶段根回归 **1935 项：1851 通过、0 失败、84 跳过**，`check:client` OK。初版合成恢复时钟与停止竞态两次失败均留痕，未改产品代码。
+
+这只覆盖同进程 loopback Agent 的 Windows 组件证据，不是独立 Agent 进程、跨机网络、机器重启或全域停写。W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，三个能力标志仍 false，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261031-E94.md](HANDOFF-20261031-E94.md)。
+
 ## 2026-10-31：E93 累计源码与证据本地检查点
 
 [E93](evidence/20261031_reproducible_checkpoint.json) 清理四个已确认临时产物，将累计一体化源码、测试、部署组件与证据提交为本地检查点 `cf56c388034835e878d47c60eadef89a9d936575`；695 个文件变更，提交后工作树干净，差异格式检查通过。`check:client` 与 `integration:check` 通过；完整两阶段根回归合计 **1934 项：1850 通过、0 失败、84 跳过**。这是本地检查点而非干净检出复现或成熟发布，未推送/发布，0 真实模型推理。门禁仍 **0/20、1/63、M0 11/12**，真实迁移激活、全域停写、激活后回退和生产验收仍开放。当前交接为 [HANDOFF-20261031-E93.md](HANDOFF-20261031-E93.md)。
