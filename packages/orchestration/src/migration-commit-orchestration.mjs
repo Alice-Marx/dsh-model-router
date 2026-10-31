@@ -9,6 +9,7 @@ import { inspectMigrationConfigurationCommit, prepareMigrationConfigurationCommi
 import { inventoryMigrationWriters } from './migration-writer-inventory.mjs'
 import { createMigrationDataArchive, verifyMigrationDataArchive } from './migration-data-archive.mjs'
 import { createMigrationLedgerArchive, verifyMigrationLedgerArchive } from './migration-ledger-export.mjs'
+import { quarantineMigrationRemoteClients } from './migration-remote-client-quarantine.mjs'
 
 const fail = (code, details) => { throw Object.assign(new Error(code), { code, ...(details ? { details } : {}) }) }
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -26,6 +27,8 @@ const FORWARD_STEPS = new Map(Object.entries({
   'drain-started': 'drain',
   'drain-completed': 'drain',
   'exclusive-acquired': 'drain',
+  'remote-revoke-requested': 'drain',
+  'remote-revoke-completed': 'drain',
   'capture-started': 'capture',
   'capture-verified': 'capture',
   'maintenance-started': 'maintenance',
@@ -155,10 +158,27 @@ function validateDomains (domains) {
   })
 }
 
+function validateRemoteClients (clients) {
+  if (!Array.isArray(clients) || clients.length > 64) fail('MIGRATION_ORCH_INPUT_INVALID')
+  const seen = new Set()
+  return clients.map(client => {
+    if (!record(client) || Object.keys(client).some(key => !['configPath', 'machineId', 'clientId'].includes(key))) fail('MIGRATION_ORCH_INPUT_INVALID')
+    if (typeof client.configPath !== 'string' || !isAbsolute(client.configPath) || client.configPath.length > 4096 || client.configPath.includes('\0')) fail('MIGRATION_ORCH_INPUT_INVALID')
+    if (!/^[-A-Za-z0-9_.]{1,128}$/.test(client.machineId ?? '') || !/^[-A-Za-z0-9_.]{1,128}$/.test(client.clientId ?? '')) fail('MIGRATION_ORCH_INPUT_INVALID')
+    const key = `${client.machineId}\0${client.clientId}`
+    if (seen.has(key)) fail('MIGRATION_ORCH_INPUT_INVALID')
+    seen.add(key)
+    return { configPath: resolve(client.configPath), machineId: client.machineId, clientId: client.clientId }
+  })
+}
+
 function validateOperation (operation) {
   if (!record(operation)) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (operation.schemaVersion !== 1 || operation.kind !== OPERATION_KIND) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (typeof operation.operationId !== 'string' || !OPERATION_ID.test(operation.operationId)) fail('MIGRATION_ORCH_OPERATION_INVALID')
+  if (operation.remoteClients !== undefined || operation.remoteClientsDigest !== undefined) {
+    if (operation.remoteClientsDigest !== sha(encode(validateRemoteClients(operation.remoteClients)))) fail('MIGRATION_ORCH_OPERATION_INVALID')
+  }
   for (const key of ['home', 'privateOutput']) if (typeof operation[key] !== 'string' || !isAbsolute(operation[key])) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (!Array.isArray(operation.domains) || !operation.domains.length || operation.domains.length > 32) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (operation.domainsDigest !== sha(encode(operation.domains))) fail('MIGRATION_ORCH_OPERATION_INVALID')
@@ -294,8 +314,10 @@ function nextAction (state) {
     case 'fence-intent-requested':
     case 'fence-intent-persisted':
     case 'drain-started':
-    case 'drain-completed': return 'fence'
+    case 'drain-completed':
+    case 'remote-revoke-requested': return 'fence'
     case 'exclusive-acquired':
+    case 'remote-revoke-completed':
     case 'capture-started': return 'capture'
     case 'capture-verified':
     case 'maintenance-started': return 'maintenance'
@@ -517,10 +539,29 @@ async function fencePhase (ctx) {
   if (!ctx.steps.some(row => row.step === 'fence-intent-persisted') && canAppend(ctx, 'intent')) {
     await appendStep(ctx, 'intent', 'fence-intent-persisted', { intentOperationId: state.intent?.operationId ?? null, ownerPid: state.intent?.pid ?? null, ownerStartTicks: state.intent?.startTicks ?? null })
   }
-  if (canAppend(ctx, 'drain')) {
+  if (canAppend(ctx, 'drain') && !ctx.steps.some(row => row.step === 'exclusive-acquired')) {
     await appendStep(ctx, 'drain', 'drain-started', { drainTimeoutMs: ctx.limits.drainTimeoutMs, delegated: true })
     await appendStep(ctx, 'drain', 'drain-completed', { liveShared: state.liveShared.length, observedHolders: ctx.observedHolders, elapsedMs: Date.now() - started, intentOperationId: state.intent?.operationId ?? null })
     await appendStep(ctx, 'drain', 'exclusive-acquired', { ownerPid: identity.pid, ownerStartTicks: identity.startTicks ?? null, exclusiveDigest, operationId: operation.operationId })
+  }
+  const remoteClients = operation.remoteClients ?? []
+  if (remoteClients.length && !ctx.steps.some(row => row.step === 'remote-revoke-completed')) {
+    if (!ctx.steps.some(row => row.step === 'remote-revoke-requested')) {
+      await appendStep(ctx, 'drain', 'remote-revoke-requested', { remoteClients: remoteClients.length, remoteClientsDigest: operation.remoteClientsDigest })
+    }
+    try {
+      const quarantine = typeof ctx.options.remoteClientQuarantine === 'function' ? ctx.options.remoteClientQuarantine : quarantineMigrationRemoteClients
+      const result = await quarantine({ Database: ctx.options.Database, cli: ctx.options.remoteClientCli, runtime: ctx.options.remoteClientRuntime, clients: remoteClients, execute: ctx.options.remoteClientExecute, signal: ctx.signal })
+      if (result?.declaredCredentialAdmissionBlocked !== true || result?.persistentDeclaredExclusion !== true || !Array.isArray(result.clients) || result.clients.length !== remoteClients.length || result.clients.some((client, index) => client.revoked !== true || client.machineId !== remoteClients[index].machineId || client.clientId !== remoteClients[index].clientId)) {
+        fail('MIGRATION_REMOTE_CLIENT_REVOKE_INVALID')
+      }
+      await appendStep(ctx, 'drain', 'remote-revoke-completed', { remoteClients: result.clients.length, remoteClientsDigest: operation.remoteClientsDigest, declaredCredentialAdmissionBlocked: true, stopWriteProvable: false })
+    } catch (error) {
+      const code = error?.code ?? 'MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED'
+      if (!code.startsWith('MIGRATION_REMOTE_CLIENT_')) throw error
+      await block(ctx, 'drain', 'blocked-drain', code, { remoteClients: remoteClients.length })
+      throw error
+    }
   }
 }
 
@@ -545,6 +586,7 @@ const CAPTURE_CODES = /^(MIGRATION_CAPTURE_|MIGRATION_LEDGER_|MIGRATION_PRIVATE_
 
 async function capturePhase (ctx) {
   const operation = ctx.operation
+  if ((operation.remoteClients ?? []).length && !ctx.steps.some(row => row.step === 'remote-revoke-completed')) return fencePhase(ctx)
   await acquireFence(ctx, 'capture')
   await assertOwnerAndFence(ctx)
   await observeGate(ctx, 'capture')
@@ -800,7 +842,7 @@ async function createOperation (options) {
   const home = await canonicalDirectory(options.home)
   const root = await canonicalNewPath(options.privateOutput)
   if (inside(home, root) || inside(root, home)) fail('MIGRATION_ORCH_INPUT_INVALID')
-  const domains = validateDomains(options.domains)
+  const domains = validateDomains(options.domains), remoteClients = validateRemoteClients(options.remoteClients ?? [])
   const configurationPlan = options.profilePlan ?? options.configurationPlan
   if (!record(configurationPlan) || configurationPlan.status !== 'ready') fail('MIGRATION_ORCH_INPUT_INVALID')
   for (const domain of domains) for (const path of domain.roots) if (inside(root, path) || inside(path, root)) fail('MIGRATION_ORCH_INPUT_INVALID')
@@ -812,6 +854,8 @@ async function createOperation (options) {
     privateOutput: root,
     domains,
     domainsDigest: sha(encode(domains)),
+    remoteClients,
+    remoteClientsDigest: sha(encode(remoteClients)),
     profilePlanDigest: sha(encode(configurationPlan)),
     profilePlanStatus: 'ready',
     limits: validateLimits(options.limits ?? {}),
@@ -859,6 +903,7 @@ async function ensureOperation (options) {
   for (const key of Object.keys(created.operation.limits)) {
     if (read.operation.limits[key] !== created.operation.limits[key]) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: 'limits.' + key })
   }
+  if ((read.operation.remoteClientsDigest !== undefined || created.operation.remoteClients.length > 0) && read.operation.remoteClientsDigest !== created.operation.remoteClientsDigest) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: 'remoteClientsDigest' })
   const steps = await loadChain(created.root, read.operation, read.digest)
   return context(options, created.root, read.operation, read.digest, steps)
 }

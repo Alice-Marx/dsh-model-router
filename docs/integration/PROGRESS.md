@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-11-01：E99 声明 client 吊销接入 drain 哈希链
+
+[E99](evidence/20261101_migration_remote_client_drain.json) 将 E98 适配器接入提交编排：不可变 operation 绑定 `remoteClients` 与摘要，`exclusive-acquired` 后依次写 `remote-revoke-requested`、真实吊销并读回、`remote-revoke-completed`，再允许 capture。未确认吊销记 `blocked-drain` 且无 `capture-started`；恢复不重复 request，真实子进程 `exit(86)` 后由同一 drain 完成。默认路径另以完整 orchestration 吊销真实 Agent 验证，非仅测试回调。组合 **31 项：30 通过、0 失败、1 跳过**；完整两阶段根回归 **1943 项：1861 通过、0 失败、84 跳过**，`check:client` OK。
+
+这只建立声明 client 的 drain 顺序，不证明在途效果或全域停写；activation/rollback 仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E99.md](HANDOFF-20261101-E99.md)。
+
 ## 2026-11-01：E98 可重入的声明 client 吊销适配器
 
 [E98](evidence/20261101_migration_remote_client_recovery.json) 新增 `quarantineMigrationRemoteClients`：预检全部 config/machine/client 身份，真实 CLI 吊销后读回 Agent SQLite 的持久 revoked 状态，config 摘要保持一致才记 completed；失败保留当前目标、completed 和原始 cause。真实测试覆盖成功与重入跳过、离线重试、双 Agent 第二项失败后仅恢复未确认项、身份 mismatch 零副作用。专项连续三轮 **4/4**，与 E97 组合 **5/5**；完整两阶段根回归 **1941 项：1857 通过、0 失败、84 跳过**，`check:client` OK。首轮 3 项失败根因为 Windows 不能直接 spawn `.mjs` 的 `EFTYPE`，已增加显式受信 Node runtime，失败留痕。

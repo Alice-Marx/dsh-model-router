@@ -174,4 +174,4 @@ E96 的后续 Host 能重新配对，是因为 Job 停止不触碰长期 client 
 - 已吊销项由持久状态识别并跳过，不重复执行 CLI。离线返回 completed 空、状态不变，恢复后可完成；双 Agent 第二项失败时第一项保持 revoked，重跑只调用第二项，最终两项读回通过。错误 machineId 在任何 revoke 前拒绝。
 - Windows 的 `.mjs` 不是可直接 spawn 的原生可执行文件，故增加显式 `runtime`：用受信 `process.execPath` 启动受信 CLI，参数数组不含 shell。首轮 4 项有 3 项因该实现缺陷失败，保留 cause 为 `EFTYPE`；修正 runtime 后连续三轮 4/4，相关组合 5/5，完整根回归 **1941 项、1857 通过、0 失败、84 跳过**。
 
-结果只声明 `declaredCredentialAdmissionBlocked:true` 与 `persistentDeclaredExclusion:true`，继续返回 `externalRestartBlocked:false`、`persistentExternalExclusion:false`、`stopWriteProvable:false`。本组件尚未被迁移编排 drain 调用，不覆盖在途效果、其他 client/机器或直接 OS 写者，也不提供 rotate/release；W06.15 与激活门禁不提升。
+结果只声明 `declaredCredentialAdmissionBlocked:true` 与 `persistentDeclaredExclusion:true`，继续返回 `externalRestartBlocked:false`、`persistentExternalExclusion:false`、`stopWriteProvable:false`。E99 已把本组件接入迁移编排 drain 的 request/completed 哈希链，但仍不覆盖在途效果、其他 client/机器或直接 OS 写者，也不提供 rotate/release；W06.15 与激活门禁不提升。

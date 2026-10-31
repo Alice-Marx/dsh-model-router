@@ -96,6 +96,7 @@ async function payloadFor (f, options) {
     dbFile: f.dbFile,
     changes: f.changes.map(change => ({ path: change.path, beforeSha256: change.beforeSha256, maintenanceB64: change.maintenance.toString('base64'), afterB64: change.after.toString('base64') })),
     drainTimeoutMs: options.drainTimeoutMs ?? 5000,
+    remoteClients: options.remoteClients ?? [],
     crashAt: options.crashAt ?? null,
     commitBoundary: options.commitBoundary ?? null,
     holdMs: options.holdMs ?? 0,
@@ -341,4 +342,53 @@ test('N1: the maintenance stage refuses to run without a held exclusive', async 
   assert.deepEqual(await readFile(f.changes[0].path), Buffer.from(json({ dsh: { profile: { bundles: ['@fixture/base', PRODUCT] } } })))
   await owner.release()
   assert.equal((await resume(f.input())).status, 'blocked-activation')
+})
+
+test('crash 12: remote revoke requested crashes before capture and resume completes the same drain', async t => {
+  const f = await scenario(t), remoteClients = [{ configPath: join(f.dir, 'agent-config.json'), machineId: 'machine-a', clientId: 'host' }]
+  await crash(f, { crashAt: 'after-step:remote-revoke-requested', remoteClients })
+  const interrupted = await stateOf(f)
+  assert.deepEqual(interrupted.journal.map(row => row.step).slice(-2), ['exclusive-acquired', 'remote-revoke-requested'])
+  assert.equal(interrupted.journal.some(row => row.step === 'capture-started'), false)
+  assert.equal(readMigrationStartupGate({ home: f.home }), null)
+  let calls = 0
+  const remoteClientQuarantine = async ({ clients }) => {
+    calls++
+    return { declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) }
+  }
+  assert.equal((await resume(f.input({ remoteClients, remoteClientQuarantine }))).status, 'blocked-activation')
+  assert.equal(calls, 1)
+  const recovered = await steps(f)
+  assert.equal(recovered.filter(step => step === 'remote-revoke-requested').length, 1)
+  assert.equal(recovered.filter(step => step === 'remote-revoke-completed').length, 1)
+  assert.ok(recovered.indexOf('remote-revoke-completed') < recovered.indexOf('capture-started'))
+})
+
+test('orchestration drain: the default adapter revokes a real Agent before capture', async t => {
+  await import('../remote-computer-agent/build.mjs')
+  const f = await scenario(t), agentDir = join(f.dir, 'remote-agent'), project = join(agentDir, 'project')
+  await mkdir(project, { recursive: true })
+  const readyFile = join(agentDir, 'agent-ready.json')
+  const child = spawn(process.execPath, [resolve('tests/fixtures/migration-remote-effect-agent.mjs'), agentDir, readyFile], { cwd: agentDir, stdio: 'ignore', windowsHide: true })
+  t.after(() => child.kill())
+  let agent
+  for (let attempt = 0; attempt < 600; attempt++) {
+    agent = await readFile(readyFile, 'utf8').then(value => JSON.parse(value)).catch(() => null)
+    if (agent) break
+    await new Promise(resolveWait => setTimeout(resolveWait, 25))
+  }
+  assert.ok(agent, 'the real Agent becomes ready')
+  const configPath = join(agentDir, 'agent-config.json')
+  await writeFile(configPath, JSON.stringify({ dataDir: join(agentDir, 'agent') }))
+  const summary = await begin(f.input({
+    remoteClients: [{ configPath, machineId: agent.machineId, clientId: 'host' }],
+    remoteClientCli: resolve('remote-computer-agent/dist/cli.mjs'),
+    remoteClientRuntime: process.execPath,
+  }))
+  assert.equal(summary.status, 'blocked-activation')
+  assert.equal(summary.steps, 14)
+  const db = new Database(join(agentDir, 'agent/agent.sqlite'), { readonly: true })
+  try { assert.equal(db.prepare('SELECT revoked FROM clients WHERE id=?').get('host').revoked, 1) } finally { db.close() }
+  const names = await steps(f)
+  assert.ok(names.indexOf('remote-revoke-completed') < names.indexOf('capture-started'))
 })

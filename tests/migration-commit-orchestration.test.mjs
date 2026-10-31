@@ -321,3 +321,46 @@ test('orchestration platform: an unavailable writer enumeration is degraded and 
   assert.equal(summary.activation.criteria.find(entry => entry.id === 'C5').ok, false)
   assert.equal(inspection.world.stopWriteProvable, false)
 })
+
+test('orchestration drain: declared remote client revocation is chained before capture', async t => {
+  const f = await scenario(t), remoteClients = [{ configPath: join(f.dir, 'agent-config.json'), machineId: 'machine-a', clientId: 'host' }]
+  let calls = 0
+  const remoteClientQuarantine = async ({ clients }) => {
+    calls++
+    assert.deepEqual(clients, remoteClients)
+    return { declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) }
+  }
+  const summary = await begin(f.input({ remoteClients, remoteClientQuarantine }))
+  assert.equal(summary.status, 'blocked-activation')
+  assert.equal(summary.steps, 14)
+  assert.equal(calls, 1)
+  const inspection = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.deepEqual(stepNames(inspection).slice(5, 9), ['exclusive-acquired', 'remote-revoke-requested', 'remote-revoke-completed', 'capture-started'])
+  const operation = await readOperationRecord({ privateOutput: f.privateOutput })
+  assert.equal(operation.remoteClientsDigest, sha(json(remoteClients)))
+  assert.equal(inspection.journal.find(row => row.step === 'remote-revoke-completed').evidence.stopWriteProvable, false)
+})
+
+test('orchestration drain: an unconfirmed remote revoke blocks capture and resumes without duplicating the request', async t => {
+  const f = await scenario(t), remoteClients = [{ configPath: join(f.dir, 'agent-config.json'), machineId: 'machine-a', clientId: 'host' }]
+  let calls = 0
+  const remoteClientQuarantine = async ({ clients }) => {
+    calls++
+    if (calls === 1) throw Object.assign(new Error('MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED'), { code: 'MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED' })
+    return { declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) }
+  }
+  const input = () => f.input({ remoteClients, remoteClientQuarantine })
+  await assert.rejects(begin(input()), { code: 'MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED' })
+  const blocked = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.equal(blocked.summary.status, 'blocked-drain')
+  assert.equal(blocked.next, 'fence')
+  assert.equal(stepNames(blocked).includes('capture-started'), false)
+  assert.equal((await readMigrationFence(f.home)).maintenanceActive, true)
+  assert.equal((await resume(input())).status, 'blocked-activation')
+  assert.equal(calls, 2)
+  const recovered = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.equal(stepNames(recovered).filter(step => step === 'remote-revoke-requested').length, 1)
+  assert.equal(stepNames(recovered).filter(step => step === 'remote-revoke-completed').length, 1)
+  assert.ok(stepNames(recovered).indexOf('blocked-drain') < stepNames(recovered).indexOf('remote-revoke-completed'))
+  assert.ok(stepNames(recovered).indexOf('remote-revoke-completed') < stepNames(recovered).indexOf('capture-started'))
+})

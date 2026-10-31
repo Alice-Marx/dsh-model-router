@@ -507,7 +507,8 @@
             "docs/integration/evidence/20261031_migration_commit_orchestration.json",
             "docs/integration/evidence/20261031_migration_atomic_rename.json",
             "docs/integration/evidence/20261031_migration_file_stability.json",
-            "docs/integration/evidence/20261031_product_migration_admission.json"
+            "docs/integration/evidence/20261031_product_migration_admission.json",
+            "docs/integration/evidence/20261101_migration_remote_client_drain.json"
           ]
         },
         {
@@ -531,7 +532,8 @@
             "docs/integration/evidence/20261031_migration_remote_effect_process_quarantine.json",
             "docs/integration/evidence/20261031_migration_remote_effect_outside_job.json",
             "docs/integration/evidence/20261101_migration_remote_client_quarantine.json",
-            "docs/integration/evidence/20261101_migration_remote_client_recovery.json"
+            "docs/integration/evidence/20261101_migration_remote_client_recovery.json",
+            "docs/integration/evidence/20261101_migration_remote_client_drain.json"
           ]
         }
       ]

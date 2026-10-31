@@ -84,6 +84,8 @@ inspect -> intent -> drain -> capture -> maintenance -> activate -> release
 
 排空期间观测到的 holder 只累加计数，不逐条落盘（避免日志膨胀与逐条泄漏 pid）。
 
+E99 在 `exclusive-acquired` 后增加可选的声明远程 client 吊销：`remote-revoke-requested {remoteClients,remoteClientsDigest}` → 调用 E98 适配器并逐项读回 → `remote-revoke-completed`。声明列表及摘要写入不可变 operation，重入必须匹配。返回必须覆盖全部声明且 `revoked:true`、`declaredCredentialAdmissionBlocked:true`、`persistentDeclaredExclusion:true`，否则失败。任何 `MIGRATION_REMOTE_CLIENT_*` 失败记 `blocked-drain` 且不进入 capture；恢复重新执行 drain 的幂等读回，request 不重复，completed 后才允许 `capture-started`。没有声明时保持原 12 步链。
+
 ### 3.4 `capture`
 
 | 项 | 定义 |
@@ -151,6 +153,7 @@ inspect -> intent -> drain -> capture -> maintenance -> activate -> release
 | `operationId` | string | 单一 id（= fence intent/exclusive = plan.id = gate.operationId） | 正则 + 三方一致 |
 | `home` / `privateOutput` | string | canonical 绝对路径 | `realpath` 复核 |
 | `domains` / `domainsDigest` | array / sha256 | 显式数据域与物理根（私有） | 重算摘要 |
+| `remoteClients` / `remoteClientsDigest` | array / sha256 | 可选声明的 `{configPath,machineId,clientId}` 吊销范围（E99） | 闭集、0–64 项、重算摘要；缺省旧记录视为空 |
 | `profilePlanDigest` / `profilePlanStatus` | sha256 / string | 就绪的配置计划绑定 | 必须 `ready` |
 | `limits` | object | 有界参数（轮询、超时、条数上限） | 白名单键 + 整型范围 |
 | `createdAt` / `host` | number / string | 诊断用，不参与判定 | 类型 |
@@ -313,3 +316,4 @@ resumeMigrationCommitOperation({ privateOutput, signal }):
 - stale shared claim 的回收沿用 fence 既有语义（死 owner 即 unlink），编排层不改写，只把观测累加进 `observedHolders`。
 - 诊断缝 `onBoundary`/`onCommitStep` 仅供真实子进程崩溃注入与状态整形使用，不能改变状态。
 - E79 加固：fence 与配置事务的 JSON 原子发布在 `rename` 遇到 `EPERM`/`EACCES`/`EBUSY` 时采用首次尝试加最多 5 次重试、固定间隔 50ms；其他错误立即抛出，耗尽后保留最后一个原始错误。临时文件仍由 `atomicJson` 的 `finally` 清理，重试不改变原子性、严格读或任何激活判据。
+- E99：声明 client 的 `remote-revoke-requested/completed` 是 drain 的可选扩展步骤，只证明授权准入的调用与读回顺序，不改写 `drain-completed` 的本地共享排空含义，也不把该证据提升为在途效果或全域停写。
