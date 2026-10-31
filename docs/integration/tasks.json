@@ -578,13 +578,14 @@
         {
           "id": "W07.2",
           "key": "planner-target-bot",
-          "title": "计划校验、目标 Bot 授权与依赖派发已验证；真实 Planner/完整场景待验收",
-          "status": "in_progress",
+          "title": "计划校验、目标 Bot 授权、依赖派发与真实 Host 离线 Planner 全链路",
+          "status": "completed",
           "evidence": [
             "tests/task-plan.native.mjs",
             "docs/integration/evidence/20261028_dependency_scheduler.json",
             "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
-            "docs/integration/evidence/20261029_remote_write_tasks.json"
+            "docs/integration/evidence/20261029_remote_write_tasks.json",
+            "docs/integration/evidence/20261101_planner_plan_validation.json"
           ]
         }
       ]
@@ -1376,17 +1377,18 @@
     },
     {
       "id": "T08",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "tests/task-plan.native.mjs",
         "tests/task-contract.test.mjs",
         "docs/integration/evidence/20261028_dependency_scheduler.json",
-        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json"
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261101_planner_plan_validation.json"
       ],
-      "notes": "The existing plan validator is reused. Native and actual default-product probes now schedule validated plans after Host-owned target authorization; invalid origin/target/write effect is rejected before rows or provider dispatch. Full product planning/approval and deployment acceptance remain separate.",
-      "level": "actual rc.3 default Host / offline fixture + native",
-      "verifiedOn": "2026-10-28",
-      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; isolated test homes"
+      "notes": "Current native tests reject cycles, self/dangling/duplicate dependencies, duplicate package ids, unknown target Bots, executable paths, MCP URLs, secrets, invalid effects and unknown fields before scheduling. The actual default Host uses the same validator before rows or provider dispatch and rejects a Worker plan targeting Main outside its delegation scope. This covers every T08 criterion without real model inference; deployment and other scenarios remain separate.",
+      "level": "integration",
+      "verifiedOn": "2026-11-01",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; actual rc.3 default Host with offline fixture model and native plan validator"
     },
     {
       "id": "T09",
