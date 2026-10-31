@@ -1565,15 +1565,16 @@
     },
     {
       "id": "T19",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m4_product_machines.json",
-        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261101_protocol_compatibility.json"
       ],
-      "verifiedOn": "2026-10-28",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models",
-      "notes": "Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance."
+      "notes": "agentApiMajor=2 now returns MACHINE_VERSION_UNSUPPORTED with requiredAgentApiMajor=1 and the actual value; MCP_VERSION_UNSUPPORTED returns MACHINE_MCP_VERSION_UNSUPPORTED with requiredMcpProtocolVersion=2025-11-25 and the actual error. The call wrapper preserves the compatibility message and details. Each negotiation fails after one request, creates no operation and does not damage a valid existing machine record. The suite and its new cases are now registered in npm test; full root regression is 1974/1889/0/83."
     },
     {
       "id": "T20",

@@ -73,17 +73,23 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
     if (typeof secret !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(secret)) fail('MACHINE_SECRET_UNAVAILABLE')
     return secret
   }
+  const versionUnsupported = (code,details) => { throw Object.assign(new Error(`${code}: require agentApiMajor=1 and MCP protocol 2025-11-25`), { code, details }) }
   const issue = async (record,botId,scope,identity,signal) => {
     const secret = await secretFor(record)
     signal?.throwIfAborted()
     const value = await request(record.config,'/control/v1/grants',secret,{ botId, taskId: identity.taskId, attemptId: identity.attemptId, roots: scope.roots, tools: scope.tools, ttlMs: 60000 },signal)
-    if (value.machineId !== record.id || value.agentApiMajor !== 1 || value.botId !== botId || value.taskId !== identity.taskId || value.attemptId !== identity.attemptId || typeof value.grantToken !== 'string') fail('MACHINE_IDENTITY_MISMATCH')
+    if (value.agentApiMajor !== 1) versionUnsupported('MACHINE_VERSION_UNSUPPORTED', { requiredAgentApiMajor: 1, actualAgentApiMajor: value.agentApiMajor ?? null })
+    if (value.machineId !== record.id || value.botId !== botId || value.taskId !== identity.taskId || value.attemptId !== identity.attemptId || typeof value.grantToken !== 'string') fail('MACHINE_IDENTITY_MISMATCH')
     return value.grantToken
   }
   const invoke = async (record,token,name,args,operationId,signal) => {
     const response = await request(record.config,'/mcp',token,{ jsonrpc:'2.0',id:1,method:'tools/call',params:{ name, arguments:args, ...(operationId ? { _meta:{ 'dsh/operationId':operationId } } : {}) } },signal)
     if (response.error) fail('MACHINE_PROTOCOL_INVALID')
-    if (response.result?.isError) { const code=response.result.content?.[0]?.text; fail(/^[A-Z][A-Z0-9_]{0,80}$/.test(code) ? code : 'MACHINE_TOOL_FAILED') }
+    if (response.result?.isError) {
+      const code=response.result.content?.[0]?.text
+      if (['MCP_VERSION_UNSUPPORTED','PROTOCOL_VERSION_UNSUPPORTED'].includes(code)) versionUnsupported('MACHINE_MCP_VERSION_UNSUPPORTED', { requiredMcpProtocolVersion: '2025-11-25', actualErrorCode: code })
+      fail(/^[A-Z][A-Z0-9_]{0,80}$/.test(code) ? code : 'MACHINE_TOOL_FAILED')
+    }
     if (!plain(response.result?.structuredContent)) fail('MACHINE_PROTOCOL_INVALID')
     return response.result.structuredContent
   }
@@ -114,7 +120,8 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       const record = {id:input.machineId,config}, identity={taskId:`pair-${randomUUID()}`,attemptId:`attempt-${randomUUID()}`}
       const token=await issue(record,input.probeBotId,{roots:config.roots,tools:['machine_ping']},identity,context.signal)
       const ping=await invoke(record,token,'machine_ping',{},null,context.signal)
-      if(ping.machineId!==record.id||ping.agentApiMajor!==1) fail('MACHINE_IDENTITY_MISMATCH')
+      if(ping.agentApiMajor!==1) versionUnsupported('MACHINE_VERSION_UNSUPPORTED', { requiredAgentApiMajor: 1, actualAgentApiMajor: ping.agentApiMajor ?? null })
+      if(ping.machineId!==record.id) fail('MACHINE_IDENTITY_MISMATCH')
       db.transaction(()=>{
         compare(db.prepare('SELECT revision FROM remote_machines WHERE id=?').get(record.id),input.expectedRevision)
         db.prepare('INSERT INTO remote_machines VALUES(?,?,?,0,?) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,config=excluded.config,revoked=0,health=excluded.health')
@@ -212,7 +219,10 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
           return result
         },{signal:combined})
       } finally { if(lease)authority.release(lease.token);active.delete(call) }
-      }catch(error){const code=/^[A-Z][A-Z0-9_]{0,80}$/.test(error?.code??'')?error.code:'MACHINE_CONNECTION_FAILED';throw Object.assign(new Error(code),{code,remoteDispatchNotSent:!sent})}
+      }catch(error){
+        const code=/^[A-Z][A-Z0-9_]{0,80}$/.test(error?.code??'')?error.code:'MACHINE_CONNECTION_FAILED'
+        throw Object.assign(new Error(error?.message??code),{code,remoteDispatchNotSent:!sent,...(error?.details?{details:error.details}:{})})
+      }
     },
     async probe(input,context) {
       owner(context); keys(input,['machineId','botId','rootId','relativePath'])

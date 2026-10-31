@@ -37,6 +37,39 @@ test('machine host: verifies real Agent identity before pairing; SQLite and publ
   await assert.rejects(f.directory.pair({...f.pair,machineId:'machine-wrong'},context),/MACHINE_IDENTITY_MISMATCH/)
   assert.equal(f.directory.readModel().items.length,1)
 })
+test('machine host: an old agent API major returns compatibility guidance after one request and no state change',async t=>{
+  let f,hits=0
+  f=await fixture(t,{fetchImpl:async(url,options)=>{
+    if(!url.endsWith('/control/v1/grants'))return fetch(url,options)
+    hits++;const body=JSON.parse(options.body)
+    return new Response(JSON.stringify({machineId:f.pair.machineId,agentApiMajor:2,botId:body.botId,taskId:body.taskId,attemptId:body.attemptId,grantToken:'x'.repeat(43)}),{status:200,headers:{'content-type':'application/json'}})
+  }})
+  let error
+  try{await f.directory.pair(f.pair,context)}catch(value){error=value}
+  assert.equal(error.code,'MACHINE_VERSION_UNSUPPORTED')
+  assert.deepEqual(error.details,{requiredAgentApiMajor:1,actualAgentApiMajor:2})
+  assert.match(error.message,/require agentApiMajor=1 and MCP protocol 2025-11-25/)
+  assert.equal(hits,1,'one rejected negotiation is not an automatic reconnect loop')
+  assert.equal(f.directory.readModel().items.length,0)
+  assert.equal(f.agent.store.db.prepare('SELECT count(*) n FROM operations').get().n,0)
+})
+test('machine host: an incompatible MCP result returns compatibility guidance without damaging the paired machine',async t=>{
+  let f,enabled=false,hits=0
+  f=await fixture(t,{fetchImpl:async(url,options)=>{
+    if(enabled&&url.endsWith('/mcp')){hits++;return new Response(JSON.stringify({jsonrpc:'2.0',id:1,result:{isError:true,content:[{type:'text',text:'MCP_VERSION_UNSUPPORTED'}]}}),{status:200,headers:{'content-type':'application/json'}})}
+    return fetch(url,options)
+  }})
+  await f.directory.pair(f.pair,context);await bind(f)
+  enabled=true
+  let error
+  try{await call(f)}catch(value){error=value}
+  assert.equal(error.code,'MACHINE_MCP_VERSION_UNSUPPORTED')
+  assert.deepEqual(error.details,{requiredMcpProtocolVersion:'2025-11-25',actualErrorCode:'MCP_VERSION_UNSUPPORTED'})
+  assert.match(error.message,/MCP protocol 2025-11-25/)
+  assert.equal(hits,1,'the incompatible call is not retried automatically')
+  assert.equal(f.directory.readModel().items.length,1,'the existing valid machine record is not damaged')
+  assert.equal(f.agent.store.db.prepare('SELECT count(*) n FROM operations').get().n,0)
+})
 test('machine host: secret resolver failures are uniform and redacted before any tool action',async t=>{
   let f
   f=await fixture(t,{resolveSecret:async()=>{throw new Error(`resolver failed at ${f.endpoint} with ${f.paired.token}`)}})
