@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-29",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261029_migration_data_archive.json",
+  "level": "private saved-capture Session/reference/financial audit, fixed rc.3 catalog replay in bounded Workers and actual isolated Host on three OS machines",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-data-archive.mjs": "1c67e86d05c24afee0b5adc361136c0c4d38eff8",
+    "packages/orchestration/src/migration-domain-audit.mjs": "8a110ac04b200b3525adf07d5d51ef4a04a16889",
+    "packages/orchestration/src/migration-financial-audit.mjs": "13f1f532884d09101145ee92fda13e27a2ff959b",
+    "packages/orchestration/src/migration-session-reader.mjs": "7393419508dfc022985abb03e465b89b33b9805a",
+    "packages/orchestration/src/migration-session-decoder.mjs": "c321b39d6bd380ab8fdf5ac9d1d63428046449ff",
+    "scripts/integration-migration-audit.mjs": "7e292240deb3a96efd99250d1b431f605cb09979",
+    "scripts/integration-web-search-config.mjs": "62869ac42393eec8afbd79edfea10bc9c57f0310",
+    "tests/migration-domain-audit.test.mjs": "302e370bc4dfb570d0e7b7057ea5f5002bc47654",
+    "tests/migration-financial-audit.test.mjs": "f0b7a31b658e1cd6587798d847d4b9c20078a07a",
+    "tests/migration-session-reader.test.mjs": "2e162426d39497bb0eda4845a6abaf01a857755f",
+    "docs/integration/plan/20261029_migration_domain_audit.md": "5fde19df13be10cd9e2a0f73a9fd02e0449f7d98",
+    "package.json": "49963c06ba56b3a69e93e00f3940c5f0eaa28950",
+    "pnpm-lock.yaml": "3c54b23045f4edc3093ec98015545167e7e54923",
+    ".github/workflows/ci.yml": "f2b73234f00f413c181118a88bdf42cd8c3f4423"
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "migration": {
+        "tests": 125,
+        "pass": 125,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1604,
+        "pass": 1601,
+        "fail": 0,
+        "skipped": 3
+      },
+      "auditHost": {
+        "checks": 6,
+        "status": "passed",
+        "actualModelCalls": 0
+      }
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "migration": {
+        "tests": 125,
+        "pass": 125,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1604,
+        "pass": 1601,
+        "fail": 0,
+        "skipped": 3
+      },
+      "auditHost": {
+        "checks": 6,
+        "status": "passed",
+        "actualModelCalls": 0
+      }
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "migration": {
+        "tests": 125,
+        "pass": 125,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1604,
+        "pass": 1580,
+        "fail": 0,
+        "skipped": 24
+      },
+      "auditHost": {
+        "checks": 6,
+        "status": "passed",
+        "actualModelCalls": 0
+      }
+    }
+  ],
+  "regression": {
+    "sourceSnapshot": {
+      "sourceFiles": 915,
+      "frozenFiles": 297,
+      "sha256": "f549b1e823d2130a34ff3d30176770a5c537b297916afb2fdac4c683f7db775f"
+    },
+    "sourceSnapshotPhase": "implementation and tests before E51 tracking/doc updates",
+    "newAuditTests": 48,
+    "sessionReader": 15,
+    "finance": 18,
+    "domains": 15,
+    "migrationTestsPerPlatform": 125,
+    "rootTestsPerPlatform": 1604,
+    "hostChecksPerPlatform": 6,
+    "hostConfigChecks": 7,
+    "client": "actual --check passed on three machines; product client bytes2061256/inputs118 on local check",
+    "strictDependencies": "pnpm10.34.6 frozen lockfile/strict peers passed with task-local cache",
+    "dependencyChange": "exact devDependency @deepseek-ai/dsh-session-format-catalog0.2.1-rc.3; no SDK upgrade",
+    "remoteDependencies": "existing isolated dependencies reused; new root catalog alias projects the already-installed pinned rc.3 dependency, no clean installation or SDK edit",
+    "frozenVendor": {
+      "files": 297,
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "status": "passed"
+    },
+    "priorRuntimeEvidence": "E45-E50 retain their own historical GUI/default-product/finance/data snapshots"
+  },
+  "ownerSelectedAudit": {
+    "profile": "desktop",
+    "source": "previous owner-only selected-tree capture only",
+    "status": "private-audit-written-and-capture-reverified",
+    "remainingCodes": [
+      "WORKSPACE_REGISTRY_REQUIRED"
+    ],
+    "manualRemovalPreserved": true,
+    "webDeferred": true,
+    "originalDataReadByAudit": false,
+    "originalSourceWritesByTool": 0,
+    "installationPerformed": false,
+    "configurationSwitched": false,
+    "applicationStopped": false,
+    "userDataUploaded": false,
+    "publicReportContainsUserData": false,
+    "databaseConsistent": false,
+    "crossDomainConsistent": false,
+    "requiresStopProof": true,
+    "applySupported": false
+  },
+  "observed": [
+    "Native pure fixed-rc.3 catalog validates current and historical Session generations in isolated bounded Workers. Independently framed Zstd input, complete physical row tails, sequence order, stored versions, filename/header storage addresses and explicit historical child facts are checked without executing plugins, tools or models",
+    "Two active/eight queued decoder slots per process, deadline/abort/heap/source/decoded/row/node/event/reference/frame limits; opaque plugin data stays opaque. Future named generations cannot fall back to an old successful generation. Deep/wide non-Session JSON refuses before recursive interpretation",
+    "Bot/Main/member/Agent/part/parent-child references and typed attachment object paths/sha256/byte counts are reconciled. Secret scopes and unknown raw files remain preserved; missing/duplicate/ambiguous references produce explicit diagnostics",
+    "Financial audit reuses original router spending/subscription/reservation semantics, preserving nullable unknowns, attempt history, global zero/unset limits, unassigned ownership and calendar archives outside the runtime display horizon. Complete lossless SQL exports include all Task/dedup/outbox/receipt/funding tables; exact authority markers select activated ledgers",
+    "DS usage v2 auxiliary/deleted-owner/token int64 data is retained separately from USD receipts. Absent lazy usage DB is not evidence of zero historical calls/spend. A leftover inactive SQLite file beside legacy JSON cannot silently become the authority",
+    "Actual isolated rc.3 Host creates custom saved Bot/workspace paths and an initialized usage DB through its official read endpoint; single-DB snapshots, archive-only audits and repeated identity/reference/money reconciliation pass with zero actual models. Workspace registry remains an explicit separate context gate",
+    "The owner-selected desktop saved capture was audited privately and reverified without touching original data/config or restoring the manually removed plugin; raw paths, user identities, counts, digests, secrets and financial values stay exclusively in private owner artifacts"
+  ],
+  "fixes": [
+    "Initial actual Host planner correctly refused omitted fixture search context; probe now supplies explicit provider IDs. DS usage is lazily initialized: optional fixture-only flag invokes official usage read before taking its snapshot, leaving default configuration probe unchanged",
+    "Dense real captured Session exceeded the initial JSON-node budget; bounded default raised to4million with a dense synthetic regression while64MiB/heap/deadline limits remain",
+    "Win10 Node24.18 and Ubuntu Node22.22 accepted a truncated final frame while local Node24.20 refused it. Both pre-fix migration runs retained one failure; independent RFC8878 frame-header/block/checksum boundary parser now rejects every tested truncated boundary, invalid/skippable tail and excessive window/content allocation before native decode. Final125 migration/root1604/Host6 pass on all three",
+    "Raw archived financial calendar fingerprint prevents deletion of history older than normalized90-day display retention from hiding behind equal normalized totals"
+  ],
+  "limitations": [
+    "Private audit component only; no completed cross-domain migration, live-source database consistency, stopped writer proof, apply/restore/recover/relocation/rollback or public installer/CLI migration flow",
+    "Workspace registry, connectors/memory/remaining storage domains and complete source-domain closure remain unverified. needs-context blocks any claim of full migration readiness; requiresCompleteDomainReview remains true",
+    "Original ACLs, ownership, NTFS alternate streams/xattrs and needed link topologies remain separate restoration gates; E50 primary-stream capture is not an OS-metadata restore",
+    "Private desktop audit checks previously captured bytes only. No live application stop or source-authority switch is inferred; a captured SQLite/WAL image is not an original live consistent backup",
+    "Financial equality is distinct from full SQL-ledger equality. JSON-to-SQL introduction changes ledger structure; source absolute paths/epochs are retained and cannot simply be activated at a new location. Unknown real spend remains unknown",
+    "Codec dependency is exact development tooling; new modules/scripts are not wired to npm public exports, shipped installer or runtime migration entry. Remote shared isolated dependencies are reused, not a clean installation test",
+    "Frame boundary handling follows RFC8878; skippable metadata frames are refused in this supported Session layout. Native codec still validates/decompresses compressed content. Explicit bounds refuse larger inputs instead of truncating them",
+    "No actual user data/credentials/private reports or TLS keys in evidence, public source archive or remote fixtures; internal hashes are consistency checks, not authenticated source signatures",
+    "Full32R/40F/63T/20package approved scope remains,0packages completed. No new real inference/commit/push/tag/Release/npm publication; completion-dependent publication authorization persists"
+  ]
+}

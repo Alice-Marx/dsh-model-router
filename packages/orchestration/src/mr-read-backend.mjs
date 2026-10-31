@@ -4,6 +4,7 @@ import {isAbsolute} from 'node:path'
 import {actualCost} from '../../../.dsh-plugin/shared/run-ledger.mjs'
 import {inspectRouterState} from '../../../.dsh-plugin/shared/router-state.mjs'
 import {canonicalTaskJson,taskHash} from './task-contract.mjs'
+import {markManagedModelRequest} from './model-receipt.mjs'
 
 const digest=value=>createHash('sha256').update(value).digest('hex')
 const unknown=reason=>({outcome:'unknown',reason})
@@ -76,13 +77,13 @@ export function createMrReadBackend({ctx,mr,model,workspace,machineId,workspaceI
       if(!v||Object.keys(v).length!==1||typeof v.task!=='string'||!v.task.trim()||v.task.length>2000)throw new Error('INVALID_TASK_INPUT')
       return v
     },
-    async run({input,signal,binding,operationId,targetHash,attemptNumber,legacyRunIds,previous:previousAttempt,checkpoint,beforeRequest}) {
+    async run({input,signal,binding,operationId,targetHash,attemptNumber,legacyRunIds,previous:previousAttempt,checkpoint,beforeRequest,ownerBotId}) {
       let reference
       const managedExecution={binding:{taskId:binding.taskId,attemptId:binding.attemptId,operationId,targetHash},onPrepared:ref=>{checkpoint(ref);reference=ref}}
       const options={...model,workspace,signal,billing:false,skipToolProbe:true,installedToolIds:[],runnableToolIds:[],skipOfficial:()=> 'Managed read-only API backend',managedExecution}
       const executionCtx=Object.create(ctx)
       Object.defineProperty(executionCtx,'llm',{value:new Proxy(ctx.llm??{}, {get(target,key){
-        if(key==='stream')return request=>{if(!reference)throw new Error('MANAGED_ADMISSION_REQUIRED');beforeRequest();return target.stream(request)}
+        if(key==='stream')return request=>{if(!reference)throw new Error('MANAGED_ADMISSION_REQUIRED');beforeRequest();markManagedModelRequest(request,{botId:ownerBotId,taskId:binding.taskId,attemptId:binding.attemptId,operationId,runId:reference.runId,targetHash,provider:model.provider,model:model.model});return target.stream(request)}
         const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value
       }})})
       try{

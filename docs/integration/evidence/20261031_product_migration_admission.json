@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_superagent_alignment.json",
+  "actualModelCalls": 0,
+  "level": "product gate-to-writer shared-admission wiring (C9); component evidence, not activation or all-domain stop-write",
+  "componentAcceptance": "startBotProduct now acquires migration shared admission immediately before openProductFunding, rechecks the startup gate and holds the claim until product disposal. A live composition causes MIGRATION_FENCE_DRAIN_TIMEOUT, a pending gate refuses writer creation with PROFILE_MIGRATION_PENDING and releases, and dispose permits exclusive acquisition. Both product tests pass. Full two-part root regression totals 1934 tests, 1850 pass, 0 fail, 84 skipped; check:client and all 26 documentation tests pass.",
+  "productAcceptance": "This closes the read-gate to create-writer race for the unified product composition. It does not stop legacy nonparticipants, prove all-domain stop-write, enable activate->committed or advance package scores from 0/20, 1/63 and M0 11/12.",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/product-composition.mjs": "3efe5979dcb7ce27b3524cdb2793f669e3aaba6a",
+    "tests/product-composition.test.mjs": "39468180176e69529ad23180e7491b918394c3b7",
+    "packages/orchestration/src/migration-fence.mjs": "238c10f7480c1879e469d8da1e111c08ab06c966",
+    "packages/orchestration/src/migration-atomic-rename.mjs": "8d31128fba396455997080b4e423a5939711e4c1",
+    "package.json": "a44c659c9ef0162a2e7421bc9618898cafca2168"
+  },
+  "implementation": [
+    "The composition root acquires shared admission before opening the funding store, calls assertMigrationStartupAllowed again and only then opens the writer. This binds writer creation to the existing guard rather than the earlier one-time apply check.",
+    "The claim remains held throughout the product's writer lifetime. Exclusive migration cannot drain it, so migration cannot proceed while the product is active.",
+    "Startup failure releases the claim, and normal dispose releases it after closing the product and authority. No activation path or new criterion is enabled.",
+    "migration-fence.mjs and migration-atomic-rename.mjs are included in package.json#files for the production import closure."
+  ],
+  "testRuns": [
+    "Live composition: shared admission is observed, beginMigrationExclusive answers MIGRATION_FENCE_DRAIN_TIMEOUT, dispose releases and a subsequent exclusive claim succeeds.",
+    "Pending gate: boot rejects PROFILE_MIGRATION_PENDING, dispose releases and a subsequent exclusive claim succeeds.",
+    "Fixture iterations were also required: the initial mock lacked the MR seam, home directory and Cordis tools.guard. These were fixture issues, not product failures, and were corrected without changing the C9 implementation.",
+    "Full two-part root regression totals 1587+347=1934 tests, 1583+267=1850 pass, 0 fail, 4+80=84 skipped (tmp/integration/product-migration-c9-root.log). check:client and all 26 documentation tests pass."
+  ],
+  "preservedFailures": [
+    "The initial test-only mock deficiencies are preserved rather than described as a first-pass success.",
+    "Legacy nonparticipants and all-domain stop-write remain open. This is admission wiring, not activation or a stop-write proof."
+  ],
+  "limitations": [
+    "W06.15 external old-entry and all-domain closure, activation, post-activation rollback and production acceptance remain open.",
+    "The test uses a real composition with synthetic homes, not a real user profile or production migration."
+  ]
+}

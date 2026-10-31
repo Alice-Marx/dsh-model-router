@@ -26,7 +26,7 @@ async function main(args){
   const run=await mkdtemp(join(parent,'suite-'))
   const env={DSH_TASK_DRIVER:pathToFileURL(DEFAULT_TASK_DRIVER).href,HOME:run,USERPROFILE:run,APPDATA:run,LOCALAPPDATA:run}
   for(const key of ['PATH','Path','SystemRoot','windir','TEMP','TMP','TMPDIR','LANG'])if(process.env[key])env[key]=process.env[key]
-  const result=spawnSync(process.execPath,['--test','tests/sqlite-router-state.native.mjs'],{cwd:process.cwd(),env,encoding:'utf8',windowsHide:true,timeout:120000,maxBuffer:4*1024*1024})
+  const result=spawnSync(process.execPath,['--test','tests/sqlite-router-state.native.mjs','tests/model-accounting.native.mjs'],{cwd:process.cwd(),env,encoding:'utf8',windowsHide:true,timeout:120000,maxBuffer:4*1024*1024})
   await writeFile(join(run,'native-tests.log'),result.stdout+'\n'+result.stderr)
   assert.equal(result.status,0,result.stdout+'\n'+result.stderr)
   const count=key=>Number(new RegExp(`(?:#|ℹ) ${key} (\\d+)`).exec(result.stdout)?.[1])

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_os_quarantine.json",
+  "actualModelCalls": 0,
+  "level": "configuration-commit Windows file-stability component fix under W06.14; no activation or product wiring",
+  "componentAcceptance": "Win11 / Node v24.20.0: the root cause is reproduced as delayed ctimeNs commits after real hardlink publication, with dev/ino/size/mtimeNs/nlink unchanged. Final behavior allows only Win32 read-stable ctime drift to trigger at most two 10ms-delayed complete rereads; every other field, phase and POSIX mismatch remains immediate fail-closed. Five deterministic tests pass, the final 5000-iteration real hardlink probe has zero unstable images, all 12 final parallel configuration-commit runs pass, the related combination is 96 tests / 89 pass / 0 fail / 7 skip, and root regression is 1905 tests / 1835 pass / 0 fail / 70 skip.",
+  "productAcceptance": "None. This fixes a false-positive file-image stability observation in the private configuration transaction. It does not prove external writers stopped, change activationSupported / postActivationRollbackSupported / stopWriteProvable, complete W06.15, or advance product scores from 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_migration_file_stability.md",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-file-stability.mjs": "b167089aee0e3802730d43f5e815c09347991076",
+    "packages/orchestration/src/migration-configuration-commit.mjs": "6a4aafe565b4b5963c5a39c7b26a871b6db23960",
+    "tests/migration-file-stability.test.mjs": "2422c54875f2b76c5126c871b73bd428b7f5015b",
+    "docs/integration/plan/20261031_migration_file_stability.md": "94e346755d36698b942897ba21525ab800626510",
+    "package.json": "d8f26bb3f9eaf00b1101ff8a311f7814175ad287"
+  },
+  "implementation": [
+    "SOURCE_CHANGED errors now carry bounded diagnostic details without paths or file contents: open-identity, read-stable, read-length and published-image include the relevant observation, field, expected/actual metadata, digest and phase.",
+    "migrationImageMetadataMismatch strictly compares dev/ino/size/mtimeNs/nlink across lstat/open/read/fstat/lstat. POSIX ctime retains the original pre-open baseline; Windows uses the opened handle as the current read baseline.",
+    "image() retries only when migrationImageCtimeRetry proves Win32 + read-stable + field=ctimeNs. It performs at most two additional complete image reads 10ms apart, reopening and rereading the file and rechecking every field. Exhaustion rethrows the original SOURCE_CHANGED.",
+    "Digest, identity, size, mtime, nlink, open-identity, read-length, published-image and POSIX mismatches never qualify for retry. Concurrent content edits remain refusals, not accepted states."
+  ],
+  "testRuns": [
+    "Diagnostic sampling before the fix: 8 serial plus 16 parallel configuration-commit runs (24 total) all passed. This non-reproduction was not used as a fix claim.",
+    "A real hardlink probe using write stage -> link -> unlink -> lstat/open/read/fstat/lstat failed at iteration 70: only ctimeNs changed from 1793426594235729200 to 1793426594236728300 between the first lstat and opened fstat; dev/ino/size/mtimeNs/nlink stayed identical.",
+    "The first opened-ctime-baseline implementation passed 12 parallel configuration-commit runs but the same 5000-iteration probe failed again at iteration 1588, now at after-read on ctimeNs. That implementation was explicitly judged insufficient and was not delivered as final.",
+    "Final deterministic helper suite: 5 tests, 5 pass, covering pre-open settle, after-read drift, nlink drift on both platforms, POSIX strictness and the closed retry predicate.",
+    "Final real hardlink probe using the same bounded complete-reread contract: 5000 iterations, zero unstable images.",
+    "Final configuration-commit stress: 12 parallel runs, all 12/12 pass. Logs: tmp/integration/migration-source-e81/final-*.log.",
+    "Final related combination: 96 tests, 89 pass, 0 fail, 7 skipped, exit 0. npm run check:client reports OK and the documentation four-suite run is 26/26.",
+    "Final npm test: 1905 tests, 1835 pass, 0 fail, 70 skipped, exit 0 (tmp/integration/migration-source-e81/root-final.log). The five new tests account for the increase from E80's 1900."
+  ],
+  "preservedFailures": [
+    "E79's original SOURCE_CHANGED logs remain unchanged. The E81 investigation also preserves the 24-run non-reproduction, iteration-70 root reproduction and iteration-1588 failure of the first insufficient implementation.",
+    "Only the observed Windows ctime timing false positive is fixed. Other present or future SOURCE_CHANGED causes must still be diagnosed from their field and must not be silently retried.",
+    "W06.15 external isolation, real old entry points, Linux backend, activation and production migration remain open. No user profile or real model call was used."
+  ],
+  "limitations": [
+    "The real probe and stress evidence is win32-only. POSIX strict behavior is covered deterministically but this session did not execute a Linux host.",
+    "Bounded reread is not a stop-write mechanism and does not replace the fence, writer inventory, OS isolation or capture verification.",
+    "Metadata diagnostics intentionally omit paths and file contents; public evidence records only synthetic values and fixed diagnostic categories."
+  ]
+}

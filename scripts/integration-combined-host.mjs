@@ -35,6 +35,20 @@ export function combinedOverlay(mockPlugin) {
   ]
 }
 
+/** Historical component-composition fixture, not the installed product bundle.
+ * The frozen DS bundle owns its runtime and auto search here. Mount the MR
+ * public entry explicitly with product composition off, so this probe does not
+ * activate the unified product's second runtime/search bundle. Real profile
+ * migration must remove/rewrite the legacy bundle and patches separately.
+ */
+export function legacyCombinedProfile(mockPlugin) {
+  return {
+    bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'ds-bot'],
+    patches: [...combinedOverlay(mockPlugin), { insert: [{ id: 'model-router-galgame', name: '@ljwei-stak/dsh-model-router',
+      config: { botProduct: false } }] }],
+  }
+}
+
 async function unusedPort() {
   const server = createServer()
   await new Promise((resolveListen, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolveListen) })
@@ -64,9 +78,13 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
   await mkdir(workspace)
   await symlink(ROOT, join(profile, 'node_modules/@ljwei-stak/dsh-model-router'), process.platform === 'win32' ? 'junction' : 'dir')
   await symlink(join(dsRoot, 'ds-bot'), join(profile, 'node_modules/ds-bot'), process.platform === 'win32' ? 'junction' : 'dir')
+  const composition = legacyCombinedProfile(mockPlugin)
   await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'integration-combined-profile', private: true,
-    dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'ds-bot', '@ljwei-stak/dsh-model-router'] } } }, null, 2))
-  const overlay = combinedOverlay(mockPlugin)
+    dsh: { profile: { bundles: composition.bundles } } }, null, 2))
+  const overlay = composition.patches
+  // Isolated strict compositions provide their own policy/runtime here; the
+  // shipped default single-plugin composition is verified separately by
+  // scripts/integration-product-default.mjs.
   if (security) {
     const plugin = join(anchor, 'security-probe.mjs')
     await copyFile(join(ROOT, 'tests/fixtures/integration-combined/security-plugin.mjs'), plugin)
@@ -88,7 +106,7 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
     const plugin = join(anchor, 'lifecycle-probe.mjs')
     await copyFile(join(ROOT, 'tests/fixtures/integration-combined/lifecycle-plugin.mjs'), plugin)
     const localModule = path => pathToFileURL(join(ROOT, path)).href
-    overlay.push({ id: 'bot', disabled: true }, { id: 'model-router-galgame', config: { requireBotPolicy: true } },
+    overlay.push({ id: 'bot', disabled: true }, { id: 'model-router-galgame', config: { requireBotPolicy: true, botProduct: false } },
       { insert: [{ id: 'integration-owned-ds', name: pathToFileURL(plugin).href, config: {
         dsEntry: pathToFileURL(join(dsRoot, 'ds-bot/index.js')).href,
         authorityModule: localModule('packages/capability-broker/src/authority.mjs'),
@@ -236,7 +254,11 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
     const details = { ...result.diagnostic, usage, exchange }
     await writeFile(join(run, 'diagnostics.json'), JSON.stringify(details, null, 2))
     const workerCall = result.diagnostic.calls.find(call => call.sessionId === worker.id)
+    record('Historical component fixture has one frozen auto search entry and provider',
+      result.diagnostic.automaticSearchEntries?.length === 1 && result.diagnostic.automaticSearchEntries[0] === 'ds-bot/web-search' &&
+      result.diagnostic.searchProviders?.filter(id => id === 'auto').length === 1)
     summary = { status: 'passed', level: 'host-integration-offline', sdkVersion: manifest.version,
+      fixtureComposition: 'frozen-ds-bundle-plus-explicit-mr-entry',
       node: process.version, platform: process.platform, arch: process.arch, frozenDsCommit: revision,
       checks, actualModelCalls: 0, mockAdapterDispatches: result.diagnostic.calls.length,
       auxiliaryModelCalls: result.diagnostic.calls.filter(call => !call.agentLoop).length,

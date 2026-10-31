@@ -95,7 +95,9 @@ receipts with no unresolved hold or amount. It does not dispatch, release holds,
 repair the source or create another invoice. A missing/unknown receipt remains
 blocked; revocation rejects late observations. Schema2 preserves schema1 task
 identities and refuses future versions. Actual budget refusals become
-`waiting-budget`, with explicit retry/cancel and the original deadline.
+`waiting-budget`, with explicit retry/cancel and the original deadline; the
+runner sweep also expires unattended budget waiting at that deadline as
+`failed`/`BUDGET_WAIT_EXPIRED` without another attempt.
 See [receipt reconciliation contract](../../docs/integration/20261027_receipt_reconciliation.md).
 
 ## SQLite MR money authority
@@ -112,3 +114,33 @@ This supersedes the earlier JSON-authority checkpoint for this isolated profile.
 Front-channel Bot/auxiliary admission, complete Task/funding atomic admission,
 per-source receipts and default product migration remain open. See
 [money cutover, rollback and reproduction](../../docs/integration/20261027_sqlite_finance.md).
+
+## Dependency plans (journal schema 3)
+
+`submitPlan` stores a validated plan and all package tasks, attempts, operations,
+outbox intents and dependency edges in one journal transaction. `ready` and
+`claim` both require every predecessor to succeed. A failed predecessor blocks
+undispatched descendants; independent read branches continue. Parent success
+requires every package to succeed. Retrying a failed package is explicit and
+does not automatically replay descendants.
+
+The service exposes `submitPlan/getPlan/cancelPlan`; the default product adds
+`bot_task_plan_start/status/cancel`, owner plan actions and a durable UI projection.
+The actual Agent stamps the caller Session. Only the committed Main's private
+chat can delegate across the Host's Bot directory; other Bots and group calls
+stay within their own subject. Each target is authorized again before dispatch.
+Existing one-package Task and legacy MR entry points keep their contracts.
+
+Plan cancellation aborts active branches and skips undispatched packages.
+An unconfirmed stop keeps the parent `cancelling` and requires reconciliation
+of the original operation. Workspace-write claims lock the Host's canonical
+machine/workspace key. Reads and independent workspaces continue; cancelling
+or recovered unknown operations retain their locks until trusted settlement.
+The write execution facade remains refused: native lock tests prove the journal
+protocol, not actual worktree writer exit or OS containment.
+
+The finance connection also accepts schema 3, preventing cold-start rejection
+after the journal migration. Task claim/outbox and money admission still use
+separate transactions; this change does not claim atomic financial admission.
+See [scheduler design](../../docs/integration/plan/20261028_dependency_scheduler.md)
+and `tests/task-plan-journal.native.mjs`.

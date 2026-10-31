@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "strict-isolated-native-model-accounting",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "bf8bcd520ece1016021004db741c5c2c9b76e077",
+    "packages/capability-broker/src/authority.mjs": "ac0d4f4ff20ff91de79417ec4d97338a5737de0a",
+    "packages/orchestration/src/bot-policy.mjs": "1e7fccb2cc87a89239cbde28b7aa4b0f75cc189d",
+    "packages/orchestration/src/model-accounting.mjs": "8ec1ffa536ad48c2dc7bd803c155a8e10bab6601",
+    "packages/orchestration/src/model-receipt.mjs": "4c9f692e902cfec5b474ce3f755edaaa5f113ec2",
+    "packages/orchestration/src/mr-read-backend.mjs": "2e75b56d611060e425f15b2d22c213432a4b8a5b",
+    "packages/orchestration/src/sqlite-router-state.mjs": "230b54f7e28972a8d9c344159ec25ca973badd3d",
+    "packages/orchestration/src/task-service.mjs": "771b5eef02c149f5a75f6c9e64b2d3c9d66c1dbc",
+    "scripts/integration-finance-probe.mjs": "5a43ef044d8e467fe3664ceaeb3cdf906f4f4c2a",
+    "tests/model-accounting.native.mjs": "8bc991aeecce1489396c5c38a528f59d4a230ac0"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "authority": {
+    "writer": "Front-channel Bot session and auxiliary model calls admit, reserve and settle in the same SQLite orchestration authority as MR runs",
+    "ledgerSchema": 2,
+    "modelReceiptTable": "router_model_calls with identity hash, owner index and monotonic rowid sequence",
+    "sources": [
+      "bot",
+      "aux",
+      "mr-api",
+      "cli",
+      "review"
+    ]
+  },
+  "nativeChecks": {
+    "status": "passed",
+    "driverVersion": "13.0.3",
+    "node": "v24.20.0",
+    "platform": "win32",
+    "tests": 27,
+    "pass": 27,
+    "fail": 0,
+    "breakdown": {
+      "sqliteRouterState": 19,
+      "modelAccounting": 8
+    },
+    "checks": [
+      "Front and auxiliary calls admit before dispatch, keep distinct source rows and settle exactly one receipt each",
+      "Budget denial never reaches the provider and writes no receipt; two concurrent calls cannot reserve the same remaining money",
+      "A missing receipt stays unknown and blocks the next budgeted call",
+      "Caller cancellation after partial usage settles known charges and marks the outcome unknown",
+      "Revocation aborts a quiet provider signal and refuses a late successful return",
+      "Subscription unknown tokens remain unknown, dollar spend stays zero and the call quota rejects another call",
+      "A linked MR request writes source evidence without a second reservation or another money run",
+      "Copied actor, frozen cancellation envelope, foreign managed marker and receipt rewrites fail closed"
+    ],
+    "actualModelCalls": 0
+  },
+  "rootSuite": {
+    "tests": 1329,
+    "pass": 1326,
+    "fail": 0,
+    "skipped": 3
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "nativeSuite": "passed",
+      "rootTests": {
+        "tests": 1329,
+        "pass": 1326,
+        "fail": 0,
+        "skipped": 3
+      },
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the enlarged native finance suite are pending; the parent checkpoint covers the earlier 19-check suite on three machines",
+  "limitations": [
+    "Initial Task/outbox and funding admission are still not one single transaction; model admission and MR run admission are separately durable",
+    "The product default composition does not yet route real DS Bot sessions through the accounting decorator; verification uses the injected decorator and managed MR requests",
+    "Budget waiting expiry, manual unknown-receipt reconciliation UI and per-source usage projection in the product UI are not implemented",
+    "No real model inference, real provider pricing or vendor bill reconciliation is exercised; all amounts use offline fixture pricing"
+  ]
+}

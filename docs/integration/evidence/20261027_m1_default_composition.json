@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-host-offline-default-composition",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "25c8a569da18f2fd4392edcf71c1a859f1b0af1c",
+    ".dsh-plugin/client.js": "0a00fff15858d3fca5ede7bcc9b14c28ac685273",
+    "packages/orchestration/src/product-composition.mjs": "907c86977178fa8ad107e2391ee309a0274c8ef3",
+    "packages/capability-broker/src/authority.mjs": "ac0d4f4ff20ff91de79417ec4d97338a5737de0a",
+    "packages/orchestration/src/principals.mjs": "25011cbf4dd5d2b579e52bd58f95f772281f2660",
+    "packages/orchestration/src/bot-policy.mjs": "1e7fccb2cc87a89239cbde28b7aa4b0f75cc189d",
+    "packages/orchestration/src/ds-lifecycle.mjs": "230b54f7e28972a8d9c344159ec25ca973badd3d",
+    "modules/bot-runtime/index.mjs": "8f7c9b83ac52f8ed444ffb05469f68a94db7a814",
+    "modules/bot-runtime/read-model.mjs": "8aafa7b51f13deb3a24333bde1cd32d406e2cbfc",
+    "modules/bot-runtime/vendor/ds-bot/index.js": "25011cbf4dd5d2b579e52bd58f95f772281f2660",
+    "scripts/integration-product-default.mjs": "0163b5dfc55269e12c9496922416b421c75f7dfd",
+    "scripts/integration-combined-host.mjs": "1613dc5c811dd0306b5a78d194281c6af048b37b",
+    "scripts/integration-product-host.mjs": "896d0fceea492b4bb8c0e37f02f8ffa80d86ccc0",
+    "scripts/build-client.mjs": "2c324ffedfeb57bd0eb77a579e9082a755e116ab",
+    "scripts/integration-product-client.mjs": "0ebcbcb6d00c2ac56be7efdcbebb88fe0e47d082",
+    "tests/product-composition.test.mjs": "2549e6c471c0a85aa928787698d5b0d4c1cbbced",
+    "tests/plugin-split.test.mjs": "241878c81563fb7040852dd232b655ee56245b78",
+    "tests/helpers/strict-ctx.mjs": "25f78e7bb6fc70ab8e96dca6733ddb5ca7e735e3",
+    "tests/cordis-inject.test.mjs": "378cb3c00fc6755f91de1dea63df130ffe9d8c0c",
+    "tests/install-settings-host.test.mjs": "a4d6d5e2d88d97cf6bf4c07fe0bf30a412d224ee",
+    "package.json": "bbf2a9288a6d9ffe9659e4960ec2f9f3c522cda7",
+    ".github/workflows/ci.yml": "e13511d47c13351326f31ca8f9ba23e237ccb76b"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "feature": "The shipped default plugin entry now composes the frozen DS Bot runtime with the MR plugin body inside one Host: one plugin, one policy, one client bundle",
+  "changes": {
+    "host": "apply() composes startBotProduct(): shared authority/directory/policy, provided botIntegrationPolicy before the first await, DS runtime after a bounded raw route-catalog snapshot; guarded so lightweight direct apply() contexts keep legacy behavior; config flag botProduct (default true) allows isolated compositions to opt out",
+    "grant": "compileProductGrant grants the fixed read-only MR surface plus this Bot's exact configured provider/model; an unconfigured model keeps no model authority (strict pause, no silent switching); the catalog is raw because the policy-filtered view refuses outside an execution context",
+    "client": "One shipped bundle: .dsh-plugin/client.js is generated from apps/integration-client/index.jsx (DS surface + MR panel + product navigation); build-client delegates to the product generator; the duplicate apps bundle was removed after byte-identical verification",
+    "packaging": "package.json files list carries the full runtime closure: bot-runtime module, vendored DS host/shared sources, and the orchestration primitives"
+  },
+  "defaultCompositionProbe": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "checks": [
+      "Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Default entry: worker executes permitted MR routing with the composed Bot grant",
+      "Default entry: original DS Bot dispatch and result return survive migration",
+      "Product channel refuses an unauthenticated snapshot at the Host connection admission",
+      "Product read model: real Bots, compiled grants and exact model routes in one snapshot",
+      "Unwired product sections report actionable blocked reasons instead of fake data",
+      "Fresh host reconstructs stable Bot identity and the composed product read model"
+    ],
+    "snapshotSections": { "bindings": "available", "tasks": "blocked", "machines": "blocked", "usage": "blocked" },
+    "restored": { "bots": 2, "bindings": "available" },
+    "actualModelCalls": 0
+  },
+  "regression": {
+    "rootSuite": { "tests": 1335, "pass": 1332, "fail": 0, "skipped": 3 },
+    "productHostFixtureProbe": "passed (isolated fixture composition unchanged)",
+    "combinedHostLegacyPolicy": "passed (9 checks; isolated strict composition unchanged)",
+    "clientChecks": "check:client OK; product-source 297 files; product-client --check passed (2045678 bytes, 118 inputs)",
+    "newUnitTests": "tests/product-composition.test.mjs: 6 checks (grant compilation, diagnostic decorator, defer/conflict semantics, policy provision, raw catalog walk)"
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "defaultComposition": "passed",
+      "fixtureProductHost": "passed",
+      "combinedHostLegacyPolicy": "passed",
+      "rootTests": { "tests": 1335, "pass": 1332, "fail": 0, "skipped": 3 },
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the default composition probe are pending; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "The diagnostic accountStream records bounded identity observations only; per-source receipts and budget admission arrive with the unified SQLite money authority",
+    "Task/machine/usage read-model sections are intentionally blocked until their services are wired; no task actions are available yet",
+    "Default user profile migration and old-install upgrade are not implemented; existing DS and MR state directories keep their formats",
+    "No Electron/Desktop carrier, Docker image, clean-install evidence or real model inference",
+    "The route catalog is refreshed at start, on a slow interval and on grant recompilation; a model added and used within the debounce window pauses its Bot until the next refresh"
+  ]
+}

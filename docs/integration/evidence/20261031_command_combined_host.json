@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261031_command_product_registration.json",
+  "level": "actual default-product AgentLoop container-command acceptance on non-container and real-Docker hosts",
+  "componentAcceptance": "verified within the stated scope",
+  "productAcceptance": "partial",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/product-composition.mjs": "4f525a2fac16fcca3fc1ee78c91fb9e1470b1cb3",
+    "scripts/integration-product-default.mjs": "133281d5ad017dd604d36c846a87fa1510f66afe",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "9af585ec6161adc8e97a6e6e9a62d6be949ec47a",
+    "docs/integration/plan/20261031_command_combined_host.md": "b1432bf3e9e86e94dde667d4f4436d29485d31a1"
+  },
+  "implementation": [
+    "grantFor now publishes remote/container_command_v1 only for workspace-write scopes that also include operation_status and operation_cancel; the backend is no longer registered without the corresponding Bot capability.",
+    "The default product probe expects all four managed backends (mr-api, codex-read, remote-write and remote-command) and drives the real AgentLoop through bot_task_start with a fixed argv alias.",
+    "The plain-Agent branch proves never-started, possiblyApplied:false, confirmed stop and no workspace lock. The real-Docker branch proves exitCode 0, possiblyApplied:true, confirmed stop, one original operation and no retained lock."
+  ],
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "defaultProductChecks": 42,
+      "commandMode": "never-started; no native fallback",
+      "rootRegression": { "tests": 1853, "pass": 1785, "fail": 0, "skipped": 68 }
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "defaultProductChecks": 42,
+      "commandMode": "actual fixed-image Docker container",
+      "logSha256": "956f84940007d0f0de2410ddd2069a0e73b77fe5adf463526908adbe8526880d",
+      "sourcePackage": { "sourceFiles": 1032, "frozenFiles": 297, "sha256": "a0fc738b462d2c668504c1a43c1fe3707c8e7f4e701afb955c9a4b414c7e4f32" }
+    }
+  ],
+  "preservedFailures": [
+    "The first default-product run failed with TOOL_DENIED because grantFor did not publish remote/container_command_v1 even though the backend was registered. The grant compiler was fixed; no authorization was bypassed.",
+    "The next assertion initially read the journal summary instead of the public remote projection. The probe was corrected to assert result.code and result.remote rather than changing the task contract.",
+    "The first minimal remote fixture attempts failed before product execution because integration-upstream-tests, integration-combined-host, task-executors and official-tool-executor modules were absent. A fresh complete-source directory and existing isolated dependency links were used instead of hiding those environment failures.",
+    "One full-root run also hit a transient Windows EPERM rename in migration-configuration-commit. The focused suite then passed 12/12 and the final full rerun completed with zero failures; the original record was not rewritten."
+  ],
+  "observed": [
+    "The default product now exposes all four backends and compiles the command capability into the same Bot grant used by the actual AgentLoop submission.",
+    "Win11 completes all 42 default-product checks, including the non-container never-started command path with no native fallback and no retained workspace lock.",
+    "Ubuntu completes all 42 default-product checks with the real fixed container image: the approved node alias runs once, returns exitCode 0 and produces confirmed stop evidence.",
+    "Final local root regression has 1853 tests, 1785 pass, 0 fail and 68 explicit skips. check:client and integration:check pass. No real model request or user profile write occurred."
+  ],
+  "limitations": [
+    "The remote run reused existing isolated dependencies; it is not a clean-install or production deployment proof. The complete-source archive and the focused overlay hashes are recorded separately.",
+    "Command exposure remains limited to the approved workspace-write/container binding and argv aliases. Broader model-facing command policy and Windows OS-isolated commands remain open.",
+    "This does not close stop-fence slices 4/5, real inference/billing, migration activation, production sleep/topology or full package acceptance."
+  ]
+}

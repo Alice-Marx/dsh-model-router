@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { isAbsolute } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { legacyPolicy, policyRequired, registerPolicyTool, registerPolicyCommand, guardLegacyTools } from './shared/legacy-policy.mjs'
@@ -12,7 +12,7 @@ import { latestVersions } from './shared/latest-versions.mjs'
 import {
   DEFAULT_COOLDOWN_MINUTES, billingOverview, billingPlan, createQuotaTracker, detectQuotaExhaustion, parseQuotaPatterns, vendorKey,
 } from './shared/subscription-billing.mjs'
-import { createRouterState } from './shared/router-state.mjs'
+import { createRouterState, defaultStatePath, resolveStateHome } from './shared/router-state.mjs'
 import { createRunJobs } from './shared/run-jobs.mjs'
 import { createBudgetReservations, reservationSpending } from './shared/budget-reservations.mjs'
 import { beginExecutionLifecycle } from './shared/execution-lifecycle.mjs'
@@ -72,13 +72,25 @@ import {
   planCommandLine,
   setInstallPreferences,
 } from './shared/official-tools-runtime.mjs'
+import { inject as botRuntimeInject } from '../modules/bot-runtime/index.mjs'
+import { createDiagnosticAccountStream, startBotProduct } from '../packages/orchestration/src/product-composition.mjs'
+import { createDeferredRouterState } from '../packages/orchestration/src/deferred-router-state.mjs'
+import { BotRuntimeConfig, normalizeBotRuntimeConfig } from '../packages/orchestration/src/bot-runtime-config.mjs'
+import { assertMigrationStartupAllowed } from '../packages/orchestration/src/migration-startup-gate.mjs'
 
 // Cordis plugin name, matching the profile entry id; unchanged by the 0.13.0 package rename.
 export const name = 'model-router-galgame'
-export const inject = ['commands', 'llm', 'tools', 'typert', 'sandboxPolicy', 'sandbox']
+// One plugin entry: the DS Bot runtime injects are merged with the MR body's.
+export const inject = [...new Set([...botRuntimeInject, 'commands', 'llm', 'tools', 'typert', 'sandboxPolicy', 'sandbox'])]
 
 export const Config = z.object({
   requireBotPolicy: z.boolean().default(false),
+  // Unified Bot product composition (DS Bot runtime + this plugin). Isolated
+  // test compositions provide their own policy/runtime and disable this.
+  botProduct: z.boolean().default(true),
+  // The former ds-bot entry's runtime options, kept separately from MR settings.
+  // Non-volatile: changing home/workspace restarts the owning runtime.
+  botRuntime: BotRuntimeConfig,
   budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
   maxConsultOutputChars: z.number().step(1).min(500).max(50_000).default(12_000).volatile(),
   modelProfilesJson: z.string().max(32_000).default('[]').volatile(),
@@ -112,6 +124,15 @@ export const Config = z.object({
   toolInstallMethodsJson: z.string().max(8_000).default('{}').volatile(),
   toolScriptUrlsJson: z.string().max(8_000).default('{}').volatile(),
   toolAllowScriptInstall: z.boolean().default(true).volatile(),
+  // 托管任务的官方 CLI 入口：executable/sha256/version 必须来自安装核验
+  // （探针期由 pinCodexExecutable 复核），Bot 与任务入参均不能提供入口。
+  // 未配置时默认产品不注册 CLI 任务后端。sessionFactory 仅供宿主级隔离验证
+  // 覆盖真实 createCodexSession，默认不设置。
+  taskCli: z.object({
+    entry: z.object({ executable: z.string().max(4_096), sha256: z.string().pattern(/^[a-f0-9]{64}$/), version: z.string().max(64) }),
+    models: z.array(z.object({ provider: z.string().max(256), model: z.string().max(256), cliModel: z.string().max(128) })).max(64).default([]),
+    sessionFactory: z.string().max(4_096).default(''),
+  }).default(null),
 })
 
 const JSON_OUTPUT = {
@@ -474,6 +495,8 @@ async function stopExecutionLifecycle(lifecycle, error, run = lifecycle.current(
 export async function executeBudgetedConsult(ctx, route, task, config = {}, { signal, limit = 12_000, confirmOverBudget = false, routes = [] } = {}) {
   const problem = taskTextProblem(text(task))
   if (problem) throw new Error(problem)
+  const fundingAdapter=typeof ctx.get==='function'?ctx.get('botFunding'):null
+  if(fundingAdapter){const projected=await fundingAdapter.routeProfiles([route,...routes]);route=projected[0];routes=projected.slice(1)}
   const catalog = [route, ...routes.filter(item => item.provider !== route.provider || item.model !== route.model)]
   const funding = initialFunding(route, { billing: { routes: catalog }, executionChannel: 'harness-llm' })
   route = catalog.find(item => item.provider === funding.route?.provider && item.model === funding.route?.model) ?? funding.route
@@ -590,7 +613,9 @@ async function routesWithLearning(ctx, config, signal, runs, dynamicData = null,
   const discovered = await discoverConfiguredRoutes(ctx, signal)
   const profiled = configuredRoutesWithProfiles(discovered, config)
   const priced = applyPricingSnapshot(profiled, dynamicOptions(config).enabled ? dynamicData?.pricing : null)
-  return applyFeedbackProfile(priced, feedbackProfile ?? buildFeedbackProfile(runs, feedbackOptions(config)))
+  const learned=applyFeedbackProfile(priced, feedbackProfile ?? buildFeedbackProfile(runs, feedbackOptions(config)))
+  const fundingAdapter=typeof ctx.get==='function'?ctx.get('botFunding'):null
+  return fundingAdapter?fundingAdapter.routeProfiles(learned):learned
 }
 
 /** Produce a route recommendation and work packages compatible with official Agent Teams. */
@@ -1221,6 +1246,8 @@ function rerunEstimates(run, ids, targetId, override, routes, dataOptions) {
 
 export async function rerunRecordedStep(ctx, config = {}, { runId, packageId, provider, model, confirmOverBudget = false, confirmWrite = false, confirmUnsandboxed = false, subscriptionChoice = null, workspace, root, signal, ...options } = {}) {
   const { run, saved } = await storedRun(runId)
+  if(run.kind==='model-call')throw new Error('模型调用收据不能作为旧工作包重跑，请在原对话中重试。')
+  if(run.kind==='cli-task')throw new Error('CLI任务必须由原Task创建新attempt重试，不能通过旧工作包入口重放。')
   if (saved.budgetReservations?.[run.id]) throw new Error('该运行仍在执行或费用待核对，请先核对原任务与厂商账单，不能直接重跑。')
   const target = run.packages.find(item => item.id === text(packageId))
   if (!target) throw new Error(`运行记录中没有工作包 ${text(packageId)}`)
@@ -2215,6 +2242,35 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
 
 /** Register model-facing tools and the human /router command. */
 export function apply(ctx, config = {}) {
+  // The unified Bot product composes the frozen DS Bot runtime with this plugin
+  // body inside one Host. Lightweight direct apply() callers (plain-object test
+  // contexts) have no Cordis surface or DS services and keep the legacy MR
+  // behavior; a real DSH Host always provides the runtime's services.
+  const botProductEnabled = (() => { const value = config?.botProduct; return (typeof value === 'function' ? value() : value) !== false })()
+  const productHost = botProductEnabled && typeof ctx?.provide === 'function' && typeof ctx?.effect === 'function'
+    && ['llm', 'tools', 'systemPrompt', 'sessionController', 'sessions', 'sessionTitle', 'workspaceRegistry', 'connection']
+      .every(name => { try { return ctx.get(name) !== undefined } catch { return false } })
+  if (typeof ctx?.provide === 'function' && typeof ctx?.effect === 'function') assertMigrationStartupAllowed({ home: resolveStateHome() })
+  let deferredRouterState = null
+  if (productHost && ctx.get('botIntegrationPolicy') === undefined) {
+    const storageFile = join(resolveStateHome(), 'model-router', 'orchestration.sqlite')
+    deferredRouterState = createDeferredRouterState({ file: storageFile })
+    installRouterStateStore(deferredRouterState.state)
+  }
+  let botProduct
+  const taskCli = (() => { const value = config?.taskCli; return (typeof value === 'function' ? value() : value) ?? null })()
+  try {
+    botProduct = productHost ? startBotProduct(ctx, { accountStream: createDiagnosticAccountStream(),
+      deferredRouterState, storageFile: deferredRouterState?.state.file, legacyFile: defaultStatePath(),
+      // N09: the managed Task runner reuses this plugin's own execution entries,
+      // so the composition never needs a second copy of the MR runtime.
+      mr: { executeConfiguredAssignment, rerunRecordedStep, routerStateStore }, taskCli,
+      runtimeConfig: normalizeBotRuntimeConfig(config?.botRuntime) }) : null
+  } catch (error) {
+    deferredRouterState?.reject(error)
+    throw error
+  }
+  if (botProduct) ctx.effect(() => async () => { await botProduct.dispose() }, 'model-router-galgame: bot product')
   guardLegacyTools(ctx, config)
   // Install addresses (directory, npm source, per-tool method and script source)
   // are volatile refs: Loader changes them without re-applying the plugin.

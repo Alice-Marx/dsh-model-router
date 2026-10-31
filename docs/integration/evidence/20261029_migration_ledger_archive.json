@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-29",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261029_profile_migration_preview.json",
+  "level": "actual SQLite online backup and lossless full-table export using offline fixtures on three OS machines",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-ledger-export.mjs": "585463dc6e4d8150a0c38e54f2599d43f8ecff2c",
+    "packages/orchestration/src/migration-private-files.mjs": "e7147e647af606df1bd40a972ff3467b0139e7a9",
+    "tests/migration-ledger-export.test.mjs": "8dc8e74aa2ecabafce573d1c7feea4b2fe2966e0",
+    "docs/integration/plan/20261029_migration_ledger_archive.md": "c343acf183446b406beb099a91de8aaa310e4c68",
+    "package.json": "994acd59827e51718c63549058308902b97e93e2",
+    "pnpm-lock.yaml": "35cc6be51f979868a36b8527ef369aa7cee8e811",
+    ".github/workflows/ci.yml": "725488629e5f9fd33fe74365e98a1a748f003f49"
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "migration": {
+        "tests": 65,
+        "pass": 65,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1544,
+        "pass": 1541,
+        "fail": 0,
+        "skipped": 3
+      }
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "migration": {
+        "tests": 65,
+        "pass": 65,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1544,
+        "pass": 1541,
+        "fail": 0,
+        "skipped": 3
+      }
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "migration": {
+        "tests": 65,
+        "pass": 65,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1544,
+        "pass": 1520,
+        "fail": 0,
+        "skipped": 24
+      }
+    }
+  ],
+  "regression": {
+    "sourceSnapshot": {
+      "sourceFiles": 901,
+      "frozenFiles": 297,
+      "sha256": "f8660ee6cca7bd9a6792bbf99e5da206624e1d0f6d23c0319bd611be6284f462"
+    },
+    "newLedgerTests": 14,
+    "migrationTestsPerPlatform": 65,
+    "rootTestsPerPlatform": 1544,
+    "client": "actual --check passed on all three machines",
+    "strictDependencies": "pinned pnpm10.34.6 frozen lockfile/strict peers passed; task-local Corepack cache",
+    "frozenVendor": {
+      "files": 297,
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "status": "passed"
+    },
+    "priorRuntimeEvidence": "E45-E47 retained as historical runtime/GUI/Host/finance validation; not rerun by this checkpoint",
+    "dependencies": "reused isolated dependencies, not clean installs"
+  },
+  "interfaces": {
+    "exportMigrationLedger": "private synchronous read-transaction export of a borrowed owner connection",
+    "createMigrationLedgerArchive": "SQLite online backup, private logical export and verified complete manifest in a new owner directory",
+    "verifyMigrationLedgerArchive": "verify member hashes and re-derive logical content from the standalone backup",
+    "summarizeMigrationLedgerArchive": "strict aggregate counts and safety flags only",
+    "databaseConsistent": true,
+    "crossDomainConsistent": false,
+    "requiresStopProof": true,
+    "applySupported": false
+  },
+  "observed": [
+    "Actual schema4 router/journal fixture includes an admitted funded task and independent/dependent package rows; all table rows compare exactly, including plan/dependencies/attempts/operations/outbox, command dedup, original references/hashes, admission intents, reconciliation/events/sequences, workspace locks, raw receipts/holds and funding history",
+    "Online backup preserves committed WAL-only rows while excluding another connection uncommitted writes; the main backup copied alone to a separate path remains readable and passes integrity checks",
+    "Complete sqlite_schema objects, table_xinfo, rowids, WITHOUT ROWID keys, generated columns, metadata, int64, blobs, null/text/real values and extension tables are retained privately; exported SQL and JSON payloads are never executed",
+    "Future user_version, already borrowed transactions, unsupported virtual tables/hidden rowids, foreign-key violations, size/schema/row/value/encoded limits and cancellation fail explicitly; borrowed connection is never closed or its transaction committed",
+    "New private output cannot overlap the source database directory or follow a junction into it; existing directories are refused. Unix0700/0600 and real Windows current-user-only directory/file ACL checks pass",
+    "File hashes/readback and complete re-export detect binary/logical/manifest mutation, including a changed logical row with a refreshed manifest hash. The completion manifest is written only after artifact verification; in-flight backup cancellation has no complete manifest",
+    "Fresh archives include new data while preserving earlier archives. No authority marker, rollback gate, legacy file or actual user profile is modified"
+  ],
+  "fixes": [
+    "Initial offline fixture attempted to insert a legacy link already created by atomic admission, and used an invalid SQL quoted name; fixture corrected, preserving initial9pass/2fail log",
+    "Added descriptor-bounded private JSON reads, SQL length preflight before fetching large row values, independent limits and full re-export verification before completion marker",
+    "Preserved integer/blob types and rowids instead of JSON-coercing unsafe integers; virtual/unaddressable cases fail explicitly rather than silently omitting them"
+  ],
+  "limitations": [
+    "Single-database consistent preservation component only; full Bot/Session/attachment/secrets/usage/workspace domains, shared launcher stop proof and semantic/money/reference reconciliation remain unfinished",
+    "requiresStopProof remains true; capturing active/unknown work does not authorize migration activation or rollback. Existing blocked/skipped rollback gate has not been loosened",
+    "Source migration/backup absolute paths and financial epochs are retained verbatim. Opening this file as an activated authority at another location is unsupported; relocation/recovery must be implemented separately",
+    "Owner API excludes the database source tree; future full migration caller must also exclude every other selected source/config/data domain. Parent directories must be owner-controlled; no same-account/kernel sandbox claim",
+    "Hashes establish internal consistency, not an external signature of origin. A future restore must compare its trusted retained manifest/plan identity as well as reverify the archive",
+    "These modules are not yet connected to a shipped installer/CLI backup command or added to public npm exports/files. No actual user data archive was created or transferred in this checkpoint",
+    "Per-database files are fsynced and read back; whole cross-file migration/power-loss recovery and deployment durability are not accepted here",
+    "Existing isolated dependencies reused; no new production/desktop state/DPI/real CLI inference/clean-install acceptance",
+    "Entire32R/40F/63T/20package scope remains;0package complete. No new real model calls; historical real CLI timeout and unknown spend remain unchanged",
+    "No commit/push/tag/Release/npm publication; full-completion publication authorization persists"
+  ]
+}

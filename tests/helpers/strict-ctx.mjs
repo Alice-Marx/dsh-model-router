@@ -6,8 +6,10 @@
 // a `ctx?.credentials` read shipped in 0.13.0. Wrap mocks with strictCtx() so
 // every test of a Host code path also checks its service accesses.
 // Mirrors `inject` in .dsh-plugin/index.mjs (tests/cordis-inject.test.mjs keeps
-// them equal). Not imported, so helpers never load the Host before a test sets DSH_HOME.
-export const HOST_INJECT = Object.freeze(['commands', 'llm', 'tools', 'typert', 'sandboxPolicy', 'sandbox'])
+// them equal). The DS Bot runtime injects are merged with the MR body's, because
+// the shipped plugin composes both inside one entry. Not imported, so helpers
+// never load the Host before a test sets DSH_HOME.
+export const HOST_INJECT = Object.freeze(['llm', 'tools', 'systemPrompt', 'sessionController', 'sessions', 'sessionTitle', 'workspaceRegistry', 'connection', 'commands', 'typert', 'sandboxPolicy', 'sandbox'])
 
 // Members a real Cordis context has without inject: its own instance
 // properties and the mixins installed by ReflectService.

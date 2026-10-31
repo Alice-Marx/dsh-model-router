@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-30",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261030_workspace_admission_mount.json",
+  "level": "actual Windows native Job atomic creation, owned-tree teardown and creator-death fixtures",
+  "sourceGitBlobs": {
+    "native/windows-desktop/ProcessJob.cs": "01a2446c6e7e069113650e51d1c3c4d18fc576d5",
+    "tests/windows-process-job.native.mjs": "a3ff7e41b0b2f72bbc84948c8a09bcb233196f3c",
+    "tests/fixtures/windows-process-job-legacy.mjs": "16c2eaa0b032907e354203990ec9653df5795354",
+    "tests/fixtures/windows-process-job-control.mjs": "449bb726f9cc0116085da2884160bb32ab2a5aa8",
+    "tests/fixtures/windows-process-job-worker.mjs": "fdbb18a30c8ec5a57df3bb1c6413a37d1a76b448",
+    "tests/fixtures/windows-process-job-agent-parent.mjs": "1fea228fb28b56df5405ff5beabcfed9ae66fe76",
+    "docs/integration/plan/20261029_windows_job_creation.md": "1d4cb8190bfaff318ac1057c7d818dc5d09efdc6",
+    "package.json": "e33bc71a5c238754dbdb03538b6b25b005e5530a",
+    ".github/workflows/ci.yml": "a686fe37e9ea7c1095850b24b892597fbcf32a45"
+  },
+  "regressionEvidence": "docs/integration/evidence/20261030_workspace_admission_mount.json",
+  "negativeWitness": {
+    "status": "expected-failure-reproduced",
+    "sourceGitBlob": "3981ba6619301da3391ff6e9d8c96f15071674a8",
+    "platform": "win32",
+    "createdBeforeJobAssignment": true,
+    "suspendedChildSurvivedLauncher": true,
+    "verifiedFixtureCleanup": true,
+    "actualModelCalls": 0,
+    "rerun": "the permanent suite reproduces and cleans the same old failure on both actual Windows platforms"
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "checks": {
+        "tests": 11,
+        "pass": 11,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "checks": {
+        "tests": 11,
+        "pass": 11,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "checks": {
+        "tests": 11,
+        "pass": 0,
+        "fail": 0,
+        "skipped": 11
+      }
+    }
+  ],
+  "observed": [
+    "An actual deterministic barrier in the exact E57 source proves a suspended child survives launcher death before AssignProcessToJobObject; retained legacy fixture and exact process creation FILETIME cleanup make the failure reproducible on both Windows machines",
+    "STARTUPINFOEX/PROC_THREAD_ATTRIBUTE_JOB_LIST establish membership atomically in CreateProcess; KILL_ON_JOB_CLOSE and non-inherited Job handle end owned descendants, unsupported systems fail closed",
+    "A kernel creator-process handle plus creation-time validation and watchdog stop the Job on actual creator death before create, after create or while descendants run. Normal shutdown signals and joins the watchdog before closing waited handles",
+    "CREATE_NO_WINDOW is retained; UTF-8 JSON decoding preserves Chinese argv. Attribute cleanup only deletes an initialized list. FILETIME identities are decimal strings, and all new executable test programs are saved mjs files",
+    "Eleven actual native checks pass on Win11 and Win10, including precise argv/nonzero result, normal child exit with a descendant, production ignoring test-only hooks, deterministic old failure, launcher deaths and three actual creator-death positions. Linux explicitly skips all11; the original Agent12 checks pass on all three"
+  ],
+  "limitations": [
+    "Process containment is not a Windows account/AppContainer/filesystem isolation boundary; malicious same-account native code is outside the claimed boundary",
+    "packages/cli-runtime/src/native-peer.ps1 has a separate suspended-create/Assign sequence and has not been changed here. Source inspection identifies its analogous startup-death window; installed-CLI normal13 checks do not accept that failure case",
+    "The creator pre-open timestamp check assumes trusted host time is not deliberately rolled backward. After opening, the original kernel handle supplies the lifetime identity",
+    "Windows DPI/session/UAC/RDP/manual tray controls, signed installers, production upgrade and full Task facade remain unfinished"
+  ]
+}

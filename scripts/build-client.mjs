@@ -1,86 +1,30 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { resolve, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
-import * as esbuild from 'esbuild'
+import { join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { generateProductClient } from './integration-product-client.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const ENTRY = join(ROOT, '.dsh-plugin', 'client', 'official-harness.jsx')
+// One shipped client bundle: the unified product client (DS surface + MR panel +
+// product navigation) built from apps/integration-client/index.jsx.
 const OUTPUT = join(ROOT, '.dsh-plugin', 'client.js')
-const PACKAGE = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 
-// Git for Windows checks text files out with CRLF (core.autocrlf=true). The bundle must not
-// depend on that: CSS is inlined verbatim as a string, and the committed client.js on disk
-// may itself have CRLF line endings.
-const lf = text => text.replace(/\r\n/g, '\n')
-const lfCss = {
-  name: 'lf-css',
-  setup(build) {
-    build.onLoad({ filter: /\.css$/ }, args => ({ contents: lf(readFileSync(args.path, 'utf8')), loader: 'text' }))
-  },
-}
-
-function wrapper(body) {
-  return [
-    'window.__ModuleLoader__.load({',
-    `  id: ${JSON.stringify(PACKAGE.name)},`,
-    '  factory: (require) => {',
-    '    var module = { exports: {} };',
-    '    var exports = module.exports;',
-    body.trimEnd(),
-    '    return module.exports;',
-    '  },',
-    '});',
-    '',
-  ].join('\n')
-}
-
+/**
+ * Build or verify the single packaged client. The bundle logic (esbuild
+ * options, LF-CSS normalization, GAL guard and the module-loader wrapper)
+ * lives in integration-product-client.mjs so the build and the product probe
+ * can never drift apart.
+ */
 export async function generate({ check = false } = {}) {
-  const result = await esbuild.build({
-    absWorkingDir: ROOT,
-    entryPoints: [ENTRY],
-    bundle: true,
-    format: 'cjs',
-    platform: 'browser',
-    // Keep readable names/lines while simplifying generated expressions as
-    // the router gains UI features; the standalone bundle remains under 1 MB.
-    minifySyntax: true,
-    target: 'es2020',
-    jsx: 'transform',
-    jsxFactory: 'React.createElement',
-    jsxFragment: 'React.Fragment',
-    // The desktop loader consumes a single self-contained client.js file.
-    // The router client has no story engine or image asset dependency.
-    loader: { '.css': 'text', '.png': 'dataurl', '.webp': 'dataurl' },
-    external: [
-      'react', 'react/*', 'react-dom', 'react-dom/*',
-      '@deepseek-ai/dsh-client-ui-primitives',
-    ],
-    plugins: [lfCss],
-    // Lets the client tell a Host that still runs older plugin code (see client/host-version.mjs).
-    define: { __ROUTER_CLIENT_VERSION__: JSON.stringify(PACKAGE.version) },
-    outfile: OUTPUT,
-    write: false,
-    metafile: true,
-  })
-  const galInputs = Object.keys(result.metafile.inputs).filter(path => /(?:gal-|Gal[A-Z]|aipicture|echo-portraits|echo-sprites)/.test(path))
-  if (galInputs.length) throw new Error(`Router bundle contains GAL dependencies: ${galInputs.join(', ')}`)
-  const output = result.outputFiles.find(file => file.path.endsWith('.js'))
-  if (output === undefined) throw new Error('esbuild did not return a JavaScript bundle')
-  const code = wrapper(output.text)
-  if (!check) {
-    writeFileSync(OUTPUT, code)
-    return { ok: true, output: OUTPUT, bytes: Buffer.byteLength(code) }
+  const result = await generateProductClient({ check, output: OUTPUT })
+  if (result.status !== 'passed') {
+    return { ok: false, output: OUTPUT, errors: [check ? 'client.js is stale; run npm run build:client' : 'product client generation failed'] }
   }
-  let committed = ''
-  try { committed = readFileSync(OUTPUT, 'utf8') } catch { return { ok: false, errors: ['client.js does not exist'] } }
-  return lf(committed) === code ? { ok: true, output: OUTPUT, bytes: Buffer.byteLength(code) }
-    : { ok: false, errors: ['client.js is not generated from official-harness.jsx'] }
+  return { ok: true, output: result.output, bytes: result.bytes }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const result = await generate({ check: process.argv.includes('--check') })
   if (!result.ok) {
-    for (const error of result.errors ?? []) console.error(`[build-client] ${error}`)
+    for (const error of result.errors) console.error(`[build-client] ${error}`)
     process.exitCode = 1
   } else {
     console.log(process.argv.includes('--check') ? '[build-client] OK' : `[build-client] generated ${result.bytes} bytes`)

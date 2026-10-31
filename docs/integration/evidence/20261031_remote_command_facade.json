@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261031_workspace_permissions.json",
+  "level": "versioned container-command Task backend: Agent container_command_v1 plus the Host remote-command backend, journal, contract and machine gating",
+  "componentAcceptance": "verified end to end with real Docker containers on the Ubuntu fixture; dispatch, dedup, unknown-outcome, bounded cancel-with-receipt and alias refusal all pass",
+  "productAcceptance": "partial; product Task/UI registration stays gated per the design's gate 5, and Windows remains a separate OS-boundary task",
+  "design": "docs/integration/plan/20261030_remote_command_task_facade.md",
+  "sourceGitBlobs": {
+    "remote-computer-agent/src/agent.ts": "05cfb80f249bfec767dcd2fdcec4b846f85d046b",
+    "remote-computer-agent/src/protocol.ts": "4a39d99f6129c4c7eb8547ce10123bda2b3d7983",
+    "remote-computer-agent/src/workspace-admission.ts": "60517116b86cc5d4ed636c0c0d0d3612a96e5f1a",
+    "packages/orchestration/src/task-contract.mjs": "dabb52c5e5df51f76fb9d966d55d170bcc8827ce",
+    "packages/orchestration/src/task-service.mjs": "72f705dffd6f2945275324fb5f32bde4c716aaa5",
+    "packages/orchestration/src/task-journal.mjs": "d2d41ef0197ad41e988c8ba28d75bc2aacf61a6d",
+    "packages/orchestration/src/remote-machines.mjs": "3871649d7e9a2ab03fdc8364323c901cae591fde",
+    "packages/orchestration/src/remote-command-execution.mjs": "02596bdf307cfd16a335833cd74b1bc776722dd1",
+    "tests/remote-command-tasks.native.mjs": "9829ed6e00b1f1d9d8c9790ad62f0ba412f80e3f",
+    "package.json": "7f2a9d4263a8aa662b3e365af861f7132b7dad0f"
+  },
+  "implementation": [
+    "Agent: container_command_v1 is a distinct mutating catalog tool. A non-container Agent settles the operation as never-started (notStarted/stopConfirmed/possiblyApplied:false, CONTAINER_COMMAND_UNAVAILABLE) instead of throwing — a thrown refusal would strand an unsettled admitted operation and an unknown Task forever — and there is no native fallback anywhere in the chain; argv is the only input shape. Container admission lists the tool for physical-root exclusion.",
+    "Host contract: parseRemoteTaskCommand accepts only bound machine/root, a bounded workspace-relative directory (empty = root), a 1..64 argv of bounded non-secret strings and a 1000..600000ms deadline; script, env, endpoint, cwd and every extra field are refused.",
+    "Host backend: createRemoteCommandBackend mirrors the remote-file discipline — target descriptor with machine/binding revisions, journal checkpoint before dispatch, bounded polling, receipt validation against the original operation identity and strict supervisor stop evidence (never a terminal status alone), dropped-reply unknown with lock retention and observation-only reconciliation, and dispatch-not-sent settled as never-started. Cancellation requests the original cancel, then observes the original operation to terminal within a bounded window that tolerates a real docker teardown; anything less settles unknown.",
+    "task-service accepts the scoped-remote-command-v1 write contract; task-journal's execution-reference validation maps remote-write→fs_write and remote-command→container_command_v1; remote-machines gains the tool with per-backend mutating-tool grant checks in taskTarget."
+  ],
+  "platforms": [
+    {
+      "platform": "Ubuntu 24.04 / Node v22.22.1 / linux 6.8.0-101-generic / real Docker / pinned node image",
+      "scope": "existing verified fixture with DSH_TEST_DOCKER=1; the container workspace carries the E71 operator grant (the fixture prepares only its own tree)",
+      "combined": "21/21 pass, 0 fail, 0 skipped (remote-command 7 with real containers, remote-write-tasks 14 unchanged)",
+      "logSha256": "48e14906e8bba3b090f95e4c0671da3df966789324fddbb0e3d20aaaaa5b25b4",
+      "rawLog": "tmp/integration/step-command-facade/output/linux-command-facade-raw.log"
+    },
+    {
+      "platform": "Win10 10.0.19044 / Node v24.18.0",
+      "combined": "21 tests, 16 pass, 0 fail, 5 skipped (the five Docker-gated dispatch cases are explicit skips; the contract and non-container refusal cases run for real), exit 0",
+      "logSha256": "476bb31c4303b240a8bb804182b861a2957967d34b925efe6056857e26da577e"
+    },
+    {
+      "platform": "Win11 / Node v24.20.0",
+      "rootRegression": "1828 tests, 1765 pass, 0 fail, 63 skipped, exit 0 (log: tmp/integration/command-facade-root-regression-final.log); the suite is registered in npm test and Windows/Ubuntu CI"
+    }
+  ],
+  "preservedFailures": [
+    "The first Ubuntu run failed 5 dispatch cases: the admission journal rejected the new tool (WORKSPACE_TOOL_NOT_SUPPORTED — the tool list is now explicit), and three test-side issues were found with real containers (success/possiblyApplied semantics, a racy lock assertion, a missing task-level cancel call) plus a 5s cancel window that real docker teardown exceeds and a 0700 fixture workspace that the 65532 worker cannot write — the last is exactly the E71 operator-grant contract, so the fixture now prepares its own permissions. Each was fixed and rerun to green; none were silenced."
+  ],
+  "limitations": [
+    "Product Task/UI registration (design gate 5), the strict-model shell gating review and the Windows OS-boundary command path remain open; this checkpoint does not open model-facing command tools.",
+    "argv aliases resolve through the container configuration's owner-approved executables only; no endpoint, environment, credential or arbitrary host executable is reachable, and worktree/Git stays refused in container mode.",
+    "The bounded cancel-observation window (20s) settling unknown on expiry is conservative by design; a torn-down container beyond the window needs observation-based reconciliation like any other unknown.",
+    "Real model inference, billing integration and user-workspace migration remain separate acceptance work."
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_commit_orchestration.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 5 hardening, component level: bounded retry for transient atomic-JSON rename failures on Windows; no product entry point and no activation",
+  "componentAcceptance": "Win11 / Node v24.20.0, offline: the seven related suites total 64 tests, 63 pass, 0 fail, 1 explicit skip (the Linux-only writer-advisory case 22). Four deterministic helper cases cover EPERM/EACCES/EBUSY, success at the retry bound, exhaustion and immediate non-transient failure. Eight no-wrapper configuration-commit repetitions contain zero rename failures; seven runs are 12/12 and one retains the separate pre-existing MIGRATION_COMMIT_SOURCE_CHANGED flake. Final root regression: 1893 tests, 1824 pass, 0 fail, 69 skipped.",
+  "productAcceptance": "None. This change only retries the atomic publication of fence records and migration-gate.json. It does not prove old-process stop-write behavior, wire the orchestration into a product entry, add an activate->committed path, or change activationSupported / postActivationRollbackSupported / stopWriteProvable. Package and acceptance scores remain 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_migration_commit_orchestration.md section 11 (E79 hardening deviation)",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-atomic-rename.mjs": "8d31128fba396455997080b4e423a5939711e4c1",
+    "packages/orchestration/src/migration-fence.mjs": "238c10f7480c1879e469d8da1e111c08ab06c966",
+    "packages/orchestration/src/migration-configuration-commit.mjs": "2f141935bc007a20aaf6f9936ccbfc7f839cac9f",
+    "tests/migration-atomic-rename.test.mjs": "753aeca5f6e9ef697aff228b919b93d88852bae3",
+    "tests/migration-commit-orchestration.native.mjs": "57e0145274a807e4aad3543c8d2b1cd5414a9bb2",
+    "tests/migration-commit-orchestration.test.mjs": "d129edf049454aa40890a87b3edf3c41f505f718",
+    "docs/integration/plan/20261031_migration_commit_orchestration.md": "a3e11959c7dcb7f197a880d0f17847214d319801",
+    "package.json": "c9ca4a45bbc6b5054682fe6031d1b060a75b971a"
+  },
+  "implementation": [
+    "A shared internal renameMigrationFile helper performs the first rename plus at most five retries at fixed 50ms intervals, only for EPERM, EACCES and EBUSY. Other errors are thrown immediately and exhaustion rethrows the last original error.",
+    "Both fence atomicJson and configuration-commit atomicJson use the helper. Temp-file creation, write, fsync, close, finally cleanup and non-Windows directory sync are unchanged; retries never accept partial JSON or relax strict reads.",
+    "The temporary test-side EPERM wrappers in both orchestration suites and the native crash-loop retry were removed. Crash injection again requires the original child to exit 86 on its first run, so product behavior rather than an operator retry is tested.",
+    "Four deterministic tests are registered in npm test. They verify all three transient codes, success on attempt six, six-attempt exhaustion with five delays, and no retry or sleep for ENOENT."
+  ],
+  "suites": {
+    "tests/migration-atomic-rename.test.mjs": "4 tests, 4 pass, 0 fail",
+    "tests/migration-fence.native.mjs": "7 tests, 7 pass, 0 fail",
+    "tests/migration-fence-hardening.native.mjs": "9 tests, 9 pass, 0 fail",
+    "tests/migration-configuration-commit.test.mjs": "12 tests, 12 pass, 0 fail in the combined acceptance run",
+    "tests/migration-commit-orchestration.native.mjs": "15 tests, 15 pass, 0 fail without test-side rename retries",
+    "tests/migration-commit-orchestration.test.mjs": "12 tests, 11 pass, 0 fail, 1 skip",
+    "tests/ci-contract.test.mjs": "5 tests, 5 pass, 0 fail"
+  },
+  "testRuns": [
+    "Pre-fix sample: six configuration-commit runs, 72 tests total, 67 pass and 5 fail. Three failures are EPERM at temp -> migration-gate.json rename (baseline-2.log has two and baseline-3.log has one); two are the separate MIGRATION_COMMIT_SOURCE_CHANGED (baseline-1.log and baseline-5.log). Logs: tmp/integration/atomic-rename-e79/baseline-*.log.",
+    "Post-fix combined related run: 64 tests, 63 pass, 0 fail, 1 skip, exit 0. This includes the four new deterministic cases and all crash injection without the old test-side wrappers.",
+    "Post-fix stress sample: eight configuration-commit runs, 96 tests total, 95 pass and 1 fail. No EPERM/EACCES/EBUSY or rename failure occurs. Runs 2-8 are 12/12; run 1 preserves one MIGRATION_COMMIT_SOURCE_CHANGED in the real-process crash-boundary case. Logs: tmp/integration/atomic-rename-e79/after-*.log.",
+    "npm test on the code and design tree: 1893 tests, 1824 pass, 0 fail, 69 skipped, exit 0 (tmp/integration/atomic-rename-e79/root-final.log). The four added tests account for the total increasing from E78's 1889 to 1893; the three E78 remote readiness failures did not reproduce in this run and are not rewritten as fixed.",
+    "npm run check:client: [build-client] OK. Documentation four-suite run: 26 tests, 26 pass, 0 fail.",
+    "npm run integration:check passed before and after STATUS regeneration: 32 requirements, 40 features, 63 acceptance scenarios and 20 work packages are valid; scores remain 0/20, 1/63 and M0 11/12."
+  ],
+  "preservedFailures": [
+    "The pre-fix EPERM failures are preserved in baseline logs and were used as the target reproduction; they are not described as a first-pass green baseline.",
+    "MIGRATION_COMMIT_SOURCE_CHANGED was observed twice before this patch and once after it, in different configuration-commit cases. It is a separate pre-existing flake, not a rename retry success or a regression proven to be caused by this patch. It remains open and was not fixed under the E79 scope.",
+    "The Linux leg of case 22 remains unverified on this win32 host; the skip is not counted as a pass.",
+    "E78's three remote concurrency-readiness timeouts were absent from the final E79 root run. No product change was made to those paths, so this single green run is not claimed as a permanent fix."
+  ],
+  "limitations": [
+    "Retry coverage is deliberately limited to atomic JSON publication in migration-fence.mjs and migration-configuration-commit.mjs. The distinct configuration-file retirement rename and other repository rename sites are unchanged.",
+    "Retry handles transient sharing/AV-style errors only; persistent permission, read-only filesystem, missing-path and corruption failures remain fail-closed.",
+    "Synthetic homes and offline fixtures only; no real profile, user DSH data, model inference, activation, production migration or release readiness is claimed."
+  ]
+}

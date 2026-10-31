@@ -1,17 +1,17 @@
 DSH Bot integration · plan 1.1 · active M0
 Work packages completed: 0/20; acceptance scenarios passed: 1/63
 Passed evidence levels: document 1
-Recorded M0 steps completed: 9/12
+Recorded M0 steps completed: 11/12
 Work-package counts do not imply product completion or release readiness.
 
 M0: W01 in_progress | W02 in_progress
-M1: W03 planned | W04 planned
-M2: W05 planned | W06 planned
-M3: W07 planned | W08 planned
-M4: W09 planned | W10 planned
-M5: W11 planned | W12 planned
+M1: W03 in_progress | W04 in_progress
+M2: W05 in_progress | W06 in_progress
+M3: W07 in_progress | W08 in_progress
+M4: W09 in_progress | W10 in_progress
+M5: W11 in_progress | W12 planned
 M6: W13 planned | W14 planned
-M7: W15 planned | W16 planned
+M7: W15 in_progress | W16 in_progress
 M8: W17 planned | W18 planned
 M9: W19 planned | W20 planned
 
@@ -21,14 +21,91 @@ W01 功能清单
   W01.1 completed 方案1.1和来源随项目保存
   W01.2 completed 建立32R/40F/63T目录
   W01.3 completed 固定源码及40组功能出处
-  W01.4 in_progress 逐入口/参数/用户行为展开并核对
+  W01.4 completed 逐入口/参数/用户行为展开并核对
 
 W02 DSH/CLI/存储兼容验证
   W02.1 completed 现有依赖/测试/客户端基线
   W02.2 completed DS完整套件使用rc.3 SDK验证
   W02.3 completed 真实SDK的作用域与执行拦截探针
   W02.4 completed SQLite驱动ABI和事务/重启探针
-  W02.5 in_progress CLI配置隔离/bridge试验
+  W02.5 completed CLI配置隔离/bridge试验（含托管 CLI facade 契约级验证）
   W02.6 completed 同宿主真实挂载与UI验证
   W02.7 in_progress 实际机器拓扑与休眠验证
   W02.8 completed 真实LLM调用前置拦截与用量探针
+
+W03 迁入 DS Bot 运行时
+  W03.1 completed 迁入冻结DS源码并登记来源、许可与字节核对
+  W03.2 completed 产品factory、只读投影、客户端bundle与上游回归
+  W03.3 completed 默认插件入口组合（出厂单插件 = DS 运行时 + MR）
+  W03.4 in_progress 用户配置迁移与旧安装升级（只读预览完成；可恢复应用待验）
+  W03.5 completed 真实SDK只读配置规划、显式新装语义与私有CLI预览
+
+W04 保留 MR 兼容入口
+  W04.1 completed 旧工具/命令/RPC 全部经统一 Policy，无绕过授权
+
+W05 Bot 身份与严格模型策略
+  W05.1 completed 严格模型：未配置/不匹配/范围停用的 Bot 零调用其他模型
+  W05.2 completed 同模型多 Bot 的私有主体、授予与越权拒绝
+
+W06 事务账本与数据迁移
+  W06.1 completed 资金连接所有权、journal借用关闭合同与schema4兼容迁移
+  W06.2 completed 默认只读MR/CLI Task、引用、outbox与原资金同事务准入及进程退出恢复
+  W06.3 in_progress 完整DS/MR配置与用户数据迁移、回滚和生产环境验收
+  W06.4 completed 显式选定数据树的有界只读清点、源校验与内容对账组件
+  W06.5 completed 单账本一致备份与完整Task/依赖/操作/去重/收据私有导出组件
+  W06.6 completed 选定目录主数据流与完整配置计划私有捕获、读回核对组件（不含迁移应用）
+  W06.7 completed 私有副本Session/引用/资金语义审计与对账组件（工作区及完整迁移另验）
+  W06.8 completed 固定SDK工作区注册表/Session归属与归档置顶的私有副本审计组件
+  W06.9 completed 配置维护/安装阶段、持久日志与激活前回退组件（完整激活独立门控）
+  W06.10 completed 已保存记忆/能力包/秘密范围审计组件（恢复/外部服务/全域激活另验）
+  W06.11 completed 停写栅栏切片1：私有只读写者/域清点与物理身份诊断（显式输入、Linux真实/proc句柄写标志、别名同身份、枚举缺口如实、永不冒充停写证明；Windows枚举能力缺口如实报告）
+  W06.12 completed 停写栅栏切片2：单机共享准入与迁移独占栅栏原型（guard原子检查+创建、持久intent跨协调者死亡阻断、排空、崩溃接管验证；仅协议参与方，非停写证明）
+  W06.13 completed 停写栅栏切片3：只读最新回退准备诊断（活跃/unknown/可重试blocked/已启动skipped、未决操作、未投递outbox、开放hold为阻断；not-started skipped仅提示；归档绑定活库比对私有导出；资金rollback guard不动）
+  W06.14 completed 停写栅栏切片5：可恢复提交编排与门控判据（activation 保持 false）
+  W06.15 in_progress 停写栅栏切片4：OS/launcher隔离适配器（Windows Job、Linux cgroup、systemd、DS/MR JSON、SDK、SQLite与Task journal负例已验；执行中操作、机器重启与全域停写未验）
+
+W07 Planner 选择目标 Bot
+  W07.1 completed 私聊 Main 建 Bot、派活、结果回原会话
+  W07.2 in_progress 计划校验、目标 Bot 授权与依赖派发已验证；真实 Planner/完整场景待验收
+
+W08 依赖调度、取消与恢复
+  W08.1 completed 同一派活重复投递指向原任务，attempt 不增加
+  W08.2 completed Host 崩溃重启核对原 attempt，不重复执行不重复计费
+  W08.3 completed 并发限额：每 Bot 并发兑现、等待可见、不丢任务
+  W08.4 completed agent 去重与冲突
+  W08.5 in_progress 依赖调度：失败阻塞下游、独立分支继续、整树取消
+
+W09 远程 agent 与配对
+  W09.1 completed agent协议主体、存储、配对/授权/撤销与Streamable HTTP传输
+  W09.2 completed 产品机器页、host-only secretRef、按Bot授权及受控读取/撤销
+  W09.3 in_progress 常开生产agent、跨机受保护网络配对及休眠拓扑验收
+  W09.4 completed 有界匿名/客户端限流、固定摘要比较与真实本地TLS/mTLS验证
+  W09.5 completed 文件API拒绝Agent控制数据/桌面密钥及别名，保留公开项目读取
+  W09.6 completed 受控远程文件写Task、原操作收据核对与取消效果展示（命令/桌面/隔离另验）
+  W09.7 completed Agent内核生命周期互斥、失效PID竞态和真实进程死亡接管组件
+  W09.8 completed 版本化容器命令Task后端container_command_v1（真实Docker：先journal后派发/重放/丢回复unknown对账/原收据取消保效果/别名拒绝；非容器Agent落never-started无原生回退；产品UI注册与Windows另门控）
+  W09.9 completed 容器命令Task后端产品注册与combined-host端到端场景（composition双后端+目录、计划接受command执行形状、UI收据、模型计划描述、真实AgentLoop授权与真容器/never-started）
+
+W10 Linux 命令、文件与工作区
+  W10.1 completed Linux容器命令/独立监督器与原operation冷恢复组件（根绑定/产品facade/Windows隔离另验）
+  W10.2 completed 实际根写入准入、只读并行、未知锁与Linux挂载身份门控组件（Task/leaf路径/权限另验）
+  W10.3 completed Linux新建文件描述符固定组件在交接后源编辑下的真机复核（不覆盖、单链接、symlink分类；Agent接线仍独立门控）
+  W10.4 completed 持久工作区root/config generation绑定与失效（同配置重启不设栅、配置变更fail-closed栅栏、ping摘要暴露；跨dataDir协调与真实权限另验）
+  W10.5 completed Linux fs_write描述符固定发布接入（新建文件0600单链接、现有目标FILE_CHANGED、匹配哈希OVERWRITE_UNSUPPORTED、发布后失败unknown保留锁；Windows路径不变）
+  W10.6 completed 真实工作区权限边界（容器UID65532真机探针：授权可读写、0600/0700 fail-closed、无提权）与跨dataDir物理根协调（dev:ino声明文件+死锁回收；组授权/跨用户/Windows另验）
+
+W11 CLI 绑定与能力桥接
+  W11.1 completed CLI运行时契约、私有引导、原生桥接与租约续期
+  W11.2 in_progress CLI身份/位置与产品facade（契约已验；真实推理及完整远程位置待验）
+  W11.3 completed 安装核验Codex0.163.0真实MCP/只读profile/正常回收组件（无真实推理）
+
+W15 Windows helper 与安装
+  W15.1 completed 桌面helper、受限named pipe ACL与合成窗口探针
+  W15.2 in_progress Win10/Win11实机验收、DPI/多屏与安装包分发
+  W15.3 completed Win10/11原子Job创建、真实父进程死亡与UTF-8参数组件（账户/安装另验）
+
+W16 DPI、会话变化与桌面互斥
+  W16.1 completed 真实Win10当前100%与Win11当前150%下的窗口/IPC/输入/互斥基础验证
+  W16.2 planned 125%/多显示器/移动和DPI及分辨率变化矩阵
+  W16.3 in_progress 真实锁屏/UAC/RDP/托盘人工暂停停止与完整桌面授权矩阵
+  W16.4 completed helper全局仲裁、Agent在途取消撤权、未知收据及双Windows真实输入效果

@@ -61,7 +61,7 @@ jobs:
   integration-host:
     name: Combined host / ${{ matrix.os }} / Node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -96,6 +96,8 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
           pnpm --dir tests/fixtures/integration-host install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
+      - name: Build the pinned product SQLite addon
+        run: pnpm rebuild better-sqlite3
       - name: Exercise real combined Sessions with an offline model
         run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --legacy-policy ${{ matrix.security }}
       - name: Verify strict automatic Bot lifecycle and authenticated Gateway RPC
@@ -116,3 +118,61 @@ jobs:
         run: node scripts/integration-finance-probe.mjs
       - name: Verify real MR managed execution, cancellation and host interruption
         run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --tasks
+      - name: Verify vendored DS Bot product source against frozen bytes
+        run: node scripts/integration-product-source.mjs
+      - name: Verify the shipped default single-plugin product composition
+        run: node scripts/integration-product-default.mjs
+      - name: Verify product UI refresh ordering and ambiguous action responses
+        run: node --test tests/product-refresh-order.test.mjs
+      - name: Verify the native CLI bridge peer and private bootstrap
+        run: node scripts/integration-cli-native.mjs
+      - name: Verify CLI atomic Windows Job creation and creator death
+        if: runner.os == 'Windows'
+        run: node --test tests/cli-native-peer-job.native.mjs tests/cli-native-peer-probe.native.mjs
+      - name: Verify CLI Task fencing, shared money receipts and recovery without model calls
+        run: node scripts/integration-cli-execution.mjs
+      - name: Verify the remote computer agent native tool catalog
+        run: node scripts/integration-remote-agent.mjs
+      - name: Verify kernel-held Agent ownership, stale-PID races and real controller death
+        run: node --test tests/remote-agent-instance.native.mjs
+      - name: Verify cancellation reports only evidenced process stops
+        run: node --test tests/operation-cancel-evidence.native.mjs
+      - name: Verify bound stop-proof and persistent retry dispatch fences
+        run: node --test tests/task-retry-stop-evidence.native.mjs
+      - name: Verify atomic Windows Job creation and actual creator death without a desktop
+        run: node --test tests/windows-process-job.native.mjs
+      - name: Verify physical workspace identities and durable alias/overlap write admissions
+        run: node --test tests/workspace-identity.native.mjs tests/workspace-admission.native.mjs tests/workspace-agent.native.mjs
+      - name: Verify actual Linux isolated command operations and Agent process death recovery
+        if: runner.os == 'Linux'
+        run: node scripts/integration-remote-container.mjs
+      - name: Verify anonymous abuse limits, real TLS and mutual TLS without model calls
+        run: node --test tests/remote-auth.native.mjs
+      - name: Verify helper protocol arbitration, cancellation and private control paths without a desktop
+        run: node --test tests/desktop-client.test.mjs tests/desktop-lease.native.mjs tests/remote-private-roots.native.mjs
+      - name: Verify preserved runtime configuration and unified automatic search without external requests
+        run: node scripts/integration-web-search-config.mjs
+      - name: Verify read-only migration planning, bounded inventory and private preview output
+        run: node --test tests/profile-migration-plan.test.mjs tests/migration-snapshot.test.mjs tests/migration-preview-cli.test.mjs
+      - name: Verify complete private ledger snapshots and lossless Task and receipt exports
+        run: node --test tests/migration-ledger-export.test.mjs
+      - name: Verify selected data private capture and source preservation
+        run: node --test tests/migration-data-archive.test.mjs
+      - name: Verify bounded Session decoding, reference and financial migration audit
+        run: node --test tests/migration-session-reader.test.mjs tests/migration-financial-audit.test.mjs tests/migration-domain-audit.test.mjs tests/migration-workspace-audit.test.mjs
+      - name: Verify recoverable configuration writes, real process exits and startup maintenance gate
+        run: node --test tests/migration-configuration-commit.test.mjs
+      - name: Verify actual rc.3 startup blocks pending migration and restores original identity after rollback
+        run: node scripts/integration-migration-gate.mjs
+      - name: Verify migration audit against the isolated rc.3 host without model calls
+        run: node scripts/integration-migration-audit.mjs
+      - name: Verify saved memory, capability packs and secret scopes without replay or external mounts
+        run: node --test tests/migration-supporting-domains.test.mjs
+      - name: Verify Host machine pairing, scoped MCP reads and remote ticket revocation
+        run: node scripts/integration-remote-machines.mjs
+      - name: Verify tracked remote file writes, durable receipt observation and cancellation without replay
+        run: node --test tests/remote-write-tasks.native.mjs
+      - name: Verify the migrated DS upstream unit and component suite
+        run: node scripts/integration-product-upstream-tests.mjs
+      - name: Verify the actual migrated product host with an offline model
+        run: node scripts/integration-product-host.mjs

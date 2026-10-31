@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "strict-isolated-remote-agent-native",
+  "sourceGitBlobs": {
+    "remote-computer-agent/src/agent.ts": "1e0c6db9a24b7a0c9979b804bf92144419b882c6",
+    "remote-computer-agent/src/protocol.ts": "1c5328a0d72003a4440959717addf325165ee0d1",
+    "remote-computer-agent/src/store.ts": "7c4742548c0b17469b795abedadd55c2792ab86b",
+    "remote-computer-agent/src/scope.ts": "c448ab257e0f5ff862cbc30d353ddaec7232ea0f",
+    "remote-computer-agent/src/transport.ts": "17e6c78593e78fec61d0de932a10b0973da2a9b2",
+    "remote-computer-agent/src/browser.ts": "7f9fc2ca05b81ec5e39781689627e0f4686d3770",
+    "remote-computer-agent/src/desktop.ts": "e5e4284f393fd062147214051e96ab43c4651a8b",
+    "remote-computer-agent/src/cli.ts": "4392cafdfa3f626cabc7d29ea5eab187882a74d3",
+    "remote-computer-agent/build.mjs": "b01f4bb563023b9c45c127ad525b10b98605b023",
+    "native/windows-desktop/Program.cs": "bd26e1f474838dd0456e04a498ed423b291ceca8",
+    "native/windows-desktop/ProcessJob.cs": "3981ba6619301da3391ff6e9d8c96f15071674a8",
+    "native/windows-desktop/build.ps1": "2fb5e10803f8a545601fba9ca4e0963b8a1282e3",
+    "scripts/integration-remote-agent.mjs": "f8c924a1d40f79efa67290d4b7359052b356936f",
+    "scripts/integration-remote-agent-browser.mjs": "59e8b65451d06d7d60fd96a457323430ac521b81",
+    "scripts/integration-remote-agent-desktop.mjs": "9a861b036b40abba9dad91f2f1e19e365f62e555",
+    "tests/remote-agent.test.mjs": "1b2d0ff3dc20f3cc2c6f727dd0cf73b091fdf85f",
+    "deploy/remote-agent/install-linux.sh": "8a4f6bce7cd36d9ccae77ad0a1d3707b3a35b131",
+    "deploy/remote-agent/install-windows.ps1": "3eed17aaf6053ec102212c632b32165ca6950a72"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "agentNativeSuite": {
+    "status": "passed",
+    "driver": "better-sqlite3@13.0.3",
+    "tests": 11,
+    "pass": 11,
+    "fail": 0,
+    "checks": [
+      "Pairing, local rotation/revocation, short grants and stable machine identity",
+      "Root authorization, traversal, ADS and symlink escape fail before reads/writes",
+      "Atomic file CAS, bounded reads, pagination and operation idempotency",
+      "Running admissions become unknown on restart; the same ID never replays",
+      "Real argv process, cwd, separate artifacts and immutable owner",
+      "Real timeout terminates the owned process tree without a delayed grandchild side effect",
+      "Cancel and active grant revocation stop owned subprocesses",
+      "Four network modes reject wildcard, unprotected HTTP and arbitrary VPN bind",
+      "Real Streamable HTTP initialize/list/call, Host/Origin auth and secretRef client",
+      "Remote worktree conditional integration preserves source changes",
+      "Desktop without a configured interactive helper fails explicitly"
+    ],
+    "actualModelCalls": 0
+  },
+  "browserProbe": {
+    "status": "passed",
+    "browserVersion": "156.0.8078.4",
+    "engine": "chromium",
+    "checks": [
+      "Real Playwright open/snapshot/Unicode fill/click",
+      "Stale snapshot rejected",
+      "Bot-context cookie isolation",
+      "Cross-owner access denied",
+      "Redirect and file URL denied"
+    ],
+    "limitations": [
+      "Explicit local browser executable may differ from the distribution-pinned browser build",
+      "Remote browser OS dependency installation remains separate",
+      "No script/upload/download or persistent-profile API yet"
+    ]
+  },
+  "desktopProbe": {
+    "status": "passed",
+    "dpi": 96,
+    "captureBackend": "GDI-PrintWindow",
+    "checks": [
+      "Named-pipe token denied",
+      "Live named-pipe ACL verified",
+      "Interactive target screenshot metadata",
+      "Cross-Bot desktop lease denied",
+      "Visible target hit-tested click",
+      "Real Unicode SendInput without clipboard",
+      "Consumed screenshot denied",
+      "Wrong session denied"
+    ],
+    "limitations": [
+      "Synthetic own-window fixture only; other apps, UAC, lock and RDP are not exercised",
+      "Single monitor and current DPI only; 125%/150% and multi-monitor remain acceptance gates",
+      "GDI backend only; Windows Graphics Capture is not validated",
+      "Win10 22H2 real-machine acceptance and signed installer distribution remain open"
+    ]
+  },
+  "rootSuite": {
+    "tests": 1329,
+    "pass": 1326,
+    "fail": 0,
+    "skipped": 3
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "agentNative": "passed",
+      "browser": "passed",
+      "desktop": "passed",
+      "rootTests": {
+        "tests": 1329,
+        "pass": 1326,
+        "fail": 0,
+        "skipped": 3
+      },
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 agent runs are pending; Linux process-group and python peer paths are implemented but only exercised locally on Windows in this checkpoint",
+  "limitations": [
+    "No product Host-side machine page, pairing UI, secretRef flow or Bot machine grants; the agent is a standalone runtime with native probes",
+    "No production always-on deployment, WireGuard/Tailscale/Cloudflare Tunnel/public TLS connection, pairing ceiling or hibernation topology evidence",
+    "Remote CLI adapter execution through the agent remains a separate Host integration gate",
+    "Installers and Docker image exist under deploy/ but have no clean-environment install or upgrade evidence"
+  ]
+}

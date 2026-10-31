@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_linux_quarantine.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4, delegated non-root cgroup-v2 process-tree component with real Ubuntu root and nobody execution; W06.15 remains in_progress",
+  "componentAcceptance": "Ubuntu 24.04.4 / Node v22.22.1: the same suite passes 4 tests with 1 skip as root and as uid/gid 65534 (nobody) inside an explicitly delegated cgroup. Three consecutive nobody runs plus the final run pass, including active stop, direct-child exit, coordinator SIGKILL, parent/descendant membership and rejection of the root-owned cgroup. The delegated root is removed with no residue. Local related combination: 101 tests, 90 pass, 0 fail, 11 skipped. Root regression: 1910 tests, 1836 pass, 0 fail, 74 skipped.",
+  "productAcceptance": "None. This is a transient delegated-cgroup component, not an installed service, persistent restart fence, account provisioning flow or product activation. External launchers, unknown writers, real old DS/SDK/MR entry points, full-domain stop-write and production topology remain open. externalRestartBlocked, persistentExternalExclusion and stopWriteProvable stay false; scores remain 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md section 5 (E83 delegated cgroupRoot contract)",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-linux-quarantine.mjs": "592a4a241c7fd2a48cbb449b62d6acb30e44b2cc",
+    "packages/orchestration/src/migration-linux-quarantine.py": "5309e5f92df866191213f2d8fd3b713ea251fc80",
+    "tests/migration-linux-quarantine.native.mjs": "85e89b4b9450cbd7fad9e1bf6a89f1b32aa24d62",
+    "docs/integration/plan/20261031_migration_os_quarantine.md": "f5c9a0473a649cedfc4eac3eb853c093e892d067",
+    "package.json": "c297095ce1a782aae007291b2056803b505f91c3"
+  },
+  "remoteSha256": {
+    "packages/orchestration/src/migration-linux-quarantine.mjs": "84a5d57df60ee0a6f50c1d44172149b83421904bad10a5f3fc933cc1b2d07425",
+    "packages/orchestration/src/migration-linux-quarantine.py": "0a2ed44a172d141eea501ce3d40c906aef431cf46c4d071d29c71f5dcf96609e",
+    "tests/migration-linux-quarantine.native.mjs": "78f60ea49403daaec9dd09d791f419601d60091488a4f3929c29ed26522b99cd"
+  },
+  "implementation": [
+    "cgroupRoot defaults to /sys/fs/cgroup and may name a delegated descendant. JS and Python canonicalize it, require it to remain inside cgroupfs and require ownership by the current effective uid; nobody cannot substitute the root-owned cgroup.",
+    "Python additionally reads /proc/self/cgroup and refuses MIGRATION_LINUX_QUARANTINE_SUPERVISOR_OUTSIDE unless the supervisor is already inside the delegated root or its descendant. This is required because process migration permission is evaluated against the common ancestor, not only the child directory's mode bits.",
+    "The test provisioner chowns only the transient delegated directory and its cgroup.procs, then moves the test shell into that cgroup before setpriv to nobody. No permanent account, service, sudo rule or system-wide delegation is installed.",
+    "The E82 pre-exec membership, cgroup.kill, empty-procs receipt, explicit rmdir and three false external-exclusion fields are unchanged."
+  ],
+  "testRuns": [
+    "systemd-run --scope --uid=nobody -p Delegate=yes was probed first: the scope directory remained root-owned and nobody could not mkdir below it. This was not counted as non-root evidence.",
+    "A root-created transient delegated directory allowed nobody to create and remove child cgroups. A later preexec_fn failure showed that directory ownership alone was insufficient; chowning the parent's cgroup.procs still did not authorize a supervisor outside the delegated root.",
+    "The test's implicit global crypto dependency was exposed by the cleared nobody environment and fixed with an explicit node:crypto randomUUID import before isolation behavior was retested.",
+    "After the test shell entered the delegated root before dropping privileges, the nobody suite passed 4 tests with 1 skip. Three consecutive runs plus the final run have the same result; the root regression also passes 4 with 1 skip. Logs: tmp/integration/migration-linux-quarantine-e83/root-final.log and nobody-final.log.",
+    "Final cleanup checked empty child procs, removed the delegated root and found no E83 cgroup residue. Remote and local SHA-256 values match for both production modules and the test.",
+    "Local related combination: 101 tests, 90 pass, 0 fail, 11 skipped. check:client and all 26 documentation tests pass. Final npm test: 1910 tests, 1836 pass, 0 fail, 74 skipped (tmp/integration/migration-linux-quarantine-e83/root-final.log)."
+  ],
+  "preservedFailures": [
+    "The systemd-scope refusal, implicit test-global failure and preexec_fn common-ancestor permission failure are preserved as investigation evidence; only the final correct delegated-supervisor model is presented as passing.",
+    "Supervisor SIGKILL, external restart, real old entry points and production account/service provisioning were not tested. Nobody evidence applies only while the correct delegated root and membership preconditions hold.",
+    "No real profile, production process, model inference, commit, push or release was involved."
+  ],
+  "limitations": [
+    "W06.15 remains in_progress. Persistent external restart exclusion, real old entry points, all-domain handle closure and production acceptance remain open.",
+    "A production service manager must provision an equivalent owned delegated root and start the supervisor inside it; this session did not install or endorse a permanent privileged configuration.",
+    "A cgroup remains process containment rather than an account, filesystem or storage fencing boundary."
+  ]
+}

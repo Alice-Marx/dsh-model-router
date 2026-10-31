@@ -115,16 +115,27 @@ export function createAuthority({ now = () => performance.now(), maxTtlMs = 300_
       return Object.freeze({ token, ttlMs })
     },
     list(token, binding) { return [...validLease(token, binding).tools].sort() },
+    renew(token, binding, { ttlMs = 30_000 } = {}) {
+      // Host-only in-memory token. Expired leases and old revisions never revive.
+      const lease = validLease(token, binding)
+      if (!Number.isSafeInteger(ttlMs) || ttlMs < 1 || ttlMs > maxTtlMs) refuse('INVALID_TTL')
+      lease.expiresAt = now() + ttlMs
+      return Object.freeze({ ttlMs })
+    },
     async run(token, binding, toolName, execute, { signal } = {}) {
       const lease = validLease(token, binding)
       if (!lease.tools.has(toolName)) refuse('TOOL_DENIED')
       if (typeof execute !== 'function') refuse('INVALID_HANDLER')
       const controller = new AbortController()
       lease.active.add(controller)
-      const timer = setTimeout(() => {
+      let timer
+      const checkExpiry = () => {
+        if (!leases.has(lease.key)) return
+        if (now() < lease.expiresAt) { timer = setTimeout(checkExpiry, Math.max(1, Math.ceil(lease.expiresAt - now()))); return }
         cancel(lease, 'LEASE_EXPIRED')
         controller.abort(new PolicyError('LEASE_EXPIRED'))
-      }, Math.max(1, Math.ceil(lease.expiresAt - now())))
+      }
+      timer = setTimeout(checkExpiry, Math.max(1, Math.ceil(lease.expiresAt - now())))
       const combined = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
       try {
         combined.throwIfAborted()

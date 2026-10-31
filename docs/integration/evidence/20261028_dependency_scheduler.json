@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-28",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-host-offline-default-composition + native SQLite protocol",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "packages/orchestration/src/task-journal.mjs": "2d951965f0e323941831954bfe1f28ddf4b540e3",
+    "packages/orchestration/src/task-service.mjs": "fe673890dcaf47de7706086b419e80be6c5cc25f",
+    "packages/orchestration/src/task-tools.mjs": "906c90dd535d1dc2e23fa0969f4e5bd253413b5c",
+    "packages/orchestration/src/task-contract.mjs": "27080fbfc3e2e95f3ba4167fb79c14b0cae5113e",
+    "packages/orchestration/src/sqlite-router-state.mjs": "fc0990ec45b4ecb39b6c06a0771c75494f293c30",
+    "packages/orchestration/src/ds-lifecycle.mjs": "28eb95e8b229c86e328803d63f5f1011fd4d9c27",
+    "packages/orchestration/src/product-composition.mjs": "646a9b0f1bec4af3f13ff80e2f71b5ed0bd72c7d",
+    "modules/bot-runtime/index.mjs": "e7a3d0b2398fd7f497f9829ff9b631d2895f5921",
+    "modules/bot-runtime/read-model.mjs": "32b5d88f3f34f72c478b8b093afcfd9905fdd630",
+    "apps/integration-client/panels.jsx": "23ac01286d3864d061d9cc9196a52b1dc3235cea",
+    "apps/integration-client/api.mjs": "604ae7c57273f83d35d8dc87e426e21a025acc17",
+    ".dsh-plugin/client.js": "fbbeb0952e0d10a01f71befd020a362a601bb7b0",
+    "tests/task-plan-journal.native.mjs": "7429809485fd66cfaaa230c06c443bf2b4c379f5",
+    "tests/task-journal.native.mjs": "b8d483518c59008a5e6ec669361a391d1c2ec52c",
+    "tests/ds-lifecycle.test.mjs": "e730f2f11f7ea6cc57f7e25b79dfa6ff75ad364c",
+    "tests/bot-runtime-ui.test.mjs": "00267af9b6ecdfbdfc8ae026e154ab48c4795ef8",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "9f7292bfbec13ff71d94a86564fa276f9cd61cbf",
+    "scripts/integration-product-default.mjs": "4304e0f24da24ef506af99c33d27e12e55681050",
+    "package.json": "ec6f87117d9aee8ed8221ce2d97ecc6332d7e04b",
+    "docs/integration/plan/20261028_dependency_scheduler.md": "c743bbf9526b9c1d523df1f0674222935d0bbc19"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "changes": {
+    "schema": "Journal version 3 adds task_plans, task_plan_packages, task_package_deps and task_workspace_locks; legacy v1/v2 journals migrate without changing existing task identities; funding accepts the shared version",
+    "submission": "One journal transaction creates the plan, all package task/attempt/operation/outbox rows and dependency edges. Owner request keys and canonical hashes deduplicate; invalid targets roll back every row",
+    "readiness": "Both ready and claim require every predecessor succeeded. Failure blocks undispatched descendants; independent branches continue. Parent success requires every package succeeded",
+    "cancellation": "Package cancellation propagates down its dependencies; plan cancellation covers every branch. Undispatched packages are skipped. Unknown stop preserves parent cancelling and requires original-operation reconciliation",
+    "locks": "Workspace-write claim atomically locks the Host machine/workspace pair; reads and independent workspaces continue. Cancelling and recovered unknown operations retain locks until trusted reconciliation",
+    "authorization": "Actual Agent metadata stamps the Session. Only committed Main private chat or owner actions can delegate to authorized directory Bots; targets are rechecked at dispatch. A finished target package cannot authorize cancellation of the planner-owned successors",
+    "product": "Three bounded plan tools, owner submit/cancel actions, durable plan projection and dependency/cancellation UI. Existing single-task and legacy MR paths retain their semantics"
+  },
+  "fixes": [
+    "Both journal and funding must accept user_version 3; changing the journal alone breaks cold product startup",
+    "No propagation or terminal aggregation may turn partial branch success into whole-plan success",
+    "No model-selected Session or completed Worker package may widen delegation/cancellation authority",
+    "Task action UI includes the original Bot ID and correctly renders numeric attempt counts"
+  ],
+  "regression": {
+    "root": {
+      "tests": 1414,
+      "pass": 1411,
+      "fail": 0,
+      "skipped": 3
+    },
+    "schedulerAndIdentityUi": {
+      "tests": 35,
+      "pass": 35,
+      "fail": 0,
+      "skipped": 0
+    },
+    "journalAndReconciliation": {
+      "tests": 51,
+      "pass": 51,
+      "fail": 0,
+      "skipped": 0
+    },
+    "finance": {
+      "tests": 33,
+      "pass": 33,
+      "fail": 0
+    },
+    "defaultProduct": {
+      "checks": 34,
+      "actualModelCalls": 0,
+      "checksObserved": [
+        "N06b: unconfigured Main stays blocked; the funding scope and Main binding are configured through real owner actions before any model turn",
+        "N06b: worker binding is configured through a real owner action before its first prompt",
+        "Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool",
+        "Default entry: worker executes permitted MR routing with the composed Bot grant",
+        "Default product: the worker consults through the MR path with the composed funding admission",
+        "Default entry: original DS Bot dispatch and result return survive migration",
+        "Product channel refuses an unauthenticated snapshot at the Host connection admission",
+        "Product read model: real Bots, compiled grants and exact model routes in one snapshot",
+        "Default owner can read the original advanced ledger through real Gateway; ungranted mutations and unauthenticated requests stay denied",
+        "Every product section is wired: no read-model section reports a blocked placeholder",
+        "N07: the usage projection shows per-source receipts with exact models and a funding summary; unknown amounts stay null",
+        "N08: the MR consult writes exactly one linked receipt; receipts and the funding summary agree without double billing",
+        "N06b: configured funding scope and Bot bindings are visible with exact model routes, the local machine entry and the scope catalog",
+        "N09: a Bot submits a managed MR Task through the configured admission; it succeeds with one attempt and one linked run",
+        "N09: an owner/Bot retry of a failed Task adds a linked attempt and succeeds without a second invoice",
+        "N09: a running managed Task stays cancellable and its terminal state keeps the original run reference",
+        "N09: a binding with maxConcurrentTasks 2 runs two managed Tasks for one Bot at the same time",
+        "N09: both concurrent Tasks stay cancellable through the real owner action",
+        "Scheduler: Main submits a dependency plan through the real tool; target Bots each run one admitted package and the join succeeds",
+        "Scheduler: duplicate plan delivery returns original package/attempt/operation IDs with zero new provider dispatch",
+        "Scheduler: Worker cannot use a plan to target Main outside its Host-owned delegation scope",
+        "Scheduler: dependency failure blocks its successor without dispatch; the independent branch succeeds and the parent remains failed",
+        "Scheduler: owner cancels the whole multi-Bot plan, running branches clean up and the undispatched join is skipped",
+        "N09: another Bot cannot read or drive a Task it does not own",
+        "N09: only a Bot granted the official CLI capability may submit the CLI backend",
+        "Default product: owner secretRef pairing and Bot-scoped real MCP read work through the real AgentLoop",
+        "Default product: owner revocation removes Bot grant, invalidates remote tickets and refuses further reads",
+        "N06b: a disabled funding scope blocks the bindings and the next model turn dispatches nothing",
+        "N09: a contract-level CLI Task writes its own linked run and stays unknown until an owner confirms it; the owner action is idempotent",
+        "N09: managed Task receipts land in the single funding authority; the unconfirmed CLI receipt is held out of the spend total and counted as unknown",
+        "N09: an unconfirmed receipt keeps its Bot refused with zero provider dispatch until an owner resolves it",
+        "N09: the owner resolves an unconfirmed receipt through a real owner action; the waive is auditable on the run and the Bot spends again",
+        "Scheduler: cold Host startup preserves dependency edges, terminal plans and original execution identities",
+        "Fresh host reconstructs stable Bot identity and the composed product read model"
+      ]
+    },
+    "strictManagedHost": "passed; see managed-host-final.log",
+    "legacyPolicyHost": "passed; see legacy-host-final.log",
+    "strictPeerInstall": "passed",
+    "client": "passed",
+    "frozenSource": {
+      "status": "passed",
+      "files": 297,
+      "frozenCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+    }
+  },
+  "platforms": [
+    {
+      "platform": "win32",
+      "node": "v24.20.0",
+      "environment": "isolated real rc.3 Host with offline fixture model; native SQLite 13.0.3"
+    }
+  ],
+  "limitations": [
+    "T09/T12 remain partial: default plan backend is read-only MR; real CLI and remote branches inside one dependency tree are not exercised",
+    "T11 verifies journal lock protocol only. Write backend registration remains refused; no real worktree writer/exit or OS isolation acceptance",
+    "Task/outbox claim and funding remain separate connections/transactions; atomic financial admission is a separate design and implementation",
+    "Main group delegation stays restricted to itself pending group-specific scope/approval work",
+    "No real model inference, production migration, physical power-loss test, clean install, remote-platform rerun or release"
+  ]
+}

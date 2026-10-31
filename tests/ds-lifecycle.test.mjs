@@ -43,6 +43,19 @@ test('DS lifecycle: ambiguous Sessions and nonmember owners fail; prototype-look
   assert.deepEqual([...compileDsOwnership(injected,grantFor).sessions],[['proto-session','__proto__']])
   assert.equal(Object.prototype.sessionId,undefined)
 })
+test('DS lifecycle: separately committed host capabilities refresh at the same DS revision and revoke the old lease',async()=>{
+  const authority=createAuthority(),directory=createPrincipalDirectory(authority),saved=snapshot()
+  let tools=['tool/read']
+  const runtime={state:structuredClone(saved),statePath:'unused',async load(){},async save(){},async refresh(){},async resolveAgent(id){return agent(id)}}
+  const bridge=attachDsLifecycle({runtime,directory,grantFor:bot=>({...grantFor(bot),tools}),readSaved:async()=>structuredClone(saved)})
+  await runtime.load();const current=await runtime.resolveAgent('a-current'),subject=directory.forAgent(current)
+  const binding={taskId:'t',attemptId:'a',machineId:'m',workspaceId:'w',location:'local'},lease=authority.issue(subject,{binding,tools:['tool/read']})
+  tools=['tool/remote-read'];await bridge.refreshGrants()
+  assert.equal(bridge.status().revision,1);assert.equal(bridge.status().healthy,true)
+  assert.throws(()=>authority.list(lease.token,binding),/GRANT_CHANGED|LEASE_REVOKED|UNKNOWN_LEASE/)
+  authority.assertTool(directory.forAgent(current),'tool/remote-read')
+  bridge.close();authority.dispose()
+})
 
 test('DS lifecycle: cached and later-resolved real object identities bind automatically',async()=>{
   const {runtime,directory,bridge}=await fixture()
@@ -168,4 +181,45 @@ test('DS lifecycle: a missing committed file after hydration suspends instead of
   await assert.rejects(runtime.refresh(),/DS_COMMITTED_STATE_MISSING/)
   assert.equal(bridge.status().healthy,false)
   assert.throws(()=>directory.forAgent(own),/UNKNOWN_SUBJECT/)
+})
+
+test('DS lifecycle: committed Bot snapshots exclude memory-only edits and are defensive clones',async()=>{
+  const {runtime,bridge}=await fixture()
+  assert.equal(bridge.committedBot('a').model,'gpt-a')
+  assert.equal(bridge.committedBots().length,1)
+  const copy=bridge.committedBot('a');copy.model='changed-copy'
+  assert.equal(bridge.committedBot('a').model,'gpt-a')
+  runtime.state.bots.a.model='memory-only'
+  assert.equal(bridge.committedBot('a').model,'gpt-a')
+  await runtime.save()
+  assert.equal(bridge.committedBot('a').model,'memory-only')
+  delete runtime.state.bots.a;runtime.state.rooms={}
+  await runtime.save()
+  assert.equal(bridge.committedBot('a'),null)
+  assert.deepEqual(bridge.committedBots(),[])
+})
+
+test('DS lifecycle: failed commits and close hide previously committed Bot snapshots',async()=>{
+  const {runtime,bridge,failSave,setPersisted}=await fixture()
+  runtime.state.bots.a.model='not-committed';failSave()
+  await assert.rejects(runtime.save(),/simulated committed-store failure/)
+  assert.equal(bridge.committedBot('a'),null)
+  assert.deepEqual(bridge.committedBots(),[])
+  setPersisted(snapshot())
+  await runtime.refresh()
+  assert.equal(bridge.committedBot('a').model,'gpt-a')
+  bridge.close()
+  assert.equal(bridge.committedBot('a'),null)
+  assert.deepEqual(bridge.committedBots(),[])
+})
+
+test('DS lifecycle: planner Main membership comes only from committed state and disappears on suspension',async()=>{
+  const {runtime,bridge,hold,failSave}=await fixture()
+  let release;hold(new Promise(resolve=>{release=resolve}))
+  runtime.state.mainBotIds=['a']
+  const saving=runtime.save()
+  assert.deepEqual(bridge.committedMainBotIds(),[])
+  release();await saving;assert.deepEqual(bridge.committedMainBotIds(),['a'])
+  failSave();await assert.rejects(runtime.save(),/simulated committed-store failure/)
+  assert.deepEqual(bridge.committedMainBotIds(),[]);bridge.close()
 })

@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-28",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+  "level": "three actual OS machines + real paused-body HTTP regression witness",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "remote-computer-agent/src/auth-throttle.ts": "ca837dfdb6cba98443e6d8a267027f130f54a265",
+    "remote-computer-agent/src/store.ts": "b29c8bc74325d3ab90c73331f75172e9264e5ab4",
+    "remote-computer-agent/src/transport.ts": "75155f226eb7107daa674624aac2d24a95406ce0",
+    "tests/remote-auth.native.mjs": "5b5bc826948e6b7c42e40189f3ad815ab2345188",
+    "remote-computer-agent/README.md": "0a8d59db77dec58769fb191b78e3548dcda73596",
+    "scripts/integration-product-client.mjs": "12c2882242112f687eb3a0409b5ea9a66cc95f6c",
+    "tests/product-client-build.test.mjs": "d6439200a91eea8493123d3a09cd0aa1a2e8a552",
+    ".dsh-plugin/client.js": "200f16464179659ee36ac64cb69551361ff1291f",
+    "package.json": "25c2454fbf8daa0ac5f6164e9172fbe2a23c1255"
+  },
+  "sourceSnapshot": {
+    "sourceFiles": 865,
+    "remoteMatched": true,
+    "finalPatchSha256": "308c2d362c08788cc328c3ec8137d970f563a26899f39fbe08e2d861f0a6b362",
+    "manifestSha256": "3c79c1c33154292baac731d4058328acf4debdcae2029e2c094934b2a9e8dfc0"
+  },
+  "changes": {
+    "bodyFence": "After reading/parsing the body, reauthenticate the original credential before any control/MCP dispatch. tools/list also revalidates the live grant.",
+    "storeFence": "Store.issue and revokeGrants reject cached client rows whose digest/revision/revoked state no longer matches the current DB row. An old request cannot revoke tickets created after rotation.",
+    "clock": "A backward wall-clock adjustment clears the stale anonymous window rather than extending cooling beyond its configured maximum."
+  },
+  "regressionWitness": {
+    "environment": "Ubuntu isolated previous E42 implementation, only the new test file overlaid",
+    "tests": 10,
+    "pass": 6,
+    "fail": 4,
+    "expectedFailure": true,
+    "meaning": "The old implementation fails clock rollback, cached client row mutation, a paused old control body revoking new tickets, and a revoked paused MCP body listing old capabilities. No production service or user token used."
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "root": {
+        "tests": 1446,
+        "pass": 1443,
+        "fail": 0,
+        "skipped": 3
+      },
+      "authNative": 10,
+      "originalAgent": 12,
+      "defaultHost": 36,
+      "actualModelCalls": 0
+    },
+    {
+      "alias": "linux",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "sourceFilesMatched": 865,
+      "sqlite": "13.0.3",
+      "native": {
+        "tests": 44,
+        "pass": 44,
+        "fail": 0
+      },
+      "root": {
+        "tests": 1446,
+        "pass": 1423,
+        "fail": 0,
+        "skipped": 23
+      },
+      "finance": {
+        "tests": 33,
+        "pass": 33,
+        "fail": 0
+      },
+      "client": "byte check passed",
+      "defaultHost": {
+        "checks": 36,
+        "status": "passed",
+        "actualModelCalls": 0
+      }
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "sourceFilesMatched": 865,
+      "sqlite": "13.0.3",
+      "native": {
+        "tests": 44,
+        "pass": 44,
+        "fail": 0
+      },
+      "root": {
+        "tests": 1446,
+        "pass": 1443,
+        "fail": 0,
+        "skipped": 3
+      },
+      "finance": {
+        "tests": 33,
+        "pass": 33,
+        "fail": 0
+      },
+      "client": "byte check passed",
+      "defaultHost": {
+        "checks": 36,
+        "status": "passed",
+        "actualModelCalls": 0
+      }
+    }
+  ],
+  "limitations": [
+    "Same isolated reused dependency installations and offline providers as E42; not clean installation, production migration or actual model inference",
+    "TLS/mTLS is local native socket testing; live protected/public network, capacity and physical security boundaries remain separate",
+    "User has now confirmed both Win10 and Win11 logged-in/unlocked interactive test desktops with dedicated visible fixture windows. This removes the missing availability condition; it is not yet physical desktop acceptance.",
+    "Full plan, all unresolved R/F/T and M0 gates remain; no commit, push, Release or npm publication. Historical spend uncertainty is unchanged."
+  ]
+}

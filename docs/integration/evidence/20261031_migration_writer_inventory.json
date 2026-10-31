@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261031_remote_command_facade.json",
+  "level": "stop-fence design slice 1: private owner-only read-only writer/domain inventory with physical identities",
+  "componentAcceptance": "verified on real Linux /proc with live child-process holders and on the honest non-Linux capability gap",
+  "productAcceptance": "diagnostic only: it never claims a stop-write proof, never mutates a domain byte, and does not advance activationSupported",
+  "design": "docs/integration/plan/20261030_migration_stop_fence.md (section 6, slice 1)",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-writer-inventory.mjs": "6077c334898468156e75d74bed89d6292843d146",
+    "tests/migration-writer-inventory.native.mjs": "8d81a36b7c26abc70cc842d73a5a2436bb84b15d",
+    "package.json": "72fcc35644ea58ebd11632c9a4885081a72f70bd"
+  },
+  "implementation": [
+    "Explicit-input domains only (closed shape, bounded counts, absolute roots); no discovery, no guessing that an unlisted writer does not exist.",
+    "Every declared root resolves once to a physical dev:ino identity, so aliases and overlapping declarations converge instead of double-counting; missing or unreadable roots are per-root diagnostics, not errors.",
+    "Linux scans /proc/<pid>/fd plus cwd/exe against the resolved roots and classifies each open handle's write access from the kernel fdinfo flags; the caller's own process is reported like any other (no self-exclusion), and processes whose descriptors cannot be read are counted as an enumeration gap (WRITER_ENUMERATION_PARTIAL) rather than as absent writers.",
+    "Every accessor carries pid, /proc stat field-22 start ticks (PID-reuse safe identity), comm and command line; deleted-inode handles keep their evidence; non-Linux platforms report WRITER_ENUMERATION_UNAVAILABLE instead of an empty answer.",
+    "The result always carries stopWriteProvable:false — an inventory is a diagnostic, never a stop proof."
+  ],
+  "platforms": [
+    { "platform": "Ubuntu 24.04 / Node v22.22.1 / linux 6.8.0-101-generic", "tests": "9 tests, 8 pass, 0 fail, 1 skip (the non-Linux capability test skips)", "logSha256": "c0be5212b11b25d95de5726112c79f2d8a525f40e9a5c125f22cbbee6cfdd182", "rawLog": "tmp/integration/step-writer-inventory/linux-writer-inventory-raw.log" },
+    { "platform": "Win10 10.0.19044 / Node v24.18.0", "tests": "9 tests, 4 pass, 0 fail, 5 skip (the /proc scan cases are Linux-only), exit 0" },
+    { "platform": "Win11 / Node v24.20.0", "rootRegression": "1837 tests, 1769 pass, 0 fail, 68 skipped, exit 0 (log: tmp/integration/writer-inventory-root-regression.log); the suite is registered in npm test and Windows/Ubuntu CI" }
+  ],
+  "observed": [
+    "A real child process holding a write handle inside a domain is observed with writable access, start-tick identity and command line, and disappears after its death; a read-only holder is observed but never classified writable; a process whose working directory is inside the domain is reported as potential-writer evidence.",
+    "Two declarations of the same physical root through a symlink converge on one identity while each domain report observes the holder through its own declaration; the caller's own open handle is reported and clears when closed.",
+    "The fdinfo octal flag parse was verified against real write and read handles on the Linux machine."
+  ],
+  "limitations": [
+    "This cannot enumerate writers of processes whose /proc descriptors are unreadable (other users): those are counted as an enumeration gap, never as absent; Windows open-handle enumeration is a platform capability gap reported as unavailable.",
+    "Handle matching is path-prefix based against resolved roots (lsof-style); alias mounts outside the resolved path, network filesystems and hard links from outside the roots are not converged identities.",
+    "Absence of observed writers is not a stop-write proof; the exclusive-fence prototype (slice 2), OS isolation adapters (slice 4) and the recoverable commit orchestration (slice 5) remain open, and activationSupported stays false."
+  ]
+}

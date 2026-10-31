@@ -1,0 +1,2 @@
+# Imported source bytes are part of the frozen provenance contract.
+vendor/** -text -whitespace

@@ -135,6 +135,11 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
   // These callbacks mutate candidate state only. CAS storage may recompute them
   // against a newer revision; no provider dispatch occurs inside a callback.
   const update=change=>state.update(change,{retrySafe:true})
+  const fundingCheck=input=>{
+    const result=state.checkExecutionFunding?.(input)
+    if(result&&typeof result.then==='function')throw new TypeError('资金准入检查必须在纯 CAS 回调中同步执行。')
+    return result?.accepted===false?result:null
+  }
   if (!Number.isSafeInteger(pid) || pid < 1) throw new TypeError('需要有效的执行进程 ID。')
   if (!Number.isInteger(maxReservations) || maxReservations < 1 || maxReservations > MAX_EXECUTION_RESERVATIONS) throw new RangeError('执行预占数量上限无效。')
   const snapshot = async () => reservationSpending(await state.read())
@@ -151,6 +156,8 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
       if (Object.keys(current.budgetReservations).length >= maxReservations) return { accepted: false, reason: 'reservation-capacity', ...checks }
       if (checks.budget.exceeded && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget', ...checks }
       if (checks.unknownBudget && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget-unknown', ...checks }
+      const funding=fundingCheck({current,run,packages})
+      if(funding)return {...checks,...funding}
       const at = now()
       const entry = { id: run.id, runId: run.id, ownerToken, ownerPid: pid, status: 'active',
         createdAt: at, updatedAt: at, packages, completedIds: [] }
@@ -188,6 +195,8 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
         if (current.historyIncomplete && checks.budget.apiExposure) return { accepted: false, reason: 'history-incomplete', ...checks }
         if (checks.budget.exceeded && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget', ...checks }
         if (checks.unknownBudget && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget-unknown', ...checks }
+        const funding=fundingCheck({current,run:budgetRun,packages:remaining,excludeRunId:entry.id,previousRun:current.runs.find(item=>item.id===run.id)})
+        if(funding)return {...checks,...funding}
       }
       entry.packages = remaining
       entry.completedIds = [...completed]
@@ -204,6 +213,8 @@ export function createBudgetReservations({ state, now = Date.now, pid = process.
       if (current.historyIncomplete && checks.budget.apiExposure) return { accepted: false, reason: 'history-incomplete', ...checks }
       if (checks.budget.exceeded && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget', ...checks }
       if (checks.unknownBudget && options.confirmOverBudget !== true) return { accepted: false, reason: 'budget-unknown', ...checks }
+      const funding=fundingCheck({current,run:current.runs.find(item=>item.id===entry.runId),packages,excludeRunId:entry.id})
+      if(funding)return {...checks,...funding}
       if (packages.some(item => entry.completedIds.includes(item.id))) throw new TypeError('已完成工作包不能重新加入剩余预占。')
       // An already-started call may still incur charges; resizing cannot erase it.
       for (const previous of entry.packages.filter(item => item.started)) {

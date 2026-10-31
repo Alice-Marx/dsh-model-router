@@ -1,0 +1,22 @@
+[Unit]
+Description=DSH remote computer agent (explicit low-privilege account)
+After=network-online.target
+
+[Service]
+Type=simple
+User=dsh-agent
+Group=dsh-agent
+WorkingDirectory=/opt/dsh-agent
+ExecStart=/opt/dsh-agent/runtime/node /opt/dsh-agent/current/dist/cli.mjs serve /opt/dsh-agent/config.json
+Restart=on-failure
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/dsh-agent/data /srv/dsh-workspaces
+UMask=0077
+KillMode=control-group
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-host-offline-default-composition",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "ffd1face80bfac8a76a0325bf9e2bf92995bdeb7",
+    "modules/bot-runtime/index.mjs": "abc1befe2c4709526a246057ec670888300e0476",
+    "packages/orchestration/src/product-composition.mjs": "41af0409fc58d7d02df89a7a56a26ec2674bd6aa",
+    "packages/orchestration/src/funded-router-state.mjs": "7e175f909ec6d2041ca7b40bd85289cd26a2096a",
+    "packages/orchestration/src/model-accounting.mjs": "7f9140f89a6785eb1837658ab498ceb9b8a2b02c",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "79e319d93168a222b6453aedc562ed728d1593ff",
+    "scripts/integration-product-default.mjs": "3621493fcaa282845186fa5202244cc92f1630c0"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "feature": "N08: a direct MR consult inside a Bot's admitted execution frame references that run's invoice instead of opening a second Bot-side receipt; exactly one linked receipt exists and the per-source receipts agree with the funding summary",
+  "changes": {
+    "identity": "The Bot runtime hook resolves identity through the trusted context: the live Session when present, otherwise the admitted execution frame. A direct MR consult carries no sessionId of its own, so the previous sessionId-only lookup left the subject unresolved",
+    "linkage": "The composition's accountStream wrapper marks a direct MR call inside an admitted frame as managed before accounting, so it settles one receipt linked to the funding run instead of a second Bot-side run",
+    "routeProjection": "The composition provides botFunding on the shared context, so the MR consult path projects its route through the same Bot binding; the run carries the binding price instead of an unknown-cost package that poisoned every later admission",
+    "fundingResolution": "bindingFunding resolves the route from the binding when the caller specifies none (the MR funding preparation), while an explicit route must still match the binding's exact model"
+  },
+  "defaultCompositionProbe": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "checks": [
+      "N06b: unconfigured Main stays blocked; the funding scope and Main binding are configured through real owner actions before any model turn",
+      "N06b: worker binding is configured through a real owner action before its first prompt",
+      "Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Default entry: worker executes permitted MR routing with the composed Bot grant",
+      "Default product: the worker consults through the MR path with the composed funding admission",
+      "Default entry: original DS Bot dispatch and result return survive migration",
+      "Product channel refuses an unauthenticated snapshot at the Host connection admission",
+      "Product read model: real Bots, compiled grants and exact model routes in one snapshot",
+      "Default owner can read the original advanced ledger through real Gateway; ungranted mutations and unauthenticated requests stay denied",
+      "Unwired product sections report actionable blocked reasons instead of fake data",
+      "N07: the usage projection shows per-source receipts with exact models and a funding summary; unknown amounts stay null",
+      "N08: the MR consult writes exactly one linked receipt; receipts and the funding summary agree without double billing",
+      "N06b: configured funding scope and Bot bindings are visible with exact model routes, the local machine entry and the scope catalog",
+      "Default product: owner secretRef pairing and Bot-scoped MCP read work through the real AgentLoop",
+      "Default product: owner revocation removes Bot grant, invalidates remote tickets and refuses further reads",
+      "N06b: a disabled funding scope blocks the bindings and the next model turn dispatches nothing",
+      "Fresh host reconstructs stable Bot identity and the composed product read model"
+    ],
+    "snapshotSections": {
+      "bindings": "available",
+      "botBindings": "available",
+      "fundingAccounts": "available",
+      "tasks": "blocked",
+      "machines": "available",
+      "usage": "available"
+    },
+    "actualModelCalls": 0
+  },
+  "regression": {
+    "rootSuite": "1382 tests, 1379 pass, 0 fail, 3 skipped",
+    "compositionAndFunded": "product-composition and funded-router-state: 12/12",
+    "auxiliaryBilling": "Auxiliary Bot calls keep their own receipts and do not reference the MR invoice (covered by the N07 usage assertions)"
+  },
+  "fixes": [
+    "The consult's model call had no sessionId, so the identity lookup left the subject unresolved; the hook now resolves through the trusted execution context",
+    "The consult opened a second Bot-side receipt alongside the MR funding run; the wrapper now marks the frame call as managed so exactly one linked receipt exists",
+    "The MR run carried an unknown-cost package because the route was not projected through the binding, which made every later admission fail with MODEL_WAITING_BUDGET; botFunding is now provided on the shared context"
+  ],
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "defaultComposition": "passed",
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the default composition probe are pending; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "Only the single-package consult path is exercised in the product probe; executor, team and rerun MR paths (T34/T35) remain for the Task/CLI wiring (N09)",
+    "Subscription-mode Bot bindings and MR subscription paths are covered by native tests only",
+    "Unknown/revoke/cold-start receipt assertions at the product level remain thin; the native suites carry the detailed matrix",
+    "No default user profile migration, Electron carrier, clean install or real model inference"
+  ]
+}

@@ -1,0 +1,1791 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/Fei2411/DS-Bot",
+  "mirror": "https://github.com/Alice-Marx/DS-Bot-model-router",
+  "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "path": "vendor/ds-bot/.gitattributes",
+      "sourcePath": "ds-bot/.gitattributes",
+      "sha256": "59969714172585ef2d19be057d8f19d1e244dde86d9525da847dc98c37525cca",
+      "gitBlob": "d8175853c06ca509fbb192f355158d0c095e3a7f"
+    },
+    {
+      "path": "vendor/ds-bot/.npmrc",
+      "sourcePath": "ds-bot/.npmrc",
+      "sha256": "9cd5a167d6db0b149cfd5bc7ce7cf44f5f6b2266b2ed99a233237803ed4785b6",
+      "gitBlob": "b16200fdb2d9b64e2ff21d2a6a241ad45d41efca"
+    },
+    {
+      "path": "vendor/ds-bot/.oxlintrc.json",
+      "sourcePath": "ds-bot/.oxlintrc.json",
+      "sha256": "cc9269257db473a923a734b00c350dc94a2772de1f08f00426a0759edbf9c48d",
+      "gitBlob": "190fbf30c342fb23f4db59856058767cea72c1c3"
+    },
+    {
+      "path": "vendor/ds-bot/LICENSE",
+      "sourcePath": "ds-bot/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "gitBlob": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+    },
+    {
+      "path": "vendor/ds-bot/README.md",
+      "sourcePath": "ds-bot/README.md",
+      "sha256": "2b0d2ebb53e5d5d4b8bdbb9eb3457cae267a434adfb81bb1f66c98cc05d2b211",
+      "gitBlob": "60503710995ea19812ca72a4c5289d5aaf90d752"
+    },
+    {
+      "path": "vendor/ds-bot/UPSTREAM_LICENSE",
+      "sourcePath": "LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "gitBlob": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+    },
+    {
+      "path": "vendor/ds-bot/UPSTREAM_NOTICE",
+      "sourcePath": "NOTICE",
+      "sha256": "83277221cf58073abbdb3ae26a61839570a93a94f255368b03513abf66cf94ad",
+      "gitBlob": "b5b5631dc270d3ec1564f4d559c75c73a09dad5d"
+    },
+    {
+      "path": "vendor/ds-bot/client.js",
+      "sourcePath": "ds-bot/client.js",
+      "sha256": "d9727c24f3f3e26ce68ffde521e860dccb3b318c391bf69741f2143495943763",
+      "gitBlob": "11627b2bf9e95bfa8ab5f463ae886e54f9611bc2"
+    },
+    {
+      "path": "vendor/ds-bot/cordis.patch.yml",
+      "sourcePath": "ds-bot/cordis.patch.yml",
+      "sha256": "ec776d258ddcc920dc8d7b743f180f87aec4e7fb559842dbfd51819a6f2ef8db",
+      "gitBlob": "ea56b8cbe4455b8bb34048d83062d576500a3218"
+    },
+    {
+      "path": "vendor/ds-bot/dev/bench.sh",
+      "sourcePath": "ds-bot/dev/bench.sh",
+      "sha256": "db541941389a225e42f5ba31e2549b0a95a78a0bc4292bc75f6e7a1b3121e4c5",
+      "gitBlob": "b52d8fd67a1fed3d540831aad008838f080b27b2"
+    },
+    {
+      "path": "vendor/ds-bot/dev/characters.mjs",
+      "sourcePath": "ds-bot/dev/characters.mjs",
+      "sha256": "e27f474b993b4c4c9fd231a41129736792f555f7ba3f984652dfba1292825dca",
+      "gitBlob": "2a20db42c9bb06e4325cae74ada85ea53ae3809a"
+    },
+    {
+      "path": "vendor/ds-bot/dev/check.sh",
+      "sourcePath": "ds-bot/dev/check.sh",
+      "sha256": "8c7d4900306ae56d415b017d44b1258721cfb043cd0b29d09ecd1adef48aeaa4",
+      "gitBlob": "956c3b9741f11099e0f2f899b37e6b1b7476e3f9"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/browser-check.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/browser-check.mjs",
+      "sha256": "2c032136a21b4d383390e9b429871abf592470da54a336f49077db194158480a",
+      "gitBlob": "31ca0cb839ebbba2df7214f5d2ef403dece4bf7b"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/cleanup-probe.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/cleanup-probe.mjs",
+      "sha256": "d124660c6a0e844d9e6e93c16ceaf0962799e3d0f93b0bc3a966f8a03d9c0626",
+      "gitBlob": "888823a735156342f3c7fd1d28bc106f6552b446"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/cookie-page.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/cookie-page.mjs",
+      "sha256": "8e0c7807f52d4d86483c2325831b3814c14d63573eca07313ac91536d76343f1",
+      "gitBlob": "ad18d6ed26cbdc912c4ead43cf895acfe38e2555"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/create-bots.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/create-bots.mjs",
+      "sha256": "e69ab1b1ae28976b126cb49019ab8ebb95122112b24695d72378caf33dfb9caa",
+      "gitBlob": "6337dff537d4c0c431d00aa56e00fb0c148b681b"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/desktop.sh",
+      "sourcePath": "ds-bot/dev/desktop-linux/desktop.sh",
+      "sha256": "a240b7ad7f3b5c0d01e92a983c224d1baf5f111d1a7f33ebaf546d30009fa609",
+      "gitBlob": "7237548048147c0eb216c282b25d308570ce9568"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/fetch-electron.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/fetch-electron.mjs",
+      "sha256": "761b0d28e08c1094ef82772dbd32ab8afedca144de852a8085b5089c67108234",
+      "gitBlob": "b5797ec1b5abdbb47d4fbbc6c6da01d8732b98e3"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/launch.mts",
+      "sourcePath": "ds-bot/dev/desktop-linux/launch.mts",
+      "sha256": "00b2564c7d89d9d568892395f5c66cd780882fa07793f9bb5070ea302d32c293",
+      "gitBlob": "c9706d3554051b1a3d46a55cee577ede58d4cb06"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/lib.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/lib.mjs",
+      "sha256": "2aa1be8b8bf6d280aca87165d7f8df521d5f88e2f7bdc1bce5831debf6faee29",
+      "gitBlob": "4f93b55ee22ec9d2435709c7ce9efb9b17ebd77f"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/onboarding.patch.yml",
+      "sourcePath": "ds-bot/dev/desktop-linux/onboarding.patch.yml",
+      "sha256": "3a8d3e6bf184eb281a324a91ab29d012a5acd69a16f9a40fc9c4fd1a99c7bda2",
+      "gitBlob": "6e9382a5e1f16f0b708405b220c7880b4f24f044"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/probe-webview.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/probe-webview.mjs",
+      "sha256": "1e5a8f5456becfe35a47e84e7492ff22a11637831956ce215b850994acd23e56",
+      "gitBlob": "145097b96b27e169073352c556b6281265b008da"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/read-check.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/read-check.mjs",
+      "sha256": "6a3df2399be30f999e255753e8fd0fd4cc97ee0d132aa5c8a41b7417ae0c371c",
+      "gitBlob": "ea9e30568549b80aeb3f1b84d980e1e139710199"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/shot.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/shot.mjs",
+      "sha256": "fe764de06e7e2fc7f7b11a5f73bfa8c2bd4f4c6a6cf24266ca0ac8a6ebd72853",
+      "gitBlob": "68d1b0def7caf72565f785d2d4bd3e7d11f26b05"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/simulate-windows-caption.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/simulate-windows-caption.mjs",
+      "sha256": "7faa61ce95b24b09c08f0b11d38ce20aaa5b8d7ad2a776f06356829d8497c04f",
+      "gitBlob": "06ba324d94f98965f77642b462cc94804c4981b2"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/wait-app.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/wait-app.mjs",
+      "sha256": "9113845e3c0a396e84418fa3605b694504b7ca7e89f507723ed91db718611c6d",
+      "gitBlob": "80c9cbf0c9c719fcc4c78ab1e0b67d7f2aa0a77f"
+    },
+    {
+      "path": "vendor/ds-bot/dev/desktop-linux/window-size.mjs",
+      "sourcePath": "ds-bot/dev/desktop-linux/window-size.mjs",
+      "sha256": "532f1ab998691dbd906c77bb3a8384d47880ae8b861bc968d4305e62943b5481",
+      "gitBlob": "92207c1911a1afc26161079945ea2c9441046df9"
+    },
+    {
+      "path": "vendor/ds-bot/dev/harness/package.json",
+      "sourcePath": "ds-bot/dev/harness/package.json",
+      "sha256": "eaf4cdc016c8122ffdf383b5f9760abed2d70711a5a6eb919ce8547160a4b4ba",
+      "gitBlob": "971981144c62e880adf92f05566aef5f0215cc05"
+    },
+    {
+      "path": "vendor/ds-bot/dev/llm-tap.mjs",
+      "sourcePath": "ds-bot/dev/llm-tap.mjs",
+      "sha256": "1f566dbd79b5742fafaf8c551c079eff62f9307aae49661ba2762ce6cbd1372f",
+      "gitBlob": "d8b14620f4c5c7f3d7e2c2117cbadc741fbccb4e"
+    },
+    {
+      "path": "vendor/ds-bot/dev/logo.mjs",
+      "sourcePath": "ds-bot/dev/logo.mjs",
+      "sha256": "a8870ef29f289ba4d39884b19934dc6a810519c809bacb1da5fa95066e4996d4",
+      "gitBlob": "711927f2db7cbed227cc2f267c0c855ec3f586a1"
+    },
+    {
+      "path": "vendor/ds-bot/dev/mascot-outlines.mjs",
+      "sourcePath": "ds-bot/dev/mascot-outlines.mjs",
+      "sha256": "5c4d5f450dcaca3323dcc13b6696a24985104723c642859f0d19775efe3d9110",
+      "gitBlob": "976cbf2b2c6f1d1491a369da2c750c777e5d710a"
+    },
+    {
+      "path": "vendor/ds-bot/dev/mcp-echo-server.mjs",
+      "sourcePath": "ds-bot/dev/mcp-echo-server.mjs",
+      "sha256": "d60026de77ca99316cb8a2048e61961ba348c1444be2de555ce1a0e3af65c1a0",
+      "gitBlob": "be2239fe5c94b51c492fbe26c4680524d7e4be2a"
+    },
+    {
+      "path": "vendor/ds-bot/dev/memory-e2e.mjs",
+      "sourcePath": "ds-bot/dev/memory-e2e.mjs",
+      "sha256": "1715ca58fd8d9efef724fcf224549eb2ccf0f9382d455fa12326c9fbe37b76f6",
+      "gitBlob": "a4ea7b11350936b708d4ed25e7fbfff65ba646cf"
+    },
+    {
+      "path": "vendor/ds-bot/dev/mock-llm.mjs",
+      "sourcePath": "ds-bot/dev/mock-llm.mjs",
+      "sha256": "8993bc3fbe879005f20d91d319b4c1c0bace1d3e4e99867493ae7dee545c30a5",
+      "gitBlob": "016e6406d9c81fd2258ae67f2472583eaf354b9d"
+    },
+    {
+      "path": "vendor/ds-bot/dev/read-page-check.mjs",
+      "sourcePath": "ds-bot/dev/read-page-check.mjs",
+      "sha256": "daec4fab3f880474e52f1960d7c79c3d369fcd516659ef97b99ee44b9d263edd",
+      "gitBlob": "53f74a0326754f991471c9165b12a51f50c4d739"
+    },
+    {
+      "path": "vendor/ds-bot/dev/read-pages.mjs",
+      "sourcePath": "ds-bot/dev/read-pages.mjs",
+      "sha256": "431cd294452ef0208b91db34f3e0a223457a5a4f2af688012091468677a0112a",
+      "gitBlob": "9ad9b22bb101081b4c3afaf1afe97f2bb4ed21ad"
+    },
+    {
+      "path": "vendor/ds-bot/dev/shared-home-check.mjs",
+      "sourcePath": "ds-bot/dev/shared-home-check.mjs",
+      "sha256": "c65363d9c1199721819f738dbb30449a46bd2c82154f7d4deb840f5301522dc9",
+      "gitBlob": "d5c69851a8a259c17e9d318dccadff3ae9422e68"
+    },
+    {
+      "path": "vendor/ds-bot/dev/smoke.mjs",
+      "sourcePath": "ds-bot/dev/smoke.mjs",
+      "sha256": "50cedfb1ebec3e2063f52300bb05404a02e7a09e32d0fb304f2dadd8a2e99e27",
+      "gitBlob": "914a2f814eedb47098a4b7df8b7ccebb2eb43c30"
+    },
+    {
+      "path": "vendor/ds-bot/dev/steward-eval.mjs",
+      "sourcePath": "ds-bot/dev/steward-eval.mjs",
+      "sha256": "bf0992848d4ea4fbb6e00f0e32ec6842c9b136b4cff0fe932c9dc14a9d1f1246",
+      "gitBlob": "ed0c6c79bde9540c4910a17f25cf73a752c16d7d"
+    },
+    {
+      "path": "vendor/ds-bot/dev/ui-shots.mjs",
+      "sourcePath": "ds-bot/dev/ui-shots.mjs",
+      "sha256": "1ee878a285f511306efac1b863afea7f1e202030e520ede0d60837f50043d930",
+      "gitBlob": "961a0049eb3e4ea60a49882fc44a2c834a2b5df6"
+    },
+    {
+      "path": "vendor/ds-bot/index.js",
+      "sourcePath": "ds-bot/index.js",
+      "sha256": "d9948841f748309be36e50320051048fb852204a94a73a5987985093e43068e7",
+      "gitBlob": "af47e7c7e6fdba423ae4ab6f8d29953d170170a4"
+    },
+    {
+      "path": "vendor/ds-bot/package-lock.json",
+      "sourcePath": "ds-bot/package-lock.json",
+      "sha256": "df6254cd0aa64eda62bb763d34bc7709ac6826d57bc4602c4368888772e7e461",
+      "gitBlob": "bf5b4a3a515c6652061accdb1b14765b8393ff14"
+    },
+    {
+      "path": "vendor/ds-bot/package.json",
+      "sourcePath": "ds-bot/package.json",
+      "sha256": "627864115e8ed0cc0f667907204af23e0feec1ea7cbef0884cbb04473d972b75",
+      "gitBlob": "cdf7e56e4e4dbfeb9031fd30b55d0a5e68c7ad4d"
+    },
+    {
+      "path": "vendor/ds-bot/scripts/build-client.mjs",
+      "sourcePath": "ds-bot/scripts/build-client.mjs",
+      "sha256": "4cbd23ce2e68a4dc20a89d420959fe657e19bed0512c1e9737b4d9632e9e4538",
+      "gitBlob": "ee79cb693a90e2304d50ade2f13bbdb786b88451"
+    },
+    {
+      "path": "vendor/ds-bot/scripts/lint.mjs",
+      "sourcePath": "ds-bot/scripts/lint.mjs",
+      "sha256": "512f56940a36d707dcf3fddb07ae61b6849e688fb008b31f868f1371d44ace30",
+      "gitBlob": "ff9376e6767145d74317347ee86078e57123d2c0"
+    },
+    {
+      "path": "vendor/ds-bot/scripts/style-debt.mjs",
+      "sourcePath": "ds-bot/scripts/style-debt.mjs",
+      "sha256": "eb801789d30e94028974d430679c562bcd2697032578660fda9440de3389d096",
+      "gitBlob": "2d3f9d66932f565d7839b7fe0d98670eb21ea606"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/about.js",
+      "sourcePath": "ds-bot/src/client/about.js",
+      "sha256": "1520b7538e30db112710b98fadd393e8f0dbc21ddc4e61ad6f3a0b3b4e523443",
+      "gitBlob": "6dc05e26fd1e7a9f80cd4c4ee6f94fe16b559a59"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/activity-row.js",
+      "sourcePath": "ds-bot/src/client/activity-row.js",
+      "sha256": "0f6946d32f8247879345a331d77708b81dec8578748a86efd46a4b3b572558f3",
+      "gitBlob": "cfaf6c9e043e63cf203bb32fc88830d28aa3f9c0"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/api.js",
+      "sourcePath": "ds-bot/src/client/api.js",
+      "sha256": "af4a4be22904ce3f33b7d16b52d6d03912496e7c18c5499fac5128041a0a9d85",
+      "gitBlob": "38e35b2521e2376da8cb307cc7a9e297f0de88c3"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/approval-notices.js",
+      "sourcePath": "ds-bot/src/client/approval-notices.js",
+      "sha256": "be00d41b9fbd715e91c4b828691a4f3475f616763109c503814b657dc7d4b738",
+      "gitBlob": "4b863698166868ef83ec09bafbb58d21230ec6a3"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/at-menu.js",
+      "sourcePath": "ds-bot/src/client/at-menu.js",
+      "sha256": "9c358a2a408e9e8df3fbff210059e54153543734e37e3339c2144105b5f6c0ef",
+      "gitBlob": "64d6cf053e838145eec326f1acf7cd744db9a990"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/bot-browsers.js",
+      "sourcePath": "ds-bot/src/client/bot-browsers.js",
+      "sha256": "b3d0c2acc12fbc6dddd617964416fdaf2ce7969974d35c7643f085e9eba643e1",
+      "gitBlob": "97ce574ed21df1745664f5b996c19c8ef43499e8"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/bot-draft.js",
+      "sourcePath": "ds-bot/src/client/bot-draft.js",
+      "sha256": "fed19a472469bce59ad0b12af55a0325d81b868bb36a0d1edaa10878a2d0122d",
+      "gitBlob": "bc8d56459f632a293e564e3bd001808e6ca32e7a"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/bot-settings.js",
+      "sourcePath": "ds-bot/src/client/bot-settings.js",
+      "sha256": "b0198f2500738d5da46e5710347084351e6104e5ad66b4720a60eb85e0a6acc8",
+      "gitBlob": "21d287c5818816f1871f739798d64d3db194363c"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/browser-overlap.js",
+      "sourcePath": "ds-bot/src/client/browser-overlap.js",
+      "sha256": "faf614e1e4c0a47332d8b77f85cd7b71640fed907fd34d18daf0727962d50a94",
+      "gitBlob": "fb816435e0d21dc468806695d9d1a2b73a4f44fe"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/browser-pane.js",
+      "sourcePath": "ds-bot/src/client/browser-pane.js",
+      "sha256": "b5554b224203464f3c6270c7c8506bfb0103f5bae95dc16f3e047e4fc5f98abb",
+      "gitBlob": "a273d4dd3deafec1becc1442b1577f0b45e538e0"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/browser-settings.js",
+      "sourcePath": "ds-bot/src/client/browser-settings.js",
+      "sha256": "7051a550667c04a7863a648a583c84cf48677ce5f3cc718f48ba547f4cbe481a",
+      "gitBlob": "358c10ee7a44394ca3ad3d58489dbb6fd4fe3ea7"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/btw-model.js",
+      "sourcePath": "ds-bot/src/client/btw-model.js",
+      "sha256": "da56675fb185e4dc349e586ce0614b78703369cc97ebfddde9369f06e65fc20d",
+      "gitBlob": "c456ab1428b898a1d16243c69a503ff19ff66040"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/btw.js",
+      "sourcePath": "ds-bot/src/client/btw.js",
+      "sha256": "d4727267d0fc9d6111b1bfd95a6b9ac42cf86f5dfaa626185330aa8f85625dac",
+      "gitBlob": "c13b257f0bb38419a41d9b32103d5fe0990f4238"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/capability-settings.js",
+      "sourcePath": "ds-bot/src/client/capability-settings.js",
+      "sha256": "0b8fca3b49f82c6d4a3afe7ea54d36e4d3c1680a0dbbcc9f30aa18edc85c3c28",
+      "gitBlob": "d572cd916ceded0c9692f5c3d6d3934f34bf2de3"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/card-hold.js",
+      "sourcePath": "ds-bot/src/client/card-hold.js",
+      "sha256": "7b502ac2eb2d9c8e80a0141f21330a5713d7cffd74839be23187de090f8f55de",
+      "gitBlob": "0963aa6ebe1fecdd227028e165eb010f696ae5ee"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/cells.js",
+      "sourcePath": "ds-bot/src/client/cells.js",
+      "sha256": "35c78ea04436552a8ed3941ab03bdc0c4fdf3cf146b7cf124bb7045ae046541a",
+      "gitBlob": "81377b965cac98e756d963b22544292c9149d9b4"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/characters.js",
+      "sourcePath": "ds-bot/src/client/characters.js",
+      "sha256": "d369ca0decf6252e3bb734240bdf3eeb07e36f86dd1b2efe551ce079c069bad2",
+      "gitBlob": "2824433cb4cdc5812e1bfce74c1151a10a75d938"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/composer.js",
+      "sourcePath": "ds-bot/src/client/composer.js",
+      "sha256": "a19430093e9b9efd10edf8febbb462f819e33d7b2476b49a2c0646e57e4ad93e",
+      "gitBlob": "08d3b669a091a91b5458c061ec857c956a4694c6"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/connectors.js",
+      "sourcePath": "ds-bot/src/client/connectors.js",
+      "sha256": "e615e4562078aba993fd5f89aa1545c09d4927e8ad82db551ca10ac188c8bae8",
+      "gitBlob": "a5e151050592d900a25a9e679f30bc1ce8596c3f"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/context-menu.js",
+      "sourcePath": "ds-bot/src/client/context-menu.js",
+      "sha256": "eb10d3cb4b7fd93aa773e67fa81ed9e1030a92c8d3f96f00e3b53775c6c2ca60",
+      "gitBlob": "dc5fd1b88a40cb2b2c0af3a395e38d19a2310045"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/create-bot.js",
+      "sourcePath": "ds-bot/src/client/create-bot.js",
+      "sha256": "8373bc373eb1be87829fcf6bc29eac89e72d11724afb967a507df4a4daeec391",
+      "gitBlob": "5c53b75a39eade573464c6b9da19a8be8abfd468"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/details-drawer.js",
+      "sourcePath": "ds-bot/src/client/details-drawer.js",
+      "sha256": "117e686d0b9aa650b180b61dad35ae09735797a03077bd9a45df6836a6ceee36",
+      "gitBlob": "cdd9dba5eb72b45aa2128a6b566f6cb127ea7a85"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/diagnostics.js",
+      "sourcePath": "ds-bot/src/client/diagnostics.js",
+      "sha256": "441e34922284f1d4a0d49543df420f41080cfa6aa0a4d4c93ab2cbe5ab38c833",
+      "gitBlob": "31258896f6d4915dbe502d214d9afeb953edf8ca"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/dsh-offer.js",
+      "sourcePath": "ds-bot/src/client/dsh-offer.js",
+      "sha256": "fa24986d887d7cc631aad060f04ee85d958b8e8c6c0d16dc692f73e40e2bf4e7",
+      "gitBlob": "eff4ee7ab11064145c180ca691d7c28620571715"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/dsh-primitives.js",
+      "sourcePath": "ds-bot/src/client/dsh-primitives.js",
+      "sha256": "3edadcf936d2d61811bbe3429da7dea12fbd1030c8a1d016735110131e939ef0",
+      "gitBlob": "993a98b7324cbc71bc298fe77b0f3d8fde43add5"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/exchange.js",
+      "sourcePath": "ds-bot/src/client/exchange.js",
+      "sha256": "d43ee65c998f8985caf5f27ba3df31b6208e5e4d747985a3b0d654bf39236db9",
+      "gitBlob": "bf8fdce1168cf718a69c39a293adcf7408510b9f"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/feedback.js",
+      "sourcePath": "ds-bot/src/client/feedback.js",
+      "sha256": "c04fa055d049c3de8cb2fe6f6c5008eb2401e417a51c1dd1ae823e5440147568",
+      "gitBlob": "a296b927041e10fc92f72c509f961bab85ed34d6"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/fold.js",
+      "sourcePath": "ds-bot/src/client/fold.js",
+      "sha256": "d01f1df59288d64f4353c9a6b1667800eadad2f90881a33881765fd47bb29cde",
+      "gitBlob": "9bc2eb6d96cfc14dbadeca70a0d071942cc62d41"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/folder-menu.js",
+      "sourcePath": "ds-bot/src/client/folder-menu.js",
+      "sha256": "341b955ac847885a448d33cd0c4d009cbd704cc29f6cc60070e1d7bf8d48e290",
+      "gitBlob": "c72138629405d170454900ca0a177d40405cdbd4"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/group-settings.js",
+      "sourcePath": "ds-bot/src/client/group-settings.js",
+      "sha256": "20221c91d1beffec3ecb75133e0b683eb32c3ad166aa578138015f88b219e0c7",
+      "gitBlob": "e1ff07ce86f9154476d8b83f2d32c9a94e0bbd49"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/header-navigation.js",
+      "sourcePath": "ds-bot/src/client/header-navigation.js",
+      "sha256": "814bf5918e9f3e89ff75c159e2f1490fc88e422956e30c3fca5a616738f4d803",
+      "gitBlob": "dd6296acd6c7c6a7c254e0f5c9ff2ca139e19698"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/header.js",
+      "sourcePath": "ds-bot/src/client/header.js",
+      "sha256": "14cb731730d50ff0af08785732bdaa6bf23c3b434169cf622207fa4e5ce87f56",
+      "gitBlob": "4e3948d66d7f54454303631f4b23a5bc90e28037"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/i18n.js",
+      "sourcePath": "ds-bot/src/client/i18n.js",
+      "sha256": "f62a4c9bdb00885467f845c497e9d9991e160022dd18346e5f54425fb9007d46",
+      "gitBlob": "3eb93caa5eebe3996c0f5a3a4acf033359026709"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/icons.js",
+      "sourcePath": "ds-bot/src/client/icons.js",
+      "sha256": "238c3c2560446955d950fbcd73f56dadc5663323237f7dea0893da0dca7549e2",
+      "gitBlob": "7def63334264ee1d8689a500e49cdbb132b7f7c1"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/index.js",
+      "sourcePath": "ds-bot/src/client/index.js",
+      "sha256": "506a0367c7f0f27abb9ef41884619174783127f23754f7a666f7d71b2afbdc38",
+      "gitBlob": "6b8b55899e8c5241bfc3d31a7145ca7727d5262f"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/inks.js",
+      "sourcePath": "ds-bot/src/client/inks.js",
+      "sha256": "6a7096404317eaba418188cc3be651ee01537929da167c522e73078b3916c23e",
+      "gitBlob": "06a3c8bac140479c8c497ace69b0ecc5e7439561"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/mark.js",
+      "sourcePath": "ds-bot/src/client/mark.js",
+      "sha256": "522d09d1f040638f0e04960b9fa7ac1b15e7cc8387d2c8a8d82475431ae013d9",
+      "gitBlob": "498d23bb7eef7037f4f7cb62ef26949319489dd5"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/member-status.js",
+      "sourcePath": "ds-bot/src/client/member-status.js",
+      "sha256": "2fcca7f37fa3486ae9acfdb0c384079a83c4c989cb8f10a260927e37e63b6ae6",
+      "gitBlob": "c3d74e9aee4df2cf4736c9b30931673e5c072e34"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/memory-panel.js",
+      "sourcePath": "ds-bot/src/client/memory-panel.js",
+      "sha256": "566cc5bf9414adf108d2a5e26db0c9215f6007a0cc70ddb744a9d2d132485f79",
+      "gitBlob": "d432c6252959c37a54a2abedfa949ec744500d2b"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/model-menu.js",
+      "sourcePath": "ds-bot/src/client/model-menu.js",
+      "sha256": "8858c8454600a5d602527679c796650a288b738646b6fa561d4c608bf892723c",
+      "gitBlob": "6980767a8b7989ea90d717e9602f6ff1507538d2"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/motion.js",
+      "sourcePath": "ds-bot/src/client/motion.js",
+      "sha256": "31afc231719042ed0b6f18a0f5ad9010658984a6eb7aed4a658536d5f64035b2",
+      "gitBlob": "66723a8039c5800714ca44a32ffc5606f69efcb1"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/new-chat.js",
+      "sourcePath": "ds-bot/src/client/new-chat.js",
+      "sha256": "113e39f263248e85fd83a6ea014363bbccb7e5277240eb737e0ca32cdcdff65d",
+      "gitBlob": "fd53a99eb0b8687e016191f3f2dc6e5d126495f9"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/open-listed.js",
+      "sourcePath": "ds-bot/src/client/open-listed.js",
+      "sha256": "a5f02199c264f35906fc06c9c8aefa192792955df733ea381118f0f04c2d21be",
+      "gitBlob": "460741df2642563bcbefd14f7b205409434be78b"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/overlay-hooks.js",
+      "sourcePath": "ds-bot/src/client/overlay-hooks.js",
+      "sha256": "33d70ce80f28e98431aa58c996dbac12c8f864d9e45896abebf564131d55114a",
+      "gitBlob": "09e2595130f58d6141549e85ec7a420f7667d4c0"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/overlays.js",
+      "sourcePath": "ds-bot/src/client/overlays.js",
+      "sha256": "1804b92aec30f21aa2800d4da2263ffb4df29187c681141a3a9885ed6d62ddb7",
+      "gitBlob": "67d7450bd1019779c8a79e4ea7642ec5e4beb0bf"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/palette.js",
+      "sourcePath": "ds-bot/src/client/palette.js",
+      "sha256": "b8e26be4a0e1f3f93f3cdf39c11b4e3365d601be0114b786810f8ad6c2b409a7",
+      "gitBlob": "128e035f0cc7cab76d937bc0a55bdf451a50ae50"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/permission-picker.js",
+      "sourcePath": "ds-bot/src/client/permission-picker.js",
+      "sha256": "338ed8324d2a7475fc2321f47684e3f029526b50ab2958257e44499f27e56432",
+      "gitBlob": "a4024a09967a47b92e96d34d2cdf8c8e50cbc229"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/providers-page.js",
+      "sourcePath": "ds-bot/src/client/providers-page.js",
+      "sha256": "759322033eece4ad05b1404cf09da3fcd449a9956e7bbe919f16b8c5d252bb1a",
+      "gitBlob": "a3f8bc8d762dc4468ea7c360933067593c9ace1b"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/questions.js",
+      "sourcePath": "ds-bot/src/client/questions.js",
+      "sha256": "eaf532469e9935d4c22409c4c38525dae95d5ba905eb9be45587ec8af57026d2",
+      "gitBlob": "3bcfb98381e315e641f99042ee3117d461fd7fcf"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/read-page.js",
+      "sourcePath": "ds-bot/src/client/read-page.js",
+      "sha256": "6f2c98538be049d05297558171be3f458c7ba8f89267c9a3f6194e6656a4767a",
+      "gitBlob": "4c56e070447ed5ec3258ee19a70881c79b68e78b"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/right-panel.js",
+      "sourcePath": "ds-bot/src/client/right-panel.js",
+      "sha256": "883ba777cbf2d05784517a1f7887510ef8be9d9c4387dd2577b33d615830d0cd",
+      "gitBlob": "42b318dfcdea59fe15dc6170e9f814474393c8e0"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/schedules.js",
+      "sourcePath": "ds-bot/src/client/schedules.js",
+      "sha256": "3c36e6f720b6d3480d60d98220256a8e57a0b8036e28dc7dd603d85879064cb5",
+      "gitBlob": "8e79ca3d0b8b07740935f3f6ceba69297fadb359"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/secret-card.js",
+      "sourcePath": "ds-bot/src/client/secret-card.js",
+      "sha256": "e20cd4698e244996e736a3e45313e5148d34b1e6d38f687429d9f6c7c4ab37cb",
+      "gitBlob": "13419cbecb6405f08a2daf2bedd8b5f820ee0ca8"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/settings.js",
+      "sourcePath": "ds-bot/src/client/settings.js",
+      "sha256": "784beaf50a96e53a1b72966276d93de4451bda12f9621227ec3c254e2f1e404a",
+      "gitBlob": "b1e36f37155769d3187b60331f56157c889b90db"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/shared-map.js",
+      "sourcePath": "ds-bot/src/client/shared-map.js",
+      "sha256": "4e68578ee54ca527aa3c90697c5faa2079e010d18e51b17af3fa1dbd258e02d0",
+      "gitBlob": "54a613db5b66f3bf62ead7fcfb33bf372b575a75"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/side-chat.js",
+      "sourcePath": "ds-bot/src/client/side-chat.js",
+      "sha256": "484ba79d7d5a86d154c87b4ef035e194de92acd751d3bb7b603fd08753fd47c1",
+      "gitBlob": "bf762a758fbb2dd2178cbd7770ae8fa36b94664e"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/side-model.js",
+      "sourcePath": "ds-bot/src/client/side-model.js",
+      "sha256": "4179ce9c3bef47eb51b234269d72479de1e7b2c83316036175a4cc2e0305fdcf",
+      "gitBlob": "e7306863441cea48c980f885f5cf835f924b485c"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/sidebar.js",
+      "sourcePath": "ds-bot/src/client/sidebar.js",
+      "sha256": "5aeee6db050bd18dcf0ef53626adfee43fe610016ec5092551e2e1e44d3095e3",
+      "gitBlob": "b6c7c7a1f310b7c7ee0ca712d899f9f2fa3eb204"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/sources.js",
+      "sourcePath": "ds-bot/src/client/sources.js",
+      "sha256": "ffbb228db1a6e948496edd0424aa38dc214ca75411e9fd80c9f8b1defc1dbb4e",
+      "gitBlob": "ff5db0df16459fd502ead1677ae92319f1c1f2f7"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/speech.js",
+      "sourcePath": "ds-bot/src/client/speech.js",
+      "sha256": "0fd57d6d86d729791ec2b31472bc9ca81888289b91d57f77d643aba6a0efe4f8",
+      "gitBlob": "bd9b7efc90388835c7562d6829ef8ca03de84976"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/storage.js",
+      "sourcePath": "ds-bot/src/client/storage.js",
+      "sha256": "0d1f71b38ae9eb929ad7af75aefc3fb9921f4580be39d6443b81ca2900c9df10",
+      "gitBlob": "f74ffcb3824e6152f5966eab03d2b8d95c748bb4"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/styles.js",
+      "sourcePath": "ds-bot/src/client/styles.js",
+      "sha256": "f26a2a4eff0b5b9afbdeab4a333cc4e4eadbbff585233f0db9a43e27c99bdb39",
+      "gitBlob": "a6f607f09a1b1aea0fe77559db2b3dc63a634e78"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/surface.js",
+      "sourcePath": "ds-bot/src/client/surface.js",
+      "sha256": "cef87dbd7dd125a67bf5fae6b647f85b6fc427d5d227bcf7fad4079232f112bc",
+      "gitBlob": "5644b8875ee899c922708a6b285bf2010ea5172f"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/team-actions.js",
+      "sourcePath": "ds-bot/src/client/team-actions.js",
+      "sha256": "3a23ffe0a884531cf5da84ed77ef68b91ee08f9856844c2b6c612898f29ae8fc",
+      "gitBlob": "d8ada8682d9f1f831808dba04d02c2efb7703b9a"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/text.js",
+      "sourcePath": "ds-bot/src/client/text.js",
+      "sha256": "c302c3479996956a45a84b259c94c56db2c3de48592e1e8da0d5190dd2519b11",
+      "gitBlob": "f62b5f559bf8cafea73eea8faece028448102f6b"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/themes.js",
+      "sourcePath": "ds-bot/src/client/themes.js",
+      "sha256": "039a9688519f4dcb67aea6bfeb86a64218fcc55a3a25b5cb322529abd97fdcfd",
+      "gitBlob": "82c3b3b930a74688357773d890e229cb6eecc9a5"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/turn-reasoning.js",
+      "sourcePath": "ds-bot/src/client/turn-reasoning.js",
+      "sha256": "99ece21299595c350235b5201b2f261781baa4f4905fe3e024fc323d37a64092",
+      "gitBlob": "17c82dfc9f787c223404714e248edde86ee67dc0"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/usage-data.js",
+      "sourcePath": "ds-bot/src/client/usage-data.js",
+      "sha256": "8ab23415f031e9d052f227a0a046ec68ed78a743b66ffa4875ac1a6cf7ce2787",
+      "gitBlob": "5593e95c8278f5e229fea8bdb4a55ff14697140e"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/usage-page.js",
+      "sourcePath": "ds-bot/src/client/usage-page.js",
+      "sha256": "6b2f56db1048e2f8db0857a3a8ae02dd0be71c5e3a5b71d7d12c47b14c961569",
+      "gitBlob": "0d705b24cb00b1d77a9eb1615176ad84c98d8379"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/user-message.js",
+      "sourcePath": "ds-bot/src/client/user-message.js",
+      "sha256": "2841f042758a3db7cb1e2920a41cca62317798417ed06d4df2c00927b2340804",
+      "gitBlob": "81a951cc8477895cbb8ffd9803b2560bd1dae9df"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/voice.js",
+      "sourcePath": "ds-bot/src/client/voice.js",
+      "sha256": "570b35fc3358dd1fc5993721e83f9a84daf6fa156cf11b288f8e0457b9c57b3c",
+      "gitBlob": "d68e6b6ffce888e1e4955560f8e1a6efa00c46f0"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/widget-cell.js",
+      "sourcePath": "ds-bot/src/client/widget-cell.js",
+      "sha256": "86b585e67cd575101a8e8794bca27ca4406311d07e54e12385a10b24737a06b2",
+      "gitBlob": "25e6e9c48d1ba3e42d0bdf5f8bd9bb4476ff1698"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/widget-chart.js",
+      "sourcePath": "ds-bot/src/client/widget-chart.js",
+      "sha256": "ac3acda18a9d29e8662bcaa48a990a6e3307a0c86e02a18578c5d2cca1518cfd",
+      "gitBlob": "b65d6baf854fc9e500b9ff5929adf183abcf3487"
+    },
+    {
+      "path": "vendor/ds-bot/src/client/widget-html.js",
+      "sourcePath": "ds-bot/src/client/widget-html.js",
+      "sha256": "fba587444a6ecac6f1d6f27a6d8a2d37d346cd14cbfd8fe7301d115b05595f8b",
+      "gitBlob": "b5fc009d595da6dd8c2165fe7d037fee43dc866f"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/agents.js",
+      "sourcePath": "ds-bot/src/host/agents.js",
+      "sha256": "abfd34f15f8cfd8bb1b6a38b497d4249ac256afaefdd4860fa2a29dc128c7380",
+      "gitBlob": "160b80d23729965fdd6916c637816d51d6277c4b"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/approvals.js",
+      "sourcePath": "ds-bot/src/host/approvals.js",
+      "sha256": "1067d1161bf9a61c8cf922942a5374f61c6104a8b79c393ef438758f97d5e838",
+      "gitBlob": "9e7fa71a70102e1f2a1f5daae686eac56b2bf834"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/avatar.js",
+      "sourcePath": "ds-bot/src/host/avatar.js",
+      "sha256": "6aa15e66fa70f15c62b574022a34694865a6391289230759d0b76efe7aeb3394",
+      "gitBlob": "d4322e3d9fb6f8654b0282a71460eb2550e66000"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser-plugins.js",
+      "sourcePath": "ds-bot/src/host/browser-plugins.js",
+      "sha256": "5ea5e3dc6411a07cf3087e6bc4a48019d56c5404160e517636054a98c542a693",
+      "gitBlob": "2f6abd4cdbf5af6731d3918ed47d7dd4d9e0979f"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser.js",
+      "sourcePath": "ds-bot/src/host/browser.js",
+      "sha256": "621c1ff0239083e4ebf55b3502d702c1c4d3cc14a46fba5b0179352af0dcb8a7",
+      "gitBlob": "5b9cc6135ba5747fd44ea90ef3a8be2fe7b4aeba"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/gate.js",
+      "sourcePath": "ds-bot/src/host/browser/gate.js",
+      "sha256": "029955c6507fe5cc72aac0bf535c9b010a4b7df68d791793ded1cf4e04f2e04e",
+      "gitBlob": "9dc3aa881a2e75925818d4f43e9855268a48eb6c"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/loop.js",
+      "sourcePath": "ds-bot/src/host/browser/loop.js",
+      "sha256": "c2598b25497f17d67b57b1b6c36eb26f09ec6d4c8646513c8926c2e3f0ccbe2a",
+      "gitBlob": "e8c7293728d1b65e9111129de9cfd26c7e7a46ba"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/mount.js",
+      "sourcePath": "ds-bot/src/host/browser/mount.js",
+      "sha256": "dfba4d67613e1a2fc1becaa0164c12f4e5674626e956665e1669b668f58b345c",
+      "gitBlob": "f4b95cc653ae040bd29b2574ec5bc1e8d2111aa8"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/refs.js",
+      "sourcePath": "ds-bot/src/host/browser/refs.js",
+      "sha256": "226c9ef61a1180f4f3d4e898aa975c980aa8acc193e86c5fcaaef443cf1e4fa7",
+      "gitBlob": "229d7c55101bea1e382042ae82ebe020ecd26d30"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/script.js",
+      "sourcePath": "ds-bot/src/host/browser/script.js",
+      "sha256": "083fd8a255992e6f4b67dcaf24be26230557a0d16d1314914993eecdd15f10f3",
+      "gitBlob": "d987214aa1c242771cc93b4c3377330bdb690a45"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/session-model.js",
+      "sourcePath": "ds-bot/src/host/browser/session-model.js",
+      "sha256": "4ea5c71b7af6f08408ad7b66f66550ba5aafc5788beaca4bb1a010d3c6bd6e34",
+      "gitBlob": "b51e74d833b65461a392df0dfe1f7202c6686e47"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/session.js",
+      "sourcePath": "ds-bot/src/host/browser/session.js",
+      "sha256": "156811b0fe18db334876bd963377c23147c257ec8ef5305ff168426c648f5bfe",
+      "gitBlob": "b3cf0c61034ca2724d9d56443f0f9e3f5e731175"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/browser/task.js",
+      "sourcePath": "ds-bot/src/host/browser/task.js",
+      "sha256": "ee3d29fa3af26a38c9b06517a048e074bcf5b883297fc359e0da027e68cc2f43",
+      "gitBlob": "a6a555a8413e0543ea41af3c7474cbae1767de1f"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/btw.js",
+      "sourcePath": "ds-bot/src/host/btw.js",
+      "sha256": "adc92043272001eb31754f2f91b6d6820a00a8963348de9c2590a05b5922b61c",
+      "gitBlob": "ab0303bac208693dcc39212d26b457808d9e3303"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/capabilities.js",
+      "sourcePath": "ds-bot/src/host/capabilities.js",
+      "sha256": "966174e15008baca711119d22cbdd2a6d2a3161327fd453f1b9d84a8082eecb4",
+      "gitBlob": "8807be25dec7c04daf5d850976df13445a5d0ee1"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/channel.js",
+      "sourcePath": "ds-bot/src/host/channel.js",
+      "sha256": "9e36a68baa920b832b5eb89c467bc936a3435965a11740cd4344aca45dd73f07",
+      "gitBlob": "83064f3f29f45ac521fd813c2c0498797ddbf48a"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/chat-index.js",
+      "sourcePath": "ds-bot/src/host/chat-index.js",
+      "sha256": "6ad7efefa31d7aaaa0ecbde2a369a28c59a36383203ff72dc50e5e98e5a007e7",
+      "gitBlob": "e7c3067b5814b89defaf59b1b9d4724a1211ac4c"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/connectors.js",
+      "sourcePath": "ds-bot/src/host/connectors.js",
+      "sha256": "95f8d052c68f6b53e969224041285c258ca97ab2acab56485051cdc9e71f1b29",
+      "gitBlob": "65c431bd02a3e27ffeaa65c0375626e9939efa77"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/constants.js",
+      "sourcePath": "ds-bot/src/host/constants.js",
+      "sha256": "b29ebf91c2784d093d4b3c9834edb7dc9fc3b98c1e1d10cb123e8b62612914e2",
+      "gitBlob": "4b0d7aa24b2a97467514e4f38083effc11180075"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/delivery.js",
+      "sourcePath": "ds-bot/src/host/delivery.js",
+      "sha256": "a678c6b6502431358ef224ba9018e9a3d178f1cbc8ca5ca916bcfe4e033df174",
+      "gitBlob": "962202447a3e851a8723b3b68b3fd49748e557c5"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/diagnostics.js",
+      "sourcePath": "ds-bot/src/host/diagnostics.js",
+      "sha256": "bf4ddbf200635afd4cb6049eda00a157fb9f0269e2823a0fe86726c85d20804c",
+      "gitBlob": "1d27d5c0e788546a3f5a76927aced4ad3256d3c4"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/dsh-update.js",
+      "sourcePath": "ds-bot/src/host/dsh-update.js",
+      "sha256": "d7c87158fe375aa3b791b81236f38db6efe4235fe925d49026778a6aabf54062",
+      "gitBlob": "9dc83495a7f8a4f86ff14707db8331e3f2a6a698"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/feed.js",
+      "sourcePath": "ds-bot/src/host/feed.js",
+      "sha256": "7af9fecea98b21858c288bed17e4ecbe5289247ec79ddaa2b7071d84be496f6b",
+      "gitBlob": "98719a3f68502c69ca905dac19f7afe6cd86cc56"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/files.js",
+      "sourcePath": "ds-bot/src/host/files.js",
+      "sha256": "52073d4d121100f58e1686da2765a616278c5cf93eb62806d0c9f81a1fcee6af",
+      "gitBlob": "b98edf27a47b01c2d3f4edb980b6579cfca3447c"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/folders.js",
+      "sourcePath": "ds-bot/src/host/folders.js",
+      "sha256": "d95c61e60de0441fd3fca7b8ce8275a98b292510f9c357998fe888d6c6b037db",
+      "gitBlob": "f3691f9fe054620fdbe5ccf3859937fe63d62622"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/groups.js",
+      "sourcePath": "ds-bot/src/host/groups.js",
+      "sha256": "750d05867b9c1dcbbacf6a1e8b88f176ef7ea101303e9061454028f8a2310da5",
+      "gitBlob": "223913d897a564551cfc090beeacaa3e63dc635c"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/handoffs.js",
+      "sourcePath": "ds-bot/src/host/handoffs.js",
+      "sha256": "d60fb5137be4b64e308fa933a8c1c2063d2e737c8ba6306e8884e4044ac8828a",
+      "gitBlob": "2cd5d199f49059e6534ce859e66826a86758f256"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/home-lock.js",
+      "sourcePath": "ds-bot/src/host/home-lock.js",
+      "sha256": "dc8fda9d62ba17e4fd2116a79af8af6a7f701593380694150f82c492056ab4b0",
+      "gitBlob": "1655cff38ee8f3eac6db39a90476fe6a0e35d21f"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/images.js",
+      "sourcePath": "ds-bot/src/host/images.js",
+      "sha256": "898f9e83f268477c3b47179c0ca8460aad072ebb086a87c21fc1c7ed3b504e29",
+      "gitBlob": "df263088e4c0f7b581c38b26cbf261d55c0a81ee"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/links.js",
+      "sourcePath": "ds-bot/src/host/links.js",
+      "sha256": "01fca4728c87728a3815e435d4f9445fe45f808b7a5e5c6ba2f92772bf38411e",
+      "gitBlob": "c2e4728f008512295be7db3bba3f49c9e5c086b5"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/memory-pending.js",
+      "sourcePath": "ds-bot/src/host/memory-pending.js",
+      "sha256": "6fc08524bceae6d9c85811244c1236b228cfe32ad2c9ac7cbca2e08cd143cdc7",
+      "gitBlob": "61b815214c6fd1a83256d51eb914e64f23f7b1ed"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/memory.js",
+      "sourcePath": "ds-bot/src/host/memory.js",
+      "sha256": "67f3003196b7734949599e69aff3b90d5e14172ed535e160d831dc0e2f574b7f",
+      "gitBlob": "de583e918e5a9d8f57764eab9a074ff2a601244f"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/models.js",
+      "sourcePath": "ds-bot/src/host/models.js",
+      "sha256": "7b120e6b789d99fc4e4c1294e2d44ffa692f5a2df085ee4335d0207ef7a9bded",
+      "gitBlob": "3bb8474aeca4c2767ee129da14111cdff1e3285b"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/parts.js",
+      "sourcePath": "ds-bot/src/host/parts.js",
+      "sha256": "56545327a3721053896afa5f3ada1ef05db6fa223ebf7405efa8dc87b8186e5d",
+      "gitBlob": "5ec7222c3c57f233ae2cdcab4364c6637c5a32d1"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/permissions.js",
+      "sourcePath": "ds-bot/src/host/permissions.js",
+      "sha256": "3c33fdb09b8d7aa2c0695408f11eac012a8c3d45c20628451298228fdac78bf1",
+      "gitBlob": "c59a584bc94de1f735f10582deed745c6a341fe4"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/prompt.js",
+      "sourcePath": "ds-bot/src/host/prompt.js",
+      "sha256": "140378ccbc91d1a08fa1f359571a314f7f21fa7d948ae5501ca33cb27da36df2",
+      "gitBlob": "39f4383ba771ab177071b0a73066ef8fb422b953"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/providers.js",
+      "sourcePath": "ds-bot/src/host/providers.js",
+      "sha256": "cc8601058d617a63ebc0573b98bc41d44d7743d55d864a23ec52256ea3ed2d33",
+      "gitBlob": "49814dd17526f40dedc15c5317fa8a93ebe985e7"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/requests.js",
+      "sourcePath": "ds-bot/src/host/requests.js",
+      "sha256": "492d785294aa3b08db336fcb508b1224dbf39365ba685b8beb42ce11a225cd95",
+      "gitBlob": "d153e4742d78d73de4122ed4ecdc76a50ded5e05"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/resume.js",
+      "sourcePath": "ds-bot/src/host/resume.js",
+      "sha256": "1378c4fd5803551aeb8a6be3f06407a00b33bdecc8d0ab3ff81f8926596e73a2",
+      "gitBlob": "e8b44c65e196b8e922e67b0ca835b6eae7051ab2"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/roster.js",
+      "sourcePath": "ds-bot/src/host/roster.js",
+      "sha256": "8495d3d46555bd26497480dc31dfc30bdc2a9b9173f6ac4545a025f68b1dc9ec",
+      "gitBlob": "b4b79a9d652ce1e2334fe9ea4ccf4ea9ebb6f8fc"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/schedules.js",
+      "sourcePath": "ds-bot/src/host/schedules.js",
+      "sha256": "aa726f22f7f4f3ef567818e2a04583e92fe1954915684b6cb3f650b1b7e62095",
+      "gitBlob": "469d8134e8ca00881e9db7af2543382a0c1e517a"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/secrets.js",
+      "sourcePath": "ds-bot/src/host/secrets.js",
+      "sha256": "cfb5eeb8d777eae640cf0863ce51935cda8e874d8e2f790a60c54249a73841b5",
+      "gitBlob": "05f46ebe2dbd43efbbde0d4bbb6955dad7eb69a1"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/side.js",
+      "sourcePath": "ds-bot/src/host/side.js",
+      "sha256": "44d99fde9abbbc4664b35353392a4c88d21eab1642c3799c2756dad40b4e8d6e",
+      "gitBlob": "a68a2e4c9f402ae4110b993a8464b2ba00c9d262"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/steward.js",
+      "sourcePath": "ds-bot/src/host/steward.js",
+      "sha256": "d57861b743d0293e21f1b29b5d5c28bb79b69fe0fed22e9e2fc1faf71bbf5155",
+      "gitBlob": "c8acdeffa4a6bfe70f6ddd71e7cba24a8508968d"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/store.js",
+      "sourcePath": "ds-bot/src/host/store.js",
+      "sha256": "c62883fb2eb461ed7d5a03c98125f6601e6322cb57715810ec7ada7e10a3a90d",
+      "gitBlob": "e3c260f9e175c04ca94ca7b7df65b30345a80b7a"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/text.js",
+      "sourcePath": "ds-bot/src/host/text.js",
+      "sha256": "2bb5f204061f12f1a648ccce62855f6a67ac0e72a1b3876a9a26937497ae4b6c",
+      "gitBlob": "547e4948584903b0066e53a760c884ee97a6e2bb"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/thinking.js",
+      "sourcePath": "ds-bot/src/host/thinking.js",
+      "sha256": "6c6d36e327eff448450cf1729612c51d8f4c8cadb288e864375d1edcd0988da4",
+      "gitBlob": "eca8d6500320a79253067f883aa3bef3be1f6048"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/time-context.js",
+      "sourcePath": "ds-bot/src/host/time-context.js",
+      "sha256": "117d3edacdebd494384445c80da4837df4583f5271cfe56f5a165ae5612cc1cd",
+      "gitBlob": "4aef4d72efda5198abc28e3314358f149c3f03e7"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/tools.js",
+      "sourcePath": "ds-bot/src/host/tools.js",
+      "sha256": "f131d434ef7699df7ac9e25c83f6ce44c54fcd5a2086740e0aa4be69db8f96fe",
+      "gitBlob": "7a7942f83de9b1ecc87a8c80fd46ae95070b0e56"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/turns.js",
+      "sourcePath": "ds-bot/src/host/turns.js",
+      "sha256": "e2d55607ff31715e9d176c7192d682c0df10abcfa8a88c8ae73210f389482cce",
+      "gitBlob": "a0e3129548dcb3ca7530c5882dc537511868a92f"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/update.js",
+      "sourcePath": "ds-bot/src/host/update.js",
+      "sha256": "83e080c8820bf9f1d49d43ebc605e77988e4eab78135a8c8dcd4581585a4f7a3",
+      "gitBlob": "eb23a8986a04170b02b4bac2aa867465c972d89c"
+    },
+    {
+      "path": "vendor/ds-bot/src/host/usage.js",
+      "sourcePath": "ds-bot/src/host/usage.js",
+      "sha256": "c09bcb2d2ee24c8779fe30e6fb4838c511fd2673c2297c10f1e758579eb56117",
+      "gitBlob": "d19c0f8cbb4f323cbbabc84efb4bbd171d63b895"
+    },
+    {
+      "path": "vendor/ds-bot/src/shared/formula.js",
+      "sourcePath": "ds-bot/src/shared/formula.js",
+      "sha256": "2fda97b3a9f146eee4c80d7fb5abeb476c47d00153032c680a8c9d1b1903a749",
+      "gitBlob": "83787ec800f61ce3eb23cccbdf9fcfbda8fe08eb"
+    },
+    {
+      "path": "vendor/ds-bot/src/shared/mentions.js",
+      "sourcePath": "ds-bot/src/shared/mentions.js",
+      "sha256": "a011d792da173dcf86f3a480ea8b9f8411528bf0b9a99db36a37e6b0e0aeecec",
+      "gitBlob": "504e212b92f895a9bf9e75a13226d69bbb70179e"
+    },
+    {
+      "path": "vendor/ds-bot/src/shared/views.js",
+      "sourcePath": "ds-bot/src/shared/views.js",
+      "sha256": "83e6a0ec08938bf4ed9874466e831a2d84b7116848daa83671c5434f7ce64609",
+      "gitBlob": "37f3250eb564b1f5194e54218a00046e9dd7f7d3"
+    },
+    {
+      "path": "vendor/ds-bot/test/about.test.js",
+      "sourcePath": "ds-bot/test/about.test.js",
+      "sha256": "ff3dfbca32b18e8d79b8577856eb1f5c1ea6605d6ac6904edf0bdc591402dd6d",
+      "gitBlob": "1f499f773c427f499593318cba551ef60fc1c4b0"
+    },
+    {
+      "path": "vendor/ds-bot/test/account-sign-out.test.js",
+      "sourcePath": "ds-bot/test/account-sign-out.test.js",
+      "sha256": "221f5b44eaeddd09d926cde33f20002a2cd44df8fa208086c02e16f432a666eb",
+      "gitBlob": "4c3403e580e2df2633d52a3d8154f8728b82c6fd"
+    },
+    {
+      "path": "vendor/ds-bot/test/activity-row.test.js",
+      "sourcePath": "ds-bot/test/activity-row.test.js",
+      "sha256": "3786632bbbff7bb4b18febe41a815f72e6042e0d70c401984e382f0e62ecb959",
+      "gitBlob": "ba2803291a0008d3d815b804539bad33df857bb1"
+    },
+    {
+      "path": "vendor/ds-bot/test/agent-preset.test.js",
+      "sourcePath": "ds-bot/test/agent-preset.test.js",
+      "sha256": "1f62976f3791d4a0840efd89f95cf4682cb45c673fba399f0f86d0d245083a26",
+      "gitBlob": "88ea24a405797757562e923c2bf1c317aa9cb5cb"
+    },
+    {
+      "path": "vendor/ds-bot/test/agent-roster.test.js",
+      "sourcePath": "ds-bot/test/agent-roster.test.js",
+      "sha256": "c08f0cf1a564aac92692e9d3138b19cbf4371232ed6a8e9d557c57c975038be6",
+      "gitBlob": "0ea5090c0f7d81055b03e14b5502d3b91b6ea1aa"
+    },
+    {
+      "path": "vendor/ds-bot/test/agents.test.js",
+      "sourcePath": "ds-bot/test/agents.test.js",
+      "sha256": "58e762050b114b7971a34aed19c664e381ace83441a6bc5bb4498d832f13d596",
+      "gitBlob": "cb1b2608c60e55d17243c21f105a0d08c8988ae2"
+    },
+    {
+      "path": "vendor/ds-bot/test/approval-notices.test.js",
+      "sourcePath": "ds-bot/test/approval-notices.test.js",
+      "sha256": "3d62d83cb1d4181336a6730302f2cc9c83c9c81a1732167486cf30ab8aeeb4d4",
+      "gitBlob": "c7792aedad68fc30fc8bcb8268e89e619d4e4519"
+    },
+    {
+      "path": "vendor/ds-bot/test/at-menu.test.js",
+      "sourcePath": "ds-bot/test/at-menu.test.js",
+      "sha256": "f6f67196cc57bb15d88282a68212fe76650ea0e70c9285720c603fccfb9afaf0",
+      "gitBlob": "adc5416982fe43238970440a857d8fd6040f9b2a"
+    },
+    {
+      "path": "vendor/ds-bot/test/avatar.test.js",
+      "sourcePath": "ds-bot/test/avatar.test.js",
+      "sha256": "0198fbef5dc37f2fb520bb7690a7fc04e81ca92cd9299ef4058b1917e9fcc02c",
+      "gitBlob": "8e2fd36127bb2f09f1deed84db0a072f4b0387aa"
+    },
+    {
+      "path": "vendor/ds-bot/test/blocking-question.test.js",
+      "sourcePath": "ds-bot/test/blocking-question.test.js",
+      "sha256": "b71ef1b964cc19473833cc6462e7187df417f84e677231bec238bfbfdf894304",
+      "gitBlob": "0eec5b9a07315d649943f16a6449e7d3cd062708"
+    },
+    {
+      "path": "vendor/ds-bot/test/bot-browsers.test.js",
+      "sourcePath": "ds-bot/test/bot-browsers.test.js",
+      "sha256": "ae34eba44d9e7603787860b2196a6d2336493144fbc8db9be7eb7b0f971df5d0",
+      "gitBlob": "6c60de4b9d0e19204d14e1bf4555cc6b45709c6d"
+    },
+    {
+      "path": "vendor/ds-bot/test/bot-mark.test.js",
+      "sourcePath": "ds-bot/test/bot-mark.test.js",
+      "sha256": "e4229366673bc45591570b4e3b978ad2faf16429245a3a464ad47f400b10ce55",
+      "gitBlob": "507e29f3121a179cedbfd7872f162f478a80a19f"
+    },
+    {
+      "path": "vendor/ds-bot/test/bot-messages.test.js",
+      "sourcePath": "ds-bot/test/bot-messages.test.js",
+      "sha256": "e9ee92d04d4b76cfacafd7f9a2aaffb9456ef86cfc4922871e45ca576fff45e8",
+      "gitBlob": "b7afecc0fd0992a6c751260f92581f373d45707d"
+    },
+    {
+      "path": "vendor/ds-bot/test/browser-channel.test.js",
+      "sourcePath": "ds-bot/test/browser-channel.test.js",
+      "sha256": "7a210f5ae25b8a8ca572bcea6f201fca31eb3c5841dadbd0a30054f8efea2f8f",
+      "gitBlob": "e49ae0ef17ba728c2863329721a98757db5221fc"
+    },
+    {
+      "path": "vendor/ds-bot/test/browser-pane.test.js",
+      "sourcePath": "ds-bot/test/browser-pane.test.js",
+      "sha256": "0bf25301ba9ae792753b4c3ee17cad688b7230a88a807ad39568f59d9bf534b2",
+      "gitBlob": "55675326356014c65a1f9fb872feec869856828d"
+    },
+    {
+      "path": "vendor/ds-bot/test/browser-plugin-output.test.js",
+      "sourcePath": "ds-bot/test/browser-plugin-output.test.js",
+      "sha256": "2b0b7e7c694cf73c24525bfce3baa3e9f8fa719bd37ad4dccc44754f9e8ca1ff",
+      "gitBlob": "f5d0f2b0eed495606a9d275ff3fadd6575df6988"
+    },
+    {
+      "path": "vendor/ds-bot/test/browser-plugins.test.js",
+      "sourcePath": "ds-bot/test/browser-plugins.test.js",
+      "sha256": "d4e4573fea1f412c1207041b064ef1f7cef7361d66a429fde934168fefb53081",
+      "gitBlob": "0361f4d1e8707552d0124509155a94ab5aa81f79"
+    },
+    {
+      "path": "vendor/ds-bot/test/btw-client.test.js",
+      "sourcePath": "ds-bot/test/btw-client.test.js",
+      "sha256": "5475303005d17388059b6833833ef4bc4618860522f67cf687e83a82bd158ae3",
+      "gitBlob": "dfc4b4ed22f5a3488425f5bc2ff86780e83a18c5"
+    },
+    {
+      "path": "vendor/ds-bot/test/btw.test.js",
+      "sourcePath": "ds-bot/test/btw.test.js",
+      "sha256": "4d74d426a6862579c00d5622efa7bf34252dbaa643aa912ccc00658d11f452a7",
+      "gitBlob": "7dbf8cb3f2ba5ac1dcbf3eeb0076307c3a00ec42"
+    },
+    {
+      "path": "vendor/ds-bot/test/capabilities.test.js",
+      "sourcePath": "ds-bot/test/capabilities.test.js",
+      "sha256": "9c1f9eadced2db1e5eed163fa26e3d3b04b84ea196aa69fda53a37828529404b",
+      "gitBlob": "39a96156305fda369167cca0a762b60a3f3727a2"
+    },
+    {
+      "path": "vendor/ds-bot/test/capability-stdio-secrets.test.js",
+      "sourcePath": "ds-bot/test/capability-stdio-secrets.test.js",
+      "sha256": "26a9136569b6f7f223afd8594c9df3033cb0b4ee44f43d74169d7ea14e77ae62",
+      "gitBlob": "e93c9048b15faf8158eb006f375a99c72276de40"
+    },
+    {
+      "path": "vendor/ds-bot/test/card-hold.test.js",
+      "sourcePath": "ds-bot/test/card-hold.test.js",
+      "sha256": "99b8a77880381dbb8e3e99ebd65db744f09b8ebb2b383bd78806dc7d6eb12dde",
+      "gitBlob": "b9196cb34c8bc71c8d0e227eadb12a08836976c5"
+    },
+    {
+      "path": "vendor/ds-bot/test/chat-rows.test.js",
+      "sourcePath": "ds-bot/test/chat-rows.test.js",
+      "sha256": "ddc3b8a363fef6836c1fd42b5c2f0d98f1e79fdc638cf1dd7bc80ccb91a1ae9e",
+      "gitBlob": "afd0eb7c0fa9c63abc9f485a85805dadbf6fc234"
+    },
+    {
+      "path": "vendor/ds-bot/test/client-bundle.test.js",
+      "sourcePath": "ds-bot/test/client-bundle.test.js",
+      "sha256": "be1f3fdf38b4275a0a706e789671edd41542dd27142180138456f0e8ea447b6a",
+      "gitBlob": "f4c9dfe293dd1fb62ce8f78bce3ce91aa3a61406"
+    },
+    {
+      "path": "vendor/ds-bot/test/connectors.test.js",
+      "sourcePath": "ds-bot/test/connectors.test.js",
+      "sha256": "01b80be721eb9ef0f9f3ab3b0c45cb467a34e6b8481d14f694326dd33da98c8a",
+      "gitBlob": "75d825402ba9a102c3af9e76964dff53f174298e"
+    },
+    {
+      "path": "vendor/ds-bot/test/constants.test.js",
+      "sourcePath": "ds-bot/test/constants.test.js",
+      "sha256": "458c025698de0eccdccd806fe1ea082286d04dd7e34f9fd3bbb9a484f49a6240",
+      "gitBlob": "ca6fac5eb158f005ca59d0ffeada28df5c5d2c70"
+    },
+    {
+      "path": "vendor/ds-bot/test/create-bot.test.js",
+      "sourcePath": "ds-bot/test/create-bot.test.js",
+      "sha256": "f554699bb97232182e8caf907b1c01defb479e989a08c5e87daf5d81584ab719",
+      "gitBlob": "bceaf80321364f0a76adda87c616807c608ac69e"
+    },
+    {
+      "path": "vendor/ds-bot/test/diagnostics.test.js",
+      "sourcePath": "ds-bot/test/diagnostics.test.js",
+      "sha256": "1cb753fe07f5e5aff9225fbe04edf5ebec54e69900043d7efa1f2284909ef3e0",
+      "gitBlob": "ddfdbc6bfc083b4ceeac5e488ea9d0169181e1c9"
+    },
+    {
+      "path": "vendor/ds-bot/test/dsh-offer.test.js",
+      "sourcePath": "ds-bot/test/dsh-offer.test.js",
+      "sha256": "af0ea66e3b012e875e58d7c94c496860938c5a8e890290fd9720449b4dcdd09a",
+      "gitBlob": "3bd68cc97893cf37e4ab43354890422a66cf4e96"
+    },
+    {
+      "path": "vendor/ds-bot/test/dsh-update.test.js",
+      "sourcePath": "ds-bot/test/dsh-update.test.js",
+      "sha256": "81c14a8381587da58b4391b9792110eeb8b0cab57c33d0b8fbc728497e236470",
+      "gitBlob": "bf5cf207d965f59063c96ee4544359696109d804"
+    },
+    {
+      "path": "vendor/ds-bot/test/elapsed.test.js",
+      "sourcePath": "ds-bot/test/elapsed.test.js",
+      "sha256": "730b7d97b580ee2ca612884a88fc3d09fa9601c8a14d7906194d1148141d74da",
+      "gitBlob": "460eee2da5303fc7a03c1100a212ebc4edb7d2a1"
+    },
+    {
+      "path": "vendor/ds-bot/test/exchange.test.js",
+      "sourcePath": "ds-bot/test/exchange.test.js",
+      "sha256": "2eae39b0be3dfa190063e3878b710dbc6a69c6c39a15513a4139dc75926b8bfa",
+      "gitBlob": "5edeb442ca31d7890ff0034f38bf009b5412e839"
+    },
+    {
+      "path": "vendor/ds-bot/test/fake-ctx.js",
+      "sourcePath": "ds-bot/test/fake-ctx.js",
+      "sha256": "9377ebd0e50c0d61aa545dcd31ca112145ccde7c3e3bb59b0f50f1e901da97c8",
+      "gitBlob": "5a72fa1e4e105ab7709ee76e2e2322c380bcd632"
+    },
+    {
+      "path": "vendor/ds-bot/test/feed.test.js",
+      "sourcePath": "ds-bot/test/feed.test.js",
+      "sha256": "648774ed34a6eb858aa38979a45a8f35800494d37d1676c9197f1ab50c0811f4",
+      "gitBlob": "4a68e21ef237940420c5b605f637665e08cdd7f4"
+    },
+    {
+      "path": "vendor/ds-bot/test/feedback.test.js",
+      "sourcePath": "ds-bot/test/feedback.test.js",
+      "sha256": "29b4582d6829ea0b5a984e52185d5682baa5b00e2310ffc23aa33c32bd1f253e",
+      "gitBlob": "27ef06c41009e1a308d9a53560ad83672cd3d976"
+    },
+    {
+      "path": "vendor/ds-bot/test/files.test.js",
+      "sourcePath": "ds-bot/test/files.test.js",
+      "sha256": "f0cc83cd1121f73d0c50f31dbdddae3318404c638a852b27f5610c81dd772cdd",
+      "gitBlob": "4cf280c0c80b5dbcb760729b924e349d5b6db76c"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/bing-zh.html",
+      "sourcePath": "ds-bot/test/fixtures/bing-zh.html",
+      "sha256": "ad1f39d41b3930fb9af94ae7e41b8430ce0edc418a6c65a2df246da099e45849",
+      "gitBlob": "1382b643578f6c9e536b228d364d084bdb2bae97"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/bing.html",
+      "sourcePath": "ds-bot/test/fixtures/bing.html",
+      "sha256": "d2a56cc14593badf04d717e0afa5f1ec5d0203dbb212aa95066bed5dbd3cd5a9",
+      "gitBlob": "c42fd1682d6247a90cba9b5e6ca6bdd4d40fe8eb"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/duckduckgo.html",
+      "sourcePath": "ds-bot/test/fixtures/duckduckgo.html",
+      "sha256": "36f6fb3be0032a8d1533c77ecccd678275872c154ef4111bd6c674c0fd7f8590",
+      "gitBlob": "13b0c606832c0b1dc2c016f54a021b8f719028a6"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/echo-argv-env.mjs",
+      "sourcePath": "ds-bot/test/fixtures/echo-argv-env.mjs",
+      "sha256": "eed6f6e8c23ffd58acb736ca8e7355dc197753265356df3a0ce33a8dad33b9f5",
+      "gitBlob": "c0788076e213b8d2c4b38979b8c58875886e961c"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/read-page/frame-1.html",
+      "sourcePath": "ds-bot/test/fixtures/read-page/frame-1.html",
+      "sha256": "3a1cf772952d75eb2ba0fa39018d3ff64ae8e58bcdbb5152f9eeeeb06f756d4a",
+      "gitBlob": "6e70324841b63417e60d3b6fffdde7704c36bafb"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/read-page/frame-2.html",
+      "sourcePath": "ds-bot/test/fixtures/read-page/frame-2.html",
+      "sha256": "88a7b679ce59efa4368c9777da35d1e27fd8a7bfba053e8777495c38ae282c2b",
+      "gitBlob": "690fadfb892a301e8ddad0be32da631b7d8dca4a"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/read-page/index.html",
+      "sourcePath": "ds-bot/test/fixtures/read-page/index.html",
+      "sha256": "7e28f377e466e714f0afc870ea81c59c3971458e9d73971720667e1e7c8c7d56",
+      "gitBlob": "2ddfd2a7fd3a105bb62b4f47bd18694f0198cdee"
+    },
+    {
+      "path": "vendor/ds-bot/test/fixtures/read-page/other.html",
+      "sourcePath": "ds-bot/test/fixtures/read-page/other.html",
+      "sha256": "06f7fdf305d7a7e3e0b4d69bda65b585075804e43e460110090b3f875ebbaf8f",
+      "gitBlob": "dd73e80c9e0dafa948186c807cd4a174e15b90b6"
+    },
+    {
+      "path": "vendor/ds-bot/test/fold.test.js",
+      "sourcePath": "ds-bot/test/fold.test.js",
+      "sha256": "140dcb2fdde2d9a2f2d3f9c227f67047a3844eabe9757d3e36be49cf5b75bea3",
+      "gitBlob": "520a821913dfb2b256dc0bcbf63e738c2dfffc3d"
+    },
+    {
+      "path": "vendor/ds-bot/test/follow-through.test.js",
+      "sourcePath": "ds-bot/test/follow-through.test.js",
+      "sha256": "17d1da40ed668aaeac8dcee435db5aaa5184af1d0c24b4a468e323a472266651",
+      "gitBlob": "e95157c523d434ab28b4ce83c14fbf9fce2ca6cc"
+    },
+    {
+      "path": "vendor/ds-bot/test/formula.test.js",
+      "sourcePath": "ds-bot/test/formula.test.js",
+      "sha256": "b82de74a2d46510fdec6509df8461aed56f605aef80447069aae0c12ce31a687",
+      "gitBlob": "4aed642b3a2b821a3a1e8d8b4667e8ae5a5e465b"
+    },
+    {
+      "path": "vendor/ds-bot/test/group-status.test.js",
+      "sourcePath": "ds-bot/test/group-status.test.js",
+      "sha256": "d1af4048e95f7fc90e0b42986bd0cfa511260e0b33932f240dedb41759dea0c5",
+      "gitBlob": "03b2a582b91bb78858b797adb6c2dd587cf80e2a"
+    },
+    {
+      "path": "vendor/ds-bot/test/group-work.test.js",
+      "sourcePath": "ds-bot/test/group-work.test.js",
+      "sha256": "ce6ed5ca76bf951ceebc40465efe3d8d8301cd3ea4bdcec239113b9c9bb8efec",
+      "gitBlob": "eea9c5882d7d5bf49abe7a73327e27279fedc6c3"
+    },
+    {
+      "path": "vendor/ds-bot/test/groups.test.js",
+      "sourcePath": "ds-bot/test/groups.test.js",
+      "sha256": "0e4bc8047611b946df5faf3cb850825c2474bbb073ef38e6c014174b478739c5",
+      "gitBlob": "642ca18ed3f2f3f25fea5fdbb58b7d4620d25017"
+    },
+    {
+      "path": "vendor/ds-bot/test/handoff-results.test.js",
+      "sourcePath": "ds-bot/test/handoff-results.test.js",
+      "sha256": "a89eabc99cdee684a418c0444d62c856096169b7a1a84d404506d14118ceb3cd",
+      "gitBlob": "5d838dc2b58daebe0167a6132eaadf5ec4a61afb"
+    },
+    {
+      "path": "vendor/ds-bot/test/harness-resolve.mjs",
+      "sourcePath": "ds-bot/test/harness-resolve.mjs",
+      "sha256": "9eed81cfbc2030298a6c0f2b44b29f9225515b7a6c3a04c31d4f375d766d4648",
+      "gitBlob": "1baaad0d7ac1edeedeae580f28a853b81179af42"
+    },
+    {
+      "path": "vendor/ds-bot/test/header.test.js",
+      "sourcePath": "ds-bot/test/header.test.js",
+      "sha256": "717373786c18717011af97b67f6a1b8d5fe94acdcbe6310523daacd06c6e45ca",
+      "gitBlob": "67dac92b7b43a1fab610db29aa8763e5c1fec5a9"
+    },
+    {
+      "path": "vendor/ds-bot/test/history.test.js",
+      "sourcePath": "ds-bot/test/history.test.js",
+      "sha256": "4b648310400fae29a5e27d7cf024c6b922ee36dbcbd4ba2f112741d3ed76a701",
+      "gitBlob": "6a13679602e40eabd864c7fae9d469431f8ae42e"
+    },
+    {
+      "path": "vendor/ds-bot/test/home-lock.test.js",
+      "sourcePath": "ds-bot/test/home-lock.test.js",
+      "sha256": "455ce42b7426e8e1af788d55cefca0e77bfd1ebf9edf5de401ffcfa5c4ccfa89",
+      "gitBlob": "e2c66a9f46cc8336ae4307fc130c12707f9473d8"
+    },
+    {
+      "path": "vendor/ds-bot/test/i18n.test.js",
+      "sourcePath": "ds-bot/test/i18n.test.js",
+      "sha256": "ec6c6285da350911782a17d4e2c2f5d1542bcaac6742ad8f762ef69da8b2ea75",
+      "gitBlob": "315ddf484e25bd625bff18fde230c839384dd7d4"
+    },
+    {
+      "path": "vendor/ds-bot/test/images.test.js",
+      "sourcePath": "ds-bot/test/images.test.js",
+      "sha256": "fe3bdeefd9465219f010cf6246cd1d8352507374354a4fc4d4f0a478915ba85c",
+      "gitBlob": "253f5e15aed190f46d616f67770bac91e2c66def"
+    },
+    {
+      "path": "vendor/ds-bot/test/install.test.js",
+      "sourcePath": "ds-bot/test/install.test.js",
+      "sha256": "fda843451357ff120960e457e21bcb58ec0862c949afb59ad77b3e5faee3060e",
+      "gitBlob": "c437e04ccc8b26386eb6d7d62ecc64ce94a8037e"
+    },
+    {
+      "path": "vendor/ds-bot/test/legacy-inks.test.js",
+      "sourcePath": "ds-bot/test/legacy-inks.test.js",
+      "sha256": "617d4d5db105dcaf02aec876585b0e997487412699e4addd491b96e4919497d8",
+      "gitBlob": "149b342e5018b8c89939cba60db28dd88bea22df"
+    },
+    {
+      "path": "vendor/ds-bot/test/legacy-state.test.js",
+      "sourcePath": "ds-bot/test/legacy-state.test.js",
+      "sha256": "93d5326ee43098ccb12682db8ef687ef2c690bb0f75f80a2b7233730ccb2bbab",
+      "gitBlob": "c543da0a71042c05c27616bb8cc36cfe10f51149"
+    },
+    {
+      "path": "vendor/ds-bot/test/legacy-storage.test.js",
+      "sourcePath": "ds-bot/test/legacy-storage.test.js",
+      "sha256": "6dc693663937c3095617bad61c89f308ad0688581e5c38ffbdba2a2e559bf11e",
+      "gitBlob": "7b1b2176a6c680e9a004b97e5e1da9e24ddb5f93"
+    },
+    {
+      "path": "vendor/ds-bot/test/links.test.js",
+      "sourcePath": "ds-bot/test/links.test.js",
+      "sha256": "a062891e48b9e2bc0f52ab38d7170736c9556e433e414efe9926dd5fcfbe875f",
+      "gitBlob": "77a5bf2dd06b5a8636449c1930b0c229cf55da1e"
+    },
+    {
+      "path": "vendor/ds-bot/test/looks.test.js",
+      "sourcePath": "ds-bot/test/looks.test.js",
+      "sha256": "8d67c0c0016421019614ecacb298d75f06f5c1dc2f18b13bbd3044fced32ac70",
+      "gitBlob": "6cbd0263e049dac1265af8dafd63b13411ae9e21"
+    },
+    {
+      "path": "vendor/ds-bot/test/member-status.test.js",
+      "sourcePath": "ds-bot/test/member-status.test.js",
+      "sha256": "b22c702910120526a7d1c7fe698664bde2eb8afb52e332290d62f96d39775e4b",
+      "gitBlob": "e3252422055c923ae733adc825e732920ce551fe"
+    },
+    {
+      "path": "vendor/ds-bot/test/memory-pending.test.js",
+      "sourcePath": "ds-bot/test/memory-pending.test.js",
+      "sha256": "d0c06ddf353d4be023fe3fb8a05abd30be0436e84b9f94301fdde9dda3282ef2",
+      "gitBlob": "3df38d7e756c94e75b02ad764bf1398738e529da"
+    },
+    {
+      "path": "vendor/ds-bot/test/memory.test.js",
+      "sourcePath": "ds-bot/test/memory.test.js",
+      "sha256": "0e68543d0c4281ce940bef3d1e51594b7ca3cf1952f30ed98cab329edfd64db4",
+      "gitBlob": "707b624bd8e2d228b7e9f07e3514cf8f805306cf"
+    },
+    {
+      "path": "vendor/ds-bot/test/mention-rule.test.js",
+      "sourcePath": "ds-bot/test/mention-rule.test.js",
+      "sha256": "0caf00d57a9de0bf27b4587271217b1d012a3379526d22c2969b4c370e5ac6c2",
+      "gitBlob": "baa754a6dd2c792b3116cb1effd6b73a85ae8796"
+    },
+    {
+      "path": "vendor/ds-bot/test/mentions.test.js",
+      "sourcePath": "ds-bot/test/mentions.test.js",
+      "sha256": "6fd93cebd8236e966e0a0edcae7d566055b74d822e671b56bc6c803b4d928fe7",
+      "gitBlob": "1a1a1b84510e84880b3d1283836e52d993a3d87a"
+    },
+    {
+      "path": "vendor/ds-bot/test/message-clock.test.js",
+      "sourcePath": "ds-bot/test/message-clock.test.js",
+      "sha256": "a64a81cfee9c518fb52d9f4418509e2eaa216188c11819619a8dce2b5a705089",
+      "gitBlob": "de7da2f34235912e2935ca867af57e7270247f7d"
+    },
+    {
+      "path": "vendor/ds-bot/test/message-layout.test.js",
+      "sourcePath": "ds-bot/test/message-layout.test.js",
+      "sha256": "47f35b79a558ca40e60a8a225a50a7e922588e36f70565bace6d1d15c5e793cf",
+      "gitBlob": "ebcae6d3c808b4b13f9f1d8da8f35056712f0ebf"
+    },
+    {
+      "path": "vendor/ds-bot/test/mock-llm.test.js",
+      "sourcePath": "ds-bot/test/mock-llm.test.js",
+      "sha256": "2e1a7684e756ed9c7432d1bfb98c0038fc1c9fb95c0fd93a2b3000e1afe40ef3",
+      "gitBlob": "7bc51e0091a2a8fb2327fe0b0f2f5e3c30a4d1db"
+    },
+    {
+      "path": "vendor/ds-bot/test/model-menu.test.js",
+      "sourcePath": "ds-bot/test/model-menu.test.js",
+      "sha256": "0751a3c2933cfee0079025f260e63b9c283c538f373af5989d121fe7f5d25246",
+      "gitBlob": "128e5a0284c76a5e405035339420880a3064af7a"
+    },
+    {
+      "path": "vendor/ds-bot/test/models.test.js",
+      "sourcePath": "ds-bot/test/models.test.js",
+      "sha256": "ad7077ff8a35ce1ca3664d1e21aaa8ef2cfb116eed313d41cb8599b9d629f0bd",
+      "gitBlob": "248b3b6f2c11ddcaedd71803684eac707a30c143"
+    },
+    {
+      "path": "vendor/ds-bot/test/open-listed.test.js",
+      "sourcePath": "ds-bot/test/open-listed.test.js",
+      "sha256": "98351837e4b71954c9579f402a43c0d0bda2ad733dcfba08fac227872a60bd69",
+      "gitBlob": "f639c91141def82a333aba4f1670463d91de9f58"
+    },
+    {
+      "path": "vendor/ds-bot/test/own-keys.test.js",
+      "sourcePath": "ds-bot/test/own-keys.test.js",
+      "sha256": "54a31db775344c9cf53e6f131252492a72bab3e48c609af1aa01690aa941e5a9",
+      "gitBlob": "37733a69421c923982be104fe91cd04effbc164e"
+    },
+    {
+      "path": "vendor/ds-bot/test/permission-picker.test.js",
+      "sourcePath": "ds-bot/test/permission-picker.test.js",
+      "sha256": "155ca88bd7b526c97de86c7f685091e87f20795b0c83e2ade92a5f29a814e506",
+      "gitBlob": "61c312f4588f29c85da892658d7bebbf2d64fd1b"
+    },
+    {
+      "path": "vendor/ds-bot/test/permissions.test.js",
+      "sourcePath": "ds-bot/test/permissions.test.js",
+      "sha256": "f4dbfd5936f79c5ab14a8008752c8745f1ef543ad72b805a9d1326e1130d6c49",
+      "gitBlob": "a48431e8191e56068c7063db4aa93fdf8d215d23"
+    },
+    {
+      "path": "vendor/ds-bot/test/prompt.test.js",
+      "sourcePath": "ds-bot/test/prompt.test.js",
+      "sha256": "fe7007152547061ef31928f8d335d6e27a60e5dfa224195580f631abe9a68d2f",
+      "gitBlob": "2cbf1c7e7723c7806db1cfe229c3e0d5dbd95554"
+    },
+    {
+      "path": "vendor/ds-bot/test/providers.test.js",
+      "sourcePath": "ds-bot/test/providers.test.js",
+      "sha256": "b879d4c12d2dde778d181af766e3149f558c4747e7d5653fdeb21f3ac579882c",
+      "gitBlob": "53e7624109a4eaf874fa385d89c5eb41ecb94482"
+    },
+    {
+      "path": "vendor/ds-bot/test/questions.test.js",
+      "sourcePath": "ds-bot/test/questions.test.js",
+      "sha256": "ba94620b67a7bf96a4fd4f352336e45105585f62b235051737672bfe3f17d582",
+      "gitBlob": "82c4ff3fa94bb37add53734650cd300729c15f59"
+    },
+    {
+      "path": "vendor/ds-bot/test/read-page.test.js",
+      "sourcePath": "ds-bot/test/read-page.test.js",
+      "sha256": "3639027bdc511aae97c3e9ebaee08b8e9f61318d2f16b7c5edc743d08f64c6e1",
+      "gitBlob": "6730bf75358cd3d9bb6e5f5d8290d80debb047b6"
+    },
+    {
+      "path": "vendor/ds-bot/test/relay-header.test.js",
+      "sourcePath": "ds-bot/test/relay-header.test.js",
+      "sha256": "dc8b5527d80f59dc408539106f34daef44243f88b2f03c2c4996dc8ba3313a1d",
+      "gitBlob": "21d4d54897c6226dba72cd057dc1355496bc753a"
+    },
+    {
+      "path": "vendor/ds-bot/test/request-id.test.js",
+      "sourcePath": "ds-bot/test/request-id.test.js",
+      "sha256": "0ba337a2d2a78b3accb5ea03a9e7747f530526d15e1774b1ea53b31fd80898b7",
+      "gitBlob": "b8dfded808110436816a3d879e0a5563f597a90b"
+    },
+    {
+      "path": "vendor/ds-bot/test/right-panel.test.js",
+      "sourcePath": "ds-bot/test/right-panel.test.js",
+      "sha256": "dedaac751fb3d69996013777c4fdc8df4adc177867e004005dcd8c6562946982",
+      "gitBlob": "9f25dd4f017df6e9a3254b376ceeaa3571614846"
+    },
+    {
+      "path": "vendor/ds-bot/test/room-races.test.js",
+      "sourcePath": "ds-bot/test/room-races.test.js",
+      "sha256": "2bc04f6dcaf2b6a2471ea7670d2c4d8346e8e529fe21e0bb40a8262511d7eb10",
+      "gitBlob": "46881a378dc91f9071ef8fc2b0b403ea137a2669"
+    },
+    {
+      "path": "vendor/ds-bot/test/roster.test.js",
+      "sourcePath": "ds-bot/test/roster.test.js",
+      "sha256": "0124bb125e33112f4c2613b07cb8653d675be435c66f73a8516dfd91dcdac5d0",
+      "gitBlob": "d9e47c6de19417514621b6387e7832a74cb27f6d"
+    },
+    {
+      "path": "vendor/ds-bot/test/rounds.test.js",
+      "sourcePath": "ds-bot/test/rounds.test.js",
+      "sha256": "6eee2a224bc8c10c3982051160b4f933f0b60ba84e54af82814220fcfcaa5009",
+      "gitBlob": "0b38aa403a71a0911b60fd951500be527aa12bd0"
+    },
+    {
+      "path": "vendor/ds-bot/test/run-stats.test.js",
+      "sourcePath": "ds-bot/test/run-stats.test.js",
+      "sha256": "68d182151b73ce2e6c267e7defc07e42c15986ed39d5d50419df61648970107e",
+      "gitBlob": "879c8251fdde5e795c3ccc11a4990faa10829919"
+    },
+    {
+      "path": "vendor/ds-bot/test/schedules.test.js",
+      "sourcePath": "ds-bot/test/schedules.test.js",
+      "sha256": "d277085a354e4a7b427b0c8ace911ff1547041818f560152d0d1c516faa21937",
+      "gitBlob": "f019f7a15924b94b5548a7d1be6a9a17e5a8c6da"
+    },
+    {
+      "path": "vendor/ds-bot/test/secrets.test.js",
+      "sourcePath": "ds-bot/test/secrets.test.js",
+      "sha256": "add34945ff81a9ecefdf4a1020141410e5d5b84f49ca9d75dc8ee5a0d676016d",
+      "gitBlob": "9b8392809be07c2a48c0b348e03ad77af50bac09"
+    },
+    {
+      "path": "vendor/ds-bot/test/session-identity.test.js",
+      "sourcePath": "ds-bot/test/session-identity.test.js",
+      "sha256": "be3725744edf3e07ca9ebb180b971dc3bd1b55194a5301e7b5c1fab064a535fd",
+      "gitBlob": "4ac088fea38821b4f891a39d82b0266335c0ee29"
+    },
+    {
+      "path": "vendor/ds-bot/test/session-model.test.js",
+      "sourcePath": "ds-bot/test/session-model.test.js",
+      "sha256": "c917a2de8c79a462b61a75470d30ea974ebe612049098665f813ec5aae31a5c7",
+      "gitBlob": "f8418354c789cf1261e0d641f6303d31ec54da16"
+    },
+    {
+      "path": "vendor/ds-bot/test/shared-map.test.js",
+      "sourcePath": "ds-bot/test/shared-map.test.js",
+      "sha256": "6291e622d4eca5524edf19dd5f21e75917d762d854179c92178d12e5dfc4d408",
+      "gitBlob": "12d84145754da0c2f0e381525a5074fd06f56f58"
+    },
+    {
+      "path": "vendor/ds-bot/test/side-panel.test.js",
+      "sourcePath": "ds-bot/test/side-panel.test.js",
+      "sha256": "8868637eb3382eff812894c13fe7ace4eb0aa7543a1e606fdea4f5f0dba7ae0c",
+      "gitBlob": "d4dda64efba54de68ecb0f7a028e3c2f2a820dc1"
+    },
+    {
+      "path": "vendor/ds-bot/test/side.test.js",
+      "sourcePath": "ds-bot/test/side.test.js",
+      "sha256": "b942bf1535552dab5c154ea2e1c8f6309f8f9360f319356317ff9317175d8ca4",
+      "gitBlob": "52765e33422c465ef8eb675c855a2fc9acdf99fa"
+    },
+    {
+      "path": "vendor/ds-bot/test/sidebar-switch.test.js",
+      "sourcePath": "ds-bot/test/sidebar-switch.test.js",
+      "sha256": "9b14f5c0b919e8c21ca38bffa82b4693e2e9b3b2248d977714d7213337516619",
+      "gitBlob": "af4a499e6bbef7b8f2eccff3684dd145228bb490"
+    },
+    {
+      "path": "vendor/ds-bot/test/speech.test.js",
+      "sourcePath": "ds-bot/test/speech.test.js",
+      "sha256": "002cc47bf676f2ec4e7218413bd4ba1487d0e6ef797339769a4c61640594b517",
+      "gitBlob": "b0d6b15662bb5753f799e80a6a3679d5cd14b4f0"
+    },
+    {
+      "path": "vendor/ds-bot/test/steward.test.js",
+      "sourcePath": "ds-bot/test/steward.test.js",
+      "sha256": "1c6e9dacc26b0329c084403a75809498482f2ca723c5e003d6a6b6e6ed2d2b0e",
+      "gitBlob": "42e59fd87b68a3409cdeedcadbd5702c60e18805"
+    },
+    {
+      "path": "vendor/ds-bot/test/store.test.js",
+      "sourcePath": "ds-bot/test/store.test.js",
+      "sha256": "ffbfcf87d398d4ecc2642078df0505757a5c79417a28d76dac505c1e60647d82",
+      "gitBlob": "03cd46f6ab5a74f68454130a14870ad68ede3a9d"
+    },
+    {
+      "path": "vendor/ds-bot/test/style-debt.json",
+      "sourcePath": "ds-bot/test/style-debt.json",
+      "sha256": "f16dd76542dc659e96f47099fa8297f7b540fa618787a8942574cd6791749ce9",
+      "gitBlob": "4985bf1900ecb111cfcafbd8d5842d3b755d7c88"
+    },
+    {
+      "path": "vendor/ds-bot/test/style-debt.test.js",
+      "sourcePath": "ds-bot/test/style-debt.test.js",
+      "sha256": "1f4aeb4cee8ee2b6556383f1a6bb39b3774f78ea28971baf1db35d9bdec2907f",
+      "gitBlob": "eb52e357e978048b61ece90c608b4c5dc3786a0f"
+    },
+    {
+      "path": "vendor/ds-bot/test/styles.test.js",
+      "sourcePath": "ds-bot/test/styles.test.js",
+      "sha256": "a880071ab19212d6b9ce3a9f51e0bdd659ab0df95904131f8cf7f37672aafc7a",
+      "gitBlob": "d714f3fd0e122dba6ba822c6d87837714a208fd7"
+    },
+    {
+      "path": "vendor/ds-bot/test/surface.test.js",
+      "sourcePath": "ds-bot/test/surface.test.js",
+      "sha256": "0de7d166808a48771dff6a5eec229c0476cdf9374ec284d6a27da0ebea3c3406",
+      "gitBlob": "752704a5728a01e8b329f302e87b6bbc8f14bf4f"
+    },
+    {
+      "path": "vendor/ds-bot/test/switch-keeps-input.test.js",
+      "sourcePath": "ds-bot/test/switch-keeps-input.test.js",
+      "sha256": "3d024353d212b8e5d4864f4821100ca178662f227e1160a96d80b04f56e1d430",
+      "gitBlob": "1dff409d844b8e8e8d35acaf684a13955a392994"
+    },
+    {
+      "path": "vendor/ds-bot/test/text.test.js",
+      "sourcePath": "ds-bot/test/text.test.js",
+      "sha256": "9049894485bae98d0cd81c6e7a4b40b0805e8d9a0056ebfa61d309b5e63a966c",
+      "gitBlob": "32462296f2a02ebcfc1feaa0dfb2912b90e3339b"
+    },
+    {
+      "path": "vendor/ds-bot/test/thinking.test.js",
+      "sourcePath": "ds-bot/test/thinking.test.js",
+      "sha256": "8302f375ac5f187036d35afeaaf2e421ed71da314b8102d323c2e03219344543",
+      "gitBlob": "f375ed310a356d927a186de64adada253d4e926f"
+    },
+    {
+      "path": "vendor/ds-bot/test/time-context.test.js",
+      "sourcePath": "ds-bot/test/time-context.test.js",
+      "sha256": "f545b6501ca86499d3118011f9511f98a4902e921ce07c52cf1660fda2710258",
+      "gitBlob": "c0d5905a13dd77e37017fd9d1379d1f51ec83682"
+    },
+    {
+      "path": "vendor/ds-bot/test/tool-cells.test.js",
+      "sourcePath": "ds-bot/test/tool-cells.test.js",
+      "sha256": "606be2cf131829b1bf33093305330efc70337ba2f59161252d3ca31e60726e93",
+      "gitBlob": "3af2be175b8db5700b1303d3be1c6ddb070e4899"
+    },
+    {
+      "path": "vendor/ds-bot/test/tool-node.test.js",
+      "sourcePath": "ds-bot/test/tool-node.test.js",
+      "sha256": "3d5b079265e93d95bee48bcc44bfb3dcecc0c01226035e49c8b61d6bb6d27aeb",
+      "gitBlob": "64836e5b7e5e8bcf5da68166a59945ae1227453e"
+    },
+    {
+      "path": "vendor/ds-bot/test/turn-reasoning.test.js",
+      "sourcePath": "ds-bot/test/turn-reasoning.test.js",
+      "sha256": "ec1ab30924ca380363ac14c53c5af75604fde3e5014e73e99e30e24650068b9c",
+      "gitBlob": "9f4e0e124c53f1e0b5ac5a36336c9c39f20810e1"
+    },
+    {
+      "path": "vendor/ds-bot/test/turn-tail.test.js",
+      "sourcePath": "ds-bot/test/turn-tail.test.js",
+      "sha256": "3f908da594e7bedcceb300e6cbcd6de8219d346b69fe178fe41b6b89443d24f7",
+      "gitBlob": "3a96093d35156942b74cbcef1ed335776638f70d"
+    },
+    {
+      "path": "vendor/ds-bot/test/update-bot.test.js",
+      "sourcePath": "ds-bot/test/update-bot.test.js",
+      "sha256": "14754c19f3d307ceb14168b37458e84dab2258d32cde6b8a991746a577fe2241",
+      "gitBlob": "1cc7469929d87239d4905ee3f416a4645929002d"
+    },
+    {
+      "path": "vendor/ds-bot/test/update.test.js",
+      "sourcePath": "ds-bot/test/update.test.js",
+      "sha256": "27e51d2dfd834232e440b0f36fd9eaf050b1782c664c901511fc5cf8e9a48b0e",
+      "gitBlob": "c551400c964e826374adbec41f486043d0c78044"
+    },
+    {
+      "path": "vendor/ds-bot/test/usage-data.test.js",
+      "sourcePath": "ds-bot/test/usage-data.test.js",
+      "sha256": "df3dfbd032973276d9eb430f6597dee84dcc5778e196eb2ca058ea59bf20199b",
+      "gitBlob": "78d0be010035aa965a858768ab1ff6e877a7a966"
+    },
+    {
+      "path": "vendor/ds-bot/test/usage.test.js",
+      "sourcePath": "ds-bot/test/usage.test.js",
+      "sha256": "0b32531b9261065ffbd08d139b31dd8ebcff70a2e0ebe861ac4044ff42c8de2d",
+      "gitBlob": "da36a5a6fe3f2e1fa5812b8263d77887fdc77aa3"
+    },
+    {
+      "path": "vendor/ds-bot/test/user-bubble.test.js",
+      "sourcePath": "ds-bot/test/user-bubble.test.js",
+      "sha256": "9f6dc92bc5f45e5ed74f82edcb30120294c61a746929cdd54f1b696dfab04727",
+      "gitBlob": "bdc9eb874730a810fc844e29b8d5701f25250e73"
+    },
+    {
+      "path": "vendor/ds-bot/test/view-inputs.test.js",
+      "sourcePath": "ds-bot/test/view-inputs.test.js",
+      "sha256": "6cafa4aa5302191e4551d5ed6459defc750f703e8c4c5131c436db59094f6688",
+      "gitBlob": "3538310d260ffde529b7db9d7bf239e130d4c842"
+    },
+    {
+      "path": "vendor/ds-bot/test/view-reply.test.js",
+      "sourcePath": "ds-bot/test/view-reply.test.js",
+      "sha256": "4fff5148f825a48fb21b5f264533b2e32a6ba005970af1245bc6d98661aa80d5",
+      "gitBlob": "8c0d4fbb19a33603511ac5373669ac9dd0f4a3aa"
+    },
+    {
+      "path": "vendor/ds-bot/test/views.test.js",
+      "sourcePath": "ds-bot/test/views.test.js",
+      "sha256": "03e0484478b9a5e29fc5b932c4e71f83254da38cc9e71297b84906c5d4aaab09",
+      "gitBlob": "115297e5a4c7492fd53bb6735b659474a7f8c208"
+    },
+    {
+      "path": "vendor/ds-bot/test/web-search.test.js",
+      "sourcePath": "ds-bot/test/web-search.test.js",
+      "sha256": "845d8929c995a0d9dfdb3107f6d6d5355c53a2caac2785ea5f4424a5889f2b82",
+      "gitBlob": "7557e92b14015b99740dbd33a79bea9ef490d409"
+    },
+    {
+      "path": "vendor/ds-bot/test/work-dir.test.js",
+      "sourcePath": "ds-bot/test/work-dir.test.js",
+      "sha256": "b671c3360d12f00bd2fa8f290b7a8b8732e9235e56201e8131d316fc2e8cc18f",
+      "gitBlob": "b4360a8816419db98c5c1c614b8364a27dbaff8e"
+    },
+    {
+      "path": "vendor/ds-bot/web-search.js",
+      "sourcePath": "ds-bot/web-search.js",
+      "sha256": "9e38330353021a9bdc1503ee24d523b16b309b3f1ff688338caef48862e20265",
+      "gitBlob": "1d56111aae5937028b27e6689fc33f2457db42ff"
+    }
+  ]
+}

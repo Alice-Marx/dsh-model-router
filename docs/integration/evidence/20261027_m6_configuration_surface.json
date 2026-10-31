@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-host-offline-default-composition",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "ffd1face80bfac8a76a0325bf9e2bf92995bdeb7",
+    "packages/orchestration/src/product-composition.mjs": "cd908b32d59494e1bf7fe93c09ff7d9d5dc73c22",
+    "packages/orchestration/src/bot-settings.mjs": "8e3dcfd2e6a803c268345ee67ddc444ce62f80cc",
+    "packages/orchestration/src/funding-accounts.mjs": "800d6e36861016867331e35c850abb684a355194",
+    "modules/bot-runtime/read-model.mjs": "59bc022eeddb4ec90bfdfa430d2957cd0a8e8a72",
+    "scripts/integration-product-default.mjs": "7ffc813c73dfab717fcc6637505a4ee2c1b14252",
+    "package.json": "4b2467e82d01c5a26a9e5c6c512828d9e7c0b52f"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "feature": "N06a: the default product boot opens the Bot-settings and funding-account components and exposes the configuration surface (read model sections plus owner save actions); grant publication and model admission remain on the verified path until N06b",
+  "changes": {
+    "components": "openBotSettings() and openFundingAccounts() open in the product boot gated on the deferred money authority, colocated as component tables in the same SQLite file; both close in the boot failure chain and in dispose",
+    "catalog": "settingsCatalog supplies the trusted binding catalog: exact route models, a local machine entry (an enabled binding requires a workspaceRef) and enabled funding scopes; tools and capability catalogs arrive with their facades",
+    "readModel": "botBindings and fundingAccounts sections joined the product snapshot; unwired or failed reads report actionable blocked reasons",
+    "actions": "binding.save (Bot-settings owner CAS commit) and funding.account.save (funding policy owner CAS commit) registered only when their component is available; unconfigured bindings stay blocked instead of faking executability",
+    "deferred": "onCommitted/onSuspended are deliberate recorders in N06a; publishing compiled grants to the authority and switching model admission to these components is N06b"
+  },
+  "defaultCompositionProbe": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "checks": [
+      "Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Default entry: worker executes permitted MR routing with the composed Bot grant",
+      "Default entry: original DS Bot dispatch and result return survive migration",
+      "Product channel refuses an unauthenticated snapshot at the Host connection admission",
+      "Product read model: real Bots, compiled grants and exact model routes in one snapshot",
+      "Default owner can read the original advanced ledger through real Gateway; ungranted mutations and unauthenticated requests stay denied",
+      "Unwired product sections report actionable blocked reasons instead of fake data",
+      "Default product: owner funding policy and Bot binding save through real owner actions; unconfigured bindings stay blocked",
+      "Default product: owner secretRef pairing and Bot-scoped real MCP read work through the real AgentLoop",
+      "Default product: owner revocation removes Bot grant, invalidates remote tickets and refuses further reads",
+      "Fresh host reconstructs stable Bot identity and the composed product read model"
+    ],
+    "snapshotSections": {
+      "bindings": "available",
+      "tasks": "blocked",
+      "machines": "available",
+      "usage": "blocked"
+    },
+    "actualModelCalls": 0
+  },
+  "regression": {
+    "targeted": "product-composition, ds-lifecycle, bot-settings.native, funding-accounts.native: 36/36",
+    "rootSuite": {
+      "tests": 1382,
+      "pass": 1379,
+      "fail": 0,
+      "skipped": 3
+    },
+    "packaging": "package.json files carries the Host-entry import closure (241 entries); roadmap closure test 20/20"
+  },
+  "fixes": [
+    "An inline closure script pushed 119 absolute-path entries into package.json files; removed all non-portable entries and re-added the two genuinely missing modules (bot-settings, funding-accounts) by relative-path walk"
+  ],
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "defaultComposition": "passed",
+      "rootTests": {
+        "tests": 1382,
+        "pass": 1379,
+        "fail": 0,
+        "skipped": 3
+      },
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the default composition probe are pending; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "N06a is the configuration surface only: grants still compile from the route catalog and model calls still run the diagnostic decorator; N06b switches grant publication to bot-settings and admission to model-accounting with the probe configuring accounts and bindings before synthetic turns",
+    "An enabled binding cannot declare officialTools or capabilities yet (their catalogs arrive with the facades); the local machine entry maps no real workspace path yet",
+    "No default user profile migration, Electron carrier, clean install or real model inference"
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-28",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261028_atomic_task_admission.json",
+  "level": "native local TCP/HTTPS/mTLS + offline default Host",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "remote-computer-agent/src/auth-throttle.ts": "67143c908b480992fb4fa6ffaf87c89e16447cf9",
+    "remote-computer-agent/src/transport.ts": "156ad47fd61212b9bc5abb36b37050790f94fbba",
+    "remote-computer-agent/src/store.ts": "b56bad8912dc67df87108ba2739046bc18fc04fd",
+    "remote-computer-agent/src/index.ts": "d06ab4f31a7faf84e9577260a19ca0788ea4e09f",
+    "remote-computer-agent/src/protocol.ts": "93897f6fad4d8a0fdddf4ffef4e0a6da3a380c63",
+    "tests/remote-auth.native.mjs": "66b3d28a6cdded3e3aa517112d95d39650c19cca",
+    "tests/helpers/remote-auth-tls.mjs": "47c8edbd8525ddac6d2ad3a7c82bd0a4ec9f4437",
+    "tests/remote-agent.test.mjs": "aadd5bcfd3dc6f0ab293f2e7355b270dce8f6fd7",
+    "remote-computer-agent/README.md": "188742c6779586b4e63a8006317f73e18c2a65e9",
+    "deploy/remote-agent/README.md": "8284953113377187070a4b220e780415c0d9e801",
+    ".github/workflows/ci.yml": "5c24299700bf2cde1247075c22a761bb12cddd01",
+    "package.json": "1b8002c36a38081ba224ea7c8c1f52ea5fb97290",
+    "docs/integration/plan/20261028_remote_auth_abuse.md": "1e6025df773a7a9fef13166569b4df5d2dc19100"
+  },
+  "dsOrSdkSourcesModified": false,
+  "existingBaseline": "32-byte random tokens, digest storage, client revision rotation, exact Host/Origin, TLS/proxy modes and bounded per-source cooling already existed before this change",
+  "changes": {
+    "anonymous": "Bounded per-TCP-peer exponential cooling plus a separate fixed global anonymous failure window; forwarded addresses/client IDs cannot reset or establish identity",
+    "authenticated": "A separate bounded request window keyed by verified Store clientId/revision covers control and all grants; valid credentials bypass anonymous quotas; another client remains usable and local rotation resets the old revision window",
+    "credentials": "Clients and grants both perform fixed-size digest comparisons, including absent-row dummy comparisons; invalid wire credentials receive uniform AUTH_INVALID/401",
+    "response": "AUTH_RATE_LIMIT/429 includes bounded Retry-After. Repeated cooling failures do not refill audit. Tokens are absent from persisted clients/grants/audit",
+    "network": "Strict bind/list bounds; exact Origin/Host and actual proxy peer, precise HTTPS forwarding marker, no forwarded Host/source trust; mTLS requires explicit CA plus independent Bearer"
+  },
+  "tests": {
+    "root": {
+      "tests": 1442,
+      "pass": 1439,
+      "fail": 0,
+      "skipped": 3
+    },
+    "authNative": {
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "checks": [
+        "bounded source/global/client counters and 30-second exponential cap with Host-only fake clock",
+        "real HTTP spoofed source/client headers cannot reset cooling; valid shared peer survives and window recovers",
+        "real HTTP global anonymous saturation leaves valid control/MCP clients usable; repeated rejections do not fill audit",
+        "real HTTP multiple tickets share actual client quota; other client remains usable; live local rotation immediately invalidates old secrets/tickets",
+        "real HTTP trusted proxy peer, exact TLS marker, exact Host/Origin and configuration rejection",
+        "real HTTPS trusted CA succeeds, missing Bearer fails and untrusted server certificate is refused",
+        "real mutual TLS requires a trusted client certificate and separate Bearer; missing/untrusted client certificates fail"
+      ]
+    },
+    "existingAgent": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0
+    },
+    "hostMachines": {
+      "tests": 8,
+      "pass": 8,
+      "fail": 0
+    },
+    "defaultHost": {
+      "status": "passed",
+      "checks": 36,
+      "actualModelCalls": 0
+    },
+    "strictPeerInstall": "passed",
+    "client": "passed"
+  },
+  "intermediateFailures": [
+    "An initial HTTP cooling test used a 500ms window, shorter than cold MCP initialization; warmed the native path first and used a 2s constrained test window. Deterministic component checks still verify exact production backoff values.",
+    "First remote capability commands passed shell text where the private helper expected a local script path; corrected to explicit .sh/.ps1 files before remote execution."
+  ],
+  "limitations": [
+    "This checkpoint is local Windows11/Node24.20.0. Ubuntu Node22 and Win10 Node24 are reachable; fresh source synchronization/reruns follow in separate evidence",
+    "TLS/mTLS uses ephemeral OpenSSL-generated test certificates and actual local sockets; no public service, VPN or Tunnel deployment is implied",
+    "Limits are bounded process-local state, reset on cold restart and subject to idle/LRU eviction at configured capacity; no distributed denial-of-service or full load acceptance claim",
+    "Authenticated request cap is per paired client, so all its grants share it; operators must observe Retry-After or rotate locally. Production capacity/load and Host retry UX remain separate work",
+    "Full project and M0 gates remain open. No git commit/push/release/npm publication yet"
+  ],
+  "references": [
+    {
+      "title": "OWASP Authentication Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html#login-throttling"
+    },
+    {
+      "title": "MCP 2025-11-25 transport security",
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#security-warning"
+    }
+  ]
+}

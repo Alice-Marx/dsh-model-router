@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-default-host-and-native-agent",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/remote-machines.mjs": "38a00a5f7d7be305e0d749d921cb399d8ce9e7be",
+    "packages/orchestration/src/machine-secrets.mjs": "9934adf122c3f00b9a33ac8665f89a6d2ea8af52",
+    "packages/orchestration/src/product-composition.mjs": "f2285614a37345a0e17d4728178ffafffe51c9dc",
+    "packages/orchestration/src/ds-lifecycle.mjs": "b484b2dd1d484a8d3c91d2a498fec9be2569cd64",
+    "modules/bot-runtime/index.mjs": "8207e9da10137fd48cfe94fb27a8b02c137271d0",
+    "modules/bot-runtime/read-model.mjs": "5948b27f1822b477ed6458a70d267f6e78c81216",
+    "apps/integration-client/panels.jsx": "9b869e5ff7ca5bcc9d74c76e5c56c96023c709da",
+    "apps/integration-client/product.css": "48f5bbbdffc9e9cbbef794da11083b785efb95ac",
+    "remote-computer-agent/src/store.ts": "73aa5526828cec91226469b019aeb1810fad08c7",
+    "remote-computer-agent/src/transport.ts": "0d62b7417568f86a19838d6b7b716efb226260c3",
+    "remote-computer-agent/src/protocol.ts": "93897f6fad4d8a0fdddf4ffef4e0a6da3a380c63",
+    "tests/remote-machines.native.mjs": "98b24797c06c90d4fe137aabbc5327e08040ded0",
+    "tests/machine-secrets.test.mjs": "9f632487537813e47594b100b06be270d29791b2",
+    "tests/remote-agent.test.mjs": "aadd5bcfd3dc6f0ab293f2e7355b270dce8f6fd7",
+    "scripts/integration-product-default.mjs": "8d1f4e9d72476e55f7a70d06f3a048e185b53972",
+    "scripts/integration-remote-machines.mjs": "2a3689c18b6b6efb9b3a88fca60ec5963d2bf5a1",
+    "package.json": "70229601f38943ea5edaf04b6c07f398188eb62f",
+    "pnpm-lock.yaml": "fe23c1d3ae3f7c2ec27c95639dd9b8a92dbba0c3"
+  },
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "hostMachineNative": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0
+      },
+      "agentNative": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0
+      },
+      "defaultComposition": {
+        "checks": 9,
+        "status": "passed"
+      },
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "ubuntu-test",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "hostMachineNative": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0
+      },
+      "agentNative": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0
+      },
+      "defaultComposition": {
+        "checks": 9,
+        "status": "passed"
+      },
+      "actualModelCalls": 0
+    },
+    {
+      "machineAlias": "win10-test",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "hostMachineNative": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0
+      },
+      "agentNative": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0
+      },
+      "defaultComposition": {
+        "checks": 9,
+        "status": "passed"
+      },
+      "actualModelCalls": 0
+    }
+  ],
+  "checks": [
+    "Owner-only secretRef pairing verifies machine identity and API major before saving metadata",
+    "Control credentials reuse DS secret storage with empty Bot scope; existing secret UI and request_secret cannot broaden reserved machine keys",
+    "Default actual AgentLoop exposes and executes only granted remote read/list/ping tools; copied subjects, spoofed context, traversal and cross-Bot use fail",
+    "Bot grant changes abort a quiet in-flight request; remote per-Bot ticket revocation stops an already running process and leaves other Bots valid",
+    "Offline revocation persists unconfirmed evidence; explicit owner reconciliation only confirms revocation and never restores a grant",
+    "A late revoke response cannot overwrite a newer revoke from another Host connection",
+    "Committed Host catalog changes recompile and revoke grants without changing or weakening the DS state revision fence",
+    "Cold host restores machine metadata, exact Bot read grants and host-only secret references"
+  ],
+  "rootSuite": {
+    "tests": 1339,
+    "pass": 1336,
+    "fail": 0,
+    "skipped": 3
+  },
+  "financialNative": {
+    "tests": 27,
+    "pass": 27,
+    "fail": 0
+  },
+  "strictPinnedInstall": "passed-local",
+  "client": "generated-and-checked-local",
+  "remoteDependencySetup": "Fresh isolated source snapshot; dependency aliases and the previously verified platform-native better-sqlite3 13.0.3 reused from the earlier test fixture. This is not a clean-install claim.",
+  "remoteSourceSnapshotSha256": "b71d627bbdd8c98d32c65a9f707c27614ce856718c4da1adfa3249de5017f2df",
+  "realCodexNonInference": {
+    "status": "passed",
+    "version": "0.163.0",
+    "executableSha256": "2692c8c7bb2cf8b0aefe638741fc90236f4b824c59578ce84994f9de58200993",
+    "requestedModel": "gpt-6.1-sol",
+    "reportedModel": "gpt-6.1-sol",
+    "actualResponseModelVerified": false,
+    "cliTurnRequestsDispatched": 0,
+    "providerRequests": 0,
+    "scopedToolPing": "passed",
+    "spoofAndRevoke": "passed",
+    "nativeTreeStopped": true
+  },
+  "priorCliInferenceUncertainty": "An earlier isolated CLI test dispatched one turn but reached its deadline without reported usage. Actual provider request count and spend are unknown; the current non-inference probe does not supersede that result.",
+  "limitations": [
+    "Fresh test Hosts and local loopback Agent transport on each of three machines; no persistent production deployment or cross-machine VPN/TLS/hibernation topology acceptance",
+    "Default product read facade is integrated; shell/browser/desktop/remote CLI Task execution and approvals remain open",
+    "Task and monetary usage projections remain blocked in the default product; diagnostic accounting is not budget admission",
+    "No new inference turn; CLI reports its configured model but not the actual response backend",
+    "Electron addon ABI, clean install/upgrade, desktop multi-DPI/multi-screen/UAC/RDP and real GPT workflow acceptance remain open",
+    "All changes remain uncommitted and unpublished for user review"
+  ]
+}

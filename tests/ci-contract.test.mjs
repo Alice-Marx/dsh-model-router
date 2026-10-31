@@ -49,3 +49,19 @@ test('package closure rejects a relative module outside the source package', asy
   await writeFile(join(options.root, 'runtime', 'index.mjs'), `export { outside } from '../../${siblingName}'\n`)
   await assert.rejects(assertRuntimeClosure(options), /Runtime import is outside the package/)
 })
+
+test('package closure requires both native peer scripts when the runtime launches them', async t => {
+  const options = await fixture(t)
+  const dir = join(options.root, 'packages', 'cli-runtime', 'src')
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, 'native-process.mjs'), 'export const native = true\n')
+  await writeFile(join(options.root, 'runtime', 'index.mjs'), "export { native } from '../packages/cli-runtime/src/native-process.mjs'\n")
+  const runtime = 'packages/cli-runtime/src/native-process.mjs'
+  const peers = ['packages/cli-runtime/src/native-peer.ps1', 'packages/cli-runtime/src/native-peer.py']
+  options.files.push(runtime, ...peers)
+  await assertRuntimeClosure(options)
+  for (const peer of peers) {
+    await assert.rejects(assertRuntimeClosure({ ...options, files: options.files.filter(path => path !== peer) }),
+      error => error.message === `Package is missing native runtime dependency: ${peer}`)
+  }
+})

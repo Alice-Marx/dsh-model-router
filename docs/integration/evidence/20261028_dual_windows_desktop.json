@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-28",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261028_auth_rotation_body_race.json",
+  "level": "real logged-in Windows interactive own-window fixture, native helper and Agent",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "native/windows-desktop/Program.cs": "bd26e1f474838dd0456e04a498ed423b291ceca8",
+    "native/windows-desktop/ProcessJob.cs": "3981ba6619301da3391ff6e9d8c96f15071674a8",
+    "native/windows-desktop/build.ps1": "2fb5e10803f8a545601fba9ca4e0963b8a1282e3",
+    "remote-computer-agent/src/desktop.ts": "e5e4284f393fd062147214051e96ab43c4651a8b",
+    "remote-computer-agent/src/agent.ts": "1e0c6db9a24b7a0c9979b804bf92144419b882c6",
+    "remote-computer-agent/src/store.ts": "b29c8bc74325d3ab90c73331f75172e9264e5ab4",
+    "scripts/integration-remote-agent-desktop.mjs": "9a861b036b40abba9dad91f2f1e19e365f62e555"
+  },
+  "userCondition": "User explicitly confirmed Win10 and Win11 logged-in/unlocked test desktops with dedicated visible test windows; only those synthetic windows were operated",
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "version": "10.0.26200",
+      "build": "26200",
+      "helperSha256": "ece2a543fa82115f75aa2b0b4014dc08c3a71d89d8368e32291ad67b78a48786",
+      "node": "v24.20.0",
+      "sessionId": 2,
+      "dpi": 144,
+      "scale": 1.5,
+      "status": "passed",
+      "checks": [
+        "named-pipe-token-denied",
+        "live-named-pipe-ACL-verified",
+        "interactive-target-screenshot-metadata",
+        "cross-Bot-desktop-lease-denied",
+        "visible-target-hit-tested-click",
+        "real-Unicode-SendInput-no-clipboard",
+        "consumed-screenshot-denied",
+        "wrong-session-denied"
+      ],
+      "launch": "same logged-in interactive session, hidden background helper and visible own fixture",
+      "cleanup": {
+        "ownedFixtureProcessesRemaining": 0
+      }
+    },
+    {
+      "alias": "win10-test",
+      "version": "10.0.19044",
+      "build": "19044",
+      "helperSha256": "ab4f5788a09bf55152da5c117dad2ed7258e6c3fd26c478d4f249ab19581cdb3",
+      "sourceSha256": "1371b9d707455e1d3ab381e192103beb6260db20545d48dc5f608ed69a646b61",
+      "node": "v24.18.0",
+      "sessionId": 1,
+      "dpi": 96,
+      "scale": 1,
+      "status": "passed",
+      "checks": [
+        "named-pipe-token-denied",
+        "live-named-pipe-ACL-verified",
+        "interactive-target-screenshot-metadata",
+        "cross-Bot-desktop-lease-denied",
+        "visible-target-hit-tested-click",
+        "real-Unicode-SendInput-no-clipboard",
+        "consumed-screenshot-denied",
+        "wrong-session-denied"
+      ],
+      "launch": "SSH Session0 only dispatches a temporary scheduled task using the existing interactive user token; actual helper/fixture runs in Session1",
+      "cleanup": {
+        "ownedFixtureProcessesRemaining": 0,
+        "scheduledFixtureRemoved": true
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "alias": "win11",
+      "path": "docs/integration/evidence/assets/20261028_desktop_win11.png",
+      "bytes": 6925,
+      "sha256": "fecbd9be175d9219f27946a41c56ce234a7224817eed50f974391739a493c63e",
+      "scope": "Visually inspected synthetic fixture window only; no other desktop content"
+    },
+    {
+      "alias": "win10",
+      "path": "docs/integration/evidence/assets/20261028_desktop_win10.png",
+      "bytes": 3389,
+      "sha256": "6e90a623dd39ad00baa69a098197d5b6d00a525846b13a2d8f634ec13af10701",
+      "scope": "Visually inspected synthetic fixture window only; no other desktop content"
+    }
+  ],
+  "observed": [
+    "Native pipe ACL denies tokenless peers and broad/network principals; tested on the live pipe",
+    "Agent takes an actual screenshot of the selected own window, with session/display/physical/DPI metadata",
+    "A second Bot cannot take the same Agent desktop lease",
+    "A hit-tested actual click and Unicode SendInput enter the fixture text without clipboard APIs",
+    "A consumed screenshot and wrong session selector are refused",
+    "Helper/fixture children exit and the exact temporary scheduled task is removed after completion"
+  ],
+  "limitations": [
+    "8 baseline checks per OS, not full product desktop acceptance. No default Bot-tool permission/approval flow for desktop is exercised",
+    "Win10 is build19044 LTSC, not a claim for every Windows10 release. Win11 actual build is recorded; current physical 100% and150% only",
+    "The old probe summary has a generic125%/150% remaining sentence; actual dpi96 and144 measurements above verify those two current settings.125%, moving between displays, resize/DPI changes and multi-monitor remain separate",
+    "No lock/UAC/logout/RDP transition, tray pause/revoke, remote cancellation propagation or in-flight grant revocation proof yet",
+    "GDI-PrintWindow backend only; Windows Graphics Capture and other application rendering are unverified",
+    "Lease denial here covers two Bots through one Agent. Cross-Agent/process arbitration still requires audit",
+    "Built from source into existing isolated dependencies; no clean installer/upgrade/Electron or dedicated OS-account isolation claim. No new inference, commit or release"
+  ]
+}

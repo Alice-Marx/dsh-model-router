@@ -141,8 +141,14 @@ test('router upgrade retains its package identity and contains no GAL payload', 
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)
   assert.doesNotMatch(client, /GalModulePage|GAL_PANEL|cancelGalReply|galReply/)
   const bundle = read('.dsh-plugin/client.js')
-  assert.ok(Buffer.byteLength(bundle) < 1_000_000, 'router must not embed GAL art')
-  assert.doesNotMatch(bundle, /data:image\/(?:png|webp)|echo-chronicle|model-router:gal-story:v1/)
+  // The unified product bundle legitimately carries the whole DS surface, so a
+  // byte ceiling is not a GAL guard. GAL art was megabytes of base64 payloads:
+  // bound the embedded image payload and reject GAL identifiers directly (the
+  // generator also rejects GAL inputs by path).
+  const embedded = [...bundle.matchAll(/data:image\/(?:png|webp);base64,([A-Za-z0-9+/=]*)/g)]
+  assert.ok(embedded.reduce((total, match) => total + match[1].length, 0) < 4096, 'no heavy embedded image art')
+  assert.doesNotMatch(bundle, /echo-chronicle|model-router:gal-story:v1/)
+  assert.doesNotMatch(bundle, /GalModulePage|GAL_PANEL|cancelGalReply|galReply/)
 })
 
 test('0.13.0 package rename: the loader imports the new name, the profile entry id stays for existing settings', async () => {

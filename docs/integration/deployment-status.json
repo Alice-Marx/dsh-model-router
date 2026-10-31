@@ -18,7 +18,9 @@
       "purpose": "isolated tests only",
       "productionControllerInstalled": false,
       "productAgentInstalled": false,
-      "evidence": "docs/integration/evidence/20261027_m0_remote_platforms.json"
+      "evidence": "docs/integration/evidence/20261027_m0_remote_platforms.json",
+      "isolatedProductHostAgentVerified": true,
+      "productMachineEvidence": "docs/integration/evidence/20261027_m4_product_machines.json"
     },
     {
       "alias": "win10-test-01",
@@ -30,7 +32,9 @@
       "purpose": "isolated tests only",
       "productionControllerInstalled": false,
       "productAgentInstalled": false,
-      "evidence": "docs/integration/evidence/20261027_m0_remote_platforms.json"
+      "evidence": "docs/integration/evidence/20261027_m0_remote_platforms.json",
+      "isolatedProductHostAgentVerified": true,
+      "productMachineEvidence": "docs/integration/evidence/20261027_m4_product_machines.json"
     }
   ],
   "privateConfigPolicy": "No real endpoint, account, credential or secret material in Git",

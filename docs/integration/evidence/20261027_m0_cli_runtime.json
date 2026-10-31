@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "strict-isolated-cli-runtime-and-native-bridge",
+  "sourceGitBlobs": {
+    "packages/capability-broker/src/authority.mjs": "ac0d4f4ff20ff91de79417ec4d97338a5737de0a",
+    "packages/capability-broker/src/cli-bootstrap.mjs": "3d75e1875b01b304003ee11d6e675a59250439bb",
+    "packages/capability-broker/src/cli-stdio-bridge.mjs": "096da1823308f4dcf7de7cee650666b5988eae24",
+    "packages/cli-runtime/src/codex-runtime.mjs": "d535d09cce09776fac493d9640b76e7efae2bace",
+    "packages/cli-runtime/src/contracts.mjs": "966d2e1f55ce278e2f0579b156d72a63feef008a",
+    "packages/cli-runtime/src/native-process.mjs": "38e11c9f80847f1a2597c9e61861ff3d6b98a993",
+    "packages/cli-runtime/src/native-peer.ps1": "3bb559a98f269c7d6e61026c20092ac95dfa187e",
+    "packages/cli-runtime/src/native-peer.py": "62857c66aa7bff0660f34c70921b80340c22834d",
+    "packages/cli-runtime/src/profile-policy.mjs": "e09277c7738189272bff62303b140098a4c34093",
+    "scripts/integration-cli-runtime.mjs": "5a6876ec0228f4a95f554d28341edbeb3764ef2d",
+    "scripts/integration-cli-native.mjs": "b50ffb797da267d12e1cf37877931cc705df0819",
+    "tests/cli-runtime-contract.test.mjs": "cc58252de6a5464dd8d01d07bc11c53f1fd6b769",
+    "tests/cli-runtime-renewal.test.mjs": "89a0e721057d04d022f76e1fe88bae37b3f68599",
+    "tests/cli-runtime-native.test.mjs": "9446877018406a302785c7eecb8a366a15b71022",
+    "tests/cli-runtime-fixture.mjs": "3ca8fd892472543ce9e1193901be6c01cb070c60"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "contractChecks": {
+    "status": "passed",
+    "checks": [
+      "CLI environment never inherits credentials, global homes, PATH shadows or Node injection",
+      "CLI evidence retains unknown usage and subscription has no fabricated USD value",
+      "CLI rejects a different configured model/provider before dispatch",
+      "CLI cumulative usage snapshots deduplicate; cross-thread and cross-turn events do not contaminate the receipt",
+      "CLI rerouting invalidates success without replacing the requested model"
+    ]
+  },
+  "leaseRenewalChecks": {
+    "status": "passed",
+    "checks": [
+      "Host renewal cannot revive expired or released leases or cross a binding/revision",
+      "An active run rechecks its renewed expiry; the original timer does not cancel it early",
+      "Renewed active operations still abort on expiry and revoke; a late success remains refused"
+    ]
+  },
+  "nativeBridgeChecks": {
+    "status": "passed",
+    "peer": "windows-kernel-pid",
+    "supervisor": "windows-job",
+    "tests": 3,
+    "pass": 3,
+    "fail": 0,
+    "checks": [
+      "Native CLI cancellation stops a real child tree and confirms its containment",
+      "Private CLI bootstrap rejects an unrelated same-user peer and scopes a real grandchild MCP connection",
+      "CLI descriptor public signature rejects replacement before native connection"
+    ],
+    "actualModelCalls": 0
+  },
+  "rootSuite": {
+    "tests": 1329,
+    "pass": 1326,
+    "fail": 0,
+    "skipped": 3
+  },
+  "realCodexEntryProbe": {
+    "status": "blocked-in-this-environment",
+    "localCodexVersion": "0.157.1",
+    "targetCodexVersion": "0.163.0",
+    "reason": "Local codex app-server exits immediately: it refuses to create PATH aliases under a temporary home and fails to initialize its sqlite state runtime under an isolated home; the pinned adapter targets the app-server protocol verified with 0.163.0",
+    "evidence": "tmp/integration/cli-debug capture retained locally; not portable, therefore summarized here",
+    "actualModelCalls": 0
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "contractSuite": "passed",
+      "renewalSuite": "passed",
+      "nativeBridgeSuite": "passed",
+      "realCodexEntry": "blocked-local-version",
+      "rootTests": {
+        "tests": 1329,
+        "pass": 1326,
+        "fail": 0,
+        "skipped": 3
+      },
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 runs of the CLI runtime suites are pending; the native peer uses python3 on Linux and PowerShell on Windows",
+  "limitations": [
+    "The real Codex app-server entry probe requires an installation-attested executable that supports the pinned app-server protocol; local 0.157.1 does not",
+    "No real CLI model identity, usage or turn is verified; model mismatch and identity recording are contract-level only",
+    "Remote CLI execution location, remote worktree CLI runs and the product Execution facade are not implemented",
+    "Grandchild MCP bridging is verified with a synthetic fixture CLI, not with a production vendor CLI"
+  ]
+}

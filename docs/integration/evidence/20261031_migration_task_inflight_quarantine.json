@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_task_journal_quarantine.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4, real executing Task attempts committing through the real journal until a Windows Job stop; W06.15 remains in_progress",
+  "componentAcceptance": "Win11 / Node v24.20.0 / better-sqlite3 13.0.3: the real openTaskJournal() submit, claim, beginDispatch and linkExecution calls leave every attempt running with an unconfirmed remote effect, and the fixture keeps appending Task, attempt, operation, outbox and task_events rows under a pending migration gate. Observed growth before the stop: attempts 1->4, outbox 1->4, task_events max seq 3->12. After launchMigrationProcessTree().stop() returns treeStopped:true with stopEvidence:'windows-job-close', the fixture PID answers ESRCH to process.kill(pid,0), and a 500ms window shows no change in row counts, attempt state fingerprint, PRAGMA data_version from a separately pinned connection, or the fixture heartbeat content and mtime. At that moment the subject attempt and its operation are still running with result and finished_ms NULL, so the stop is read from observation and never from a terminal row. Cold recovery through the product recover() yields needs-reconciliation with {code:'HOST_INTERRUPTED',outcome:'unknown'}, and a later succeeded or cancelled submission is rejected by reconcile with TASK_STOP_UNCONFIRMED. possiblyApplied is pinned by the real createRemoteWriteBackend(): a dispatch that was sent but unconfirmed reports possiblyApplied:true, a dispatch that never left reports notStarted:true with possiblyApplied:false. New suite: 3 tests, 2 pass, 0 fail, 1 non-Windows skip. Local related combination (os-quarantine + task-journal-quarantine + inflight-quarantine): 12 tests, 9 pass, 0 fail, 3 skipped. Root regression: 1928 tests, 1841 pass, 3 fail, 84 skipped; the three failures are the known load-dependent readiness timeouts, and those three files alone pass 27 with 5 skipped.",
+  "productAcceptance": "None. This covers one executing Task attempt and its journal rows under a Windows Job stop. It is not complete Task cancellation and not a stop-write proof: stopWriteProvable, activationSupported and postActivationRollbackSupported stay false, and product scores remain 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md section 13",
+  "sourceGitBlobs": {
+    "tests/fixtures/migration-task-inflight-writer.mjs": "d1bf0215d8ecfa50283d61d031cae5eecd58bd6d",
+    "tests/migration-task-inflight-quarantine.native.mjs": "0b6b96bee4562407bf96728db25375cb71ca471c",
+    "packages/orchestration/src/migration-os-quarantine.mjs": "0f16e6bbb48abf035b165110b7a6b11f0b89daa2",
+    "packages/orchestration/src/task-journal.mjs": "d2d41ef0197ad41e988c8ba28d75bc2aacf61a6d",
+    "packages/orchestration/src/remote-execution.mjs": "e8b6345feaae6b4d334dcc82ef46ac8a43a77987",
+    "packages/orchestration/src/task-contract.mjs": "85d9d1888c20cb4fede4999dbc3a5caf2504cb82",
+    "docs/integration/plan/20261031_migration_os_quarantine.md": "cf42dda42ca63e88c76605ec1bf32eb2d51d70b6",
+    "package.json": "330f661eee5ebdacdff60dacb017edda3c1d9ba2"
+  },
+  "implementation": [
+    "The fixture drives the real journal only: submit() creates Task, attempt, operation and outbox rows, claim() moves them to running and delivers the outbox row, beginDispatch() enters the dispatch fence and linkExecution() records a remote-operation reference. No model, executor or production Task is invoked and no terminal row is ever written for these attempts.",
+    "A pending migration-gate.json sits in the synthetic home. Growth is measured by three independent counts read on a read-only connection: attempts, task_outbox and max(task_events.seq).",
+    "The stop is a Windows Job close, not a journal write: stop() returns treeStopped:true with stopEvidence:'windows-job-close' while stopWriteProvable stays false, the fixture PID is observed dead through process.kill(pid,0) -> ESRCH, and the 500ms quiet window is then measured with a second pinned connection so PRAGMA data_version independently shows that no other connection committed.",
+    "Recovery and reconciliation use the product API only: recover() marks the interrupted dispatched attempt needs-reconciliation with HOST_INTERRUPTED/unknown, and later succeeded or cancelled submissions are rejected as TASK_STOP_UNCONFIRMED. Nothing is written into the database by the test itself.",
+    "possiblyApplied semantics are pinned by the real createRemoteWriteBackend(): a dispatch that was sent but unconfirmed reports outcome unknown with stopConfirmed:false and possiblyApplied:true, while a dispatch that never left reports notStarted:true with possiblyApplied:false.",
+    "The result keeps stopWriteProvable, activationSupported and postActivationRollbackSupported false and does not generalize one executing attempt into complete Task cancellation or external-effect stop proof."
+  ],
+  "testRuns": [
+    "New suite alone: 3 tests, 2 pass, 0 fail, 1 skipped (the non-Windows unsupported case is skipped on Win11).",
+    "Local related combination (migration-os-quarantine, migration-task-journal-quarantine, migration-task-inflight-quarantine): 12 tests, 9 pass, 0 fail, 3 skipped.",
+    "Documentation four-suite run (integration-progress, integration-documents, integration-inventory, product-client-build): 26 tests, 26 pass. npm run integration:check is valid with 32 requirements, 40 features, 63 acceptance scenarios and 20 work packages.",
+    "Final npm test: 1928 tests, 1841 pass, 3 fail, 84 skipped, exit 1 (tmp/integration/migration-task-inflight-quarantine-e90/root-final.log). The expected 1928 tests and 84 skips matched, but the expected 0 failures did not: the known load-dependent readiness timeouts reappeared."
+  ],
+  "preservedFailures": [
+    "The final root run failed 3 tests and they are preserved as-is: remote-auth native HTTP source cooling (27.5s), remote command never-started settlement (28.0s) and remote write scoped operation journaling (26.3s). All three are the known ~25s concurrency readiness timeouts; those three files run alone give 32 tests, 27 pass, 0 fail, 5 skipped, so they are neither fixed nor explained away here.",
+    "Only the executing-attempt slice is covered. Machine reboot, real remote Agent external effects, all-domain write handles, other launchers and accounts, and Linux hardware remain unverified.",
+    "The Linux leg was not run: the configured Fedora host timed out during the SSH handshake, so the Linux side of this slice stays design plus negative cases only.",
+    "PID reuse is not checked at startTicks granularity; liveness is a bare process.kill(pid,0) probe.",
+    "No real user profile, model inference, production Task, commit, push or release was used."
+  ],
+  "limitations": [
+    "W06.15 remains in_progress. Complete Task cancellation, a stop-write proof, machine reboot and production acceptance remain open.",
+    "The migration-gate.json written by the fixture is a minimal synthetic file holding only schemaVersion, kind and phase, which is not a legal gate under the product's strict schema. The assertion therefore proves that these writers do not read the gate, not that they interact with the gate schema.",
+    "The stop receipt describes the wrapper only; it is not evidence about the durability of writes the killed child had already issued to the OS.",
+    "The result must not be generalized to complete Task cancellation or to a stop-write proof."
+  ],
+  "remainingOpen": [
+    "task-journal.mjs renew() (lines 204-207) only updates task_runner.until_ms and there is no per-attempt progress or heartbeat row API, so 'rows keep appearing while executing' can only be shown by continuously dispatching new attempts.",
+    "The migration-os-quarantine.mjs stop receipt (lines 45-61) carries only the wrapper code/signal plus treeStopped and stopEvidence; it exposes no descendant PID or exit code, so 'the child really died' has to be self-reported by the subject and probed separately.",
+    "task-journal.mjs recover() (lines 212-233) writes {code:'HOST_INTERRUPTED',outcome:'unknown'} for an interrupted dispatched attempt and does not persist possiblyApplied; the read side infers it from the '!== false' default rule, so the recovery path should persist it directly later."
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "strict-isolated-native-task-journal",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/task-journal.mjs": "6b0cdfe3f2344280646d417b18b162445666e5b5",
+    "packages/orchestration/src/task-service.mjs": "6695774b288cff331e20e145cde5ee78b068b6bb",
+    "packages/orchestration/README.md": "70fca21560b590869dee4b446f9c9508d8f22cd7",
+    "tests/task-journal.native.mjs": "4401ce73d634d0126235f1eff91e0281140b1fd7",
+    "scripts/integration-task-probe.mjs": "97193ff840a7b73938f9af661042c88b42db9f4f"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "feature": "Unattended budget waiting now ends at the task total deadline instead of parking forever",
+  "changes": {
+    "journal": "expire(identity, now) sweeps waiting-budget tasks whose deadline_ms<=now to failed with BUDGET_WAIT_EXPIRED and records a budget-wait-expired event inside one fenced transaction",
+    "service": "The runner sweep runs on start and on every heartbeat renewal (runnerTtlMs/3); no new timer or scheduler is introduced",
+    "semantics": "Explicit retry and cancel keep their existing behavior; retry after expiry still refuses with TASK_DEADLINE because a retry cannot extend the total deadline"
+  },
+  "nativeChecks": {
+    "status": "passed",
+    "driverVersion": "13.0.3",
+    "node": "v24.20.0",
+    "platform": "win32",
+    "tests": 28,
+    "pass": 28,
+    "fail": 0,
+    "breakdown": { "previousTaskSuite": 26, "newExpiryChecks": 2 },
+    "newChecks": [
+      "Journal: budget waiting survives a sweep before the deadline, expires at it with one failed attempt, a budget-wait-expired event and no new attempt, and retry still refuses with TASK_DEADLINE",
+      "Service: unattended budget waiting expires through the runner heartbeat sweep with zero extra backend calls and no replay"
+    ],
+    "actualModelCalls": 0
+  },
+  "rootSuite": {
+    "tests": 1329,
+    "pass": 1326,
+    "fail": 0,
+    "skipped": 3
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "taskNativeSuite": "passed",
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the enlarged task suite are pending; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "Waiting-budget auto-expiry covers the journal deadline; the product UI for waiting and expired budget states reuses the existing task card labels and has no dedicated acceptance yet",
+    "Initial Task/outbox and funding admission remain separate transactions; this change does not make them one",
+    "Missing-receipt manual reconciliation UI and budget-wait product notifications are still not implemented"
+  ]
+}

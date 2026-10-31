@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261031_migration_writer_inventory.json",
+  "level": "stop-fence design slice 2: single-machine shared-admission and migration exclusive-fence prototype on synthetic homes",
+  "componentAcceptance": "verified with real child-process holders on Windows and Linux machines: drain, gate race, concurrent coordinators and crash takeover",
+  "productAcceptance": "prototype for protocol-participating processes only; it is not a stop-write proof for old programs or third parties and does not advance activationSupported",
+  "design": "docs/integration/plan/20261031_migration_fence.md",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-fence.mjs": "fe6a0b26394208fea58f7f647cac06fc1024e2ae",
+    "tests/migration-fence.native.mjs": "5d96ddb2d6afd4422542d2e95386156412887a30",
+    "tests/fixtures/migration-fence-holder.mjs": "54b2702621c0eed8ce0aa6fe7d0b820ad5955fe8",
+    "docs/integration/plan/20261031_migration_fence.md": "346a87e0f6e5c96b316f96c2b41d6d727e7db402",
+    "package.json": "19a7dbda1f34f67b84c455822629848e644e7ab8"
+  },
+  "implementation": [
+    "Shared admission (a protocol host before creating any writer): under a claimed-directory guard mutex, refuse when a durable intent or exclusive claim exists, otherwise create the shared claim — the check-and-create pair is atomic under the guard, closing the read-gate → create-writer gap.",
+    "Coordinator exclusive: persist the durable intent under the guard (this alone blocks every new shared admission and outlives coordinator death), drain live shared holders with per-holder observation, then re-take the guard, re-verify no new shared claim appeared and the intent is ours, and create the exclusive claim. Release is owner-checked and removes intent plus claim.",
+    "Crash takeover: a live foreign coordinator (with or without its exclusive claim) answers MIGRATION_FENCE_BUSY; a verifiably dead coordinator's intent keeps blocking writers until a takeover coordinator reclaims its stale exclusive claim after death verification and re-runs the drain.",
+    "Guard discipline: dead-owner guards are reclaimed after identity verification; a guard owned by the current process is treated as stale cleanup residue (withGuard is never re-entered recursively) and reclaimed too — this closed a real Windows self-deadlock found during development. Guard removal retries against transient directory locks. Linux claims carry /proc start-tick identity (PID-reuse safe); Windows keeps pid-only identity as a documented prototype limitation."
+  ],
+  "platforms": [
+    { "platform": "Ubuntu 24.04 / Node v22.22.1 / linux 6.8.0-101-generic", "tests": "7/7 pass, 0 fail, 0 skipped, exit 0", "logSha256": "117dbd3fa702f304e3dda702ee0becad48b78dc39a7b7a932fc0e40f6e73e12f", "rawLog": "tmp/integration/step-migration-fence/output/linux-migration-fence-raw.log" },
+    { "platform": "Win10 10.0.19044 / Node v24.18.0", "tests": "7/7 pass, 0 fail, 0 skipped, exit 0", "logSha256": "fcf168eee3e60dbf8859a821ffb749cd6cb7524b6fc1127395021ec3cbb562d4", "rawLog": "tmp/integration/step-migration-fence/output/win10-migration-fence-raw.log" },
+    { "platform": "Win11 / Node v24.20.0", "rootRegression": "1844 tests, 1776 pass, 0 fail, 68 skipped, exit 0 (log: tmp/integration/migration-fence-root-regression.log); the suite is registered in npm test and Windows/Ubuntu CI" }
+  ],
+  "preservedFailures": [
+    "Development found four real defects, each reproduced then fixed: (1) a protocol-deadlock by test design — the drain waits for holders while the test awaited the drain before releasing them (fixed to the real timing: coordinator requests stop, holders exit, then the fence resolves); (2) a Windows guard self-deadlock — a transient directory-lock failure left the guard behind and a later withGuard in the same process respected its own residue forever (fixed with self-residue reclaim plus removal retries); (3) an assertion race against the asynchronous intent write (fixed with a bounded poll); (4) an exited() helper that attached exit listeners after the event had fired and never resolved (fixed with an already-exited check). None were silenced."
+  ],
+  "limitations": [
+    "Participation is voluntary and same-machine: old programs, third parties and other machines are outside this fence (slices 4 and 5); pid liveness is not a kernel write barrier.",
+    "Windows claims carry no start-tick identity, so PID reuse inside a claim's lifetime is a documented prototype limitation there.",
+    "This prototype does not wire the product startup gate, does not perform capture/commit, and stopWriteProvable-style honesty is kept: the fence never claims a stop-write proof. activationSupported stays false."
+  ]
+}

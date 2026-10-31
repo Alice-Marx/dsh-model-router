@@ -41,6 +41,13 @@ export async function assertRuntimeClosure({ root = ROOT, files, manifest } = {}
     assert.ok(path !== '..' && !path.startsWith('../') && !isAbsolute(path), `Runtime import is outside the package: ${path}`)
     assert.ok(packed.has(path), `Package is missing runtime dependency: ${path}`)
   }
+  // The native peer scripts are launched as child processes, not imported;
+  // esbuild cannot discover them in the module graph.
+  if (runtimeFiles.includes('packages/cli-runtime/src/native-process.mjs')) {
+    for (const path of ['packages/cli-runtime/src/native-peer.ps1', 'packages/cli-runtime/src/native-peer.py']) {
+      assert.ok(packed.has(path), `Package is missing native runtime dependency: ${path}`)
+    }
+  }
   return runtimeFiles
 }
 

@@ -35,6 +35,31 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
   }
   return Object.freeze({
     check,
+    replaceOwnerGrant(grant) { authority.replaceGrant(owner,grant) },
+    activeIdentity() {
+      const frame=current.getStore()
+      return frame?{subject:frame.subject,botId:authority.describe(frame.subject).botId,owner:frame.owner}:null
+    },
+    bindFinancialRun(binding) {
+      const frame=current.getStore()
+      if(!frame||frame.owner||frame.financial?.active())throw new PolicyError('FINANCIAL_CALL_CONTEXT_REQUIRED')
+      frame.financial=Object.freeze({...binding})
+    },
+    financialRunActive() { return Boolean(current.getStore()?.financial?.active()) },
+    financialRun() {
+      const frame=current.getStore(),binding=frame?.financial
+      if(!binding||!binding.active())return null
+      frame.signal?.throwIfAborted()
+      const packageId=binding.packageId()
+      if(!packageId)throw new PolicyError('FINANCIAL_PACKAGE_NOT_STARTED')
+      return {...binding,packageId,botId:authority.describe(frame.subject).botId}
+    },
+    modelIdentity(options) {
+      const active=current.getStore(),subject=active?.subject??directory.forSession(options.sessionId)
+      if(active&&options.sessionId&&directory.forSession(options.sessionId)!==subject)throw new PolicyError('SUBJECT_MISMATCH')
+      authority.assertModel(subject,options.provider,options.model)
+      return {subject,botId:authority.describe(subject).botId,sessionId:options.sessionId??null}
+    },
     executionContext(subject, signal, operation) {
       authority.assertTool(subject, 'task/execute')
       return current.run({ subject, owner: false, signal }, operation)

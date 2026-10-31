@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-host-offline-default-composition",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "ffd1face80bfac8a76a0325bf9e2bf92995bdeb7",
+    "packages/orchestration/src/product-composition.mjs": "31fd22b39344b6cb2cf2ba162dec6093dbf5447d",
+    "packages/orchestration/src/model-accounting.mjs": "7f9140f89a6785eb1837658ab498ceb9b8a2b02c",
+    "apps/integration-client/panels.jsx": "0093a38eeabebde4405cc8ff6497aa7bbc7a08b7",
+    ".dsh-plugin/client.js": "925cc441b34db416fa646a5b5f4b7989a014d0a2",
+    "scripts/integration-product-default.mjs": "f53aab3c56f7253a38e24c01db8ba2bae2c4b61f",
+    "tests/bot-runtime-ui.test.mjs": "9d6dc98ed75c5d7d65cefd62bb41e7c54112eaba",
+    "package.json": "3ffd30b8f48b98832f05220fe44deb9003b21cc8"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "feature": "N07: the usage read-model section reads the single authority's durable source receipts and funding totals, so the product page shows per-source receipts, exact models and a funding summary; unknown amounts stay null",
+  "changes": {
+    "provider": "The usage provider pages the durable model-call receipts per committed Bot through the store's modelCalls cursor, computes each amount with the shared actualCost helper (null when usage or price is unknown, zero only when genuinely not run), and summarises apiUsd/reservedUsd/unknownCount plus the subscription call counts from the funding projection",
+    "vocabulary": "The client source labels now use the receipt vocabulary (bot/aux/mr-api/cli/review) instead of the runtime's descriptive origins, so the projection and the UI agree on one vocabulary",
+    "bundle": "The shipped client bundle was regenerated (2055661 bytes) and check:client verifies it"
+  },
+  "defaultCompositionProbe": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "checks": [
+      "N06b: unconfigured Main stays blocked; the funding scope and Main binding are configured through real owner actions before any model turn",
+      "N06b: worker binding is configured through a real owner action before its first prompt",
+      "Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Default entry: worker executes permitted MR routing with the composed Bot grant",
+      "Default entry: original DS Bot dispatch and result return survive migration",
+      "Product channel refuses an unauthenticated snapshot at the Host connection admission",
+      "Product read model: real Bots, compiled grants and exact model routes in one snapshot",
+      "Default owner can read the original advanced ledger through real Gateway; ungranted mutations and unauthenticated requests stay denied",
+      "Unwired product sections report actionable blocked reasons instead of fake data",
+      "N07: the usage projection shows per-source receipts with exact models and a funding summary; unknown amounts stay null",
+      "N06b: configured funding scope and Bot bindings are visible with exact model routes, the local machine entry and the scope catalog",
+      "Default product: owner secretRef pairing and Bot-scoped real MCP read work through the real AgentLoop",
+      "Default product: owner revocation removes Bot grant, invalidates remote tickets and refuses further reads",
+      "N06b: a disabled funding scope blocks the bindings and the next model turn dispatches nothing",
+      "Fresh host reconstructs stable Bot identity and the composed product read model"
+    ],
+    "snapshotSections": {
+      "bindings": "available",
+      "botBindings": "available",
+      "fundingAccounts": "available",
+      "tasks": "blocked",
+      "machines": "available",
+      "usage": "available"
+    },
+    "actualModelCalls": 0
+  },
+  "regression": {
+    "rootSuite": "1382 tests, 1379 pass, 0 fail, 3 skipped",
+    "uiAndComposition": "bot-runtime-ui and product-composition: 11/11",
+    "clientChecks": "build:client and check:client passed; product-client --check equivalent bundle is current"
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "defaultComposition": "passed",
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the default composition probe are pending; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "The usage provider pages the first 100 receipts per Bot through the cursor; the read model has no cross-Bot pagination yet",
+    "Task attribution comes from the receipt's taskId field, but the product Task service is not wired into the default composition (N09), so no task cards exist yet",
+    "CLI-source receipts appear only once the CLI execution facade lands (N09); MR-linked receipts are written by the MR path and surface here automatically",
+    "MR consult no-double-billing, auxiliary independent billing and unknown/revoke/cold-start receipt assertions remain for the probe (N08)",
+    "No default user profile migration, Electron carrier, clean install or real model inference"
+  ]
+}

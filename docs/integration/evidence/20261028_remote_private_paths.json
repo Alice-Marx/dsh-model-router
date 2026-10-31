@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-28",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261028_dual_windows_desktop.json",
+  "actualModelCalls": 0,
+  "regression": {
+    "sourceSnapshot": {
+      "sourceFiles": 884,
+      "frozenFiles": 297,
+      "sha256": "7a13aef9e3614b01b7d9f2535aa273d64285d587f836f82e16e825b54f512dd5",
+      "postMatrixChanges": [
+        {
+          "path": "tests/fixtures/desktop-window/Program.cs",
+          "reason": "Hide the synthetic TextBox caret to remove blinking content from PrintWindow; production helper and Node runtime unchanged; final fixture rerun19 on each Windows"
+        }
+      ]
+    },
+    "root": [
+      {
+        "alias": "local-win11",
+        "tests": 1479,
+        "pass": 1476,
+        "fail": 0,
+        "skipped": 3
+      },
+      {
+        "alias": "win10",
+        "tests": 1479,
+        "pass": 1476,
+        "fail": 0,
+        "skipped": 3
+      },
+      {
+        "alias": "ubuntu",
+        "tests": 1479,
+        "pass": 1455,
+        "fail": 0,
+        "skipped": 24
+      }
+    ],
+    "native": [
+      {
+        "alias": "win10",
+        "tests": 63,
+        "pass": 63,
+        "fail": 0,
+        "skipped": 0
+      },
+      {
+        "alias": "ubuntu",
+        "tests": 63,
+        "pass": 62,
+        "fail": 0,
+        "skipped": 1
+      }
+    ],
+    "remoteAgent": {
+      "testsPerPlatform": 12,
+      "fail": 0,
+      "platforms": [
+        "win11",
+        "win10",
+        "ubuntu"
+      ]
+    },
+    "finance": {
+      "testsPerRemotePlatform": 33,
+      "fail": 0
+    },
+    "defaultHost": {
+      "checksPerPlatform": 36,
+      "fail": 0,
+      "actualModelCalls": 0
+    },
+    "configurationHost": {
+      "checksPerPlatform": 6,
+      "fail": 0,
+      "actualModelCalls": 0,
+      "externalSearchCalls": 0,
+      "fixtureSearchCalls": 1
+    },
+    "strictDependencies": "pnpm10.34.6 frozen lockfile and strict peers passed locally with fixed dsh-web rc.3",
+    "client": "actual client --check passed on three machines",
+    "frozenVendor": {
+      "files": 297,
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "status": "passed"
+    }
+  },
+  "level": "native filesystem/API negative tests on three actual OS machines",
+  "sourceGitBlobs": {
+    "remote-computer-agent/src/scope.ts": "54a74db007d2e11bc5d903ae63f8c1b149177d46",
+    "remote-computer-agent/src/agent.ts": "21d1016262d1ebe40981d35e9d789fb54937315f",
+    "tests/remote-private-roots.native.mjs": "9aded452ab695f38bc088dc0ea87dcbb73db3eb5",
+    "docs/integration/plan/20261028_remote_private_roots.md": "2114176d750ba27d5af333c38b351e482170438b"
+  },
+  "checksPerPlatform": 8,
+  "observed": [
+    "Agent always reserves its own control data directory and desktop pipe secret even inside an authorized parent root",
+    "Private lexical/real descendants are refused and hidden from list; public siblings remain usable; missing future secrets reserve their path and replacing their ancestors is refused",
+    "Hard-linked private file aliases are refused by fresh inode/device comparison against bounded protected scans; overflow fails closed without stale caches",
+    "Windows case aliases, junction paths, inherited root IDs and private Git-tree exports are refused; Agent wiring tested with generated credentials only"
+  ],
+  "limitations": [
+    "Entire approved32R/40F/63T/20package scope remains; this checkpoint is not complete product acceptance or a release",
+    "Existing isolated dependencies reused on remote machines; no clean installation or production deployment claim",
+    "No new real model inference; historical earlier CLI timeout and unknown spend are not cancelled by these offline tests",
+    "No Git commit/push/tag/Release or npm publication at this checkpoint",
+    "Application API guard only, not an OS filesystem sandbox; configured same-account shell executables remain a separate isolation gate",
+    "Protection covers this Agent configured control paths; unrelated applications and other Agent private roots require explicit deployment separation/protection",
+    "Concurrent adversarial filesystem mutation still needs an OS account/container boundary; descriptor checks are not a kernel sandbox"
+  ]
+}

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "planVersion": "1.1",
   "startedOn": "2026-10-26",
-  "updatedOn": "2026-10-27",
+  "updatedOn": "2026-10-31",
   "activeMilestone": "M0",
   "statusMeaning": "Task/step completion is separate from product R/T verification; no percentage implies release readiness",
   "tasks": [
@@ -19,7 +19,9 @@
       "evidence": [
         "docs/integration/feature-inventory.json",
         "docs/integration/evidence/20261027_m0_combined_host.json",
-        "docs/integration/evidence/20261027_m0_remote_platforms.json"
+        "docs/integration/evidence/20261027_m0_remote_platforms.json",
+        "docs/integration/evidence/20261027_m1_bot_runtime.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json"
       ],
       "steps": [
         {
@@ -53,10 +55,11 @@
           "id": "W01.4",
           "key": "behavior-audit",
           "title": "逐入口/参数/用户行为展开并核对",
-          "status": "in_progress",
+          "status": "completed",
           "evidence": [
             "docs/integration/behavior-audit.json",
-            "docs/integration/evidence/20261027_m0_combined_host.json"
+            "docs/integration/evidence/20261027_m0_combined_host.json",
+            "docs/integration/evidence/20261027_m1_bot_runtime.json"
           ]
         }
       ]
@@ -87,7 +90,15 @@
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261027_m0_cli_runtime.json",
+        "docs/integration/evidence/20261027_m0_budget_wait_expiry.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json"
       ],
       "steps": [
         {
@@ -96,7 +107,8 @@
           "title": "现有依赖/测试/客户端基线",
           "status": "completed",
           "evidence": [
-            "docs/integration/evidence/20261026_m0_baseline.json"
+            "docs/integration/evidence/20261026_m0_baseline.json",
+            "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
           ]
         },
         {
@@ -131,10 +143,12 @@
         {
           "id": "W02.5",
           "key": "cli",
-          "title": "CLI配置隔离/bridge试验",
-          "status": "in_progress",
+          "title": "CLI配置隔离/bridge试验（含托管 CLI facade 契约级验证）",
+          "status": "completed",
           "evidence": [
-            "docs/integration/evidence/20261027_m0_broker_bridge.json"
+            "docs/integration/evidence/20261027_m0_cli_runtime.json",
+            "docs/integration/evidence/20261027_m5_cli_execution.json",
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
           ]
         },
         {
@@ -155,7 +169,8 @@
           "status": "in_progress",
           "evidence": [
             "docs/integration/evidence/20261027_m0_remote_platforms.json",
-            "docs/integration/deployment-status.json"
+            "docs/integration/deployment-status.json",
+            "docs/integration/deployment-profile.md"
           ]
         },
         {
@@ -173,7 +188,7 @@
       "id": "W03",
       "milestone": "M1",
       "title": "迁入 DS Bot 运行时",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W01",
         "W02"
@@ -183,28 +198,103 @@
         "T04",
         "T44"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261027_m1_bot_runtime.json",
+        "docs/integration/evidence/20261027_m1_default_composition.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261027_m5_default_funding_machines.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261028_runtime_config_search.json",
+        "docs/integration/evidence/20261029_profile_migration_preview.json"
+      ],
+      "steps": [
+        {
+          "id": "W03.1",
+          "key": "vendored-source",
+          "title": "迁入冻结DS源码并登记来源、许可与字节核对",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m1_bot_runtime.json"
+          ]
+        },
+        {
+          "id": "W03.2",
+          "key": "product-factory",
+          "title": "产品factory、只读投影、客户端bundle与上游回归",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m1_bot_runtime.json"
+          ]
+        },
+        {
+          "id": "W03.3",
+          "key": "default-composition",
+          "title": "默认插件入口组合（出厂单插件 = DS 运行时 + MR）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m1_bot_runtime.json",
+            "docs/integration/evidence/20261027_m1_default_composition.json",
+            "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+          ]
+        },
+        {
+          "id": "W03.4",
+          "key": "config-migration",
+          "title": "用户配置迁移与旧安装升级（只读预览完成；可恢复应用待验）",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261028_runtime_config_search.json",
+            "docs/integration/evidence/20261029_profile_migration_preview.json",
+            "docs/integration/evidence/20261029_migration_data_archive.json",
+            "docs/integration/evidence/20261029_migration_domain_audit.json",
+            "docs/integration/evidence/20261029_migration_workspace_audit.json",
+            "docs/integration/evidence/20261029_migration_configuration_commit.json",
+            "docs/integration/evidence/20261029_migration_supporting_domains.json"
+          ]
+        },
+        {
+          "id": "W03.5",
+          "key": "readonly-profile-preview",
+          "title": "真实SDK只读配置规划、显式新装语义与私有CLI预览",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_profile_migration_preview.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W04",
       "milestone": "M1",
       "title": "保留 MR 兼容入口",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W03"
       ],
       "acceptanceIds": [
         "T55"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261028_runtime_config_search.json"
+      ],
+      "steps": [
+        {
+          "id": "W04.1",
+          "key": "legacy-facade-policy",
+          "title": "旧工具/命令/RPC 全部经统一 Policy，无绕过授权",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_legacy_policy.json",
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W05",
       "milestone": "M2",
       "title": "Bot 身份与严格模型策略",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W03",
         "W04"
@@ -215,14 +305,41 @@
         "T05",
         "T32"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261027_m5_default_funding_machines.json",
+        "docs/integration/evidence/20261027_m6_configuration_surface.json",
+        "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
+        "docs/integration/evidence/20261027_m8_usage_projection.json",
+        "docs/integration/evidence/20261027_m9_mr_consult_receipts.json"
+      ],
+      "steps": [
+        {
+          "id": "W05.1",
+          "key": "strict-model-admission",
+          "title": "严格模型：未配置/不匹配/范围停用的 Bot 零调用其他模型",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+          ]
+        },
+        {
+          "id": "W05.2",
+          "key": "per-bot-identity",
+          "title": "同模型多 Bot 的私有主体、授予与越权拒绝",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+            "tests/capability-authority.test.mjs"
+          ]
+        }
+      ]
     },
     {
       "id": "W06",
       "milestone": "M2",
       "title": "事务账本与数据迁移",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W04"
       ],
@@ -233,14 +350,192 @@
         "T48",
         "T49"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261027_m5_default_funding_machines.json",
+        "docs/integration/evidence/20261027_m6_configuration_surface.json",
+        "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
+        "docs/integration/evidence/20261027_m8_usage_projection.json",
+        "docs/integration/evidence/20261027_m9_mr_consult_receipts.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261028_runtime_config_search.json",
+        "docs/integration/evidence/20261029_profile_migration_preview.json",
+        "docs/integration/evidence/20261029_migration_ledger_archive.json",
+        "docs/integration/evidence/20261029_migration_data_archive.json",
+        "docs/integration/evidence/20261029_migration_domain_audit.json",
+        "docs/integration/evidence/20261029_migration_workspace_audit.json",
+        "docs/integration/evidence/20261029_migration_configuration_commit.json",
+        "docs/integration/evidence/20261029_migration_supporting_domains.json",
+        "docs/integration/evidence/20261031_migration_writer_inventory.json",
+        "docs/integration/evidence/20261031_migration_fence.json",
+        "docs/integration/evidence/20261031_migration_rollback_readiness.json"
+      ],
+      "steps": [
+        {
+          "id": "W06.1",
+          "key": "shared-connection-schema4",
+          "title": "资金连接所有权、journal借用关闭合同与schema4兼容迁移",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261028_atomic_task_admission.json",
+            "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+          ]
+        },
+        {
+          "id": "W06.2",
+          "key": "atomic-funded-task",
+          "title": "默认只读MR/CLI Task、引用、outbox与原资金同事务准入及进程退出恢复",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261028_atomic_task_admission.json",
+            "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+          ]
+        },
+        {
+          "id": "W06.3",
+          "key": "full-data-migration",
+          "title": "完整DS/MR配置与用户数据迁移、回滚和生产环境验收",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261028_runtime_config_search.json",
+            "docs/integration/evidence/20261029_profile_migration_preview.json",
+            "docs/integration/evidence/20261029_migration_ledger_archive.json",
+            "docs/integration/evidence/20261029_migration_data_archive.json",
+            "docs/integration/evidence/20261029_migration_domain_audit.json",
+            "docs/integration/evidence/20261029_migration_workspace_audit.json",
+            "docs/integration/evidence/20261029_migration_configuration_commit.json",
+            "docs/integration/evidence/20261029_migration_supporting_domains.json"
+          ]
+        },
+        {
+          "id": "W06.4",
+          "key": "readonly-selected-data-inventory",
+          "title": "显式选定数据树的有界只读清点、源校验与内容对账组件",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_profile_migration_preview.json"
+          ]
+        },
+        {
+          "id": "W06.5",
+          "key": "private-ledger-full-export",
+          "title": "单账本一致备份与完整Task/依赖/操作/去重/收据私有导出组件",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_migration_ledger_archive.json"
+          ]
+        },
+        {
+          "id": "W06.6",
+          "key": "private-selected-tree-capture",
+          "title": "选定目录主数据流与完整配置计划私有捕获、读回核对组件（不含迁移应用）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_migration_data_archive.json"
+          ]
+        },
+        {
+          "id": "W06.7",
+          "key": "private-reference-financial-audit",
+          "title": "私有副本Session/引用/资金语义审计与对账组件（工作区及完整迁移另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_migration_domain_audit.json"
+          ]
+        },
+        {
+          "id": "W06.8",
+          "key": "private-workspace-registry-audit",
+          "title": "固定SDK工作区注册表/Session归属与归档置顶的私有副本审计组件",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_migration_workspace_audit.json"
+          ]
+        },
+        {
+          "id": "W06.9",
+          "key": "recoverable-configuration-stage",
+          "title": "配置维护/安装阶段、持久日志与激活前回退组件（完整激活独立门控）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_migration_configuration_commit.json"
+          ]
+        },
+        {
+          "id": "W06.10",
+          "key": "saved-memory-capability-audit",
+          "title": "已保存记忆/能力包/秘密范围审计组件（恢复/外部服务/全域激活另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_migration_supporting_domains.json"
+          ]
+        },
+        {
+          "id": "W06.11",
+          "key": "writer-domain-inventory",
+          "title": "停写栅栏切片1：私有只读写者/域清点与物理身份诊断（显式输入、Linux真实/proc句柄写标志、别名同身份、枚举缺口如实、永不冒充停写证明；Windows枚举能力缺口如实报告）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261031_migration_writer_inventory.json"
+          ]
+        },
+        {
+          "id": "W06.12",
+          "key": "exclusive-fence-prototype",
+          "title": "停写栅栏切片2：单机共享准入与迁移独占栅栏原型（guard原子检查+创建、持久intent跨协调者死亡阻断、排空、崩溃接管验证；仅协议参与方，非停写证明）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261031_migration_fence.json"
+          ]
+        },
+        {
+          "id": "W06.13",
+          "key": "rollback-readiness-diagnostic",
+          "title": "停写栅栏切片3：只读最新回退准备诊断（活跃/unknown/可重试blocked/已启动skipped、未决操作、未投递outbox、开放hold为阻断；not-started skipped仅提示；归档绑定活库比对私有导出；资金rollback guard不动）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261031_migration_rollback_readiness.json"
+          ]
+        },
+        {
+          "id": "W06.14",
+          "key": "recoverable-commit-orchestration",
+          "title": "停写栅栏切片5：可恢复提交编排与门控判据（activation 保持 false）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261031_migration_commit_orchestration.json",
+            "docs/integration/evidence/20261031_migration_atomic_rename.json",
+            "docs/integration/evidence/20261031_migration_file_stability.json",
+            "docs/integration/evidence/20261031_product_migration_admission.json"
+          ]
+        },
+        {
+          "id": "W06.15",
+          "key": "os-launcher-quarantine",
+          "title": "停写栅栏切片4：OS/launcher隔离适配器（Windows Job、Linux cgroup、systemd、DS/MR JSON、SDK、SQLite与Task journal负例已验；执行中操作、机器重启与全域停写未验）",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/plan/20261031_migration_os_quarantine.md",
+            "docs/integration/evidence/20261031_migration_os_quarantine.json",
+            "docs/integration/evidence/20261031_migration_linux_quarantine.json",
+            "docs/integration/evidence/20261031_migration_delegated_cgroup.json",
+            "docs/integration/evidence/20261031_migration_systemd_quarantine.json",
+            "docs/integration/evidence/20261031_migration_legacy_ds_quarantine.json",
+            "docs/integration/evidence/20261031_migration_legacy_mr_quarantine.json",
+            "docs/integration/evidence/20261031_migration_sdk_loader_quarantine.json",
+            "docs/integration/evidence/20261031_migration_sqlite_quarantine.json",
+            "docs/integration/evidence/20261031_migration_task_journal_quarantine.json",
+            "docs/integration/evidence/20261031_migration_task_inflight_quarantine.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W07",
       "milestone": "M3",
       "title": "Planner 选择目标 Bot",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W05",
         "W06"
@@ -249,14 +544,40 @@
         "T06",
         "T08"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261028_dependency_scheduler.json",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261029_remote_write_tasks.json"
+      ],
+      "steps": [
+        {
+          "id": "W07.1",
+          "key": "main-no-group-e2e",
+          "title": "私聊 Main 建 Bot、派活、结果回原会话",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+          ]
+        },
+        {
+          "id": "W07.2",
+          "key": "planner-target-bot",
+          "title": "计划校验、目标 Bot 授权与依赖派发已验证；真实 Planner/完整场景待验收",
+          "status": "in_progress",
+          "evidence": [
+            "tests/task-plan.native.mjs",
+            "docs/integration/evidence/20261028_dependency_scheduler.json",
+            "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+            "docs/integration/evidence/20261029_remote_write_tasks.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W08",
       "milestone": "M3",
       "title": "依赖调度、取消与恢复",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W07"
       ],
@@ -269,14 +590,85 @@
         "T13",
         "T15"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261028_dependency_scheduler.json",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261029_remote_write_tasks.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_product_refresh_order.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json",
+        "docs/integration/evidence/20261030_write_cancel_effects.json"
+      ],
+      "steps": [
+        {
+          "id": "W08.1",
+          "key": "idempotent-dispatch",
+          "title": "同一派活重复投递指向原任务，attempt 不增加",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_managed_tasks.json",
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+          ]
+        },
+        {
+          "id": "W08.2",
+          "key": "crash-recovery",
+          "title": "Host 崩溃重启核对原 attempt，不重复执行不重复计费",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_managed_tasks.json",
+            "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+            "docs/integration/evidence/20261030_bound_stop_proof.json",
+            "docs/integration/evidence/20261030_stop_proof_regression.json"
+          ]
+        },
+        {
+          "id": "W08.3",
+          "key": "concurrency-limits",
+          "title": "并发限额：每 Bot 并发兑现、等待可见、不丢任务",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+            "tests/cli-execution.native.mjs"
+          ]
+        },
+        {
+          "id": "W08.4",
+          "key": "agent-dedup",
+          "title": "agent 去重与冲突",
+          "status": "completed",
+          "evidence": [
+            "tests/task-journal.native.mjs",
+            "tests/task-reconciliation.test.mjs"
+          ]
+        },
+        {
+          "id": "W08.5",
+          "key": "dag-dependencies",
+          "title": "依赖调度：失败阻塞下游、独立分支继续、整树取消",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261028_dependency_scheduler.json",
+            "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+            "docs/integration/evidence/20261030_bound_stop_proof.json",
+            "docs/integration/evidence/20261030_stop_proof_regression.json",
+            "docs/integration/evidence/20261030_write_cancel_effects.json",
+            "docs/integration/evidence/20261031_superagent_alignment.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W09",
       "milestone": "M4",
       "title": "远程 agent 与配对",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W01",
         "W02"
@@ -288,14 +680,123 @@
         "T19",
         "T24"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261027_m5_default_funding_machines.json",
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json",
+        "docs/integration/evidence/20261028_remote_private_paths.json",
+        "docs/integration/evidence/20261029_remote_write_tasks.json",
+        "docs/integration/evidence/20261029_remote_container_commands.json",
+        "docs/integration/evidence/20261029_agent_controller_ownership.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_operation_cancel_evidence.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json",
+        "docs/integration/evidence/20261030_write_cancel_effects.json",
+        "docs/integration/evidence/20261031_remote_command_facade.json",
+        "docs/integration/evidence/20261031_command_product_registration.json",
+        "docs/integration/evidence/20261031_command_combined_host.json"
+      ],
+      "steps": [
+        {
+          "id": "W09.1",
+          "key": "agent-protocol",
+          "title": "agent协议主体、存储、配对/授权/撤销与Streamable HTTP传输",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_remote_agent.json",
+            "docs/integration/evidence/20261030_operation_cancel_evidence.json",
+            "docs/integration/evidence/20261030_bound_stop_proof.json",
+            "docs/integration/evidence/20261030_stop_proof_regression.json"
+          ]
+        },
+        {
+          "id": "W09.2",
+          "key": "product-machines",
+          "title": "产品机器页、host-only secretRef、按Bot授权及受控读取/撤销",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m4_product_machines.json"
+          ]
+        },
+        {
+          "id": "W09.3",
+          "key": "machine-deployment",
+          "title": "常开生产agent、跨机受保护网络配对及休眠拓扑验收",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261027_m4_product_machines.json"
+          ]
+        },
+        {
+          "id": "W09.4",
+          "key": "public-auth-abuse",
+          "title": "有界匿名/客户端限流、固定摘要比较与真实本地TLS/mTLS验证",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261028_remote_auth_abuse.json",
+            "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+          ]
+        },
+        {
+          "id": "W09.5",
+          "key": "private-control-paths",
+          "title": "文件API拒绝Agent控制数据/桌面密钥及别名，保留公开项目读取",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261028_remote_private_paths.json"
+          ]
+        },
+        {
+          "id": "W09.6",
+          "key": "scoped-file-write-tasks",
+          "title": "受控远程文件写Task、原操作收据核对与取消效果展示（命令/桌面/隔离另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_remote_write_tasks.json",
+            "docs/integration/evidence/20261030_bound_stop_proof.json",
+            "docs/integration/evidence/20261030_stop_proof_regression.json",
+            "docs/integration/evidence/20261030_write_cancel_effects.json"
+          ]
+        },
+        {
+          "id": "W09.7",
+          "key": "kernel-controller-ownership",
+          "title": "Agent内核生命周期互斥、失效PID竞态和真实进程死亡接管组件",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_agent_controller_ownership.json"
+          ]
+        },
+        {
+          "id": "W09.8",
+          "key": "container-command-task-backend",
+          "title": "版本化容器命令Task后端container_command_v1（真实Docker：先journal后派发/重放/丢回复unknown对账/原收据取消保效果/别名拒绝；非容器Agent落never-started无原生回退；产品UI注册与Windows另门控）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261031_remote_command_facade.json"
+          ]
+        },
+        {
+          "id": "W09.9",
+          "key": "command-product-registration",
+          "title": "容器命令Task后端产品注册与combined-host端到端场景（composition双后端+目录、计划接受command执行形状、UI收据、模型计划描述、真实AgentLoop授权与真容器/never-started）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261031_command_product_registration.json",
+            "docs/integration/evidence/20261031_command_combined_host.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W10",
       "milestone": "M4",
       "title": "Linux 命令、文件与工作区",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W09",
         "W06"
@@ -310,14 +811,77 @@
         "T25",
         "T42"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261029_remote_container_commands.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_pinned_write_recheck.json",
+        "docs/integration/evidence/20261030_workspace_roots_generation.json",
+        "docs/integration/evidence/20261030_pinned_write_agent_wiring.json",
+        "docs/integration/evidence/20261031_workspace_permissions.json"
+      ],
+      "steps": [
+        {
+          "id": "W10.1",
+          "key": "durable-linux-container-controller",
+          "title": "Linux容器命令/独立监督器与原operation冷恢复组件（根绑定/产品facade/Windows隔离另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261029_remote_container_commands.json",
+            "docs/integration/evidence/20261029_agent_controller_ownership.json"
+          ]
+        },
+        {
+          "id": "W10.2",
+          "key": "physical-root-and-bind-transition",
+          "title": "实际根写入准入、只读并行、未知锁与Linux挂载身份门控组件（Task/leaf路径/权限另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261030_workspace_admission_mount.json"
+          ]
+        },
+        {
+          "id": "W10.3",
+          "key": "linux-pinned-create-recheck",
+          "title": "Linux新建文件描述符固定组件在交接后源编辑下的真机复核（不覆盖、单链接、symlink分类；Agent接线仍独立门控）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261030_pinned_write_recheck.json"
+          ]
+        },
+        {
+          "id": "W10.4",
+          "key": "workspace-roots-generation",
+          "title": "持久工作区root/config generation绑定与失效（同配置重启不设栅、配置变更fail-closed栅栏、ping摘要暴露；跨dataDir协调与真实权限另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261030_workspace_roots_generation.json"
+          ]
+        },
+        {
+          "id": "W10.5",
+          "key": "pinned-write-agent-wiring",
+          "title": "Linux fs_write描述符固定发布接入（新建文件0600单链接、现有目标FILE_CHANGED、匹配哈希OVERWRITE_UNSUPPORTED、发布后失败unknown保留锁；Windows路径不变）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261030_pinned_write_agent_wiring.json"
+          ]
+        },
+        {
+          "id": "W10.6",
+          "key": "real-permissions-cross-datadir",
+          "title": "真实工作区权限边界（容器UID65532真机探针：授权可读写、0600/0700 fail-closed、无提权）与跨dataDir物理根协调（dev:ino声明文件+死锁回收；组授权/跨用户/Windows另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261031_workspace_permissions.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W11",
       "milestone": "M5",
       "title": "CLI 绑定与能力桥接",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W05",
         "W08"
@@ -327,8 +891,52 @@
         "T33",
         "T34"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_cli_runtime.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261030_installed_cli_protocol.json",
+        "docs/integration/evidence/20261030_cli_native_peer_job.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json"
+      ],
+      "steps": [
+        {
+          "id": "W11.1",
+          "key": "cli-runtime-bridge",
+          "title": "CLI运行时契约、私有引导、原生桥接与租约续期",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_cli_runtime.json"
+          ]
+        },
+        {
+          "id": "W11.2",
+          "key": "real-cli-entry",
+          "title": "CLI身份/位置与产品facade（契约已验；真实推理及完整远程位置待验）",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261027_m5_cli_execution.json",
+            "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+            "docs/integration/evidence/20261030_installed_cli_protocol.json",
+            "docs/integration/evidence/20261030_cli_native_peer_job.json",
+            "docs/integration/evidence/20261030_bound_stop_proof.json",
+            "docs/integration/evidence/20261030_stop_proof_regression.json",
+            "docs/integration/evidence/20261030_cli_peer_hardening.json"
+          ]
+        },
+        {
+          "id": "W11.3",
+          "key": "installed-cli-protocol-no-inference",
+          "title": "安装核验Codex0.163.0真实MCP/只读profile/正常回收组件（无真实推理）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261030_installed_cli_protocol.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W12",
@@ -344,7 +952,9 @@
         "T36",
         "T37"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/integration/evidence/20261027_m5_cli_execution.json"
+      ],
       "steps": []
     },
     {
@@ -390,7 +1000,7 @@
       "id": "W15",
       "milestone": "M7",
       "title": "Windows helper 与安装",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W09",
         "W10"
@@ -400,14 +1010,46 @@
         "T30",
         "T50"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261028_dual_windows_desktop.json",
+        "docs/integration/evidence/20261030_windows_job_creation.json"
+      ],
+      "steps": [
+        {
+          "id": "W15.1",
+          "key": "helper-ipc",
+          "title": "桌面helper、受限named pipe ACL与合成窗口探针",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261027_m0_remote_agent.json"
+          ]
+        },
+        {
+          "id": "W15.2",
+          "key": "real-machine-install",
+          "title": "Win10/Win11实机验收、DPI/多屏与安装包分发",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261028_dual_windows_desktop.json"
+          ]
+        },
+        {
+          "id": "W15.3",
+          "key": "atomic-process-job-creation",
+          "title": "Win10/11原子Job创建、真实父进程死亡与UTF-8参数组件（账户/安装另验）",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261030_windows_job_creation.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W16",
       "milestone": "M7",
       "title": "DPI、会话变化与桌面互斥",
-      "status": "planned",
+      "status": "in_progress",
       "dependsOn": [
         "W15"
       ],
@@ -416,8 +1058,46 @@
         "T30",
         "T31"
       ],
-      "evidence": [],
-      "steps": []
+      "evidence": [
+        "docs/integration/evidence/20261028_dual_windows_desktop.json",
+        "docs/integration/evidence/20261028_desktop_arbitration_stop.json"
+      ],
+      "steps": [
+        {
+          "id": "W16.1",
+          "key": "physical-basic-dpi",
+          "title": "真实Win10当前100%与Win11当前150%下的窗口/IPC/输入/互斥基础验证",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261028_dual_windows_desktop.json"
+          ]
+        },
+        {
+          "id": "W16.2",
+          "key": "dpi-monitor-transitions",
+          "title": "125%/多显示器/移动和DPI及分辨率变化矩阵",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "W16.3",
+          "key": "desktop-stop-transitions",
+          "title": "真实锁屏/UAC/RDP/托盘人工暂停停止与完整桌面授权矩阵",
+          "status": "in_progress",
+          "evidence": [
+            "docs/integration/evidence/20261028_desktop_arbitration_stop.json"
+          ]
+        },
+        {
+          "id": "W16.4",
+          "key": "global-helper-confirmed-stop",
+          "title": "helper全局仲裁、Agent在途取消撤权、未知收据及双Windows真实输入效果",
+          "status": "completed",
+          "evidence": [
+            "docs/integration/evidence/20261028_desktop_arbitration_stop.json"
+          ]
+        }
+      ]
     },
     {
       "id": "W17",
@@ -434,7 +1114,10 @@
         "T25",
         "T54"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json"
+      ],
       "steps": []
     },
     {
@@ -471,7 +1154,9 @@
         "T62",
         "T63"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+      ],
       "steps": []
     },
     {
@@ -505,7 +1190,10 @@
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
       ]
     },
     {
@@ -520,7 +1208,24 @@
         "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_desktop_arbitration_stop.json",
+        "docs/integration/evidence/20261028_remote_private_paths.json",
+        "docs/integration/evidence/20261028_runtime_config_search.json",
+        "docs/integration/evidence/20261029_profile_migration_preview.json",
+        "docs/integration/evidence/20261029_migration_ledger_archive.json",
+        "docs/integration/evidence/20261029_migration_data_archive.json",
+        "docs/integration/evidence/20261029_migration_domain_audit.json",
+        "docs/integration/evidence/20261029_migration_workspace_audit.json",
+        "docs/integration/evidence/20261029_migration_configuration_commit.json",
+        "docs/integration/evidence/20261029_migration_supporting_domains.json",
+        "docs/integration/evidence/20261029_remote_container_commands.json",
+        "docs/integration/evidence/20261029_agent_controller_ownership.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_windows_job_creation.json",
+        "docs/integration/evidence/20261030_installed_cli_protocol.json"
       ]
     },
     {
@@ -528,7 +1233,8 @@
       "title": "CLI隔离配置与能力桥接",
       "status": "in_progress",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_broker_bridge.json"
+        "docs/integration/evidence/20261027_m0_broker_bridge.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json"
       ]
     },
     {
@@ -540,7 +1246,21 @@
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261028_dual_windows_desktop.json",
+        "docs/integration/evidence/20261028_desktop_arbitration_stop.json",
+        "docs/integration/evidence/20261028_remote_private_paths.json",
+        "docs/integration/evidence/20261028_runtime_config_search.json",
+        "docs/integration/evidence/20261029_profile_migration_preview.json",
+        "docs/integration/evidence/20261029_migration_ledger_archive.json",
+        "docs/integration/evidence/20261029_migration_data_archive.json",
+        "docs/integration/evidence/20261029_migration_domain_audit.json",
+        "docs/integration/evidence/20261029_migration_workspace_audit.json",
+        "docs/integration/evidence/20261029_migration_configuration_commit.json",
+        "docs/integration/evidence/20261029_migration_supporting_domains.json"
       ]
     }
   ],
@@ -549,86 +1269,173 @@
       "id": "T01",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_combined_host.json",
-        "docs/integration/evidence/20261027_m0_remote_platforms.json",
-        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
+        "docs/integration/evidence/20261027_m1_bot_runtime.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-27",
+      "verifiedOn": "2026-10-28",
       "environment": "Isolated strict DS factory composition; Win11/Win10 Node24 and Ubuntu Node22; offline fixture model",
-      "notes": "Automatic committed-state lifecycle, group/part/delete/cold reconstruction and real authenticated Gateway allow/deny verified. Default product composition, remaining lifecycle, execution/task accounting and remote/OS deployment criteria remain incomplete."
+      "notes": "Migrated product factory, vendored source bytes, client bundle, 1062-test upstream suite and a real rc.3 host composition (create/dispatch/return/cold restart) are verified. Default shipped-entry composition, remaining lifecycle (MCP/search/approval/schedule), Task accounting integration and remote/OS deployment criteria remain incomplete. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance."
     },
     {
       "id": "T02",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m1_default_composition.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+      ],
+      "level": "actual rc.3 host / offline fixture model",
+      "environment": "Shipped default single-plugin entry on a real rc.3 host; no fixture plugin in the composition",
+      "notes": "The shipped default entry composes the frozen DS Bot runtime with the MR body inside one Host: the policy is provided before the first await, the DS runtime starts after a bounded route snapshot, and the funding, machine, Bot-settings, funding-account and Task authorities all open on one orchestration.sqlite with fail-closed cleanup on boot failure. Strict isolated fixture compositions remain separate probes by design.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T03",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "tests/capability-authority.test.mjs",
+        "tests/bot-policy.test.mjs"
+      ],
+      "level": "actual rc.3 host / offline fixture model + native",
+      "environment": "Shipped default entry on a real rc.3 host with the offline fixture provider; native authority and policy suites",
+      "notes": "An unconfigured, model-mismatched or incomplete Bot binding keeps no model authority and a disabled funding scope refuses the turn with zero provider dispatch; the binding is re-evaluated against the live route catalog, so a removed route blocks admission instead of switching models, and the route returning resumes the same model. A provider that fails at key/credential level inside a live call is not exercised at the product level.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T04",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "tests/capability-authority.test.mjs",
+        "docs/integration/evidence/20261028_runtime_config_search.json"
+      ],
+      "level": "actual rc.3 host / offline fixture model + native",
+      "environment": "Shipped default entry on a real rc.3 host with three Bots on the same fixture model",
+      "notes": "Main, worker and CLI Bots run on the same model with separate principals, grants, sessions and bindings; cross-Bot task reads and machine reads are refused (TASK_NOT_FOUND, MACHINE_BOT_DENIED) and a Bot cannot resolve another Bot receipt. DS memory API and CLI profile isolation per Bot session come from the vendored DS runtime and are not separately re-verified here. E47: Saved runtime config/search compatibility and cold identity verified by real rc.3 Host6 checks on three platforms; full preview/apply/data/rollback/binding migration remains.",
+      "verifiedOn": "2026-10-28"
     },
     {
       "id": "T05",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_security.json",
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
-        "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
-        "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "tests/legacy-policy.test.mjs",
+        "docs/integration/evidence/20261028_atomic_task_admission.json"
       ],
-      "level": "integration",
-      "verifiedOn": "2026-10-27",
-      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
-      "notes": "Pre-admission run/attempt/operation linkage and SDK owner-only read reconciliation verified; request metadata cannot provide result or proof. Default product/CLI/OS boundaries remain open."
+      "level": "strict host composition + actual rc.3 host / offline fixture model",
+      "verifiedOn": "2026-10-28",
+      "environment": "Isolated strict legacy-policy composition and the shipped default entry on a real rc.3 host",
+      "notes": "All 12 ungranted legacy model_router tools refuse at policy, all 23 RPC receivers refuse in-process calls without an authenticated invocation, a granted route tool still runs and projects only bound models, and the default product owner reads the advanced ledger while mutations and unauthenticated requests stay denied. Forged botId and PTC sub-call paths are covered by the authority suite; billing behaviour preservation is covered by the finance probe rather than this scenario. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed."
     },
     {
       "id": "T06",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+      ],
+      "level": "actual rc.3 host / offline fixture model",
+      "environment": "Shipped default entry on a real rc.3 host; Main, worker and CLI Bots with real AgentLoops",
+      "notes": "Private-chat Main creates a worker through the original DS create_bot tool, the worker runs permitted MR routing and consults through the composed funding admission, Main delegates through message_bot and the reply returns, and a Bot-scoped remote read returns its content to the session. The full analysis to implementation to review to summary workflow still waits on the execution facade (executor, team and rerun MR paths remain refused by policy).",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T07",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_managed_tasks.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "tests/task-journal.native.mjs",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json"
+      ],
+      "level": "strict host composition + actual rc.3 host / offline fixture model + native",
+      "environment": "Managed-task strict composition with a real crash and restart, plus the shipped default entry",
+      "notes": "The journal keys every command by (owner Bot, request key), so a repeated submit returns the original task and operation and a repeated reconcile is replayed without a new attempt; the product probe asserts the owner reconcile replay. A UI resend and a duplicate message_bot delivery reach the same idempotency key path but are not driven as separate product flows. Owner canonical plan replay after cold startup or original Agent detach retains the original package/attempt/operation IDs and performs no new provider dispatch; changed content is rejected. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed.",
+      "verifiedOn": "2026-10-28"
     },
     {
       "id": "T08",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "tests/task-plan.native.mjs",
+        "tests/task-contract.test.mjs",
+        "docs/integration/evidence/20261028_dependency_scheduler.json",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json"
+      ],
+      "notes": "The existing plan validator is reused. Native and actual default-product probes now schedule validated plans after Host-owned target authorization; invalid origin/target/write effect is rejected before rows or provider dispatch. Full product planning/approval and deployment acceptance remain separate.",
+      "level": "actual rc.3 default Host / offline fixture + native",
+      "verifiedOn": "2026-10-28",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; isolated test homes"
     },
     {
       "id": "T09",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261028_dependency_scheduler.json",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261029_remote_write_tasks.json"
+      ],
+      "notes": "Native journal and real rc.3 default-product offline probes verify failure propagation, blocked undispatched successors, independent read branch success, no false whole-plan success and cold-restart identity/edge preservation. The full root suite and legacy-policy Host probe preserve existing serial semantics. Real model/planner and full deployment acceptance remain open. E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open.",
+      "level": "actual rc.3 default Host / offline fixture + native",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; isolated test homes",
+      "verifiedOn": "2026-10-29"
     },
     {
       "id": "T10",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "tests/cli-execution.native.mjs",
+        "docs/integration/evidence/20261028_atomic_task_admission.json"
+      ],
+      "level": "actual rc.3 host / offline fixture model + native",
+      "environment": "Shipped default entry on a real rc.3 host with a binding whose maxConcurrentTasks is 2; native service suite",
+      "notes": "A binding with maxConcurrentTasks 2 runs two managed Tasks for one Bot at the same time and both stay cancellable, an unconfigured Bot keeps one active task, the runner caps active tasks, and waiting-budget is a visible state that expires at the task deadline instead of parking forever. A load test against the configured package/Bot/machine ceilings has not been run. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed.",
+      "verifiedOn": "2026-10-28"
     },
     {
       "id": "T11",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261028_dependency_scheduler.json",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261029_remote_write_tasks.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json",
+        "docs/integration/evidence/20261030_write_cancel_effects.json"
+      ],
+      "notes": "Native SQLite protocol tests verify exclusive locks for the same machine/workspace, parallel independent workspace keys, unaffected reads, lock retention during cancellation/recovered unknown outcome and release only after an accepted trusted reconciliation proof. The write execution facade remains refused. Real worktree writer exit/OS containment is not verified, so this is partial only. E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open.",
+      "level": "native SQLite journal protocol",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; isolated test homes",
+      "verifiedOn": "2026-10-30"
     },
     {
       "id": "T12",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m0_receipt_reconciliation.json"
+        "docs/integration/evidence/20261027_m0_cli_runtime.json",
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261028_dependency_scheduler.json",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261029_remote_write_tasks.json",
+        "docs/integration/evidence/20261029_remote_container_commands.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_windows_job_creation.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json",
+        "docs/integration/evidence/20261030_write_cancel_effects.json"
       ],
-      "level": "integration",
-      "verifiedOn": "2026-10-27",
-      "environment": "Strict isolated DS/MR host; Win11/Win10 Node24 and Ubuntu Node22; SQLite13.0.3, offline adapter with nonzero synthetic rates",
-      "notes": "Task cancellation waits for cleanup, request dispatch rechecks current running/fence/deadline; cancel intent survives crash/reconciliation. Full native/remote task-tree cancellation is unverified."
+      "level": "actual rc.3 default Host / offline fixture + native",
+      "verifiedOn": "2026-10-30",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; isolated test homes",
+      "notes": "The real default product cancels a multi-Bot MR dependency plan, aborts running branches, skips its undispatched join and preserves terminal plans across restart. Native tests retain parent cancelling on unknown stop and reject operation replay; existing CLI/remote process-stop component evidence remains. A mixed actual native CLI/remote dependency tree and physical stop verification remain open. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed. E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open. E56: actual Linux Agent container controller24 checks incl7 Agent process deaths; original operation/worker never replayed, different-UID absolute deadline survives downtime, command descendants stop, outputs bounded and control identities verified. Three-platform root1687/0fail, original Agent12/default40/finance33 pass; Windows skips13 real-container top-level cases. Root ownership/pinning/every executable entry, model-facing command Task facade, Windows OS isolation and full end-to-end acceptance remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E59: deterministic old suspended-child orphan reproduced and cleaned; actual Windows Job atomic creation/creator death/Unicode suite11 passes on both Windows. The separate CLI native-peer supervisor still needs its analogous creation-death fix; no account/AppContainer acceptance. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open."
     },
     {
       "id": "T13",
@@ -636,98 +1443,225 @@
       "evidence": [
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261029_remote_container_commands.json",
+        "docs/integration/evidence/20261029_agent_controller_ownership.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_windows_job_creation.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json",
+        "docs/integration/evidence/20261030_write_cancel_effects.json"
       ],
-      "level": "integration",
-      "verifiedOn": "2026-10-27",
-      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
-      "notes": "Strict MR runtime keeps SQLite ledger/holds across hard host exit; original receipt reconciliation does not reexecute. WAL and migration/rollback process-exit windows verified; complete vendor/artifact/physical-power-loss matrix remains open."
+      "level": "strict host composition with a real crash + actual rc.3 host / offline fixture model",
+      "verifiedOn": "2026-10-30",
+      "environment": "Managed-task strict composition killed mid-flight and restarted, plus the shipped default entry cold start",
+      "notes": "A hard crash leaves a dispatched operation for recovery, restart marks it needs-reconciliation without replaying unknown work, a receipt committed before Task completion restores the original attempt and operation to success with no model dispatch and no second invoice, an interrupted in-flight receipt stays unknown without releasing its hold, and the default product reconstructs Bot identity, grants, machines and bindings after a restart. Crash before dispatch and crash before receipt persistence are covered separately in the native journal suite. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance. E56: actual Linux Agent container controller24 checks incl7 Agent process deaths; original operation/worker never replayed, different-UID absolute deadline survives downtime, command descendants stop, outputs bounded and control identities verified. Three-platform root1687/0fail, original Agent12/default40/finance33 pass; Windows skips13 real-container top-level cases. Root ownership/pinning/every executable entry, model-facing command Task facade, Windows OS isolation and full end-to-end acceptance remain open. E57: old stale-PID double-start reproduced on all3OS; fixed native ownership9/9 each, kernel lifetime semaphore and identity-safe close preserve live tickets and original operations. Six simultaneous starters yield one owner; SIGKILL releases ownership. Root1696/0fail and actual Linux container24 pass. Actual root admission/pinning, complete command Task facade and mixed-version installer coordination remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E59: deterministic old suspended-child orphan reproduced and cleaned; actual Windows Job atomic creation/creator death/Unicode suite11 passes on both Windows. The separate CLI native-peer supervisor still needs its analogous creation-death fix; no account/AppContainer acceptance. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open."
     },
     {
       "id": "T14",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261029_remote_write_tasks.json",
+        "docs/integration/evidence/20261030_operation_cancel_evidence.json",
+        "docs/integration/evidence/20261031_command_combined_host.json"
+      ],
+      "verifiedOn": "2026-10-31",
+      "notes": "undefined E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open. E62: cancellation reports external process stop only with strict original evidence; missing or ambiguous evidence remains unconfirmed. Five native checks pass on each of Win11, Win10 and Ubuntu. E77: default-product AgentLoop command acceptance passes42 checks on Win11 (never-started/no native fallback) and Ubuntu (real fixed-image Docker exit0/confirmed stop). grantFor publishes container capability only with write/status/cancel scope. Windows OS-isolated command and full product acceptance remain open."
     },
     {
       "id": "T15",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "tests/task-journal.native.mjs",
+        "tests/task-reconciliation.test.mjs"
+      ],
+      "level": "native",
+      "environment": "Native journal and reconciliation suites on Node 24",
+      "notes": "The same operation id with the same digest returns the original record, a different digest conflicts (TASK_REQUEST_CONFLICT), observation keys are durable and idempotent, and dedup survives a fresh connection to the same database. Artifact cleanup followed by dedup is covered by the archived-run replay protection rather than a dedicated product flow.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T16",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json",
+        "docs/integration/evidence/20261029_remote_write_tasks.json"
+      ],
+      "notes": "Agent pairing stores only a digest, rejects unpaired or revoked clients before any tool action and rotates/revokes locally. Host secretRef flow, machine page and diagnostics-export redaction are not implemented. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E43 closes the header/body rotation race: old client rows cannot issue/revoke newer grants, paused old requests fail after rotation, revoked tickets cannot list capabilities, and clock rollback keeps cooling finite. New10-check auth suite plus full1446/three-machine native44/defaultHost36 pass. A previous-code negative witness has exactly four expected failures. E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open.",
+      "verifiedOn": "2026-10-29",
+      "level": "integration",
+      "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
     },
     {
       "id": "T17",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json",
+        "docs/integration/evidence/20261029_agent_controller_ownership.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_windows_job_creation.json"
+      ],
+      "notes": "Active grant revocation stops owned subprocesses and cross-owner access is denied at the agent. Product-level grant/approval/preview invalidation and in-flight cancel evidence remain open. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E43 closes the header/body rotation race: old client rows cannot issue/revoke newer grants, paused old requests fail after rotation, revoked tickets cannot list capabilities, and clock rollback keeps cooling finite. New10-check auth suite plus full1446/three-machine native44/defaultHost36 pass. A previous-code negative witness has exactly four expected failures. E57: old stale-PID double-start reproduced on all3OS; fixed native ownership9/9 each, kernel lifetime semaphore and identity-safe close preserve live tickets and original operations. Six simultaneous starters yield one owner; SIGKILL releases ownership. Root1696/0fail and actual Linux container24 pass. Actual root admission/pinning, complete command Task facade and mixed-version installer coordination remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E59: deterministic old suspended-child orphan reproduced and cleaned; actual Windows Job atomic creation/creator death/Unicode suite11 passes on both Windows. The separate CLI native-peer supervisor still needs its analogous creation-death fix; no account/AppContainer acceptance.",
+      "verifiedOn": "2026-10-30",
+      "level": "integration",
+      "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
     },
     {
       "id": "T18",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json"
+      ],
+      "notes": "Four network modes reject wildcard binds, unprotected HTTP and arbitrary VPN binding at configuration; MCP HTTP checks Host/Origin and auth. Live WireGuard/Tailscale/Cloudflare Tunnel/public TLS, proxy trust and mTLS are not exercised. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance. E43 closes the header/body rotation race: old client rows cannot issue/revoke newer grants, paused old requests fail after rotation, revoked tickets cannot list capabilities, and clock rollback keeps cooling finite. New10-check auth suite plus full1446/three-machine native44/defaultHost36 pass. A previous-code negative witness has exactly four expected failures.",
+      "verifiedOn": "2026-10-28",
+      "level": "integration",
+      "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
     },
     {
       "id": "T19",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+      ],
+      "verifiedOn": "2026-10-28",
+      "level": "integration",
+      "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models",
+      "notes": "Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance."
     },
     {
       "id": "T20",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json"
+      ],
+      "notes": "Traversal, absolute paths, Windows drive letters, ADS and symlink/junction escapes fail before reads or writes at the agent. OS-boundary claims for native same-account modes remain separate.",
+      "verifiedOn": "2026-10-27",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T21",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json"
+      ],
+      "notes": "Symlink/junction escapes are rejected before reads and writes in the isolated agent. Adversarial same-account native races are documented as outside the application API and still require the dedicated OS account/container profile. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open.",
+      "verifiedOn": "2026-10-30",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T22",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json"
+      ],
+      "notes": "expectedHash mismatch is refused, replacement is atomic via temp+rename with parent inode checks, and duplicate operation IDs return the original record. Physical power-loss windows are not tested.",
+      "verifiedOn": "2026-10-27",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T23",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json"
+      ],
+      "notes": "Bounded reads, pagination, artifact stat/read with owner scope and hash verification pass, including Chinese content. Large-file replacement limit and artifact quota are enforced; download and expiry UX remain product work.",
+      "verifiedOn": "2026-10-27",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T24",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261029_remote_container_commands.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261030_windows_job_creation.json"
+      ],
+      "notes": "Fixed-executable argv bypasses shell parsing, timeout terminates the owned process tree, and output capture is bounded with artifacts. Space/Unicode/newline argument parity and 30-minute CLI ceilings are not yet explicitly covered. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E56: actual Linux Agent container controller24 checks incl7 Agent process deaths; original operation/worker never replayed, different-UID absolute deadline survives downtime, command descendants stop, outputs bounded and control identities verified. Three-platform root1687/0fail, original Agent12/default40/finance33 pass; Windows skips13 real-container top-level cases. Root ownership/pinning/every executable entry, model-facing command Task facade, Windows OS isolation and full end-to-end acceptance remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E59: deterministic old suspended-child orphan reproduced and cleaned; actual Windows Job atomic creation/creator death/Unicode suite11 passes on both Windows. The separate CLI native-peer supervisor still needs its analogous creation-death fix; no account/AppContainer acceptance.",
+      "verifiedOn": "2026-10-30",
+      "level": "integration",
+      "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
     },
     {
       "id": "T25",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_security.json"
+        "docs/integration/evidence/20261027_m0_security.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261028_remote_private_paths.json",
+        "docs/integration/evidence/20261029_remote_container_commands.json",
+        "docs/integration/evidence/20261030_workspace_admission_mount.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-27",
-      "environment": "Isolated prototype and synthetic fixtures; not installed product",
-      "notes": "Synthetic Linux container denies another Bot fixture. Ordinary Ubuntu/Win10 PTC can read it; Win11 setup blocked. Real DSH worker and Windows account isolation are unverified."
+      "verifiedOn": "2026-10-30",
+      "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models",
+      "notes": "Synthetic Linux container denies another Bot fixture. Ordinary Ubuntu/Win10 PTC can read it; Win11 setup blocked. Real DSH worker and Windows account isolation are unverified. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E46: Own control data/pipe secret excluded from file/list/write/Git APIs,8 checks on three OSes. No same-account shell/kernel isolation claim. E56: actual Linux Agent container controller24 checks incl7 Agent process deaths; original operation/worker never replayed, different-UID absolute deadline survives downtime, command descendants stop, outputs bounded and control identities verified. Three-platform root1687/0fail, original Agent12/default40/finance33 pass; Windows skips13 real-container top-level cases. Root ownership/pinning/every executable entry, model-facing command Task facade, Windows OS isolation and full end-to-end acceptance remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open."
     },
     {
       "id": "T26",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json"
+      ],
+      "notes": "Per-Bot/task Playwright contexts isolate cookies and state; cross-owner access is denied and redirect/file URLs are blocked. Persistent profile selection, upload/download and script modes are not implemented.",
+      "verifiedOn": "2026-10-27",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T27",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json"
+      ],
+      "notes": "Real open/snapshot/Unicode fill/click with stale-snapshot rejection and URL scope policy pass at the agent. refs/script/task plugin surface, downloads and internal-address policy remain product work.",
+      "verifiedOn": "2026-10-27",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T28",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261028_dual_windows_desktop.json",
+        "docs/integration/evidence/20261028_desktop_arbitration_stop.json"
+      ],
+      "notes": "A real Win11 logged-in session drove screenshot, hit-tested click and Unicode SendInput against a synthetic own-window fixture through the ACL-protected pipe. Win10 22H2, other applications, scrolling and multi-monitor remain open. E44 adds actual logged-in Win10(build19044,current96DPI) and Win11(current144DPI) native pipe/capture/click/Unicode/lease/stale/session checks,8 each, with visually inspected own-window PNGs and confirmed cleanup.125%,cross-monitor,session transitions,full desktop facade/approvals and cross-Agent arbitration remain open. E45: Both actual Windows run19 synthetic-window checks; helper global arbitration, key/wheel effects, confirmed partial-input cancel/revoke, sibling continuation and screenshot expiry passed. Physical tray/session/DPI matrix and full product facade remain.",
+      "verifiedOn": "2026-10-28",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T29",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261028_dual_windows_desktop.json",
+        "docs/integration/evidence/20261028_desktop_arbitration_stop.json"
+      ],
+      "verifiedOn": "2026-10-28",
+      "level": "integration",
+      "notes": " E44 adds actual logged-in Win10(build19044,current96DPI) and Win11(current144DPI) native pipe/capture/click/Unicode/lease/stale/session checks,8 each, with visually inspected own-window PNGs and confirmed cleanup.125%,cross-monitor,session transitions,full desktop facade/approvals and cross-Agent arbitration remain open. E45: Both actual Windows run19 synthetic-window checks; helper global arbitration, key/wheel effects, confirmed partial-input cancel/revoke, sibling continuation and screenshot expiry passed. Physical tray/session/DPI matrix and full product facade remain."
     },
     {
       "id": "T30",
@@ -736,29 +1670,59 @@
     },
     {
       "id": "T31",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261028_dual_windows_desktop.json",
+        "docs/integration/evidence/20261028_desktop_arbitration_stop.json"
+      ],
+      "notes": "Cross-Bot desktop lease denial, consumed-screenshot rejection and wrong-session denial pass at the agent. Tray pause/stop, remote cancel propagation and revocation of an in-flight desktop step remain open. E44 adds actual logged-in Win10(build19044,current96DPI) and Win11(current144DPI) native pipe/capture/click/Unicode/lease/stale/session checks,8 each, with visually inspected own-window PNGs and confirmed cleanup.125%,cross-monitor,session transitions,full desktop facade/approvals and cross-Agent arbitration remain open. E45: Both actual Windows run19 synthetic-window checks; helper global arbitration, key/wheel effects, confirmed partial-input cancel/revoke, sibling continuation and screenshot expiry passed. Physical tray/session/DPI matrix and full product facade remain.",
+      "verifiedOn": "2026-10-28",
+      "level": "integration",
+      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },
     {
       "id": "T32",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "tests/cli-execution.native.mjs",
+        "docs/integration/evidence/20261030_installed_cli_protocol.json"
+      ],
+      "notes": "The requested model, the reported CLI model and the reported provider are recorded separately, a configured-model mismatch or an unconfirmed stop keeps the outcome unknown and retains the original hold, and a copied subject, remote location or unbound model parameter fails before admission. A real codex entry still needs an install-verified host decision, so actual response model identity is not verified. E60: official installed Codex0.163.0 normal initialization/native-MCP/close13 passes on all3OS. No credentials or turns; configuration identity is synthetic, not real model/backend/entitlement/billing proof. Startup HTTP attempts are explicitly refused by the local403 sink. Latest human AGENTS authorizes StepCode/Step Plan development and supersedes historical GPT-only routing; development assistance is separate from0 product model calls.",
+      "verifiedOn": "2026-10-30",
+      "level": "component / native (contract level)",
+      "environment": "Native CLI execution suite with a contract-level session factory; no native codex executable is spawned"
     },
     {
       "id": "T33",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_broker_bridge.json"
+        "docs/integration/evidence/20261027_m0_cli_runtime.json",
+        "docs/integration/evidence/20261027_m4_product_machines.json",
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261028_remote_private_paths.json",
+        "docs/integration/evidence/20261030_installed_cli_protocol.json",
+        "docs/integration/evidence/20261030_cli_native_peer_job.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json",
+        "docs/integration/evidence/20261030_write_cancel_effects.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-27",
-      "environment": "Isolated prototype and synthetic fixtures; not installed product",
-      "notes": "Real standalone MCP SDK bridge and Codex config parser verified separately. CLI-launched bridge, remote paths and live GPT calls are not connected."
+      "verifiedOn": "2026-10-30",
+      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
+      "notes": "A private signed bootstrap scopes a real grandchild MCP connection to one task lease: only granted tools are listed, spoofed arguments and unrelated same-user peers are rejected, and revocation ends the bridge. Real vendor CLI native MCP and product bridge wiring remain open. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open. E46: Own control data/pipe secret excluded from file/list/write/Git APIs,8 checks on three OSes. No same-account shell/kernel isolation claim. E60: official installed Codex0.163.0 normal initialization/native-MCP/close13 passes on all3OS. No credentials or turns; configuration identity is synthetic, not real model/backend/entitlement/billing proof. Startup HTTP attempts are explicitly refused by the local403 sink. Latest human AGENTS authorizes StepCode/Step Plan development and supersedes historical GPT-only routing; development assistance is separate from0 product model calls. E61: CLI Windows native Job-list atomic creation, creator death and capability failure/cleanup verified with 13 fixture tests on both actual Windows versions; installed CLI normal protocol13 again on Win11 without inference. Full product/model/OS isolation remains open. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open."
     },
     {
       "id": "T34",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m5_cli_execution.json"
+      ],
+      "verifiedOn": "2026-10-27",
+      "level": "integration",
+      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
+      "notes": "CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open."
     },
     {
       "id": "T35",
@@ -780,34 +1744,55 @@
       "status": "partial",
       "evidence": [
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-27",
-      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
-      "notes": "Original budget algorithms now atomically commit normalized SQLite run/hold/archive revisions; two connections and two actual child processes cannot consume the same balance. Front-channel Bot/auxiliary and initial Task/funding transaction/UI remain open."
+      "verifiedOn": "2026-10-28",
+      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
+      "notes": "Original budget algorithms now atomically commit normalized SQLite run/hold/archive revisions; two connections and two actual child processes cannot consume the same balance. Front-channel Bot/auxiliary and initial Task/funding transaction/UI remain open. CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed."
     },
     {
       "id": "T39",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "tests/subscription-billing.test.mjs",
+        "tests/subscription-reservations.test.mjs",
+        "tests/subscription-receipts-runtime.test.mjs",
+        "tests/subscription-accounting-host.test.mjs",
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+      ],
+      "level": "unit + integration",
+      "environment": "Native subscription suites on Node 24; SQLite finance probe with the verified native driver",
+      "notes": "subscription-only never uses an API key and api-only never uses the subscription; quota exhaustion switches the same step to the API key and records why; a pure subscription admission ignores a full API budget and preserves subscription use; an interrupted unknown subscription hold cannot turn into unknown API spending or occupy money; unknown token usage is never counted as zero and an incomplete subscription archive keeps the quota conservative. A live vendor quota turn and a user-confirmed API fallback are not exercised.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T40",
       "status": "partial",
       "evidence": [
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261027_m5_cli_execution.json",
+        "docs/integration/evidence/20261028_atomic_task_admission.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-27",
-      "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
-      "notes": "Nonzero receipts, known/unknown holds, API money and subscription archive/unknown-token dimensions survive cutover, retention and latest-data rollback. Duplicate settlement does not double count; complete per-source Bot/CLI receipts remain open."
+      "verifiedOn": "2026-10-28",
+      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
+      "notes": "Nonzero receipts, known/unknown holds, API money and subscription archive/unknown-token dimensions survive cutover, retention and latest-data rollback. Duplicate settlement does not double count; complete per-source Bot/CLI receipts remain open. CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed."
     },
     {
       "id": "T41",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "tests/quality-gates.test.mjs",
+        "tests/quality-attempt-ledger.test.mjs"
+      ],
+      "level": "unit",
+      "environment": "Quality gate and attempt ledger suites on Node 24",
+      "notes": "A quality upgrade requires literal true approval and picks the first different configured model; missing, false, truthy or throwing approval cannot trigger a paid upgrade; a failed second output stops after two attempts; each attempt incurs its own call and the first paid usage is retained while unknown usage stays unknown; a second not-started or blocked attempt cannot erase the first paid request. Learning retract/reset is available as a host setting (feedbackResetAt) and is not exercised end to end here.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T42",
@@ -821,45 +1806,85 @@
     },
     {
       "id": "T44",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_llm_admission.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+      ],
+      "level": "integration + actual rc.3 host / offline fixture model",
+      "environment": "Real LlmRuntime with an offline GPT-named fixture; default entry on a real rc.3 host",
+      "notes": "Auxiliary Bot calls keep their own receipts and are admitted through the same funding authority, and the default probe shows aux receipts beside bot receipts in the usage projection. DS long-term memory and history surfaces themselves come from the vendored DS runtime and are not separately re-verified here.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T45",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_ds_full.json"
+      ],
+      "level": "upstream suite",
+      "environment": "Frozen DS upstream full suite on Windows Node24",
+      "notes": "Scheduled-task behaviour ships inside the frozen DS upstream suite, which passes unchanged. Product-level scheduled-task interaction through the composed entry remains for W14.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T46",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_ds_full.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+      ],
+      "level": "upstream suite + actual rc.3 host / offline fixture model",
+      "environment": "Frozen DS upstream full suite plus the shipped default entry on a real rc.3 host",
+      "notes": "The frozen DS upstream suite passes and the default entry keeps the original DS Bot tools working on a real host: create_bot creates a worker, message_bot dispatches and returns, session exchange survives migration, and a fresh host reconstructs Bot identity and exchange history. Remaining DS interaction surfaces (MCP/search/approval/schedule) are recorded in the behavior audit as remaining.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T47",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261029_migration_supporting_domains.json"
+      ],
+      "verifiedOn": "2026-10-29",
+      "notes": "undefined E55:27 new checks; three-platform migration175/root1670/default40, actual semantic Host8 verifies original remember entries/topic/journal and saved skill attachment after cold restart. Saved memory/pack/approval/secret scopes are audited without replay or external mounts; unknown/pending state requires context. Live external MCP/secret replacement/GitHub login/logout and full stopped-writer/all-domain/OS/activation/latest-data rollback remain open."
     },
     {
       "id": "T48",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261028_runtime_config_search.json",
+        "docs/integration/evidence/20261029_profile_migration_preview.json",
+        "docs/integration/evidence/20261029_migration_ledger_archive.json",
+        "docs/integration/evidence/20261029_migration_data_archive.json",
+        "docs/integration/evidence/20261029_migration_domain_audit.json",
+        "docs/integration/evidence/20261029_migration_workspace_audit.json",
+        "docs/integration/evidence/20261029_migration_configuration_commit.json",
+        "docs/integration/evidence/20261029_migration_supporting_domains.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-27",
+      "verifiedOn": "2026-10-29",
       "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
-      "notes": "MR API history, archive dimensions, unknown quantities, quota/auth metadata and held run IDs preserve across controlled SQLite migration. Bot/group/memory/session and entire product import are not migrated."
+      "notes": "MR API history, archive dimensions, unknown quantities, quota/auth metadata and held run IDs preserve across controlled SQLite migration. Bot/group/memory/session and entire product import are not migrated. E47: Saved runtime config/search compatibility and cold identity verified by real rc.3 Host6 checks on three platforms; full preview/apply/data/rollback/binding migration remains. E48: Offline configuration planning29 + selected-tree inventory14 + private CLI8 pass on three platforms; manual uninstall preserved in a private desktop preview. No backup/apply/stop proof/consistent DB/domain reconciliation or complete rollback acceptance. E49: Actual SQLite online backup and complete lossless table export pass14 new native cases on three platforms (migration65/root1544); committed WAL included, uncommitted writes excluded, archive reread/re-export and private ACL checked. Cross-domain stop/data/money reconciliation, trusted-origin restore, recoverable apply/relocation and complete rollback remain unverified; rollback guards unchanged. E50: Selected-tree primary byte capture12 new checks passes on three platforms (migration77/root1556). Private desktop preview/capture refreshed and reverified without modifying sources or reinstalling MR. Complete semantic/money/reference closure, consistent databases, OS metadata/permissions, stop proof, recoverable apply and rollback remain unverified. E51: Private Session/reference/financial audit48 checks and migration125/root1604/isolated rc.3 Host6 pass on three platforms. Original authority/unknown ownership and raw history retained; private desktop capture audited without source writes. Workspace/remaining domains, OS metadata, live consistent backups, stop proof, recoverable apply and rollback remain open. E52: Explicit saved workspace SDK schema/order/session/archive/pin audit closes the prior registry context gap;10 unit+1 archive integration, migration136/root1615/actual isolated Host7 pass on all three platforms. Owner desktop saved selected-domain audit passes privately without original access/writes. Remaining domain closure, filesystem/OS metadata, consistent databases, stop proof, recoverable apply/location/rollback still required. E53:12 configuration checks incl24 real exit boundaries per platform; migration148/root1627, actual startup-gate Host7, semantic Host7/default36/finance33 pass on three platforms. Pending gate protects new product writers; pre-activation rollback restores configuration and saved Main/Session. Full shared-launcher stop proof, complete data/OS/backup/money/location activation and latest-data rollback remain open. Initial local consult timeout is retained/unexplained despite unchanged-source successful recheck. E55:27 new checks; three-platform migration175/root1670/default40, actual semantic Host8 verifies original remember entries/topic/journal and saved skill attachment after cold restart. Saved memory/pack/approval/secret scopes are audited without replay or external mounts; unknown/pending state requires context. Live external MCP/secret replacement/GitHub login/logout and full stopped-writer/all-domain/OS/activation/latest-data rollback remain open."
     },
     {
       "id": "T49",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261028_runtime_config_search.json",
+        "docs/integration/evidence/20261029_profile_migration_preview.json",
+        "docs/integration/evidence/20261029_migration_ledger_archive.json",
+        "docs/integration/evidence/20261029_migration_data_archive.json",
+        "docs/integration/evidence/20261029_migration_domain_audit.json",
+        "docs/integration/evidence/20261029_migration_workspace_audit.json",
+        "docs/integration/evidence/20261029_migration_configuration_commit.json",
+        "docs/integration/evidence/20261029_migration_supporting_domains.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-27",
+      "verifiedOn": "2026-10-29",
       "environment": "Controlled strict DS/MR homes; Win11/Win10 Node24, Ubuntu Node22; SQLite13.0.3 with native subprocess crashes and offline model fixture",
-      "notes": "Raw backup, old-writer marker refusal, CAS conflicts, forward-schema refusal and five real migration/rollback exit stages preserve current data; rollback exports latest MR receipts. Complete Task export/profile/rollback UI and live-legacy takeover remain unverified."
+      "notes": "Raw backup, old-writer marker refusal, CAS conflicts, forward-schema refusal and five real migration/rollback exit stages preserve current data; rollback exports latest MR receipts. Complete Task export/profile/rollback UI and live-legacy takeover remain unverified. E47: Saved runtime config/search compatibility and cold identity verified by real rc.3 Host6 checks on three platforms; full preview/apply/data/rollback/binding migration remains. E48: Offline configuration planning29 + selected-tree inventory14 + private CLI8 pass on three platforms; manual uninstall preserved in a private desktop preview. No backup/apply/stop proof/consistent DB/domain reconciliation or complete rollback acceptance. E49: Actual SQLite online backup and complete lossless table export pass14 new native cases on three platforms (migration65/root1544); committed WAL included, uncommitted writes excluded, archive reread/re-export and private ACL checked. Cross-domain stop/data/money reconciliation, trusted-origin restore, recoverable apply/relocation and complete rollback remain unverified; rollback guards unchanged. E50: Selected-tree primary byte capture12 new checks passes on three platforms (migration77/root1556). Private desktop preview/capture refreshed and reverified without modifying sources or reinstalling MR. Complete semantic/money/reference closure, consistent databases, OS metadata/permissions, stop proof, recoverable apply and rollback remain unverified. E51: Private Session/reference/financial audit48 checks and migration125/root1604/isolated rc.3 Host6 pass on three platforms. Original authority/unknown ownership and raw history retained; private desktop capture audited without source writes. Workspace/remaining domains, OS metadata, live consistent backups, stop proof, recoverable apply and rollback remain open. E52: Explicit saved workspace SDK schema/order/session/archive/pin audit closes the prior registry context gap;10 unit+1 archive integration, migration136/root1615/actual isolated Host7 pass on all three platforms. Owner desktop saved selected-domain audit passes privately without original access/writes. Remaining domain closure, filesystem/OS metadata, consistent databases, stop proof, recoverable apply/location/rollback still required. E53:12 configuration checks incl24 real exit boundaries per platform; migration148/root1627, actual startup-gate Host7, semantic Host7/default36/finance33 pass on three platforms. Pending gate protects new product writers; pre-activation rollback restores configuration and saved Main/Session. Full shared-launcher stop proof, complete data/OS/backup/money/location activation and latest-data rollback remain open. Initial local consult timeout is retained/unexplained despite unchanged-source successful recheck. E55:27 new checks; three-platform migration175/root1670/default40, actual semantic Host8 verifies original remember entries/topic/journal and saved skill attachment after cold restart. Saved memory/pack/approval/secret scopes are audited without replay or external mounts; unknown/pending state requires context. Live external MCP/secret replacement/GitHub login/logout and full stopped-writer/all-domain/OS/activation/latest-data rollback remain open."
     },
     {
       "id": "T50",
@@ -868,18 +1893,40 @@
     },
     {
       "id": "T51",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/deployment-profile.md",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+      ],
+      "level": "document",
+      "environment": "Repository deployment profile document",
+      "notes": "The deployment profile records the supported carriers, the SQLite/native dependency constraints and the platform matrix. Building and byte-checking the actual optional carriers remains for W18. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance.",
+      "verifiedOn": "2026-10-28"
     },
     {
       "id": "T52",
       "status": "not_run",
-      "evidence": []
+      "evidence": [
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+      ],
+      "verifiedOn": "2026-10-28",
+      "notes": " E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance."
     },
     {
       "id": "T53",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "tests/bot-runtime-ui.test.mjs",
+        "docs/integration/evidence/20261030_product_refresh_order.json",
+        "docs/integration/evidence/20261030_bound_stop_proof.json",
+        "docs/integration/evidence/20261030_stop_proof_regression.json",
+        "docs/integration/evidence/20261030_write_cancel_effects.json"
+      ],
+      "level": "actual rc.3 host / offline fixture model + UI unit",
+      "environment": "Shipped default entry on a real rc.3 host with the product read model, plus the jsdom UI suite",
+      "notes": "The product channel serves a real snapshot to the client with all six sections available, the client bundle is rebuilt and byte-checked, and the UI suite covers Bot bindings, the review card, resolved receipt tags, machine controls and the blocked-placeholder rendering. Browser/Desktop visual acceptance and offline behaviour of the real UI remain for W14. E63: actual React panels in JSDOM retain the newest snapshot and disable operations on stale reads or lost action replies; seven synthetic cases pass on each of Win11, Win10 and Ubuntu. Full product/UI acceptance and backend retry gates remain open. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open.",
+      "verifiedOn": "2026-10-30"
     },
     {
       "id": "T54",
@@ -888,13 +1935,31 @@
     },
     {
       "id": "T55",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m0_legacy_policy.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "tests/legacy-policy.test.mjs"
+      ],
+      "level": "strict host composition + actual rc.3 host / offline fixture model",
+      "environment": "Isolated strict legacy-policy composition and the shipped default entry on a real rc.3 host",
+      "notes": "Legacy tools, commands and RPC receivers keep their inputs and results while every path resolves the unified policy: ungranted legacy tools and installer commands refuse, granted route tools still run and project only bound models, all 23 RPC receivers refuse without an authenticated invocation, and a second real Session shares its Bot principal so grant removal reaches both. Billing behaviour preservation is covered by the finance probe rather than this scenario.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T56",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/behavior-audit.json",
+        "docs/integration/STATUS.txt",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261030_installed_cli_protocol.json"
+      ],
+      "level": "document + evidence audit",
+      "environment": "Repository evidence bundle; 37 behavior-audit entries covering all 40 feature groups; every evidence file records level and actualModelCalls",
+      "notes": "The behavior audit records per-entry observed behavior, source git blobs, verification level and explicit remaining gaps for all 40 feature groups, and every evidence file separates component, host and real-inference levels with actualModelCalls counted. The final support statement for release remains for W19. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance. E60: official installed Codex0.163.0 normal initialization/native-MCP/close13 passes on all3OS. No credentials or turns; configuration identity is synthetic, not real model/backend/entitlement/billing proof. Startup HTTP attempts are explicitly refused by the local403 sink. Latest human AGENTS authorizes StepCode/Step Plan development and supersedes historical GPT-only routing; development assistance is separate from0 product model calls.",
+      "verifiedOn": "2026-10-30"
     },
     {
       "id": "T57",
@@ -902,12 +1967,13 @@
       "evidence": [
         "docs/integration/evidence/20261027_m0_combined_host.json",
         "docs/integration/evidence/20261027_m0_remote_platforms.json",
-        "docs/integration/evidence/20261027_m0_ds_lifecycle.json"
+        "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
+        "docs/integration/deployment-profile.md"
       ],
       "level": "integration",
       "verifiedOn": "2026-10-27",
       "environment": "Isolated strict DS factory composition; Win11/Win10 Node24 and Ubuntu Node22; offline fixture model",
-      "notes": "Automatic committed-state lifecycle, group/part/delete/cold reconstruction and real authenticated Gateway allow/deny verified. Default product composition, remaining lifecycle, execution/task accounting and remote/OS deployment criteria remain incomplete."
+      "notes": "deployment-profile.md now fixes the four roles, machine identifiers, network path, run accounts, data directories and hibernation impact with placeholders; deployment-status.json records two verified isolated test targets. Production always-on host and product agent are still not deployed, and the sleep/hibernation topology is not verified."
     },
     {
       "id": "T58",
@@ -916,23 +1982,52 @@
     },
     {
       "id": "T59",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261028_remote_auth_abuse.json",
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json"
+      ],
+      "verifiedOn": "2026-10-28",
+      "level": "integration",
+      "environment": "Actual local TCP/HTTPS/mTLS, ephemeral test CA and SQLite on Windows11/Node24.20.0",
+      "notes": "E41 verifies bounded anonymous/global/client limits, spoofed source refusal, valid-client isolation, natural cooling recovery, immediate rotation, exact proxy/Host/Origin/TLS and optional mTLS. No production public/VPN/Tunnel deployment, full load or DDoS acceptance; process-local limiter state is not persisted. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance. E43 closes the header/body rotation race: old client rows cannot issue/revoke newer grants, paused old requests fail after rotation, revoked tickets cannot list capabilities, and clock rollback keeps cooling finite. New10-check auth suite plus full1446/three-machine native44/defaultHost36 pass. A previous-code negative witness has exactly four expected failures."
     },
     {
       "id": "T60",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m5_cli_execution.json"
+      ],
+      "verifiedOn": "2026-10-27",
+      "level": "integration",
+      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
+      "notes": "CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open."
     },
     {
       "id": "T61",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261026_m0_baseline.json",
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+      ],
+      "level": "actual rc.3 host / offline fixture model",
+      "environment": "Real rc.3 host; frozen DS commit and tracked-source checks on Windows Node24",
+      "notes": "Every default-composition probe asserts the frozen DS commit and that frozen tracked sources are unchanged, and product-source verifies 297 files against the frozen commit. Incremental upstream handling and the full frozen-baseline inventory audit remain for W19.",
+      "verifiedOn": "2026-10-27"
     },
     {
       "id": "T62",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
+        "docs/integration/evidence/20261030_installed_cli_protocol.json"
+      ],
+      "level": "actual rc.3 host / offline fixture model",
+      "environment": "Real rc.3 host with an offline fixture model; actualModelCalls is 0 in every evidence file",
+      "notes": "All verification this project uses an offline fixture provider and records actualModelCalls: 0; the GPT-only constraint and the rule that mock evidence never claims real inference are stated in the plan and carried in every evidence file. Real inference acceptance is explicitly the user side. E60: official installed Codex0.163.0 normal initialization/native-MCP/close13 passes on all3OS. No credentials or turns; configuration identity is synthetic, not real model/backend/entitlement/billing proof. Startup HTTP attempts are explicitly refused by the local403 sink. Latest human AGENTS authorizes StepCode/Step Plan development and supersedes historical GPT-only routing; development assistance is separate from0 product model calls.",
+      "verifiedOn": "2026-10-30"
     },
     {
       "id": "T63",

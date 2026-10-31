@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-30",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261030_installed_cli_protocol.json",
+  "level": "actual CLI native-peer Windows atomic Job creation, helper/creator death and owned-tree teardown fixtures",
+  "sourceGitBlobs": {
+    "packages/cli-runtime/src/native-peer.ps1": "498a48f4196bead8e0bc685828a0d8605f1675dc",
+    "tests/cli-native-peer-job.native.mjs": "bd8e19187e7a5060ee234af0951cca555bfb711e",
+    "tests/fixtures/cli-native-peer-barrier.mjs": "676029c9e16d32ff645cda4652c3743d4d636e6e",
+    "tests/fixtures/cli-native-peer-parent.mjs": "b16bfd77e7b612f16b3a95189b22ee336abfe222",
+    "tests/fixtures/windows-process-job-control.mjs": "449bb726f9cc0116085da2884160bb32ab2a5aa8",
+    "tests/fixtures/windows-process-job-worker.mjs": "fdbb18a30c8ec5a57df3bb1c6413a37d1a76b448",
+    "docs/integration/plan/20261030_cli_native_peer_job.md": "4f80426c698b38fcc32aa9ab810abd07e0180f75",
+    "package.json": "c7a1c1f84b547a84caa94bccf95a78a10391c98f",
+    ".github/workflows/ci.yml": "274beca73112083637eac17aa051be7d0b5a259b",
+    "scripts/integration-cli-installed.mjs": "b2f71a71317b3e653e4eb2605bf23734dfe0e33f",
+    "packages/cli-runtime/src/native-process.mjs": "38e11c9f80847f1a2597c9e61861ff3d6b98a993"
+  },
+  "sourceSnapshot": {
+    "sourceFiles": 977,
+    "frozenVendorFiles": 297,
+    "matchedOnAllThreePlatforms": true,
+    "archiveSha256": "6d7a78405ceef4e26995cc8b13d86cd9958e8c325f8e0b9d78dddbb4c8f1939c",
+    "note": "The private test archive also carried a newly generated synthetic TLS fixture. Private keys, credentials and user profiles are not public evidence."
+  },
+  "regressionEvidence": "docs/integration/evidence/20261030_installed_cli_protocol.json",
+  "negativeWitness": {
+    "status": "expected-failure-reproduced",
+    "originalSourceGitBlob": "3bb559a98f269c7d6e61026c20092ac95dfa187e",
+    "platform": "win32",
+    "createdBeforeJobAssignment": true,
+    "suspendedChildSurvivedLauncher": true,
+    "verifiedFixtureCleanup": true,
+    "actualModelCalls": 0,
+    "rerun": "The real original helper first reproduced the failure on local Win11. The permanent generated legacy variant reproduces and exactly reclaims it on both Windows platforms; production and atomic-barrier variants are tested independently."
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "checks": {
+        "cliNativePeer": { "tests": 10, "pass": 10, "fail": 0, "skipped": 0 },
+        "cliNativeBridge": { "tests": 3, "pass": 3, "fail": 0, "skipped": 0 },
+        "cliContractAndRenewal": { "tests": 8, "pass": 8, "fail": 0, "skipped": 0 },
+        "agentWindowsJob": { "tests": 11, "pass": 11, "fail": 0, "skipped": 0 },
+        "installedCliNoInference": { "tests": 13, "pass": 13, "fail": 0, "skipped": 0 },
+        "root": { "tests": 1754, "pass": 1732, "fail": 0, "skipped": 22 }
+      }
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "checks": {
+        "cliNativePeer": { "tests": 10, "pass": 10, "fail": 0, "skipped": 0 },
+        "cliNativeBridge": { "tests": 3, "pass": 3, "fail": 0, "skipped": 0 },
+        "cliContractAndRenewal": { "tests": 8, "pass": 8, "fail": 0, "skipped": 0 },
+        "agentWindowsJob": { "tests": 11, "pass": 11, "fail": 0, "skipped": 0 },
+        "installedCliNoInference": { "tests": 13, "pass": 13, "fail": 0, "skipped": 0 },
+        "root": { "tests": 1754, "pass": 1732, "fail": 0, "skipped": 22 }
+      }
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "checks": {
+        "cliNativePeer": { "tests": 10, "pass": 0, "fail": 0, "skipped": 10 },
+        "cliNativeBridge": { "tests": 3, "pass": 3, "fail": 0, "skipped": 0 },
+        "cliContractAndRenewal": { "tests": 8, "pass": 8, "fail": 0, "skipped": 0 },
+        "installedCliNoInference": { "tests": 13, "pass": 13, "fail": 0, "skipped": 0 },
+        "root": { "tests": 1754, "pass": 1691, "fail": 0, "skipped": 63 }
+      },
+      "note": "All ten Windows-only native-peer cases are explicit platform skips, not passes. The root suite also contains the separate eleven Windows Agent Job skips."
+    }
+  ],
+  "observed": [
+    "The original CLI PowerShell supervisor created a suspended child before AssignProcessToJobObject. A deterministic gate in the real old source proves helper death leaves that child alive outside the Job; exact kernel creation FILETIME cleanup reclaims it without process-name killing.",
+    "STARTUPINFOEX and PROC_THREAD_ATTRIBUTE_JOB_LIST now establish membership in CreateProcess itself. IsProcessInJob verifies it before Resume; unsupported Job-list creation fails closed without an Assign fallback.",
+    "A real creator kernel handle, creation-time check and watchdog cover creator death before creation, after creation and while descendants run. Helper death after atomic creation/resume closes the only Job handle and kills the owned tree. Abrupt paths do not invent graceful stopped evidence.",
+    "Existing anonymous pipes, base64 CLI-output framing, native control channel, EOF/deadline/exit semantics, ActiveProcesses stop evidence and named-pipe peer checks remain. Console JSON is UTF-8 before the first request; exact Unicode/empty/quote/newline/backslash argv and child exit codes pass.",
+    "Ten independent native-peer checks pass on Win11 and Win10 and explicitly skip on Ubuntu. Existing CLI bridge3, contract/renewal8 and Agent Windows Job11 pass; official installed Codex0.163.0 no-inference protocol passes13 on every platform with zero turns and two local-403 startup attempts.",
+    "All three platforms verify the same977 source files including frozen DS297 and finish root1754 with zero failures: Windows1732pass/22skip and Ubuntu1691pass/63skip. Product-source and client-byte checks also pass locally."
+  ],
+  "fixtureTiming": {
+    "initialParallelRootRun": "Two new fixture waits expired under full-suite load at10s/8s while standalone checks passed.",
+    "resolution": "Only bounded fixture waits were increased to20s/25s with a60s per-test ceiling; product assertions and implementation were not weakened. The final local and both remote full-root runs have zero failures."
+  },
+  "limitations": [
+    "This is cooperative Windows process containment, not a separate account, AppContainer, filesystem/network isolation boundary or complete model-facing command backend.",
+    "No real model inference, response identity, entitlement, usage or billing was tested. The installed probe uses a synthetic configured model and refuses provider HTTP at a local sink.",
+    "The creator pre-open timestamp check assumes a trusted host clock; after opening, the original kernel handle supplies lifetime identity.",
+    "Existing ReadLine-based bootstrap/relay input is not reclassified as a streaming hard cap; that separate framing concern is not closed by this Job fix.",
+    "Full remote CLI locations, twelve-tool/PTY/write facades, fs_write leaf/parent pinning, workspace permissions/config generations, migration/activation, production sleep/desktop/UI/installer and release acceptance remain open."
+  ]
+}

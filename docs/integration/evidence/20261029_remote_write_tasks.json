@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-29",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261029_migration_configuration_commit.json",
+  "level": "tracked remote file-write Task facade with real Agent receipts, authority revocation and actual fixed rc.3 Host on three OS machines",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "packages/orchestration/src/remote-execution.mjs": "3e3d072b4d0cf6feccea51f682951e5a0aee9084",
+    "packages/orchestration/src/remote-machines.mjs": "e3b984c6c54444c185132c4f8d733eebcd35506c",
+    "packages/orchestration/src/task-contract.mjs": "e050cdeb5e60ccc66ca54818ac3035ce8ad06c3a",
+    "packages/orchestration/src/task-service.mjs": "13524ef4ba366cce0e8b4b91c76e07277fbfc30c",
+    "packages/orchestration/src/task-journal.mjs": "2bad5df7ce599bc5453576334cef6549e293fe41",
+    "packages/orchestration/src/task-tools.mjs": "400cb077891628978cb43d172a3b43fd25fcee7f",
+    "packages/orchestration/src/product-composition.mjs": "98248c704be9a7d8fddb020d7b12753d2a74af0d",
+    "packages/orchestration/src/sqlite-router-state.mjs": "d909fba9f1cc1075b77725f2a34675c5efd29d82",
+    "packages/orchestration/src/migration-ledger-export.mjs": "c9302a321e832e310fd811d8fc0918b8a26b7576",
+    "packages/orchestration/src/migration-financial-audit.mjs": "39563f502115c9d2dd3320045fbb68dec94e81f4",
+    "apps/integration-client/panels.jsx": "3c7cba59431ffbf996a541ade515f00553f4b1d5",
+    ".dsh-plugin/client.js": "a9fe1188bf18b1bde766b17fc5e9ae910bea9f80",
+    "tests/remote-write-tasks.native.mjs": "002ca49d81d08ab895582c27c77a0c17824f34ae",
+    "tests/bot-runtime-ui.test.mjs": "615bf5acdce35035c241aa825ff4bd1dbb6ddef9",
+    "tests/task-journal.native.mjs": "8b70646cd756ac70da5a8df6c359374a7014c4b2",
+    "tests/task-plan-journal.native.mjs": "0c14ab524801a371a7a3cab92134066f5f89c878",
+    "tests/task-admission.native.mjs": "142dd099afb1f735fc1257c49c21fd8246c246fa",
+    "tests/migration-ledger-export.test.mjs": "edb711dbb882af104ddcb4edff4a01c8ddb08ef0",
+    "scripts/integration-product-default.mjs": "7ff353b5baeb9a7eebf3f15761483bbc84dd34c1",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "4d0554cb133d30535d4cf9040d8e362edacc7222",
+    "docs/integration/plan/20261029_remote_write_tasks.md": "f4452aa6f3c971d096a6a241788e28d2a4276fa9",
+    "package.json": "356e62240ee6bf482b7a1ee00c0a73cd45538ee2",
+    ".github/workflows/ci.yml": "ee275a80ee5d599bbc95fd877651afada090cb2f"
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "remoteWrite": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0
+      },
+      "migration": {
+        "tests": 148,
+        "pass": 148,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1643,
+        "pass": 1640,
+        "fail": 0,
+        "skipped": 3
+      },
+      "defaultProductChecks": 40,
+      "startupGateChecks": 7,
+      "semanticHostChecks": 7,
+      "financeChecks": 33
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "remoteWrite": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0
+      },
+      "migration": {
+        "tests": 148,
+        "pass": 148,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1643,
+        "pass": 1640,
+        "fail": 0,
+        "skipped": 3
+      },
+      "defaultProductChecks": 40,
+      "startupGateChecks": 7,
+      "semanticHostChecks": 7,
+      "financeChecks": 33
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "remoteWrite": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0
+      },
+      "migration": {
+        "tests": 148,
+        "pass": 148,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1643,
+        "pass": 1619,
+        "fail": 0,
+        "skipped": 24
+      },
+      "defaultProductChecks": 40,
+      "startupGateChecks": 7,
+      "semanticHostChecks": 7,
+      "financeChecks": 33
+    }
+  ],
+  "regression": {
+    "sourceSnapshot": {
+      "sourceFiles": 930,
+      "frozenFiles": 297,
+      "sha256": "95e9680a7e85669b04a508486fb4129c5d64a417cc6fece654c47461646eabc9"
+    },
+    "sourceSnapshotPhase": "implementation/tests before E54 tracking updates",
+    "newRemoteWriteChecks": 14,
+    "newUIReceiptChecks": 2,
+    "focusedNativeCoreChecks": 122,
+    "rootTestsPerPlatform": 1643,
+    "client": {
+      "bytes": 2061889,
+      "status": "actual bundle --check and product client byte comparison pass on all three"
+    },
+    "strictDependencies": "pinned pnpm10.34.6 frozen/strict passed, no dependency upgrade",
+    "journalSchema": 5,
+    "financialAuthorityMarker": 4,
+    "frozenVendor": {
+      "files": 297,
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "status": "passed"
+    },
+    "initialFindings": [
+      "Dotted Agent root IDs initially failed the stricter internal authority workspace ID; fixed by deterministic root hashing, without weakening grants or Agent root scope",
+      "Actual default probe catalog and money admission assertion still assumed two paid backends; updated to include the nonfinancial remote backend and assert its Task/outbox/op identity and zero model receipts"
+    ]
+  },
+  "observed": [
+    "The real default product exposes remote_computer_write only for owner-paired computer/root scopes with workspace-write/fs_write/status/cancel. The tool submits a durable Task, not direct IO. Inputs contain bounded UTF-8 bytes (8192), relative path and explicit expected SHA256 or null-for-new; endpoints, secrets and shell/program metadata are refused",
+    "Admission and redispatch resolve actual machine/root/config/binding revisions. Task workspace locks and remote authority leases use the same collision-resistant root key. Unknown writes hold the lock while an independent read and independent dependency branches continue",
+    "Task/attempt/operation identity is checkpointed before the first Agent request. The Agent durable fs_write operation is linked as remote-operation; duplicate model tool requests return the original Task/operation. File IO has no fabricated model run, invoice or usage receipt",
+    "Missing, corrupt and revoked responses remain needs-reconciliation. Full Host-service cold reopen and a new read-status-only grant observe the original remote operation; observation never resends fs_write. Genuinely absent receipts remain unknown and explicit retry is refused",
+    "A cancellation tree skips unstarted descendants and requires a terminal remote receipt before releasing its running write. A completed write remains visibly applied after cancellation. The Tasks UI shows stop confirmation, possible effects and the actual output hash/size rather than implying that cancellation reverted files",
+    "Journal schema advances4->5 and every supported journal/money/export reader accepts5/refuses future6. Financial authority JSON marker stays4. Existing money Task admission and paid backend receipts remain intact; remote file operations have their own nonfinancial reference",
+    "The actual fixed rc.3 default Host runs the new model-facing tool against a real isolated Agent, verifies changed bytes and one original remote operation across replay and Host cold restart. No real model provider or native codex executable is invoked"
+  ],
+  "limitations": [
+    "Only the controlled remote UTF-8 file-write Task facade is delivered here. Remote shell/program execution, browser and desktop Task adapters, native CLI write modes and real OS isolation are separate unfinished work; legacy MR executable tools remain denied",
+    "A confirmed cancellation stops future work; it does not undo a file change. Failed operations may also have effects. Missing receipts continue holding the write lock and require observation; there is no automatic replay to manufacture certainty",
+    "Agent file CAS/protected-root boundaries remain the existing measured implementation. This phase does not claim general arbitrary-size/binary upload, cross-file atomic changes or process sandbox isolation",
+    "The root schema version protects supported old readers. Financial marker4 is unchanged; a version bump alone is not a complete profile/data/permission migration or rollback protocol",
+    "All tests use synthetic files, private ephemeral profiles and offline model/session factories. Existing dependencies are reused; this is not clean installation, production deployment or paid inference acceptance",
+    "E53 initial default-consult timeout remains an unresolved historical stability finding. This checkpoint runs a new fixed-source default40 probe on each platform but does not claim to have diagnosed that earlier cause",
+    "User desktop data/config remain untouched, the manual MR removal remains preserved and web remains deferred. Full migration domains/OS metadata/stopped writers/activation/latest-data rollback, installers and the remaining master-plan gates remain open",
+    "No git commit/push/tag/Release/npm publication in this checkpoint. Completion-dependent GitHub/npm authorization persists. Whole packages remain0/20, scenes1passed/51partial/11not_run and M0 11/12"
+  ]
+}

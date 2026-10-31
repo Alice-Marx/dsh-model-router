@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-host-offline-default-composition",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "1cb336f67ccad9091b3a23c48d3c34f01c0490c4",
+    "packages/orchestration/src/product-composition.mjs": "3a6b356ce2a3f623d23c2091cce2d4edb509213d",
+    "packages/orchestration/src/sqlite-router-state.mjs": "00af43363a5ccdadbed08659c3d4bfce53803772",
+    "packages/orchestration/src/task-journal.mjs": "ad04531d73d6b4a03b67c0e0ee89d879e90a4813",
+    "packages/orchestration/src/task-service.mjs": "2d5f9d85b735516dae8c82f46709cc2c33b787f9",
+    "packages/orchestration/src/task-tools.mjs": "09508ae7ee2a9a1703f975f4559846ea36c9fe61",
+    "packages/orchestration/src/mr-read-backend.mjs": "2e75b56d611060e425f15b2d22c213432a4b8a5b",
+    "packages/orchestration/src/cli-execution.mjs": "635f63d3fb98ccd745965fc5d830b3bf1bf3c776",
+    "modules/bot-runtime/read-model.mjs": "2c4a7fed35c978e75fee95697a8e4b8db13e2289",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "d8a3cf3cf408aafb93286f54ea7b8992e0f0d14c",
+    "tests/fixtures/integration-combined/cli-session-factory.mjs": "e120a75d6ad40c6a86b8d6107a5dae89ed7b406d",
+    "tests/unknown-receipt-resolution.native.mjs": "89cd3840092324dfa58ef4c724fce7b658f94ab8",
+    "tests/product-composition.test.mjs": "bb210d88d0e87e92d9302c157808e250654aefd2",
+    "scripts/integration-product-default.mjs": "ba3fa37af9ce27ee6eece5d621afdf585e323fb3",
+    "apps/integration-client/panels.jsx": "530fce2a6961dcdba17db5f6d6870599b1d34b84",
+    "tests/bot-runtime-ui.test.mjs": "1e476d8ad0301db2d568d2753799278e3647673d",
+    ".dsh-plugin/client.js": "d8671a8b71680a30d9e02003f03ad039f540ee0b",
+    "tests/cli-execution.native.mjs": "c52610f44902226ded5cc510106c5370857be6b3"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "feature": "N09: the default single-plugin product runs one managed Task Service over the same SQLite authority, with unified Bot/account admission, durable cancel/retry/reconciliation, and a managed CLI backend gated on a host-verified official entry",
+  "changes": {
+    "taskServiceWiring": "The composition boot opens the Task journal on the same orchestration.sqlite, creates one Task Service whose execution context is the shared policy, registers the bounded bot_task_* tools and releases them on dispose or a failed boot. A previous Host that died without releasing its runner lease blocks the claim until it expires, so the next boot waits instead of dropping every managed task",
+    "backendDecision": "Resolved queue decision point 2: the durable target contract stays fixed per backend kind (mr-api, codex-read) while the execution target, model and money resolve at run time from the submitting Bot's committed binding. A binding change therefore never rewrites a persisted target hash, retries of older tasks stay admissible, and each Bot is charged at its own configured price. The binding is the single source of truth for grant and money, so no service-level model check is duplicated",
+    "cliEntryGate": "The CLI backend exists only when the host declares an installation-verified entry (executable, sha256, version) plus verified CLI model identities; neither a Bot nor a Task input can supply an entry. Without configuration the catalog exposes no codex tool, modes or cliModels, so a Bot binding cannot select an unverified CLI identity",
+    "readModelAndActions": "The tasks read-model section pages the durable journal per Bot with the available backend catalog, and owner task.cancel/retry/reconcile actions run on the owning Bot's own subject so the Bot's committed grant authorizes every operation",
+    "catalog": "The settings catalog adds the managed-tasks capability (task tools plus the MR execution capabilities), the codex official-tool entry with its CLI grant tools, and the task backend catalog; the compiled grant takes its tools from the selected capabilities",
+    "unknownReceiptResolution": "The owner action usage.resolve settles an unconfirmed package in one CAS transaction: it attests a vendor-confirmed amount or waives it, releases the interrupted execution hold that keeps its estimate and unknown count, and records the resolution on the run so the commit digest chain is the audit trail. The usage read model exposes the resolvable packages and each receipt resolution; a cross-Bot attempt is refused by ownership before any state changes.",
+    "reviewUi": "The usage page renders the reviewable unconfirmed packages as cards with a required note, an optional vendor-confirmed amount and two gated actions (attest the confirmed amount, or waive with the note), and each receipt row shows its resolution tag; the shipped bundle is rebuilt and verified.",
+    "taskConcurrency": "The Task Service accepts a per-Bot concurrency limit and the composition passes the committed binding maxConcurrentTasks. The durable target contract stays per backend kind, so a concurrency change never rewrites a persisted target hash; an unconfigured Bot, or any answer outside the stored 1..32 range, keeps the conservative single-task default instead of failing open."
+  },
+  "defaultCompositionProbe": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "checks": [
+      "N06b: unconfigured Main stays blocked; the funding scope and Main binding are configured through real owner actions before any model turn",
+      "N06b: worker binding is configured through a real owner action before its first prompt",
+      "Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Default entry: worker executes permitted MR routing with the composed Bot grant",
+      "Default product: the worker consults through the MR path with the composed funding admission",
+      "Default entry: original DS Bot dispatch and result return survive migration",
+      "Product channel refuses an unauthenticated snapshot at the Host connection admission",
+      "Product read model: real Bots, compiled grants and exact model routes in one snapshot",
+      "Default owner can read the original advanced ledger through real Gateway; ungranted mutations and unauthenticated requests stay denied",
+      "Every product section is wired: no read-model section reports a blocked placeholder",
+      "N07: the usage projection shows per-source receipts with exact models and a funding summary; unknown amounts stay null",
+      "N08: the MR consult writes exactly one linked receipt; receipts and the funding summary agree without double billing",
+      "N06b: configured funding scope and Bot bindings are visible with exact model routes, the local machine entry and the scope catalog",
+      "N09: a Bot submits a managed MR Task through the configured admission; it succeeds with one attempt and one linked run",
+      "N09: an owner/Bot retry of a failed Task adds a linked attempt and succeeds without a second invoice",
+      "N09: a running managed Task stays cancellable and its terminal state keeps the original run reference",
+      "N09: a binding with maxConcurrentTasks 2 runs two managed Tasks for one Bot at the same time",
+      "N09: both concurrent Tasks stay cancellable through the real owner action",
+      "N09: another Bot cannot read or drive a Task it does not own",
+      "N09: only a Bot granted the official CLI capability may submit the CLI backend",
+      "Default product: owner secretRef pairing and Bot-scoped real MCP read work through the real AgentLoop",
+      "Default product: owner revocation removes Bot grant, invalidates remote tickets and refuses further reads",
+      "N06b: a disabled funding scope blocks the bindings and the next model turn dispatches nothing",
+      "N09: a contract-level CLI Task writes its own linked run and stays unknown until an owner confirms it; the owner action is idempotent",
+      "N09: managed Task receipts land in the single funding authority; the unconfirmed CLI receipt is held out of the spend total and counted as unknown",
+      "N09: an unconfirmed receipt keeps its Bot refused with zero provider dispatch until an owner resolves it",
+      "N09: the owner resolves an unconfirmed receipt through a real owner action; the waive is auditable on the run and the Bot spends again",
+      "Fresh host reconstructs stable Bot identity and the composed product read model"
+    ],
+    "snapshotSections": {
+      "bindings": "available",
+      "botBindings": "available",
+      "fundingAccounts": "available",
+      "tasks": "available",
+      "machines": "available",
+      "usage": "available"
+    },
+    "restored": {
+      "bots": 3,
+      "bindings": "available"
+    },
+    "actualModelCalls": 0
+  },
+  "regression": {
+    "rootSuite": "1394 tests, 1391 pass, 0 fail, 3 skipped",
+    "composition": "product-composition suite 10/10 (normalizeTaskCli and createTaskBackends contract tests)",
+    "closure": "roadmap files closure 20/20 with 252 listed files",
+    "integrationTracking": "valid: 32 requirements, 40 features, 63 acceptance scenarios, 20 work packages",
+    "documentTests": "documents, inventory and progress suites 25/25",
+    "combinedHostTasks": "strict managed-tasks composition passed 9/9 including crash-recovery reconciliation, 0 model calls",
+    "combinedHostLegacyPolicy": "legacy-policy probe passed, 0 model calls",
+    "financeProbe": "33/33, 0 model calls",
+    "productHost": "passed 4/4",
+    "remoteMachines": "passed",
+    "clientBundle": "check:client OK; product-client --check passed (2,059,617 bytes, 118 inputs); product-source passed (297 files)",
+    "unknownReceiptResolution": "unknown-receipt-resolution native suite 7/7 (waive, attest, ownership, duplicate, active hold refusal, interrupted hold settlement, cross-connection durability)",
+    "uiSuite": "bot-runtime-ui suite 5/5 (review card rendering, required-note gating, resolved receipt audit tag)",
+    "taskConcurrency": "CLI execution native suite 10/10, including a new test where the default keeps one active task per Bot while a two-task binding dispatches both concurrently and both stay cancellable"
+  },
+  "fixes": [
+    "The composition used dirname without importing it, so the product host aborted before any service opened",
+    "The probe drove reconciliation through the Bot's own AgentLoop, but an unconfirmed receipt fail-closes that Bot's model turns; recovery now runs through the real owner action on the owning Bot's subject",
+    "The receipts-versus-summary invariant counted an unconfirmed receipt's usage in both sides; the confirmed receipts now reconcile with the spend total and the unconfirmed amount is asserted separately as unknown",
+    "A duplicate resolution attempt by another Bot was reported as an ownership refusal rather than a duplicate; the probe now asserts both the cross-Bot ownership refusal and the same-Bot duplicate refusal"
+  ],
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "defaultComposition": "passed",
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the default composition probe are pending; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "The managed CLI backend runs on a contract-level fixture session factory declared by the probe; no native codex executable is spawned and the real entry still needs an install-verified host decision (local codex-cli 0.157.1 cannot initialize its sqlite state in an isolated home)",
+    "The CLI facade admits through its own budget reservation plus the Bot grant; one shared Task/outbox admission transaction with the funding authority is still open",
+    "An evicted run folds its unknown into the archive and is no longer individually resolvable; the review must happen while the run is retained",
+    "No default user profile migration, Electron carrier, clean install, three-machine re-run or real model inference",
+    "The review UI is verified for rendering and gating; typing is not simulated in the jsdom harness because React is imported before the DOM is installed, so the resolve payload semantics stay covered by the real-host probe and the native suite"
+  ]
+}

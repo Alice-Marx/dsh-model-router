@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_task_journal_quarantine.json",
+  "actualModelCalls": 0,
+  "level": "architecture alignment with the read-only dsh-superagent research prototype; computed Task stage projection, no second workflow",
+  "componentAcceptance": "The read-only prototype's Trigger→Eval→Ticket→Assignment and Effects model is mapped to the existing request→admission→Task→attempt→outbox path without replacing frozen code. taskStage now exposes structured working/* and person/* states on real Task and Plan views, distinguishing reconciliation from failure. Four new tests pass, including a real journal queued→running→succeeded projection. check:client and all 26 documentation tests pass. Full two-part root regression totals 1932 tests, 1848 pass, 0 fail, 84 skipped.",
+  "productAcceptance": "No product scenario is advanced by this architecture slice. Source intake, real old-entry closure, migration activation and deployment acceptance remain open. Scores remain 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_superagent_alignment.md",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/task-stage.mjs": "37538d6574fb69687d829d7348e81626539eecd2",
+    "tests/task-stage.test.mjs": "7aa724a3119fb3f93483592d6da40267a431a901",
+    "packages/orchestration/src/task-journal.mjs": "edcff6623f4272f2d102f4b26db8aef5a02489d9",
+    "docs/integration/plan/20261031_superagent_alignment.md": "542fbf316aa26510493c3e2bb18f1e0f3e21f713",
+    "package.json": "d45de1971285131eae185d4f0ab4b3e1b249dc35"
+  },
+  "implementation": [
+    "The alignment contract maps immutable requests to admission, Task to attempt and outbox to Effects while preserving current idempotency, one-writer, after-commit, unknown and stopProof semantics.",
+    "taskStage computes working/queued, working, working/cancelling, working/budget, person/reconciliation, person/blocked, person/failed, person/review and idle. Unknown states throw TASK_STAGE_INVALID instead of appearing healthy.",
+    "Journal Task and Plan responses include the computed stage without a new database field or a second state machine. person/delivery and person/answer are not guessed without equivalent structured facts.",
+    "package.json#files includes task-stage.mjs so the published Host import closure remains complete."
+  ],
+  "testRuns": [
+    "Four task-stage tests pass: working states, human-attention states, terminal/invalid states and a real journal projection.",
+    "The first root run failed the published-file closure because task-journal imported the new module before package.json#files included it. The list was fixed and the complete rerun passes. This failure is preserved rather than rewritten as first-pass success.",
+    "check:client and all 26 documentation tests pass. The full two-part root run totals 1585+347=1932 tests, 1581+267=1848 pass, 0 fail, 4+80=84 skipped (tmp/integration/task-stage-e90-root-2.log)."
+  ],
+  "preservedFailures": [
+    "The initial published-file-list failure is retained and was fixed before final acceptance.",
+    "The research prototype is not treated as production-ready or as a new upstream baseline. No real Source event, model inference, production migration, commit, push or release was exercised."
+  ],
+  "limitations": [
+    "This is an architecture and projection slice, not a complete Source implementation or product migration capability.",
+    "W06.15 old-entry and all-domain closure, W12/W13 Source intake, real activation and production acceptance remain open."
+  ]
+}

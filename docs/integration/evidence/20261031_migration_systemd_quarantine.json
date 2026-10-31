@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_delegated_cgroup.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4, declared systemd-unit persistent restart fence with real Ubuntu Restart=always execution; W06.15 remains in_progress",
+  "componentAcceptance": "Ubuntu 24.04.4 / Node v22.22.1: a real transient Restart=always writer is first shown to restart after SIGKILL. Fragment-bound mask+stop then prevents further starts and heartbeat growth, coordinator SIGKILL leaves the mask effective, active release is refused, and fragment mismatch is refused before any state change. Three consecutive runs plus the final run each pass 4 tests with 1 non-Linux skip and no mask-link residue. Local related combination: 106 tests, 91 pass, 0 fail, 15 skipped. Root regression: 1915 tests, 1837 pass, 0 fail, 78 skipped.",
+  "productAcceptance": "None. Only explicitly listed and fingerprint-bound systemd units are covered. Other launchers, accounts, unknown writers, real old DS/SDK/MR entry points, full-domain stop-write, machine reboot and production migration remain unverified. externalRestartBlocked, persistentExternalExclusion and stopWriteProvable stay false; scores remain 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md section 6",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-systemd-quarantine.mjs": "d3e2d2b245f806979367ed2e3ccb1b9a9bef8bee",
+    "tests/migration-systemd-quarantine.native.mjs": "71f3aecae98a06e565833e15034af6834311cd50",
+    "tests/fixtures/migration-systemd-writer.mjs": "4e93e2c3f50a76ee3e529054fa62e27c25dd1b88",
+    "tests/fixtures/migration-systemd-quarantine-parent.mjs": "19a2e189b7e9afeeafe902deff49709f22f2cc68",
+    "docs/integration/plan/20261031_migration_os_quarantine.md": "051289202facdabd1b4c200c2af3c4d2afd60611",
+    "package.json": "f38adb69ba3ad16692bec930728134355ecbfc70"
+  },
+  "remoteSha256": {
+    "packages/orchestration/src/migration-systemd-quarantine.mjs": "7a0e62eb81f12943de13e5cf85ef993d34610a71a5eb32b208b921e6009ae156",
+    "tests/migration-systemd-quarantine.native.mjs": "6ec44630d426f0e0f767a0c0df22f4e515f57ac15b0003b02f85bc3ed4504d66"
+  },
+  "implementation": [
+    "Every unit is validated by name and fragment SHA-256 before any mask or stop. Quarantine masks first, verifies the /dev/null link directly, stops and waits for inactive, and never auto-unmasks after failure.",
+    "Transient systemctl is-enabled output is not used as mask proof because it can remain 'transient'. Mask state is read from /etc/systemd/system or /run/systemd/system links; is-active=4 after unload maps to inactive.",
+    "Receipts bind fragmentPath and fragmentSha256. When a transient fragment has been deleted, release allows the missing original only if no replacement exists in trusted standard paths; a replacement is rehashed and mismatches refuse.",
+    "Release requires masked plus inactive, never starts the old unit, and reports declaredRestartBlocked/persistentDeclaredExclusion only for receipt-listed units. All global external-exclusion and stop-write flags remain false."
+  ],
+  "testRuns": [
+    "Initial implementation failed mask verification because transient is-enabled did not become masked. A dedicated probe established the /dev/null link and post-stop start refusal, and mask verification was corrected to inspect that link directly.",
+    "Stopped transient units then produced is-active=4 and deleted fragment files. The adapter now handles unload state and carries fragmentPath plus digest in the quarantine receipt so release remains identity-bound without accepting replacements.",
+    "The active-release test initially assumed systemctl start would work after unmask, but a stopped transient definition no longer existed. The test now recreates the same unit before asserting MIGRATION_SYSTEMD_RELEASE_BLOCKED; this was a test correction, not a product bypass.",
+    "Final remote suite, three consecutive runs plus final: each 5 tests, 4 pass, 0 fail, 1 skip. The full test kills MainPID and observes a new PID before quarantine, then verifies start refusal and unchanged heartbeat. Logs: tmp/integration/migration-systemd-quarantine-e84/remote-final.log.",
+    "Final cleanup finds no dsh-e84 mask links. Remote and local SHA-256 match for the production module and test.",
+    "Local related combination: 106 tests, 91 pass, 0 fail, 15 skipped. check:client and all 26 documentation tests pass. Final npm test: 1915 tests, 1837 pass, 0 fail, 78 skipped (tmp/integration/migration-systemd-quarantine-e84/root-final.log)."
+  ],
+  "preservedFailures": [
+    "The transient is-enabled misread, is-active=4 handling gap, deleted-fragment release failure and incorrect active-test assumption are all retained as development evidence rather than hidden by the final green result.",
+    "Machine reboot was not performed. persistentDeclaredExclusion refers to the on-disk mask and declared unit identity, not a completed reboot acceptance test.",
+    "No real old DS/SDK/MR service, user profile, external non-systemd launcher or production process was touched."
+  ],
+  "limitations": [
+    "W06.15 remains in_progress. Real old entry points, other launchers/accounts, full write-handle closure, machine reboot and production acceptance remain open.",
+    "The adapter operates only on explicit unit names with matching fragments. It does not discover or claim a complete launcher closure.",
+    "Systemd mask is a launcher fence, not a filesystem or storage write fence and not a substitute for draining open handles."
+  ]
+}

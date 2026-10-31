@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-27",
+  "status": "passed-for-described-checks",
+  "actualModelCalls": 0,
+  "frozenDSCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "sourceFiles": 297,
+  "productChecks": {
+    "tests": 10,
+    "pass": 10,
+    "fail": 0,
+    "skipped": 0
+  },
+  "migratedDSChecks": {
+    "status": "passed",
+    "tests": 1062,
+    "pass": 1061,
+    "fail": 0,
+    "skipped": 1,
+    "source": {
+      "status": "passed",
+      "files": 297,
+      "frozenCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+    },
+    "actualModelCalls": 0,
+    "level": "migrated-upstream-unit-and-component-tests"
+  },
+  "hostChecks": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "checks": [
+      "Migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Migrated worker executes permitted MR routing in the same actual rc.3 host",
+      "Original DS Bot dispatch and result return survive migration",
+      "Fresh actual host reconstructs stable identity and accounting hook from persisted migrated Bot state"
+    ],
+    "first": {
+      "status": "passed",
+      "checks": [
+        "Migrated DS factory automatically binds two real SDK Agent objects to distinct stable Bots",
+        "Unified product factory hides ungranted old MR execution tools",
+        "Migrated runtime create/delete commits automatically grant and revoke current Session ownership",
+        "Versioned product projection reads actual persisted Bot model and explicitly blocks absent finance adapter",
+        "Real Bot model stream traverses the injected accounting decorator with trusted identity",
+        "Embedded DS updater cannot install a second plugin"
+      ],
+      "metered": [
+        {
+          "source": "bot-session",
+          "sessionId": "session-e3f5dd63-c8da-444f-a319-a51d34207680",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-e3f5dd63-c8da-444f-a319-a51d34207680",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-e3f5dd63-c8da-444f-a319-a51d34207680",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-57598aa4-b6f7-4aa9-a390-3d1909ee0e79",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-auxiliary",
+          "sessionId": "session-e3f5dd63-c8da-444f-a319-a51d34207680",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-57598aa4-b6f7-4aa9-a390-3d1909ee0e79",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-57598aa4-b6f7-4aa9-a390-3d1909ee0e79",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-e3f5dd63-c8da-444f-a319-a51d34207680",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-57598aa4-b6f7-4aa9-a390-3d1909ee0e79",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-e3f5dd63-c8da-444f-a319-a51d34207680",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        },
+        {
+          "source": "bot-session",
+          "sessionId": "session-e3f5dd63-c8da-444f-a319-a51d34207680",
+          "provider": "integration-gpt-fixture",
+          "model": "gpt-fixture",
+          "purpose": null
+        }
+      ],
+      "actualModelCalls": 0,
+      "lifecycle": {
+        "healthy": true,
+        "closed": false,
+        "revision": 18,
+        "bots": 2,
+        "activeSessions": 2,
+        "boundAgents": 2
+      }
+    },
+    "restored": {
+      "status": "passed",
+      "checks": [
+        "Migrated DS factory automatically binds two real SDK Agent objects to distinct stable Bots",
+        "Unified product factory hides ungranted old MR execution tools",
+        "Versioned product projection reads actual persisted Bot model and explicitly blocks absent finance adapter",
+        "Embedded DS updater cannot install a second plugin"
+      ],
+      "metered": [],
+      "actualModelCalls": 0,
+      "lifecycle": {
+        "healthy": true,
+        "closed": false,
+        "revision": 18,
+        "bots": 2,
+        "activeSessions": 2,
+        "boundAgents": 2
+      }
+    },
+    "source": {
+      "status": "passed",
+      "files": 297,
+      "frozenCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+    },
+    "sdkVersion": "0.2.1-rc.3",
+    "actualModelCalls": 0,
+    "limitations": [
+      "Offline diagnostic accounting decorator only, no monetary debit tested here",
+      "No Task/remote/OS worker or default user migration acceptance",
+      "Client bundle/component checks are separate from this host-only probe"
+    ]
+  },
+  "client": {
+    "loaderId": "@ljwei-stak/dsh-model-router",
+    "bytes": 2045678,
+    "sha256": "be2e1ddff9ccda717155105bf9e7cc3ea16837309686aff8a4fb657d5b747f7b",
+    "buildInputs": 118
+  },
+  "limits": [
+    "No monetary debit acceptance: host probe used an explicitly offline diagnostic accounting decorator.",
+    "Factory requires shared identity/policy/accounting; missing product services display blockers.",
+    "Client components and complete source bundle checked; full browser/Electron/keyboard/narrow viewport and default user migration remain to be verified.",
+    "No Task DAG, remote machine or OS isolation acceptance claimed by this product-composition evidence."
+  ],
+  "sourceVerification": {
+    "algorithm": [
+      "sha256",
+      "Git blob SHA-1"
+    ],
+    "files": 297,
+    "status": "passed",
+    "sourceManifestSha256": "057d7b0647566c777da58f4f595d0a372551124dacec47b9be47d5d2070f406b"
+  }
+}

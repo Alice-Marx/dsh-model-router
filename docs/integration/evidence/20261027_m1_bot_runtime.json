@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "migrated-product-source-and-actual-host-offline",
+  "sourceGitBlobs": {
+    "modules/bot-runtime/index.mjs": "8f7c9b83ac52f8ed444ffb05469f68a94db7a814",
+    "modules/bot-runtime/read-model.mjs": "8aafa7b51f13deb3a24333bde1cd32d406e2cbfc",
+    "modules/bot-runtime/SOURCE.json": "e832ba773abd7f849fb0064a7d7c77020d2c2d36",
+    "apps/integration-client/api.mjs": "25011cbf4dd5d2b579e52bd58f95f772281f2660",
+    "apps/integration-client/index.jsx": "85a643e350191881d9691ee8cd4dcb9638d8c25b",
+    "apps/integration-client/panels.jsx": "d89aa1d119abfe35ff26f1c09b214aa91d1d1aa0",
+    "apps/integration-client/client.js": "0a00fff15858d3fca5ede7bcc9b14c28ac685273",
+    "scripts/integration-product-source.mjs": "97193ff840a7b73938f9af661042c88b42db9f4f",
+    "scripts/integration-product-client.mjs": "5e1769dbbcadae267702ff9b6f6b1ea25f7d0370",
+    "scripts/integration-product-upstream-tests.mjs": "ff5eb8f79a8035c8d5a5206f982f3a9d844f73e9",
+    "scripts/integration-product-host.mjs": "1dd66360f9da8d6b35a3ad587db01389b3060c96",
+    "tests/bot-runtime-product.test.mjs": "b007e203f051e0d804f80ee0e73e3a891a65ccca",
+    "tests/bot-runtime-ui.test.mjs": "287899604a14e1e10995d55410d6eab834fc8d1a",
+    "tests/bot-runtime-host-plugin.mjs": "78d78ac5089bd445cc9b5bab23af4ce1aa3edee4",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "6ab18075ebc61fb273cff15629d76364f8576819",
+    "package.json": "5af8c1ecc4ad2cb53e3287b0308c0933a383d063",
+    ".github/workflows/ci.yml": "8646424a0ef80c601e4f5a182f1a42cd6fc752c3"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "vendorSource": {
+    "status": "passed",
+    "files": 297,
+    "check": "Every vendored file matches the frozen Git blob and SHA-256; no untracked vendor file exists",
+    "license": "Apache-2.0 preserved with UPSTREAM_LICENSE and UPSTREAM_NOTICE"
+  },
+  "productClientBundle": {
+    "status": "passed",
+    "bytes": 2045678,
+    "inputs": 118,
+    "check": "One loader factory carries the whole DS client surface plus the existing MR advanced panel; committed bundle equals a fresh build"
+  },
+  "migratedUpstreamSuite": {
+    "status": "passed",
+    "tests": 1062,
+    "pass": 1061,
+    "fail": 0,
+    "skipped": 1,
+    "level": "migrated-upstream-unit-and-component-tests",
+    "limitations": [
+      "Unit/component regression only; not whole-application or real-inference acceptance"
+    ]
+  },
+  "actualHostChecks": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "checks": [
+      "Migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Migrated worker executes permitted MR routing in the same actual rc.3 host",
+      "Original DS Bot dispatch and result return survive migration",
+      "Fresh actual host reconstructs stable identity and accounting hook from persisted migrated Bot state"
+    ],
+    "accountingDecorator": "Offline diagnostic decorator only; no monetary debit is tested here",
+    "limitations": [
+      "Product factory is composed through an isolated fixture plugin, not yet the shipped default .dsh-plugin entry",
+      "No default user profile migration, Task/remote/OS worker or full DAG acceptance",
+      "No Electron/Desktop carrier, real model inference or production deployment evidence"
+    ]
+  },
+  "rootSuite": {
+    "tests": 1329,
+    "pass": 1326,
+    "fail": 0,
+    "skipped": 3,
+    "newSuites": [
+      "tests/bot-runtime-product.test.mjs",
+      "tests/bot-runtime-ui.test.mjs",
+      "tests/cli-runtime-contract.test.mjs",
+      "tests/cli-runtime-renewal.test.mjs"
+    ]
+  },
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "vendorSource": "passed",
+      "productClient": "passed",
+      "migratedUpstreamSuite": "passed",
+      "actualHost": "passed",
+      "rootTests": {
+        "tests": 1329,
+        "pass": 1326,
+        "fail": 0,
+        "skipped": 3
+      },
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 three-machine runs remain in the parent checkpoints; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "Default product composition and configuration migration are not implemented; the factory is verified through an isolated fixture plugin in a real host",
+    "The migrated runtime keeps DS storage formats; unified Task/accounting integration for Bot sessions is partial (see the model-accounting checkpoint)",
+    "Electron ABI, Desktop carrier, Docker, clean install/upgrade and Release packaging are not covered",
+    "Group chat, memory, browser pane, voice, schedules and other DS surfaces passed the upstream unit/component suite but lack live-product acceptance"
+  ]
+}

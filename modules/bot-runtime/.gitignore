@@ -1,0 +1,2 @@
+# This frozen upstream file only configures engine/peer checks, no credentials.
+!vendor/ds-bot/.npmrc

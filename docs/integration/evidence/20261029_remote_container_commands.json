@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-29",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261029_migration_supporting_domains.json",
+  "level": "actual Linux Agent container command controller, independent different-UID deadline supervisor and seven native process deaths; three-platform regression",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "remote-computer-agent/src/container-command.ts": "b9be3472a1f61329be4dc4c8bd4d58da4f4ba563",
+    "remote-computer-agent/src/container-supervisor.mjs": "7abfb22f324c6236c4b449f94a25a200b3029fd3",
+    "remote-computer-agent/src/agent.ts": "9448413d3b10dba26af4c86ad3534d0018f35f50",
+    "remote-computer-agent/src/scope.ts": "919ee27648e8e765f4b94cc313b2f8448a40b848",
+    "remote-computer-agent/src/index.ts": "8dc5912412cf7ff04d5876847cd9a41772f0e476",
+    "remote-computer-agent/build.mjs": "b01f4bb563023b9c45c127ad525b10b98605b023",
+    "tests/remote-container.native.mjs": "9be521ad4b2e61c3e8fa5804a4ad9a67d0b58825",
+    "tests/fixtures/remote-container-crash.mjs": "42c19de0949f177623352c1aa6797b9aad2fcff4",
+    "scripts/integration-remote-container.mjs": "f3fd5346b39c415d5679e26f97febd09feb2cd5b",
+    "docs/integration/plan/20261029_remote_command_isolation.md": "f8d2e7dd81e3dd4fe1eb6abeba550fc04fbd401f",
+    "package.json": "d24f4867bd4ec59e0d606dbdd974f3c0abf9b2e5",
+    ".github/workflows/ci.yml": "f99e8fd21beb1611f52e67a20a95403ad928a25b"
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "root": {
+        "tests": 1687,
+        "pass": 1671,
+        "fail": 0,
+        "skipped": 16
+      },
+      "migration": {
+        "tests": 175,
+        "pass": 175,
+        "fail": 0,
+        "skipped": 0
+      },
+      "remoteWrite": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0
+      },
+      "agentChecks": 12,
+      "semanticHostChecks": 8,
+      "defaultProductChecks": 40,
+      "startupGateChecks": 7,
+      "financeChecks": 33,
+      "container": {
+        "status": "not-run-platform",
+        "platform": "win32",
+        "actualModelCalls": 0,
+        "reason": "Linux container gate only; Windows native tests exercise config guards and skip real containers"
+      }
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "root": {
+        "tests": 1687,
+        "pass": 1671,
+        "fail": 0,
+        "skipped": 16
+      },
+      "migration": {
+        "tests": 175,
+        "pass": 175,
+        "fail": 0,
+        "skipped": 0
+      },
+      "remoteWrite": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0
+      },
+      "agentChecks": 12,
+      "semanticHostChecks": 8,
+      "defaultProductChecks": 40,
+      "startupGateChecks": 7,
+      "financeChecks": 33,
+      "container": {
+        "status": "not-run-platform",
+        "platform": "win32",
+        "actualModelCalls": 0,
+        "reason": "Linux container gate only; Windows native tests exercise config guards and skip real containers"
+      }
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "root": {
+        "tests": 1687,
+        "pass": 1650,
+        "fail": 0,
+        "skipped": 37
+      },
+      "migration": {
+        "tests": 175,
+        "pass": 175,
+        "fail": 0,
+        "skipped": 0
+      },
+      "remoteWrite": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0
+      },
+      "agentChecks": 12,
+      "semanticHostChecks": 8,
+      "defaultProductChecks": 40,
+      "startupGateChecks": 7,
+      "financeChecks": 33,
+      "container": {
+        "tests": 24,
+        "pass": 24,
+        "fail": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "regression": {
+    "sourceSnapshot": {
+      "sourceFiles": 941,
+      "frozenFiles": 297,
+      "sha256": "eb4d4666f4f197f2d329ddf374e23186d34672981cbb3d63b2276249130e4217"
+    },
+    "sourceSnapshotPhase": "implementation/tests before E56 tracking updates",
+    "newRootCases": 17,
+    "newRootPlatformSkips": 13,
+    "actualLinuxContainerChecks": 24,
+    "actualAgentProcessDeaths": 7,
+    "rootChecksPerPlatform": 1687,
+    "client": {
+      "bytes": 2061889,
+      "status": "unchanged actual bundle and product byte checks pass on all three"
+    },
+    "strictDependencies": "pinned pnpm10.34.6 frozen/strict passed without dependency upgrade",
+    "fixedImage": "node@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d",
+    "frozenVendor": {
+      "files": 297,
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "status": "passed"
+    },
+    "tlsFixtureRefresh": {
+      "folder": "tmp/integration/auth-20261028/tls-container-fresh-20261029",
+      "oldValidTo": "Oct 29 08:32:48 2026 GMT",
+      "newValidTo": "Oct 30 12:01:43 2026 GMT",
+      "generatedAt": "2026-10-29T12:01:43.871Z",
+      "fixtureOnly": true,
+      "verificationDisabled": false
+    },
+    "initialFindings": [
+      "Initial Windows roots failed2 TLS cases because their synthetic server/client certificates expired. Fresh isolated fixtures are signed and verified, then both Windows roots rerun; no certificate verification is disabled; the original logs are retained",
+      "Early cold-receipt fixture queried the public status API and correctly recovered its own unknown before asserting it; the fixture now observes its stored interruption before reopening",
+      "Actual Docker normalizes added capability names with CAP_ prefix; exact two-capability verification now normalizes that spelling without accepting any additional capability",
+      "A different-UID supervisor intentionally has no CAP_KILL. The deadline check found that a child.kill permission error could replace exit124 with126; supervisor now exits namespace PID1 directly, which tears down descendants",
+      "A separate direct-source test builder lacked the main bundler text loader. Supervisor source is now emitted from one self-contained canonical function and all builders use ordinary module imports; actual cold/deadline proof is rerun on that final source"
+    ]
+  },
+  "observed": [
+    "An explicit Linux container-only Agent configuration uses owner-selected fixed executable aliases and the preloaded frozen amd64 image. Native executable/shell fields must be empty; missing/invalid container configuration refuses rather than downgrading to native commands. machine_ping separates a configured label from the actual command controller/dependency state",
+    "Only the admitted workspace and hash-verified readonly public supervisor code are bound; Agent data/credentials and the Docker socket are not mounted. Root filesystem is readonly, network none, no-new-privileges enabled, and pids/memory/CPU/tmpfs/log storage/returned output bounded. A bounded recursive scan rejects protected-control aliases/hardlinks and symbolic/special entries before mounting",
+    "Trusted container PID1 has only SETUID/SETGID, clears supplementary groups and spawns caller programs as65532:65532 with a clean environment and zero effective capabilities. The different-UID child cannot SIGSTOP its supervisor. A fixed absolute deadline is bounded by the original grant and command timeout; it survives Agent death. PID1 exit tears down descendants without granting CAP_KILL",
+    "Original operation/name/unpredictable label/workspace/input digest and create/start phases are persisted before Docker actions. Actual immutable ID and ownership/image/user/cap/network/readonly/mount policy are checked before observation/stop/removal. Docker client exit alone does not establish process termination",
+    "Durable original-container observation never creates/starts a replacement. Known pre-start records terminate without effects; missing/unreachable or unrecognized objects after start stay unknown. Receipt and worker phase commit together before cleanup. A per-operation control queue and bounded fair sweep reconcile orphaned workers, stop invalid tickets and recover cleanup without rewriting an already terminal result",
+    "Actual Agent HTTP/MCP checks verify Unicode/newline argv, original operation replay/conflict, nonzero exit and existing effects, timeout descendants/no late writes, explicit cancel/revoke, bounded tail artifacts, Agent-control hardlink refusal and foreign-label refusal. Tail output is always declared possibly truncated instead of pretending to be the complete transcript",
+    "Seven actual Agent process deaths cover prepared/create/start intent, before/after native SQLite receipt commit, active execution and deadline while Agent stays down. Cold recovery retains one original worker/operation, never duplicates its file counter, confirms stop before cancellation and releases only the exact owned stopped container"
+  ],
+  "limitations": [
+    "This delivers the explicitly configured Agent Linux container controller, not the complete model-facing command Task facade. Bot shell tools remain unavailable. Full root/workspace ownership/locking/pinning, latest grant/config binding and every Git/native executable entry must be covered before enabling that facade",
+    "A bounded admission-tree scan is not descriptor/mount pinning against arbitrary concurrent host subtree replacement. Existing workspace permissions must allow65532; no user permission/ownership changes are silently applied. Full OS/file race acceptance remains partial",
+    "Windows Job Objects are process-lifetime controls, not private-state read isolation. This phase makes no Windows container/account/AppContainer claim. The real container checks run on Ubuntu only; Windows records explicit platform skips",
+    "Docker daemon, host administrator, immutable image and fixed trusted supervisor remain trusted. PID1 has only SETUID/SETGID to drop the child identity; the untrusted program is verified non-root with zero effective capabilities",
+    "Receipts/output are bounded and persisted tail logs may omit earlier text. Lost output/control remains unknown. General remote binary transfer/artifacts, browser/desktop Task adapters and native CLI write isolation remain independent work",
+    "Cold recovery here is same-build recovery, not upgrade/migration acceptance across supervisor generations. Upgrades must settle workers or retain/verify their original controller generation; the public installer/rollback flow is unfinished",
+    "Source/test matrix reuses existing isolated dependencies and preloaded Docker image. No image pull, personal desktop/capture/config change, production service install, real model request, Git commit/push or npm publication occurred",
+    "E53 original default-consult timeout remains unresolved. Full master-plan acceptance still0/20 packages,1passed/52partial/10not_run and M0 11/12; completion-dependent GitHub/npm authorization persists"
+  ]
+}

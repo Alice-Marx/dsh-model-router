@@ -49,6 +49,13 @@ async function harnessLikeContext({ withCredentials = true } = {}) {
     typert: { register() { return () => {} } },
     sandboxPolicy: { resolve: () => null },
     sandbox: {},
+    // DS Bot runtime services, merged into the one plugin entry's inject.
+    systemPrompt: {},
+    sessionController: { resolveAgent: async () => ({}), prompt: async () => {}, create: async () => ({}) },
+    sessions: { flush: async () => {} },
+    sessionTitle: {},
+    workspaceRegistry: {},
+    connection: { fetch: { register: () => () => {} }, admit: () => ({ rejection: 401 }) },
     ...(withCredentials ? { credentials: { describe: async () => ({ configured: false }) } } : {}),
   }
   for (const [name, value] of Object.entries(services)) {

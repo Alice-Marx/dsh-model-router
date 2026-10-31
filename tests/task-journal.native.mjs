@@ -85,6 +85,21 @@ test('journal/native: claiming an expired task does not dispatch it; retries can
   assert.equal(j.get('bot-a',a.taskId).result.notStarted,true)
   assert.throws(()=>j.retry(f,'bot-a',a.taskId,'retry','h',12),/TASK_DEADLINE/)
 })
+test('journal/native: unattended budget waiting expires at the total deadline without another attempt',async t=>{
+  const {j,f}=await store(t),a=j.submit(f,'bot-a','budget','hash',payload,500,1)
+  j.claim(f,'bot-a',a.taskId,2)
+  j.finish(f,'bot-a',a.taskId,a.attemptId,'waiting-budget',{code:'MR_WAITING_BUDGET',notStarted:true},3)
+  assert.equal(j.get('bot-a',a.taskId).state,'waiting-budget')
+  assert.equal(j.expire(f,499),0)
+  assert.equal(j.get('bot-a',a.taskId).state,'waiting-budget')
+  assert.equal(j.expire(f,500),1)
+  const expired=j.get('bot-a',a.taskId)
+  assert.equal(expired.state,'failed');assert.equal(expired.result.code,'BUDGET_WAIT_EXPIRED');assert.equal(expired.result.notStarted,true)
+  assert.equal(expired.attempts.length,1);assert.equal(expired.attempts[0].state,'failed')
+  assert.ok(j.events('bot-a',a.taskId).some(e=>e.kind==='budget-wait-expired'))
+  assert.equal(j.expire(f,501),0)
+  assert.throws(()=>j.retry(f,'bot-a',a.taskId,'retry','h',502),/TASK_DEADLINE/)
+})
 test('journal/native: a conflicting legacy-run owner rolls the whole completion transaction back',async t=>{
   const {j,f}=await store(t),a=j.submit(f,'bot-a','a','h',payload,1000,1),b=j.submit(f,'bot-b','b','h',payload,1000,1)
   j.claim(f,'bot-a',a.taskId,2);j.finish(f,'bot-a',a.taskId,a.attemptId,'failed',{legacyRunId:'same-run'},3)
@@ -129,7 +144,7 @@ async function managed(t,run,options={}) {
   const journal=openTaskJournal(Database,await fresh()),authority=createAuthority(),directory=createPrincipalDirectory(authority)
   for(const id of ['bot-a','bot-b'])directory.register(id,{tools:caps,modelRoutes:[{provider:'fixture',model:'gpt-test'}]})
   const parse=input=>{if(!input||Object.keys(input).some(key=>key!=='text')||typeof input.text!=='string')throw new Error('invalid fixture input');return {text:input.text}}
-  const service=createTaskService({journal,authority,directory,runnerTtlMs:1000,taskTtlMs:4000,backends:[{id:'read',version:'v1',effect:'read',machineId:'machine',workspaceId:'workspace',location:'local',capability:'execution/read',retryCapability:'execution/retry',model:{provider:'fixture',model:'gpt-test'},parse,run,...(options.reconcile?{reconcile:options.reconcile,reconcileCapability:'execution/observe'}:{})}]})
+  const service=createTaskService({journal,authority,directory,runnerTtlMs:options.runnerTtlMs??1000,taskTtlMs:options.taskTtlMs??4000,executionLeaseMs:options.executionLeaseMs??30000,backends:[{id:'read',version:'v1',effect:'read',machineId:'machine',workspaceId:'workspace',location:'local',capability:'execution/read',retryCapability:'execution/retry',model:{provider:'fixture',model:'gpt-test'},parse,run,...(options.reconcile?{reconcile:options.reconcile,reconcileCapability:'execution/observe'}:{})}]})
   service.start();t.after(async()=>{await service.close();authority.dispose()})
   return {service,journal,authority,directory,a:directory.forBot('bot-a'),b:directory.forBot('bot-b')}
 }
@@ -259,9 +274,9 @@ test('journal/native: schema1 rows migrate intact to schema2; a future schema is
   const task=first.submit(f,'bot-a','old','h',payload,5000,0);first.close()
   const raw=new Database(path);raw.exec('DROP TABLE task_reconciliations; DROP TABLE task_execution_refs; PRAGMA user_version=1;');raw.close()
   const migrated=openTaskJournal(Database,path);assert.equal(migrated.get('bot-a',task.taskId).operationId,task.operationId);assert.equal(migrated.get('bot-a',task.taskId).executionRef,null);migrated.close()
-  const next=new Database(path);assert.equal(next.pragma('user_version',{simple:true}),2);next.pragma('user_version=3');next.close()
+  const next=new Database(path);assert.equal(next.pragma('user_version',{simple:true}),5);next.pragma('user_version=6');next.close()
   assert.throws(()=>openTaskJournal(Database,path),/TASK_SCHEMA_UNSUPPORTED/)
-  const check=new Database(path);assert.equal(check.pragma('user_version',{simple:true}),3);check.close()
+  const check=new Database(path);assert.equal(check.pragma('user_version',{simple:true}),6);check.close()
 })
 test('service/native: live subject owns read-only reconciliation; known evidence unblocks without executing another attempt',async t=>{
   let queries=0,outcome='unknown',dispatches=0
@@ -297,4 +312,28 @@ test('service/native: budget admission waits without auto retry, supports cancel
   const other=service.submit(a,{requestKey:'cancel-budget',backend:'read',input:{text:'budget'}})
   await wait(()=>service.get(a,{taskId:other.taskId}).state==='waiting-budget')
   assert.equal(service.cancel(a,{taskId:other.taskId}).state,'cancelled');assert.equal(calls,3)
+})
+test('service/native: unattended budget waiting expires at the task deadline through the runner sweep',async t=>{
+  let calls=0
+  const {service,a}=await managed(t,async({attemptNumber})=>{calls++;return {outcome:attemptNumber===1?'waiting-budget':'succeeded',summary:{notStarted:attemptNumber===1}}},{runnerTtlMs:500,taskTtlMs:700})
+  const task=service.submit(a,{requestKey:'expire-budget',backend:'read',input:{text:'budget'}})
+  await wait(()=>service.get(a,{taskId:task.taskId}).state==='waiting-budget');assert.equal(calls,1)
+  await wait(()=>service.get(a,{taskId:task.taskId}).state==='failed')
+  const expired=service.get(a,{taskId:task.taskId})
+  assert.equal(expired.result.code,'BUDGET_WAIT_EXPIRED');assert.equal(expired.attempts.length,1);assert.equal(calls,1)
+  await assert.rejects(async()=>service.retry(a,{taskId:task.taskId,requestKey:'after-expiry'}),/TASK_DEADLINE/)
+})
+test('service/native: a long deadline keeps renewing short execution leases while a later grant revoke still cancels',async t=>{
+  let entered=false
+  const {service,a,directory}=await managed(t,async({input,signal})=>{
+    if(input.text==='first'){await new Promise(resolve=>setTimeout(resolve,800));signal.throwIfAborted();return {outcome:'succeeded'}}
+    entered=true;await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));return {outcome:'cancelled'}
+  },{executionLeaseMs:250,taskTtlMs:7200000})
+  const first=service.submit(a,{requestKey:'long',backend:'read',input:{text:'first'}})
+  assert.equal(first.deadlineAt-first.createdAt,7200000)
+  await wait(()=>service.get(a,{taskId:first.taskId}).state==='succeeded')
+  const second=service.submit(a,{requestKey:'revoke-renewed',backend:'read',input:{text:'second'}})
+  await wait(()=>entered);await new Promise(resolve=>setTimeout(resolve,400))
+  directory.replaceGrant('bot-a',{tools:['task/read'],modelRoutes:[]})
+  await wait(()=>service.get(a,{taskId:second.taskId}).state==='cancelled')
 })

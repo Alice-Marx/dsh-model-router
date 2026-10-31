@@ -21,6 +21,13 @@ async function mountedRouter(t, initial = {}) {
     typert: { register: () => () => {} },
     sandboxPolicy: {},
     sandbox: {},
+    // DS Bot runtime services, merged into the one plugin entry's inject.
+    systemPrompt: {},
+    sessionController: { resolveAgent: async () => ({}), prompt: async () => {}, create: async () => ({}) },
+    sessions: { flush: async () => {} },
+    sessionTitle: {},
+    workspaceRegistry: {},
+    connection: { fetch: { register: () => () => {} }, admit: () => ({ rejection: 401 }) },
   }
   for (const [name, service] of Object.entries(services)) root.provide(name, service)
   const loaderFiber = root.plugin(Loader)
@@ -34,7 +41,9 @@ async function mountedRouter(t, initial = {}) {
       host.apply(ctx, config)
     },
   }
-  await root.loader.create({ id: 'router', name: 'cordis:router', config: initial })
+  // This suite covers install settings; the unified Bot product composition is
+  // verified by scripts/integration-product-default.mjs.
+  await root.loader.create({ id: 'router', name: 'cordis:router', config: { botProduct: false, ...initial } })
   await root.loader.await()
   const entry = root.loader.resolve('router')
   assert.equal(entry.fiber?.state, 2, 'real Loader activated the router plugin')

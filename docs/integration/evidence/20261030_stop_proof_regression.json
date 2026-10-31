@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-30",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261030_bound_stop_proof.json",
+  "level": "automatic root and CI registration of the existing bound stop-proof native suite",
+  "componentAcceptance": "verified within the stated scope",
+  "productAcceptance": "partial",
+  "sourceGitBlobs": {
+    "package.json": "cd5d209bd997ca6cec263b9f5b914b2e33145455",
+    ".github/workflows/ci.yml": "1969f75a14dee829f007cde56ed351932db0a65c",
+    "docs/integration/plan/20261030_stop_proof_regression.md": "e4d6e80233fd51285873fdb5fe34219807013ee5",
+    "tests/task-retry-stop-evidence.native.mjs": "7352998d606fbeef2f2439ee405075e12d43ef93",
+    "tests/cli-native-peer-job.native.mjs": "873e79db8b7c3145b9905c851ff9d3b471e83270"
+  },
+  "changes": [
+    "Register the existing eleven task-retry-stop-evidence checks in the root npm test command and in Windows/Ubuntu CI.",
+    "Remove the duplicate unconditioned CLI native-peer CI step while retaining the Windows-only Job/probe step.",
+    "Raise only the CLI fixture waitControl timeout from the native-process default15s to45s after full-suite load produced two additional control-frame timeouts; no product assertion or implementation changes."
+  ],
+  "validation": {
+    "focusedStopProofSuites": { "tests": 59, "pass": 59, "fail": 0, "skipped": 0 },
+    "ciAndPackageClosureChecks": { "tests": 6, "pass": 6, "fail": 0, "skipped": 0 },
+    "cliNativePeerAndProbeAfterTimingAdjustment": { "tests": 13, "pass": 13, "fail": 0, "skipped": 0 },
+    "rootAfterRegistrationBeforeIndependentFixes": { "tests": 1774, "pass": 1749, "fail": 3, "skipped": 22 }
+  },
+  "rootFailureWitness": [
+    "The known workspace-agent cancellation case still returned possiblyApplied:true where the pre-publication path should report false; it is fixed separately in the write-cancel-effects evidence.",
+    "Two CLI native-peer cases exceeded the prior15s control-frame wait under full-suite load. Focused13/13 passed after the bounded fixture wait was raised to45s; test timing is not presented as a product semantic fix."
+  ],
+  "observed": [
+    "The root manifest now contains task-retry-stop-evidence.native.mjs, so the eleven E64 provenance and retry-fence checks are no longer manual-only.",
+    "CI runs the same stop-proof file directly on both operating-system jobs; the existing operation-cancel and other stop-proof regressions remain registered.",
+    "All six E64 focused suites still aggregate59/59 and CI/package closure checks pass6/6 after registration."
+  ],
+  "limitations": [
+    "This is test/CI registration and fixture timing hardening, not new product behavior or evidence that every root case passed at this checkpoint.",
+    "The workspace cancellation no-effects failure and final full-root result are recorded separately rather than hidden by this component.",
+    "Overall product scenarios, work packages, real inference, remote deployment and release readiness remain unchanged and incomplete."
+  ]
+}

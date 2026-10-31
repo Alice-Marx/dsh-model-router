@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "actualModelCalls": 0,
+  "parentEvidence": "docs/integration/evidence/20261031_migration_fence.json",
+  "level": "stop-fence design slice 3: private owner-only read-only latest-rollback readiness diagnostic",
+  "componentAcceptance": "verified offline on three platforms with synthetic journal/router databases and a real ledger archive",
+  "productAcceptance": "diagnostic only: it changes no byte, relaxes no money rollback guard, and postActivationRollbackSupported stays false",
+  "design": "docs/integration/plan/20261030_migration_stop_fence.md (section 6, slice 3; section 5 rollback contract)",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-rollback-readiness.mjs": "b0b317371cc575a3a8d897e78cf6da86713503e0",
+    "tests/migration-rollback-readiness.native.mjs": "a6aaba739575634e0c88a7d98fa4bd45278427cb",
+    "package.json": "07ae7c0b8d2380d9ea6d3fd43e635cf9ec354330"
+  },
+  "implementation": [
+    "Opens both databases read-only (query_only) and answers one question: may the LATEST new-generation data be handed back right now? Active tasks (ready/admitting/running/cancelling/waiting-budget), unknown outcomes (needs-reconciliation), retryable blocked tasks and skipped entries whose attempt provably started are blockers with bounded ids; a skipped entry is advisory only when its own attempt never started (started_ms null plus notStarted evidence).",
+    "Open holds, unsettled operations and an undelivered outbox block; nothing is ever auto-turned into success or released.",
+    "Backup binding: the ledger archive must verify, and the archive's full private export document must equal the live export of the current router database — the verifier's redacted summary deliberately omits digests, so the binding compares the private export itself; a mismatch or post-archive mutation answers BACKUP_BINDING_STALE, a missing or invalid archive MIGRATION_READINESS_BACKUP_BINDING_INVALID.",
+    "The result always carries postActivationRollbackSupported:false and moneyRollbackGuardUntouched:true; the existing sqlite-router-state rollback() guards are untouched."
+  ],
+  "platforms": [
+    { "platform": "Ubuntu 24.04 / Node v22.22.1", "tests": "6/6 pass, 0 fail, exit 0", "logSha256": "51dc61ffbd30d5cfbb4586db54ff913d0451da82633d6e5ad37613b5ae8c0a91", "rawLog": "tmp/integration/step-rollback-readiness/output/linux-rollback-readiness-raw.log" },
+    { "platform": "Win10 10.0.19044 / Node v24.18.0", "tests": "6/6 pass, 0 fail, exit 0", "logSha256": "cff91fa87c38655dbe845f68f2b1f6d3a261fd6582a85738746ae3b450ae229c", "rawLog": "tmp/integration/step-rollback-readiness/output/win10-rollback-readiness-raw.log" },
+    { "platform": "Win11 / Node v24.20.0", "rootRegression": "1850 tests, 1782 pass, 0 fail, 68 skipped, exit 0 (log: tmp/integration/rollback-readiness-root-regression.log); the suite is registered in npm test and Windows/Ubuntu CI" }
+  ],
+  "preservedFailures": [
+    "Development findings, all reproduced and fixed: the archive refuses an output directory under the source database (the fixture now uses separate data/archive roots); the ledger verifier returns a redacted summary without digests, so the live binding was redesigned to compare the archive's full private export document; two fixture defects (a wrong placeholder count and a Windows-absolute test path) were corrected. The first Ubuntu run failed at module load because the fixture lacked the ledger-export dependency closure; the closure was uploaded and the run rerun to green."
+  ],
+  "limitations": [
+    "Readiness means no blocking state was observed at diagnosis time — it is not a stop-write or activation proof and does not verify external side effects.",
+    "The binding covers the router ledger archive; the wider cross-domain capture (sessions, memory, attachments, usage) binds through the existing archive family and remains part of slice 5 orchestration.",
+    "OS isolation adapters (slice 4), recoverable commit orchestration and activation (slice 5), and any relaxation for not-started blocked/skipped entries remain open; the money rollback guard is deliberately untouched."
+  ]
+}

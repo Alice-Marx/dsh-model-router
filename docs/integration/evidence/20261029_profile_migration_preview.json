@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-29",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261028_runtime_config_search.json",
+  "level": "read-only configuration planning and selected-tree inventory; offline fixtures on three actual OS machines",
+  "actualModelCalls": 0,
+  "externalSearchCalls": 0,
+  "sourceGitBlobs": {
+    "packages/orchestration/src/profile-migration-plan.mjs": "09d74fb853dfcc2c1655c703ec8694f77011a6d5",
+    "packages/orchestration/src/migration-snapshot.mjs": "cd12f2cbac62c8bc78a9adafb56b6ab8f4089a71",
+    "scripts/integration-migrate-profile.mjs": "86e27b6b95b9fbe7ccb10cd23b4e70784c59cd1a",
+    "tests/profile-migration-plan.test.mjs": "f3cac9f239389befb556a68e39ad6e6b5fa1e1a2",
+    "tests/migration-snapshot.test.mjs": "2639430dde9420e1bb87d13ef869b61b45c104dd",
+    "tests/migration-preview-cli.test.mjs": "0a58197240d11e7305045339513767c503d3520c",
+    "package.json": "dcd98278a0eec4b32f34d4b47d3d92b1a6ae0e8a",
+    "pnpm-lock.yaml": "35cc6be51f979868a36b8527ef369aa7cee8e811",
+    ".github/workflows/ci.yml": "024a75ea244c269efaec59c03a2cefafbb34d777",
+    "docs/integration/plan/20261028_profile_data_migration.md": "f4c3d32aa1f8cfc45a8e5fa779286627d40dee67",
+    "docs/integration/plan/20261028_migration_inventory.md": "f59e3040ef7bccd8c3c64969c4666f91ec56edf3"
+  },
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "dedicated": {
+        "tests": 51,
+        "pass": 51,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1530,
+        "pass": 1527,
+        "fail": 0,
+        "skipped": 3
+      }
+    },
+    {
+      "alias": "win10",
+      "node": "v24.18.0",
+      "dedicated": {
+        "tests": 51,
+        "pass": 51,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1530,
+        "pass": 1527,
+        "fail": 0,
+        "skipped": 3
+      }
+    },
+    {
+      "alias": "ubuntu",
+      "node": "v22.22.1",
+      "dedicated": {
+        "tests": 51,
+        "pass": 51,
+        "fail": 0,
+        "skipped": 0
+      },
+      "root": {
+        "tests": 1530,
+        "pass": 1506,
+        "fail": 0,
+        "skipped": 24
+      }
+    }
+  ],
+  "regression": {
+    "sourceSnapshot": {
+      "sourceFiles": 896,
+      "frozenFiles": 297,
+      "sha256": "c5fecce924120a0a7c958b0ae110d0ce8eac5a6ee4f7788cd50c9e1b38f32a90"
+    },
+    "strictDependencies": "passed using pinned pnpm10.34.6 with a task-local Corepack cache; frozen lockfile and strict peers, no dependency changes",
+    "client": "actual --check passed on three platforms",
+    "priorRuntimeEvidence": "E45/E46/E47 retained unchanged; no new actual GUI/default Host/finance run claimed",
+    "dependencies": "existing isolated dependencies reused; not a clean installation"
+  },
+  "interfaces": {
+    "command": "npm run integration:migrate-profile -- --request <owner-selected-json> [--private-output <new-absolute-directory>]",
+    "configurationTests": 29,
+    "inventoryTests": 14,
+    "cliTests": 8,
+    "intents": [
+      "migration",
+      "install-unified-product"
+    ],
+    "applySupported": false,
+    "consistentSnapshot": false,
+    "requiresStopProof": true
+  },
+  "observed": [
+    "Pure actual rc.3 SDK composition preserves config whole-replacement, name assertions, home/launcher order, relative plugin anchoring, raw DS paths, disabled ancestry, search provider and existing MR options; no loadProfile writer or plugin import",
+    "YAML expressions remain AST data; unrelated dynamic disabled rows are proven unchanged; target/ancestor dynamic states, includes, unsupported entries and missing launch context block explicitly",
+    "Explicit new-install intent accepts only a source without DS/MR entries; orphan MR patches use actual final composition and emit a review warning; existing product cannot be reinterpreted as empty installation",
+    "Bounded descriptor-based source snapshots detect byte/identity drift and a previously absent patch appearing; selected data trees retain every regular file and empty directory, reject links/special files/overlap, stream hashes and enforce limits/cancellation",
+    "CLI emits only strict redacted summaries; private full plan is written only to a new external directory after current-user-only Windows ACL or Unix0700, then fsync/readback and source reverification; existing output and overlapping/junction destinations are refused",
+    "Owner-selected desktop preview was completed privately after the owner confirmed manually removing the old MR entry; the uninstall was preserved. No private profile bytes, paths, data identities or credentials are included in this evidence"
+  ],
+  "fixes": [
+    "Used SDK internal YAML expression dialect: exported LOADER_EXPRESSION_SCHEMA is JSON Schema metadata, not a js-yaml schema instance",
+    "Unchanged unrelated dynamic disabled conditions no longer incorrectly block a preview; target dynamic conditions remain guarded and throw sentinels prove no evaluation",
+    "An observed manual bundle removal was detected as BUNDLE_ORDER_MISMATCH; refreshed only the read-only request, never restored the removed bundle",
+    "Added explicit install intent and preserved reactivated orphan MR settings instead of overwriting them with empty settings",
+    "Windows ACL fixture uses .NET Directory.GetAccessControl instead of relying on Get-Acl module autoload",
+    "Machine Corepack cache became unreadable; fallback pnpm11 refused modules removal and was not forced. Switched to an isolated cache with pinned pnpm10.34.6; frozen/strict install passed unchanged"
+  ],
+  "limitations": [
+    "Read-only preview is not a completed migration, installer, stopped-writer proof, consistent database backup or activation; full approved32R/40F/63T/20package scope remains",
+    "Only explicitly selected data trees are inventoried; complete references, all shared profiles/launchers, data identities, usage/money and full Task/plan/operation/receipt export require further reconciliation",
+    "No backup/apply/recovery/rollback/generation move/binding wizard/global-budget compatibility is implemented by this preview",
+    "The repository CLI/modules are development tools and are not yet wired into a shipped installer or added to npm exports/files; target artifact verification remains required",
+    "Real user preview is private and was not transferred to test machines, Git/npm, public evidence or model inputs; there was no real profile/data write or plugin installation",
+    "Three-platform fixtures reuse dependencies, not clean install or production/desktop state/DPI acceptance",
+    "This checkpoint made zero new real model/search requests; earlier historical real CLI timeout and unknown spend remain unknown",
+    "No commit/push/tag/GitHub Release/npm publication; conditional full-completion release authorization persists"
+  ]
+}

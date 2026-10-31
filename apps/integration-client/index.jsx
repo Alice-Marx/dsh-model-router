@@ -1,0 +1,44 @@
+import React from 'react'
+import { apply as applyDs, inject as dsInject } from '../../modules/bot-runtime/vendor/ds-bot/src/client/index.js'
+import { TeamSidebar } from '../../modules/bot-runtime/vendor/ds-bot/src/client/sidebar.js'
+import { apply as applyMr } from '../../.dsh-plugin/client/official-harness.jsx'
+import { createProductApi, PRODUCT_PANELS } from './api.mjs'
+import { ProductNavigation, ProductPage } from './panels.jsx'
+import css from './product.css'
+
+export const inject = [...new Set([...dsInject, 'remote'])]
+export { ProductPage, ProductNavigation, PRODUCT_PANELS }
+
+/** Add navigation through a public slot wrapper; vendored DS files stay exact. */
+export function productSlots(slots, openPanel) {
+  return new Proxy(slots, { get(target, key) {
+    if (key === 'register') return (options, component) => {
+      if (component !== TeamSidebar) return target.register(options, component)
+      const Sidebar = props => <div className="bp-sidebar"><TeamSidebar {...props} /><ProductNavigation panels={PRODUCT_PANELS} openPanel={openPanel} compact={!props.wide} /></div>
+      return target.register(options, Sidebar)
+    }
+    const value = Reflect.get(target, key, target)
+    return typeof value === 'function' ? value.bind(target) : value
+  } })
+}
+
+export async function apply(ctx) {
+  const api = createProductApi()
+  const openPanel = id => ctx.layout.selectPanel(id)
+  const slots = productSlots(ctx.slots, openPanel)
+  const dsContext = new Proxy(ctx, { get: (target, key) => key === 'slots' ? slots : Reflect.get(target, key, target) })
+  ctx.effect(() => {
+    const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = css; document.head.append(style)
+    return () => style.remove()
+  }, 'bot-product: styles')
+  applyDs(dsContext)
+  const disposeMr = await applyMr(ctx)
+  for (const [section, key] of Object.entries(PRODUCT_PANELS)) {
+    ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key,
+      inject: () => ({ section, productApi: api, openPanel,
+        openSession: id => ctx.uiWorkspace.openSession(id),
+      }),
+    }, ProductPage)), `bot-product: ${section}`)
+  }
+  return disposeMr
+}

@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-27",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "level": "actual-host-offline-default-composition",
+  "sourceGitBlobs": {
+    ".dsh-plugin/index.mjs": "ffd1face80bfac8a76a0325bf9e2bf92995bdeb7",
+    "packages/orchestration/src/product-composition.mjs": "ec477210073559b5899f770bc3de1e13f047fd85",
+    "packages/orchestration/src/model-accounting.mjs": "7f9140f89a6785eb1837658ab498ceb9b8a2b02c",
+    "packages/orchestration/src/bot-settings.mjs": "8e3dcfd2e6a803c268345ee67ddc444ce62f80cc",
+    "packages/orchestration/src/funding-accounts.mjs": "800d6e36861016867331e35c850abb684a355194",
+    "packages/orchestration/src/model-receipt.mjs": "b996c811872581d06223829fd6cf70d0e7e7b075",
+    "packages/orchestration/src/product-funding.mjs": "bed7759b35efbace2f812fd84a6f1f23037f7534",
+    "packages/orchestration/src/funded-router-state.mjs": "7e175f909ec6d2041ca7b40bd85289cd26a2096a",
+    "modules/bot-runtime/read-model.mjs": "59bc022eeddb4ec90bfdfa430d2957cd0a8e8a72",
+    "scripts/integration-product-default.mjs": "c75d0910950975959a5f0081e06faeb04741f793",
+    "tests/model-accounting.native.mjs": "37f0a74702497329bebee2107b5dc66c63f2b86b",
+    "package.json": "3ffd30b8f48b98832f05220fe44deb9003b21cc8"
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "actualModelCalls": 0,
+  "feature": "N06b: the default product's Bot model calls now run the unified admission — grants compile from committed Bot bindings, funding scopes come from the owner-configured accounts, and every call settles one receipt in the single SQLite authority",
+  "changes": {
+    "grants": "grantFor delegates to botSettings.grantFor(): an unconfigured, mismatched or incomplete binding grants no model authority; the settings catalog exposes the model-inference and mr-routing capabilities plus a local machine entry so an enabled binding is possible",
+    "publication": "onCommitted publishes the compiled grant to the directory immediately and onSuspended revokes it; a funding-account change re-evaluates every binding because the scope catalog follows it",
+    "admission": "bindingFunding maps the binding to the accounting policy (API pricing/request bounds/budgets plus the account limits, or subscription call quotas); the shared store is the SQLite authority; the accountStream switches from the diagnostic decorator to model-accounting",
+    "vocabulary": "The Bot runtime reports bot-session/bot-auxiliary origins; the receipt schema keeps its closed vocabulary, so the composition maps them explicitly and an unmapped origin fails closed",
+    "frozenRequests": "The SDK AgentLoop passes a frozen request whose signal cannot be replaced: the lease now gates the iteration so a quiet provider is still interrupted on revoke or expiry, and output clamping is required only when the request explicitly exceeds the configured allowance"
+  },
+  "defaultCompositionProbe": {
+    "status": "passed",
+    "level": "actual-host-offline",
+    "sdkVersion": "0.2.1-rc.3",
+    "checks": [
+      "N06b: unconfigured Main stays blocked; the funding scope and Main binding are configured through real owner actions before any model turn",
+      "N06b: worker binding is configured through a real owner action before its first prompt",
+      "Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool",
+      "Default entry: worker executes permitted MR routing with the composed Bot grant",
+      "Default entry: original DS Bot dispatch and result return survive migration",
+      "Product channel refuses an unauthenticated snapshot at the Host connection admission",
+      "Product read model: real Bots, compiled grants and exact model routes in one snapshot",
+      "Default owner can read the original advanced ledger through real Gateway; ungranted mutations and unauthenticated requests stay denied",
+      "Unwired product sections report actionable blocked reasons instead of fake data",
+      "N06b: configured funding scope and Bot bindings are visible with exact model routes, the local machine entry and the scope catalog",
+      "Default product: owner secretRef pairing and Bot-scoped real MCP read work through the real AgentLoop",
+      "Default product: owner revocation removes Bot grant, invalidates remote tickets and refuses further reads",
+      "N06b: a disabled funding scope blocks the bindings and the next model turn dispatches nothing",
+      "Fresh host reconstructs stable Bot identity and the composed product read model"
+    ],
+    "snapshotSections": {
+      "bindings": "available",
+      "botBindings": "available",
+      "fundingAccounts": "available",
+      "tasks": "blocked",
+      "machines": "available",
+      "usage": "blocked"
+    },
+    "actualModelCalls": 0
+  },
+  "regression": {
+    "modelAccountingNative": "14/14 (including the new frozen-request admission and lease-gated quiet provider check)",
+    "rootSuite": "1382 tests, 1379 pass, 0 fail, 3 skipped (background re-run after the final clamp change)",
+    "packaging": "package.json files carries the Host-entry import closure"
+  },
+  "fixes": [
+    "The Bot runtime reports bot-session/bot-auxiliary origins while the receipt schema allows bot/aux/mr-api/cli/review: auxiliary calls were refused with INVALID_MODEL_RECEIPT until the composition mapped the vocabulary explicitly",
+    "The SDK AgentLoop passes a frozen request with a non-writable signal: the accounting first failed with MODEL_CANCELLATION_BOUNDARY_REQUIRED, then with MODEL_OUTPUT_BOUNDARY_REQUIRED because an absent maxTokens looked like a clamp; both are fixed by the carrier split and the explicit-bound clamp rule",
+    "bot-settings compiledGrant takes tools from the selected catalog capabilities: the catalog initially exposed none, so the grant lacked model/infer and every call was refused with TOOL_DENIED"
+  ],
+  "platforms": [
+    {
+      "machineAlias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "arch": "x64",
+      "defaultComposition": "passed",
+      "modelAccountingNative": "passed",
+      "actualModelCalls": 0
+    }
+  ],
+  "remoteMachineEvidence": "Ubuntu and Win10 re-runs of the default composition probe are pending; this checkpoint was produced on the local Win11 machine only",
+  "limitations": [
+    "inputBoundFor returns the configured request allowance; deriving it from the pinned model's context window is the planned follow-up",
+    "The probe exercises API-mode funding only; subscription-mode Bot bindings and their call quotas are covered by native tests, not by the product probe",
+    "MR consult no-double-billing, auxiliary-call independent billing and unknown/revoke/cold-start receipt assertions are not yet in the product probe (N08)",
+    "The usage read-model section is still blocked; per-source receipt and budget views in the product UI are N07",
+    "No default user profile migration, Electron carrier, clean install or real model inference"
+  ]
+}

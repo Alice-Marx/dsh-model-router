@@ -30,6 +30,11 @@ export function apply(ctx) {
         yield {type:'usage',usage:{inputTokens:11,outputTokens:0}}
         throw new Error('Offline task fixture first-attempt failure after a reported receipt')
       }
+      if(!isAgentLoopRequest(options)&&userText.includes('integration:plan-failure')){
+        yield {type:'usage',usage:{inputTokens:11,outputTokens:0}}
+        yield {type:'finish',reason:{kind:'error',failure:{code:'FIXTURE_PLAN_FAILED',message:'Offline dependency failure',status:400}}}
+        return
+      }
       if(!isAgentLoopRequest(options)&&userText.includes('integration:task-wait')){
         taskWaits.entered++
         yield {type:'usage',usage:{inputTokens:11,outputTokens:0}}
@@ -48,6 +53,59 @@ export function apply(ctx) {
       } else if (userText.trim() === 'integration:router-routes') {
         name = 'model_router_routes'
         args = {}
+      } else if (userText.trim() === 'integration:consult') {
+        name = 'model_router_consult'
+        args = { task: 'offline consult fixture' }
+      } else if (/^integration:remote-read:machine-[A-Za-z0-9-]+$/.test(userText.trim())) {
+        name = 'remote_computer_read'
+        args = {machineId:userText.trim().slice('integration:remote-read:'.length),rootId:'project',relativePath:'README.md'}
+      } else if (/^integration:remote-write:machine-[A-Za-z0-9-]+$/.test(userText.trim())) {
+        name = 'remote_computer_write'
+        args = {requestKey:'fixture-remote-write',machineId:userText.trim().slice('integration:remote-write:'.length),rootId:'project',relativePath:'managed.txt',content:'owned remote product fixture write',expectedHash:null}
+      } else if (/^integration:remote-command:machine-[A-Za-z0-9-]+$/.test(userText.trim())) {
+        name = 'bot_task_start'
+        args = {backend:'remote-command',requestKey:'fixture-remote-command',input:{machineId:userText.trim().slice('integration:remote-command:'.length),rootId:'project',workspaceRelativePath:'',argv:['node','-e','process.stdout.write("command-ok")'],timeoutMs:20000}}
+      } else if (userText.trim() === 'integration:create-cli') {
+        name = 'create_bot'
+        args = { name: 'IntegrationCli', role: 'Test', instructions: 'Offline integration CLI worker.', model: `${PROVIDER}/${MODEL}` }
+      } else if (/^integration:plan:(success|fail|cancel):[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$/.test(userText.trim())) {
+        const [, , mode, main, worker] = userText.trim().split(':')
+        const item=(id,targetBotId,objective,dependsOn=[])=>({id,targetBotId,objective,dependsOn,acceptance:['Offline fixture verified'],effectClass:'read'})
+        const packages=mode==='success'?[item('first',worker,'integration:task-ok'),item('join',main,'integration:task-ok',['first'])]:
+          mode==='fail'?[item('failure',worker,'integration:plan-failure'),item('blocked',worker,'integration:never-dispatch',['failure']),item('independent',main,'integration:task-ok')]:
+          [item('left',worker,'integration:task-wait'),item('right',main,'integration:task-wait'),item('later',worker,'integration:never-dispatch',['left','right'])]
+        name='bot_task_plan_start'
+        args={requestKey:`fixture-plan-${mode}`,plan:{schemaVersion:1,taskId:`fixture-plan-${mode}`,origin:{kind:'private',botId:main,sessionId:options.sessionId},planRevision:1,packages}}
+      } else if (userText.trim() === 'integration:task-run') {
+        name = 'bot_task_start'
+        args = { backend: 'mr-api', requestKey: 'task-run-1', input: { task: 'integration:task-ok' } }
+      } else if (userText.trim() === 'integration:task-fail') {
+        name = 'bot_task_start'
+        args = { backend: 'mr-api', requestKey: 'task-fail-1', input: { task: 'integration:task-failure' } }
+      } else if (userText.trim() === 'integration:task-cancel') {
+        name = 'bot_task_start'
+        args = { backend: 'mr-api', requestKey: 'task-cancel-1', input: { task: 'integration:task-wait' } }
+      } else if (userText.trim() === 'integration:task-parallel-a') {
+        name = 'bot_task_start'
+        args = { backend: 'mr-api', requestKey: 'parallel-a', input: { task: 'integration:task-wait' } }
+      } else if (userText.trim() === 'integration:task-parallel-b') {
+        name = 'bot_task_start'
+        args = { backend: 'mr-api', requestKey: 'parallel-b', input: { task: 'integration:task-wait' } }
+      } else if (userText.trim() === 'integration:cli-task') {
+        name = 'bot_task_start'
+        args = { backend: 'codex-read', requestKey: 'cli-task-1', input: { task: 'integration:cli-read' } }
+      } else if (/^integration:task-cancel-task:(task-[A-Za-z0-9_-]+)$/.test(userText.trim())) {
+        name = 'bot_task_cancel'
+        args = { taskId: userText.trim().slice('integration:task-cancel-task:'.length) }
+      } else if (/^integration:task-status:(task-[A-Za-z0-9_-]+)$/.test(userText.trim())) {
+        name = 'bot_task_status'
+        args = { taskId: userText.trim().slice('integration:task-status:'.length) }
+      } else if (/^integration:task-retry:(task-[A-Za-z0-9_-]+)$/.test(userText.trim())) {
+        name = 'bot_task_retry'
+        args = { taskId: userText.trim().slice('integration:task-retry:'.length), requestKey: 'task-retry-1' }
+      } else if (/^integration:task-reconcile:(task-[A-Za-z0-9_-]+)$/.test(userText.trim())) {
+        name = 'bot_task_reconcile'
+        args = { taskId: userText.trim().slice('integration:task-reconcile:'.length), requestKey: 'task-reconcile-1' }
       }
       const block = name
         ? { type: 'tool-call', id: `integration-call-${calls.length}`, name, arguments: JSON.stringify(args) }
@@ -66,12 +124,18 @@ export function apply(ctx) {
     return next()
   })
   ctx.on('tools/result', (execution, result) => {
-    if (['create_bot', 'message_bot', 'model_router_routes'].includes(execution.name)) {
+    if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write',
+      'bot_task_start', 'bot_task_status', 'bot_task_cancel', 'bot_task_retry', 'bot_task_reconcile','bot_task_plan_start','bot_task_plan_status','bot_task_plan_cancel'].includes(execution.name)) {
       toolResults.push({ name: execution.name, agentId: execution.agent?.id ?? null, result })
     }
   })
   ctx.effect(() => ctx.connection.fetch.register({
     path: '/api/integration-probe', methods: ['POST'], requestBody: 'buffered',
-    fetch: () => Response.json({ calls, toolResults, providers: ctx.llm.listProviders(), registeredTools: ctx.tools.schemas().map(tool => tool.name) }),
+    fetch: () => Response.json({ calls, toolResults, providers: ctx.llm.listProviders(), registeredTools: ctx.tools.schemas().map(tool => tool.name),
+      searchProviders: [...(ctx.get('web')?.searchProviders?.keys() ?? [])],
+      automaticSearchEntries: [...ctx.root.get('loader').entries()]
+        .filter(entry => entry.fiber?.state === 2 && ['ds-bot/web-search', '@ljwei-stak/dsh-model-router/web-search'].includes(entry.options.name))
+        .map(entry => entry.options.name),
+    }),
   }), 'integration: diagnostics')
 }

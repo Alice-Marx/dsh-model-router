@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_file_stability.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4, controlled Linux cgroup-v2 process-tree component with real Ubuntu execution; W06.15 remains in_progress",
+  "componentAcceptance": "Ubuntu 24.04.4 LTS / kernel 6.8.0-101 / Node v22.22.1, root in an isolated test root: the new suite passes 4 tests with 1 non-Linux skip, including direct /proc cgroup-membership assertions for both parent and descendant. Active stop, direct-child exit and coordinator SIGKILL all kill the cgroup before delayed writes. Three consecutive remote runs and the final run have the same result, and no owned cgroup residue remains. Local related combination: 101 tests, 90 pass, 0 fail, 11 skipped. Final root regression on Win11: 1910 tests, 1836 pass, 0 fail, 74 skipped.",
+  "productAcceptance": "None. The backend is not wired into a product entry and covers only a process tree created through its supervisor. External restart, other accounts or launchers, unknown writers, network shares, external effects, real old DS/SDK/MR entry points and full-domain stop-write are not proven. externalRestartBlocked, persistentExternalExclusion and stopWriteProvable remain false; activation and product scores remain unchanged at 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md section 5",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-linux-quarantine.mjs": "79c792b5e7a20d70e1dc144cab325c31ce46a505",
+    "packages/orchestration/src/migration-linux-quarantine.py": "0b2f378ead8e19544278b0afb8897c42149ac8f5",
+    "tests/migration-linux-quarantine.native.mjs": "1b884d7268c567f104f532bd5963c5c98367e413",
+    "tests/fixtures/migration-linux-quarantine-parent.mjs": "8b65bf833325da3ded83fe4f512d4d5ddd9c505e",
+    "docs/integration/plan/20261031_migration_os_quarantine.md": "5d3dfec8ad3dc6616eab22f9fb5c4e5214bec6f0",
+    "package.json": "c297095ce1a782aae007291b2056803b505f91c3"
+  },
+  "remoteSha256": {
+    "packages/orchestration/src/migration-linux-quarantine.mjs": "f09e949c86f432613a5420f62074dce05f189cabca230e1efe3950aa9b5e86cf",
+    "packages/orchestration/src/migration-linux-quarantine.py": "4cafcbd038d11798b746f9c65ca7185d817ff6f4ad6d79f2e7ac82aa73771d70",
+    "tests/migration-linux-quarantine.native.mjs": "6c3137d93af58c0bc2c21e6246dd2dca901cd7330fe49f8bb01545e333141064"
+  },
+  "implementation": [
+    "The Python supervisor creates one operation-bound cgroup v2 directory and uses preexec_fn to write the target PID into cgroup.procs before exec. Descendants inherit the cgroup; no shell or post-start assignment window is used.",
+    "The supervisor watches the target and the coordinator's /proc startTicks identity. Active SIGTERM stop, target exit and coordinator death all write cgroup.kill, wait for cgroup.procs to become empty, then explicitly rmdir the owned empty cgroup.",
+    "Only a matching supervisor receipt with treeStopped:true produces stopEvidence:'linux-cgroup-v2-kill'. Missing or invalid receipts fail closed, cgroupRemoved is reported separately, and stop timeout remains MIGRATION_LINUX_QUARANTINE_STOP_UNKNOWN.",
+    "Target output uses temporary files rather than blocking pipes. JS and Python both enforce closed bounded input, canonical absolute paths and argv without a shell. Every result keeps externalRestartBlocked:false, persistentExternalExclusion:false and stopWriteProvable:false.",
+    "The capability probe creates its own child cgroup because cgroup.kill is not present at the root on this host. Probe cleanup uses explicit rmdir rather than fs.rm on cgroupfs."
+  ],
+  "testRuns": [
+    "Initial owned primitive probe: a uniquely named cgroup containing only this invocation's sleep process accepted cgroup.kill, became empty and was removed.",
+    "First remote suite attempt skipped all five tests because the capability check incorrectly looked for /sys/fs/cgroup/cgroup.kill at the root. The check was corrected to create a child cgroup; no product capability was claimed from the skipped run.",
+    "After the capability-check correction, the suite passed 4 tests with 1 skip. Parent and descendant /proc/<pid>/cgroup entries were then added as direct assertions, and three consecutive runs each passed 4 tests with 1 skip.",
+    "A cleanup audit found empty dsh-capability-* directories left by fs.rm. Only those empty directories owned by this session were rmdir-cleaned after checking cgroup.procs. The probe now uses rmdir, and the final run reports no-owned-cgroup-residue.",
+    "Final remote log: tmp/integration/migration-linux-quarantine-e82/remote-final.log — 5 tests, 4 pass, 0 fail, 1 skip. Remote SHA-256 values for the two production modules and test exactly match the local files.",
+    "Local related combination: 101 tests, 90 pass, 0 fail, 11 skipped, exit 0. The new suite contributes 1 explicit unsupported pass and 4 Linux-only skips on win32.",
+    "npm run check:client: OK; documentation four-suite run: 26/26. Final npm test: 1910 tests, 1836 pass, 0 fail, 74 skipped, exit 0 (tmp/integration/migration-linux-quarantine-e82/root-final.log)."
+  ],
+  "preservedFailures": [
+    "The initial all-skip capability-probe mistake and the empty-cgroup cleanup defect are preserved rather than erased by the final green runs. Both were test-side issues; the process-stop implementation was not changed to hide them.",
+    "Supervisor SIGKILL was not injected and is not guaranteed by this component. Coordinator SIGKILL was tested with the supervisor alive to perform cgroup.kill.",
+    "No real old DS/SDK/MR process, real user profile, external service, scheduled task, machine reboot or production deployment was exercised. Ubuntu root is an isolated test capability, not a production privilege model."
+  ],
+  "limitations": [
+    "W06.15 remains in_progress. Dedicated-account privilege design, external restart exclusion, real old entry points, full write-handle and domain closure, machine reboot and production acceptance remain open.",
+    "A cgroup is process containment, not an account, filesystem or storage fencing boundary. It cannot constrain a process launched outside the supervised tree.",
+    "The backend requires Linux cgroup v2 with cgroup.kill and appropriate privileges. Unsupported or unprivileged environments do not fall back to a weaker process-group claim."
+  ]
+}

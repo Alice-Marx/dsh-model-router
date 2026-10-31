@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_atomic_rename.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4, controlled Windows process-tree component only; W06.15 remains in_progress",
+  "componentAcceptance": "Win11 / Node v24.20.0, offline synthetic processes and directories: the new suite has 7 tests, 6 pass, 0 fail, 1 explicit non-Windows skip. Active stop, direct-child exit with a live descendant, and real coordinator SIGKILL all close the owned Job tree before its delayed write. The related eight-suite combination totals 75 tests, 68 pass, 0 fail, 7 skipped. Final root regression: 1900 tests, 1830 pass, 0 fail, 70 skipped.",
+  "productAcceptance": "None. The adapter is not wired into a product entry and only covers a process tree created through an explicit trusted Windows Job runner. External services, scheduled tasks, other launchers/accounts, unknown writers, network shares, external side effects, real old DS/SDK/MR entry points, machine restart and Linux are not verified. externalRestartBlocked, persistentExternalExclusion and stopWriteProvable remain false; activationSupported and postActivationRollbackSupported are unchanged. Scores remain 0/20, 1/63 and M0 11/12.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-os-quarantine.mjs": "0f16e6bbb48abf035b165110b7a6b11f0b89daa2",
+    "tests/migration-os-quarantine.native.mjs": "87e3ccb22dcf1d94946c4b8bdfde1253173a1f16",
+    "tests/fixtures/migration-os-quarantine-parent.mjs": "16ce326f09af6b0ff05cb33f90534cdb72a18e24",
+    "docs/integration/plan/20261031_migration_os_quarantine.md": "127341f9725418342e274cd2e5a963adce2eb8f2",
+    "package.json": "6252e2d41b7992d91c2359ae7f2045efc83c5ecd"
+  },
+  "implementation": [
+    "launchMigrationProcessTree accepts only an explicit runner, existing absolute executable/cwd, a bounded operationId and 0-64 bounded argv strings. It canonicalizes paths, rejects symlinks and wrong file types, never uses PATH or a shell, and is private owner-only component code.",
+    "The existing native ProcessJob.cs runner is spawned directly and receives one bounded JSON request. The native CreateProcess Job-list admission, KILL_ON_JOB_CLOSE and creator watchdog are reused without modifying frozen DS/SDK code or the C# source.",
+    "Only native runner close produces treeStopped:true with stopEvidence:'windows-job-close'. stop() targets exactly the owned wrapper, waits bounded for the original close result and is idempotent. Timeout answers MIGRATION_OS_QUARANTINE_STOP_UNKNOWN.",
+    "Every result and snapshot carries externalRestartBlocked:false, persistentExternalExclusion:false and stopWriteProvable:false. There is no release or activate method and cancellation is not represented as rollback.",
+    "Synchronous spawn failures such as Windows EFTYPE are normalized to MIGRATION_OS_QUARANTINE_RUNNER_UNAVAILABLE; asynchronous runner-start failure is consumed and reports runnerNotStarted:true and treeStopped:false rather than a fabricated Job stop receipt."
+  ],
+  "suites": {
+    "tests/migration-os-quarantine.native.mjs": "7 tests, 6 pass, 0 fail, 1 skip; repeated three times with the same result",
+    "tests/windows-process-job.native.mjs": "11 tests, 11 pass, 0 fail in the related combination",
+    "tests/migration-writer-inventory.native.mjs": "9 tests, 4 pass, 0 fail, 5 Linux-only skips",
+    "tests/migration-fence.native.mjs": "7 tests, 7 pass, 0 fail",
+    "tests/migration-fence-hardening.native.mjs": "9 tests, 9 pass, 0 fail",
+    "tests/migration-commit-orchestration.native.mjs": "15 tests, 15 pass, 0 fail",
+    "tests/migration-commit-orchestration.test.mjs": "12 tests, 11 pass, 0 fail, 1 skip",
+    "tests/ci-contract.test.mjs": "5 tests, 5 pass, 0 fail"
+  },
+  "testRuns": [
+    "New-suite initial development run: 7-test suite then had 6 tests; 4 pass, 1 fail, 1 skip. The missing-executable test incorrectly expected native exit 126 although the documented adapter contract rejects a nonexistent path before launch. The test and design were corrected to MIGRATION_OS_QUARANTINE_PATH_INVALID; product path validation was not weakened.",
+    "A newly added runner-start boundary then exposed a real adapter defect: Windows synchronously threw EFTYPE for a non-executable runner. The adapter now normalizes synchronous spawn failure to MIGRATION_OS_QUARANTINE_RUNNER_UNAVAILABLE and consumes asynchronous error/close without fabricating a Job stop receipt. This development failure is preserved rather than described as first-pass success.",
+    "Final new suite, three consecutive runs: each 7 tests, 6 pass, 0 fail, 1 skip.",
+    "Final related combination: 75 tests, 68 pass, 0 fail, 7 skipped, exit 0. This includes the new adapter, native Windows Job, writer inventory, two fence suites, two orchestration suites and ci-contract.",
+    "npm test on the code and design tree: 1900 tests, 1830 pass, 0 fail, 70 skipped, exit 0 (tmp/integration/migration-os-quarantine-e80/root-final.log). The seven new tests account for the increase from E79's 1893; skip count increased by one for the non-Windows assertion on win32.",
+    "npm run check:client: [build-client] OK. Documentation four-suite run: 26 tests, 26 pass, 0 fail."
+  ],
+  "preservedFailures": [
+    "The two development failures above are retained: one incorrect test expectation and one real synchronous-spawn error handling defect. Final green results do not erase them.",
+    "No real old DS/SDK/MR process, user profile, external auto-restart mechanism, dedicated account or machine reboot was exercised. The synthetic parent and grandchild prove only the owned Windows Job tree behavior.",
+    "Linux support is explicitly unsupported in this component and the new non-Windows test is skipped on win32; it is not counted as Linux evidence.",
+    "E79's separate MIGRATION_COMMIT_SOURCE_CHANGED flake and the Linux-only orchestration case 22 are not fixed or reclassified by this work. Their absence from one green root run is not a permanent fix claim."
+  ],
+  "limitations": [
+    "W06.15 remains in_progress. Dedicated-account and device validation, persistent external restart exclusion, real old entry points, write-handle closure across all domains, Linux, full migration activation and production acceptance remain open.",
+    "A Windows Job is process-tree containment, not an account, AppContainer, filesystem or storage fencing boundary. It cannot constrain a process outside the controlled launch tree.",
+    "The adapter requires a trusted prebuilt runner; tests compile the repository ProcessJob.cs into an isolated tmp directory. The component does not compile or install a runner in production."
+  ]
+}

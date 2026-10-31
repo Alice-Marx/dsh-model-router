@@ -8,6 +8,8 @@ const receiptTimestamp = value => typeof value === 'number' && Number.isFinite(v
 export async function beginExecutionLifecycle({ state, buildRun, packageEstimates, settings = {}, confirmOverBudget = false, managedExecution }) {
   // Host-only seam. Wire commands never accept this binding or callback.
   const managed=prepareManagedExecution(managedExecution)
+  const funding=await state.prepareExecutionFunding?.({packageEstimates,managedExecution})
+  if(funding){state=funding.state;packageEstimates=funding.packageEstimates}
   const ownerToken = randomUUID()
   const manager = createBudgetReservations({ state })
   await manager.recoverInterruptedExecutions()
@@ -20,6 +22,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     })
     for (const [id, result] of results) if (!started.has(id)) receipts.push(result)
     const run = managed.stamp(buildRun({ status, results: receipts, workspace }))
+    funding?.stamp(run)
     if (status === 'running' || status === 'interrupted') {
       run.status = status
       if (status === 'running') run.finishedAt = null
@@ -37,6 +40,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
   await managed.prepared(initial.id)
   const accepted = await manager.beginExecution({ run: initial, packageEstimates, ownerToken, ...settings, confirmOverBudget })
   if (!accepted.accepted) return accepted
+  funding?.bind({runId:initial.id,packageId:()=>[...started.keys()].findLast(id=>!completed.has(id)),active:()=>!closed&&!poisoned})
   const identity = { reservationId: accepted.reservationId, ownerToken }
   const rejectBudget = changed => {
     const error = new Error(changed.budget?.message || '费用或预占已变化，已暂停启动后续步骤，请重新核对预算。')
@@ -109,6 +113,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     },
     async saveRun(run, { completedIds = [], startedIds = [] } = {}) {
       managed.stamp(run)
+      funding?.stamp(run)
       const previousCompleted = new Set(completed), previousStarted = new Map(started)
       for (const id of completedIds) completed.add(id)
       for (const id of startedIds) if (!started.has(id)) started.set(id, { id })
@@ -134,6 +139,7 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     async finish(run) {
       if (poisoned) throw poisoned
       managed.stamp(run)
+      funding?.stamp(run)
       const value = await required(() => manager.finishExecution({ ...identity, run: preserveReceiptTimes(run) }))
       closed = true
       return value
@@ -141,9 +147,11 @@ export async function beginExecutionLifecycle({ state, buildRun, packageEstimate
     async interrupt(run) {
       if (closed) return
       managed.stamp(run)
+      funding?.stamp(run)
       // Keep the reservation when storage itself remains unavailable. It is
       // never safe to turn an unconfirmed paid receipt into free capacity.
       try { await manager.interruptExecution({ ...identity, run: preserveReceiptTimes(run) }) } catch { /* original hold stays durable */ }
+      finally { closed = true }
     },
   }
 }

@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-28",
+  "parentCheckpoint": "89e831264ebc7dacacdd54234377e51f37fb0785",
+  "parentEvidence": [
+    "docs/integration/evidence/20261028_atomic_task_admission.json",
+    "docs/integration/evidence/20261028_remote_auth_abuse.json"
+  ],
+  "level": "three actual OS machines; native SQLite/process-exit/TCP/TLS + offline real rc.3 Host",
+  "actualModelCalls": 0,
+  "sourceGitBlobs": {
+    "scripts/integration-product-client.mjs": "12c2882242112f687eb3a0409b5ea9a66cc95f6c",
+    "scripts/build-client.mjs": "2c324ffedfeb57bd0eb77a579e9082a755e116ab",
+    "tests/product-client-build.test.mjs": "d6439200a91eea8493123d3a09cd0aa1a2e8a552",
+    ".dsh-plugin/client.js": "200f16464179659ee36ac64cb69551361ff1291f",
+    "package.json": "25c2454fbf8daa0ac5f6164e9172fbe2a23c1255",
+    ".github/workflows/ci.yml": "5c24299700bf2cde1247075c22a761bb12cddd01",
+    "packages/orchestration/src/task-admission.mjs": "25f2c773ba41114b5f34e59f052461ea2bb2d820",
+    "packages/orchestration/src/task-journal.mjs": "e016eebf71720eedf953eca9715db8de51f08e7f",
+    "packages/orchestration/src/task-service.mjs": "8275319591cceab153f2372d0428efb246bbd66e",
+    "packages/orchestration/src/sqlite-router-state.mjs": "fd974639be9d8e5868602086f679f8759e50b10f",
+    "packages/orchestration/src/product-composition.mjs": "9e308461e600c4e56fcf7d66aad0e798badd2cf8",
+    "packages/orchestration/src/cli-execution.mjs": "b1aa14e8266a2e8c57aef231772617274e3b9a24",
+    "tests/task-admission.native.mjs": "701d231c229b5333424a662878e4acaadc05137e",
+    "tests/task-admission-crash-fixture.mjs": "80017f9071bb4c6ca2c42e02a98646cd815bd477",
+    "tests/task-plan-journal.native.mjs": "9008ca9548a555554346eaad8cd0a1b678b5df73",
+    "tests/remote-auth.native.mjs": "edf630eb261cd69477682c8994a08aa45de9cbd5",
+    "tests/helpers/remote-auth-tls.mjs": "47c8edbd8525ddac6d2ad3a7c82bd0a4ec9f4437",
+    "remote-computer-agent/src/auth-throttle.ts": "67143c908b480992fb4fa6ffaf87c89e16447cf9",
+    "remote-computer-agent/src/transport.ts": "1f416709314fb59200954428a539aa85dde5369d",
+    "remote-computer-agent/src/store.ts": "b56bad8912dc67df87108ba2739046bc18fc04fd",
+    "remote-computer-agent/src/index.ts": "d06ab4f31a7faf84e9577260a19ca0788ea4e09f",
+    "scripts/integration-product-default.mjs": "34322885be84f24ae5f79ef5221c14c55ffd3dc7"
+  },
+  "sourceSnapshot": {
+    "sourceFiles": 864,
+    "frozenDsFiles": 297,
+    "manifestSha256": "82a38d130e554baf575b685d94a228c934928155b7796a587dcf9e291778bbe5",
+    "baseArchiveSha256": "0872a99842d602990e38eed66bcbd423684e3f923442ff3dca9b0c9b0c8ae86d",
+    "finalOverlaySha256": "adcdb07ad385d85ce3155e7560ba050c6f3ee16bab22d0c909c5218db98ca0b2",
+    "meaning": "Both remote hosts verified every source file SHA-256 after extraction; source payload excludes private credentials and node_modules. Existing isolated dependencies were reused; this is not a clean install."
+  },
+  "frozenDsCommit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+  "dsOrSdkSourcesModified": false,
+  "platforms": [
+    {
+      "alias": "local-win11",
+      "node": "v24.20.0",
+      "platform": "win32",
+      "sqlite": "13.0.3",
+      "root": {
+        "tests": 1443,
+        "pass": 1440,
+        "fail": 0,
+        "skipped": 3
+      },
+      "native": {
+        "atomic": 20,
+        "scheduler": 14,
+        "auth": 7,
+        "clientLayout": 1,
+        "fail": 0
+      },
+      "defaultHost": {
+        "checks": 36,
+        "status": "passed",
+        "actualModelCalls": 0
+      },
+      "client": "byte check passed",
+      "skippedTests": [
+        "pipe process echoes input, maps Enter and turns Ctrl+C into a kill # SKIP",
+        "the bundled PTY loads and runs a real shell when available # SKIP",
+        "M1: cancelling a CLI kills its whole process tree quickly # SKIP"
+      ]
+    },
+    {
+      "alias": "ubuntu-test",
+      "node": "v22.22.1",
+      "platform": "linux",
+      "sqlite": "13.0.3",
+      "sourceFilesMatched": 864,
+      "native": {
+        "tests": 41,
+        "pass": 41,
+        "fail": 0
+      },
+      "root": {
+        "tests": 1443,
+        "pass": 1420,
+        "fail": 0,
+        "skipped": 23
+      },
+      "finance": {
+        "tests": 33,
+        "pass": 33,
+        "fail": 0
+      },
+      "defaultHost": {
+        "status": "passed",
+        "checks": 36,
+        "sdkVersion": "0.2.1-rc.3",
+        "actualModelCalls": 0
+      },
+      "client": "byte check passed",
+      "skippedTests": [
+        "team saves the isolated workspace and base commit before any paid execution # SKIP",
+        "team workspace checkpoint failure blocks paid calls and keeps the isolated location # SKIP",
+        "team result checkpoint failure keeps paid changes and prevents Git integration # SKIP",
+        "team package observers preserve ordering, cancellation, usage and explicit reported cost # SKIP",
+        "editable team cancellation at last-result keeps isolated changes and never integrates # SKIP",
+        "editable team cancellation at integrating-stage keeps isolated changes and never integrates # SKIP",
+        "Codex follows pnpm sibling platform links only inside its selected global tree # SKIP",
+        "MiniMax automatic launch follows the Windows installation default and script switch # SKIP",
+        "MiniMax repair releases attest manifest version while keeping release root guards # SKIP",
+        "MiMo follows pnpm sibling platform packages within the selected store and attests the pinned version # SKIP",
+        "Grok follows pnpm sibling platform packages and requires the attested decompressed binary # SKIP",
+        "team executes distinct official adapters in dependency order and does not invent actual model IDs # SKIP",
+        "team CLI bindings choose package then tool names and leave other packages on CLI defaults # SKIP",
+        "team retains reported-model, usage and sandbox evidence and rejects an unready execution mode # SKIP",
+        "team stops after a failed CLI and never dispatches dependent work # SKIP",
+        "an adapter abort preserves earlier results and records a cancelled package before stopping # SKIP",
+        "cancellation between work packages stops dispatch without inventing completion # SKIP",
+        "Windows edit storage is derived from canonical source outside its approved source scope # SKIP",
+        "Windows Host storage rejects an existing source-key junction before CLI dispatch # SKIP",
+        "MiniMax official Windows installer entry: any release, but its code must match the npm registry # SKIP",
+        "Codex Windows visible bin can link to the documented user-owned standalone release # SKIP",
+        "Windows cmd preserves a selected directory containing spaces and ampersands as one argument # SKIP",
+        "managed readiness accepts the attested package at the exact platform npm module root # SKIP"
+      ]
+    },
+    {
+      "alias": "win10-test",
+      "node": "v24.18.0",
+      "platform": "win32",
+      "sqlite": "13.0.3",
+      "sourceFilesMatched": 864,
+      "native": {
+        "tests": 41,
+        "pass": 41,
+        "fail": 0
+      },
+      "root": {
+        "tests": 1443,
+        "pass": 1440,
+        "fail": 0,
+        "skipped": 3
+      },
+      "finance": {
+        "tests": 33,
+        "pass": 33,
+        "fail": 0
+      },
+      "defaultHost": {
+        "status": "passed",
+        "checks": 36,
+        "sdkVersion": "0.2.1-rc.3",
+        "actualModelCalls": 0
+      },
+      "client": "byte check passed",
+      "skippedTests": [
+        "pipe process echoes input, maps Enter and turns Ctrl+C into a kill # SKIP",
+        "the bundled PTY loads and runs a real shell when available # SKIP",
+        "M1: cancelling a CLI kills its whole process tree quickly # SKIP"
+      ]
+    }
+  ],
+  "changes": {
+    "portableBuild": "The two remote checks first exposed esbuild realpath source comments from reused dependency trees. preserveSymlinks keeps module labels relative to the current project. A real local-directory versus external linked-directory test verifies identical bytes and inputs.",
+    "client": {
+      "bytes": 2061256,
+      "sha256": "2bb04cff485f09a97da2dca9389682bb821de6267bf46ffe86fd4a4d51a52a3b",
+      "runtimeFiles": 253
+    },
+    "emptyOrigin": "A present but empty Origin is now rejected, like null/foreign origins. The final native security suite tests it on all three machines.",
+    "reporting": "Remote Node runner writes original UTF-8 TAP and exit codes, avoiding PowerShell5 native-stderr/Unicode redirection corruption. Full root skips are reported per platform."
+  },
+  "intermediateFailures": [
+    "Initial 863-file source snapshot matched on both machines and native41/finance33/root1442 had zero failures, but client byte checks failed because linked dependency realpaths were embedded in three comments. Fixed the actual generator and added a linked-layout regression test.",
+    "A preliminary source privacy guard rejected the frozen public DS .npmrc by filename; allowed only that exact frozen file after rejecting credential-bearing auth settings, without modifying frozen bytes.",
+    "Remote Windows PowerShell5 redirection damaged Unicode report prefixes and treated native stderr as an exception. Replaced the test runner with direct Node process capture and explicit TAP; retained earlier failure logs locally."
+  ],
+  "limitations": [
+    "Offline model and CLI session-factory fixtures only; no new real model request and no historical spend-zero claim",
+    "Reused isolated dependency installations, not empty-machine installation or production user-profile migration",
+    "Actual TLS/mTLS uses test CA and real sockets on each machine; no live public/VPN/Tunnel production endpoint, load/DoS, physical power-loss or laptop-sleep acceptance",
+    "Linux23/Windows3 skipped root tests are explicit platform gates, not passed checks; full native CLI adapters and physical Windows desktop/PTY acceptance stay separate",
+    "DAG write execution facade remains refused; real writer OS isolation, mixed native CLI/remote graph and complete approvals remain open",
+    "Full 32R/40F/63T scope remains. No Git commit, push, tag, Release or npm publication at this checkpoint"
+  ]
+}
