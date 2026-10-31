@@ -541,7 +541,8 @@
             "docs/integration/evidence/20261101_migration_remote_operation_drain.json",
             "docs/integration/evidence/20261101_migration_remote_effect_drain.json",
             "docs/integration/evidence/20261101_migration_remote_unknown_effect.json",
-            "docs/integration/evidence/20261101_migration_remote_file_reconciliation.json"
+            "docs/integration/evidence/20261101_migration_remote_file_reconciliation.json",
+            "docs/integration/evidence/20261101_migration_windows_launcher_quarantine.json"
           ]
         }
       ]

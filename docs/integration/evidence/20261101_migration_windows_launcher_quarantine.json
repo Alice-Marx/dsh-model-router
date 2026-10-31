@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "89f4ce7f1ca0f86fe25e6f2e5e799d60fbfa3c2b",
+  "parentEvidence": "docs/integration/evidence/20261101_migration_remote_file_reconciliation.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4 implementation with an explicit Windows scheduled-task capability gap; real launcher acceptance is not verified",
+  "componentAcceptance": "An owner-only Windows scheduled-task adapter now binds declared task names to Export-ScheduledTask XML SHA-256, prevalidates all targets, disables and stops them, verifies Disabled and offers an Enable-only release. However, this Windows host refused every unique synthetic task registration with 0x80070005, including an explicit current-user Limited/Interactive principal. The real writer and fingerprint tests are skipped as unverified, not reported as passing. The suite is 4 tests / 1 pass / 0 fail / 3 skipped; the pass is only the explicit capability report.",
+  "productAcceptance": "None. Windows launcher closure, real stop/restart evidence and reboot persistence remain open. Scores remain 0/20, 1/63 and M0 11/12; stopWriteProvable, activationSupported and postActivationRollbackSupported remain false.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md section 19",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-windows-launcher-quarantine.mjs": "5ae825917846b5764bcf3f30a8a9c60256f93275",
+    "tests/migration-windows-launcher-quarantine.native.mjs": "28d18fdb031198d4e2616db65f9eb1701269cc1b",
+    "tests/fixtures/migration-windows-launcher-writer.mjs": "a8116f9599c4efff26b8cdc87c0900c096c6ea7f",
+    "package.json": "845c14b0250a9952e726a98deff62b03fa74e707"
+  },
+  "implementation": [
+    "The adapter accepts only bounded task names and XML digests, uses a trusted PowerShell executable with fixed commands and validates every declaration before changing any task.",
+    "Quarantine disables and, when running, stops a declared task before accepting the Disabled state. Release requires Disabled, enables without Start and never claims external exclusion or stop-write proof.",
+    "The native fixture registers a unique AtLogOn Node writer, starts it, observes heartbeat, checks quarantine, rejected Start and Enable-only release, and includes a wrong-fingerprint no-side-effect case.",
+    "The capability probe attempts registration and cleanup of a unique synthetic task. On this host it is denied, so real cases skip explicitly and the suite reports the capability gap."
+  ],
+  "testRuns": [
+    "Initial real registration and the explicit current-user Limited/Interactive variant both failed with 0x80070005 before any quarantine action.",
+    "Final capability-aware suite: 4 tests / 1 pass / 0 fail / 3 skipped.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1590/1586/0/4 and phase two 368/285/0/83; total 1957 tests, 1872 pass, 0 fail, 87 skipped."
+  ],
+  "preservedFailures": [
+    "Register-ScheduledTask failed with PermissionDenied HRESULT 0x80070005 for the unique synthetic AtLogOn task.",
+    "Using New-ScheduledTaskPrincipal with the actual current user, LogonType Interactive and RunLevel Limited failed with the same code. No elevation or permission changes were attempted."
+  ],
+  "limitations": [
+    "No real scheduled writer was registered on this host. Disable, Stop, rejected Start, Enable-only release and fingerprint refusal are therefore unverified here.",
+    "An authorized Windows test host is still required. Other accounts, unknown launchers, machine reboot and all-domain stop-write remain open.",
+    "No existing user task, real profile, model inference, production process, push or release was used."
+  ]
+}

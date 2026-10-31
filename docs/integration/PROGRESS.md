@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-11-01：E104 Windows 计划任务适配器与本机权限未验
+
+[E104](evidence/20261101_migration_windows_launcher_quarantine.json) 新增计划任务 XML 指纹绑定的 Disable/Stop/Enable 适配器及真实 AtLogOn writer 用例。两次唯一合成任务注册均被 `0x80070005` 拒绝，显式当前用户 + Limited/Interactive principal 也失败；未提权、未改系统权限、未触碰现有任务。最终套件 **4 项：1 通过、0 失败、3 跳过**，真实 writer 与指纹负例均记未验而非通过；完整两阶段根回归 **1957 项：1872 通过、0 失败、87 跳过**，`check:client` OK。
+
+Windows launcher 实机闭包仍开放，适配器需在获授权的 Windows 测试机复验。三标志仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E104.md](HANDOFF-20261101-E104.md)。
+
 ## 2026-11-01：E103 受限 unknown 文件效果对账
 
 [E103](evidence/20261101_migration_remote_file_reconciliation.json) 新增显式对账：重算原 operation 的 client/Bot/Task/attempt/tool/args 摘要，要求已吊销 client 与 unknown fs_write，并独立读取实际文件与原始 content 全字节比对。证明只写独立 `migration_operation_resolutions`，原 operation 保持 unknown；drain 每次重验当前文件，篡改、错误参数或错误摘要继续阻断。真实 E102 崩溃场景先两次 UNRESOLVED，再经显式对账恢复 capture，未伪造 Agent 成功回执。组合 **40 项：39 通过、0 失败、1 跳过**；完整两阶段根回归 **1953 项：1871 通过、0 失败、84 跳过**，`check:client` OK。

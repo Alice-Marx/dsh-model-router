@@ -175,3 +175,9 @@ E96 的后续 Host 能重新配对，是因为 Job 停止不触碰长期 client 
 - Windows 的 `.mjs` 不是可直接 spawn 的原生可执行文件，故增加显式 `runtime`：用受信 `process.execPath` 启动受信 CLI，参数数组不含 shell。首轮 4 项有 3 项因该实现缺陷失败，保留 cause 为 `EFTYPE`；修正 runtime 后连续三轮 4/4，相关组合 5/5，完整根回归 **1941 项、1857 通过、0 失败、84 跳过**。
 
 结果只声明 `declaredCredentialAdmissionBlocked:true` 与 `persistentDeclaredExclusion:true`，继续返回 `externalRestartBlocked:false`、`persistentExternalExclusion:false`、`stopWriteProvable:false`。E99 已把本组件接入迁移编排 drain 的 request/completed 哈希链，但仍不覆盖在途效果、其他 client/机器或直接 OS 写者，也不提供 rotate/release；W06.15 与激活门禁不提升。
+
+## 19. Windows 计划任务隔离适配器与本机能力缺口（E104）
+
+新增 `quarantineWindowsLaunchers` / `releaseWindowsLaunchers`，仅处理显式声明的任务名与 `Export-ScheduledTask` XML SHA-256。先读完全部任务并核对指纹，再 Disable、必要时 Stop，读回 Disabled 才返回 `declaredRestartBlocked:true` / `persistentDeclaredExclusion:true`；release 要求 Disabled，只 Enable 不 Start。外部重启、其他账户、未知 launcher 与 `stopWriteProvable` 继续 false。
+
+本机真实验收**未完成**：两次以唯一合成 AtLogOn 任务注册均返回 `0x80070005`，随后显式当前用户 + Limited/Interactive principal 仍同样拒绝。未提权、未修改系统权限、未触碰现有任务。套件增加能力探测，最终 4 项、1 通过、3 跳过；跳过的是真实 writer 和 XML 指纹负例，不是通过。组件与用例入库用于下一台有授权的 Windows 测试机复验，W06.15 保持 in_progress。
