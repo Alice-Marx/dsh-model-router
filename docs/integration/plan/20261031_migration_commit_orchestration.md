@@ -88,6 +88,8 @@ E99 在 `exclusive-acquired` 后增加可选的声明远程 client 吊销：`rem
 
 E100 在吊销完成后追加 `remote-operation-drain-requested` → 只读检查原 Agent `operations` → `remote-operation-drain-completed`，然后才允许 capture。检查复用 config/machine/client 身份核验并要求 client 已 revoked；任一声明 client 存在 `admitted/running/cancel_pending` 即 `MIGRATION_REMOTE_OPERATION_ACTIVE`，存在 `unknown` 即 `MIGRATION_REMOTE_OPERATION_UNRESOLVED`，均记 `blocked-drain`。恢复必须等原操作收据进入 succeeded/failed/cancelled，unknown 不得自动改写为成功或无效果。完成记录携带声明数、原操作总数及 `stopWriteProvable:false`。
 
+E101 用真实 Agent/Host 补效果层证据：测试夹具先调用产品原 `execute()` 让 `slow.txt` 真正落盘，再把 operation 收据保持在 running（仅为确定性测试暂停 auth sweep），随后运行完整 orchestration。client 吊销后操作仍 running，`MIGRATION_REMOTE_OPERATION_ACTIVE` 阻断且没有 `capture-started`，文件仍在但不被视为已结算。释放夹具屏障后，原 Agent 写回收据为 succeeded、Host remote-write 也 succeeded；resume 才追加唯一 `remote-operation-drain-completed` 并进入 capture。连续三轮专项及最终组合 36 项、35 通过、0 失败、1 跳过通过。该证据不覆盖未知写者、跨机生产网络或全域 OS 句柄关闭。
+
 ### 3.4 `capture`
 
 | 项 | 定义 |

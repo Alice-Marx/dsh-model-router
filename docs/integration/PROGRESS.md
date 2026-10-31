@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-11-01：E101 真实已落盘效果的 drain 证据
+
+[E101](evidence/20261101_migration_remote_effect_drain.json) 用真实独立 Agent 与外部 Host 执行 `slow.txt` 写入：夹具在产品原 `execute()` 完成后才设置收据屏障，因此文件真实落盘而 operation 仍 running。完整 orchestration 吊销 client 后以 `MIGRATION_REMOTE_OPERATION_ACTIVE` 阻断，没有 capture；文件存在也不能冒充结算。释放后原 Agent/Host 均 succeeded，resume 才写唯一 drain completed 并进入 capture。专项连续三轮通过，组合 **36 项：35 通过、0 失败、1 跳过**；完整两阶段根回归 **1949 项：1867 通过、0 失败、84 跳过**，`check:client` OK。仅改测试与 owned fixture，未改产品行为。
+
+这是声明 Agent 的一个真实文件效果，不是未知写者、跨机生产或全域 OS 句柄闭包。三标志仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E101.md](HANDOFF-20261101-E101.md)。
+
 ## 2026-11-01：E100 声明 Agent 未决操作结算接入 drain
 
 [E100](evidence/20261101_migration_remote_operation_drain.json) 新增只读 `assertMigrationRemoteOperationsSettled`：核验 config/machine/client 且要求已吊销，原 Agent `operations` 中 `admitted/running/cancel_pending` 阻断为 ACTIVE，`unknown` 阻断为 UNRESOLVED；只有原收据 succeeded/failed/cancelled 才完成。drain 在吊销后追加 `remote-operation-drain-requested/completed`，缺失或失败不得 capture，恢复不重复 request。真实 Store 覆盖 running→cancelled、unknown 阻断和未吊销拒绝；crash 13 用真实 `exit(86)` 验证恢复。组合 **35 项：34 通过、0 失败、1 跳过**；完整两阶段根回归 **1948 项：1866 通过、0 失败、84 跳过**，`check:client` OK。

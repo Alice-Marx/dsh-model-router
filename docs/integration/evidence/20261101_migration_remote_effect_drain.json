@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "1e2a3effb5fb574a981c1ef21c5c2450aee91ffc",
+  "parentEvidence": "docs/integration/evidence/20261101_migration_remote_operation_drain.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 5, real landed remote file effect held running, then settled by the original Agent receipt before capture; component evidence only",
+  "componentAcceptance": "Win11: a real independent Agent and a separate outside Host execute remote-write for slow.txt. The fixture calls the product execute() first, so slow physical effect bytes really land, and only then holds the receipt barrier with the original operation still running. Full orchestration revokes the client and fails MIGRATION_REMOTE_OPERATION_ACTIVE with no capture-started; the existing file is not treated as settled. Releasing the barrier lets the original Agent operation and the Host remote-write both finish succeeded. Resume then records one remote-operation-drain-completed before capture. The focused test passes three consecutive runs; the related combination is 36 tests / 35 pass / 0 fail / 1 skipped.",
+  "productAcceptance": "None. This is one declared Agent and one real file effect on loopback, not unknown-writer, cross-machine production or all-domain OS-handle closure. Scores remain 0/20, 1/63 and M0 11/12; stopWriteProvable, activationSupported and postActivationRollbackSupported remain false.",
+  "design": "docs/integration/plan/20261031_migration_commit_orchestration.md section 3.3 E101",
+  "sourceGitBlobs": {
+    "tests/fixtures/migration-remote-slow-effect-agent.mjs": "a7a2c3cd5726e46b99c3bc9d8efc92a34a9e8e3e",
+    "tests/migration-commit-orchestration.native.mjs": "9c9c551ce41313d65872a0435d07df92ca0c9532"
+  },
+  "implementation": [
+    "The fixture wraps only the test Agent's execute method and invokes the original product method first. It does not create slow.txt itself or substitute a simulated write result.",
+    "After the original write returns, the fixture records effect-landed and waits for an explicit release while leaving the original operation running. The test auth sweep is paused only to make this interval deterministic, not to test revocation cancellation.",
+    "The complete default orchestration path performs real client revocation and the real operation settlement check. It blocks while the landed effect has a running receipt and produces no capture.",
+    "Releasing the barrier settles the original Agent receipt to succeeded and the outside Host task to succeeded. Resume reads that original terminal receipt and only then enters capture.",
+    "No product source behavior changed."
+  ],
+  "testRuns": [
+    "Focused real landed-effect test: three consecutive runs, each 1 test / 1 pass / 0 fail.",
+    "Real Store drain tests plus orchestration, default real Agent and crash 12/13: 36 tests / 35 pass / 0 fail / 1 skipped.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1590/1586/0/4 and phase two 360/280/0/80; total 1949 tests, 1867 pass, 0 fail, 84 skipped."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "The receipt delay is a test fixture barrier after the real write. It is not a claim that production revocation always cancels or drains every effect this way.",
+    "The fixture pauses the Agent auth sweep to keep the receipt running deterministically; revocation-driven cancellation timing is not evaluated by this test.",
+    "Only one loopback Agent, one Host and one file effect are covered. Unknown writers, cross-machine deployment, other domains and complete OS-handle closure remain open.",
+    "No real user profile, model inference, production process, push or release was used."
+  ]
+}
