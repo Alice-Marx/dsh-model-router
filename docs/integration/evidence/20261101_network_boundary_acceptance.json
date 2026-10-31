@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "03c9d7c0b62b19176e614f68ad27c4b8a2c630da",
+  "parentEvidence": "docs/integration/evidence/20261028_remote_auth_abuse.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T18 criteria are covered. Wildcard binds, unprotected HTTP and arbitrary VPN binding fail at configuration. HTTP enforces exact Host/Origin and actual proxy trust, HTTPS requires an explicit CA and mTLS requires a trusted client certificate plus Bearer. Endpoint validation rejects embedded credentials and arbitrary paths. A real cross-origin 302 proves redirect:'error' prevents any target request, Authorization or body forwarding and creates no operation. Current network boundary suites pass 28/28.",
+  "productAcceptance": "T18 passes at integration level. Protected production tunnel deployment and full network topology acceptance remain separate. Formal scores are 0/20 work packages, 11/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/remote-machines.native.mjs": "b3595aa4bb591439786c61daa2aabc4ba3584389"
+  },
+  "testRuns": [
+    "remote-auth + remote-machines + remote-private-roots including the real cross-origin redirect: 28 tests / 28 pass / 0 fail.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1590/1586/0/4 and phase two 371/288/0/83; total 1962 tests, 1877 pass, 0 fail, 83 skipped."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "The redirect test uses local loopback servers; production WireGuard/Tailscale/Cloudflare/public-TLS topology is not thereby accepted.",
+    "No real model inference, production process, push or release was used."
+  ]
+}

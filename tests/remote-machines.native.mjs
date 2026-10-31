@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile, readFile } from 'node:fs/promises'
+import http from 'node:http'
 import { join, resolve } from 'node:path'
 import Database from 'better-sqlite3'
 import { createAuthority } from '../packages/capability-broker/src/authority.mjs'
@@ -100,6 +101,19 @@ test('machine host: offline revoke remains revoked after restart and reports rem
     assert.equal(result.remoteRevoked,true);assert.equal(result.grantsRestored,false)
     assert.equal(restored.readModel().items[0].revocations[0].status,'revoked');assert.deepEqual(restored.scopes('bot-a'),[])
   }finally{restored.close()}
+})
+test('machine host: a cross-origin redirect is refused without forwarding credentials or reaching the target',async t=>{
+  const f=await fixture(t);let hits=0
+  const target=http.createServer((req,res)=>{hits++;res.end()})
+  await new Promise(resolve=>target.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>target.close(resolve)))
+  const redirect=http.createServer((req,res)=>{res.writeHead(302,{location:`http://127.0.0.1:${target.address().port}/control/v1/grants`});res.end()})
+  await new Promise(resolve=>redirect.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>redirect.close(resolve)))
+  let error
+  try{await f.directory.pair({...f.pair,endpoint:`http://127.0.0.1:${redirect.address().port}/`},context)}catch(value){error=value}
+  assert.equal(error.code,'MACHINE_CONNECTION_FAILED')
+  assert.equal(hits,0,'the redirect target never receives the Authorization header or request body')
+  assert.equal(f.agent.store.db.prepare('SELECT count(*) n FROM operations').get().n,0)
+  assert.equal(f.directory.readModel().items.length,0)
 })
 test('machine host: endpoint validation rejects embedded secrets, unprotected public HTTP and arbitrary URL paths',()=>{
   assert.equal(normalizeMachineEndpoint('https://machine.example/'),'https://machine.example')

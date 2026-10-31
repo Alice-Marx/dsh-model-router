@@ -1549,16 +1549,17 @@
     },
     {
       "id": "T18",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_remote_agent.json",
         "docs/integration/evidence/20261027_m4_product_machines.json",
         "docs/integration/evidence/20261028_remote_auth_abuse.json",
         "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
-        "docs/integration/evidence/20261028_auth_rotation_body_race.json"
+        "docs/integration/evidence/20261028_auth_rotation_body_race.json",
+        "docs/integration/evidence/20261101_network_boundary_acceptance.json"
       ],
-      "notes": "Four network modes reject wildcard binds, unprotected HTTP and arbitrary VPN binding at configuration; MCP HTTP checks Host/Origin and auth. Live WireGuard/Tailscale/Cloudflare Tunnel/public TLS, proxy trust and mTLS are not exercised. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance. E43 closes the header/body rotation race: old client rows cannot issue/revoke newer grants, paused old requests fail after rotation, revoked tickets cannot list capabilities, and clock rollback keeps cooling finite. New10-check auth suite plus full1446/three-machine native44/defaultHost36 pass. A previous-code negative witness has exactly four expected failures.",
-      "verifiedOn": "2026-10-28",
+      "notes": "Wildcard binds, unprotected HTTP and arbitrary VPN binding fail at configuration; HTTP enforces exact Host/Origin and actual proxy trust, HTTPS requires an explicit CA and mTLS requires both a trusted client certificate and Bearer. Endpoint validation rejects embedded credentials and arbitrary paths. A real cross-origin 302 now proves redirect:'error' prevents any target request or Authorization/body forwarding. Current network boundary suites pass 28/28. Production tunnel deployment remains a separate gate.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
     },

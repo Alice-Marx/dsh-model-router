@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E115 T18 网络边界验收闭合
+
+[E115](evidence/20261101_network_boundary_acceptance.json) 复验非法 Origin/Host、通配绑定、非保护 HTTP、代理信任、HTTPS CA 与 mTLS；新增真实跨域 302：重定向被拒绝，目标端点零命中，Authorization/请求体不转发，operation 为零。相关组合 **28/28**；完整两阶段根回归 **1962 项：1877 通过、0 失败、83 跳过**，`check:client` OK。T18 以 integration 级别 passed，正式为 **0/20、11/63、M0 11/12**。生产隧道部署仍是独立门禁，未推送/发布。当前交接为 [HANDOFF-20261101-E115.md](HANDOFF-20261101-E115.md)。
+
 ## 2026-11-01：E114 T17 授权撤销与配置变化验收闭合
 
 [E114](evidence/20261101_grant_revocation_acceptance.json) 复验 **49/49**：旧 grant/审批/预览不能启动新动作；在途请求取消或保持 unknown，迟到成功不能越权；只允许显式新授权的只读对账。机器 revision CAS 与 roots-generation 变化 fail-closed，主体身份不能冒充。T17 以 integration 级别 passed，正式为 **0/20、10/63、M0 11/12**。无产品代码变化，最近全量根回归为 E113 的 1961 项、0 失败，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E114.md](HANDOFF-20261101-E114.md)。
