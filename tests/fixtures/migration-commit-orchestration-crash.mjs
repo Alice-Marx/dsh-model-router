@@ -51,6 +51,7 @@ const options = {
   ledgerDatabase: database ?? undefined,
   remoteClients: payload.remoteClients ?? [],
   remoteClientQuarantine: async ({ clients }) => ({ declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) }),
+  remoteOperationDrain: async ({ clients }) => ({ declaredOperationsSettled: true, clients: clients.map(client => ({ ...client, operations: 0, settled: true })) }),
   limits: { drainTimeoutMs: payload.drainTimeoutMs ?? 60000, pollMs: payload.pollMs ?? 50 },
   onBoundary: async ({ point }) => { if (payload.crashAt && payload.crashAt === point) process.exit(86) },
   onCommitStep: async (step, index) => {

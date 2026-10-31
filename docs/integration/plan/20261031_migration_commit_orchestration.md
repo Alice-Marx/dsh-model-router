@@ -84,7 +84,9 @@ inspect -> intent -> drain -> capture -> maintenance -> activate -> release
 
 排空期间观测到的 holder 只累加计数，不逐条落盘（避免日志膨胀与逐条泄漏 pid）。
 
-E99 在 `exclusive-acquired` 后增加可选的声明远程 client 吊销：`remote-revoke-requested {remoteClients,remoteClientsDigest}` → 调用 E98 适配器并逐项读回 → `remote-revoke-completed`。声明列表及摘要写入不可变 operation，重入必须匹配。返回必须覆盖全部声明且 `revoked:true`、`declaredCredentialAdmissionBlocked:true`、`persistentDeclaredExclusion:true`，否则失败。任何 `MIGRATION_REMOTE_CLIENT_*` 失败记 `blocked-drain` 且不进入 capture；恢复重新执行 drain 的幂等读回，request 不重复，completed 后才允许 `capture-started`。没有声明时保持原 12 步链。
+E99 在 `exclusive-acquired` 后增加可选的声明远程 client 吊销：`remote-revoke-requested {remoteClients,remoteClientsDigest}` → 调用 E98 适配器并逐项读回 → `remote-revoke-completed`。声明列表及摘要写入不可变 operation，重入必须匹配。返回必须覆盖全部声明且 `revoked:true`、`declaredCredentialAdmissionBlocked:true`、`persistentDeclaredExclusion:true`，否则失败。任何 `MIGRATION_REMOTE_CLIENT_*` 失败记 `blocked-drain` 且不进入 capture；恢复重新执行 drain 的幂等读回，request 不重复。没有声明时保持原 12 步链。
+
+E100 在吊销完成后追加 `remote-operation-drain-requested` → 只读检查原 Agent `operations` → `remote-operation-drain-completed`，然后才允许 capture。检查复用 config/machine/client 身份核验并要求 client 已 revoked；任一声明 client 存在 `admitted/running/cancel_pending` 即 `MIGRATION_REMOTE_OPERATION_ACTIVE`，存在 `unknown` 即 `MIGRATION_REMOTE_OPERATION_UNRESOLVED`，均记 `blocked-drain`。恢复必须等原操作收据进入 succeeded/failed/cancelled，unknown 不得自动改写为成功或无效果。完成记录携带声明数、原操作总数及 `stopWriteProvable:false`。
 
 ### 3.4 `capture`
 
@@ -317,3 +319,4 @@ resumeMigrationCommitOperation({ privateOutput, signal }):
 - 诊断缝 `onBoundary`/`onCommitStep` 仅供真实子进程崩溃注入与状态整形使用，不能改变状态。
 - E79 加固：fence 与配置事务的 JSON 原子发布在 `rename` 遇到 `EPERM`/`EACCES`/`EBUSY` 时采用首次尝试加最多 5 次重试、固定间隔 50ms；其他错误立即抛出，耗尽后保留最后一个原始错误。临时文件仍由 `atomicJson` 的 `finally` 清理，重试不改变原子性、严格读或任何激活判据。
 - E99：声明 client 的 `remote-revoke-requested/completed` 是 drain 的可选扩展步骤，只证明授权准入的调用与读回顺序，不改写 `drain-completed` 的本地共享排空含义，也不把该证据提升为在途效果或全域停写。
+- E100：`remote-operation-drain-requested/completed` 只读取声明 Agent 的原 operations；active/unknown 均 fail-closed。完成记录不是跨域一致点，不把 terminal 收据单独提升为 `stopWriteProvable`。

@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-11-01：E100 声明 Agent 未决操作结算接入 drain
+
+[E100](evidence/20261101_migration_remote_operation_drain.json) 新增只读 `assertMigrationRemoteOperationsSettled`：核验 config/machine/client 且要求已吊销，原 Agent `operations` 中 `admitted/running/cancel_pending` 阻断为 ACTIVE，`unknown` 阻断为 UNRESOLVED；只有原收据 succeeded/failed/cancelled 才完成。drain 在吊销后追加 `remote-operation-drain-requested/completed`，缺失或失败不得 capture，恢复不重复 request。真实 Store 覆盖 running→cancelled、unknown 阻断和未吊销拒绝；crash 13 用真实 `exit(86)` 验证恢复。组合 **35 项：34 通过、0 失败、1 跳过**；完整两阶段根回归 **1948 项：1866 通过、0 失败、84 跳过**，`check:client` OK。
+
+这只是声明 Agent 原操作状态门，不是跨域一致点或全域停写；尚未以延迟物理写入验证效果层 drain。三标志仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E100.md](HANDOFF-20261101-E100.md)。
+
 ## 2026-11-01：E99 声明 client 吊销接入 drain 哈希链
 
 [E99](evidence/20261101_migration_remote_client_drain.json) 将 E98 适配器接入提交编排：不可变 operation 绑定 `remoteClients` 与摘要，`exclusive-acquired` 后依次写 `remote-revoke-requested`、真实吊销并读回、`remote-revoke-completed`，再允许 capture。未确认吊销记 `blocked-drain` 且无 `capture-started`；恢复不重复 request，真实子进程 `exit(86)` 后由同一 drain 完成。默认路径另以完整 orchestration 吊销真实 Agent 验证，非仅测试回调。组合 **31 项：30 通过、0 失败、1 跳过**；完整两阶段根回归 **1943 项：1861 通过、0 失败、84 跳过**，`check:client` OK。

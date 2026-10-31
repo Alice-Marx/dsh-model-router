@@ -94,6 +94,7 @@ async function scenario (t, { breakCapture = false } = {}) {
 }
 
 const stepNames = inspection => inspection.journal.map(row => row.step)
+const remoteOperationDrain = async ({ clients }) => ({ declaredOperationsSettled: true, clients: clients.map(client => ({ ...client, operations: 0, settled: true })) })
 async function rejection (promise) {
   try { await promise } catch (error) { return error }
   throw new Error('expected a rejection')
@@ -330,15 +331,15 @@ test('orchestration drain: declared remote client revocation is chained before c
     assert.deepEqual(clients, remoteClients)
     return { declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) }
   }
-  const summary = await begin(f.input({ remoteClients, remoteClientQuarantine }))
+  const summary = await begin(f.input({ remoteClients, remoteClientQuarantine, remoteOperationDrain }))
   assert.equal(summary.status, 'blocked-activation')
-  assert.equal(summary.steps, 14)
+  assert.equal(summary.steps, 16)
   assert.equal(calls, 1)
   const inspection = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
-  assert.deepEqual(stepNames(inspection).slice(5, 9), ['exclusive-acquired', 'remote-revoke-requested', 'remote-revoke-completed', 'capture-started'])
+  assert.deepEqual(stepNames(inspection).slice(5, 11), ['exclusive-acquired', 'remote-revoke-requested', 'remote-revoke-completed', 'remote-operation-drain-requested', 'remote-operation-drain-completed', 'capture-started'])
   const operation = await readOperationRecord({ privateOutput: f.privateOutput })
   assert.equal(operation.remoteClientsDigest, sha(json(remoteClients)))
-  assert.equal(inspection.journal.find(row => row.step === 'remote-revoke-completed').evidence.stopWriteProvable, false)
+  assert.equal(inspection.journal.find(row => row.step === 'remote-operation-drain-completed').evidence.stopWriteProvable, false)
 })
 
 test('orchestration drain: an unconfirmed remote revoke blocks capture and resumes without duplicating the request', async t => {
@@ -349,7 +350,7 @@ test('orchestration drain: an unconfirmed remote revoke blocks capture and resum
     if (calls === 1) throw Object.assign(new Error('MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED'), { code: 'MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED' })
     return { declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) }
   }
-  const input = () => f.input({ remoteClients, remoteClientQuarantine })
+  const input = () => f.input({ remoteClients, remoteClientQuarantine, remoteOperationDrain })
   await assert.rejects(begin(input()), { code: 'MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED' })
   const blocked = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
   assert.equal(blocked.summary.status, 'blocked-drain')
@@ -362,5 +363,27 @@ test('orchestration drain: an unconfirmed remote revoke blocks capture and resum
   assert.equal(stepNames(recovered).filter(step => step === 'remote-revoke-requested').length, 1)
   assert.equal(stepNames(recovered).filter(step => step === 'remote-revoke-completed').length, 1)
   assert.ok(stepNames(recovered).indexOf('blocked-drain') < stepNames(recovered).indexOf('remote-revoke-completed'))
-  assert.ok(stepNames(recovered).indexOf('remote-revoke-completed') < stepNames(recovered).indexOf('capture-started'))
+  assert.ok(stepNames(recovered).indexOf('remote-operation-drain-completed') < stepNames(recovered).indexOf('capture-started'))
+})
+
+test('orchestration drain: an active remote operation blocks capture until its original receipt settles', async t => {
+  const f = await scenario(t), remoteClients = [{ configPath: join(f.dir, 'agent-config.json'), machineId: 'machine-a', clientId: 'host' }]
+  const remoteClientQuarantine = async ({ clients }) => ({ declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) })
+  let calls = 0
+  const drain = async ({ clients }) => {
+    calls++
+    if (calls === 1) throw Object.assign(new Error('MIGRATION_REMOTE_OPERATION_ACTIVE'), { code: 'MIGRATION_REMOTE_OPERATION_ACTIVE' })
+    return remoteOperationDrain({ clients })
+  }
+  const input = () => f.input({ remoteClients, remoteClientQuarantine, remoteOperationDrain: drain })
+  await assert.rejects(begin(input()), { code: 'MIGRATION_REMOTE_OPERATION_ACTIVE' })
+  const blocked = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.equal(blocked.summary.status, 'blocked-drain')
+  assert.equal(stepNames(blocked).includes('capture-started'), false)
+  assert.equal(stepNames(blocked).includes('remote-operation-drain-completed'), false)
+  assert.equal((await resume(input())).status, 'blocked-activation')
+  assert.equal(calls, 2)
+  const recovered = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.equal(stepNames(recovered).filter(step => step === 'remote-operation-drain-requested').length, 1)
+  assert.equal(stepNames(recovered).filter(step => step === 'remote-operation-drain-completed').length, 1)
 })

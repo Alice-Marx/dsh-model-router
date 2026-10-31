@@ -356,7 +356,7 @@ test('crash 12: remote revoke requested crashes before capture and resume comple
     calls++
     return { declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) }
   }
-  assert.equal((await resume(f.input({ remoteClients, remoteClientQuarantine }))).status, 'blocked-activation')
+  assert.equal((await resume(f.input({ remoteClients, remoteClientQuarantine, remoteOperationDrain: async ({ clients }) => ({ declaredOperationsSettled: true, clients: clients.map(client => ({ ...client, operations: 0, settled: true })) }) }))).status, 'blocked-activation')
   assert.equal(calls, 1)
   const recovered = await steps(f)
   assert.equal(recovered.filter(step => step === 'remote-revoke-requested').length, 1)
@@ -386,9 +386,29 @@ test('orchestration drain: the default adapter revokes a real Agent before captu
     remoteClientRuntime: process.execPath,
   }))
   assert.equal(summary.status, 'blocked-activation')
-  assert.equal(summary.steps, 14)
+  assert.equal(summary.steps, 16)
   const db = new Database(join(agentDir, 'agent/agent.sqlite'), { readonly: true })
   try { assert.equal(db.prepare('SELECT revoked FROM clients WHERE id=?').get('host').revoked, 1) } finally { db.close() }
   const names = await steps(f)
-  assert.ok(names.indexOf('remote-revoke-completed') < names.indexOf('capture-started'))
+  assert.ok(names.indexOf('remote-operation-drain-completed') < names.indexOf('capture-started'))
+})
+
+test('crash 13: remote operation drain requested crashes before capture and resume rechecks the same operations', async t => {
+  const f = await scenario(t), remoteClients = [{ configPath: join(f.dir, 'agent-config.json'), machineId: 'machine-a', clientId: 'host' }]
+  await crash(f, { crashAt: 'after-step:remote-operation-drain-requested', remoteClients })
+  const interrupted = await stateOf(f)
+  assert.equal(interrupted.journal.at(-1).step, 'remote-operation-drain-requested')
+  assert.equal(interrupted.journal.some(row => row.step === 'capture-started'), false)
+  let calls = 0
+  const remoteOperationDrain = async ({ clients }) => {
+    calls++
+    return { declaredOperationsSettled: true, clients: clients.map(client => ({ ...client, operations: 0, settled: true })) }
+  }
+  const remoteClientQuarantine = async ({ clients }) => ({ declaredCredentialAdmissionBlocked: true, persistentDeclaredExclusion: true, clients: clients.map(client => ({ ...client, revoked: true })) })
+  assert.equal((await resume(f.input({ remoteClients, remoteClientQuarantine, remoteOperationDrain }))).status, 'blocked-activation')
+  assert.equal(calls, 1)
+  const recovered = await steps(f)
+  assert.equal(recovered.filter(step => step === 'remote-operation-drain-requested').length, 1)
+  assert.equal(recovered.filter(step => step === 'remote-operation-drain-completed').length, 1)
+  assert.ok(recovered.indexOf('remote-operation-drain-completed') < recovered.indexOf('capture-started'))
 })

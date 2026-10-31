@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "c9408ffdbe4e876aa1e1a5add09b70f7b2a3f2e2",
+  "parentEvidence": "docs/integration/evidence/20261101_migration_remote_client_drain.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 5, declared Agent original-operation settlement gate before capture; component evidence only",
+  "componentAcceptance": "assertMigrationRemoteOperationsSettled revalidates every declared config/machine/client and requires a revoked client. It reads the original Agent operations table and refuses admitted/running/cancel_pending as MIGRATION_REMOTE_OPERATION_ACTIVE and unknown as MIGRATION_REMOTE_OPERATION_UNRESOLVED. Only original succeeded/failed/cancelled receipts permit completion. Real Store tests cover running -> cancelled recovery, persistent unknown refusal and unrevoked-authority refusal. The orchestration adds remote-operation-drain-requested/completed after client revocation and before capture; active operations block capture and recovery does not duplicate the request. Real subprocess crash 13 exits 86 after the request and resumes to one completed record before capture. The related combination is 35 tests / 34 pass / 0 fail / 1 skipped.",
+  "productAcceptance": "None. This is an original-operation state gate for declared Agents, not a cross-domain consistency point, a delayed physical-write drain test or all-domain stop-write proof. Scores remain 0/20, 1/63 and M0 11/12; activation and post-activation rollback remain unsupported and stopWriteProvable remains false.",
+  "design": "docs/integration/plan/20261031_migration_commit_orchestration.md sections 3.3 and 11",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-remote-operation-drain.mjs": "8e45f947cb74bf4c24ffe129092765e16e783b6d",
+    "packages/orchestration/src/migration-remote-client-quarantine.mjs": "2fb456d6fb47df9ae07d5b268bd44f50c18eead7",
+    "packages/orchestration/src/migration-commit-orchestration.mjs": "d6c23a5f6c73ffafaed9262b6755c01bc2600bb3",
+    "tests/migration-remote-operation-drain.native.mjs": "818413a4a1fd3b8a94530a2b24a9e65178ac322a",
+    "tests/migration-commit-orchestration.test.mjs": "f32473be4859c2f050b16d3b5af633d2d341c422",
+    "tests/migration-commit-orchestration.native.mjs": "d5a4fc47e09330edf1256b7b77ed43640d31c600",
+    "tests/fixtures/migration-commit-orchestration-crash.mjs": "d65f08ed7fd1c8657b1b63e17842b747bd3e0b01",
+    "package.json": "97091e144fa6456a77fafd5a19b2d735a86b92c1"
+  },
+  "implementation": [
+    "The read-only component shares the canonical config and identity inspector with client revocation and never infers settlement from Host state.",
+    "Pending IDs are bounded in errors. Unknown outcomes remain unresolved rather than being converted to success, cancellation or no-effect.",
+    "The drain chain validates that the result covers every declaration with settled:true and records the original operation count without claiming stop-write proof.",
+    "Capture refuses to run unless both client revocation and original-operation settlement are complete. Crash recovery retains one request and performs the read-only check again.",
+    "The default production path is exercised against a real Agent with no pending operations; real Store lifecycle tests cover pending and unknown states."
+  ],
+  "testRuns": [
+    "Two real Store settlement tests plus orchestration and crash 12/13: 35 tests / 34 pass / 0 fail / 1 skipped.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1590/1586/0/4 and phase two 359/279/0/80; total 1948 tests, 1866 pass, 0 fail, 84 skipped."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "The tests use real Store operation state transitions, not a deliberately delayed physical file write. Effect-level timing and OS-handle closure remain separate evidence requirements.",
+    "Only declared Agent clients are inspected. Unknown writers, other clients or machines and direct OS writes remain outside the gate.",
+    "Terminal original receipts are necessary for this component, but do not by themselves establish a cross-domain consistency point or global stop-write proof.",
+    "No real user profile, model inference, production process, push or release was used."
+  ]
+}

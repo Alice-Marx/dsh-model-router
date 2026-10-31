@@ -10,6 +10,7 @@ import { inventoryMigrationWriters } from './migration-writer-inventory.mjs'
 import { createMigrationDataArchive, verifyMigrationDataArchive } from './migration-data-archive.mjs'
 import { createMigrationLedgerArchive, verifyMigrationLedgerArchive } from './migration-ledger-export.mjs'
 import { quarantineMigrationRemoteClients } from './migration-remote-client-quarantine.mjs'
+import { assertMigrationRemoteOperationsSettled } from './migration-remote-operation-drain.mjs'
 
 const fail = (code, details) => { throw Object.assign(new Error(code), { code, ...(details ? { details } : {}) }) }
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -29,6 +30,8 @@ const FORWARD_STEPS = new Map(Object.entries({
   'exclusive-acquired': 'drain',
   'remote-revoke-requested': 'drain',
   'remote-revoke-completed': 'drain',
+  'remote-operation-drain-requested': 'drain',
+  'remote-operation-drain-completed': 'drain',
   'capture-started': 'capture',
   'capture-verified': 'capture',
   'maintenance-started': 'maintenance',
@@ -315,9 +318,11 @@ function nextAction (state) {
     case 'fence-intent-persisted':
     case 'drain-started':
     case 'drain-completed':
-    case 'remote-revoke-requested': return 'fence'
+    case 'remote-revoke-requested':
+    case 'remote-operation-drain-requested': return 'fence'
     case 'exclusive-acquired':
     case 'remote-revoke-completed':
+    case 'remote-operation-drain-completed':
     case 'capture-started': return 'capture'
     case 'capture-verified':
     case 'maintenance-started': return 'maintenance'
@@ -563,6 +568,24 @@ async function fencePhase (ctx) {
       throw error
     }
   }
+  if (remoteClients.length && !ctx.steps.some(row => row.step === 'remote-operation-drain-completed')) {
+    if (!ctx.steps.some(row => row.step === 'remote-operation-drain-requested')) {
+      await appendStep(ctx, 'drain', 'remote-operation-drain-requested', { remoteClients: remoteClients.length, remoteClientsDigest: operation.remoteClientsDigest })
+    }
+    try {
+      const drain = typeof ctx.options.remoteOperationDrain === 'function' ? ctx.options.remoteOperationDrain : assertMigrationRemoteOperationsSettled
+      const result = await drain({ Database: ctx.options.Database, clients: remoteClients, signal: ctx.signal })
+      if (result?.declaredOperationsSettled !== true || !Array.isArray(result.clients) || result.clients.length !== remoteClients.length || result.clients.some((client, index) => client.settled !== true || client.machineId !== remoteClients[index].machineId || client.clientId !== remoteClients[index].clientId)) {
+        fail('MIGRATION_REMOTE_OPERATION_DRAIN_INVALID')
+      }
+      await appendStep(ctx, 'drain', 'remote-operation-drain-completed', { remoteClients: result.clients.length, remoteOperations: result.clients.reduce((sum, client) => sum + client.operations, 0), declaredOperationsSettled: true, stopWriteProvable: false })
+    } catch (error) {
+      const code = error?.code ?? 'MIGRATION_REMOTE_OPERATION_UNRESOLVED'
+      if (!code.startsWith('MIGRATION_REMOTE_OPERATION_')) throw error
+      await block(ctx, 'drain', 'blocked-drain', code, { remoteClients: remoteClients.length })
+      throw error
+    }
+  }
 }
 
 async function recheckCapture (ctx) {
@@ -586,7 +609,7 @@ const CAPTURE_CODES = /^(MIGRATION_CAPTURE_|MIGRATION_LEDGER_|MIGRATION_PRIVATE_
 
 async function capturePhase (ctx) {
   const operation = ctx.operation
-  if ((operation.remoteClients ?? []).length && !ctx.steps.some(row => row.step === 'remote-revoke-completed')) return fencePhase(ctx)
+  if ((operation.remoteClients ?? []).length && (!ctx.steps.some(row => row.step === 'remote-revoke-completed') || !ctx.steps.some(row => row.step === 'remote-operation-drain-completed'))) return fencePhase(ctx)
   await acquireFence(ctx, 'capture')
   await assertOwnerAndFence(ctx)
   await observeGate(ctx, 'capture')

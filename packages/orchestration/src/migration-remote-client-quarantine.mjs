@@ -27,7 +27,7 @@ function validateClients(clients) {
   }
 }
 
-async function inspect(client, Database) {
+export async function inspectMigrationRemoteClient(client, Database) {
   const configPath = await canonical(client.configPath, false)
   const bytes = await readFile(configPath)
   if (bytes.length > 65536) fail('MIGRATION_REMOTE_CLIENT_INPUT_INVALID')
@@ -43,7 +43,7 @@ async function inspect(client, Database) {
     const row = db.prepare('SELECT id,revoked,revision FROM clients WHERE id=?').get(client.clientId)
     if (!row) fail('MIGRATION_REMOTE_CLIENT_IDENTITY_MISMATCH', { machineId: client.machineId, clientId: client.clientId })
     if (![0, 1].includes(row.revoked)) fail('MIGRATION_REMOTE_CLIENT_STATE_INVALID', { machineId: client.machineId, clientId: client.clientId })
-    return { ...client, configPath, configSha256: createHash('sha256').update(bytes).digest('hex'), alreadyRevoked: row.revoked === 1 }
+    return { ...client, configPath, dataDir, configSha256: createHash('sha256').update(bytes).digest('hex'), alreadyRevoked: row.revoked === 1 }
   } finally { db.close() }
 }
 
@@ -53,13 +53,13 @@ export async function quarantineMigrationRemoteClients({ Database, cli = '/usr/l
   const executable = await canonical(cli, false), launcher = runtime === undefined ? executable : await canonical(runtime, false)
   const prefix = runtime === undefined ? [] : [executable]
   const rows = []
-  for (const client of clients) rows.push(await inspect(client, Database))
+  for (const client of clients) rows.push(await inspectMigrationRemoteClient(client, Database))
   const completed = []
   for (const row of rows) {
     if (signal?.aborted) fail('MIGRATION_REMOTE_CLIENT_CANCELLED', { completed })
     try {
       if (!row.alreadyRevoked) await execute(launcher, [...prefix, 'revoke', row.configPath, row.clientId], { timeout: 10000, windowsHide: true, maxBuffer: 65536, signal })
-      const verified = await inspect(row, Database)
+      const verified = await inspectMigrationRemoteClient(row, Database)
       if (verified.configSha256 !== row.configSha256) fail('MIGRATION_REMOTE_CLIENT_CONFIG_CHANGED', { machineId: row.machineId, clientId: row.clientId })
       if (!verified.alreadyRevoked) fail('MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED', { machineId: row.machineId, clientId: row.clientId })
       completed.push({ machineId: row.machineId, clientId: row.clientId, configSha256: row.configSha256, revoked: true, alreadyRevoked: row.alreadyRevoked })
