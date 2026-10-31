@@ -128,3 +128,16 @@ E83 增加非 root 委托合同：`cgroupRoot` 默认 `/sys/fs/cgroup`，也可�
 专项连续三轮 1/1，相关 remote-write + in-flight + 新套件组合 18 项、17 通过、0 失败、1 跳过；完整两阶段根回归 1935 项、1851 通过、0 失败、84 跳过。初版两次失败均保留：合成恢复时钟落后于真实 service runner 导致 `TASK_RUNNER_BUSY`；修正后又因停止竞态使目标已结束、`recover()` 返回 0。第四次回复保持屏障用于消除该测试竞态，不改变产品代码。
 
 边界：Host 和 Agent 位于同一受控测试进程，HTTP 仅 loopback；这不是独立 Agent OS 进程、跨机网络、生产账户或机器重启证据。它只补齐真实 Agent 写路径及未确认效果的 Windows 组件证据，`stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 继续 false，W06.15 不销项。
+
+## 15. 独立 Agent OS 进程的真实外部效果与 Windows Job 隔离（E95）
+
+E94 的 Host 与 Agent 同处一个受控进程。本节把 Agent 拆成独立 OS 进程：新 fixture 自行创建真实 `Agent`、配对并把 Streamable HTTP 服务监听到 `127.0.0.1:0`，再经 ready 文件交回 `{pid, machineId, token, port}`；Host fixture 以 `spawn(process.execPath)` 启动它，不再在同进程内建 Agent 或 server。写路径仍是真实 `remote-write`、Task service/journal 与 loopback HTTP，目标效果不手写。
+
+- 进程独立性是断言，不是假设：停止前要求 `agentPid !== hostPid` 且两个 PID 都能被 `process.kill(pid,0)` 命中；Job 关闭后要求两个 PID 都变成 `ESRCH`，因此“Job 连带回收 Agent”是被观测的，而不是从 `treeStopped` 推断的。
+- 前三次写入仍由 Host 逐项确认；第四次真实文件与 Agent succeeded 收据已存在而 Host 回复被 fixture 屏障保持，attempt 保持 running、效果未确认。
+- 停止后的观测不再对刚被杀死的 WAL 库做原地只读打开：把 `agent.sqlite` 与 `agent.sqlite-wal` 复制到一次性目录后读副本，并对 `agent/` 下全部 `agent*` 文件（store、WAL、shm、instance 库与其 journal、lock）做含文件名的 SHA-256 指纹。窗口前后指纹与操作收据必须完全一致，“停止后没有新提交”因此由字节级证据支持，而不只是两条查询结果相等。
+- 冷恢复仍走产品 `recover()`：第四次 attempt 为 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，`possiblyApplied` 不被错误清除。
+
+失败留痕：原地只读打开刚被 Job 杀死的 WAL 库在修复前 5 轮中失败 3 轮（`SQLITE_IOERR_TRUNCATE`），而同一批文件事后由新进程以 readonly / readonly+immutable / readwrite 三种方式打开都正常，因此判定为观测方式与被杀写者遗留 wal-index/shm 状态的交互，不是文件内容或产品回归。修复只替换观测方式，并顺带把断言加强到字节级，未改产品代码；修复后专项连续 6 轮 1/1。
+
+边界：Host 与 Agent 虽是独立 OS 进程，仍同机、同一 Windows Job、仅 loopback；它不是跨机网络、Job 之外的写者、生产账户或机器重启证据。`stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 继续 false，W06.15 不销项。

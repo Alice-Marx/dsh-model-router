@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "2674d0104b8f41c915b84df4466d20c65a316a91",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_remote_effect_quarantine.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4, a real Host process and a real Agent OS process linked only by loopback HTTP, stopped together by one Windows Job; component evidence only",
+  "componentAcceptance": "Win11: the Agent runs as its own OS process (tests/fixtures/migration-remote-effect-agent.mjs builds the real Agent, pairs it and serves Streamable HTTP on 127.0.0.1:0) and the Host fixture spawns it with process.execPath. The Host still drives real remote-write Task service/journal submissions over loopback HTTP and never writes an effect file directly. Before the stop the test asserts agentPid !== hostPid and that both PIDs answer process.kill(pid,0). Three writes are Host-acknowledged; the fourth real file and Agent succeeded receipt exist while the fixture holds the Host reply, so the attempt stays running with the effect unconfirmed. launchMigrationProcessTree().stop() returns treeStopped:true/windows-job-close and both PIDs reach ESRCH. A 500ms window then shows no change in: the sorted file list and SHA-256 over every project filename and content; a name-inclusive SHA-256 over every agent* file in the Agent data directory (store, -wal, -shm, instance store and journal, lock); the Agent operation rows read from a copy snapshot; and heartbeat/active content and mtime. Product recover() marks the fourth attempt needs-reconciliation with HOST_INTERRUPTED/unknown and preserves possiblyApplied.",
+  "productAcceptance": "None. Both processes are independent OS processes but still share one machine and one Windows Job, and only loopback HTTP. This is not a cross-machine network, an Agent outside the Job, a production account, a machine reboot or an all-domain stop-write proof. Scores remain 0/20, 1/63 and M0 11/12; stopWriteProvable, activationSupported and postActivationRollbackSupported remain false.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md section 15",
+  "sourceGitBlobs": {
+    "tests/fixtures/migration-remote-effect-agent.mjs": "cf26f8c8f31cc93a1d52da1e7e158e7ab753eab3",
+    "tests/fixtures/migration-remote-effect-writer.mjs": "8d54ddc7455483f19d512ad740882f4f635e5298",
+    "tests/migration-remote-effect-quarantine.native.mjs": "f5479e5c42a9482cd3daeb334b6c46ceed942725",
+    "package.json": "4417cbab1e30b9d39ebf020bf5a5d99662acbda0"
+  },
+  "implementation": [
+    "The Agent moved out of the Host process: the new fixture creates the real Agent with a synthetic project root, pairs it and serves the real transport on 127.0.0.1:0, then reports {pid, machineId, token, port} through a ready file. The Host fixture no longer imports Agent or serve.",
+    "The Host fixture spawns that fixture with process.execPath and pairs/binds the machine through the product remote machine store using the reported token and port, so the write path is unchanged product code over a real socket between two processes.",
+    "The test proves process independence rather than assuming it: it requires agentPid !== hostPid and that both PIDs are alive before the stop, then that both are ESRCH after the Job close.",
+    "Post-stop observation no longer opens the just-killed WAL store in place. It copies agent.sqlite and agent.sqlite-wal into a one-shot directory and reads the copy, and it fingerprints every agent* file byte-for-byte with names included, so 'no commit after the stop' is supported by file bytes and not only by two equal query results.",
+    "Cold recovery still uses the product journal recover() path; the interrupted attempt stays unknown, so an already applied remote effect is neither reported as success nor rolled back.",
+    "No product source was modified; the new fixture is registered implicitly through the existing suite entry in the root npm test command."
+  ],
+  "testRuns": [
+    "New suite after the observation fix: six consecutive standalone runs, each 1 test / 1 pass / 0 fail.",
+    "Related remote-write + in-flight-Task + remote-effect combination: 18 tests / 17 pass / 0 fail / 1 skipped.",
+    "npm run check:client: OK.",
+    "Phase one of npm test: 1587 tests / 1583 pass / 0 fail / 4 skipped. Phase two: 348 tests / 268 pass / 0 fail / 80 skipped. Total 1935 tests / 1851 pass / 0 fail / 84 skipped."
+  ],
+  "preservedFailures": [
+    "The first working-tree version of this test read the just-killed Agent WAL store in place with a readonly connection and failed 3 of 5 runs with SQLITE_IOERR_TRUNCATE (extended code SQLITE_IOERR_TRUNCATE from PRAGMA data_version).",
+    "The same files opened normally from a fresh process immediately after a failing run, in readonly, readonly+immutable and readwrite, so the failure was traced to the observation method interacting with the wal-index/-shm state left by the killed writer, not to file contents or a product regression.",
+    "The observation was therefore replaced by a copy snapshot plus byte fingerprints, which is strictly stronger evidence; no product code and no assertion about the stop or the recovery semantics was weakened.",
+    "Failure counts before and after the change are recorded here rather than silently dropped: 5 runs with 2 pass / 3 fail before, 6 runs with 6 pass after."
+  ],
+  "limitations": [
+    "Host and Agent are separate OS processes but on the same machine, inside the same Windows Job and linked only by loopback HTTP. Reaching the Agent from outside the Job is untested, so the Job reaping the Agent is evidence about Job ownership, not about a writer the Job cannot reach.",
+    "The quiet window starts after the Job stop and the ESRCH observation of both PIDs; it is not a durable write-fence guarantee and does not cover unknown writers.",
+    "Machine reboot, other launchers/accounts, cross-machine effects, all data domains, activation and post-activation rollback remain open.",
+    "No real user profile, model inference, production process, push or release was used."
+  ]
+}

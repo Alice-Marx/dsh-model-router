@@ -1,5 +1,13 @@
 # 一体化工程进度
 
+## 2026-10-31：E95 独立 Agent 进程的真实外部效果停止证据
+
+[E95](evidence/20261031_migration_remote_effect_process_quarantine.json) 把 Agent 从 Host 进程拆出为独立 OS 进程：新 fixture 自建真实 `Agent`、配对并在 `127.0.0.1:0` 提供 Streamable HTTP，Host 仍以真实 `remote-write` 与 Task service/journal 经 loopback 调用；停止前断言 `agentPid !== hostPid` 且两个 PID 都存活。第四次真实文件与 Agent succeeded 收据存在而 Host 回复被屏障保持时，Windows Job 关闭后两个 PID 都 `ESRCH`，500ms 内 `agent/` 全部 store/WAL/shm/instance/journal/lock 的含名摘要、项目文件摘要、操作收据、heartbeat/active 内容与 mtime 均不变；冷恢复仍为 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，不清除 `possiblyApplied`。
+
+观测改为“副本快照 + 字节指纹”后专项连续 6 轮 1/1；相关组合 **18 项：17 通过、0 失败、1 跳过**；两阶段根回归 phase one 1587/1583/0/4 与 phase two 348/268/0/80 合计 **1935 项：1851 通过、0 失败、84 跳过**。修复前对刚被 Job 杀死的 WAL 库做原地只读打开在 5 轮中失败 3 轮（`SQLITE_IOERR_TRUNCATE`），而同一批文件事后由新进程打开正常，故只替换观测方式、未改产品代码，失败如实留痕。
+
+这仍只是同机、同一 Windows Job 内的独立进程证据，不是跨机网络、Job 之外的写者、生产账户、机器重启或全域停写；`stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261031-E95.md](HANDOFF-20261031-E95.md)。
+
 ## 2026-10-31：E94 真实 Agent loopback 外部效果停止证据
 
 [E94](evidence/20261031_migration_remote_effect_quarantine.json) 以真实 `remote-write`、Task service/journal 和 loopback HTTP Agent 连续完成四次合成文件写入；第四次 Agent 操作已成功但 Host 回复被确定性保持。Windows Job 停止后，500ms 内全部文件内容摘要、Agent 操作/收据与 `data_version`、heartbeat/active 内容及 mtime 均不变；冷恢复保持 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，不把已存在效果误判为成功或回滚。专项连续三轮 1/1，相关组合 **18 项：17 通过、0 失败、1 跳过**；完整两阶段根回归 **1935 项：1851 通过、0 失败、84 跳过**，`check:client` OK。初版合成恢复时钟与停止竞态两次失败均留痕，未改产品代码。
