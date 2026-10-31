@@ -73,7 +73,7 @@ W08 依赖调度、取消与恢复
   W08.2 completed Host 崩溃重启核对原 attempt，不重复执行不重复计费
   W08.3 completed 并发限额：每 Bot 并发兑现、等待可见、不丢任务
   W08.4 completed agent 去重与冲突
-  W08.5 in_progress 依赖调度：失败阻塞下游、独立分支继续、整树取消
+  W08.5 completed 依赖调度：失败阻塞下游、独立分支继续、整树取消
 
 W09 远程 agent 与配对
   W09.1 completed agent协议主体、存储、配对/授权/撤销与Streamable HTTP传输

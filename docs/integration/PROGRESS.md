@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E105 W08.5 依赖调度步骤闭合
+
+[E105](evidence/20261101_dag_dependency_acceptance.json) 复验当前产品既有场景 **28/28**：失败及传递下游 blocked、独立分支和跨 Bot 分支 succeeded；整树取消中止所有运行分支、跳过等待 join 并等待清理；真实 remote-write 验证已应用效果不回滚、未启动后代不写入。另有 unknown 保持 cancelling、原操作对账后释放锁、冷恢复依赖边不丢等证据。W08.5 因此标为 completed；这只是实施步骤闭合，W08 整包和关联场景不自动通过，正式仍 **0/20、1/63、M0 11/12**。本轮无产品代码改动，最近全量根回归仍为 E104 的 1957 项、0 失败，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E105.md](HANDOFF-20261101-E105.md)。
+
 ## 2026-11-01：E104 Windows 计划任务适配器与本机权限未验
 
 [E104](evidence/20261101_migration_windows_launcher_quarantine.json) 新增计划任务 XML 指纹绑定的 Disable/Stop/Enable 适配器及真实 AtLogOn writer 用例。两次唯一合成任务注册均被 `0x80070005` 拒绝，显式当前用户 + Limited/Interactive principal 也失败；未提权、未改系统权限、未触碰现有任务。最终套件 **4 项：1 通过、0 失败、3 跳过**，真实 writer 与指纹负例均记未验而非通过；完整两阶段根回归 **1957 项：1872 通过、0 失败、87 跳过**，`check:client` OK。

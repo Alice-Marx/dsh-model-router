@@ -668,14 +668,15 @@
           "id": "W08.5",
           "key": "dag-dependencies",
           "title": "依赖调度：失败阻塞下游、独立分支继续、整树取消",
-          "status": "in_progress",
+          "status": "completed",
           "evidence": [
             "docs/integration/evidence/20261028_dependency_scheduler.json",
             "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
             "docs/integration/evidence/20261030_bound_stop_proof.json",
             "docs/integration/evidence/20261030_stop_proof_regression.json",
             "docs/integration/evidence/20261030_write_cancel_effects.json",
-            "docs/integration/evidence/20261031_superagent_alignment.json"
+            "docs/integration/evidence/20261031_superagent_alignment.json",
+            "docs/integration/evidence/20261101_dag_dependency_acceptance.json"
           ]
         }
       ]
