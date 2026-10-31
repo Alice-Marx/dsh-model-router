@@ -513,7 +513,7 @@
         {
           "id": "W06.15",
           "key": "os-launcher-quarantine",
-          "title": "停写栅栏切片4：OS/launcher隔离适配器（Windows Job、Linux cgroup、systemd、DS/MR JSON、SDK、SQLite、Task journal、真实Agent loopback效果与独立Agent OS进程效果已验；跨机效果、机器重启与全域停写未验）",
+          "title": "停写栅栏切片4：OS/launcher隔离适配器（Windows Job、Linux cgroup、systemd、DS/MR JSON、SDK、SQLite、Task journal、真实Agent loopback效果、独立Agent OS进程与Job外写者负例已验；跨机效果、机器重启与全域停写未验）",
           "status": "in_progress",
           "evidence": [
             "docs/integration/plan/20261031_migration_os_quarantine.md",
@@ -528,7 +528,8 @@
             "docs/integration/evidence/20261031_migration_task_journal_quarantine.json",
             "docs/integration/evidence/20261031_migration_task_inflight_quarantine.json",
             "docs/integration/evidence/20261031_migration_remote_effect_quarantine.json",
-            "docs/integration/evidence/20261031_migration_remote_effect_process_quarantine.json"
+            "docs/integration/evidence/20261031_migration_remote_effect_process_quarantine.json",
+            "docs/integration/evidence/20261031_migration_remote_effect_outside_job.json"
           ]
         }
       ]

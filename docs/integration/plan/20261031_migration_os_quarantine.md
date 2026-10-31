@@ -141,3 +141,16 @@ E94 的 Host 与 Agent 同处一个受控进程。本节把 Agent 拆成独立 O
 失败留痕：原地只读打开刚被 Job 杀死的 WAL 库在修复前 5 轮中失败 3 轮（`SQLITE_IOERR_TRUNCATE`），而同一批文件事后由新进程以 readonly / readonly+immutable / readwrite 三种方式打开都正常，因此判定为观测方式与被杀写者遗留 wal-index/shm 状态的交互，不是文件内容或产品回归。修复只替换观测方式，并顺带把断言加强到字节级，未改产品代码；修复后专项连续 6 轮 1/1。
 
 边界：Host 与 Agent 虽是独立 OS 进程，仍同机、同一 Windows Job、仅 loopback；它不是跨机网络、Job 之外的写者、生产账户或机器重启证据。`stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 继续 false，W06.15 不销项。
+## 16. Job 之外的 Agent：Job 级停止的边界负例（E96）
+
+E95 把 Agent 拆成独立进程，但它仍是 Job 的子进程，所以 "Job 关闭后 Agent 也死" 只证明了 Job 拥有者的回收能力。本节反过来测边界：让 Agent 完全在 Job 之外，再用一个从未进入该 Job 的 Host 证明它仍能提交真实效果。
+
+- Agent fixture 原样复用，但由测试进程直接 spawn，因此它是测试的子进程、不属于任何 Windows Job；Host fixture 增加可选接入参数，给出 agent ready 文件时不自己 spawn，而是使用这个既存 Agent，两者只通过真实 HTTP endpoint 与已配对密钥相连。
+- Job 内的 Host 先完成四次真实写入（三次 Host 确认，第四次回复被屏障保持）。`stop()` 返回 `treeStopped:true` / `windows-job-close` 后，Host PID 为 `ESRCH`，而 Job 之外的 Agent PID 仍存活——这是被断言的期望结果，不是偶发。
+- 随后一个全新的 Host 在 Job 之外启动（自己的 authority、principal 目录、machine store、Task journal 与 remote-write backend），重新配对同一台机器并提交一个任务：状态 `succeeded`、Agent `operations` 出现第五条真实 succeeded 收据、`outside-effect.txt` 真实落到项目中。
+- 被杀死 Host 的中断 attempt 仍然恢复为 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，且 `executionRef.operationId` 不等于后一次写入的操作号：后来的效果不会替它结案。
+- 结论按负例记录：Job 级停止能证明 Job 拥有的进程树被回收，不能证明有有效凭据、位于 Job 之外的写者被停住。这正是 `stopWriteProvable` 保持 false 的原因，而不是需要掩盖的失败。
+
+同源缺陷清理：本轮首次完整两阶段回归有 1 项失败——`migration-sqlite-quarantine` 在 Job 杀死 WAL 写者后做原地只读打开，报 `SQLITE_IOERR_TRUNCATE`，与 E95 已诊断并只在该套件内修掉的是同一类缺陷。因此把同一观测模式在 `migration-task-journal-quarantine`（停止后新开只读连接）与 `migration-task-inflight-quarantine`（停止后 snapshot 与 observer）一并改为副本快照 + 含名字节指纹，in-flight 的 pinned observer 连接改到停止前打开，不再对被杀写者留下的库新开连接。三套件各连续三轮通过，最终完整两阶段回归 0 失败。
+
+边界：Agent 仍同机、仅 loopback；负例只证明 Job 范围不足，不设计也不验证全域栅栏（机器级 fence、凭据吊销或跨 Job 监管），因此 `stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 继续 false，W06.15 不销项。

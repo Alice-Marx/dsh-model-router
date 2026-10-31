@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-31",
+  "parentCheckpoint": "9f2c691dbfbc33f9509855a3b8e568a3acc1660f",
+  "parentEvidence": "docs/integration/evidence/20261031_migration_remote_effect_process_quarantine.json",
+  "actualModelCalls": 0,
+  "level": "stop-fence slice 4 boundary, a Windows Job close proven insufficient for an Agent that runs outside the Job; component and limitation evidence only",
+  "componentAcceptance": "Win11: the real Agent runs as its own OS process outside any Job (spawned by the test), while the Host runs inside launchMigrationProcessTree(). The Job Host attaches to that outside Agent through the product remote machine store and completes four real writes over loopback HTTP, three Host-acknowledged and the fourth held by the reply barrier. After stop() returns treeStopped:true/windows-job-close, the Host PID reaches ESRCH while the outside Agent PID stays alive. A second Host, started outside the Job and sharing neither the Job nor the killed Host's journal, then pairs with that same Agent and commits a fifth real effect: state succeeded, a real Agent operation receipt, and outside-effect.txt present in the project. The killed Host's interrupted attempt still recovers as needs-reconciliation HOST_INTERRUPTED/unknown and is never resolved by that later effect.",
+  "productAcceptance": "None. This is the negative boundary that keeps stopWriteProvable false: a Job-scoped stop provably ends the tree the Job owns and provably does not end a writer with valid credentials outside it. Scores remain 0/20, 1/63 and M0 11/12; stopWriteProvable, activationSupported and postActivationRollbackSupported remain false.",
+  "design": "docs/integration/plan/20261031_migration_os_quarantine.md section 16",
+  "sourceGitBlobs": {
+    "tests/fixtures/migration-remote-effect-outside-writer.mjs": "1cd91939f441be3917111040672ba52bf34cfcf4",
+    "tests/fixtures/migration-remote-effect-writer.mjs": "d0d5a2daa5ecc7487cd40d2e871b4e20e720738a",
+    "tests/migration-remote-effect-outside-job.native.mjs": "f9b4854059f6b3c701fd2ea282951426be599110",
+    "tests/migration-sqlite-quarantine.native.mjs": "d382a15993d870df29b94534e0bf8301c76bacc4",
+    "tests/migration-task-journal-quarantine.native.mjs": "68e12d16035f0b6b8512f98535f04ff2015ee4fa",
+    "tests/migration-task-inflight-quarantine.native.mjs": "3cc708a19f93a9099c33525c28404197ae6e87be",
+    "package.json": "4b04408fb8cc72560ea9bfe6b4981a2182b7132c"
+  },
+  "implementation": [
+    "The Agent fixture is reused unchanged: the test spawns it directly, so the Agent is a child of the test process and never enters the Windows Job.",
+    "The Host writer fixture gained an optional attach argument: given an agent ready file it uses that already-running Agent instead of spawning one, so the Job Host and the outside Agent are linked only by the real HTTP endpoint and paired secret.",
+    "A second fixture runs a complete product Host outside the Job: its own authority, principal directory, machine store, Task journal and remote-write backend. It pairs with the same machine, submits one task and records state, task, operation and both PIDs.",
+    "The new suite asserts the negative explicitly: the Job reaps the Host it started, the outside Agent survives, the outside Host is still admitted, the effect file appears, the Agent's real receipt count goes from four to five, and the killed Host's interrupted attempt still resolves to unknown.",
+    "Three sibling quarantine suites that opened the just-killed WAL store in place were hardened the same way as E95 (copy snapshot plus name-inclusive byte fingerprints, and the pinned observer connection in the in-flight suite is now opened before the stop). No product source was modified.",
+    "The new native suite is registered in the root npm test command."
+  ],
+  "testRuns": [
+    "New suite: three consecutive standalone runs, each 1 test / 1 pass / 0 fail.",
+    "Hardened sibling suites (sqlite, task journal, in-flight): three consecutive rounds, each 7 tests / 4 pass / 0 fail / 3 skipped.",
+    "Related remote-write + in-flight + remote-effect + outside-job combination: 19 tests / 18 pass / 0 fail / 1 skipped.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1587 tests / 1583 pass / 0 fail / 4 skipped, phase two 349 tests / 269 pass / 0 fail / 80 skipped; total 1936 tests, 1852 pass, 0 fail, 84 skipped."
+  ],
+  "preservedFailures": [
+    "The first full two-phase run of this step failed one test: migration-sqlite-quarantine died with SQLITE_IOERR_TRUNCATE on a readonly in-place open of the store the Job had just killed. That is the same defect class E95 diagnosed and fixed only inside its own suite.",
+    "That failure was not dismissed as unrelated: the same observation pattern was found in migration-task-journal-quarantine (fresh readonly open after the stop) and migration-task-inflight-quarantine (snapshot and observer opened after the stop), and all three were converted to copy snapshots and byte fingerprints before the final run.",
+    "The failing suite was preserved as evidence of the class (docs/integration/evidence/20261031_migration_sqlite_quarantine.json still records the original three-round result); no product assertion was weakened and no suite was skipped."
+  ],
+  "limitations": [
+    "The outside Agent still lives on the same machine and is reachable only over loopback; it is not a cross-machine or production network deployment.",
+    "The negative proves a Job-scoped stop cannot fence a writer the Job does not own. It does not design or verify the mechanism that would (a machine-wide fence, credential revocation or cross-Job supervision), and stopWriteProvable therefore stays false.",
+    "The outside Host re-pairs the same machine identity with the same secret; credential revocation semantics for a stopped Host are not exercised.",
+    "Machine reboot, other launchers/accounts, all data domains, activation and post-activation rollback remain open.",
+    "No real user profile, model inference, production process, push or release was used."
+  ]
+}

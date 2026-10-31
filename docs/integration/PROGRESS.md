@@ -1,5 +1,12 @@
 # 一体化工程进度
 
+## 2026-10-31：E96 Job 之外的 Agent 与 Job 级停止边界负例
+
+[E96](evidence/20261031_migration_remote_effect_outside_job.json) 把 Agent 放到 Windows Job 之外（由测试进程直接 spawn），Job 内的 Host 通过真实 remote-write 与 loopback HTTP 完成四次写入后，`stop()` 回 `treeStopped:true`/`windows-job-close`、Host PID 为 `ESRCH`，而 Job 外的 Agent 仍存活。随后一个从未进入该 Job 的 Host 重新配对同一台机器并提交任务：`succeeded`、Agent 出现第五条真实收据、`outside-effect.txt` 真实落盘；被杀死 Host 的中断 attempt 仍为 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，不被后来的效果结案。这是 Job 级停止不足的负例证据，正是 `stopWriteProvable` 保持 false 的原因。
+
+同源缺陷清理：首次完整两阶段回归有 1 项失败（`migration-sqlite-quarantine` 对刚被杀的 WAL 库原地只读打开，`SQLITE_IOERR_TRUNCATE`），与 E95 已诊断的同一类；因此把 `migration-task-journal-quarantine`、`migration-task-inflight-quarantine` 的同类观测一并改为副本快照 + 含名字节指纹，并把 in-flight 的 pinned observer 移到停止前打开。新专项连续三轮 1/1，三套加固件连续三轮各 7 项（4 通过 / 3 跳过），相关组合 **19 项：18 通过、0 失败、1 跳过**，最终两阶段根回归 phase one 1587/1583/0/4 与 phase two 349/269/0/80 合计 **1936 项：1852 通过、0 失败、84 跳过**。
+
+这仍只是同机、仅 loopback 的边界证据，不是跨机网络、生产账户或机器重启；也**不**设计全域栅栏（机器级 fence、凭据吊销、跨 Job 监管）。`stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261031-E96.md](HANDOFF-20261031-E96.md)。
 ## 2026-10-31：E95 独立 Agent 进程的真实外部效果停止证据
 
 [E95](evidence/20261031_migration_remote_effect_process_quarantine.json) 把 Agent 从 Host 进程拆出为独立 OS 进程：新 fixture 自建真实 `Agent`、配对并在 `127.0.0.1:0` 提供 Streamable HTTP，Host 仍以真实 `remote-write` 与 Task service/journal 经 loopback 调用；停止前断言 `agentPid !== hostPid` 且两个 PID 都存活。第四次真实文件与 Agent succeeded 收据存在而 Host 回复被屏障保持时，Windows Job 关闭后两个 PID 都 `ESRCH`，500ms 内 `agent/` 全部 store/WAL/shm/instance/journal/lock 的含名摘要、项目文件摘要、操作收据、heartbeat/active 内容与 mtime 均不变；冷恢复仍为 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，不清除 `possiblyApplied`。
