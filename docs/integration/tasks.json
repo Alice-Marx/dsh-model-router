@@ -1578,12 +1578,13 @@
     },
     {
       "id": "T20",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_remote_agent.json"
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261101_path_escape_acceptance.json"
       ],
-      "notes": "Traversal, absolute paths, Windows drive letters, ADS and symlink/junction escapes fail before reads or writes at the agent. OS-boundary claims for native same-account modes remain separate.",
-      "verifiedOn": "2026-10-27",
+      "notes": "Current real Agent tests reject traversal, absolute paths, Windows drive/UNC forms, ADS, symlink/junction escapes and private hardlink aliases before read/write. Public siblings remain readable, control stores stay protected and workspace admission resolves aliases to the same physical root. Current revalidation is 38 tests / 37 pass / 0 fail / 1 skipped; earlier three-platform evidence covers the skipped Linux descriptor case. T20 criteria are covered without claiming an OS sandbox for hostile same-account processes.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },

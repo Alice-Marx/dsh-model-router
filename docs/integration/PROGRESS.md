@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E117 T20 文件路径逃逸验收闭合
+
+[E117](evidence/20261101_path_escape_acceptance.json) 复验真实 Agent：`../`、绝对路径、Windows 盘符/UNC、ADS、symlink/junction 与私有 hardlink 均在读写前拒绝；公开兄弟路径和控制数据保护不受影响。相关组合 **38 项：37 通过、0 失败、1 跳过**，既有三平台证据覆盖 Linux 描述符腿。T20 以 integration 级别 passed，正式为 **0/20、13/63、M0 11/12**。这不是同账户恶意进程 OS 沙箱结论。无产品代码变化，最近全量根回归为 E116 的 1974 项、0 失败，未推送/发布。当前交接为 [HANDOFF-20261101-E117.md](HANDOFF-20261101-E117.md)。
+
 ## 2026-11-01：E116 T19 产品与协议不兼容验收闭合
 
 [E116](evidence/20261101_protocol_compatibility.json) 新增 API major=2 与 MCP 不兼容处理：分别返回 `MACHINE_VERSION_UNSUPPORTED` / `MACHINE_MCP_VERSION_UNSUPPORTED`，携带要求版本和实际值；call 包装保留指引文本与 details。每个协商只请求一次，无 operation，已有有效机器记录不受损。发现并补齐根回归遗漏的 `remote-machines.native.mjs` 注册，最终全量 **1974 项：1889 通过、0 失败、83 跳过**，`check:client` OK。T19 以 integration 级别 passed，正式为 **0/20、12/63、M0 11/12**。未推送/发布，当前交接为 [HANDOFF-20261101-E116.md](HANDOFF-20261101-E116.md)。

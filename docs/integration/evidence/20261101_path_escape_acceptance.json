@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "588f21379aab7bfc8c22666e67d3b0ce0c3aa959",
+  "parentEvidence": "docs/integration/evidence/20261028_remote_private_paths.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T20 criteria are covered by real Agent tests. Traversal, absolute paths, Windows drive/UNC forms, ADS, symlink/junction escapes and private hardlink aliases are refused before read or write. Public siblings remain usable, control data is always protected and aliases resolve to the same physical root. Current revalidation is 38 tests / 37 pass / 0 fail / 1 skipped; earlier three-platform evidence covers the Linux descriptor case.",
+  "productAcceptance": "T20 passes at integration level. This is not a claim that application checks are an OS sandbox for hostile same-account native processes. Formal scores are 0/20 work packages, 13/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/remote-private-roots.native.mjs": "9aded452ab695f38bc088dc0ea87dcbb73db3eb5",
+    "tests/workspace-agent.native.mjs": "8c1ab5917fdbdd06d0396f6f79083b52965f11d9",
+    "tests/remote-write-tasks.native.mjs": "0464dab2dc3a48487168fb4fa71cf9acb05c96b1"
+  },
+  "testRuns": [
+    "remote-private-roots + workspace-agent + remote-write + workspace-identity: 38 tests / 37 pass / 0 fail / 1 skipped.",
+    "No product source changed. The latest full root regression remains E116: 1974 tests, 1889 pass, 0 fail, 83 skipped."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "Application path controls do not replace a dedicated OS account/container boundary for hostile native processes.",
+    "No real model inference, production process, push or release was used."
+  ]
+}
