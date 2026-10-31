@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E108 T10 并发限额压测验收闭合
+
+[E108](evidence/20261101_concurrency_load_acceptance.json) 新增真实 service/journal 压测：24 个包跨两个 Bot，单 Bot 并发上限 2、服务/机器活动上限 4。连续三轮确认 ready/running 等待可见，所有包最终 succeeded，每个原 attempt 只执行一次、后端恰好调用 24 次，无丢任务、重复派发或忙循环。相关组合 **29/29**；完整两阶段根回归 **1958 项：1873 通过、0 失败、87 跳过**，`check:client` OK。T10 以 integration 级别 passed，正式为 **0/20、4/63、M0 11/12**；W08 仍待 T12。初版 fixture 使用不符合合同的工作区写后端而被拒绝，改为真实 read 压测，工作区互斥仍由 T11 专证。未推送/发布，当前交接为 [HANDOFF-20261101-E108.md](HANDOFF-20261101-E108.md)。
+
 ## 2026-11-01：E107 T09 依赖失败与独立分支验收闭合
 
 [E107](evidence/20261101_dependency_failure_acceptance.json) 汇总并复核 E105/E106 的当前产品证据：失败直接/传递下游 blocked，合法独立只读与跨 Bot 分支 succeeded，父任务 failed 而非误报成功；实际默认 Host 保留旧串行 managed Task 语义，真实 remote-write 只阻塞依赖后代，冷恢复保留依赖边和原身份。T09 全部判据已满足，以 integration 级别 passed；正式为 **0/20、3/63、M0 11/12**。T10 压测、T12 混合 CLI/远程命令树仍未完成，W08 继续 in_progress。本轮无产品代码变化，最近全量根回归仍为 E104 的 1957 项、0 失败，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E107.md](HANDOFF-20261101-E107.md)。

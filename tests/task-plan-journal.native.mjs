@@ -187,3 +187,26 @@ test('plan service/native: authenticated owner replay survives detached original
   assert.throws(()=>f.service.submitPlan(f.subject,{...request,plan:{...value,planRevision:2}},{owner:true}),/TASK_REQUEST_CONFLICT/)
   assert.throws(()=>f.service.submitPlan(f.subject,request),/UNKNOWN_SUBJECT/)
 })
+
+test('plan service/native: configured load keeps Bot and machine ceilings with visible waiting and no duplicate dispatch',async t=>{
+  const active={total:0,machine:0,bots:new Map()},maximum={total:0,machine:0,bots:new Map()};let calls=0
+  const backend={id:'fixture',version:'v1',effect:'read',machineId:'machine-a',workspaceId:'workspace-a',location:'remote',capability:'execution/read',retryCapability:'execution/retry',parse:input=>input,
+    async run(context){
+      calls++;active.total++;active.machine++;active.bots.set(context.ownerBotId,(active.bots.get(context.ownerBotId)??0)+1)
+      maximum.total=Math.max(maximum.total,active.total);maximum.machine=Math.max(maximum.machine,active.machine)
+      for(const [bot,count] of active.bots)maximum.bots.set(bot,Math.max(maximum.bots.get(bot)??0,count))
+      try{await sleep(30);return{outcome:'succeeded'}}finally{active.total--;active.machine--;active.bots.set(context.ownerBotId,active.bots.get(context.ownerBotId)-1)}
+    }}
+  const f=await serviceFixture(t,{backends:[backend],concurrencyFor:()=>2})
+  const packages=Array.from({length:24},(_,index)=>pkg(`read-${index}`,[],{targetBotId:index%2?'bot-b':'bot-a',effectClass:'read'}))
+  const submitted=f.service.submitPlan(f.subject,{requestKey:'load',plan:plan(packages,'load-plan')})
+  const waiting=await wait(()=>{if(calls<4)return null;const value=f.service.getPlan(f.subject,{planId:submitted.planId});return value.packages.some(item=>item.state==='ready')&&value.packages.some(item=>item.state==='running')?value:null})
+  assert.ok(waiting.packages.filter(item=>item.state==='ready').length>0,'queued work is visible instead of spinning invisibly')
+  const result=await wait(()=>{const value=f.service.getPlan(f.subject,{planId:submitted.planId});return value.state==='succeeded'&&value})
+  assert.equal(result.packages.length,24)
+  assert.ok(result.packages.every(item=>item.state==='succeeded'&&item.attemptId),'every package settles once with its original attempt')
+  assert.equal(calls,24,'no package is lost or dispatched twice')
+  assert.ok(maximum.machine<=4,'the service-wide machine ceiling is never exceeded')
+  for(const maximumForBot of maximum.bots.values())assert.ok(maximumForBot<=2)
+  assert.ok(maximum.total<=4,'the two Bot configured ceilings are never exceeded')
+})

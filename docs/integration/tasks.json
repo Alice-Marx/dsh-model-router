@@ -1407,16 +1407,17 @@
     },
     {
       "id": "T10",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
         "tests/cli-execution.native.mjs",
-        "docs/integration/evidence/20261028_atomic_task_admission.json"
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261101_concurrency_load_acceptance.json"
       ],
-      "level": "actual rc.3 host / offline fixture model + native",
-      "environment": "Shipped default entry on a real rc.3 host with a binding whose maxConcurrentTasks is 2; native service suite",
-      "notes": "A binding with maxConcurrentTasks 2 runs two managed Tasks for one Bot at the same time and both stay cancellable, an unconfigured Bot keeps one active task, the runner caps active tasks, and waiting-budget is a visible state that expires at the task deadline instead of parking forever. A load test against the configured package/Bot/machine ceilings has not been run. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed.",
-      "verifiedOn": "2026-10-28"
+      "level": "integration",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; actual default Host plus native service with 24 packages across two Bots",
+      "notes": "The default Host runs two managed Tasks concurrently with maxConcurrentTasks 2. The new real service load test submits 24 packages across two Bots with per-Bot concurrency 2 and service-wide active cap 4: every per-Bot maximum is <=2, total/machine activity is <=4, ready/running waiting is visible, all 24 settle succeeded with one original attempt and exactly 24 backend calls. No loss, duplicate dispatch or busy-loop dispatch is observed; unrelated deadline expiry and cancellation evidence remains.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T11",
