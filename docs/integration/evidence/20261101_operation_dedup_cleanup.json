@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "f64ab54de830da15500fb3ede5be842006c0672f",
+  "parentEvidence": "docs/integration/evidence/20261028_atomic_task_admission.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "A dedicated real remote-write flow now covers T15 artifact cleanup. After a successful write, the produced file is deleted and the same request is submitted again. The original succeeded Task/operation is returned with one fs_write and one operation row, and the file is not recreated. Changed content still raises TASK_REQUEST_CONFLICT. Native journal dedup also survives fresh connections and archived runs.",
+  "productAcceptance": "T15 passes at integration level: same operation ID plus same digest returns the original record, altered digest conflicts and dedup survives artifact cleanup. Dedup does not restore or roll back artifacts. Formal scores are 0/20 work packages, 8/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/remote-write-tasks.native.mjs": "0464dab2dc3a48487168fb4fa71cf9acb05c96b1"
+  },
+  "testRuns": [
+    "remote-write including the new artifact-cleanup dedup case: 15 tests / 15 pass / 0 fail.",
+    "node scripts/integration-task-probe.mjs: 29 tests / 29 pass / 0 fail with verified SQLite driver.",
+    "npm run check:client: OK.",
+    "Final npm test: phase one 1590/1586/0/4 and phase two 371/288/0/83; total 1960 tests, 1875 pass, 0 fail, 83 skipped."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "The test proves identity dedup after artifact deletion, not artifact restoration, rollback or garbage collection semantics.",
+    "No real model inference, production process, push or release was used."
+  ]
+}

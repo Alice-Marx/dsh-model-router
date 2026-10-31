@@ -1502,15 +1502,16 @@
     },
     {
       "id": "T15",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "tests/task-journal.native.mjs",
-        "tests/task-reconciliation.test.mjs"
+        "tests/task-reconciliation.test.mjs",
+        "docs/integration/evidence/20261101_operation_dedup_cleanup.json"
       ],
-      "level": "native",
-      "environment": "Native journal and reconciliation suites on Node 24",
-      "notes": "The same operation id with the same digest returns the original record, a different digest conflicts (TASK_REQUEST_CONFLICT), observation keys are durable and idempotent, and dedup survives a fresh connection to the same database. Artifact cleanup followed by dedup is covered by the archived-run replay protection rather than a dedicated product flow.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; real Agent remote-write plus native journal",
+      "notes": "The same request returns the original Task/operation and a changed digest conflicts. A dedicated real product flow now deletes the produced file after success and resubmits: the original succeeded identity is returned with one fs_write and one operation row, and the file is not recreated. Dedup also survives fresh connections and archived runs. All T15 criteria are covered without implying that dedup rolls back or restores artifacts.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T16",

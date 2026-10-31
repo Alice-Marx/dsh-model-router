@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdir,mkdtemp,writeFile,readFile} from 'node:fs/promises'
+import {mkdir,mkdtemp,writeFile,readFile,unlink} from 'node:fs/promises'
 import {resolve,join} from 'node:path'
 import {setTimeout as sleep} from 'node:timers/promises'
 import Database from 'better-sqlite3'
@@ -51,6 +51,12 @@ test('remote write: real scoped Agent operation is journaled before dispatch and
 })
 test('remote write: duplicate command replays original Task/operation; altered content conflicts without another write',async t=>{
  const f=await fixture(t),a=f.submit();await f.settled(a);const b=f.submit();assert.equal(b.taskId,a.taskId);assert.equal(b.operationId,a.operationId);assert.throws(()=>f.submit('write',{content:'different'}),/TASK_REQUEST_CONFLICT/);assert.equal(f.calls.filter(t=>t==='fs_write').length,1)
+})
+test('remote write: dedup survives artifact cleanup without recreating the file or operation',async t=>{
+ const f=await fixture(t),a=f.submit(),done=await f.settled(a);assert.equal(done.state,'succeeded');await unlink(join(f.project,'new.txt'))
+ const replay=f.submit(),restored=await f.settled(replay);assert.equal(restored.taskId,a.taskId);assert.equal(restored.operationId,a.operationId);assert.equal(restored.state,'succeeded')
+ assert.equal(f.calls.filter(t=>t==='fs_write').length,1);assert.equal(f.agent.store.db.prepare('SELECT count(*) n FROM operations').get().n,1)
+ await assert.rejects(readFile(join(f.project,'new.txt')),{code:'ENOENT'})
 })
 test('remote write: file CAS refusal preserves the file and gives a terminal operation receipt',async t=>{
  const f=await fixture(t),task=f.submit('cas',{relativePath:'probe.txt',expectedHash:'0'.repeat(64)}),done=await f.settled(task);assert.equal(done.state,'failed');assert.equal(await readFile(join(f.project,'probe.txt'),'utf8'),'original fixture');assert.equal(done.result.summary.code,'FILE_CHANGED');assert.equal(done.result.summary.stopConfirmed,true)

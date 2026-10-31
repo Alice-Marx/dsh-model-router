@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E112 T15 agent 去重与产物清理验收闭合
+
+[E112](evidence/20261101_operation_dedup_cleanup.json) 新增真实产品场景：成功写入后删除目标文件，再提交同一请求，仍返回原 succeeded Task/operation，`fs_write` 与 operation 都保持一次，文件不重建；不同摘要继续冲突。remote-write **15/15**、journal **29/29**；完整两阶段根回归 **1960 项：1875 通过、0 失败、83 跳过**，`check:client` OK。T15 以 integration 级别 passed，正式为 **0/20、8/63、M0 11/12**。去重不等于恢复或回滚产物，未推送/发布。当前交接为 [HANDOFF-20261101-E112.md](HANDOFF-20261101-E112.md)。
+
 ## 2026-11-01：E111 T14 真实远程断网与重连验收闭合
 
 [E111](evidence/20261101_remote_network_reconnect.json) 新增真实独立 Agent 断网测试：文件与 succeeded 收据先落盘，再 SIGKILL Agent 并切断 Host 回复，Host 为 needs-reconciliation/unknown；正常 Agent 同 dataDir 重启后重新配对新端口，只读对账原 operation 为 succeeded，`fs_write` 仍恰好一次、操作库仍一行、文件不变。专项连续三轮通过，相关组合 **15/15**；完整两阶段根回归 **1959 项：1874 通过、0 失败、87 跳过**，`check:client` OK。T14 以 integration 级别 passed，正式为 **0/20、7/63、M0 11/12**。两次 fixture 等待与 revision 错误已留痕修正，未改产品行为。未推送/发布，当前交接为 [HANDOFF-20261101-E111.md](HANDOFF-20261101-E111.md)。
