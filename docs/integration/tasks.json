@@ -1590,13 +1590,14 @@
     },
     {
       "id": "T21",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_remote_agent.json",
-        "docs/integration/evidence/20261030_workspace_admission_mount.json"
+        "docs/integration/evidence/20261030_workspace_admission_mount.json",
+        "docs/integration/evidence/20261101_external_hash_conflict.json"
       ],
-      "notes": "Symlink/junction escapes are rejected before reads and writes in the isolated agent. Adversarial same-account native races are documented as outside the application API and still require the dedicated OS account/container profile. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open.",
-      "verifiedOn": "2026-10-30",
+      "notes": "When expectedHash does not match an externally changed file, the operation fails with FILE_CHANGED and the original bytes remain unchanged. Even a matching current hash returns OVERWRITE_UNSUPPORTED rather than forcing replacement; existing directories and external-creator wins are preserved. Real stop receipts and create-only/dedup semantics remain intact. Current suites have 24 passing checks and 32 Linux-only skips on Windows, with prior Linux evidence for those paths. T21 criteria are covered without claiming every hostile native race is eliminated.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },

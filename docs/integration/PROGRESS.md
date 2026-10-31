@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E118 T21 外部修改与哈希冲突验收闭合
+
+[E118](evidence/20261101_external_hash_conflict.json) 复验真实 CAS：外部修改导致 `FILE_CHANGED` 时原字节不变；即使哈希匹配也返回 `OVERWRITE_UNSUPPORTED`，不强制替换，外部创建者获胜。真实停止回执与 create-only/dedup 语义保持。相关组合 **56 项：24 通过、0 失败、32 个 Linux-only 跳过**，既有 Linux 证据覆盖。T21 以 integration 级别 passed，正式为 **0/20、14/63、M0 11/12**。无产品代码变化，最近全量根回归为 E116 的 1974 项、0 失败，未推送/发布。当前交接为 [HANDOFF-20261101-E118.md](HANDOFF-20261101-E118.md)。
+
 ## 2026-11-01：E117 T20 文件路径逃逸验收闭合
 
 [E117](evidence/20261101_path_escape_acceptance.json) 复验真实 Agent：`../`、绝对路径、Windows 盘符/UNC、ADS、symlink/junction 与私有 hardlink 均在读写前拒绝；公开兄弟路径和控制数据保护不受影响。相关组合 **38 项：37 通过、0 失败、1 跳过**，既有三平台证据覆盖 Linux 描述符腿。T20 以 integration 级别 passed，正式为 **0/20、13/63、M0 11/12**。这不是同账户恶意进程 OS 沙箱结论。无产品代码变化，最近全量根回归为 E116 的 1974 项、0 失败，未推送/发布。当前交接为 [HANDOFF-20261101-E117.md](HANDOFF-20261101-E117.md)。
