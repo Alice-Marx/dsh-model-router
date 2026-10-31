@@ -67,9 +67,14 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
         body: JSON.stringify(body), signal: AbortSignal.any([AbortSignal.timeout(35000), ...(signal ? [signal] : [])]) }))
     } catch (error) { if (signal?.aborted) throw signal.reason; if (/^[A-Z][A-Z0-9_]{0,80}$/.test(error?.code)) throw error; fail('MACHINE_CONNECTION_FAILED') }
   }
-  const issue = async (record,botId,scope,identity,signal) => {
-    const secret = await resolveSecret(record.config.secretRef)
+  const secretFor = async record => {
+    let secret
+    try { secret = await resolveSecret(record.config.secretRef) } catch { fail('MACHINE_SECRET_UNAVAILABLE') }
     if (typeof secret !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(secret)) fail('MACHINE_SECRET_UNAVAILABLE')
+    return secret
+  }
+  const issue = async (record,botId,scope,identity,signal) => {
+    const secret = await secretFor(record)
     signal?.throwIfAborted()
     const value = await request(record.config,'/control/v1/grants',secret,{ botId, taskId: identity.taskId, attemptId: identity.attemptId, roots: scope.roots, tools: scope.tools, ttlMs: 60000 },signal)
     if (value.machineId !== record.id || value.agentApiMajor !== 1 || value.botId !== botId || value.taskId !== identity.taskId || value.attemptId !== identity.attemptId || typeof value.grantToken !== 'string') fail('MACHINE_IDENTITY_MISMATCH')
@@ -83,7 +88,7 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
     return response.result.structuredContent
   }
   const remoteRevoke = async (record,botId,signal) => {
-    const secret = await resolveSecret(record.config.secretRef)
+    const secret = await secretFor(record)
     const value = await request(record.config,'/control/v1/grants/revoke',secret,{botId},signal)
     if (value.machineId !== record.id || value.agentApiMajor !== 1) fail('MACHINE_IDENTITY_MISMATCH')
     return { remoteRevoked: true }

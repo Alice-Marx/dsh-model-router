@@ -1515,16 +1515,17 @@
     },
     {
       "id": "T16",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_remote_agent.json",
         "docs/integration/evidence/20261027_m4_product_machines.json",
         "docs/integration/evidence/20261028_remote_auth_abuse.json",
         "docs/integration/evidence/20261028_auth_rotation_body_race.json",
-        "docs/integration/evidence/20261029_remote_write_tasks.json"
+        "docs/integration/evidence/20261029_remote_write_tasks.json",
+        "docs/integration/evidence/20261101_machine_secret_redaction.json"
       ],
-      "notes": "Agent pairing stores only a digest, rejects unpaired or revoked clients before any tool action and rotates/revokes locally. Host secretRef flow, machine page and diagnostics-export redaction are not implemented. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E43 closes the header/body rotation race: old client rows cannot issue/revoke newer grants, paused old requests fail after rotation, revoked tickets cannot list capabilities, and clock rollback keeps cooling finite. New10-check auth suite plus full1446/three-machine native44/defaultHost36 pass. A previous-code negative witness has exactly four expected failures. E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open.",
-      "verifiedOn": "2026-10-29",
+      "notes": "Invalid or revoked credentials fail uniformly before tool admission with no operation row. Public read models, diagnostics and SQLite never contain pairing tokens, and host-only secret UI prevents Bot sharing. E113 closes a real leak: resolveSecret exceptions containing an endpoint/token are now normalized to MACHINE_SECRET_UNAVAILABLE instead of propagating private text into model-facing errors. New regression asserts no tool action and no secret in error text, projection or database. Existing 401 and audit redaction evidence covers the remaining criteria.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
     },

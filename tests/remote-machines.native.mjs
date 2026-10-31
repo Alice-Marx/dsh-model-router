@@ -36,6 +36,19 @@ test('machine host: verifies real Agent identity before pairing; SQLite and publ
   await assert.rejects(f.directory.pair({...f.pair,machineId:'machine-wrong'},context),/MACHINE_IDENTITY_MISMATCH/)
   assert.equal(f.directory.readModel().items.length,1)
 })
+test('machine host: secret resolver failures are uniform and redacted before any tool action',async t=>{
+  let f
+  f=await fixture(t,{resolveSecret:async()=>{throw new Error(`resolver failed at ${f.endpoint} with ${f.paired.token}`)}})
+  let error
+  try{await f.directory.pair(f.pair,context)}catch(value){error=value}
+  assert.equal(error.code,'MACHINE_SECRET_UNAVAILABLE')
+  assert.equal(error.message,'MACHINE_SECRET_UNAVAILABLE')
+  assert.equal(JSON.stringify(error).includes(f.paired.token),false)
+  assert.equal(JSON.stringify(f.directory.readModel()).includes(f.paired.token),false)
+  assert.equal(f.directory.readModel().items.length,0)
+  assert.equal(f.agent.store.db.prepare('SELECT count(*) n FROM operations').get().n,0)
+  assert.equal((await readFile(f.config.file)).includes(Buffer.from(f.paired.token)),false)
+})
 test('machine host: only owner can pair/bind/probe/revoke; scopes are ceilings with CAS and explicit read-only enforcement',async t=>{
   const f=await fixture(t)
   await assert.rejects(f.directory.pair(f.pair,{kind:'agent'}),/REMOTE_OWNER_REQUIRED/)

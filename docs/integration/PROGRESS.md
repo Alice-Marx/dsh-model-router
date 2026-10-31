@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E113 T16 凭据失败与诊断脱敏闭合
+
+[E113](evidence/20261101_machine_secret_redaction.json) 修复真实泄漏：`resolveSecret` 抛出含端点/token 的错误时，`openRemoteMachines` 原样外传，可能进入模型消息。现统一为 `MACHINE_SECRET_UNAVAILABLE`，配对/吊销共用脱敏读取。新增测试断言零工具动作、零 operation，错误文本/公开投影/SQLite 均无 token；既有 401、审计脱敏与 host-only secret UI 证据覆盖其余判据。相关组合 **36/36**；完整两阶段根回归 **1961 项：1876 通过、0 失败、83 跳过**，`check:client` OK。T16 以 integration 级别 passed，正式为 **0/20、9/63、M0 11/12**。未推送/发布，当前交接为 [HANDOFF-20261101-E113.md](HANDOFF-20261101-E113.md)。
+
 ## 2026-11-01：E112 T15 agent 去重与产物清理验收闭合
 
 [E112](evidence/20261101_operation_dedup_cleanup.json) 新增真实产品场景：成功写入后删除目标文件，再提交同一请求，仍返回原 succeeded Task/operation，`fs_write` 与 operation 都保持一次，文件不重建；不同摘要继续冲突。remote-write **15/15**、journal **29/29**；完整两阶段根回归 **1960 项：1875 通过、0 失败、83 跳过**，`check:client` OK。T15 以 integration 级别 passed，正式为 **0/20、8/63、M0 11/12**。去重不等于恢复或回滚产物，未推送/发布。当前交接为 [HANDOFF-20261101-E112.md](HANDOFF-20261101-E112.md)。
