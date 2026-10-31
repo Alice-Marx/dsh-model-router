@@ -530,7 +530,8 @@
             "docs/integration/evidence/20261031_migration_remote_effect_quarantine.json",
             "docs/integration/evidence/20261031_migration_remote_effect_process_quarantine.json",
             "docs/integration/evidence/20261031_migration_remote_effect_outside_job.json",
-            "docs/integration/evidence/20261101_migration_remote_client_quarantine.json"
+            "docs/integration/evidence/20261101_migration_remote_client_quarantine.json",
+            "docs/integration/evidence/20261101_migration_remote_client_recovery.json"
           ]
         }
       ]

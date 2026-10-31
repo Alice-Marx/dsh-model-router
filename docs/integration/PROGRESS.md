@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-11-01：E98 可重入的声明 client 吊销适配器
+
+[E98](evidence/20261101_migration_remote_client_recovery.json) 新增 `quarantineMigrationRemoteClients`：预检全部 config/machine/client 身份，真实 CLI 吊销后读回 Agent SQLite 的持久 revoked 状态，config 摘要保持一致才记 completed；失败保留当前目标、completed 和原始 cause。真实测试覆盖成功与重入跳过、离线重试、双 Agent 第二项失败后仅恢复未确认项、身份 mismatch 零副作用。专项连续三轮 **4/4**，与 E97 组合 **5/5**；完整两阶段根回归 **1941 项：1857 通过、0 失败、84 跳过**，`check:client` OK。首轮 3 项失败根因为 Windows 不能直接 spawn `.mjs` 的 `EFTYPE`，已增加显式受信 Node runtime，失败留痕。
+
+组件只证明声明 client 的持久授权排除，尚未被迁移 drain 调用，不停止在途效果或覆盖其他 client/机器/OS 写者；`stopWriteProvable` 等三标志仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E98.md](HANDOFF-20261101-E98.md)。
+
 ## 2026-11-01：E97 声明 pairing client 的授权栅栏
 
 [E97](evidence/20261101_migration_remote_client_quarantine.json) 复用真实 Agent 本地 `dsh-remote-agent revoke` 原语，验证 E96 的 Job 外写入缺口可按声明 client 关闭：第一次真实外部写入完成后吊销 `host`，Agent 进程仍存活；吊销前已签发但尚未执行的 fs_write grant 再调用得到 HTTP 401 / `AUTH_INVALID`，另一个全新 Host 持旧 pairing secret 也无法重新配对。两条路径均无目标文件、无新 operation，原 succeeded 收据不变。专项连续三轮 1/1，与 E96 及 remote-auth 组合 **12/12**；完整两阶段根回归 **1937 项：1853 通过、0 失败、84 跳过**，`check:client` OK。首次等待失败是测试把文本 stack 误按 JSON 读取，修正后通过，未改产品代码。

@@ -165,3 +165,13 @@ E96 的后续 Host 能重新配对，是因为 Job 停止不触碰长期 client 
 - 新专项连续三轮 1/1；与 E96 负例及 remote-auth 组合 12/12；完整两阶段根回归 1937 项、1853 通过、0 失败、84 跳过。首次测试等待 20 秒失败是 fixture 把 stack 写成 UTF-8 文本而测试误按 JSON 解析，改为读取文本后通过；产品行为未改。
 
 该证据只覆盖**明确声明的 Agent dataDir + clientId**，且只证明吊销后新请求与尚未执行的已签发 grant 被拒绝。吊销前已经在执行的写效果仍需 drain/stop 证据；其他 client、其他机器、直接 OS 写者与未知 launcher 不在此范围。CLI 是机器本地管理面，本轮未接入远程部署或迁移编排，也未验证 rotate/恢复。故仍不设置全域 `stopWriteProvable`，W06.15 保持 in_progress。
+
+## 18. 可重入的声明 client 吊销适配器（E98）
+
+新增 owner-only `quarantineMigrationRemoteClients({Database,cli,runtime,clients,execute,signal})`，把 E97 的原语变成可由迁移 drain 调用的恢复组件。输入仅接受 1–64 个 `{configPath,machineId,clientId}`，config/dataDir/database/CLI/runtime 都必须是真实绝对路径且非符号链接；先读完全部目标并核对 machine/client 身份，再开始任何吊销，避免输入错误造成先做后验。
+
+- 每个 config 记录 SHA-256；调用真实 CLI `revoke` 后重新打开真实 Agent SQLite，核对 config 未变、机器未变且 client `revoked=1`。只有读回成功才进入 completed；异常统一为 `MIGRATION_REMOTE_CLIENT_REVOKE_UNCONFIRMED`，附当前目标、已完成项与原始 cause。
+- 已吊销项由持久状态识别并跳过，不重复执行 CLI。离线返回 completed 空、状态不变，恢复后可完成；双 Agent 第二项失败时第一项保持 revoked，重跑只调用第二项，最终两项读回通过。错误 machineId 在任何 revoke 前拒绝。
+- Windows 的 `.mjs` 不是可直接 spawn 的原生可执行文件，故增加显式 `runtime`：用受信 `process.execPath` 启动受信 CLI，参数数组不含 shell。首轮 4 项有 3 项因该实现缺陷失败，保留 cause 为 `EFTYPE`；修正 runtime 后连续三轮 4/4，相关组合 5/5，完整根回归 **1941 项、1857 通过、0 失败、84 跳过**。
+
+结果只声明 `declaredCredentialAdmissionBlocked:true` 与 `persistentDeclaredExclusion:true`，继续返回 `externalRestartBlocked:false`、`persistentExternalExclusion:false`、`stopWriteProvable:false`。本组件尚未被迁移编排 drain 调用，不覆盖在途效果、其他 client/机器或直接 OS 写者，也不提供 rotate/release；W06.15 与激活门禁不提升。
