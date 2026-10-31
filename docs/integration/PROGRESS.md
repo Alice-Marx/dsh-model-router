@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-10-31：E93 累计源码与证据本地检查点
+
+[E93](evidence/20261031_reproducible_checkpoint.json) 清理四个已确认临时产物，将累计一体化源码、测试、部署组件与证据提交为本地检查点 `cf56c388034835e878d47c60eadef89a9d936575`；695 个文件变更，提交后工作树干净，差异格式检查通过。`check:client` 与 `integration:check` 通过；完整两阶段根回归合计 **1934 项：1850 通过、0 失败、84 跳过**。这是本地检查点而非干净检出复现或成熟发布，未推送/发布，0 真实模型推理。门禁仍 **0/20、1/63、M0 11/12**，真实迁移激活、全域停写、激活后回退和生产验收仍开放。当前交接为 [HANDOFF-20261031-E93.md](HANDOFF-20261031-E93.md)。
+
 ## 2026-10-31：E92 C9 产品 gate→writer 原子准入
 
 [E92](evidence/20261031_product_migration_admission.json) 将共享准入接入 `startBotProduct`：`openProductFunding` 前先 `acquireMigrationShared` 并再次 `assertMigrationStartupAllowed`，writer 整个生命周期持有，启动失败与 dispose 均释放。存活组合 drain 超时，pending gate 拒绝创建并释放，关闭后独占成功。fence 与 atomic-rename 纳入发布清单。两项产品测试通过，完整两阶段根回归合计 **1934 项：1850 通过、0 失败、84 跳过**；`check:client` OK、文档 26/26。
