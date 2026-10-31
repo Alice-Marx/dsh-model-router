@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "ffedf383a644511bd4bb786a40d8fd31005a787c",
+  "parentEvidence": "docs/integration/evidence/20261028_atomic_task_admission.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T13 criteria are covered. Real process exits cover pre-dispatch, post-dispatch and receipt-persistence boundaries. Recovery restores the original attempt and operation, leaves unknown work unreplayed, restores committed receipts without another model dispatch or duplicate invoice and preserves original artifacts. The actual default Host reconstructs Bot identity, grants, machines and bindings after cold start. Current recovery revalidation totals 67 passing checks, including 29/29 through the required integration-task-probe SQLite driver entry.",
+  "productAcceptance": "T13 passes at integration level. This does not claim physical power-loss testing or universal exactly-once for every external provider. Formal scores are 0/20 work packages, 6/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/task-admission.native.mjs": "142dd099afb1f735fc1257c49c21fd8246c246fa",
+    "tests/task-journal.native.mjs": "8b70646cd756ac70da5a8df6c359374a7014c4b2",
+    "tests/unknown-receipt-resolution.native.mjs": "89cd3840092324dfa58ef4c724fce7b658f94ab8",
+    "tests/task-retry-stop-evidence.native.mjs": "8b16403910899dcd52890e8bfce182b18b77218b",
+    "scripts/integration-task-probe.mjs": "f22695f78463c135fc9ef5ffb399ade77563d594"
+  },
+  "testRuns": [
+    "Atomic admission real crash suite, unknown receipt resolution and stop-evidence suites: 38 checks passed.",
+    "node scripts/integration-task-probe.mjs: 29 tests / 29 pass / 0 fail with verified better-sqlite3 13.0.3.",
+    "E106 actual default Host cold-start identity and dependency recovery checks passed with actualModelCalls=0.",
+    "No product source changed. The latest full root regression remains E108: 1958 tests, 1873 pass, 0 fail, 87 skipped."
+  ],
+  "preservedFailures": [
+    "The first direct invocation of task-journal.native.mjs failed its required DSH_TASK_DRIVER assertion. This was an invocation error, not a product failure; the required integration-task-probe entry then passed 29/29."
+  ],
+  "limitations": [
+    "The tests use deliberate process exits and offline controlled providers, not physical power loss or public-provider recovery.",
+    "T12 mixed native CLI/remote command-tree cancellation remains open.",
+    "No real model inference, production process, push or release was used."
+  ]
+}
