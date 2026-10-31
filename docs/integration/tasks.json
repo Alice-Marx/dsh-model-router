@@ -1392,16 +1392,18 @@
     },
     {
       "id": "T09",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261028_dependency_scheduler.json",
         "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
-        "docs/integration/evidence/20261029_remote_write_tasks.json"
+        "docs/integration/evidence/20261029_remote_write_tasks.json",
+        "docs/integration/evidence/20261101_dag_dependency_acceptance.json",
+        "docs/integration/evidence/20261101_dependency_failure_acceptance.json"
       ],
-      "notes": "Native journal and real rc.3 default-product offline probes verify failure propagation, blocked undispatched successors, independent read branch success, no false whole-plan success and cold-restart identity/edge preservation. The full root suite and legacy-policy Host probe preserve existing serial semantics. Real model/planner and full deployment acceptance remain open. E54: actual scoped remote file-write Tasks now pass14 checks plus2 UI receipt checks; real default Host40/root1643/finance33 on three platforms. Original op dedup, CAS, lock retention on unknown, status-only cold reconcile and cancellation effects verified. Lost-response fixture coverage is partial; real network break/restore and process-command acceptance remain open. Commands/browser/desktop facades, native CLI/OS isolation and full acceptance remain open.",
-      "level": "actual rc.3 default Host / offline fixture + native",
-      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; isolated test homes",
-      "verifiedOn": "2026-10-29"
+      "notes": "Current journal/service scenarios prove direct and transitive downstream blocking while independent read and cross-Bot branches succeed and the parent finishes failed rather than succeeded. The actual default Host exercises the same dependency plan and preserves legacy serial managed Task behavior. Real remote-write confirms failure blocks only the downstream package, and cold restart retains dependency edges and identities. All T09 criteria are covered; other scenarios and deployment acceptance remain separate.",
+      "level": "integration",
+      "environment": "Win11 / Node24.20.0 / SQLite13.0.3; actual rc.3 default Host with offline fixture model and native SQLite journal",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T10",

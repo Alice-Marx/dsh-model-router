@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E107 T09 依赖失败与独立分支验收闭合
+
+[E107](evidence/20261101_dependency_failure_acceptance.json) 汇总并复核 E105/E106 的当前产品证据：失败直接/传递下游 blocked，合法独立只读与跨 Bot 分支 succeeded，父任务 failed 而非误报成功；实际默认 Host 保留旧串行 managed Task 语义，真实 remote-write 只阻塞依赖后代，冷恢复保留依赖边和原身份。T09 全部判据已满足，以 integration 级别 passed；正式为 **0/20、3/63、M0 11/12**。T10 压测、T12 混合 CLI/远程命令树仍未完成，W08 继续 in_progress。本轮无产品代码变化，最近全量根回归仍为 E104 的 1957 项、0 失败，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E107.md](HANDOFF-20261101-E107.md)。
+
 ## 2026-11-01：E106 W07.2 与 T08 非法计划验收闭合
 
 [E106](evidence/20261101_planner_plan_validation.json) 复跑实际 rc.3 默认 Host 离线 Planner 探针：真实 `bot_task_plan_start` 完成目标 Bot 依赖派发、成功/失败/整树取消、重复投递、越权拒绝和冷恢复，全部检查通过，0 真实模型推理。非法计划套件 **5/5**：环路、自/悬空/重复依赖、重复包 id、未知 Bot、可执行路径/MCP/秘密、非法 effect 与未知字段均在执行前拒绝。W07.2 因此 completed，T08 以 integration 级别 passed；W07/T06 不自动通过。正式为 **0/20、2/63、M0 11/12**，实施步骤 **58/67**。本轮无产品代码变化，最近全量根回归仍为 E104 的 1957 项、0 失败，未推送/发布。当前交接为 [HANDOFF-20261101-E106.md](HANDOFF-20261101-E106.md)。
