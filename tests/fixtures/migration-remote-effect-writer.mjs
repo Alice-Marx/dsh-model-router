@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
 import Database from 'better-sqlite3'
 import { createAuthority } from '../../packages/capability-broker/src/authority.mjs'
@@ -9,7 +11,7 @@ import { openRemoteMachines } from '../../packages/orchestration/src/remote-mach
 import { openTaskJournal } from '../../packages/orchestration/src/task-journal.mjs'
 import { createTaskService } from '../../packages/orchestration/src/task-service.mjs'
 import { createRemoteWriteBackend } from '../../packages/orchestration/src/remote-execution.mjs'
-const { Agent, serve, TOOL_NAMES } = await import('../../remote-computer-agent/dist/index.mjs')
+const { TOOL_NAMES } = await import('../../remote-computer-agent/dist/index.mjs')
 
 const [dir, readyFile] = process.argv.slice(2)
 const owner = { kind: 'owner' }
@@ -26,9 +28,9 @@ async function wait(check) {
 async function main() {
   const project = join(dir, 'project')
   await mkdir(project, { recursive: true })
-  const agent = new Agent({ dataDir: join(dir, 'agent'), roots: { 'project.v1': project } }, Database)
-  const pair = agent.store.pair('host', { botIds: ['bot-a'], roots: ['project.v1'], tools: TOOL_NAMES })
-  const server = await serve(agent, { port: 0 })
+  const agentFixture = fileURLToPath(new URL('./migration-remote-effect-agent.mjs', import.meta.url))
+  spawn(process.execPath, [agentFixture, dir, join(dir, 'agent-ready.json')], { cwd: dir, stdio: 'ignore', windowsHide: true })
+  const pair = await wait(() => readFile(join(dir, 'agent-ready.json'), 'utf8').then(value => JSON.parse(value)).catch(() => null))
   const authority = createAuthority()
   const directory = createPrincipalDirectory(authority)
   directory.register('bot-a', { tools: all, modelRoutes: [] })
@@ -43,7 +45,7 @@ async function main() {
     return response
   }
   const machines = openRemoteMachines({ Database, file: join(dir, 'machines.sqlite'), resolveSecret: async () => pair.token, botExists: id => id === 'bot-a', authority, fetchImpl })
-  await machines.pair({ machineId: pair.machineId, name: 'Synthetic migration effect fixture', endpoint: `http://127.0.0.1:${server.address.port}`, secretRef: 'ds-secret/FIXTURE_AGENT', roots: ['project.v1'], tools: ['machine_ping', 'fs_read', 'fs_write', 'operation_status', 'operation_cancel'], probeBotId: 'bot-a', expectedRevision: 0 }, owner)
+  await machines.pair({ machineId: pair.machineId, name: 'Synthetic migration effect fixture', endpoint: `http://127.0.0.1:${pair.port}`, secretRef: 'ds-secret/FIXTURE_AGENT', roots: ['project.v1'], tools: ['machine_ping', 'fs_read', 'fs_write', 'operation_status', 'operation_cancel'], probeBotId: 'bot-a', expectedRevision: 0 }, owner)
   await machines.bind({ machineId: pair.machineId, botId: 'bot-a', expectedRevision: 0, roots: ['project.v1'], tools: ['fs_write', 'fs_read', 'operation_status', 'operation_cancel'], mode: 'workspace-write' }, owner)
   const remote = createRemoteWriteBackend({ machines: () => machines, directory, pollMs: 5 })
   const journal = openTaskJournal(Database, join(dir, 'tasks.sqlite'))
@@ -64,7 +66,7 @@ async function main() {
     const written = await readFile(join(project, `effect-${tick}.txt`), 'utf8')
     if (written !== content) throw new Error('REMOTE_EFFECT_CONTENT_MISMATCH')
     await writeFile(join(dir, 'heartbeat.json'), JSON.stringify({ pid: process.pid, tick, taskId: task.taskId, operationId: task.operationId }))
-    if (tick === 1) await writeFile(readyFile, JSON.stringify({ pid: process.pid, machineId: pair.machineId, taskId: task.taskId, operationId: task.operationId, tick }))
+    if (tick === 1) await writeFile(readyFile, JSON.stringify({ pid: process.pid, agentPid: pair.pid, machineId: pair.machineId, taskId: task.taskId, operationId: task.operationId, tick }))
     await sleep(20)
   }
 }
