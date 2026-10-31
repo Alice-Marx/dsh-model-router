@@ -154,3 +154,14 @@ E95 把 Agent 拆成独立进程，但它仍是 Job 的子进程，所以 "Job �
 同源缺陷清理：本轮首次完整两阶段回归有 1 项失败——`migration-sqlite-quarantine` 在 Job 杀死 WAL 写者后做原地只读打开，报 `SQLITE_IOERR_TRUNCATE`，与 E95 已诊断并只在该套件内修掉的是同一类缺陷。因此把同一观测模式在 `migration-task-journal-quarantine`（停止后新开只读连接）与 `migration-task-inflight-quarantine`（停止后 snapshot 与 observer）一并改为副本快照 + 含名字节指纹，in-flight 的 pinned observer 连接改到停止前打开，不再对被杀写者留下的库新开连接。三套件各连续三轮通过，最终完整两阶段回归 0 失败。
 
 边界：Agent 仍同机、仅 loopback；负例只证明 Job 范围不足，不设计也不验证全域栅栏（机器级 fence、凭据吊销或跨 Job 监管），因此 `stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 继续 false，W06.15 不销项。
+
+## 17. 声明 pairing client 的授权栅栏（E97）
+
+E96 的后续 Host 能重新配对，是因为 Job 停止不触碰长期 client 凭据。现有 Agent 已有本地管理命令 `dsh-remote-agent revoke CONFIG CLIENT_ID`：`Store.revoke()` 持久吊销 client；`Store.validate()` 每次工具调用又经 `currentClient()` 检查该 client 的 revoked 状态，因此无需另造一套远程授权协议。本节用真实独立 Agent、真实 CLI 和两个独立 Host 进程验证该原语能否覆盖 E96 的缺口。
+
+- 吊销前，第一个 Job 外 Host 通过完整 remote-write 路径真实写入 `before-revoke.txt` 并得到 succeeded；另用长期 secret 签发一个 fs_write grant，但先不调用。
+- 真实 `node dist/cli.mjs revoke ... host` 返回 `{revoked:true}` 后，Agent PID 仍存活。持已签发 grant 的 `/mcp` 调用得到 HTTP 401 / `AUTH_INVALID`，`existing-grant.txt` 不存在。
+- 第二个全新 Job 外 Host 持旧 pairing secret 重新配对，`/control/v1/grants` 同样为 `AUTH_INVALID`，不能进入 Task 提交，`after-revoke.txt` 不存在。Agent 操作库仍只有第一次 succeeded 收据，没有新增 admission。
+- 新专项连续三轮 1/1；与 E96 负例及 remote-auth 组合 12/12；完整两阶段根回归 1937 项、1853 通过、0 失败、84 跳过。首次测试等待 20 秒失败是 fixture 把 stack 写成 UTF-8 文本而测试误按 JSON 解析，改为读取文本后通过；产品行为未改。
+
+该证据只覆盖**明确声明的 Agent dataDir + clientId**，且只证明吊销后新请求与尚未执行的已签发 grant 被拒绝。吊销前已经在执行的写效果仍需 drain/stop 证据；其他 client、其他机器、直接 OS 写者与未知 launcher 不在此范围。CLI 是机器本地管理面，本轮未接入远程部署或迁移编排，也未验证 rotate/恢复。故仍不设置全域 `stopWriteProvable`，W06.15 保持 in_progress。

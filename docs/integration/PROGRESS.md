@@ -1,5 +1,11 @@
 # 一体化工程进度
 
+## 2026-11-01：E97 声明 pairing client 的授权栅栏
+
+[E97](evidence/20261101_migration_remote_client_quarantine.json) 复用真实 Agent 本地 `dsh-remote-agent revoke` 原语，验证 E96 的 Job 外写入缺口可按声明 client 关闭：第一次真实外部写入完成后吊销 `host`，Agent 进程仍存活；吊销前已签发但尚未执行的 fs_write grant 再调用得到 HTTP 401 / `AUTH_INVALID`，另一个全新 Host 持旧 pairing secret 也无法重新配对。两条路径均无目标文件、无新 operation，原 succeeded 收据不变。专项连续三轮 1/1，与 E96 及 remote-auth 组合 **12/12**；完整两阶段根回归 **1937 项：1853 通过、0 失败、84 跳过**，`check:client` OK。首次等待失败是测试把文本 stack 误按 JSON 读取，修正后通过，未改产品代码。
+
+证据仅覆盖声明 Agent dataDir/clientId 的授权准入，不停止吊销前已在执行的效果，不覆盖其他 client/机器或直接 OS 写者；本地 CLI 尚未接入远程部署和迁移编排，恢复/rotate 未验。`stopWriteProvable`、`activationSupported`、`postActivationRollbackSupported` 仍 false，W06.15 仍 in_progress，门禁仍 **0/20、1/63、M0 11/12**，0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E97.md](HANDOFF-20261101-E97.md)。
+
 ## 2026-10-31：E96 Job 之外的 Agent 与 Job 级停止边界负例
 
 [E96](evidence/20261031_migration_remote_effect_outside_job.json) 把 Agent 放到 Windows Job 之外（由测试进程直接 spawn），Job 内的 Host 通过真实 remote-write 与 loopback HTTP 完成四次写入后，`stop()` 回 `treeStopped:true`/`windows-job-close`、Host PID 为 `ESRCH`，而 Job 外的 Agent 仍存活。随后一个从未进入该 Job 的 Host 重新配对同一台机器并提交任务：`succeeded`、Agent 出现第五条真实收据、`outside-effect.txt` 真实落盘；被杀死 Host 的中断 attempt 仍为 `needs-reconciliation` + `HOST_INTERRUPTED/unknown`，不被后来的效果结案。这是 Job 级停止不足的负例证据，正是 `stopWriteProvable` 保持 false 的原因。
