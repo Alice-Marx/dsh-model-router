@@ -1831,8 +1831,14 @@
     },
     {
       "id": "T42",
-      "status": "not_run",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "docs/integration/evidence/20261101_worktree_conditional_integration.json"
+      ],
+      "level": "integration",
+      "environment": "Real Git worktrees and artifact reads on isolated Win11 Node24; synthetic repositories only",
+      "notes": "Dirty source and moved HEAD return integration-pending/SOURCE_CHANGED without overwriting source bytes. Internal commits cannot bypass source validation, diff artifacts recover, and valid state integrates as expected. Real Git suite passes 13/13.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T43",

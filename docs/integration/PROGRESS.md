@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E140 T42 worktree 条件合入验收闭合
+
+[E140](evidence/20261101_worktree_conditional_integration.json) 真实 Git 验证：worktree diff 可恢复；脏源与 HEAD 移动均 `integration-pending/SOURCE_CHANGED`，不覆盖源；内部提交不能绕过检查，合法状态恢复后才合入。套件 **13/13**，无产品代码变化。T42 以 integration 级别 passed，正式为 **0/20、36/63、M0 11/12**。最近完整根回归为 E133 的 1980/1892/0/88，本轮未重跑全量。仅合成仓库，未推送/发布。当前交接为 [HANDOFF-20261101-E140.md](HANDOFF-20261101-E140.md)。
+
 ## 2026-11-01：E139 T41 质量复核与用户评分验收闭合
 
 [E139](evidence/20261101_quality_review_feedback.json) 复验真实 Host/client 的反馈撤回/重置：只更新学习起点、可取消且单在途，旧反馈不能评价替换结果；主观评分不绕过质量下限，付费升级须 literal true 审批且换用不同配置模型。复核另计调用并保留原收据，未启动/阻塞的二次尝试不抹掉首次费用。组合 **42/42**。T41 以 integration 级别 passed，正式为 **0/20、35/63、M0 11/12**。不评价真实模型质量，未推送/发布。当前交接为 [HANDOFF-20261101-E139.md](HANDOFF-20261101-E139.md)。

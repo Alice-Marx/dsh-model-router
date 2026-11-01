@@ -113,4 +113,16 @@ test('remote worktree conditional integration preserves source changes',async()=
   await writeFile(join(repo,'a'),'base\n');const integrated=await f.agent.call('worktree_integrate',{worktreeId},f.context,'wt-integrate');assert.equal(integrated.result.status,'integrated');assert.equal(await readFile(join(repo,'a'),'utf8'),'changed\n')
 }finally{await f.agent.close()}})
 
+test('remote worktree dirty source, moved HEAD and internal commit never overwrite the source',async()=>{const f=await fixture();try{
+  const repo=join(f.dir,'root/repo');await mkdir(repo);const git=args=>execFileSync('git',args,{cwd:repo,encoding:'utf8',windowsHide:true});git(['init']);await writeFile(join(repo,'a'),'base\n');git(['add','a']);git(['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','base'])
+  const created=await f.agent.call('worktree_create',{rootId:'project',relativePath:'repo',worktreeRelativePath:'edit'},f.context,'wt-create');assert.equal(created.status,'succeeded');const worktreeId=created.result.worktreeId
+  await writeFile(join(f.dir,'root/edit/a'),'changed\n');const diff=await f.agent.call('worktree_diff',{worktreeId},f.context);assert.ok(diff.artifactId)
+  const recovered=await f.agent.call('artifact_read',{artifactId:diff.artifactId,offset:0,length:1048576},f.context);assert.ok(Buffer.from(recovered.content,'base64').toString().includes('changed'))
+  await writeFile(join(repo,'a'),'dirty\n');const dirty=await f.agent.call('worktree_integrate',{worktreeId},f.context,'wt-dirty');assert.equal(dirty.result.status,'integration-pending');assert.equal(dirty.result.reason,'SOURCE_CHANGED');assert.equal(await readFile(join(repo,'a'),'utf8'),'dirty\n')
+  git(['checkout','--','a']);await writeFile(join(repo,'a'),'head-moved\n');git(['add','a']);git(['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','head moved'])
+  const moved=await f.agent.call('worktree_integrate',{worktreeId},f.context,'wt-head');assert.equal(moved.result.status,'integration-pending');assert.equal(moved.result.reason,'SOURCE_CHANGED');assert.equal(await readFile(join(repo,'a'),'utf8'),'head-moved\n')
+  git(['reset','--hard','HEAD~1']);const edit=join(f.dir,'root/edit');execFileSync('git',['add','a'],{cwd:edit});execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','worktree local'],{cwd:edit})
+  const internal=await f.agent.call('worktree_integrate',{worktreeId},f.context,'wt-internal');assert.equal(internal.result.status,'integration-pending');assert.equal(internal.result.reason,'SOURCE_CHANGED');assert.ok(['base\n','base\r\n'].includes(await readFile(join(repo,'a'),'utf8')))
+}finally{await f.agent.close()}})
+
 test('desktop without configured interactive helper fails explicitly',async()=>{const f=await fixture();try{const result=await f.agent.call('desktop_screenshot',{displayId:'display',sessionSelector:0,targetWindow:'0'},f.context,'desktop');assert.equal(result.status,'failed');assert.equal(result.error.code,'DESKTOP_UNAVAILABLE')}finally{await f.agent.close()}})

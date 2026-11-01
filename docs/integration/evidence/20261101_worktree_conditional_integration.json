@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "af4e07c4ac389c190421dadbcc323890e0ee478a",
+  "parentEvidence": "docs/integration/evidence/20261027_m0_remote_agent.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T42 criteria are covered by real Git worktrees. A changed worktree produces a recoverable diff artifact. Dirty source files and moved HEAD return integration-pending/SOURCE_CHANGED without overwriting source bytes. An internal worktree commit cannot bypass source validation; source content remains untouched while pending. The existing valid path integrates only after source state is restored and applies the expected change.",
+  "productAcceptance": "T42 passes at integration level. Integration occurs only under the validated source state, conflicts stop without overwriting, and artifacts remain recoverable. Formal scores are 0/20 work packages, 36/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/remote-agent.test.mjs": "73418471ab0c3cc27989a1f1f4e0ba1248a18b09"
+  },
+  "implementation": [
+    "No product code changed. Existing worktree_create/diff/integrate and artifact_read enforce conditional integration.",
+    "Added a real Git negative test for dirty source, moved HEAD and internal commit, plus artifact recovery."
+  ],
+  "testRuns": [
+    "node --test tests/remote-agent.test.mjs: 13 tests / 13 pass / 0 fail, including both conditional-integration cases.",
+    "Latest complete root regression remains E133: 1980 tests / 1892 pass / 0 fail / 88 skipped; this test-only change did not rerun the full suite."
+  ],
+  "preservedFailures": [
+    "The new test initially read artifact content through the wrong envelope, expected no-changes despite an internal diff and compared CRLF-normalized bytes to LF. These fixture assertions were corrected without changing product behavior."
+  ],
+  "limitations": [
+    "No real model inference, production repository, push or release was used. Git mutations were confined to synthetic repositories."
+  ]
+}
