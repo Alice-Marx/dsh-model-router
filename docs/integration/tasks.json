@@ -1967,19 +1967,20 @@
     },
     {
       "id": "T53",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
         "tests/bot-runtime-ui.test.mjs",
         "docs/integration/evidence/20261030_product_refresh_order.json",
         "docs/integration/evidence/20261030_bound_stop_proof.json",
         "docs/integration/evidence/20261030_stop_proof_regression.json",
-        "docs/integration/evidence/20261030_write_cancel_effects.json"
+        "docs/integration/evidence/20261030_write_cancel_effects.json",
+        "docs/integration/evidence/20261101_ui_offline_recovery.json"
       ],
-      "level": "actual rc.3 host / offline fixture model + UI unit",
-      "environment": "Shipped default entry on a real rc.3 host with the product read model, plus the jsdom UI suite",
-      "notes": "The product channel serves a real snapshot to the client with all six sections available, the client bundle is rebuilt and byte-checked, and the UI suite covers Bot bindings, the review card, resolved receipt tags, machine controls and the blocked-placeholder rendering. Browser/Desktop visual acceptance and offline behaviour of the real UI remain for W14. E63: actual React panels in JSDOM retain the newest snapshot and disable operations on stale reads or lost action replies; seven synthetic cases pass on each of Win11, Win10 and Ubuntu. Full product/UI acceptance and backend retry gates remain open. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open.",
-      "verifiedOn": "2026-10-30"
+      "level": "integration",
+      "environment": "Real default product browser session and actual React/advanced-run suites with an isolated offline Host",
+      "notes": "E146: narrow/wide and approval interaction evidence is retained; restored plans, failures, unknown receipts and 20,000-line logs remain readable and operable. Full-page refresh kept diagnostic calls 1 -> 1 and bot_task calls 0 -> 0. Host outage preserves the old view and disables all stop/retry/reconcile mutations; advanced polling resumes the same job without replay. Default product 47 checks and focused UI 43/43 pass.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T54",

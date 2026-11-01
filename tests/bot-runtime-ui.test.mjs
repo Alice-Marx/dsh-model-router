@@ -225,6 +225,22 @@ test('bot product UI: machine grants, controlled read and revoke use the selecte
   })
 })
 
+test('bot product UI: long execution logs preserve their tail and the original recovery action',async()=>{
+  await withDom(async({root,container,click})=>{
+    const snapshot=sample(),calls=[],lastLine='log-line-19999: final reconciliation sentinel'
+    snapshot.availableActions=['task.reconcile']
+    snapshot.tasks.items[0].attempts[0].output=Array.from({length:20000},(_,index)=>index===19999?lastLine:`log-line-${index}: ${'x'.repeat(80)}`).join('\n')
+    const dispatch=async(action,payload)=>calls.push({action,payload})
+    await act(async()=>root.render(React.createElement(ProductPage,{section:'tasks',productApi:{snapshot:async()=>snapshot,dispatch},openSession:()=>{},openPanel:()=>{}})))
+    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='原始执行任务'))
+    assert.match(container.textContent,/log-line-0:/);assert.match(container.textContent,new RegExp(lastLine))
+    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='核对原收据'))
+    assert.equal(calls.length,1);assert.equal(calls[0].action,'task.reconcile');assert.equal(calls[0].payload.taskId,'task-existing')
+    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='关闭'))
+    assert.ok(!container.textContent.includes(lastLine));assert.equal(calls.length,1)
+  })
+})
+
 test('bot product UI: artifact download verifies before linking and reports expiry without exposing content',async()=>{
   await withDom(async({root,container,click})=>{
     const calls=[],snapshot=sample()
