@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "d345750d2f8643743c23e764a6ca18ac2d0d1d6e",
+  "parentEvidence": "docs/integration/evidence/20261027_m1_default_composition.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T02 criteria are covered. The shipped default single-plugin entry composes DS Bot and MR with one policy and one generated client. The real browser shows the DS Bot roster and the same Bot product navigation in one sidebar: Bot bindings, tasks, machines, usage and the MR advanced workbench. The advanced workbench opens the existing Model Router planning/configuration/tools/budget surface. Original PNGs verify the complete 1440x900 wide view and the 390 CSS-pixel narrow view; compact navigation remains accessible and cards, tabs and form content reflow without visible horizontal overflow.",
+  "productAcceptance": "T02 passes at integration level. One plugin configuration entry, one Bot/team and consistent sidebar are visible in the real product, with the MR advanced entry reachable in both wide and narrow windows. Formal scores are 0/20 work packages, 24/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "scripts/integration-product-default.mjs": "7660c2576519d7a022d25a88ae832cf0b68b8197"
+  },
+  "screenshots": {
+    "docs/integration/evidence/20261101_product_wide.png": "f13f0c67970e61cf136886dd6d6dd730841b1fa7e301082822e12d6513c0c246",
+    "docs/integration/evidence/20261101_product_narrow.png": "75ffb1d8e432aef53b18379ba2e11d978bcff712f297cd47c7d8c06c27d10999"
+  },
+  "implementation": [
+    "No product code changed. The existing public sidebar.workspaces wrapper and generated client provide the unified navigation.",
+    "The isolated default-product probe gained an explicit --serve mode for real browser acceptance; it preserves all 44 self-checks and stops only through the owned stop marker or bounded lifetime."
+  ],
+  "testRuns": [
+    "The isolated default Host completed all 44 checks, then remained available for real browser inspection through an authenticated loopback URL.",
+    "Wide desktop 1440x900: advanced Model Router workbench visible with the unified DS Bot sidebar and all product entries.",
+    "Responsive 390x844 CSS pixels at DPR2: advanced entry clicked again, Model Router workbench and compact navigation visible with reflowed content; original 780x1688 PNG retained.",
+    "Latest complete root regression remains E127: 1980 tests / 1892 pass / 0 fail / 88 skipped; check:client OK. This browser/probe-only change did not alter product code."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "Screenshots use the isolated offline fixture Host, not a production user profile or real model account.",
+    "The UI review is visual and DOM-based; it does not claim Electron packaging or every interactive control has been exercised.",
+    "No real model inference, push or release was used."
+  ]
+}

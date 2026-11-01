@@ -1298,15 +1298,16 @@
     },
     {
       "id": "T02",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m1_default_composition.json",
-        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261101_single_product_ui.json"
       ],
-      "level": "actual rc.3 host / offline fixture model",
-      "environment": "Shipped default single-plugin entry on a real rc.3 host; no fixture plugin in the composition",
-      "notes": "The shipped default entry composes the frozen DS Bot runtime with the MR body inside one Host: the policy is provided before the first await, the DS runtime starts after a bounded route snapshot, and the funding, machine, Bot-settings, funding-account and Task authorities all open on one orchestration.sqlite with fail-closed cleanup on boot failure. Strict isolated fixture compositions remain separate probes by design.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Shipped default single-plugin entry on actual rc.3 Host; authenticated real browser at 1440x900 and 390 CSS px; offline fixture model",
+      "notes": "One plugin and generated client present one DS Bot/team sidebar with product navigation and the MR advanced workbench. Both wide and narrow original screenshots are stored; compact navigation remains reachable and content reflows without visible horizontal overflow. All 44 Host checks pass before browser acceptance.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T03",

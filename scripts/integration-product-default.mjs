@@ -589,6 +589,14 @@ try {
   const afterRestart=await product('machine.probe',{payload:{machineId:paired.machineId,botId:workerId,rootId:'project'}})
   assert.equal(afterRestart.ok,true,JSON.stringify(afterRestart))
   checks.push('Fresh host reconstructs stable Bot identity and the composed product read model')
+  if(process.argv.includes('--serve')){
+    const url=output().match(new RegExp(`${base.replaceAll('.', '\\.')}\\/\\?token=[^\\s]+`))?.[0]
+    await writeFile(join(run,'browser-access.json'),JSON.stringify({url,runDirectory:run,pid:child.pid},null,2))
+    process.stdout.write(JSON.stringify({status:'ready-for-browser',runDirectory:run,url})+'\n')
+    clearTimeout(timer);timer=setTimeout(()=>killProcessTree(child),15*60_000)
+    const deadline=Date.now()+14*60_000
+    while(Date.now()<deadline){if(await readFile(join(run,'stop'),'utf8').then(value=>value.trim()==='stop',()=>false))break;await sleep(250)}
+  }
   summary = { status: 'passed', level: 'actual-host-offline-default-composition', checks, snapshotSections: Object.fromEntries(['bindings', 'botBindings', 'fundingAccounts', 'tasks', 'machines', 'usage'].map(key => [key, snapshot[key].status])),
     restored: { mainBotId: restored.mainBotId, bots: restored.bots.length, bindings: restored.bindings.status }, source, sdkVersion: manifest.version, actualModelCalls: 0,
     limitations: ['Shipped default entry composition; strict isolated fixture compositions remain separate probes',

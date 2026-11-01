@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E128 T02 单一产品入口与宽窄 UI 验收闭合
+
+[E128](evidence/20261101_single_product_ui.json) 在默认单插件 Host 完成 44 项自检后，使用真实浏览器验证：DS Bot/群与 Bot 绑定、任务、远程电脑、费用、高级工作台同侧栏，MR 高级任务规划/配置/工具/预算可达。原始 **1440×900 宽屏**和 **390 CSS px 窄屏** PNG 已入库，窄屏重排无可见横向溢出。T02 以 integration 级别 passed，正式为 **0/20、24/63、M0 11/12**。无产品代码变化，最近完整根回归为 E127 的 1980/1892/0/88，`check:client` OK。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E128.md](HANDOFF-20261101-E128.md)。
+
 ## 2026-11-01：E127 T04 同模型 Bot 私有状态与目录隔离闭合
 
 [E127](evidence/20261101_bot_workspace_privacy.json) 实测先发现跨 Bot 目录读取真实缺陷，随后在组合层新增真实路径读取守卫：`read/read_image/glob/grep` 仅限当前 Session 工作区，junction/symlink 逃逸拒绝；真实 `pwsh` 调用以 `BOT_NATIVE_EXECUTION_DENIED` 拒绝，不能绕过。两个同模型非 Main Bot 的记忆、Session 轮换、私有目录、每 operation CLI profile 与既有 Task/机器/收据边界均通过。默认产品 **44/44**；完整根回归 **1980 项：1892 通过、0 失败、88 跳过**，`check:client` OK；新模块已纳入 npm 文件清单。T04 以 integration 级别 passed，正式为 **0/20、23/63、M0 11/12**。这不是独立 OS 账户沙箱，T25 另验。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E127.md](HANDOFF-20261101-E127.md)。
