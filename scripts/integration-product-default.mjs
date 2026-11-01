@@ -109,7 +109,7 @@ try {
   const localMachine = preSnapshot.botBindings.machines.find(item => item.location === 'local')
   assert.ok(localMachine, JSON.stringify(preSnapshot.botBindings.machines))
   const rootId = localMachine.roots[0].rootId
-  const enabledAccount = await product('funding.account.save', { payload: { scopeId: fixtureScope.id, expectedRevision: 0, enabled: true, dailyLimitUsd: 5, monthlyLimitUsd: 50 } })
+  const enabledAccount = await product('funding.account.save', { payload: { scopeId: fixtureScope.id, expectedRevision: 0, enabled: true, dailyLimitUsd: 10, monthlyLimitUsd: 100 } })
   assert.equal(enabledAccount.ok, true, JSON.stringify(enabledAccount))
   assert.equal(enabledAccount.value.enabled, true)
   const bindingSettings = { schemaVersion: 1, enabled: true,
@@ -220,7 +220,7 @@ try {
   assert.ok(fixtureAccount, JSON.stringify(accounts.items))
   assert.equal(fixtureAccount.enabled, true)
   assert.equal(fixtureAccount.revision, 1)
-  assert.equal(fixtureAccount.dailyLimitUsd, 5)
+  assert.equal(fixtureAccount.dailyLimitUsd, 10)
   const bindingsSection = snapshot.botBindings
   assert.equal(bindingsSection.status, 'available')
   for (const botId of [mainId, workerId]) {
@@ -401,10 +401,29 @@ try {
   }
   assert.equal(remoteAgent.workspaces.list().length,0)
   checks.push(docker?'Remote command: the default product dispatches an approved argv alias into the real container and returns bounded stop evidence':'Remote command: a non-container Agent settles never-started with no native fallback or workspace lock')
+  const callsBeforeCredential=(await request('integration-probe')).calls.length
+  await request('integration-probe',{action:'credential-outage'})
+  await api('send',{sessionId:workerId,text:'integration:router-routes'});await quiet()
+  const credentialFailure=await request('integration-probe')
+  assert.equal(credentialFailure.calls.length,callsBeforeCredential,'a missing key produces no provider stream or fallback model')
+  assert.equal(credentialFailure.credential.failures,1)
+  const routeCallsBeforeRestore=credentialFailure.calls.filter(call=>call.sessionId===workerId&&call.marker==='integration:router-routes').length
+  assert.match(String(await api('diagnostics-log')),/FIXTURE_CREDENTIAL_UNAVAILABLE: missing key for integration-gpt-fixture\/gpt-fixture/)
+  const credentialUnresolved=(await product('snapshot')).value.usage.unresolved.filter(item=>item.botId===workerId&&item.packageId==='inference')
+  assert.equal(credentialUnresolved.length,1,JSON.stringify(credentialUnresolved))
+  const credentialWaived=await product('usage.resolve',{payload:{botId:workerId,runId:credentialUnresolved[0].runId,packageId:'inference',kind:'waive',note:'离线凭据故障：首字节前失败，按 fixture 零费用显式对账。'}})
+  assert.equal(credentialWaived.ok,true,JSON.stringify(credentialWaived));assert.equal(credentialWaived.value.costUsd,0)
+  await request('integration-probe',{action:'credential-restore'})
+  await api('send',{sessionId:workerId,text:'integration:router-routes'});current=await quiet()
+  const restoredRoute=current.diagnostic.toolResults.filter(item=>item.name==='model_router_routes').at(-1)
+  assert.equal(restoredRoute.result.isError,false,JSON.stringify(restoredRoute))
+  assert.ok(current.diagnostic.calls.filter(call=>call.sessionId===workerId&&call.marker==='integration:router-routes').length>routeCallsBeforeRestore,'credential recovery must produce a fresh original-model turn')
+  assert.ok(current.diagnostic.calls.every(call=>`${call.provider}/${call.model}`==='integration-gpt-fixture/gpt-fixture'))
+  checks.push('Strict model: a live missing-key failure pauses with an actionable original-route error and zero fallback; explicit receipt reconciliation plus credential recovery resumes the same model')
   // N06b: disabling the funding scope blocks the bindings; the next model turn
   // is refused with zero provider dispatch.
   const callsBefore=(await request('integration-probe')).calls.length
-  const disabledAccount=await product('funding.account.save',{payload:{scopeId:fixtureScope.id,expectedRevision:1,enabled:false,dailyLimitUsd:5,monthlyLimitUsd:50}})
+  const disabledAccount=await product('funding.account.save',{payload:{scopeId:fixtureScope.id,expectedRevision:1,enabled:false,dailyLimitUsd:10,monthlyLimitUsd:100}})
   assert.equal(disabledAccount.ok,true,JSON.stringify(disabledAccount))
   assert.equal(disabledAccount.value.enabled,false)
   await api('send',{sessionId:workerId,text:'integration:router-routes'});await quiet()
@@ -415,7 +434,7 @@ try {
   // N09: the managed CLI task runs last because an unconfirmed receipt is a
   // fail-closed unknown: it blocks that Bot and its shared account scope until
   // an owner reconciles it, which is exactly the manual-review gate.
-  const reEnabled=await product('funding.account.save',{payload:{scopeId:fixtureScope.id,expectedRevision:2,enabled:true,dailyLimitUsd:5,monthlyLimitUsd:50}})
+  const reEnabled=await product('funding.account.save',{payload:{scopeId:fixtureScope.id,expectedRevision:2,enabled:true,dailyLimitUsd:10,monthlyLimitUsd:100}})
   assert.equal(reEnabled.ok,true,JSON.stringify(reEnabled));assert.equal(reEnabled.value.enabled,true)
   await api('send',{sessionId:cliBotId,text:'integration:cli-task'});await quiet()
   const cliTask=await settleTask((await latestTask('codex-read',cliBotId)).taskId,'needs-reconciliation')

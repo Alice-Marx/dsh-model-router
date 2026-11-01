@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "e040eb226076ab7a238ca3b27bddfd34496f5e76",
+  "parentEvidence": "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T03 criteria are covered. Existing product evidence rejects unconfigured, mismatched and removed routes with zero other-model dispatch and restores the original route when it returns. The new default-product probe injects a live missing-key failure at the offline Provider boundary: no stream or fallback model is dispatched, diagnostics name the exact original route and missing key, and the conservative unknown receipt blocks another attempt. After an explicit zero-cost fixture reconciliation and credential restoration, a fresh original-model turn succeeds.",
+  "productAcceptance": "T03 passes at integration level. Invalid or missing model configuration and credentials pause with actionable diagnostics, never fall back to another model, and recover only on the original model. Unknown provider outcomes remain fail-closed until reconciled. Formal scores are 0/20 work packages, 22/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "scripts/integration-product-default.mjs": "76551331bd8cecefcd25e0d3a68dc3486abbb87e",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "e479b43f5093b0e0cfbff77ded926cec8cc1e831"
+  },
+  "implementation": [
+    "No product code changed. The offline Provider now supports an explicit missing-key fault and reports failure counts separately from successful stream dispatches.",
+    "The default-product probe verifies zero fallback, original-route diagnostics, explicit unknown-receipt reconciliation and a fresh successful call after credential restoration.",
+    "The isolated fixture account limits are 10/100 USD to accommodate the additional test turns; funding admission and refusal behavior are unchanged."
+  ],
+  "testRuns": [
+    "npm run integration:probe-product-default: passed all 42 checks on the shipped default entry with real rc.3 Host and frozen DS.",
+    "The new strict-model check verifies one missing-key failure, no successful provider stream during outage, one explicit receipt resolution and a fresh successful integration-gpt-fixture/gpt-fixture turn after restoration.",
+    "Raw summary: tmp/integration/product-default/run-dJC2ZQ/summary.json. Latest complete root regression remains E120: 1977 tests / 1892 pass / 0 fail / 83 skipped; this fixture-only change did not rerun the full suite."
+  ],
+  "preservedFailures": [
+    "The initial check passed but consumed the original 5 USD fixture budget before the later CLI case. Raising only to 6 USD still left MODEL_WAITING_BUDGET.",
+    "Further diagnosis showed the first-byte Provider failure also created a conservative unknown reservation. This is correct fail-closed behavior, not a product defect. The probe now performs the required explicit receipt reconciliation instead of weakening it, and uses sufficient isolated test budget.",
+    "Two overly broad recovery assertions were corrected to compare the worker's actual routes call count, excluding unrelated auxiliary memory calls and stale successful tool results."
+  ],
+  "limitations": [
+    "The missing-key condition is deterministic offline fault injection, not a real provider credential request. No real model inference or real credential was used.",
+    "No production profile, push or release was used."
+  ]
+}

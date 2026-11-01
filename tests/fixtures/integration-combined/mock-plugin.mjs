@@ -13,6 +13,7 @@ export function apply(ctx) {
   ctx.provide('integrationOfflineDiagnostics',Object.freeze({taskWaits,calls}))
   const toolResults = []
   const workflowStages = new Map()
+  const credential = { unavailable: false, failures: 0 }
   class OfflineAdapter extends LlmAdapter {
     providerInfo(id) { return { id, name: 'Offline integration fixture' } }
     async listModels(provider) { return [{ provider, id: MODEL, name: MODEL, inputModalities: ['text'] }] }
@@ -24,6 +25,7 @@ export function apply(ctx) {
       options.signal.throwIfAborted()
       const latest = options.messages.at(-1)
       const userText = latest?.role === 'user' ? (typeof latest.content === 'string' ? latest.content : latest.content.filter(block => block.type === 'text').map(block => block.text).join('\n')) : ''
+      if (credential.unavailable) { credential.failures++; throw new Error(`FIXTURE_CREDENTIAL_UNAVAILABLE: missing key for ${options.provider}/${options.model}`) }
       calls.push({ sessionId: options.sessionId ?? null, provider: options.provider, model: options.model,
         agentLoop: isAgentLoopRequest(options), tools: options.tools?.map(tool => tool.name) ?? [],
         marker: /integration:[a-z-]+/.exec(userText)?.[0] ?? null })
@@ -148,11 +150,16 @@ export function apply(ctx) {
   })
   ctx.effect(() => ctx.connection.fetch.register({
     path: '/api/integration-probe', methods: ['POST'], requestBody: 'buffered',
-    fetch: () => Response.json({ calls, toolResults, providers: ctx.llm.listProviders(), registeredTools: ctx.tools.schemas().map(tool => tool.name),
-      searchProviders: [...(ctx.get('web')?.searchProviders?.keys() ?? [])],
-      automaticSearchEntries: [...ctx.root.get('loader').entries()]
-        .filter(entry => entry.fiber?.state === 2 && ['ds-bot/web-search', '@ljwei-stak/dsh-model-router/web-search'].includes(entry.options.name))
-        .map(entry => entry.options.name),
-    }),
+    fetch: async request => {
+      const body = await request.json()
+      if (body.action === 'credential-outage') credential.unavailable = true
+      if (body.action === 'credential-restore') credential.unavailable = false
+      return Response.json({ calls, toolResults, credential, providers: ctx.llm.listProviders(), registeredTools: ctx.tools.schemas().map(tool => tool.name),
+        searchProviders: [...(ctx.get('web')?.searchProviders?.keys() ?? [])],
+        automaticSearchEntries: [...ctx.root.get('loader').entries()]
+          .filter(entry => entry.fiber?.state === 2 && ['ds-bot/web-search', '@ljwei-stak/dsh-model-router/web-search'].includes(entry.options.name))
+          .map(entry => entry.options.name),
+      })
+    },
   }), 'integration: diagnostics')
 }

@@ -1310,17 +1310,18 @@
     },
     {
       "id": "T03",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
         "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
         "tests/capability-authority.test.mjs",
-        "tests/bot-policy.test.mjs"
+        "tests/bot-policy.test.mjs",
+        "docs/integration/evidence/20261101_strict_model_recovery.json"
       ],
-      "level": "actual rc.3 host / offline fixture model + native",
-      "environment": "Shipped default entry on a real rc.3 host with the offline fixture provider; native authority and policy suites",
-      "notes": "An unconfigured, model-mismatched or incomplete Bot binding keeps no model authority and a disabled funding scope refuses the turn with zero provider dispatch; the binding is re-evaluated against the live route catalog, so a removed route blocks admission instead of switching models, and the route returning resumes the same model. A provider that fails at key/credential level inside a live call is not exercised at the product level.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Shipped default entry on actual rc.3 Host with offline credential fault injection and native policy suites; zero real model calls",
+      "notes": "Unconfigured, mismatched and removed routes refuse without fallback and restore the original model. A live missing-key failure names the original route and produces no stream/fallback. Its unknown receipt stays blocked until explicit reconciliation; after reconciliation and credential restoration a fresh original-model turn succeeds. Default product passes all 42 checks.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T04",

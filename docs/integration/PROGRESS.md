@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E126 T03 严格模型不可用与恢复验收闭合
+
+[E126](evidence/20261101_strict_model_recovery.json) 在默认产品真实调用边界注入离线缺密钥故障：原路线错误明确、零 Provider stream、零回退；首字节前异常按 unknown 保守阻断，经显式零费用 fixture 对账及凭据恢复后，新的原模型调用成功。既有未配置/不匹配/路由移除与恢复证据保持。默认产品完整探针 **42 项检查通过**，0 真实模型推理。T03 以 integration 级别 passed，正式为 **0/20、22/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。未推送/发布。当前交接为 [HANDOFF-20261101-E126.md](HANDOFF-20261101-E126.md)。
+
 ## 2026-11-01：E125 T05 白名单与旧入口越权验收闭合
 
 [E125](evidence/20261101_legacy_authorization_acceptance.json) 复验真实 legacy-policy Host：12 个未授权旧工具（含执行/重跑）均在执行前拒绝，23 个 RPC receiver 均拒绝未认证调用；伪造 botId、PTC 路线/主体替换与跨 Bot Task/legacy rerun 均 fail-closed，合法 routes 只投影绑定模型。权限套件 **26/26**，0 真实模型推理。T05 以 integration 级别 passed，正式为 **0/20、21/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。未推送/发布。当前交接为 [HANDOFF-20261101-E125.md](HANDOFF-20261101-E125.md)。
