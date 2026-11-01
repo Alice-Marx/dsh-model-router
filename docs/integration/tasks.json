@@ -1878,15 +1878,16 @@
     },
     {
       "id": "T46",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261026_m0_ds_full.json",
-        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261101_interaction_ui_acceptance.json"
       ],
-      "level": "upstream suite + actual rc.3 host / offline fixture model",
-      "environment": "Frozen DS upstream full suite plus the shipped default entry on a real rc.3 host",
-      "notes": "The frozen DS upstream suite passes and the default entry keeps the original DS Bot tools working on a real host: create_bot creates a worker, message_bot dispatches and returns, session exchange survives migration, and a fresh host reconstructs Bot identity and exchange history. Remaining DS interaction surfaces (MCP/search/approval/schedule) are recorded in the behavior audit as remaining.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Real default-product browser UI with offline ask_user/show_view tools, /side, voice, quote and PNG upload",
+      "notes": "Real screenshots cover ask_user response, show_view widgets, side question, voice entries, quote selection and PNG attachment preview. Default Host passes 47 checks per UI session. Voice device acceptance and side-answer quality remain outside this UI claim.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T47",

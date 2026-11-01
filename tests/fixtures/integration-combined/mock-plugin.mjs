@@ -68,6 +68,8 @@ export function apply(ctx) {
         const phase = userText.trim().slice('integration:delegate-'.length)
         name = 'message_bot'; args = { to: `${phase[0].toUpperCase()}${phase.slice(1)}Worker`, message: `integration:${phase}`, request_id: `workflow-${phase}-1` }
       }
+      else if (userText.trim() === 'integration:ask-card') { name = 'ask_user'; args = { question: '继续验收吗？', options: [{ label: '继续' }, { label: '停止' }], detail: '离线 UI fixture' } }
+      else if (userText.trim() === 'integration:show-view') { name = 'show_view'; args = { title: '验收指标', view: { type: 'stack', children: [{ type: 'metric', label: '通过场景', value: '39' }, { type: 'progress', label: '进度', percent: 62 }] }, await_reply: false } }
       else if (userText.trim() === 'integration:private-remember') { name = 'remember'; args = { text: 'bot-private-memory-sentinel' } }
       else if (userText.trim() === 'integration:private-recall') { name = 'recall'; args = { query: 'bot-private-memory-sentinel' } }
       else if (userText.trim() === 'integration:private-write') { name = 'write'; args = { file_path: 'private.md', content: 'bot-private-file-sentinel\n' } }
@@ -155,7 +157,7 @@ export function apply(ctx) {
   })
   ctx.on('tools/result', (execution, result) => {
     if (execution.name === 'remote_computer_browser' && !result.isError) Object.assign(browserFlow, result.value, result.value?.result)
-    if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write','remote_computer_browser','read','write','remember','recall','pwsh',
+    if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write','remote_computer_browser','read','write','remember','recall','pwsh','ask_user','show_view',
       'bot_task_start', 'bot_task_status', 'bot_task_cancel', 'bot_task_retry', 'bot_task_reconcile','bot_task_plan_start','bot_task_plan_status','bot_task_plan_cancel'].includes(execution.name)) {
       toolResults.push({ name: execution.name, agentId: execution.agent?.id ?? null, result })
     }
