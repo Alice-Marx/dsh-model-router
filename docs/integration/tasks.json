@@ -1771,17 +1771,18 @@
     },
     {
       "id": "T38",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
         "docs/integration/evidence/20261027_m0_sqlite_finance.json",
-        "docs/integration/evidence/20261027_m5_cli_execution.json",
-        "docs/integration/evidence/20261028_atomic_task_admission.json"
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261101_api_concurrent_budget.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-28",
-      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
-      "notes": "Original budget algorithms now atomically commit normalized SQLite run/hold/archive revisions; two connections and two actual child processes cannot consume the same balance. Front-channel Bot/auxiliary and initial Task/funding transaction/UI remain open. CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed."
+      "verifiedOn": "2026-11-01",
+      "environment": "Native budget/finance/model accounting with real process competition and default-product usage UI; offline fixtures",
+      "notes": "Atomic run/hold/archive reservations prevent duplicate balance use across connections/processes. Front and auxiliary receipts stay distinct; budget denial has no dispatch/receipt and unknown holds fail closed. Product separates actual, reserved and unknown amounts. Related 65+14 checks and default product 45 checks pass.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T39",

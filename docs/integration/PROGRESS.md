@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E136 T38 API 并发预算验收闭合
+
+[E136](evidence/20261101_api_concurrent_budget.json) 复验两连接与真实子进程不能消费同一余额；重试、复核、Bot/辅助调用均原子预占并保留独立来源收据。超预算无 dispatch/收据，未知收据 fail-closed；默认产品分开显示实际支出、预占与未知金额。组合 **65 项**及驱动修正后的 model-accounting **14/14** 全过，默认产品保持 45/45。T38 以 integration 级别 passed，正式为 **0/20、32/63、M0 11/12**。不声称厂商端 exactly-once，未推送/发布。当前交接为 [HANDOFF-20261101-E136.md](HANDOFF-20261101-E136.md)。
+
 ## 2026-11-01：E135 T33 CLI 原生 MCP bridge 验收闭合
 
 [E135](evidence/20261101_cli_mcp_bridge.json) 复验私有签名 bootstrap：仅当前 task lease 的获准能力可见，伪造参数/异己 peer 拒绝；机器秘密保持 host-only，撤权/退出使桥失效并回收进程树。默认产品沿用同一 Task/operation 与账本；真实安装 Codex 协议保持 13/13、零 turn。组合 **28/28**。T33 以 integration 级别 passed，正式为 **0/20、31/63、M0 11/12**。不声称同账户 OS 全量读隔离，未推送/发布。当前交接为 [HANDOFF-20261101-E135.md](HANDOFF-20261101-E135.md)。

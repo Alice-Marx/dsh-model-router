@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "336096529fae5793c33bba34821907629cb3dd56",
+  "parentEvidence": "docs/integration/evidence/20261028_atomic_task_admission.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T38 criteria are covered. Atomic SQLite run/hold/archive revisions prevent two connections or real child processes from consuming the same remaining balance. Front-channel Bot and auxiliary calls retain separate source receipts, shared account/project holds serialize Bots, and independent funds stay usable. Budget denial has no provider dispatch or receipt; unknown receipts remain fail-closed until explicit resolution. Product usage and budget cards distinguish actual spend from reserved holds and unknown amounts.",
+  "productAcceptance": "T38 passes at integration level. Concurrent starts, retries and reviews use atomic reservations; unknown or over-budget work cannot execute without permission, and spend is shown separately from holds. Formal scores are 0/20 work packages, 32/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {},
+  "implementation": [
+    "No product code changed. Existing budget reservations, model accounting, Task admission and funding projections provide the controls.",
+    "Current native process-competition, front/auxiliary accounting and product UI evidence supplements the older SQLite-only record."
+  ],
+  "testRuns": [
+    "Budget/finance/Task/subscription combination: 65 tests / 65 pass before the model-accounting driver correction.",
+    "Verified-driver model accounting: 14 tests / 14 pass / 0 fail, including real budget competition, unknown holds and frozen-request revocation.",
+    "Default product remains 45/45 with per-source receipts, funding summary, budget denial and separate reserved/actual/unknown projections.",
+    "Latest complete root regression remains E133: 1980 tests / 1892 pass / 0 fail / 88 skipped; check:client OK."
+  ],
+  "preservedFailures": [
+    "The combined run's only failure was model-accounting.native.mjs receiving no DSH_TASK_DRIVER. The same file passes 14/14 with the verified better-sqlite3 driver; this was an invocation error, not a product failure."
+  ],
+  "limitations": [
+    "No real provider billing or model inference was used; this validates offline accounting and admission, not vendor-side exactly-once charging.",
+    "No production process, push or release was used."
+  ]
+}
