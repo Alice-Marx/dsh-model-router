@@ -12,7 +12,7 @@ const DIGEST = /^[a-f0-9]{64}$/
 
 export function fingerprintWindowsLauncherXml(xml) {
   if (typeof xml !== 'string') fail('MIGRATION_WINDOWS_LAUNCHER_STATE_INVALID')
-  return createHash('sha256').update(xml.replace(/<Enabled>(?:true|false)<\/Enabled>/g, '<Enabled>state</Enabled>')).digest('hex')
+  return createHash('sha256').update(xml.replace(/<Enabled>(?:true|false)<\/Enabled>/gi, '<Enabled>state</Enabled>')).digest('hex')
 }
 
 async function command(powershell, script, signal) {

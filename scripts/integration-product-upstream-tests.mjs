@@ -18,4 +18,4 @@ const output = Buffer.concat(chunks).toString('utf8'); await writeFile(join(dir,
 const counts = Object.fromEntries(['tests', 'pass', 'fail', 'skipped'].map(key => [key, Number([...output.matchAll(new RegExp(`\\b${key} (\\d+)\\b`, 'g'))].at(-1)?.[1] ?? -1)]))
 const result = { status: code === 0 && counts.fail === 0 ? 'passed' : 'failed', ...counts, source, actualModelCalls: 0, level: 'migrated-upstream-unit-and-component-tests' }
 await writeFile(join(dir, 'summary.json'), JSON.stringify(result, null, 2) + '\n'); process.stdout.write(JSON.stringify(result, null, 2) + '\n')
-if (result.status !== 'passed') process.exitCode = 1
+if (result.status !== 'passed') { console.error(output); process.exitCode = 1 }
