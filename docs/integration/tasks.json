@@ -1853,15 +1853,16 @@
     },
     {
       "id": "T44",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261026_m0_llm_admission.json",
-        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261101_long_memory_history.json"
       ],
-      "level": "integration + actual rc.3 host / offline fixture model",
-      "environment": "Real LlmRuntime with an offline GPT-named fixture; default entry on a real rc.3 host",
-      "notes": "Auxiliary Bot calls keep their own receipts and are admitted through the same funding authority, and the default probe shows aux receipts beside bot receipts in the usage projection. DS long-term memory and history surfaces themselves come from the vendored DS runtime and are not separately re-verified here.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Frozen upstream memory/handoff suites plus current private Session rotation and restart evidence; offline fixtures",
+      "notes": "Memory editing/deletion/retrieval, segmented history, restart continuation, scoped references and attachments pass upstream. Session rotation keeps the same Bot/model grant and owner memory without cross-Bot leakage. Upstream 1062/1061/0/1 passes.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T45",
