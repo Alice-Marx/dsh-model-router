@@ -1866,14 +1866,15 @@
     },
     {
       "id": "T45",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261026_m0_ds_full.json"
+        "docs/integration/evidence/20261026_m0_ds_full.json",
+        "docs/integration/evidence/20261101_schedule_execution.json"
       ],
-      "level": "upstream suite",
-      "environment": "Frozen DS upstream full suite on Windows Node24",
-      "notes": "Scheduled-task behaviour ships inside the frozen DS upstream suite, which passes unchanged. Product-level scheduled-task interaction through the composed entry remains for W14.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Actual default-product one-shot schedules with Session rotation and funding CAS toggles; offline prompts",
+      "notes": "A real one-shot schedule follows the stable Bot through Session rotation, executes once and does not duplicate on a later tick. Execution rechecks model/funding authority; disabled account adds no call, explicit restoration allows the next run. Default product passes all 47 checks.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T46",
