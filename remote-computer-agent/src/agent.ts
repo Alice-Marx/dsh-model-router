@@ -14,10 +14,10 @@ import {WorkspaceAdmissions} from './workspace-admission.js'
 import {reconcileRootsGeneration,rootsGeneration} from './workspace-generation.js'
 import {pinnedCreateNewFile,pinnedWriteSupported} from './pinned-write.js'
 const execFileAsync=promisify(execFile)
-export type AgentConfig={dataDir:string;roots:Record<string,string>;executables?:Record<string,string>;shell?:string;windowsJobRunner?:string;browserOrigins?:string[];browserExecutablePath?:string;isolation?:'os-account'|'container'|'application';container?:ContainerCommandConfig;desktop?:{pipeName:string;secretFile:string}}
+export type AgentConfig={dataDir:string;roots:Record<string,string>;executables?:Record<string,string>;shell?:string;windowsJobRunner?:string;browserOrigins?:string[];browserExecutablePath?:string;browserProfiles?:Record<string,string>;isolation?:'os-account'|'container'|'application';container?:ContainerCommandConfig;desktop?:{pipeName:string;secretFile:string}}
 export class Agent {
   store:Store;roots:Roots;browser:BrowserTools;desktop:DesktopTools;workspaces:WorkspaceAdmissions;container?:ContainerCommands;rootsGeneration:string;private processes=new Map<string,any>();private jobs=new Map<string,Promise<any>>();private desktopJobs=new Map<string,{context:Context;cancel:(why:string)=>Promise<void>}>();private cancelRequested=new Set<string>();private writes=new Set<string>();private authTimer:any
-  constructor(public config:AgentConfig,Database?:any){this.store=new Store(resolve(config.dataDir),Database);this.roots=new Roots(config.roots,{protectedPaths:[resolve(config.dataDir),...(config.desktop?[resolve(config.desktop.secretFile)]:[])]});this.browser=new BrowserTools(config.browserOrigins??[],config.browserExecutablePath);this.desktop=new DesktopTools(config.desktop,{validate:c=>this.store.validate(c)})
+  constructor(public config:AgentConfig,Database?:any){this.store=new Store(resolve(config.dataDir),Database);this.roots=new Roots(config.roots,{protectedPaths:[resolve(config.dataDir),...(config.desktop?[resolve(config.desktop.secretFile)]:[])]});this.browser=new BrowserTools(config.browserOrigins??[],config.browserExecutablePath,undefined,config.browserProfiles);this.desktop=new DesktopTools(config.desktop,{validate:c=>this.store.validate(c)})
     try{
      // Which roots configuration produced the persisted workspace state. A
      // changed mapping between runs fences unsettled admissions instead of

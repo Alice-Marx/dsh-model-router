@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "8cbe44a894e15297c9f3f368859e091f9b58ea7e",
+  "parentEvidence": "docs/integration/evidence/20261027_m0_remote_agent.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T26 criteria are covered by real Playwright. Temporary Bot/task contexts keep cookies and state apart, cross-owner sessions are denied and browser_close reclaims the session. An operator-approved profileId uses launchPersistentContext with a per-client/Bot/profile hashed data directory: the same Bot retains cookies across attempts, while another Bot using the same profile name starts empty. Downloads are scoped to the original session, capped at 1 MiB, returned with bytes and SHA-256, deleted after consumption and unavailable to another Bot.",
+  "productAcceptance": "T26 passes at integration level. Login state, cookies and downloads do not leak between Bots; nonpersistent tasks are reclaimed and persistent profiles require explicit selection. Formal scores are 0/20 work packages, 28/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "remote-computer-agent/src/browser.ts": "cac8d0e3744d75a3607e2cb5e5f7ea948fc5de42",
+    "remote-computer-agent/src/agent.ts": "e87768acb9e6296481935df092dfae9e3a08569d",
+    "remote-computer-agent/src/protocol.ts": "5f09d17ba772dc671e5ac30a1311fb4e5adbefb6",
+    "scripts/integration-remote-agent-browser.mjs": "a75d41e0576b76b491b39511cf670ef92606ff33"
+  },
+  "implementation": [
+    "Added optional browserProfiles operator configuration and explicit browser_open profileId selection, partitioned by client/Bot/profile hash.",
+    "Nonpersistent contexts close completely; persistent sessions close only their page and retain the selected per-Bot context until Agent shutdown.",
+    "Added browser_download with session ownership, 1 MiB cap, SHA-256, one-time consumption and no cross-Bot lookup."
+  ],
+  "testRuns": [
+    "npm run integration:probe-remote-agent-browser: all nine checks pass on Win11 Node24 with Chromium 156.0.8078.4.",
+    "Real assertions cover cookie isolation, cross-owner denial, close reclamation, persistent profile across attempt IDs, empty state for another Bot with the same profile name, and scoped one-time download bytes.",
+    "Final npm test: phase one 1593/1589/0/4 and phase two 387/303/0/84; total 1980 tests, 1892 pass, 0 fail, 88 skipped. npm run check:client: OK.",
+    "Raw probe summary: tmp/integration/agent-browser/summary.json."
+  ],
+  "preservedFailures": [
+    "The first persistent reopen checked a download page that had no cookie-state element; the fixture now exposes the same state probe there.",
+    "Repeated/cross-Bot download attempts return operation-level failed receipts rather than thrown errors; assertions now check the actual protocol shape."
+  ],
+  "limitations": [
+    "The local browser executable may differ from a future distribution-pinned build. OS dependency installation remains a deployment gate.",
+    "Script and upload APIs remain T27 work. No production browser profile, real account, real model inference, push or release was used."
+  ]
+}

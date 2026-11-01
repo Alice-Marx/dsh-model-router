@@ -1651,14 +1651,15 @@
     },
     {
       "id": "T26",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_remote_agent.json"
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261101_browser_identity_isolation.json"
       ],
-      "notes": "Per-Bot/task Playwright contexts isolate cookies and state; cross-owner access is denied and redirect/file URLs are blocked. Persistent profile selection, upload/download and script modes are not implemented.",
-      "verifiedOn": "2026-10-27",
+      "notes": "Real Playwright verifies per-Bot cookie/state isolation and close reclamation. Explicit operator profileId persists per-client/Bot/profile across attempts without sharing across Bots. Downloads are original-session scoped, capped at 1 MiB, hash-verified and consumed once. Full root 1980/1892/0/88 passes.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
-      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
+      "environment": "Real Playwright Chromium on isolated Win11 Node24 with synthetic HTTP origin and profile roots; offline fixtures only"
     },
     {
       "id": "T27",

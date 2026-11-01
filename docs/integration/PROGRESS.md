@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E132 T26 浏览器身份隔离验收闭合
+
+[E132](evidence/20261101_browser_identity_isolation.json) 新增 operator 白名单持久 profile 与受控下载：profile 按 client/Bot/profile 哈希分目录，同 Bot 跨 attempt 保留 cookie，另一 Bot 同名 profile 为空；临时 context 关闭即回收；下载限原会话、1 MiB、SHA-256、读后删除且不可跨 Bot。真实 Playwright 九项检查全过；完整根回归 **1980 项：1892 通过、0 失败、88 跳过**，`check:client` OK。T26 以 integration 级别 passed，正式为 **0/20、28/63、M0 11/12**。script/upload 属 T27，浏览器 OS 部署另验。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E132.md](HANDOFF-20261101-E132.md)。
+
 ## 2026-11-01：E131 T28 Windows 基本控机验收闭合
 
 [E131](evidence/20261101_windows_basic_desktop.json) 当前 Win11 实机复跑 **19/19**：截图、真实按钮点击、允许按键、目标滚轮、Unicode SendInput（无剪贴板）及 lease/过期/清理通过；Win10 22H2 既有实机同样 **19/19** 且有合成窗口 PNG，桌面 helper、协议、驱动与夹具源码核对未变。T28 以 integration 级别 passed，正式为 **0/20、27/63、M0 11/12**。仅操作合成自有窗口，其他应用、UAC/RDP、DPI、多屏与 WGC 另验。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E131.md](HANDOFF-20261101-E131.md)。
