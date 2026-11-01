@@ -1786,18 +1786,19 @@
     },
     {
       "id": "T39",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "tests/subscription-billing.test.mjs",
         "tests/subscription-reservations.test.mjs",
         "tests/subscription-receipts-runtime.test.mjs",
         "tests/subscription-accounting-host.test.mjs",
-        "docs/integration/evidence/20261027_m0_sqlite_finance.json"
+        "docs/integration/evidence/20261027_m0_sqlite_finance.json",
+        "docs/integration/evidence/20261101_subscription_accounting.json"
       ],
-      "level": "unit + integration",
-      "environment": "Native subscription suites on Node 24; SQLite finance probe with the verified native driver",
-      "notes": "subscription-only never uses an API key and api-only never uses the subscription; quota exhaustion switches the same step to the API key and records why; a pure subscription admission ignores a full API budget and preserves subscription use; an interrupted unknown subscription hold cannot turn into unknown API spending or occupy money; unknown token usage is never counted as zero and an incomplete subscription archive keeps the quota conservative. A live vendor quota turn and a user-confirmed API fallback are not exercised.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Native subscription, funded MR and usage UI suites with offline fixtures; zero real model calls",
+      "notes": "Unknown/partial tokens stay unknown. Subscription-only routes never borrow API credentials or money; explicit API fallback checkpoints subscription then re-prices, re-approves and atomically reserves. Concurrent resize cannot double-admit and UI keeps token quantities separate from USD. Related suites pass 79/79.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T40",

@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E137 T39 订阅计量与回退验收闭合
+
+[E137](evidence/20261101_subscription_accounting.json) 复验未知/部分 token 不按零计；subscription-only 即使 API 历史满或未知也不借 API 凭据/美元。显式转 API 先保存订阅收据，再重新估价、审批和原子预占；并发回退不重复准入，崩溃分别保留订阅用量与未知 API 费用，UI 不混用 token 与美元。组合 **79/79**。T39 以 integration 级别 passed，正式为 **0/20、33/63、M0 11/12**。不证明真实厂商配额/账单，未推送/发布。当前交接为 [HANDOFF-20261101-E137.md](HANDOFF-20261101-E137.md)。
+
 ## 2026-11-01：E136 T38 API 并发预算验收闭合
 
 [E136](evidence/20261101_api_concurrent_budget.json) 复验两连接与真实子进程不能消费同一余额；重试、复核、Bot/辅助调用均原子预占并保留独立来源收据。超预算无 dispatch/收据，未知收据 fail-closed；默认产品分开显示实际支出、预占与未知金额。组合 **65 项**及驱动修正后的 model-accounting **14/14** 全过，默认产品保持 45/45。T38 以 integration 级别 passed，正式为 **0/20、32/63、M0 11/12**。不声称厂商端 exactly-once，未推送/发布。当前交接为 [HANDOFF-20261101-E136.md](HANDOFF-20261101-E136.md)。
