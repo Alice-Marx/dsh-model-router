@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E121 T24 命令参数、超时与输出边界验收闭合
+
+[E121](evidence/20261101_command_output_acceptance.json) 复验真实 argv 与进程监督：空格、Unicode、换行参数保持离散，不经 shell 拼接；超时终止自有进程树并准确报告状态，输出限 8 MiB 并使用有界 artifact。相关组合 **47 项：42 通过、0 失败、5 个 Windows Docker 腿跳过**，既有 Linux 容器证据覆盖对应路径。T24 以 integration 级别 passed，正式为 **0/20、17/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E121.md](HANDOFF-20261101-E121.md)。
+
 ## 2026-11-01：E120 T23 文件与 artifact 边界验收闭合
 
 [E120](evidence/20261101_artifact_download_acceptance.json) 新增授权 `machine.artifact`：先 stat 再完整读取，核对大小和 SHA-256，限 1 MiB；缺失映射 `ARTIFACT_DOWNLOAD_EXPIRED`，其他 Bot 不能读取。产品 UI 使用同一 Bot 作用域，只展示已核验下载链接，不回显内容；过期/未授权均明确拒绝。相关组合 **28/28**；完整两阶段根回归 **1977 项：1892 通过、0 失败、83 跳过**，客户端已重建且 `check:client` OK。T23 以 integration 级别 passed，正式为 **0/20、16/63、M0 11/12**。未推送/发布，当前交接为 [HANDOFF-20261101-E120.md](HANDOFF-20261101-E120.md)。

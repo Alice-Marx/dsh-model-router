@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "0a89da6842331ff059d729bbf2a49d3a153e4b49",
+  "parentEvidence": "docs/integration/evidence/20261027_m0_remote_agent.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T24 criteria are covered by real native command and process-supervision probes. Spaces, Unicode and embedded newlines remain distinct argv elements without shell joining. Timeout terminates the owned process tree and reports the correct stopped state. Output capture is bounded at 8 MiB with artifacts, and actual child processes are supervised. Related tests report 47 tests, 42 pass, 0 fail and 5 skipped.",
+  "productAcceptance": "T24 passes at integration level. Command execution preserves argument boundaries, enforces deadlines and bounds output; it does not imply cross-account OS isolation, which remains T25. Formal scores are 0/20 work packages, 17/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "tests/remote-agent.test.mjs": "aadd5bcfd3dc6f0ab293f2e7355b270dce8f6fd7",
+    "tests/remote-command-tasks.native.mjs": "af671f141a77aa8019db42dc48c561b15c0bceb6",
+    "tests/windows-process-job.native.mjs": "a3ff7e41b0b2f72bbc84948c8a09bcb233196f3c",
+    "tests/cli-native-peer-job.native.mjs": "caebe75423697a9572db66196aa0538f4b69e573",
+    "tests/cli-native-peer-probe.native.mjs": "233252a7d82864b8b8482ecb81dad69727a442cf"
+  },
+  "implementation": [
+    "No product code changed. Existing executable-plus-argv APIs avoid shell interpolation and preserve individual arguments including spaces, Unicode and newlines.",
+    "Existing process supervision terminates the owned process tree on timeout and records the resulting status.",
+    "Existing bounded output capture limits retained output to 8 MiB and uses artifacts instead of unbounded result payloads."
+  ],
+  "testRuns": [
+    "node --test tests/remote-agent.test.mjs tests/remote-command-tasks.native.mjs tests/windows-process-job.native.mjs tests/cli-native-peer-job.native.mjs tests/cli-native-peer-probe.native.mjs: 47 tests / 42 pass / 0 fail / 5 skipped in 91.6 seconds.",
+    "Five skipped cases require real Docker containers on Windows; the existing Linux evidence docs/integration/evidence/20261029_remote_container_commands.json covers the corresponding container legs.",
+    "Latest complete root regression remains E120: 1977 tests / 1892 pass / 0 fail / 83 skipped; this evidence-only checkpoint did not rerun the full suite."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "Argument and output acceptance is not a claim of separate-user or cross-machine OS sandboxing.",
+    "No real model inference, production process, push or release was used."
+  ]
+}

@@ -1627,18 +1627,17 @@
     },
     {
       "id": "T24",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_remote_agent.json",
-        "docs/integration/evidence/20261027_m4_product_machines.json",
         "docs/integration/evidence/20261029_remote_container_commands.json",
-        "docs/integration/evidence/20261030_workspace_admission_mount.json",
-        "docs/integration/evidence/20261030_windows_job_creation.json"
+        "docs/integration/evidence/20261030_windows_job_creation.json",
+        "docs/integration/evidence/20261101_command_output_acceptance.json"
       ],
-      "notes": "Fixed-executable argv bypasses shell parsing, timeout terminates the owned process tree, and output capture is bounded with artifacts. Space/Unicode/newline argument parity and 30-minute CLI ceilings are not yet explicitly covered. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. E56: actual Linux Agent container controller24 checks incl7 Agent process deaths; original operation/worker never replayed, different-UID absolute deadline survives downtime, command descendants stop, outputs bounded and control identities verified. Three-platform root1687/0fail, original Agent12/default40/finance33 pass; Windows skips13 real-container top-level cases. Root ownership/pinning/every executable entry, model-facing command Task facade, Windows OS isolation and full end-to-end acceptance remain open. E58: physical-root/alias-overlap admission, retained unknown locks, read/independent-root continuation, file cancel/join and verified Linux bind transition pass on actual machines; workspace31 and container29. Parent/leaf descriptor writes, worker permissions, application native mode, full command Task and OS boundaries remain open. E59: deterministic old suspended-child orphan reproduced and cleaned; actual Windows Job atomic creation/creator death/Unicode suite11 passes on both Windows. The separate CLI native-peer supervisor still needs its analogous creation-death fix; no account/AppContainer acceptance.",
-      "verifiedOn": "2026-10-30",
+      "notes": "Real native probes preserve spaces, Unicode and embedded newlines as discrete argv elements without shell joining. Timeout terminates the owned process tree and records the stopped state; output is bounded at 8 MiB with artifacts and real child supervision. The related suites pass 42/47 with zero failures and five Windows-only Docker skips covered by existing Linux evidence.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
-      "environment": "Default rc.3 Host and native Agent on isolated Win11/Win10/Ubuntu test roots; offline models"
+      "environment": "Real argv and process supervision on isolated Win11 Node24; existing Linux Docker evidence covers the five skipped container legs; offline fixtures only"
     },
     {
       "id": "T25",
