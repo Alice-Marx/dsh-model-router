@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "becce1f34cf09c05efa9f23da228990a12cf3c9b",
+  "parentEvidence": "docs/integration/evidence/20261101_migration_restore.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "Real child processes exit(86) immediately after the first restored domain and after ledger publication. A fresh process validates the original request and resumes both cases. Domain bytes, schema 5 logical exports, Bot ownership and unknown values match the source archives; router_model_calls remains exactly one row. A further replay remains read-only with respect to restored content. Conflicting old targets, operation rebinding and archive tampering stay refused.",
+  "productAcceptance": "T48 and T49 pass at integration level. Existing domain audits cover Bot/group/memory/Session/reference semantics; complete byte and logical restore preserves those facts. Existing old-writer marker refusal, forward-schema guards and latest ledger exports cover the remaining T49 criteria. Formal scores are 0/20 work packages, 44/63 scenarios and M0 11/12. This does not assert production activation, all-domain stop-write or post-activation rollback.",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-restore.mjs": "7516a2517e69d453f9b0ef8ba7c48de07d2dc60e",
+    "tests/migration-restore.test.mjs": "9e85f16fe6065ca9ff92727b7f88c2b23ff49d1b",
+    "tests/migration-restore.native.mjs": "afc8fba413e6e45d5c9d8b0102493034954dc917",
+    "tests/fixtures/migration-restore-crash.mjs": "00c88d4dcffe2cbe330f1eb53298f9b7786c578b",
+    "package.json": "f576af52b965705518157ad52d8252da3d1e24e5"
+  },
+  "implementation": [
+    "The crash fixture uses the actual restoreMigrationArchives entry and exits only after the durable domain/ledger marker has been written. It does not simulate a completed restore or edit receipts.",
+    "The parent process observes exit code 86 and absence of completed.json before invoking a separate recovery call. The domain-crash case has only the first domain; the ledger-crash case preserves the published database byte-for-byte.",
+    "No product source changed in this increment. The native suite and its fixture are registered in the root regression."
+  ],
+  "testRuns": [
+    "Real crash injection: 2 tests / 2 pass / 0 fail, domain and ledger publication boundaries.",
+    "Restore component: 6 tests / 6 pass / 0 fail; repeat import, interruption, conflicts and input validation remain green.",
+    "Complete root regression: phase one 1600/1596/0/4 plus phase two 389/305/0/84 = 1989 tests / 1901 pass / 0 fail / 88 skipped.",
+    "npm run check:client: OK."
+  ],
+  "preservedFailures": [
+    "The initial native fixture produced a non-ready profile plan and failed before archive creation. The real web bundle prerequisite and an explicit ready assertion were added; the same tests then passed.",
+    "E147 exception boundaries are not mislabeled as process crashes; this evidence uses actual child exit(86)."
+  ],
+  "limitations": [
+    "Integration-level fresh-target restore does not activate a production profile, stop unknown OS writers or roll back newly arriving production data.",
+    "Old-writer refusal applies to the established migration marker/schema boundaries, not every historical binary or external process.",
+    "No real user profile, model inference, production process, push or release was used."
+  ]
+}
