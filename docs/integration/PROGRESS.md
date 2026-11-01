@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E129 T01 固定 DSH 下 DS/MR 生命周期加载闭合
+
+[E129](evidence/20261101_lifecycle_loading_acceptance.json) 汇总当前真实证据：默认插件在 DSH rc.3/冻结 DS 启动，AgentLoop、Session、工具/审批与 Task 控制经冷启动验证；真实孙子进程 MCP 连接成功且异己 peer 拒绝；search Loader 配置/替换/禁用与完整客户端特性加载通过。组合 **29/29**，源完整性 **297 文件零偏差**；默认 Host 的刻意离线故障日志保留。T01 以 integration 级别 passed，正式为 **0/20、25/63、M0 11/12**。无产品代码变化，最近完整根回归为 E127 的 1980/1892/0/88，`check:client` OK。未推送/发布。当前交接为 [HANDOFF-20261101-E129.md](HANDOFF-20261101-E129.md)。
+
 ## 2026-11-01：E128 T02 单一产品入口与宽窄 UI 验收闭合
 
 [E128](evidence/20261101_single_product_ui.json) 在默认单插件 Host 完成 44 项自检后，使用真实浏览器验证：DS Bot/群与 Bot 绑定、任务、远程电脑、费用、高级工作台同侧栏，MR 高级任务规划/配置/工具/预算可达。原始 **1440×900 宽屏**和 **390 CSS px 窄屏** PNG 已入库，窄屏重排无可见横向溢出。T02 以 integration 级别 passed，正式为 **0/20、24/63、M0 11/12**。无产品代码变化，最近完整根回归为 E127 的 1980/1892/0/88，`check:client` OK。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E128.md](HANDOFF-20261101-E128.md)。

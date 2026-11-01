@@ -1285,16 +1285,18 @@
   "acceptanceResults": [
     {
       "id": "T01",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m1_bot_runtime.json",
         "docs/integration/evidence/20261028_atomic_task_admission.json",
-        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json"
+        "docs/integration/evidence/20261028_atomic_auth_three_platforms.json",
+        "docs/integration/evidence/20261101_lifecycle_loading_acceptance.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-28",
-      "environment": "Isolated strict DS factory composition; Win11/Win10 Node24 and Ubuntu Node22; offline fixture model",
-      "notes": "Migrated product factory, vendored source bytes, client bundle, 1062-test upstream suite and a real rc.3 host composition (create/dispatch/return/cold restart) are verified. Default shipped-entry composition, remaining lifecycle (MCP/search/approval/schedule), Task accounting integration and remote/OS deployment criteria remain incomplete. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed. E42: final three-machine source-byte verification, root/native41/finance33/defaultHost36 and reproducible client build passed with explicit platform skips; reused dependencies and offline providers do not prove clean install, live public deployment, physical UI or release acceptance."
+      "verifiedOn": "2026-11-01",
+      "environment": "DSH 0.2.1-rc.3 and frozen DS on isolated Win11 Node24; actual Host, native MCP, Loader search and generated client; offline fixture model",
+      "notes": "Default plugin, real AgentLoop/Sessions, tools/approvals, native MCP, search settings and full client lifecycle load and survive restart. Related suites pass 29/29 and source integrity is 297 files with zero drift. Offline fixture errors are preserved in logs; production migration and deployment remain separate gates.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T02",
