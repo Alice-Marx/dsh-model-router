@@ -10,6 +10,11 @@ const fail = (code, details) => { throw Object.assign(new Error(code), { code, .
 const NAME = /^[A-Za-z0-9_.-]{1,120}$/
 const DIGEST = /^[a-f0-9]{64}$/
 
+export function fingerprintWindowsLauncherXml(xml) {
+  if (typeof xml !== 'string') fail('MIGRATION_WINDOWS_LAUNCHER_STATE_INVALID')
+  return createHash('sha256').update(xml.replace(/<Enabled>(?:true|false)<\/Enabled>/g, '<Enabled>state</Enabled>')).digest('hex')
+}
+
 async function command(powershell, script, signal) {
   return execute(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], { timeout: 15000, windowsHide: true, maxBuffer: 4 * 1024 * 1024, signal })
 }
@@ -31,7 +36,7 @@ async function inspect(powershell, task, signal, checkDigest = true) {
   let current
   try { current = JSON.parse(stdout) } catch { fail('MIGRATION_WINDOWS_LAUNCHER_STATE_INVALID', { name: task.name }) }
   if (typeof current.state !== 'string' || typeof current.xml !== 'string') fail('MIGRATION_WINDOWS_LAUNCHER_STATE_INVALID', { name: task.name })
-  const xmlSha256 = createHash('sha256').update(current.xml).digest('hex')
+  const xmlSha256 = fingerprintWindowsLauncherXml(current.xml)
   if (checkDigest && xmlSha256 !== task.xmlSha256) fail('MIGRATION_WINDOWS_LAUNCHER_CHANGED', { name: task.name, expected: task.xmlSha256, actual: xmlSha256 })
   return { name: task.name, state: current.state, xmlSha256 }
 }

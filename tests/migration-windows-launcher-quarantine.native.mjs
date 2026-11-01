@@ -1,12 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { quarantineWindowsLaunchers as quarantine, releaseWindowsLaunchers as release } from '../packages/orchestration/src/migration-windows-launcher-quarantine.mjs'
+import { quarantineWindowsLaunchers as quarantine, releaseWindowsLaunchers as release, fingerprintWindowsLauncherXml as fingerprint } from '../packages/orchestration/src/migration-windows-launcher-quarantine.mjs'
 
 const execute = promisify(execFile)
 const enabled = process.platform === 'win32'
@@ -24,7 +24,7 @@ async function state(name) {
 }
 async function digest(name) {
   const { stdout } = await command(`Export-ScheduledTask -TaskName ${quote(name)} -ErrorAction Stop`)
-  return createHash('sha256').update(stdout).digest('hex')
+  return fingerprint(stdout)
 }
 async function wait(fn, ms = 15000) {
   const end = Date.now() + ms

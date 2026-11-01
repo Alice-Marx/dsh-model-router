@@ -178,6 +178,6 @@ E96 的后续 Host 能重新配对，是因为 Job 停止不触碰长期 client 
 
 ## 19. Windows 计划任务隔离适配器与本机能力缺口（E104）
 
-新增 `quarantineWindowsLaunchers` / `releaseWindowsLaunchers`，仅处理显式声明的任务名与 `Export-ScheduledTask` XML SHA-256。先读完全部任务并核对指纹，再 Disable、必要时 Stop，读回 Disabled 才返回 `declaredRestartBlocked:true` / `persistentDeclaredExclusion:true`；release 要求 Disabled，只 Enable 不 Start。外部重启、其他账户、未知 launcher 与 `stopWriteProvable` 继续 false。
+新增 `quarantineWindowsLaunchers` / `releaseWindowsLaunchers`，仅处理显式声明的任务名与归一化 `Export-ScheduledTask` XML SHA-256；`fingerprintWindowsLauncherXml` 将运行期 `Enabled` 状态排除在配置指纹之外。先读完全部任务并核对指纹，再 Disable、必要时 Stop，读回 Disabled 才返回 `declaredRestartBlocked:true` / `persistentDeclaredExclusion:true`；状态变更后只读状态，release 前重新核对配置指纹，且只 Enable 不 Start。外部重启、其他账户、未知 launcher 与 `stopWriteProvable` 继续 false。
 
 本机真实验收**未完成**：两次以唯一合成 AtLogOn 任务注册均返回 `0x80070005`，随后显式当前用户 + Limited/Interactive principal 仍同样拒绝。未提权、未修改系统权限、未触碰现有任务。套件增加能力探测，最终 4 项、1 通过、3 跳过；跳过的是真实 writer 和 XML 指纹负例，不是通过。组件与用例入库用于下一台有授权的 Windows 测试机复验，W06.15 保持 in_progress。
