@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E122 T07 同一派活重复投递验收闭合
+
+[E122](evidence/20261101_assignment_replay_acceptance.json) 在真实 rc.3 Host 分离验证 UI HTTP 重发、独立重复 `message_bot` 和真实重启后的 replay：三者均返回原回执或当前 Task，不重复 worker 投递。冷启动重复 `bot_task_start` 保留当前 Task/operation，原提交与显式重试形成的两个 attempt 不增加，后端调用为零。T07 以 integration 级别 passed，正式为 **0/20、18/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E122.md](HANDOFF-20261101-E122.md)。
+
 ## 2026-11-01：E121 T24 命令参数、超时与输出边界验收闭合
 
 [E121](evidence/20261101_command_output_acceptance.json) 复验真实 argv 与进程监督：空格、Unicode、换行参数保持离散，不经 shell 拼接；超时终止自有进程树并准确报告状态，输出限 8 MiB 并使用有界 artifact。相关组合 **47 项：42 通过、0 失败、5 个 Windows Docker 腿跳过**，既有 Linux 容器证据覆盖对应路径。T24 以 integration 级别 passed，正式为 **0/20、17/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E121.md](HANDOFF-20261101-E121.md)。

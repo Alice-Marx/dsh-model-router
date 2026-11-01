@@ -1362,18 +1362,16 @@
     },
     {
       "id": "T07",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_managed_tasks.json",
-        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
-        "tests/task-journal.native.mjs",
         "docs/integration/evidence/20261028_dependency_scheduler_cold_replay.json",
-        "docs/integration/evidence/20261028_atomic_task_admission.json"
+        "docs/integration/evidence/20261101_assignment_replay_acceptance.json"
       ],
-      "level": "strict host composition + actual rc.3 host / offline fixture model + native",
-      "environment": "Managed-task strict composition with a real crash and restart, plus the shipped default entry",
-      "notes": "The journal keys every command by (owner Bot, request key), so a repeated submit returns the original task and operation and a repeated reconcile is replayed without a new attempt; the product probe asserts the owner reconcile replay. A UI resend and a duplicate message_bot delivery reach the same idempotency key path but are not driven as separate product flows. Owner canonical plan replay after cold startup or original Agent detach retains the original package/attempt/operation IDs and performs no new provider dispatch; changed content is rejected. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed.",
-      "verifiedOn": "2026-10-28"
+      "level": "integration",
+      "environment": "Actual rc.3 Host with frozen DS and offline fixture model on isolated Win11 Node24; real restart and zero real model calls",
+      "notes": "Separate real Host flows verify UI HTTP resend, duplicate message_bot and cold-start replay. Each returns the original receipt or current Task without another worker delivery. After an explicit retry, cold replay preserves the current Task/operation and two attempts with zero backend dispatch. Existing canonical plan replay remains covered.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T08",

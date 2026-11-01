@@ -244,7 +244,25 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
     await api('send', { sessionId: main.id, text: 'integration:delegate' })
     result = await quiet()
     const exchange = await api('exchange', { a: main.id, b: worker.id })
-    record('Main message_bot dispatch reaches worker and its reply returns', result.diagnostic.toolResults.some(tool => tool.name === 'message_bot' && !tool.result.isError) && exchange.some(item => item.from === main.id && item.to === worker.id) && exchange.some(item => item.from === worker.id && item.to === main.id))
+    const firstMessage = result.diagnostic.toolResults.find(tool => tool.name === 'message_bot' && !tool.result.isError)
+    const workerDeliveries = result.diagnostic.calls.filter(call => call.sessionId === worker.id && call.agentLoop && call.marker === 'integration:worker-answer').length
+    record('Main message_bot dispatch reaches worker and its reply returns', firstMessage && exchange.some(item => item.from === main.id && item.to === worker.id) && exchange.some(item => item.from === worker.id && item.to === main.id))
+    await api('send', { sessionId: main.id, text: 'integration:delegate' })
+    result = await quiet()
+    const resentMessages = result.diagnostic.toolResults.filter(tool => tool.name === 'message_bot' && !tool.result.isError)
+    record('UI resend replays the original message_bot receipt without another worker delivery',
+      resentMessages.length === 2 && JSON.stringify(resentMessages[1].result.value) === JSON.stringify(firstMessage.result.value) &&
+      (await api('exchange', { a: main.id, b: worker.id })).length === exchange.length &&
+      result.diagnostic.calls.filter(call => call.sessionId === worker.id && call.agentLoop && call.marker === 'integration:worker-answer').length === workerDeliveries)
+    if (lifecycle) {
+      const replay = await request('integration-lifecycle', { action: 'replay', mainId: main.id, workerId: worker.id })
+      assert.equal(replay.status, 'passed-for-described-checks', replay.error)
+      result = await quiet()
+      record('A duplicate message_bot tool call returns the original receipt and does not restart the worker',
+        JSON.stringify(replay.receipt) === JSON.stringify(firstMessage.result.value) &&
+        (await api('exchange', { a: main.id, b: worker.id })).length === exchange.length &&
+        result.diagnostic.calls.filter(call => call.sessionId === worker.id && call.agentLoop && call.marker === 'integration:worker-answer').length === workerDeliveries)
+    }
     record('Main and worker use real AgentLoops; every call keeps the exact offline route', [main.id, worker.id].every(id => result.diagnostic.calls.some(call => call.sessionId === id && call.agentLoop)) && result.diagnostic.calls.every(call => `${call.provider}/${call.model}` === FIXTURE_ROUTE))
     const usage = await api('usage')
     record('DS usage projection attributes positive mock token usage to both Bots', [main.id, worker.id].every(id => {
@@ -335,9 +353,12 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       summary.lifecycleAfterRestart = await request('integration-lifecycle', { action: 'restored', mainId: main.id, workerId: worker.id })
       await writeFile(join(run, 'lifecycle-restored.json'), JSON.stringify(summary.lifecycleAfterRestart, null, 2))
       assert.equal(summary.lifecycleAfterRestart.status, 'passed-for-described-checks', summary.lifecycleAfterRestart.error)
+      record('After a real host restart message_bot still replays its original receipt without another worker delivery',
+        JSON.stringify(summary.lifecycleAfterRestart.receipt) === JSON.stringify(firstMessage.result.value) &&
+        (await api('exchange', { a: main.id, b: worker.id })).length === exchange.length)
     }
     if(tasks){
-      summary.tasksAfterRestart=await request('integration-tasks',{action:'restored',mainId:main.id,workerId:worker.id,recoveryTaskId:summary.tasks.recoveryTaskId,operationId:summary.tasks.operationId,committedTaskId:summary.tasks.committedTaskId})
+      summary.tasksAfterRestart=await request('integration-tasks',{action:'restored',mainId:main.id,workerId:worker.id,recoveryTaskId:summary.tasks.recoveryTaskId,operationId:summary.tasks.operationId,committedTaskId:summary.tasks.committedTaskId,replayTask:summary.tasks.replayTask})
       await writeFile(join(run,'tasks-restored.json'),JSON.stringify(summary.tasksAfterRestart,null,2))
       assert.equal(summary.tasksAfterRestart.status,'passed',summary.tasksAfterRestart.error)
     }

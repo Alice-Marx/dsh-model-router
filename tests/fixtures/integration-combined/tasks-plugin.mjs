@@ -51,7 +51,7 @@ export async function apply(ctx,config) {
   ctx.effect(()=>ctx.connection.fetch.register({path:'/api/integration-tasks',methods:['POST'],requestBody:'buffered',fetch:async request=>{
     const checks=[]
     try{
-      const {action,mainId,workerId,recoveryTaskId,operationId,committedTaskId}=await request.json()
+      const {action,mainId,workerId,recoveryTaskId,operationId,committedTaskId,replayTask}=await request.json()
       const main=await rt.resolveAgent(rt.chatOf(mainId)),worker=await rt.resolveAgent(rt.chatOf(workerId))
       const a=directory.forAgent(worker),b=directory.forAgent(main)
       assert.equal(mr.routerStateStore().kind,'sqlite-router-state')
@@ -83,6 +83,10 @@ export async function apply(ctx,config) {
         assert.equal(settled.state,'succeeded');assert.equal(settled.operationId,completed.operationId);assert.equal(settled.attempts.length,1)
         assert.equal((await call(main,'bot_task_reconcile',{taskId:committedTaskId,requestKey:'observe-committed'})).replayed,true)
         assert.equal(observationCalls,2);assert.equal(backendCalls,0)
+        const replayed=await call(worker,'bot_task_start',{backend:'mr-api',requestKey:'first',input:{task:'integration:task-failure'}})
+        assert.equal(replayed.taskId,replayTask.taskId);assert.equal(replayed.operationId,replayTask.operationId)
+        assert.equal(replayed.attempts.length,replayTask.attempts);assert.equal(backendCalls,0)
+        checks.push('Cold-start replay of the original assignment preserves its Task, operation and attempt count with zero new dispatch')
         assert.equal(await source(),before)
         const next=service.submit(b,{backend:'mr-api',requestKey:'after-reconciled',input:{task:'integration:new-task'}})
         assert.equal(service.cancel(b,{taskId:next.taskId}).attempts[0].state,'skipped')
@@ -148,7 +152,7 @@ export async function apply(ctx,config) {
       assert.equal(service.get(a,{taskId:recovery.taskId}).state,'running')
       checks.push('Persisted running Task is left for an actual owned-host process interruption')
       checks.push('A second Bot has a real nonzero fixture receipt durably saved while Task completion is deliberately held for the same hard crash')
-      return Response.json({status:'passed',checks,recoveryTaskId:recovery.taskId,operationId:recovery.operationId,committedTaskId:committed.taskId,backendCalls,financialAuthority:finance.status(),actualModelCalls:0,
+      return Response.json({status:'passed',checks,recoveryTaskId:recovery.taskId,operationId:recovery.operationId,committedTaskId:committed.taskId,replayTask:{taskId:done.taskId,operationId:done.operationId,attempts:done.attempts.length},backendCalls,financialAuthority:finance.status(),actualModelCalls:0,
         limitations:['Fixed read-only API backend in isolated strict profile; default product migration still open','MR budget algorithms use one SQLite ledger/hold authority; Task initial admission and funding are not yet one transaction','No front-channel Bot/auxiliary accounting, full DAG, native CLI, remote agent, OS worker or manual unknown-receipt resolution UI']})
     }catch(error){return Response.json({status:'failed',checks,error:error.stack,actualModelCalls:0})}
   }}),'integration: managed Task verification route')

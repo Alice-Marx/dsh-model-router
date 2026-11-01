@@ -59,6 +59,12 @@ export async function apply(ctx,config) {
       assert.notEqual((await call(worker)).isError,true)
       assert.deepEqual(ctx.tools.schemas(worker).filter(tool=>tool.name.startsWith('model_router_')).map(tool=>tool.name),['model_router_routes'])
       checks.push('Original Main and worker acquire exact grants automatically from committed DS ownership')
+      let receipt
+      if(action==='replay'||action==='restored'){
+        const result=await ctx.tools.execute({agent:main,name:'message_bot',arguments:{to:'IntegrationWorker',message:'integration:worker-answer',request_id:'integration-delegation-1'},callId:`delegation-${action}`,signal:new AbortController().signal})
+        assert.notEqual(result.isError,true,JSON.stringify(result));receipt=result.value
+        checks.push('The named message_bot delivery replays its original receipt without another worker turn')
+      }
       if(action==='probe'){
         assert.equal(consumed,false);consumed=true
         const bot=await rt.createBot({name:'LifecycleDisposable',model:'integration-gpt-fixture/gpt-fixture'})
@@ -99,11 +105,10 @@ export async function apply(ctx,config) {
         assert.notEqual((await call(worker)).isError,true)
         assert.notEqual((await call(main)).isError,true)
         checks.push('Real DS deletion revokes own/group identities while surviving Main and worker remain usable')
-      }else{
-        assert.equal(action,'restored')
+      }else if(action==='restored'){
         checks.push('Fresh host process rebuilds live Agent bindings from persisted Bot ownership')
-      }
-      return Response.json({status:'passed-for-described-checks',checks,lifecycle:lifecycle.status(),actualModelCalls:0,
+      }else assert.equal(action,'replay')
+      return Response.json({status:'passed-for-described-checks',checks,receipt,lifecycle:lifecycle.status(),actualModelCalls:0,
         limitations:['Strict test composition only; no default user profile migration','Only exact fixture model and limited MR capabilities granted','No task ledger, CLI bootstrap or OS worker verified','Read-only/lock-takeover and every schedule/recovery interleaving remain open']})
     }catch(error){return Response.json({status:'failed',checks,error:error.stack,actualModelCalls:0})}
   }}),'integration: lifecycle verification route')
