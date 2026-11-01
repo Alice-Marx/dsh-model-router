@@ -13,6 +13,8 @@ export function apply(ctx) {
   ctx.provide('integrationOfflineDiagnostics',Object.freeze({taskWaits,calls}))
   const toolResults = []
   const workflowStages = new Map()
+  const browserFlow = {}
+  let browserOrigin = null
   const credential = { unavailable: false, failures: 0 }
   class OfflineAdapter extends LlmAdapter {
     providerInfo(id) { return { id, name: 'Offline integration fixture' } }
@@ -48,7 +50,10 @@ export function apply(ctx) {
       }
       let name, args, finalText
       const stage = workflowStages.get(options.sessionId)
-      if (stage === 'analysis-written') { finalText = 'integration:analysis-complete'; workflowStages.delete(options.sessionId) }
+      if (stage === 'browser-opened') { name = 'remote_computer_browser'; args = { machineId: browserFlow.machineId, rootId: 'project', tool: 'browser_script', args: { browserSessionId: browserFlow.browserSessionId, script: 'document.title' }, taskId: browserFlow.taskId, attemptId: browserFlow.attemptId }; workflowStages.set(options.sessionId, 'browser-scripted') }
+      else if (stage === 'browser-scripted') { name = 'remote_computer_browser'; args = { machineId: browserFlow.machineId, rootId: 'project', tool: 'browser_close', args: { browserSessionId: browserFlow.browserSessionId }, taskId: browserFlow.taskId, attemptId: browserFlow.attemptId }; workflowStages.delete(options.sessionId) }
+      else if (userText.startsWith('integration:remote-browser:')) { name = 'remote_computer_browser'; args = { machineId: userText.trim().slice('integration:remote-browser:'.length), rootId: 'project', tool: 'browser_open', args: { url: browserOrigin } }; workflowStages.set(options.sessionId, 'browser-opened') }
+      else if (stage === 'analysis-written') { finalText = 'integration:analysis-complete'; workflowStages.delete(options.sessionId) }
       else if (stage === 'implementation-written') { finalText = 'integration:implementation-complete'; workflowStages.delete(options.sessionId) }
       else if (stage === 'review-read') { name = 'write'; args = { file_path: 'review.md', content: '# Review\nImplementation approved: analysis and implementation agree.\n' }; workflowStages.set(options.sessionId, 'review-written') }
       else if (stage === 'review-written') { finalText = 'integration:review-complete'; workflowStages.delete(options.sessionId) }
@@ -149,7 +154,8 @@ export function apply(ctx) {
     return next()
   })
   ctx.on('tools/result', (execution, result) => {
-    if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write','read','write','remember','recall','pwsh',
+    if (execution.name === 'remote_computer_browser' && !result.isError) Object.assign(browserFlow, result.value, result.value?.result)
+    if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write','remote_computer_browser','read','write','remember','recall','pwsh',
       'bot_task_start', 'bot_task_status', 'bot_task_cancel', 'bot_task_retry', 'bot_task_reconcile','bot_task_plan_start','bot_task_plan_status','bot_task_plan_cancel'].includes(execution.name)) {
       toolResults.push({ name: execution.name, agentId: execution.agent?.id ?? null, result })
     }
@@ -160,6 +166,7 @@ export function apply(ctx) {
       const body = await request.json()
       if (body.action === 'credential-outage') credential.unavailable = true
       if (body.action === 'credential-restore') credential.unavailable = false
+      if (body.action === 'browser-origin') browserOrigin = body.value
       return Response.json({ calls, toolResults, credential, providers: ctx.llm.listProviders(), registeredTools: ctx.tools.schemas().map(tool => tool.name),
         searchProviders: [...(ctx.get('web')?.searchProviders?.keys() ?? [])],
         automaticSearchEntries: [...ctx.root.get('loader').entries()]

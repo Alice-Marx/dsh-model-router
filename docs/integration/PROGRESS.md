@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E133 T27 浏览器行为控制验收闭合
+
+[E133](evidence/20261101_browser_action_control.json) 新增有界 `browser_script`、内存 `browser_upload`（1 MiB，严格文件名/MIME/base64）与产品 `remote_computer_browser`。后者覆盖 open/snapshot/click/type/script/upload/download/close，保持 Bot/machine/root 授权、稳定 task/attempt 和逐 action operation ID；内部导航/fetch 仍被 origin 策略阻断。Agent **11 项**、默认产品 **45 项**通过；完整根回归 **1980 项：1892 通过、0 失败、88 跳过**，`check:client` OK。T27 以 integration 级别 passed，正式为 **0/20、29/63、M0 11/12**。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E133.md](HANDOFF-20261101-E133.md)。
+
 ## 2026-11-01：E132 T26 浏览器身份隔离验收闭合
 
 [E132](evidence/20261101_browser_identity_isolation.json) 新增 operator 白名单持久 profile 与受控下载：profile 按 client/Bot/profile 哈希分目录，同 Bot 跨 attempt 保留 cookie，另一 Bot 同名 profile 为空；临时 context 关闭即回收；下载限原会话、1 MiB、SHA-256、读后删除且不可跨 Bot。真实 Playwright 九项检查全过；完整根回归 **1980 项：1892 通过、0 失败、88 跳过**，`check:client` OK。T26 以 integration 级别 passed，正式为 **0/20、28/63、M0 11/12**。script/upload 属 T27，浏览器 OS 部署另验。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E132.md](HANDOFF-20261101-E132.md)。

@@ -90,7 +90,7 @@ const ready = async () => {
   await wait(async () => { try { await api('state'); return true } catch { return false } })
 }
 let summary
-let remoteAgent,remoteServer
+let remoteAgent,remoteServer,browserServer
 try {
   launch(); await login(); await ready()
   await wait(async () => (await request('integration-probe')).providers.some(item => item.id === 'integration-gpt-fixture'))
@@ -342,20 +342,24 @@ try {
   checks.push('N09: only a Bot granted the official CLI capability may submit the CLI backend')
   // A real machine Agent and MCP HTTP transport, owned by this probe. No real endpoint or model.
   await import('../remote-computer-agent/build.mjs')
-  const {Agent,serve,CONTAINER_IMAGE}=await import('../remote-computer-agent/dist/index.mjs')
+  const {Agent,serve,CONTAINER_IMAGE,TOOL_NAMES}=await import('../remote-computer-agent/dist/index.mjs')
+  const {default:http}=await import('node:http')
+  browserServer=http.createServer((req,res)=>{res.setHeader('content-type','text/html');res.end('<!doctype html><title>Product browser fixture</title><h1>Scoped remote browser</h1>')})
+  await new Promise(resolve=>browserServer.listen(0,'127.0.0.1',resolve))
+  const browserOrigin=`http://127.0.0.1:${browserServer.address().port}`
   const agentRoot=join(run,'agent-root');await mkdir(agentRoot);await writeFile(join(agentRoot,'README.md'),'owned remote product fixture')
   const docker=process.platform==='linux'&&process.env.DSH_TEST_DOCKER==='1'
   if(docker)await chmod(agentRoot,0o777)
-  const agentConfig={dataDir:join(run,'agent'),roots:{project:agentRoot},...(docker?{isolation:'container',container:{dockerExecutable:'/usr/bin/docker',image:CONTAINER_IMAGE,executables:{node:'/usr/local/bin/node'}}}:{})}
+  const agentConfig={dataDir:join(run,'agent'),roots:{project:agentRoot},browserOrigins:[browserOrigin],browserExecutablePath:process.env.DSH_REMOTE_AGENT_BROWSER,browserProfiles:{work:join(run,'browser-profiles')},...(docker?{isolation:'container',container:{dockerExecutable:'/usr/bin/docker',image:CONTAINER_IMAGE,executables:{node:'/usr/local/bin/node'}}}:{})}
   remoteAgent=new Agent(agentConfig,Database)
-  const paired=remoteAgent.store.pair('integration-host',{botIds:[mainId,workerId],roots:['project'],tools:['machine_ping','fs_list','fs_read','fs_write','operation_status','operation_cancel','container_command_v1']})
+  const paired=remoteAgent.store.pair('integration-host',{botIds:[mainId,workerId],roots:['project'],tools:TOOL_NAMES})
   remoteServer=await serve(remoteAgent,{port:0})
   const secret=await product('machine.secret',{payload:{name:'REMOTE_AGENT_PRODUCT_TEST',value:paired.token}})
   assert.equal(secret.ok,true,JSON.stringify(secret));assert.equal(secret.value.secretRef,'ds-secret/REMOTE_AGENT_PRODUCT_TEST')
   assert.equal(JSON.stringify(secret).includes(paired.token),false)
   const sharedSecret=await request('bot',{endpoint:'secret-update',payload:{name:'REMOTE_AGENT_PRODUCT_TEST',scope:'all'}})
   assert.equal(sharedSecret.ok,false,'existing DS secret UI cannot offer machine control credentials to Bot shells')
-  const saved=await product('machine.pair',{payload:{name:'Product test Agent',machineId:paired.machineId,endpoint:`http://127.0.0.1:${remoteServer.address.port}`,secretRef:secret.value.secretRef,probeBotId:workerId,roots:['project'],tools:['machine_ping','fs_list','fs_read','fs_write','operation_status','operation_cancel','container_command_v1'],expectedRevision:0}})
+  const saved=await product('machine.pair',{payload:{name:'Product test Agent',machineId:paired.machineId,endpoint:`http://127.0.0.1:${remoteServer.address.port}`,secretRef:secret.value.secretRef,probeBotId:workerId,roots:['project'],tools:TOOL_NAMES,expectedRevision:0}})
   assert.equal(saved.ok,true,JSON.stringify(saved));assert.equal(saved.value.status,'online')
   let granted=await product('machine.bind',{payload:{machineId:paired.machineId,botId:workerId,expectedRevision:0,roots:['project'],tools:['machine_ping','fs_read'],mode:'read-only'}})
   assert.equal(granted.ok,true,JSON.stringify(granted));assert.equal(granted.value.remoteRevoked,true)
@@ -386,7 +390,7 @@ try {
   checks.push('Remote write: the outer Bot model turn keeps its normal receipt while filesystem IO creates no fake model/CLI invoice')
   await api('send',{sessionId:workerId,text:`integration:remote-write:${paired.machineId}`});await quiet();const replayedFile=await latestTask('remote-write',workerId);assert.equal(replayedFile.taskId,fileTask.taskId);assert.equal(replayedFile.operationId,fileTask.operationId);assert.equal(remoteAgent.store.db.prepare("SELECT count(*) n FROM operations WHERE tool='fs_write'").get().n,1)
   checks.push('Remote write: a repeated real tool command keeps the original Task/operation and the Agent writes exactly once')
-  granted=await product('machine.bind',{payload:{machineId:paired.machineId,botId:workerId,expectedRevision:4,roots:['project'],tools:['machine_ping','fs_read','fs_write','operation_status','operation_cancel','container_command_v1'],mode:'workspace-write'}})
+  granted=await product('machine.bind',{payload:{machineId:paired.machineId,botId:workerId,expectedRevision:4,roots:['project'],tools:TOOL_NAMES,mode:'workspace-write'}})
   assert.equal(granted.ok,true,JSON.stringify(granted))
   await api('send',{sessionId:workerId,text:`integration:remote-command:${paired.machineId}`});current=await quiet()
   const commandTask=await settleTask((await latestTask('remote-command',workerId)).taskId,docker?'succeeded':'failed')
@@ -401,6 +405,16 @@ try {
   }
   assert.equal(remoteAgent.workspaces.list().length,0)
   checks.push(docker?'Remote command: the default product dispatches an approved argv alias into the real container and returns bounded stop evidence':'Remote command: a non-container Agent settles never-started with no native fallback or workspace lock')
+  await request('integration-probe',{action:'browser-origin',value:browserOrigin})
+  await sleep(5100)
+  await api('send',{sessionId:workerId,text:`integration:remote-browser:${paired.machineId}`});current=await quiet()
+  const browserActions=current.diagnostic.toolResults.filter(item=>item.name==='remote_computer_browser')
+  assert.equal(browserActions.length,3,JSON.stringify(browserActions));assert.ok(browserActions.every(item=>!item.result.isError&&item.result.value.status==='succeeded'),JSON.stringify(browserActions))
+  const openedBrowser=browserActions[0].result.value,scriptedBrowser=browserActions[1].result.value,closedBrowser=browserActions[2].result.value
+  assert.equal(scriptedBrowser.result.result,'Product browser fixture',JSON.stringify(browserActions));assert.equal(closedBrowser.result.closed,true)
+  assert.equal(openedBrowser.taskId,scriptedBrowser.taskId);assert.equal(openedBrowser.attemptId,closedBrowser.attemptId)
+  assert.equal(remoteAgent.store.db.prepare("SELECT count(*) n FROM operations WHERE tool LIKE 'browser_%'").get().n,3)
+  checks.push('Remote browser: the default product AgentLoop opens, scripts and closes one scoped remote browser under the original task/attempt')
   const callsBeforeCredential=(await request('integration-probe')).calls.length
   await request('integration-probe',{action:'credential-outage'})
   await api('send',{sessionId:workerId,text:'integration:router-routes'});await quiet()
@@ -610,6 +624,6 @@ try {
     try{await writeFile(join(run,'failure-diagnostic.json'),JSON.stringify({state:await api('state'),diagnostic:await request('integration-probe'),log:await api('diagnostics-log')},null,2))}catch{}
   }
 }
-finally { if (child) await stop('last');await remoteServer?.close();await remoteAgent?.close() }
+finally { if (child) await stop('last');await remoteServer?.close();await remoteAgent?.close();await new Promise(resolve=>browserServer?browserServer.close(resolve):resolve()) }
 await writeFile(join(run, 'summary.json'), JSON.stringify(summary, null, 2) + '\n')
 process.stdout.write(JSON.stringify({ ...summary, runDirectory: run }, null, 2) + '\n')

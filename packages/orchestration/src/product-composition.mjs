@@ -286,6 +286,7 @@ export function startBotProduct(ctx, options = {}) {
     try { scopes = machines?.scopes(bot.id) ?? [] } catch { /* no machine access */ }
     for (const scope of scopes) for (const tool of scope.tools) {
       if(['operation_status','operation_cancel'].includes(tool)){grant.tools.push(`remote/${tool}`);continue}
+      if(tool.startsWith('browser_')){if(scope.mode==='workspace-write')grant.tools.push(`remote/${tool}`,'tool/remote_computer_browser');continue}
       if(tool==='container_command_v1'){
         if(scope.mode==='workspace-write'&&['container_command_v1','operation_status','operation_cancel'].every(name=>scope.tools.includes(name)))grant.tools.push(`remote/${tool}`)
         continue
@@ -612,6 +613,17 @@ export function startBotProduct(ctx, options = {}) {
         parameters:{requestKey:{type:'string',required:true},machineId:{type:'string',required:true},rootId:{type:'string',required:true},relativePath:{type:'string',required:true},content:{type:'string',required:true},expectedHash:{type:'json',required:true}},
         output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]},
         async execute(args,exec){await product.rt.load();const {requestKey,...input}=args;return taskService.submit(directory.forAgent(exec.agent),{requestKey,backend:'remote-write',input})},
+      }))
+      ctx.tools.register(defineTool({name:'remote_computer_browser',description:'Use the current Bot\'s explicitly granted remote browser. open/snapshot/click/type/script/upload/download/close stay on one owner task/attempt. Scripts run only inside the approved page; uploads are in-memory bytes up to 1 MiB, never disk paths.',
+        parameters:{machineId:{type:'string',required:true},rootId:{type:'string',required:true},tool:{type:'string',required:true},args:{type:'json',required:true},taskId:{type:'string'},attemptId:{type:'string'}},
+        output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]},
+        async execute(args,exec){
+          await product.rt.load()
+          if(!['browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close'].includes(args.tool))throw new Error('INVALID_MACHINE_REQUEST')
+          const taskId=args.taskId??`browser-${randomUUID()}`,attemptId=args.attemptId??`attempt-${randomUUID()}`,operationId=`operation-${randomUUID()}`
+          const value=await machines.call(directory.forAgent(exec.agent),{machineId:args.machineId,rootId:args.rootId,taskId,attemptId,operationId,tool:args.tool,args:args.args},{signal:exec.signal})
+          return {...value,taskId,attemptId,operationId}
+        },
       }))
       // The MR execution paths project their routes through the same Bot
       // binding, so a consult run carries the binding price instead of an

@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 
 export const REMOTE_TOOLS = Object.freeze(['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1',
   'operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate',
-  'browser_open','browser_snapshot','browser_click','browser_type','browser_close',
+  'browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close',
   'desktop_screenshot','desktop_click','desktop_type','desktop_key','desktop_scroll'])
 const readonly = new Set(['machine_ping','fs_list','fs_read','operation_status','artifact_stat','artifact_read','worktree_diff','browser_snapshot'])
 const ref = value => typeof value === 'string' && /^[-A-Za-z0-9_.]{1,128}$/.test(value)

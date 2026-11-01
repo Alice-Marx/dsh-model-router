@@ -35,6 +35,13 @@ export class BrowserTools {
       const data=await readFile(path);await unlink(path);session.downloads.delete(a.downloadId)
       return {downloadId:a.downloadId,filename:item.suggestedFilename,encoding:'base64',content:data.toString('base64'),sha256:sha(data),size:data.length}
     }
+    if(name==='browser_script'){
+      if(typeof a.script!=='string'||!a.script.trim()||a.script.length>16384||a.script.includes('\0'))fail('INVALID_ARGUMENT')
+      let value;try{value=await session.page.evaluate(a.script)}catch{fail('BROWSER_SCRIPT_FAILED',400)}
+      let text;try{text=JSON.stringify(value??null)}catch{fail('BROWSER_SCRIPT_RESULT_LIMIT',413)}
+      if(text.length>100000)fail('BROWSER_SCRIPT_RESULT_LIMIT',413)
+      return {completed:true,url:session.page.url(),result:value??null}
+    }
     if(name==='browser_snapshot'){
       session.revision=`snapshot-${randomUUID()}`
       const nodes=await session.page.locator('a,button,input,textarea,select,[role="button"]').evaluateAll((elements:any[])=>elements.slice(0,300).map((el:any,i:number)=>{el.setAttribute('data-dsh-agent-ref',String(i));return {ref:String(i),tag:el.tagName.toLowerCase(),text:(el.innerText||el.getAttribute('aria-label')||'').slice(0,300)}}))
@@ -44,9 +51,17 @@ export class BrowserTools {
     const node=session.page.locator(`[data-dsh-agent-ref="${a.ref}"]`);if(await node.count()!==1)fail('TARGET_STALE',409)
     session.revision=null
     if(name==='browser_type'&&(typeof a.text!=='string'||a.text.length>65536))fail('INVALID_ARGUMENT')
+    let upload
+    if(name==='browser_upload'){
+      if(typeof a.filename!=='string'||!a.filename||a.filename.length>128||/[\0/\\]/.test(a.filename)||typeof a.contentBase64!=='string')fail('INVALID_ARGUMENT')
+      const data=Buffer.from(a.contentBase64,'base64');if(data.toString('base64')!==a.contentBase64||data.length>1048576)fail('BROWSER_UPLOAD_LIMIT',413)
+      if(a.mimeType!==undefined&&(typeof a.mimeType!=='string'||!/^[-\w.+]+\/[-\w.+]+$/.test(a.mimeType)))fail('INVALID_ARGUMENT')
+      upload={name:a.filename,mimeType:a.mimeType??'text/plain',buffer:data}
+    }
     const pendingDownload=name==='browser_click'?session.page.waitForEvent('download',{timeout:1000}).catch(()=>null):null
     try{if(name==='browser_click')await node.click({timeout:10000})
       else if(name==='browser_type')await node.fill(a.text,{timeout:10000})
+      else if(name==='browser_upload')await node.setInputFiles(upload,{timeout:10000})
       else fail('TOOL_NOT_READY',503)
     }catch{fail('OUTCOME_UNKNOWN',409)}
     const download=await pendingDownload,downloadId=download?[...session.downloads.entries()].find(([,item])=>item.download===download)?.[0]:undefined

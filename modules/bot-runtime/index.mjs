@@ -32,7 +32,7 @@ export function createBotProduct(ctx, options = {}) {
       const deny = ctx.tools.schemas().map(tool => tool.name)
         .filter(name => (name.startsWith('model_router_') && !grant.tools.includes(`tool/${name}`)) ||
           (name.startsWith('bot_task_') && !grant.tools.includes(`task/${({ start: 'submit', status: 'read', plan_start:'submit',plan_status:'read',plan_cancel:'cancel' })[name.slice(9)] ?? name.slice(9)}`)) ||
-          (name.startsWith('remote_computer_') && !grant.tools.includes(`tool/${name}`)))
+          (name.startsWith('remote_computer_') && name !== 'remote_computer_browser' && !grant.tools.includes(`tool/${name}`)))
         .sort()
       const next = JSON.stringify(deny)
       if (next === signature) return

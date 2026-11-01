@@ -17,7 +17,7 @@ export const CATALOG = Object.freeze([
   ['container_command_v1',true],
   ['operation_status',false],['operation_cancel',true],['artifact_stat',false],['artifact_read',false],
   ['worktree_create',true],['worktree_diff',false],['worktree_integrate',true],
-  ['browser_open',true],['browser_snapshot',false],['browser_click',true],['browser_type',true],['browser_download',true],['browser_close',true],
+  ['browser_open',true],['browser_snapshot',false],['browser_click',true],['browser_type',true],['browser_script',true],['browser_upload',true],['browser_download',true],['browser_close',true],
   ['desktop_screenshot',true],['desktop_click',true],['desktop_type',true],['desktop_key',true],['desktop_scroll',true],
 ].map(([name,mutating])=>({name:String(name),mutating:Boolean(mutating),inputSchema:{type:'object',additionalProperties:true}})))
 export const TOOL_NAMES = CATALOG.map(x=>x.name)
