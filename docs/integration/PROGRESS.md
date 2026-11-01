@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E125 T05 白名单与旧入口越权验收闭合
+
+[E125](evidence/20261101_legacy_authorization_acceptance.json) 复验真实 legacy-policy Host：12 个未授权旧工具（含执行/重跑）均在执行前拒绝，23 个 RPC receiver 均拒绝未认证调用；伪造 botId、PTC 路线/主体替换与跨 Bot Task/legacy rerun 均 fail-closed，合法 routes 只投影绑定模型。权限套件 **26/26**，0 真实模型推理。T05 以 integration 级别 passed，正式为 **0/20、21/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。未推送/发布。当前交接为 [HANDOFF-20261101-E125.md](HANDOFF-20261101-E125.md)。
+
 ## 2026-11-01：E124 T06 Main 无群端到端验收闭合
 
 [E124](evidence/20261101_main_workflow_acceptance.json) 在真实 rc.3 Host 补齐分析→实现→评审→汇总：Main 私聊派给三个独立 Bot，各自保持精确模型绑定；分析/实现写文件，评审读实现并写评审，结果经真实交换返回；Main 在原私聊读回三份产物完成汇总，字节逐项核对。完整 Host **20 项检查通过**，含既有重启/replay 门禁，0 真实模型推理。T06 以 integration 级别 passed，正式为 **0/20、20/63、M0 11/12**。W07 场景已齐但 W05/W06 依赖未完成，W08 也不能提前 completed。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。未推送/发布。当前交接为 [HANDOFF-20261101-E124.md](HANDOFF-20261101-E124.md)。

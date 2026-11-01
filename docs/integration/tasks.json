@@ -1337,17 +1337,17 @@
     },
     {
       "id": "T05",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_legacy_policy.json",
         "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
-        "tests/legacy-policy.test.mjs",
-        "docs/integration/evidence/20261028_atomic_task_admission.json"
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261101_legacy_authorization_acceptance.json"
       ],
-      "level": "strict host composition + actual rc.3 host / offline fixture model",
-      "verifiedOn": "2026-10-28",
-      "environment": "Isolated strict legacy-policy composition and the shipped default entry on a real rc.3 host",
-      "notes": "All 12 ungranted legacy model_router tools refuse at policy, all 23 RPC receivers refuse in-process calls without an authenticated invocation, a granted route tool still runs and projects only bound models, and the default product owner reads the advanced ledger while mutations and unauthenticated requests stay denied. Forged botId and PTC sub-call paths are covered by the authority suite; billing behaviour preservation is covered by the finance probe rather than this scenario. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed."
+      "level": "integration",
+      "verifiedOn": "2026-11-01",
+      "environment": "Actual rc.3 legacy-policy Host and native authority suites on isolated Win11 Node24; offline fixture model",
+      "notes": "All 12 ungranted legacy tools including execution/rerun and all 23 unauthenticated RPC receivers refuse. Forged identities, PTC route/subject substitutions and cross-Bot Task/legacy rerun fail closed; granted routes still project only bound models. Related suites pass 26/26 with zero real model calls."
     },
     {
       "id": "T06",
