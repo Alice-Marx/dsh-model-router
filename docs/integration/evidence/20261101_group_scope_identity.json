@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "4f9451f4c9aeaf6b7783cb09bf10b37aacdc847e",
+  "parentEvidence": "docs/integration/evidence/20261027_m0_ds_lifecycle.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T43 criteria are covered by the frozen upstream group-work/status/roster/memory suites and composed lifecycle. Admin and @ workflows, progress and result return, nonmember/outside-group denial and unrelated memory scoping are exercised upstream. Active own/group Sessions map to one stable Bot principal, archived Sessions have no owner, duplicate/copied Agents and reassigned Sessions fail closed, and deletion retires every live identity without duplicating the Bot.",
+  "productAcceptance": "T43 passes at integration level. Group administration, progress and result flows preserve scope, outside Bots and unrelated memories stay hidden, and identity is not duplicated. Formal scores are 0/20 work packages, 37/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {},
+  "implementation": [
+    "No product code changed. Frozen DS group workflows and the Host-owned lifecycle provide the group and identity boundaries.",
+    "The complete frozen upstream suite and current principal/lifecycle suites were rerun."
+  ],
+  "testRuns": [
+    "npm run integration:probe-product-upstream: 1062 tests / 1061 pass / 0 fail / 1 skipped; frozen source 297 files at de55888a93983fc51c94f7d22bc94b4f8293205d.",
+    "DS lifecycle + Bot policy + capability authority: 34 tests / 34 pass / 0 fail.",
+    "Latest complete root regression remains E133: 1980 tests / 1892 pass / 0 fail / 88 skipped; check:client OK."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "Offline fixtures do not prove real model conversation quality or production deployment.",
+    "No real model inference, push or release was used."
+  ]
+}

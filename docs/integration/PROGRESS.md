@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E141 T43 群聊与授权范围验收闭合
+
+[E141](evidence/20261101_group_scope_identity.json) 冻结上游覆盖管理员、@ 工作流、进度/结果回群、非成员拒绝及不相关群记忆隔离；自有/群 Session 映射唯一 Bot 主体，归档无 owner，复制/重分配身份和删除复活均 fail-closed。上游 **1062 项：1061 通过、0 失败、1 跳过**，身份组合 **34/34**。T43 以 integration 级别 passed，正式为 **0/20、37/63、M0 11/12**。不证明真实会话质量或部署，未推送/发布。当前交接为 [HANDOFF-20261101-E141.md](HANDOFF-20261101-E141.md)。
+
 ## 2026-11-01：E140 T42 worktree 条件合入验收闭合
 
 [E140](evidence/20261101_worktree_conditional_integration.json) 真实 Git 验证：worktree diff 可恢复；脏源与 HEAD 移动均 `integration-pending/SOURCE_CHANGED`，不覆盖源；内部提交不能绕过检查，合法状态恢复后才合入。套件 **13/13**，无产品代码变化。T42 以 integration 级别 passed，正式为 **0/20、36/63、M0 11/12**。最近完整根回归为 E133 的 1980/1892/0/88，本轮未重跑全量。仅合成仓库，未推送/发布。当前交接为 [HANDOFF-20261101-E140.md](HANDOFF-20261101-E140.md)。

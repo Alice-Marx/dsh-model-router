@@ -1842,8 +1842,14 @@
     },
     {
       "id": "T43",
-      "status": "not_run",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "docs/integration/evidence/20261101_group_scope_identity.json"
+      ],
+      "level": "integration",
+      "environment": "Frozen upstream group workflows plus composed lifecycle and principal suites; offline fixtures",
+      "notes": "Upstream admin/@/progress/result and unrelated-memory scopes pass. Active own/group Sessions map one stable Bot identity; archived/copied/reassigned identities and deletion revival fail closed. Upstream 1062/1061/0/1 and identity suites 34/34 pass.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T44",
