@@ -26,13 +26,13 @@ async function input(powershell, tasks) {
   }
   return executable
 }
-async function inspect(powershell, task, signal) {
+async function inspect(powershell, task, signal, checkDigest = true) {
   const { stdout } = await command(powershell, `$t=Get-ScheduledTask -TaskName '${task.name}' -ErrorAction Stop; $x=Export-ScheduledTask -TaskName '${task.name}' -ErrorAction Stop; [pscustomobject]@{state=[string]$t.State;xml=$x} | ConvertTo-Json -Compress`, signal)
   let current
   try { current = JSON.parse(stdout) } catch { fail('MIGRATION_WINDOWS_LAUNCHER_STATE_INVALID', { name: task.name }) }
   if (typeof current.state !== 'string' || typeof current.xml !== 'string') fail('MIGRATION_WINDOWS_LAUNCHER_STATE_INVALID', { name: task.name })
   const xmlSha256 = createHash('sha256').update(current.xml).digest('hex')
-  if (xmlSha256 !== task.xmlSha256) fail('MIGRATION_WINDOWS_LAUNCHER_CHANGED', { name: task.name, expected: task.xmlSha256, actual: xmlSha256 })
+  if (checkDigest && xmlSha256 !== task.xmlSha256) fail('MIGRATION_WINDOWS_LAUNCHER_CHANGED', { name: task.name, expected: task.xmlSha256, actual: xmlSha256 })
   return { name: task.name, state: current.state, xmlSha256 }
 }
 async function inspected(powershell, tasks, signal) {
@@ -48,11 +48,11 @@ export async function quarantineWindowsLaunchers({ powershell = joinSystemPowerS
   for (const row of rows) {
     if (signal?.aborted) fail('MIGRATION_WINDOWS_LAUNCHER_CANCELLED', { quarantined })
     if (row.state !== 'Disabled') await command(executable, `Disable-ScheduledTask -TaskName '${row.name}' -ErrorAction Stop | Out-Null`, signal)
-    let current = await inspect(executable, row, signal)
+    let current = await inspect(executable, row, signal, false)
     if (current.state === 'Running') await command(executable, `Stop-ScheduledTask -TaskName '${row.name}' -ErrorAction Stop`, signal)
     const deadline = Date.now() + 10000
     do {
-      current = await inspect(executable, row, signal)
+      current = await inspect(executable, row, signal, false)
       if (current.state === 'Disabled') break
       if (Date.now() >= deadline) fail('MIGRATION_WINDOWS_LAUNCHER_STOP_UNKNOWN', { name: row.name, state: current.state, quarantined })
       await sleep(50)
@@ -69,7 +69,7 @@ export async function releaseWindowsLaunchers({ powershell = joinSystemPowerShel
   const released = []
   for (const row of rows) {
     await command(executable, `Enable-ScheduledTask -TaskName '${row.name}' -ErrorAction Stop | Out-Null`, signal)
-    const current = await inspect(executable, row, signal)
+    const current = await inspect(executable, row, signal, false)
     if (current.state === 'Disabled') fail('MIGRATION_WINDOWS_LAUNCHER_RELEASE_UNKNOWN', { name: row.name, released })
     released.push({ name: row.name, xmlSha256: row.xmlSha256, started: false })
   }
