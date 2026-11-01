@@ -362,6 +362,41 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
       await writeFile(join(run,'tasks-restored.json'),JSON.stringify(summary.tasksAfterRestart,null,2))
       assert.equal(summary.tasksAfterRestart.status,'passed',summary.tasksAfterRestart.error)
     }
+    {
+      const workflowDir = join(workspace, 'workflow'); await mkdir(workflowDir)
+      const workers = {}
+      for (const phase of ['analysis', 'implementation', 'review']) {
+        const name = `${phase[0].toUpperCase()}${phase.slice(1)}Worker`
+        workers[phase] = await api('create-bot', { name, role: phase, instructions: `Offline ${phase} worker.`, model: FIXTURE_ROUTE, workDir: workflowDir })
+        await quiet()
+      }
+      state = await api('state')
+      record('Main creates analysis, implementation and review Bots with their own exact model bindings',
+        Object.values(workers).every(bot => state.bots.some(saved => saved.id === bot.id && saved.model === FIXTURE_ROUTE && saved.workDir === workflowDir)))
+      for (const phase of ['analysis', 'implementation', 'review']) {
+        await api('send', { sessionId: main.id, text: `integration:delegate-${phase}` })
+        const completed = await quiet(), worker = workers[phase]
+        const exchange = await api('exchange', { a: main.id, b: worker.id })
+        const writes = completed.diagnostic.toolResults.filter(tool => tool.agentId === worker.id && tool.name === 'write' && !tool.result.isError)
+        const reads = completed.diagnostic.toolResults.filter(tool => tool.agentId === worker.id && tool.name === 'read' && !tool.result.isError)
+        record(`Private Main ${phase} delegation returns its result and file receipt`,
+          exchange.some(item => item.from === main.id && item.to === worker.id) && exchange.some(item => item.from === worker.id && item.to === main.id) &&
+          writes.length === 1 && (phase === 'review' ? reads.length === 1 : reads.length === 0))
+      }
+      await api('send', { sessionId: main.id, text: 'integration:workflow-summary' })
+      result = await quiet()
+      const summaryReads = result.diagnostic.toolResults.filter(tool => tool.agentId === main.id && tool.name === 'read' && !tool.result.isError).slice(-3)
+      const files = {
+        'analysis.md': await readFile(join(workflowDir, 'analysis.md'), 'utf8'),
+        'implementation.js': await readFile(join(workflowDir, 'implementation.js'), 'utf8'),
+        'review.md': await readFile(join(workflowDir, 'review.md'), 'utf8'),
+      }
+      record('Main reads analysis, implementation and review back into the original private Session for summary',
+        summaryReads.length === 3 && summaryReads.every((tool, index) => JSON.stringify(tool.result).includes(Object.values(files)[index].trim().split('\n')[0])) &&
+        files['implementation.js'].includes('a + b') && files['review.md'].includes('approved'))
+      summary.workflow = { status: 'passed', originalSessionId: main.id, workers: Object.fromEntries(Object.entries(workers).map(([phase, bot]) => [phase, bot.id])), summaryReads: summaryReads.length, files, actualModelCalls: 0 }
+      await writeFile(join(run, 'workflow.json'), JSON.stringify(summary.workflow, null, 2))
+    }
     if (serve) {
       await writeFile(join(run, 'browser-access.json'), JSON.stringify({ base, loginUrl, home, pid: child.pid }))
       process.stdout.write(JSON.stringify({ status: 'ready-for-browser', run: relative(ROOT, run), checks: checks.length }) + '\n')

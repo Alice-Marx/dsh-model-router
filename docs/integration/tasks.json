@@ -1351,14 +1351,15 @@
     },
     {
       "id": "T06",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261101_main_workflow_acceptance.json"
       ],
-      "level": "actual rc.3 host / offline fixture model",
-      "environment": "Shipped default entry on a real rc.3 host; Main, worker and CLI Bots with real AgentLoops",
-      "notes": "Private-chat Main creates a worker through the original DS create_bot tool, the worker runs permitted MR routing and consults through the composed funding admission, Main delegates through message_bot and the reply returns, and a Bot-scoped remote read returns its content to the session. The full analysis to implementation to review to summary workflow still waits on the execution facade (executor, team and rerun MR paths remain refused by policy).",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Actual rc.3 Host with frozen DS, real AgentLoops and filesystem tools on isolated Win11 Node24; deterministic offline model only",
+      "notes": "Private Main delegates analysis, implementation and review to three Bots with exact model bindings. Workers return through real exchanges and write/read actual files; Main reads all three artifacts into its original Session for summary. All 20 Host checks pass, including existing restart/replay gates; zero real model calls.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T07",

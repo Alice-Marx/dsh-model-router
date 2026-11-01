@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E124 T06 Main 无群端到端验收闭合
+
+[E124](evidence/20261101_main_workflow_acceptance.json) 在真实 rc.3 Host 补齐分析→实现→评审→汇总：Main 私聊派给三个独立 Bot，各自保持精确模型绑定；分析/实现写文件，评审读实现并写评审，结果经真实交换返回；Main 在原私聊读回三份产物完成汇总，字节逐项核对。完整 Host **20 项检查通过**，含既有重启/replay 门禁，0 真实模型推理。T06 以 integration 级别 passed，正式为 **0/20、20/63、M0 11/12**。W07 场景已齐但 W05/W06 依赖未完成，W08 也不能提前 completed。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。未推送/发布。当前交接为 [HANDOFF-20261101-E124.md](HANDOFF-20261101-E124.md)。
+
 ## 2026-11-01：E123 T12 混合 CLI／远程命令整树取消验收闭合
 
 [E123](evidence/20261101_mixed_command_tree_cancellation.json) 新增同一真实 Task 计划的混合场景：离线 CLI 原生父子进程与 Linux Docker 远程命令并行，整树取消后两个运行包均 cancelled、原 attempt 各一次，join 为 skipped。CLI 的 `native-tree` 证明及 `/proc` 父子 PID 结束核对通过；远程 `container-supervisor` 证明及单原 operation 保持。未确认停止仍 cancelling 且禁止重试。Ubuntu 相关组合 **34/34**，Windows **28 通过、0 失败、6 个 Linux-only 跳过**。T12 以 integration 级别 passed，正式为 **0/20、19/63、M0 11/12**；W08 场景已齐但需先闭合 W07/T06。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E123.md](HANDOFF-20261101-E123.md)。

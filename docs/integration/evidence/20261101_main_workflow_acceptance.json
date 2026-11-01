@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "b7ce0c54e31de5f031fef78ee68dcbca4f02f493",
+  "parentEvidence": "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T06 criteria are covered in the actual rc.3 Host with the frozen DS commit and isolated offline models. Private Main delegates analysis, implementation and review to three different Bots. Each worker has its own exact model binding, returns its result through the real message exchange and uses the real DS filesystem tools in the isolated shared workspace. Analysis and implementation each write one artifact; review reads implementation.js and writes review.md. Main then reads analysis.md, implementation.js and review.md into its original private Session for the summary.",
+  "productAcceptance": "T06 passes at integration level. The full analysis-to-implementation-to-review-to-summary chain, per-Bot model identities, results and file receipts return to the original Main Session. Formal scores are 0/20 work packages and 20/63 scenarios. W07 still depends on incomplete W05/W06; W08 also remains transitively blocked.",
+  "sourceGitBlobs": {
+    "scripts/integration-combined-host.mjs": "05fc04c2ece4a8efa151a0ed395be72f0ae7eed9",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "6d6c77f2934973c10ac8713998c256b3f3f66382"
+  },
+  "implementation": [
+    "No product code changed. The actual DS Bot, Session, message_bot and read/write tools provide the workflow.",
+    "The offline fixture adds deterministic analysis, implementation, review and summary tool sequences; each phase runs through the real AgentLoop and tool registry.",
+    "The host probe verifies exact Bot model bindings, bidirectional exchanges, worker file receipts, Main's three original-Session reads and the final file bytes."
+  ],
+  "testRuns": [
+    "node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --tasks: passed all 20 Host checks, including the four new T06 workflow checks and the existing restart/replay checks.",
+    "Final workflow: summaryReads=3; analysis.md, implementation.js and review.md match their expected bytes; actualModelCalls=0.",
+    "Raw summary: tmp/integration/combined-host/run-1rRN1A/summary.json. Latest complete root regression remains E120: 1977 tests / 1892 pass / 0 fail / 83 skipped; this fixture-only change did not rerun the full suite."
+  ],
+  "preservedFailures": [
+    "The first workflow run emitted no file because worker messages carry a [Message from ...] prefix and the fixture incorrectly required exact equality with the phase marker. The fixture now recognizes the phase inside the real relay message; no product behavior was changed."
+  ],
+  "limitations": [
+    "The model is a deterministic offline fixture; this validates real Host orchestration and filesystem effects, not real model quality or inference.",
+    "No production user profile, push or release was used."
+  ]
+}

@@ -12,6 +12,7 @@ export function apply(ctx) {
   const taskWaits={entered:0,cleaned:0}
   ctx.provide('integrationOfflineDiagnostics',Object.freeze({taskWaits,calls}))
   const toolResults = []
+  const workflowStages = new Map()
   class OfflineAdapter extends LlmAdapter {
     providerInfo(id) { return { id, name: 'Offline integration fixture' } }
     async listModels(provider) { return [{ provider, id: MODEL, name: MODEL, inputModalities: ['text'] }] }
@@ -43,8 +44,24 @@ export function apply(ctx) {
         taskWaits.cleaned++
         options.signal.throwIfAborted()
       }
-      let name, args
-      if (userText.trim() === 'integration:create-worker') {
+      let name, args, finalText
+      const stage = workflowStages.get(options.sessionId)
+      if (stage === 'analysis-written') { finalText = 'integration:analysis-complete'; workflowStages.delete(options.sessionId) }
+      else if (stage === 'implementation-written') { finalText = 'integration:implementation-complete'; workflowStages.delete(options.sessionId) }
+      else if (stage === 'review-read') { name = 'write'; args = { file_path: 'review.md', content: '# Review\nImplementation approved: analysis and implementation agree.\n' }; workflowStages.set(options.sessionId, 'review-written') }
+      else if (stage === 'review-written') { finalText = 'integration:review-complete'; workflowStages.delete(options.sessionId) }
+      else if (stage === 'summary-analysis') { name = 'read'; args = { file_path: 'implementation.js' }; workflowStages.set(options.sessionId, 'summary-implementation') }
+      else if (stage === 'summary-implementation') { name = 'read'; args = { file_path: 'review.md' }; workflowStages.set(options.sessionId, 'summary-review') }
+      else if (stage === 'summary-review') { finalText = 'integration:workflow-summary-complete'; workflowStages.delete(options.sessionId) }
+      else if (userText.includes('integration:analysis')) { name = 'write'; args = { file_path: 'analysis.md', content: '# Analysis\nRequire a pure function returning the sum of two integers.\n' }; workflowStages.set(options.sessionId, 'analysis-written') }
+      else if (userText.includes('integration:implementation')) { name = 'write'; args = { file_path: 'implementation.js', content: 'export const add = (a, b) => a + b\n' }; workflowStages.set(options.sessionId, 'implementation-written') }
+      else if (userText.includes('integration:review')) { name = 'read'; args = { file_path: 'implementation.js' }; workflowStages.set(options.sessionId, 'review-read') }
+      else if (userText.trim() === 'integration:workflow-summary') { name = 'read'; args = { file_path: 'analysis.md' }; workflowStages.set(options.sessionId, 'summary-analysis') }
+      else if (/^integration:delegate-(analysis|implementation|review)$/.test(userText.trim())) {
+        const phase = userText.trim().slice('integration:delegate-'.length)
+        name = 'message_bot'; args = { to: `${phase[0].toUpperCase()}${phase.slice(1)}Worker`, message: `integration:${phase}`, request_id: `workflow-${phase}-1` }
+      }
+      else if (userText.trim() === 'integration:create-worker') {
         name = 'create_bot'
         args = { name: 'IntegrationWorker', role: 'Test', instructions: 'Offline integration worker.', model: `${PROVIDER}/${MODEL}` }
       } else if (userText.trim() === 'integration:delegate') {
@@ -109,7 +126,7 @@ export function apply(ctx) {
       }
       const block = name
         ? { type: 'tool-call', id: `integration-call-${calls.length}`, name, arguments: JSON.stringify(args) }
-        : { type: 'text', text: isAgentLoopRequest(options) ? 'integration:fixture-reply' : '{"changes":[]}' }
+        : { type: 'text', text: isAgentLoopRequest(options) ? finalText ?? 'integration:fixture-reply' : '{"changes":[]}' }
       yield { type: 'block-start', index: 0, blockType: block.type }
       if (name) yield { type: 'tool-call-delta', index: 0, id: block.id, name, argumentsDelta: block.arguments }
       else yield { type: 'text-delta', index: 0, text: block.text }
@@ -124,7 +141,7 @@ export function apply(ctx) {
     return next()
   })
   ctx.on('tools/result', (execution, result) => {
-    if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write',
+    if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write','read','write',
       'bot_task_start', 'bot_task_status', 'bot_task_cancel', 'bot_task_retry', 'bot_task_reconcile','bot_task_plan_start','bot_task_plan_status','bot_task_plan_cancel'].includes(execution.name)) {
       toolResults.push({ name: execution.name, agentId: execution.agent?.id ?? null, result })
     }
