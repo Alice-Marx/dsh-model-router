@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0-preview.0 — 2026-11-01
+
+- Publish the integrated DS Bot + Model Router product as an explicitly non-stable preview: one plugin composition, stable Bot identities, exact-model authorization, private state, managed dependency tasks, unified accounting and remote machine/browser controls.
+- Add unified wide/narrow product UI, offline error and recovery behavior, safe task reconciliation, and private migration archive restore with real process-crash recovery and repeat-import protection.
+- Preserve the frozen DS baseline and existing stable npm `latest` release. Install this version only from the `preview` tag or by exact version.
+
+This preview is not a production migration or full-platform acceptance release. Validation evidence and remaining gates are tracked in the [0.26.0-preview.0 acceptance report](docs/releases/0.26.0-preview.0-validation.md).
+
 ## 0.25.5 — 2026-10-26
 
 - Fix ZCode TUI mojibake and damaged VT color sequences in Windows embedded terminals. Initialize UTF-8 input/output encoding in each new ZCode ConPTY before Node starts, using a profile-free PowerShell bootstrap and literal arguments.
