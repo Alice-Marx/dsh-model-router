@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "d608b4e4e2798c115584655a335f87933ca006b8",
+  "parentEvidence": "docs/integration/evidence/20261029_migration_domain_audit.json",
+  "actualModelCalls": 0,
+  "level": "private archive restore component; not product activation or production migration",
+  "componentAcceptance": "restoreMigrationArchives verifies both private archives before effects, stages each domain, rechecks complete content, publishes into explicit fresh targets and preserves exact prior restores. Real schema 5 SQLite data restores with identical lossless exports, original Bot ownership and unknown values. Repeating the same operation and independently importing the same archive do not duplicate receipts. Exceptions after a domain and after ledger publication resume from durable records; conflicting old targets remain untouched. Six focused tests pass and the related migration combination is 101 tests / 100 pass / 0 fail / 1 skipped.",
+  "productAcceptance": "None yet. This supplies a verified private restore component for W06.3 and T48/T49, but is not wired into product activation and does not prove stopped writers, old-plugin compatibility or production rollback. Scores remain 0/20 work packages, 42/63 scenarios and M0 11/12. activationSupported, postActivationRollbackSupported and stopWriteProvable remain false.",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/migration-restore.mjs": "7516a2517e69d453f9b0ef8ba7c48de07d2dc60e",
+    "tests/migration-restore.test.mjs": "9e85f16fe6065ca9ff92727b7f88c2b23ff49d1b",
+    "package.json": "210f866334c8f861a2dc6829e2f4badf6402c32a"
+  },
+  "implementation": [
+    "Each domain is copied under the owner-only operation directory and compared against the archive inventory before rename. Existing directories are accepted only when their complete structure and bytes match; conflicts never overwrite old data.",
+    "The SQLite archive is staged, checked by a fresh lossless export and published only to an absent target. Existing databases must have exactly the same logical export.",
+    "Immutable request/step records bind targets and archive content. Resume tolerates already-written markers, validates their file identity and completes missing domains/ledger without duplicate writes.",
+    "Public results contain counts and conservative capability flags, not private paths or payloads. The component is not imported by the product entry, so the npm runtime closure is unchanged; its test is registered in npm test."
+  ],
+  "testRuns": [
+    "Focused restore: 6 tests / 6 pass / 0 fail, including two independent imports, same-operation replay, two interruption boundaries, conflict preservation, archive tampering and invalid inputs.",
+    "Related migration/package suites: 101 tests / 100 pass / 0 fail / 1 skipped (Linux-only orchestration writer case).",
+    "Complete root regression: phase one 1600/1596/0/4 plus phase two 387/303/0/84 = 1987 tests / 1899 pass / 0 fail / 88 skipped.",
+    "npm run check:client: OK."
+  ],
+  "preservedFailures": [
+    "Initial fixture omitted legacyFile and failed before restore; it was corrected. A request digest TypeError and a test call that accidentally reused the old operation directory were fixed without weakening identity checks. No failure is rewritten as a first-pass success.",
+    "Interruption tests in this component throw at deterministic boundaries. Real child-process exit injection remains separate work."
+  ],
+  "limitations": [
+    "Only explicit fresh or exactly matching targets are supported; this is not in-place upgrade, configuration activation, latest-data rollback or OS/launcher stop proof.",
+    "Filesystem mode bits are restored on non-Windows, but cross-platform ACL/ownership restoration is not claimed.",
+    "No real user profile, model inference, production process, push or release was used."
+  ]
+}
