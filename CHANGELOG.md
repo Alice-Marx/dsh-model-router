@@ -3,7 +3,7 @@
 ## 0.26.0-preview.0 — 2026-11-01
 
 - Publish the integrated DS Bot + Model Router product as an explicitly non-stable preview: one plugin composition, stable Bot identities, exact-model authorization, private state, managed dependency tasks, unified accounting and remote machine/browser controls.
-- Add unified wide/narrow product UI, offline error and recovery behavior, safe task reconciliation, and private migration archive restore with real process-crash recovery and repeat-import protection.
+- Add unified wide/narrow product UI, offline error and recovery behavior, and safe task reconciliation. The source repository also adds an owner-only private migration archive restore component with real process-crash recovery and repeat-import protection; it is not wired into product activation or exposed as a production migration feature.
 - Preserve the frozen DS baseline and existing stable npm `latest` release. Install this version only from the `preview` tag or by exact version.
 
 This preview is not a production migration or full-platform acceptance release. Validation evidence and remaining gates are tracked in the [0.26.0-preview.0 acceptance report](docs/releases/0.26.0-preview.0-validation.md).
