@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "68f9076266d487ba2a5d5b0883f6f71a245f19eb",
+  "parentEvidence": "tests/quality-gates.test.mjs",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T41 criteria are covered. Feedback withdrawal/reset is exposed through the real Host/client settings and run history: only the learning start changes, in-flight reset is single and cancelable, and stale feedback cannot rate a replaced result. Model-originated ratings require explicit approval and are audit labels, not authentication or a way around quality floors. Paid upgrades require literal true approval and the first different configured model; false/truthy/throwing approvals cannot upgrade. A second review has its own call and preserves first-attempt usage and receipts; not-started or blocked attempts cannot erase actual spend.",
+  "productAcceptance": "T41 passes at integration level. Learning withdrawal/reset is available, subjective scores do not bypass quality gates, and review calls are billed separately without losing original receipts. Formal scores are 0/20 work packages, 35/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {},
+  "implementation": [
+    "No product code changed. Existing adaptive feedback settings, quality gates and attempt ledger provide the controls.",
+    "Current Host/client integration, quality and maturity suites were rerun together."
+  ],
+  "testRuns": [
+    "Quality gates + attempt ledger + adaptive integration + adaptive UI + adaptive maturity UI: 42 tests / 42 pass / 0 fail.",
+    "Coverage includes reset/withdrawal, approval-based upgrades, no subjective bypass, independent review calls and first-receipt retention.",
+    "Latest complete root regression remains E133: 1980 tests / 1892 pass / 0 fail / 88 skipped; check:client OK."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "No real model quality judgment or inference was used; this validates offline quality and learning controls.",
+    "No production process, push or release was used."
+  ]
+}

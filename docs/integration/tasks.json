@@ -1818,15 +1818,16 @@
     },
     {
       "id": "T41",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "tests/quality-gates.test.mjs",
-        "tests/quality-attempt-ledger.test.mjs"
+        "tests/quality-attempt-ledger.test.mjs",
+        "docs/integration/evidence/20261101_quality_review_feedback.json"
       ],
-      "level": "unit",
-      "environment": "Quality gate and attempt ledger suites on Node 24",
-      "notes": "A quality upgrade requires literal true approval and picks the first different configured model; missing, false, truthy or throwing approval cannot trigger a paid upgrade; a failed second output stops after two attempts; each attempt incurs its own call and the first paid usage is retained while unknown usage stays unknown; a second not-started or blocked attempt cannot erase the first paid request. Learning retract/reset is available as a host setting (feedbackResetAt) and is not exercised end to end here.",
-      "verifiedOn": "2026-10-27"
+      "level": "integration",
+      "environment": "Real Host/client adaptive settings, quality and attempt-ledger suites with offline fixtures",
+      "notes": "Feedback reset/withdrawal works end to end and stale feedback cannot rate replaced results. Subjective ratings do not bypass quality floors; paid upgrades require literal true approval. Review calls are separate and preserve original receipts, including not-started/blocked second attempts. Related suites pass 42/42.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T42",
