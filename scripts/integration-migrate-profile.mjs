@@ -1,13 +1,12 @@
-import {open,lstat,realpath,mkdir,rmdir,writeFile,readFile} from 'node:fs/promises'
+import {open,realpath,mkdir,writeFile,readFile} from 'node:fs/promises'
 import {resolve,dirname,join,isAbsolute,relative,sep} from 'node:path'
 import {fileURLToPath} from 'node:url'
-import {execFile} from 'node:child_process'
-import {promisify} from 'node:util'
 import {createHash} from 'node:crypto'
 import {previewProfileMigration,summarizeProfileMigration,verifyProfileMigrationSources} from '../packages/orchestration/src/profile-migration-plan.mjs'
 import {inspectMigrationSources,summarizeMigrationInventory,verifyMigrationInventory} from '../packages/orchestration/src/migration-snapshot.mjs'
+import {createPrivateMigrationDirectory as privateDirectory} from '../packages/orchestration/src/migration-private-files.mjs'
 
-const execute=promisify(execFile),sha=data=>createHash('sha256').update(data).digest('hex')
+const sha=data=>createHash('sha256').update(data).digest('hex')
 const fail=code=>{throw Object.assign(new Error(code),{code})}
 const within=(base,target)=>{const p=relative(base,target);return !p||p!=='..'&&!p.startsWith('..'+sep)&&!isAbsolute(p)}
 async function actual(p){try{return await realpath(p)}catch(e){if(!['ENOENT','ENOTDIR'].includes(e.code))throw e;const parent=dirname(p);if(parent===p)throw e;return join(await actual(parent),p.slice(parent.length).replace(/^[/\\]/,''))}}
@@ -22,17 +21,6 @@ async function readRequest(file){
     if(!request||typeof request!=='object'||Array.isArray(request)||Object.keys(request).some(k=>!['profile','dataSources','limits'].includes(k)))fail('MIGRATION_REQUEST_INVALID')
     return request
   }finally{await handle.close()}
-}
-async function privateDirectory(path){
-  await mkdir(path,{mode:0o700}) // new directory only; never change a user's existing ACL
-  try{
-    if(process.platform==='win32'){
-      const system=join(process.env.SystemRoot??'C:/Windows','System32')
-      const who=await execute(join(system,'whoami.exe'),['/user','/fo','csv','/nh'],{windowsHide:true,timeout:5000,maxBuffer:65536})
-      const sid=who.stdout.match(/S-1-\d+(?:-\d+)+/)?.[0];if(!sid)fail('MIGRATION_PRIVATE_ACL_FAILED')
-      await execute(join(system,'icacls.exe'),[path,'/inheritance:r','/grant:r',`*${sid}:(OI)(CI)F`],{windowsHide:true,timeout:5000,maxBuffer:65536})
-    }else if((await lstat(path)).mode&0o077)fail('MIGRATION_PRIVATE_ACL_FAILED')
-  }catch{await rmdir(path).catch(()=>{});fail('MIGRATION_PRIVATE_ACL_FAILED')}
 }
 
 /** Owner CLI/API only. A preview never installs, activates, or stops a writer. */
