@@ -1,6 +1,6 @@
 DSH Bot integration · plan 1.1 · active M0
-Work packages completed: 0/20; acceptance scenarios passed: 40/63
-Passed evidence levels: document 1, integration 39
+Work packages completed: 0/20; acceptance scenarios passed: 41/63
+Passed evidence levels: document 1, integration 40
 Recorded M0 steps completed: 11/12
 Work-package counts do not imply product completion or release readiness.
 

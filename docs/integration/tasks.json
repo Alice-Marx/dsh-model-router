@@ -1891,12 +1891,15 @@
     },
     {
       "id": "T47",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261029_migration_supporting_domains.json"
+        "docs/integration/evidence/20261029_migration_supporting_domains.json",
+        "docs/integration/evidence/20261101_capability_secret_lifecycle.json"
       ],
-      "verifiedOn": "2026-10-29",
-      "notes": "undefined E55:27 new checks; three-platform migration175/root1670/default40, actual semantic Host8 verifies original remember entries/topic/journal and saved skill attachment after cold restart. Saved memory/pack/approval/secret scopes are audited without replay or external mounts; unknown/pending state requires context. Live external MCP/secret replacement/GitHub login/logout and full stopped-writer/all-domain/OS/activation/latest-data rollback remain open."
+      "verifiedOn": "2026-11-01",
+      "level": "integration",
+      "environment": "Frozen upstream connectors/capabilities/secrets with synthetic API and MCP endpoints",
+      "notes": "Capability mount/remount/disposal, scoped secrets, replacement/deletion and GitHub connect/disconnect pass. Invalid tokens are not saved, old values stop injection, state/errors stay redacted and Bot scopes hold. Upstream 1062/1061/0/1 passes; live account not claimed."
     },
     {
       "id": "T48",

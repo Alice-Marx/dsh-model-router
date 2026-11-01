@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E145 T47 能力包／秘密／连接器验收闭合
+
+[E145](evidence/20261101_capability_secret_lifecycle.json) 冻结上游覆盖 MCP/skill/pack 挂载/重挂/卸载、作用域秘密解析、替换/删除与 Bot scope；GitHub 连接挂载 MCP，断开/删除同时卸载，无效 token 不保存且错误/状态脱敏。上游 **1062 项：1061 通过、0 失败、1 跳过**。T47 以 integration 级别 passed，正式为 **0/20、41/63、M0 11/12**。合成 API/MCP，不冒充真实 GitHub 账户，未推送/发布。当前交接为 [HANDOFF-20261101-E145.md](HANDOFF-20261101-E145.md)。
+
 ## 2026-11-01：E144 T46 原交互能力回归验收闭合
 
 [E144](evidence/20261101_interaction_ui_acceptance.json) 真实 UI 证据覆盖：`ask_user` 显示并接受回答，`show_view` 渲染指标/进度条；`/side` 候选与侧问发送、语音按钮可达；原生文件选择器上传 PNG 并显示附件预览，引用对话选择器可达。默认 Host 每次先通过 47 项自检，Host/标签页均关闭。T46 以 integration 级别 passed，正式为 **0/20、40/63、M0 11/12**。语音仅验收入口，未验证音频设备；未推送/发布。当前交接为 [HANDOFF-20261101-E144.md](HANDOFF-20261101-E144.md)。
