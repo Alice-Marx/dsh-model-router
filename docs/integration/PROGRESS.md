@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E120 T23 文件与 artifact 边界验收闭合
+
+[E120](evidence/20261101_artifact_download_acceptance.json) 新增授权 `machine.artifact`：先 stat 再完整读取，核对大小和 SHA-256，限 1 MiB；缺失映射 `ARTIFACT_DOWNLOAD_EXPIRED`，其他 Bot 不能读取。产品 UI 使用同一 Bot 作用域，只展示已核验下载链接，不回显内容；过期/未授权均明确拒绝。相关组合 **28/28**；完整两阶段根回归 **1977 项：1892 通过、0 失败、83 跳过**，客户端已重建且 `check:client` OK。T23 以 integration 级别 passed，正式为 **0/20、16/63、M0 11/12**。未推送/发布，当前交接为 [HANDOFF-20261101-E120.md](HANDOFF-20261101-E120.md)。
+
 ## 2026-11-01：E119 T22 写文件并发与中断验收闭合
 
 [E119](evidence/20261101_write_crash_consistency.json) 在真实 `fs_write` 的 rename 前后分别 `exit(86)`：前者保留旧完整文件，后者得到新完整文件，不出现半写内容；重启后原 operation 均为 `OUTCOME_UNKNOWN`、result 为 NULL，不生成成功回执。专项连续三轮通过，相关组合 **17/17**；完整两阶段根回归 **1976 项：1891 通过、0 失败、83 跳过**，`check:client` OK。T22 以 integration 级别 passed，正式为 **0/20、15/63、M0 11/12**。这证明进程中断，不冒充物理断电测试。未推送/发布，当前交接为 [HANDOFF-20261101-E119.md](HANDOFF-20261101-E119.md)。

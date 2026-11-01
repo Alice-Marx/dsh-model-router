@@ -1615,12 +1615,13 @@
     },
     {
       "id": "T23",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_remote_agent.json"
+        "docs/integration/evidence/20261027_m0_remote_agent.json",
+        "docs/integration/evidence/20261101_artifact_download_acceptance.json"
       ],
-      "notes": "Bounded reads, pagination, artifact stat/read with owner scope and hash verification pass, including Chinese content. Large-file replacement limit and artifact quota are enforced; download and expiry UX remain product work.",
-      "verifiedOn": "2026-10-27",
+      "notes": "Bounded reads, pagination, Chinese/binary content, replacement limits and artifact quota are enforced. The new machine.artifact path performs artifact_stat then a scoped full read, verifies exact size and SHA-256, limits downloads to 1 MiB and returns ARTIFACT_DOWNLOAD_EXPIRED for missing artifacts. The product UI issues the same Bot-scoped action and renders only a verified download link, never raw content; expiry and unauthorized access stay denied. Current artifact and UI tests pass 28/28 and full root is 1977/1892/0/83.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
       "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
     },

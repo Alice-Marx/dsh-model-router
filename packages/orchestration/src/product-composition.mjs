@@ -470,6 +470,7 @@ export function startBotProduct(ctx, options = {}) {
         releaseTaskTools = registerTaskTools(ctx, defineTool, { service: taskService, directory })
       }
       const machineActions=Object.fromEntries(['pair','bind','probe','revoke','reconcile'].map(name=>[`machine.${name}`,(payload,context)=>machines[name](payload,context)]))
+      machineActions['machine.artifact']=(payload,context)=>machines.download(taskOwner(payload),payload,context)
       machineActions['machine.secret']=async(payload,context)=>{
         if(context?.kind!=='owner')throw new Error('REMOTE_OWNER_REQUIRED')
         if(!payload||Object.keys(payload).some(key=>!['name','value'].includes(key))||!/^REMOTE_AGENT_[A-Z0-9_]{1,50}$/.test(payload.name)||typeof payload.value!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(payload.value))throw new Error('INVALID_MACHINE_SECRET')

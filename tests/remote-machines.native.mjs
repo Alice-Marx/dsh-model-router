@@ -70,6 +70,18 @@ test('machine host: an incompatible MCP result returns compatibility guidance wi
   assert.equal(f.directory.readModel().items.length,1,'the existing valid machine record is not damaged')
   assert.equal(f.agent.store.db.prepare('SELECT count(*) n FROM operations').get().n,0)
 })
+test('machine host: authorized artifact download verifies bytes and reports missing artifacts as expired',async t=>{
+  const f=await fixture(t);await f.directory.pair({...f.pair,tools:['machine_ping','fs_read','fs_list','artifact_stat','artifact_read']},context)
+  const tools=['machine_ping','fs_read','artifact_stat','artifact_read'];await bind(f,'bot-a',{tools});await bind(f,'bot-b',{tools})
+  const ticket=f.agent.store.issue(f.agent.store.client(f.paired.token),{botId:'bot-a',taskId:'task-a',attemptId:'attempt-a',roots:['project'],tools:['artifact_read']})
+  const bytes=Buffer.from('中文\0binary', 'utf8'),created=await f.agent.artifact(bytes,ticket)
+  const input={machineId:f.pair.machineId,rootId:'project',taskId:'task-a',attemptId:'attempt-a',operationId:'operation-a',artifactId:created.artifactId}
+  const result=await f.directory.download(f.a,input)
+  assert.equal(Buffer.from(result.content,'base64').equals(bytes),true)
+  assert.equal(result.sha256,created.sha256);assert.equal(result.size,bytes.length);assert.equal(result.mediaType,created.mediaType)
+  await assert.rejects(f.directory.download(f.b,input),/SCOPE_DENIED|MACHINE_BOT_DENIED/)
+  await assert.rejects(f.directory.download(f.a,{...input,artifactId:'artifact-missing'}),{code:'ARTIFACT_DOWNLOAD_EXPIRED'})
+})
 test('machine host: secret resolver failures are uniform and redacted before any tool action',async t=>{
   let f
   f=await fixture(t,{resolveSecret:async()=>{throw new Error(`resolver failed at ${f.endpoint} with ${f.paired.token}`)}})

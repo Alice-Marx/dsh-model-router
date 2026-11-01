@@ -224,3 +224,40 @@ test('bot product UI: machine grants, controlled read and revoke use the selecte
     assert.deepEqual(calls.at(-1),{action:'machine.reconcile',payload:{machineId:'machine-fixture'}})
   })
 })
+
+test('bot product UI: artifact download verifies before linking and reports expiry without exposing content',async()=>{
+  await withDom(async({root,container,click})=>{
+    const calls=[],snapshot=sample()
+    snapshot.availableActions=['machine.artifact']
+    snapshot.machines={status:'available',items:[{id:'machine-fixture',revision:1,name:'Machine fixture',status:'online',roots:['project'],tools:['artifact_stat','artifact_read'],bindings:[]}]}
+    const dispatch=async(action,payload)=>{calls.push({action,payload});return{artifactId:payload.artifactId,sha256:'a'.repeat(64),size:4,mediaType:'application/octet-stream',content:Buffer.from('test').toString('base64')}}
+    await act(async()=>root.render(React.createElement(Machines,{snapshot,busy:false,dispatch})))
+    for(const [key,value] of [['Task','task-a'],['Attempt','attempt-a'],['Operation','operation-a'],['Artifact','artifact-a']]){
+      const input=container.querySelector(`input[aria-label="机器 machine-fixture 的 artifact ${key}"]`)
+      Object.getOwnPropertyDescriptor(container.ownerDocument.defaultView.HTMLInputElement.prototype,'value').set.call(input,value)
+      await act(async()=>input.dispatchEvent(new container.ownerDocument.defaultView.Event('input',{bubbles:true})))
+    }
+    const submit=[...container.querySelectorAll('button')].find(button=>button.textContent==='核验并下载')
+    assert.equal(submit.disabled,false,'all required fields are populated before submission')
+    await click(submit)
+    assert.deepEqual(calls[0],{action:'machine.artifact',payload:{machineId:'machine-fixture',botId:'bot-main',taskId:'task-a',attemptId:'attempt-a',operationId:'operation-a',artifactId:'artifact-a'}})
+    const link=container.querySelector('a[download="artifact-a.bin"]')
+    assert.ok(link);assert.match(link.href,/^data:application\/octet-stream;base64,/)
+    assert.match(link.textContent,/SHA-256 已匹配/)
+    assert.equal(container.textContent.includes('test内容'),false)
+  })
+  await withDom(async({root,container,click})=>{
+    const snapshot=sample();snapshot.availableActions=['machine.artifact']
+    snapshot.machines={status:'available',items:[{id:'machine-fixture',revision:1,name:'Machine fixture',status:'online',roots:['project'],tools:['artifact_stat','artifact_read'],bindings:[]}]}
+    await act(async()=>root.render(React.createElement(Machines,{snapshot,busy:false,dispatch:async()=>{throw Object.assign(new Error('expired'),{code:'ARTIFACT_DOWNLOAD_EXPIRED'})}})))
+    for(const [key,value] of [['Task','task-a'],['Attempt','attempt-a'],['Operation','operation-a'],['Artifact','artifact-a']]){
+      const input=container.querySelector(`input[aria-label="机器 machine-fixture 的 artifact ${key}"]`)
+      Object.getOwnPropertyDescriptor(container.ownerDocument.defaultView.HTMLInputElement.prototype,'value').set.call(input,value)
+      await act(async()=>input.dispatchEvent(new container.ownerDocument.defaultView.Event('input',{bubbles:true})))
+    }
+    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='核验并下载'))
+    assert.match(container.textContent,/ARTIFACT_DOWNLOAD_EXPIRED/)
+    assert.match(container.textContent,/不存在、已过期或未获授权/)
+    assert.equal(container.querySelector('a[download]'),null)
+  })
+})

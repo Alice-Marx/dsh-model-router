@@ -192,7 +192,7 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
     async call(subject,input,{signal,expectedTarget}={}) {
       let sent=false
       try{
-      alive(); keys(input,['machineId','rootId','taskId','attemptId','tool','args','operationId'])
+      alive(); keys(input,['machineId','rootId','taskId','attemptId','tool','args','operationId','artifactId'])
       const botId=authority.describe(subject).botId
       authority.assertTool(subject,`remote/${input.tool}`)
       if(!ref(input.taskId)||!ref(input.attemptId)||input.operationId!==undefined&&!ref(input.operationId)) fail('INVALID_MACHINE_REQUEST')
@@ -240,6 +240,22 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       }
       event(record.id,input.botId,tool==='fs_read'?'diagnostic-read':'probed')
       return tool==='fs_read'?{...value,content:undefined,diagnostic:'read-confirmed',bytes:Buffer.from(value.content,'base64').length}:publicMachine(machine(record.id))
+    },
+    async download(subject,input,{signal}={}) {
+      alive(); keys(input,['machineId','rootId','taskId','attemptId','operationId','artifactId'])
+      for(const key of ['machineId','rootId','taskId','attemptId','operationId','artifactId'])if(!ref(input[key]))fail('INVALID_MACHINE_REQUEST')
+      try {
+        const metadata=await this.call(subject,{...input,tool:'artifact_stat',args:{artifactId:input.artifactId}},{signal})
+        if(metadata?.artifactId!==input.artifactId||!/^[a-f0-9]{64}$/.test(metadata.sha256??'')||!Number.isSafeInteger(metadata.size)||metadata.size<0)fail('ARTIFACT_CORRUPT')
+        if(metadata.size>1048576)fail('ARTIFACT_DOWNLOAD_LIMIT')
+        const value=await this.call(subject,{...input,tool:'artifact_read',args:{artifactId:input.artifactId,offset:0,length:Math.max(1,metadata.size)}},{signal})
+        const bytes=Buffer.from(value?.content??'','base64')
+        if(value.eof!==true||bytes.length!==metadata.size||createHash('sha256').update(bytes).digest('hex')!==metadata.sha256)fail('ARTIFACT_CORRUPT')
+        return {artifactId:metadata.artifactId,sha256:metadata.sha256,size:metadata.size,mediaType:metadata.mediaType,content:value.content}
+      } catch(error) {
+        if(error?.code==='ARTIFACT_NOT_FOUND')fail('ARTIFACT_DOWNLOAD_EXPIRED')
+        throw error
+      }
     },
     scopes(botId) { alive(); return db.prepare('SELECT machine_id,revision,scope FROM remote_machine_bindings WHERE bot_id=? AND revoked=0').all(botId).flatMap(r=>{try{machine(r.machine_id);return [{machineId:r.machine_id,revision:r.revision,...JSON.parse(r.scope)}]}catch{return []}}) },
     readModel() { alive(); return {status:'available',items:db.prepare('SELECT * FROM remote_machines ORDER BY id').all().map(row=>publicMachine({...row,config:JSON.parse(row.config),health:row.health?JSON.parse(row.health):null}))} },

@@ -127,6 +127,22 @@ function MachineControls({ machine, snapshot, dispatch, busy }) {
   </div>
 }
 
+function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
+  const [form,setForm]=useState({botId:snapshot.bots?.[0]?.id??'',taskId:'',attemptId:'',operationId:'',artifactId:''})
+  const [result,setResult]=useState(null),[error,setError]=useState(null)
+  const change=(key,value)=>setForm(current=>({...current,[key]:value}))
+  return <details className="bp-form"><summary>下载 artifact</summary>
+    <p className="bp-muted">仅下载原任务已授权的 artifact；先核对元数据，再校验完整字节和 SHA-256。内容不会显示在页面中。</p>
+    <form onSubmit={async event=>{event.preventDefault();setError(null);setResult(null);try{setResult(await dispatch('machine.artifact',{machineId:machine.id,...form}))}catch(error){setError(error)}}}>
+      <label>Bot<select aria-label={`机器 ${machine.id} 的 artifact Bot`} value={form.botId} onChange={event=>change('botId',event.target.value)}>{snapshot.bots.map(bot=><option key={bot.id} value={bot.id}>{bot.name??bot.id}</option>)}</select></label>
+      {[['taskId','Task'],['attemptId','Attempt'],['operationId','Operation'],['artifactId','Artifact']].map(([key,label])=><label key={key}>{label}<input aria-label={`机器 ${machine.id} 的 artifact ${label}`} value={form[key]} onInput={event=>change(key,event.target.value)} required autoComplete="off" /></label>)}
+      <button type="submit" disabled={busy||Object.values(form).some(value=>!value)}>核验并下载</button>
+    </form>
+    {error&&<p className="bp-blocked" role="status">下载失败：{error.code??'ARTIFACT_DOWNLOAD_FAILED'}。artifact 不存在、已过期或未获授权。</p>}
+    {result&&<a download={`${form.artifactId}.bin`} href={`data:${result.mediaType??'application/octet-stream'};base64,${result.content}`}>下载已核验 artifact（{result.size} 字节，SHA-256 已匹配）</a>}
+  </details>
+}
+
 export function Machines({ snapshot, dispatch, busy }) {
   const section = snapshot.machines
   if (section?.status !== 'available') return <Blocked value={section} />
@@ -137,7 +153,7 @@ export function Machines({ snapshot, dispatch, busy }) {
     {(machine.blockedReason || machine.status !== 'online') && <Blocked value={{ reason: machine.blockedReason ?? '机器未在线，任务不会派到此机器。', nextAction: machine.nextAction ?? '启动 Agent 并检查配对、网络及登录桌面。' }} />}
     {machine.revocations?.some(item=>item.status!=='revoked')&&<aside className="bp-blocked" role="status"><strong>远程停止尚未确认</strong><p>本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。</p>
       {dispatch&&snapshot.availableActions?.includes('machine.reconcile')&&<button type="button" disabled={busy} onClick={()=>dispatch('machine.reconcile',{machineId:machine.id})}>重试确认远程撤销</button>}</aside>}
-    {dispatch&&machine.status!=='revoked'&&<MachineControls machine={machine} snapshot={snapshot} dispatch={dispatch} busy={busy} />}
+    {dispatch&&machine.status!=='revoked'&&<><MachineControls machine={machine} snapshot={snapshot} dispatch={dispatch} busy={busy} /><ArtifactDownload machine={machine} snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}
   </article>)}</div> : <p className="bp-empty">尚未配对远程电脑。安装同版本 Agent，核验指纹并授予所需根目录后，机器会显示在这里。</p>}</>
 }
 
