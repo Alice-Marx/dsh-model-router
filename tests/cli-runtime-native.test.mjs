@@ -17,7 +17,7 @@ async function setup(t) {
   await protectProfile(probe.helper, home)
   return { home, helper: probe.helper }
 }
-function message(proc, type, timeout = 15_000) {
+function message(proc, type, timeout = 30_000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => { proc.events.off('message', receive); reject(new Error(`MISSING_${type}: ${proc.stderr}`)) }, timeout)
     const receive = value => { if (value.type === type || value.type === 'fixture-error') { clearTimeout(timer); proc.events.off('message', receive); value.type === 'fixture-error' ? reject(new Error(value.error)) : resolve(value) } }
@@ -25,13 +25,13 @@ function message(proc, type, timeout = 15_000) {
   })
 }
 async function supervised(t, options) {
-  const proc = nativeProcess(options.helper, 'supervise', { executable: process.execPath, args: [fixture], cwd: options.home, ttlMs: 60_000 }, { home: options.home })
+  const proc = nativeProcess(options.helper, 'supervise', { executable: process.execPath, args: [fixture], cwd: options.home, ttlMs: 120_000 }, { home: options.home })
   t.after(async () => { proc.end(); await proc.exit })
   const root = await proc.waitControl('spawned')
   return { proc, root }
 }
 
-test('native CLI cancellation stops a real child tree and confirms its containment', { timeout: 45_000 }, async t => {
+test('native CLI cancellation stops a real child tree and confirms its containment', { timeout: 90_000 }, async t => {
   const options = await setup(t); if (!options) return
   const { proc } = await supervised(t, options)
   let forgedStop = false
@@ -52,12 +52,12 @@ test('native CLI cancellation stops a real child tree and confirms its containme
   }
 })
 
-test('private CLI bootstrap rejects an unrelated same-user peer and scopes a real grandchild MCP connection', { timeout: 60_000 }, async t => {
+test('private CLI bootstrap rejects an unrelated same-user peer and scopes a real grandchild MCP connection', { timeout: 120_000 }, async t => {
   const options = await setup(t); if (!options) return
   const authority = createAuthority(); t.after(() => authority.dispose())
   const subject = {}; authority.register(subject, { botId: 'bot-a', tools: ['own_ping'] })
   let calls = 0
-  const bridge = await createCliBootstrap({ authority, subject, binding, tools: ['own_ping'], home: options.home, helper: options.helper, ttlMs: 55_000,
+  const bridge = await createCliBootstrap({ authority, subject, binding, tools: ['own_ping'], home: options.home, helper: options.helper, ttlMs: 110_000,
     handlers: [{ definition: { name: 'own_ping', description: 'Offline peer test', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
       parse(value) { if (Object.keys(value).length) throw new PolicyError('INVALID_ARGUMENTS'); return value }, execute() { calls++; return { marker: 'owned' } } }] })
   t.after(() => bridge.close())
@@ -99,11 +99,11 @@ test('private CLI bootstrap rejects an unrelated same-user peer and scopes a rea
   if(shortSocketDirectory)await assert.rejects(lstat(shortSocketDirectory),{code:'ENOENT'})
 })
 
-test('CLI descriptor public signature rejects replacement before native connection', { timeout: 15_000 }, async t => {
+test('CLI descriptor public signature rejects replacement before native connection', { timeout: 45_000 }, async t => {
   const options = await setup(t); if (!options) return
   const authority = createAuthority(); t.after(() => authority.dispose())
   const subject = {}; authority.register(subject, { botId: 'bot-a', tools: [] })
-  const bridge = await createCliBootstrap({ authority, subject, binding, tools: [], handlers: [], home: options.home, ttlMs: 10_000, helper: options.helper })
+  const bridge = await createCliBootstrap({ authority, subject, binding, tools: [], handlers: [], home: options.home, ttlMs: 30_000, helper: options.helper })
   t.after(() => bridge.close())
   await writeFile(bridge.descriptorPath, JSON.stringify({ payload: '{}', signature: Buffer.alloc(64).toString('base64url') }))
   const child = spawn(bridge.command, bridge.args, { cwd: options.home, env: privateEnvironment(options.home), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })

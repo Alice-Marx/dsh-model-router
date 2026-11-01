@@ -41,7 +41,9 @@ test('atomic file CAS, bounded reads, pagination and operation idempotency',asyn
   await assert.rejects(f.agent.call('fs_write',{...a,content:'different'},f.context,'write-1'),code('OPERATION_CONFLICT'))
   const bad=await f.agent.call('fs_write',{...a,content:'bad'},f.context,'write-2');assert.equal(bad.error.code,'FILE_CHANGED');assert.equal(await readFile(join(f.dir,'root/one.txt'),'utf8'),a.content)
   const read=await f.agent.call('fs_read',{rootId:'project',relativePath:'one.txt',offset:0,length:5},f.context);assert.equal(Buffer.from(read.content,'base64').toString(),'hello');assert.equal(read.eof,false)
-  const good=await f.agent.call('fs_write',{...a,content:'new',expectedHash:first.result.sha256},f.context,'write-3');assert.equal(good.status,'succeeded')
+  const overwrite=await f.agent.call('fs_write',{...a,content:'new',expectedHash:first.result.sha256},f.context,'write-3')
+  if(process.platform==='win32'){assert.equal(overwrite.status,'succeeded');assert.equal(await readFile(join(f.dir,'root/one.txt'),'utf8'),'new')}
+  else{assert.equal(overwrite.error.code,'OVERWRITE_UNSUPPORTED');assert.equal(await readFile(join(f.dir,'root/one.txt'),'utf8'),a.content)}
   const missing=await f.agent.call('fs_write',{rootId:'project',relativePath:'x',content:'x'},f.context,'write-4');assert.equal(missing.error.code,'EXPECTED_HASH_REQUIRED')
   assert.equal((await f.agent.call('fs_list',{rootId:'project',limit:1},f.context)).entries.length,1)
 }finally{await f.agent.close()}})

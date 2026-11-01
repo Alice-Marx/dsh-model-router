@@ -267,7 +267,7 @@ export class Agent {
     const row=this.store.db.prepare('SELECT * FROM worktrees WHERE id=?').get(a.worktreeId);if(!row)fail('WORKTREE_NOT_FOUND',404);this.store.own(row.context,c);if(!c.roots.includes(row.root))fail('SCOPE_DENIED',403)
     const base=await realpath(this.config.roots[row.root]);for(const p of [row.path,row.source]){if(!this.roots.inside(base,await realpath(p)))fail('WORKSPACE_OUTSIDE_SCOPE',403);await this.roots.assertPublicTree(p)}
     const patch=await this.git(row.path,['diff','--binary',row.head]);if(name==='worktree_diff')return {sourceHead:row.head,...await this.artifact(Buffer.from(patch+'\n'),c,'text/x-diff')}
-    if(await this.git(row.source,['rev-parse','HEAD'])!==row.head||await this.git(row.source,['status','--porcelain']))return {status:'integration-pending',reason:'SOURCE_CHANGED',worktreeId:a.worktreeId}
+    if(await this.git(row.path,['rev-parse','HEAD'])!==row.head||await this.git(row.source,['rev-parse','HEAD'])!==row.head||await this.git(row.source,['status','--porcelain']))return {status:'integration-pending',reason:'SOURCE_CHANGED',worktreeId:a.worktreeId}
     const patchFile=join(this.config.dataDir,`patch-${randomUUID()}`);await writeFile(patchFile,patch+'\n',{mode:0o600})
     try{if(!patch)return {status:'no-changes'};await this.git(row.source,['apply','--check',patchFile]);this.store.validate(c);await this.git(row.source,['apply',patchFile]);return {status:'integrated',sourceHead:row.head,patchSha256:sha(patch)}}catch(e){if(e instanceof AgentError)throw e;return {status:'integration-pending',reason:'PATCH_CONFLICT',worktreeId:a.worktreeId}}finally{await unlink(patchFile)}
   }
