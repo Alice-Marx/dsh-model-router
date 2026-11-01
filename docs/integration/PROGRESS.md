@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E134 T32 CLI 精确模型身份验收闭合
+
+[E134](evidence/20261101_cli_model_identity.json) 复验请求/报告/已验证配置身份分离：不匹配或停止未确认保持 unknown 与原 hold，复制主体、远程位置、未绑定模型及合同变化提前拒绝。真实 Codex `0.163.0` 内容/版本、隔离 profile、单 task MCP、能力边界与原生清理 **13/13**；合同套件 **18/18**。`cliTurnRequestsDispatched: 0`、`actualModelCalls: 0`。T32 以 integration 级别 passed，正式为 **0/20、30/63、M0 11/12**。不证明真实响应模型/权益/配额，未推送/发布。当前交接为 [HANDOFF-20261101-E134.md](HANDOFF-20261101-E134.md)。
+
 ## 2026-11-01：E133 T27 浏览器行为控制验收闭合
 
 [E133](evidence/20261101_browser_action_control.json) 新增有界 `browser_script`、内存 `browser_upload`（1 MiB，严格文件名/MIME/base64）与产品 `remote_computer_browser`。后者覆盖 open/snapshot/click/type/script/upload/download/close，保持 Bot/machine/root 授权、稳定 task/attempt 和逐 action operation ID；内部导航/fetch 仍被 origin 策略阻断。Agent **11 项**、默认产品 **45 项**通过；完整根回归 **1980 项：1892 通过、0 失败、88 跳过**，`check:client` OK。T27 以 integration 级别 passed，正式为 **0/20、29/63、M0 11/12**。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E133.md](HANDOFF-20261101-E133.md)。

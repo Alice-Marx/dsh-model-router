@@ -1717,16 +1717,17 @@
     },
     {
       "id": "T32",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m5_cli_execution.json",
         "tests/cli-execution.native.mjs",
-        "docs/integration/evidence/20261030_installed_cli_protocol.json"
+        "docs/integration/evidence/20261030_installed_cli_protocol.json",
+        "docs/integration/evidence/20261101_cli_model_identity.json"
       ],
-      "notes": "The requested model, the reported CLI model and the reported provider are recorded separately, a configured-model mismatch or an unconfirmed stop keeps the outcome unknown and retains the original hold, and a copied subject, remote location or unbound model parameter fails before admission. A real codex entry still needs an install-verified host decision, so actual response model identity is not verified. E60: official installed Codex0.163.0 normal initialization/native-MCP/close13 passes on all3OS. No credentials or turns; configuration identity is synthetic, not real model/backend/entitlement/billing proof. Startup HTTP attempts are explicitly refused by the local403 sink. Latest human AGENTS authorizes StepCode/Step Plan development and supersedes historical GPT-only routing; development assistance is separate from0 product model calls.",
-      "verifiedOn": "2026-10-30",
-      "level": "component / native (contract level)",
-      "environment": "Native CLI execution suite with a contract-level session factory; no native codex executable is spawned"
+      "notes": "Requested, reported and verified configuration identities stay separate. Mismatch/unconfirmed stop keeps unknown and the original hold; copied subjects, remote locations, unbound models and contract changes refuse early. Real Codex 0.163.0 entry and native MCP pass 13/13 with zero turns; related suites pass 18/18. No real response-model claim.",
+      "verifiedOn": "2026-11-01",
+      "level": "integration",
+      "environment": "Native CLI suites plus actual installed Codex 0.163.0 on isolated Win11 Node24; synthetic configuration identity, zero real inference"
     },
     {
       "id": "T33",
