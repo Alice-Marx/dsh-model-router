@@ -14,8 +14,7 @@ export async function createPrivateMigrationDirectory(path){
       const system=join(process.env.SystemRoot??'C:/Windows','System32')
       const who=await execute(join(system,'whoami.exe'),['/user','/fo','csv','/nh'],{windowsHide:true,timeout:5000,maxBuffer:65536})
       const sid=who.stdout.match(/S-1-\d+(?:-\d+)+/)?.[0];if(!sid)fail('MIGRATION_PRIVATE_ACL_FAILED')
-      const script='& {$path=$args[0];$sid=$args[1];$acl=Get-Acl -LiteralPath $path;$acl.SetAccessRuleProtection($true,$false);foreach($rule in @($acl.Access)){$acl.RemoveAccessRuleAll($rule)};$identity=[Security.Principal.SecurityIdentifier]::new($sid);$rule=[Security.AccessControl.FileSystemAccessRule]::new($identity,"FullControl","ContainerInherit,ObjectInherit","None","Allow");$acl.AddAccessRule($rule);Set-Acl -LiteralPath $path -AclObject $acl}'
-      await execute(join(system,'WindowsPowerShell/v1.0/powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-Command',script,path,sid],{windowsHide:true,timeout:10000,maxBuffer:65536})
+      await execute(join(system,'icacls.exe'),[path,'/inheritance:r','/grant:r',`*${sid}:(OI)(CI)F`,'/remove:g','*S-1-5-32-544','*S-1-5-18','*S-1-3-0','*S-1-5-32-545'],{windowsHide:true,timeout:10000,maxBuffer:65536})
     }else if((await lstat(path)).mode&0o077)fail('MIGRATION_PRIVATE_ACL_FAILED')
     if((await lstat(path)).isSymbolicLink())fail('MIGRATION_PRIVATE_ACL_FAILED')
   }catch{await rmdir(path).catch(()=>{});fail('MIGRATION_PRIVATE_ACL_FAILED')}
