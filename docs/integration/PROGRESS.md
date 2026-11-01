@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E131 T28 Windows 基本控机验收闭合
+
+[E131](evidence/20261101_windows_basic_desktop.json) 当前 Win11 实机复跑 **19/19**：截图、真实按钮点击、允许按键、目标滚轮、Unicode SendInput（无剪贴板）及 lease/过期/清理通过；Win10 22H2 既有实机同样 **19/19** 且有合成窗口 PNG，桌面 helper、协议、驱动与夹具源码核对未变。T28 以 integration 级别 passed，正式为 **0/20、27/63、M0 11/12**。仅操作合成自有窗口，其他应用、UAC/RDP、DPI、多屏与 WGC 另验。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E131.md](HANDOFF-20261101-E131.md)。
+
 ## 2026-11-01：E130 T62 研发与产品角色分离验收闭合
 
 [E130](evidence/20261101_role_separation_acceptance.json) 核对产品 Bot 的宿主身份、Session、模型/工具授权和私有工作区均独立于 IDE/外部评审角色；全部当前产品探针使用离线 fixture 并记录 `actualModelCalls: 0`。宽窄截图仅由本机浏览器采集，未触发外部 agent、提权、推送或发布。T62 以 integration 级别 passed，正式为 **0/20、26/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E127 的 1980/1892/0/88，`check:client` OK。未推送/发布。当前交接为 [HANDOFF-20261101-E130.md](HANDOFF-20261101-E130.md)。

@@ -1673,16 +1673,16 @@
     },
     {
       "id": "T28",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
-        "docs/integration/evidence/20261027_m0_remote_agent.json",
         "docs/integration/evidence/20261028_dual_windows_desktop.json",
-        "docs/integration/evidence/20261028_desktop_arbitration_stop.json"
+        "docs/integration/evidence/20261028_desktop_arbitration_stop.json",
+        "docs/integration/evidence/20261101_windows_basic_desktop.json"
       ],
-      "notes": "A real Win11 logged-in session drove screenshot, hit-tested click and Unicode SendInput against a synthetic own-window fixture through the ACL-protected pipe. Win10 22H2, other applications, scrolling and multi-monitor remain open. E44 adds actual logged-in Win10(build19044,current96DPI) and Win11(current144DPI) native pipe/capture/click/Unicode/lease/stale/session checks,8 each, with visually inspected own-window PNGs and confirmed cleanup.125%,cross-monitor,session transitions,full desktop facade/approvals and cross-Agent arbitration remain open. E45: Both actual Windows run19 synthetic-window checks; helper global arbitration, key/wheel effects, confirmed partial-input cancel/revoke, sibling continuation and screenshot expiry passed. Physical tray/session/DPI matrix and full product facade remain.",
-      "verifiedOn": "2026-10-28",
+      "notes": "Current Win11 reruns all 19 native checks; Win10 22H2 has the same 19 passing checks and inspected PNG evidence. Both real logged-in Sessions verify screenshot, real click, wheel and Unicode SendInput with effect/cleanup checks. Helper, protocol, driver and fixture blobs are unchanged. Other apps, UAC/RDP, DPI and multi-monitor remain separate gates.",
+      "verifiedOn": "2026-11-01",
       "level": "integration",
-      "environment": "Isolated native remote-computer-agent probes on local Win11 Node24 with better-sqlite3 13.0.3; offline fixtures only"
+      "environment": "Real logged-in Win11 and Win10 22H2 synthetic own-window fixtures through ACL-protected native helper; offline only"
     },
     {
       "id": "T29",
