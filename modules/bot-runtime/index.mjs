@@ -1,6 +1,7 @@
 import { createRuntime, inject } from './vendor/ds-bot/index.js'
 import { isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
 import { attachDsLifecycle } from '../../packages/orchestration/src/ds-lifecycle.mjs'
+import { guardDsWorkspaceReads } from '../../packages/orchestration/src/ds-workspace-privacy.mjs'
 import { createProductReadModel, registerProductChannel } from './read-model.mjs'
 
 export { inject }
@@ -62,11 +63,12 @@ export function createBotProduct(ctx, options = {}) {
   const readModel = createProductReadModel({ runtime: rt, lifecycle, providers: options.readModels, actions: options.actions })
   ctx.provide('botProductReadModel', readModel)
   const releaseChannel = authorizeRequest ? registerProductChannel(ctx, readModel, authorizeRequest) : () => {}
+  const releaseWorkspacePrivacy = guardDsWorkspaceReads(ctx, rt)
   let closed = false
   const dispose = () => {
     if (closed) return
     closed = true
-    releaseChannel(); offStream(); offAgent(); lifecycle.close()
+    releaseWorkspacePrivacy(); releaseChannel(); offStream(); offAgent(); lifecycle.close()
   }
   ctx.effect(() => dispose, 'bot-product: composed lifecycle')
   return Object.freeze({ version: contractVersion, rt, lifecycle, readModel, dispose })

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "4c37a73e7676a8c97e48d06339461bab7975e640",
+  "parentEvidence": "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T04 criteria are covered. Two same-model non-Main Bots keep separate Sessions, principals and exact model grants. One Bot's saved memory is visible after its workspace-driven Session rotation, while the other Bot's recall returns no entry. The real product test initially exposed cross-workspace file reads; a new composition guard now resolves real paths and confines read/read_image/glob/grep to the current Session workspace, including junction/symlink escape refusal. A real pwsh attempt returns BOT_NATIVE_EXECUTION_DENIED, so native shell cannot bypass the read guard. Existing cross-Bot Task/machine/receipt denial and per-operation CLI h-<operationId> profile evidence remains.",
+  "productAcceptance": "T04 passes at integration level. Private chats, memory, rotated Sessions, restricted directories and per-attempt CLI profiles do not leak between same-model Bots; explicitly delegated input remains the intended shared content. Formal scores are 0/20 work packages, 23/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {
+    "packages/orchestration/src/ds-workspace-privacy.mjs": "b81127d39392db767b9209d6d7d66ba2a074d6eb",
+    "modules/bot-runtime/index.mjs": "3be0d73c409522e06310f02730d4ec247eb156ff",
+    "scripts/integration-product-default.mjs": "082ecd402d8b1d95b038ca6cfe97f7846875637e",
+    "tests/fixtures/integration-combined/mock-plugin.mjs": "9ed80d827d261c7dd0e85a4d989d81b27af6f8b4",
+    "tests/ds-workspace-privacy.test.mjs": "371106bbb40b82c555a87ac4ac721981b2a657bb",
+    "package.json": "9e2723dcb15fbe5470e0668ec9ac36850c9eabf0"
+  },
+  "implementation": [
+    "Added a composition-layer real-path read guard and native pwsh execution denial for Bot Sessions; frozen DS and SDK sources were not changed.",
+    "The guard is disposed with the composed product, fails closed without trusted folder identity and is included in the npm published file list.",
+    "The default product probe now exercises memory, private file, Session rotation, cross-directory read and native shell paths, followed by cold-start checks."
+  ],
+  "testRuns": [
+    "npm run integration:probe-product-default: all 44 checks pass, including two new T04 checks and all existing Task, credential and restart checks.",
+    "Workspace privacy + lifecycle + product composition: 25/25; CLI contract/renewal + authority/policy: 26/26.",
+    "Final npm test: phase one 1593/1589/0/4 and phase two 387/303/0/84; total 1980 tests, 1892 pass, 0 fail, 88 skipped. npm run check:client: OK.",
+    "Raw product summary: tmp/integration/product-default/run-qKOe5d/summary.json."
+  ],
+  "preservedFailures": [
+    "Before the guard, the real cross-Bot read returned the other Bot's private file successfully. This was a genuine product isolation defect and is now fixed.",
+    "The first root regression found the new module absent from package.json files. It is now explicitly published and the complete root passes.",
+    "Schema restriction alone did not remove built-in pwsh from the model-facing list. The final control enforces BOT_NATIVE_EXECUTION_DENIED at execution and tests a real rejected call instead of relying on tool visibility.",
+    "Fixture corrections distinguished Bot IDs from rotated Session IDs and treated a no-memory response containing the query text as no entry, not a memory leak."
+  ],
+  "limitations": [
+    "This is a product tool/session boundary, not separate OS-account isolation; T25 remains the OS isolation gate.",
+    "The CLI model and memory workflows use deterministic offline fixtures. No real model inference, real credential, production profile, push or release was used."
+  ]
+}

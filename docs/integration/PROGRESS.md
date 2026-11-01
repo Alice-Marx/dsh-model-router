@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E127 T04 同模型 Bot 私有状态与目录隔离闭合
+
+[E127](evidence/20261101_bot_workspace_privacy.json) 实测先发现跨 Bot 目录读取真实缺陷，随后在组合层新增真实路径读取守卫：`read/read_image/glob/grep` 仅限当前 Session 工作区，junction/symlink 逃逸拒绝；真实 `pwsh` 调用以 `BOT_NATIVE_EXECUTION_DENIED` 拒绝，不能绕过。两个同模型非 Main Bot 的记忆、Session 轮换、私有目录、每 operation CLI profile 与既有 Task/机器/收据边界均通过。默认产品 **44/44**；完整根回归 **1980 项：1892 通过、0 失败、88 跳过**，`check:client` OK；新模块已纳入 npm 文件清单。T04 以 integration 级别 passed，正式为 **0/20、23/63、M0 11/12**。这不是独立 OS 账户沙箱，T25 另验。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E127.md](HANDOFF-20261101-E127.md)。
+
 ## 2026-11-01：E126 T03 严格模型不可用与恢复验收闭合
 
 [E126](evidence/20261101_strict_model_recovery.json) 在默认产品真实调用边界注入离线缺密钥故障：原路线错误明确、零 Provider stream、零回退；首字节前异常按 unknown 保守阻断，经显式零费用 fixture 对账及凭据恢复后，新的原模型调用成功。既有未配置/不匹配/路由移除与恢复证据保持。默认产品完整探针 **42 项检查通过**，0 真实模型推理。T03 以 integration 级别 passed，正式为 **0/20、22/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。未推送/发布。当前交接为 [HANDOFF-20261101-E126.md](HANDOFF-20261101-E126.md)。

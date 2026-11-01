@@ -1325,16 +1325,17 @@
     },
     {
       "id": "T04",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
         "tests/capability-authority.test.mjs",
-        "docs/integration/evidence/20261028_runtime_config_search.json"
+        "docs/integration/evidence/20261028_runtime_config_search.json",
+        "docs/integration/evidence/20261101_bot_workspace_privacy.json"
       ],
-      "level": "actual rc.3 host / offline fixture model + native",
-      "environment": "Shipped default entry on a real rc.3 host with three Bots on the same fixture model",
-      "notes": "Main, worker and CLI Bots run on the same model with separate principals, grants, sessions and bindings; cross-Bot task reads and machine reads are refused (TASK_NOT_FOUND, MACHINE_BOT_DENIED) and a Bot cannot resolve another Bot receipt. DS memory API and CLI profile isolation per Bot session come from the vendored DS runtime and are not separately re-verified here. E47: Saved runtime config/search compatibility and cold identity verified by real rc.3 Host6 checks on three platforms; full preview/apply/data/rollback/binding migration remains.",
-      "verifiedOn": "2026-10-28"
+      "level": "integration",
+      "environment": "Shipped default entry on actual rc.3 Host with same-model non-Main Bots, real Session rotation and native read/shell negative paths; offline fixtures",
+      "notes": "Memory stays per Bot across workspace-driven Session rotation. A genuine cross-directory read defect is fixed by a real-path Session guard with junction escape refusal; real pwsh is denied at execution. Per-operation CLI profiles and cross-Bot Task/machine/receipt denial remain. Default product 44/44 and full root 1980/1892/0/88 pass.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T05",
