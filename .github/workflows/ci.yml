@@ -35,7 +35,9 @@ jobs:
           corepack enable
           corepack install
       - name: Install the exact dependency graph
-        run: pnpm install --frozen-lockfile --strict-peer-dependencies
+        run: pnpm install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
+      - name: Verify the packaged SQLite prebuild
+        run: node -e "const Database=require('better-sqlite3');const db=new Database(':memory:');if(db.prepare('SELECT 1 AS value').get().value!==1)process.exit(1);db.close()"
       - name: Verify the integration scope, task dependencies and evidence
         run: npm run integration:check
       - name: Run the complete test suite
@@ -96,8 +98,16 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
           pnpm --dir tests/fixtures/integration-host install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
-      - name: Build the pinned product SQLite addon
-        run: pnpm rebuild better-sqlite3
+      - name: Verify the packaged SQLite prebuild
+        run: node -e "const Database=require('better-sqlite3');const db=new Database(':memory:');if(db.prepare('SELECT 1 AS value').get().value!==1)process.exit(1);db.close()"
+      - name: Install remote browser test dependencies
+        run: npm ci --prefix remote-computer-agent --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium and Linux runtime dependencies
+        if: runner.os == 'Linux'
+        run: node remote-computer-agent/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Install Chromium on Windows
+        if: runner.os == 'Windows'
+        run: node remote-computer-agent/node_modules/playwright/cli.js install chromium
       - name: Exercise real combined Sessions with an offline model
         run: node scripts/integration-combined-host.mjs --ds-root tmp/integration/upstream/ds-bot-frozen --host-root tests/fixtures/integration-host --legacy-policy ${{ matrix.security }}
       - name: Verify strict automatic Bot lifecycle and authenticated Gateway RPC
