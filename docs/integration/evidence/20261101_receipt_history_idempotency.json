@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "5a89e2d5028a1dc22d77d302c5d14d819ce88e50",
+  "parentEvidence": "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T40 criteria are covered. Bot, auxiliary, CLI and MR calls retain distinct source rows with exactly one invoice each. Legacy runs and subscription archives remain visible without being recounted after pruning/reload. Failure, cancellation and interrupted fallback retain observed usage and known or unknown charges rather than zeroing them. Revised live receipts replace their contribution, archived replay is refused, copied actors and receipt rewrites fail closed. Cold recovery restores the original attempt/receipt without another dispatch or invoice.",
+  "productAcceptance": "T40 passes at integration level. Bot/CLI/review/legacy history does not double bill, actual charges survive failure and cancellation, and receipt settlement remains idempotent. Formal scores are 0/20 work packages, 34/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {},
+  "implementation": [
+    "No product code changed. Existing source receipts, original-run projections, subscription archives and recovery paths provide the idempotent history.",
+    "Current native suites were run with the verified SQLite driver."
+  ],
+  "testRuns": [
+    "Funding projection + funded MR + model accounting + CLI execution + unknown receipt + subscription receipts/history: 67 tests / 67 pass / 0 fail.",
+    "Coverage includes per-source invoices, revised receipt replacement, archive replay refusal, failure/cancellation usage, unknown resolution and cold restart without duplicate invoice.",
+    "Latest complete root regression remains E133: 1980 tests / 1892 pass / 0 fail / 88 skipped; check:client OK."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "No real provider invoice or model inference was used; this validates offline receipt history and idempotency.",
+    "No production process, push or release was used."
+  ]
+}

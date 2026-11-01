@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E138 T40 收据与历史验收闭合
+
+[E138](evidence/20261101_receipt_history_idempotency.json) 复验 Bot、辅助、CLI、MR 与旧档案分别计账且不重复；失败/取消/中断保留实际用量和已知/未知费用。修改中的收据只替换原贡献，归档重放和篡改拒绝，冷恢复不重复 dispatch/invoice。组合 **67/67**。T40 以 integration 级别 passed，正式为 **0/20、34/63、M0 11/12**。不验证真实厂商账单，未推送/发布。当前交接为 [HANDOFF-20261101-E138.md](HANDOFF-20261101-E138.md)。
+
 ## 2026-11-01：E137 T39 订阅计量与回退验收闭合
 
 [E137](evidence/20261101_subscription_accounting.json) 复验未知/部分 token 不按零计；subscription-only 即使 API 历史满或未知也不借 API 凭据/美元。显式转 API 先保存订阅收据，再重新估价、审批和原子预占；并发回退不重复准入，崩溃分别保留订阅用量与未知 API 费用，UI 不混用 token 与美元。组合 **79/79**。T39 以 integration 级别 passed，正式为 **0/20、33/63、M0 11/12**。不证明真实厂商配额/账单，未推送/发布。当前交接为 [HANDOFF-20261101-E137.md](HANDOFF-20261101-E137.md)。

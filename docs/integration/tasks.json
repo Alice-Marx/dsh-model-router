@@ -1802,17 +1802,19 @@
     },
     {
       "id": "T40",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_receipt_reconciliation.json",
         "docs/integration/evidence/20261027_m0_sqlite_finance.json",
         "docs/integration/evidence/20261027_m5_cli_execution.json",
-        "docs/integration/evidence/20261028_atomic_task_admission.json"
+        "docs/integration/evidence/20261028_atomic_task_admission.json",
+        "docs/integration/evidence/20261101_receipt_history_idempotency.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-28",
-      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
-      "notes": "Nonzero receipts, known/unknown holds, API money and subscription archive/unknown-token dimensions survive cutover, retention and latest-data rollback. Duplicate settlement does not double count; complete per-source Bot/CLI receipts remain open. CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open. E40 adds schema4 shared Task/outbox/funding admission: 20 native checks including 6 real process exits, cancellation/revocation/deadline and CAS/competition, plus default Host MR/CLI and cold restart (36 checks). No external exactly-once or physical/production acceptance is claimed."
+      "verifiedOn": "2026-11-01",
+      "environment": "Verified native SQLite driver with offline receipt/history fixtures; zero real model calls",
+      "notes": "Bot/auxiliary/CLI/MR and legacy sources each bill once. Prune/reload does not recount; failure/cancel preserves usage and charges. Revised receipts replace contribution, archived replay and rewrites fail closed, cold recovery adds no dispatch/invoice. Related suites pass 67/67.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T41",
