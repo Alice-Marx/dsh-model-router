@@ -1731,22 +1731,17 @@
     },
     {
       "id": "T33",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m0_cli_runtime.json",
         "docs/integration/evidence/20261027_m4_product_machines.json",
-        "docs/integration/evidence/20261027_m5_cli_execution.json",
-        "docs/integration/evidence/20261028_remote_private_paths.json",
         "docs/integration/evidence/20261030_installed_cli_protocol.json",
-        "docs/integration/evidence/20261030_cli_native_peer_job.json",
-        "docs/integration/evidence/20261030_bound_stop_proof.json",
-        "docs/integration/evidence/20261030_stop_proof_regression.json",
-        "docs/integration/evidence/20261030_write_cancel_effects.json"
+        "docs/integration/evidence/20261101_cli_mcp_bridge.json"
       ],
       "level": "integration",
-      "verifiedOn": "2026-10-30",
-      "environment": "Three platform native Task/money stores with an explicitly offline CLI test double; native bridge separate",
-      "notes": "A private signed bootstrap scopes a real grandchild MCP connection to one task lease: only granted tools are listed, spoofed arguments and unrelated same-user peers are rejected, and revocation ends the bridge. Real vendor CLI native MCP and product bridge wiring remain open. Current machine product evidence: secretRef pairing/read/revocation/cold restore and native ticket cancellation verified on three platforms; live protected network, full Task execution and end-to-end acceptance remain separate. CLI Task/money component has 8 native checks on three platforms; actual default-product execution, atomic admission and real GPT dual-source workflow remain open. E46: Own control data/pipe secret excluded from file/list/write/Git APIs,8 checks on three OSes. No same-account shell/kernel isolation claim. E60: official installed Codex0.163.0 normal initialization/native-MCP/close13 passes on all3OS. No credentials or turns; configuration identity is synthetic, not real model/backend/entitlement/billing proof. Startup HTTP attempts are explicitly refused by the local403 sink. Latest human AGENTS authorizes StepCode/Step Plan development and supersedes historical GPT-only routing; development assistance is separate from0 product model calls. E61: CLI Windows native Job-list atomic creation, creator death and capability failure/cleanup verified with 13 fixture tests on both actual Windows versions; installed CLI normal protocol13 again on Win11 without inference. Full product/model/OS isolation remains open. E64: exact-operation bound stop proof, durable no-dispatch fencing, independent settled Agent write receipts and conservative UI projection verified with six complete suites (59/59) on Win11/Win10/Ubuntu. E65 registers the eleven stop-proof checks in root/CI and retains bounded timing-hardening records. E66 distinguishes pre-publication cancellation (possiblyApplied:false) from post-publication cancellation (true) with three-platform focused67/67; local root1776 has1754 pass/0 fail/22 skip. External-writer CAS, full product/OS/model gates and remote full-root acceptance stay open."
+      "verifiedOn": "2026-11-01",
+      "environment": "Real native grandchild MCP and installed Codex on isolated Win11 Node24; product machine/secret/Task suites; zero real inference",
+      "notes": "Signed bootstrap lists only granted capabilities under a short task lease, rejects spoofing and unrelated peers, and ends on revoke/close. Host-only machine secrets stay outside Bot reach. Default product uses the same Task/operation authority. Related suites pass 28/28; installed protocol remains 13/13 without turns."
     },
     {
       "id": "T34",

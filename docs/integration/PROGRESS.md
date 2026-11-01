@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E135 T33 CLI 原生 MCP bridge 验收闭合
+
+[E135](evidence/20261101_cli_mcp_bridge.json) 复验私有签名 bootstrap：仅当前 task lease 的获准能力可见，伪造参数/异己 peer 拒绝；机器秘密保持 host-only，撤权/退出使桥失效并回收进程树。默认产品沿用同一 Task/operation 与账本；真实安装 Codex 协议保持 13/13、零 turn。组合 **28/28**。T33 以 integration 级别 passed，正式为 **0/20、31/63、M0 11/12**。不声称同账户 OS 全量读隔离，未推送/发布。当前交接为 [HANDOFF-20261101-E135.md](HANDOFF-20261101-E135.md)。
+
 ## 2026-11-01：E134 T32 CLI 精确模型身份验收闭合
 
 [E134](evidence/20261101_cli_model_identity.json) 复验请求/报告/已验证配置身份分离：不匹配或停止未确认保持 unknown 与原 hold，复制主体、远程位置、未绑定模型及合同变化提前拒绝。真实 Codex `0.163.0` 内容/版本、隔离 profile、单 task MCP、能力边界与原生清理 **13/13**；合同套件 **18/18**。`cliTurnRequestsDispatched: 0`、`actualModelCalls: 0`。T32 以 integration 级别 passed，正式为 **0/20、30/63、M0 11/12**。不证明真实响应模型/权益/配额，未推送/发布。当前交接为 [HANDOFF-20261101-E134.md](HANDOFF-20261101-E134.md)。

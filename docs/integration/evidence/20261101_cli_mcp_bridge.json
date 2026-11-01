@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "961639612ef8002e612a1e5c70e799421f3379bf",
+  "parentEvidence": "docs/integration/evidence/20261027_m0_cli_runtime.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T33 criteria are covered. A signed private bootstrap scopes a real grandchild MCP connection to one task lease and lists only granted tools. Spoofed arguments, unrelated same-user peers and out-of-scope capabilities are rejected. Host-only machine secrets cannot be requested by a Bot or exposed in public projections. Revocation and close end the bridge and reclaim the native process tree. The default product uses the same Task/operation and SQLite authority; the installed Codex protocol separately proves the genuine vendor app-server bridge without inference.",
+  "productAcceptance": "T33 passes at integration level. The CLI native MCP bridge lists only authorized capabilities, holds short-lived identity, cannot access other Bots/machines/secrets and becomes invalid on exit. Formal scores are 0/20 work packages, 31/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {},
+  "implementation": [
+    "No product code changed. Existing signed bootstrap, authority leases, host-only machine secrets and CLI Task composition enforce the boundary.",
+    "Current native bridge, product machine, secret and Task suites were rerun together with the already verified installed Codex protocol."
+  ],
+  "testRuns": [
+    "CLI runtime native + CLI execution + remote machines + machine secrets: 28 tests / 28 pass / 0 fail.",
+    "The real grandchild MCP connection lists only own_ping, rejects other_bot_secret and botId substitution, records one authorized call and rejects an unrelated peer.",
+    "Installed Codex protocol evidence remains 13/13 with zero turn dispatch and native process reclamation.",
+    "Latest complete root regression remains E133: 1980 tests / 1892 pass / 0 fail / 88 skipped; check:client OK."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "The bridge and profile are application-level controls, not OS-wide same-account read isolation.",
+    "No real model inference, real credentials, production profile, push or release was used."
+  ]
+}
