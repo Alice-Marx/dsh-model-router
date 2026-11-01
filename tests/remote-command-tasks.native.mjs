@@ -12,6 +12,10 @@ import { createTaskService } from '../packages/orchestration/src/task-service.mj
 import { createRemoteWriteBackend } from '../packages/orchestration/src/remote-execution.mjs'
 import { createRemoteCommandBackend } from '../packages/orchestration/src/remote-command-execution.mjs'
 import { parseRemoteTaskCommand, parseTaskPlan, taskHash } from '../packages/orchestration/src/task-contract.mjs'
+import { createCliReadBackend } from '../packages/orchestration/src/cli-execution.mjs'
+import { openSqliteRouterState } from '../packages/orchestration/src/sqlite-router-state.mjs'
+import { createRouterState } from '../.dsh-plugin/shared/router-state.mjs'
+import { capabilityProbe, nativeProcess } from '../packages/cli-runtime/src/native-process.mjs'
 await import('../remote-computer-agent/build.mjs')
 const { Agent, serve, TOOL_NAMES, CONTAINER_IMAGE } = await import('../remote-computer-agent/dist/index.mjs')
 
@@ -19,10 +23,47 @@ const owner = { kind: 'owner' }
 const root = resolve('tmp/integration/remote-command-tasks'); await mkdir(root, { recursive: true })
 const docker = process.platform === 'linux' && process.env.DSH_TEST_DOCKER === '1'
 const real = (name, fn) => test(name, { skip: !docker, timeout: 90_000 }, fn)
-const all = ['task/submit','task/execute','task/read','task/cancel','task/retry','task/reconcile',...TOOL_NAMES.map(t=>'remote/'+t)]
+const all = ['task/submit','task/execute','task/read','task/cancel','task/retry','task/reconcile','cli/codex','cli/cancel','cli/read','cli/retry',...TOOL_NAMES.map(t=>'remote/'+t)]
 const machineTools = ['machine_ping','fs_read','fs_write','operation_status','operation_cancel','container_command_v1']
+const model = { provider: 'fixture', model: 'gpt-exact' }
 
 async function wait(check){const end=Date.now()+20000;while(Date.now()<end){const value=await check();if(value)return value;await sleep(10)}throw Error('Remote command fixture did not settle')}
+
+async function attachOfflineCli(t, f) {
+  const home = join(f.dir, 'cli-home'); await mkdir(join(home, 'tmp'), { recursive: true })
+  const probe = await capabilityProbe({ home }); assert.equal(probe.available, true, probe.reason)
+  const legacyFile = join(f.dir, 'cli-legacy.json'); await createRouterState({ file: legacyFile }).saveHealth(null)
+  f.cliStore = await openSqliteRouterState({ Database, file: join(f.dir, 'cli-ledger.sqlite'), legacyFile })
+  f.cliSessions = []
+  const sessionFactory = async options => {
+    const proc = nativeProcess(probe.helper, 'supervise', { executable: process.execPath, args: [resolve('tests/cli-runtime-fixture.mjs')], cwd: home, ttlMs: 60_000 }, { home })
+    const root = await proc.waitControl('spawned')
+    const record = { proc, rootPid: root.pid, descendantPid: null, stopped: null }
+    f.cliSessions.push(record)
+    const snapshot = { terminal: null, finalText: '', cliTurnRequestsDispatched: 1, actualProviderRequestCount: null,
+      usage: { inputTokens: 11, outputTokens: 5, cachedInputTokens: null, cacheWriteInputTokens: null },
+      identity: { requestedCliModel: 'gpt-exact', reportedCliModel: 'gpt-exact', reportedProvider: 'openai', verification: 'cli-configured-model', actualResponseModelVerified: false, reroutes: [] } }
+    return {
+      async run() {
+        await options.onBeforeRequest(); await options.onUsage(snapshot)
+        const started = new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('CLI child tree did not start')), 15_000)
+          proc.events.on('message', value => { if (value.type === 'child-started') { clearTimeout(timer); record.descendantPid = value.pid; resolve() } })
+        })
+        await proc.send({ op: 'tree' }); await started
+        await new Promise(done => { if (options.signal.aborted) done(); else options.signal.addEventListener('abort', done, { once: true }) })
+        snapshot.terminal = 'interrupted'; throw new Error('offline CLI cancelled')
+      },
+      async close() {
+        if (!record.stopped) { const stopped = proc.waitControl('stopped'); proc.end(); record.stopped = await stopped; await proc.exit }
+        return record.stopped
+      },
+      snapshot: () => structuredClone(snapshot),
+    }
+  }
+  f.cli = createCliReadBackend({ store: f.cliStore, authority: f.authority, directory: f.directory, model, requestedModel: 'gpt-exact', machineId: 'machine', workspaceId: 'workspace', workspace: f.dir, runtimeRoot: f.dir,
+    entry: { executable: process.execPath, sha256: 'a'.repeat(64), version: '0.163.0' }, billing: 'subscription', subscriptionMaxCalls: 100, sessionFactory })
+}
 
 /**
  * Real Agent over loopback HTTP with the real machine directory, journal and
@@ -30,7 +71,7 @@ async function wait(check){const end=Date.now()+20000;while(Date.now()<end){cons
  * coverage everywhere); `container:true` builds the fixed-image container
  * Agent for real dispatch coverage on a Docker Linux host.
  */
-async function fixture(t, { container = false } = {}) {
+async function fixture(t, { container = false, cli = false } = {}) {
   const dir = await mkdtemp(join(root, 'case-')), project = join(dir, 'project'); await mkdir(project)
   // Operator grant for the container worker (E71 contract): the fixture owns
   // this tree and prepares its own permissions; user projects are never touched.
@@ -45,22 +86,24 @@ async function fixture(t, { container = false } = {}) {
     if (tool === 'container_command_v1' && f.dropNext) { f.dropNext = false; await response.arrayBuffer(); throw Error('FIXTURE_LOST_RESPONSE') }
     return response
   }
-  function open() {
-    f.authority = createAuthority(); f.directory = createPrincipalDirectory(f.authority); for (const id of ['bot-a', 'bot-b']) f.directory.register(id, { tools: all, modelRoutes: [] })
+  async function open() {
+    f.authority = createAuthority(); f.directory = createPrincipalDirectory(f.authority); for (const id of ['bot-a', 'bot-b']) f.directory.register(id, { tools: all, modelRoutes: [model] })
+    if (cli && !f.cli) await attachOfflineCli(t, f)
     f.machines = openRemoteMachines({ Database, file: join(dir, 'machines.sqlite'), resolveSecret: async () => f.secret, botExists: id => ['bot-a', 'bot-b'].includes(id), authority: f.authority, fetchImpl })
     const command = createRemoteCommandBackend({ machines: () => f.machines, directory: f.directory, pollMs: 5 })
     const write = createRemoteWriteBackend({ machines: () => f.machines, directory: f.directory, pollMs: 5 })
-    f.journal = openTaskJournal(Database, join(dir, 'tasks.sqlite')); f.service = createTaskService({ journal: f.journal, authority: f.authority, directory: f.directory, backends: [command, write], concurrencyFor: () => 2, planTargetsFor: () => ['bot-a', 'bot-b'] }); f.service.start(); f.subject = f.directory.forBot('bot-a'); f.b = f.directory.forBot('bot-b')
+    const backends = f.cli ? [command, write, f.cli] : [command, write]
+    f.journal = openTaskJournal(Database, join(dir, 'tasks.sqlite')); f.service = createTaskService({ journal: f.journal, authority: f.authority, directory: f.directory, backends, concurrencyFor: () => 2, planTargetsFor: () => ['bot-a', 'bot-b'] }); f.service.start(); f.subject = f.directory.forBot('bot-a'); f.b = f.directory.forBot('bot-b')
   }
-  open()
+  await open()
   await f.machines.pair({ machineId: pair.machineId, name: 'Command fixture', endpoint: `http://127.0.0.1:${server.address.port}`, secretRef: 'ds-secret/FIXTURE_AGENT', roots: ['project.v1'], tools: machineTools, probeBotId: 'bot-a', expectedRevision: 0 }, owner)
   for (const botId of ['bot-a', 'bot-b']) await f.machines.bind({ machineId: pair.machineId, botId, expectedRevision: 0, roots: ['project.v1'], tools: container ? ['container_command_v1', 'operation_status', 'operation_cancel'] : machineTools, mode: 'workspace-write' }, owner)
   f.input = (extra = {}) => ({ machineId: pair.machineId, rootId: 'project.v1', workspaceRelativePath: '', argv: ['node', '-e', 'process.stdout.write("command-ok")'], timeoutMs: 20000, ...extra })
   f.submit = (key = 'command', extra = {}, subject = f.subject) => f.service.submit(subject, { requestKey: key, backend: 'remote-command', input: f.input(extra) })
   f.get = task => f.journal.get(task.ownerBotId, task.taskId)
   f.settled = task => wait(() => { const row = f.get(task); return ['succeeded','failed','cancelled','needs-reconciliation','blocked'].includes(row.state) && row })
-  f.restart = async () => { await f.service.close(); f.machines.close(); f.authority.dispose(); open() }
-  t.after(async () => { await f.service.close(); f.machines.close(); f.authority.dispose(); await server.close(); await agent.close() })
+  f.restart = async () => { await f.service.close(); f.machines.close(); f.authority.dispose(); await open() }
+  t.after(async () => { await f.service.close(); await f.cli?.facade.close(); await f.cliStore?.close(); f.machines.close(); f.authority.dispose(); await server.close(); await agent.close() })
   return f
 }
 
@@ -154,6 +197,35 @@ real('remote command: an unapproved executable alias is refused without starting
   assert.equal(done.state, 'failed')
   assert.equal(done.result.summary.code, 'EXECUTABLE_NOT_ALLOWED')
   assert.equal(f.agent.store.db.prepare('SELECT count(*) n FROM container_workers').get().n, 0)
+})
+
+real('mixed CLI and remote command plan: whole-tree cancellation stops both owned process trees and skips the join', async t => {
+  const f = await fixture(t, { container: true, cli: true })
+  const item = (id, effectClass, dependsOn = [], execution) => ({ id, targetBotId: 'bot-a', objective: id === 'remote' ? 'run the pinned node helper inside the container' : `offline ${id} assignment`, dependsOn, acceptance: ['original process tree stopped'], effectClass, ...(execution ? { execution } : {}) })
+  const plan = { schemaVersion: 1, taskId: 'mixed-cancel', origin: { kind: 'private', botId: 'bot-a', sessionId: null }, planRevision: 1, packages: [
+    item('cli', 'read'),
+    item('remote', 'workspace-write', [], { backend: 'remote-command', input: f.input({ argv: ['node', '-e', 'setInterval(()=>{},1000)'], timeoutMs: 30000 }) }),
+    item('later', 'read', ['cli', 'remote']),
+  ] }
+  const submitted = f.service.submitPlan(f.subject, { requestKey: 'mixed-cancel-key', plan })
+  await wait(() => f.cliSessions[0]?.descendantPid && f.agent.store.db.prepare("SELECT status FROM operations WHERE tool='container_command_v1'").get()?.status === 'running')
+  const requested = f.service.cancelPlan(f.subject, { planId: submitted.planId })
+  assert.equal(requested.state, 'cancelling')
+  const done = await wait(() => { const value = f.service.getPlan(f.subject, { planId: submitted.planId }); return value.state === 'cancelled' && value })
+  const child = id => done.packages.find(value => value.id === id)
+  assert.equal(child('cli').state, 'cancelled'); assert.equal(child('remote').state, 'cancelled'); assert.equal(child('later').state, 'skipped')
+  const cli = f.service.get(f.subject, { taskId: child('cli').taskId }), remote = f.service.get(f.subject, { taskId: child('remote').taskId })
+  assert.equal(cli.attempts.length, 1); assert.equal(remote.attempts.length, 1)
+  assert.equal(child('cli').result.summary.stopConfirmed, true); assert.equal(child('cli').result.summary.stopEvidence, 'native-tree')
+  assert.equal(child('remote').result.summary.stopConfirmed, true); assert.equal(child('remote').result.summary.stopEvidence, 'container-supervisor')
+  assert.equal(f.cliSessions.length, 1, 'the skipped join never creates another CLI process')
+  assert.equal(f.agent.store.db.prepare("SELECT count(*) n FROM operations WHERE tool='container_command_v1'").get().n, 1)
+  const alive = async pid => {
+    try { return (await readFile(`/proc/${pid}/stat`, 'utf8')).split(') ')[1].split(' ')[0] !== 'Z' }
+    catch (error) { if (error.code === 'ENOENT') return false; throw error }
+  }
+  await wait(async () => !(await alive(f.cliSessions[0].rootPid)) && !(await alive(f.cliSessions[0].descendantPid)))
+  await wait(() => f.agent.workspaces.list().length === 0)
 })
 
 test('remote command plan: workspace-write plans accept the command execution and other shapes refuse it', async () => {

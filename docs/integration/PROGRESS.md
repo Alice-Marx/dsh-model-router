@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E123 T12 混合 CLI／远程命令整树取消验收闭合
+
+[E123](evidence/20261101_mixed_command_tree_cancellation.json) 新增同一真实 Task 计划的混合场景：离线 CLI 原生父子进程与 Linux Docker 远程命令并行，整树取消后两个运行包均 cancelled、原 attempt 各一次，join 为 skipped。CLI 的 `native-tree` 证明及 `/proc` 父子 PID 结束核对通过；远程 `container-supervisor` 证明及单原 operation 保持。未确认停止仍 cancelling 且禁止重试。Ubuntu 相关组合 **34/34**，Windows **28 通过、0 失败、6 个 Linux-only 跳过**。T12 以 integration 级别 passed，正式为 **0/20、19/63、M0 11/12**；W08 场景已齐但需先闭合 W07/T06。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E123.md](HANDOFF-20261101-E123.md)。
+
 ## 2026-11-01：E122 T07 同一派活重复投递验收闭合
 
 [E122](evidence/20261101_assignment_replay_acceptance.json) 在真实 rc.3 Host 分离验证 UI HTTP 重发、独立重复 `message_bot` 和真实重启后的 replay：三者均返回原回执或当前 Task，不重复 worker 投递。冷启动重复 `bot_task_start` 保留当前 Task/operation，原提交与显式重试形成的两个 attempt 不增加，后端调用为零。T07 以 integration 级别 passed，正式为 **0/20、18/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E120 的 1977/1892/0/83，本轮未重跑全量。0 真实模型推理，未推送/发布。当前交接为 [HANDOFF-20261101-E122.md](HANDOFF-20261101-E122.md)。
