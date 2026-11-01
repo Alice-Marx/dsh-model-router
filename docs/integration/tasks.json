@@ -2050,16 +2050,17 @@
     },
     {
       "id": "T62",
-      "status": "partial",
+      "status": "passed",
       "evidence": [
         "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
         "docs/integration/evidence/20261027_m7_bot_funding_admission.json",
-        "docs/integration/evidence/20261030_installed_cli_protocol.json"
+        "docs/integration/evidence/20261030_installed_cli_protocol.json",
+        "docs/integration/evidence/20261101_role_separation_acceptance.json"
       ],
-      "level": "actual rc.3 host / offline fixture model",
-      "environment": "Real rc.3 host with an offline fixture model; actualModelCalls is 0 in every evidence file",
-      "notes": "All verification this project uses an offline fixture provider and records actualModelCalls: 0; the GPT-only constraint and the rule that mock evidence never claims real inference are stated in the plan and carried in every evidence file. Real inference acceptance is explicitly the user side. E60: official installed Codex0.163.0 normal initialization/native-MCP/close13 passes on all3OS. No credentials or turns; configuration identity is synthetic, not real model/backend/entitlement/billing proof. Startup HTTP attempts are explicitly refused by the local403 sink. Latest human AGENTS authorizes StepCode/Step Plan development and supersedes historical GPT-only routing; development assistance is separate from0 product model calls.",
-      "verifiedOn": "2026-10-30"
+      "level": "integration",
+      "environment": "Real rc.3 Host with Host-owned Bot identities and offline fixture model; local browser screenshots; zero real model calls",
+      "notes": "Product Bot principals, grants and workspaces remain separate from IDE/reviewer roles. Current probes record actualModelCalls=0; UI screenshot capture did not delegate externally, elevate privileges or publish. Development assistance is documented separately from product inference.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T63",

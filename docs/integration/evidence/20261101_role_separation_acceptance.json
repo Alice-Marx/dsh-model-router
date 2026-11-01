@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "parentCheckpoint": "9ddf9f8ae969b1feeea166392fcce8f8f663ac36",
+  "parentEvidence": "docs/integration/evidence/20261030_installed_cli_protocol.json",
+  "actualModelCalls": 0,
+  "level": "integration",
+  "componentAcceptance": "All T62 criteria are covered. Product Bots have Host-owned identities, Sessions, model/tool grants and private workspaces, separate from the IDE/reviewer identity. Real product evidence uses only the declared offline fixture provider; no IDE or external reviewer identity is injected into a Bot. Browser screenshot collection did not invoke an external coding agent, change permissions or publish anything. Human/IDE development assistance is documented separately from product model invocation; every current acceptance probe records actualModelCalls=0.",
+  "productAcceptance": "T62 passes at integration level. Product Bot authorization is independent of IDE/external review roles, screenshots do not confer delegation or release authority, and no product model call occurred. Formal scores are 0/20 work packages, 26/63 scenarios and M0 11/12.",
+  "sourceGitBlobs": {},
+  "implementation": [
+    "No product code changed. Existing Host-owned Bot principals, capability grants and offline fixture adapters enforce role separation.",
+    "Real UI screenshots were gathered by the local browser tool without external agent delegation or release action.",
+    "Human-approved development tooling remains outside the product's model and authorization boundary; product evidence does not claim real inference."
+  ],
+  "testRuns": [
+    "Default product and workflow probes: actualModelCalls=0; Bots use their own exact model and tool grants.",
+    "Wide/narrow browser evidence: local screenshots only, no external delegation, Git push, npm publish or GitHub Release.",
+    "Installed CLI protocol evidence: actual normal initialization/MCP/close on three platforms with zero credentials, turns or real model/backend/entitlement claims.",
+    "Latest complete root regression remains E127: 1980 tests / 1892 pass / 0 fail / 88 skipped; check:client OK."
+  ],
+  "preservedFailures": [],
+  "limitations": [
+    "This validates role separation and the absence of product model calls, not real provider inference or a future authorized release.",
+    "No production user profile, real credential, external agent, push or release was used."
+  ]
+}

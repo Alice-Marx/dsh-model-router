@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E130 T62 研发与产品角色分离验收闭合
+
+[E130](evidence/20261101_role_separation_acceptance.json) 核对产品 Bot 的宿主身份、Session、模型/工具授权和私有工作区均独立于 IDE/外部评审角色；全部当前产品探针使用离线 fixture 并记录 `actualModelCalls: 0`。宽窄截图仅由本机浏览器采集，未触发外部 agent、提权、推送或发布。T62 以 integration 级别 passed，正式为 **0/20、26/63、M0 11/12**。无产品代码变化，最近完整根回归仍为 E127 的 1980/1892/0/88，`check:client` OK。未推送/发布。当前交接为 [HANDOFF-20261101-E130.md](HANDOFF-20261101-E130.md)。
+
 ## 2026-11-01：E129 T01 固定 DSH 下 DS/MR 生命周期加载闭合
 
 [E129](evidence/20261101_lifecycle_loading_acceptance.json) 汇总当前真实证据：默认插件在 DSH rc.3/冻结 DS 启动，AgentLoop、Session、工具/审批与 Task 控制经冷启动验证；真实孙子进程 MCP 连接成功且异己 peer 拒绝；search Loader 配置/替换/禁用与完整客户端特性加载通过。组合 **29/29**，源完整性 **297 文件零偏差**；默认 Host 的刻意离线故障日志保留。T01 以 integration 级别 passed，正式为 **0/20、25/63、M0 11/12**。无产品代码变化，最近完整根回归为 E127 的 1980/1892/0/88，`check:client` OK。未推送/发布。当前交接为 [HANDOFF-20261101-E129.md](HANDOFF-20261101-E129.md)。
