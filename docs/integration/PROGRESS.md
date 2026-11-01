@@ -1,5 +1,9 @@
 # 一体化工程进度
 
+## 2026-11-01：E149 0.26.0-preview.0 已发布并在线核验，CI 后续开放
+
+[E149](evidence/20261101_preview_release_0_26_0.json) `v0.26.0-preview.0` 固定于 `de1ae86`，npm 使用 `preview`，`latest` 保持 `0.25.5`；GitHub 为 prerelease。272 个包文件与 Git 全部一致，隔离安装可加载真实入口，npm/GitHub 匿名下载 SHA-256 均为 `16d678edbdc190111f5c414a58a201872fb9b4f3fab03609af4e95818b7df1fd`。本地完整回归 **1989/1901/0/88**、客户端 OK。CI `41307437999` 失败：根 `jsdom`、Chromium 与 Windows SQLite 编译环境待修；T52 未通过，T58 仅 partial 且需补 F 差分。正式 **0/20、44/63、M0 11/12**，不是 stable 或生产迁移发布。当前交接为 [HANDOFF-20261101-E149.md](HANDOFF-20261101-E149.md)。
+
 ## 2026-11-01：E148 T48/T49 迁移完整性与失败恢复验收闭合
 
 [E148](evidence/20261101_migration_restore_crash.json) 使用真实子进程在首个数据域发布后、账本发布后分别 `exit(86)`，新进程均续跑成功；字节、schema 5 逻辑导出、Bot 归属和 unknown 一致，收据不重复，后续重放不写入。结合既有域语义审计、旧写者拒绝、前向 schema 与最新数据导出，T48/T49 以 integration 级别 passed，正式为 **0/20、44/63、M0 11/12**。原生崩溃 **2/2**、恢复组件 **6/6**；完整根回归 **1989 项：1901 通过、0 失败、88 跳过**，`check:client` OK。未声称生产激活、全域停写或激活后回退，未推送/发布。当前交接为 [HANDOFF-20261101-E148.md](HANDOFF-20261101-E148.md)。

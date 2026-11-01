@@ -2037,8 +2037,14 @@
     },
     {
       "id": "T58",
-      "status": "not_run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "docs/integration/evidence/20261101_preview_release_0_26_0.json"
+      ],
+      "level": "actual preview publication and anonymous online byte verification",
+      "environment": "npm preview dist-tag and GitHub prerelease at de1ae86; stable latest remains 0.25.5",
+      "notes": "Preview naming, R/T status, known limits, platform boundaries and public artifacts are real; npm and GitHub download bytes match the 272-file Git-verified tarball. T52 remains open because CI run 41307437999 failed. T58 also needs an explicit F-difference appendix and CI follow-up, so it is not passed.",
+      "verifiedOn": "2026-11-01"
     },
     {
       "id": "T59",
