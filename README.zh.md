@@ -8,7 +8,7 @@
 
 想跟进版本更新？点右上角 **Watch → Custom → 勾选 Releases**（不必 Watching 全部活动）。
 
-**手动试用版：0.26.0-preview.1。** DS Bot + Model Router 一体化预发布版仅用于隔离试用，不用于生产配置自动升级。请先准备独立测试 profile/home 和备份，再在 **Harness Desktop → 插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.26.0-preview.1`。下文稳定版安装说明仍为 0.25.5，`latest` 不是试用通道。安装前阅读[试用指南](docs/releases/0.26.0-preview.1-trial.md)和[验证限制](docs/releases/0.26.0-preview.1-validation.md)。完整迁移激活、全域停写及激活后回滚仍不可用；本次不声称完成新的真实厂商或生产配置验收。
+**手动试用版：0.26.0-preview.2。** 本次兼容更新新增精确的 **0.2.1-rc.5** Host peer 版本，并将源码 SDK 固定到 rc.5；preview.1 在加载插件前即被 rc.5 拒绝。是否已发布以实际 registry 条目为准，本文不构成发布收据。DS Bot + Model Router 一体化预发布版仅用于隔离试用，不用于生产配置自动升级。请先准备独立测试 profile/home 和备份，再在 **Harness Desktop → 插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.26.0-preview.2`。下文稳定版安装说明仍为 0.25.5，`latest` 不是试用通道。安装前阅读[试用指南](docs/releases/0.26.0-preview.2-trial.md)和[验证限制](docs/releases/0.26.0-preview.2-validation.md)。完整迁移激活、全域停写及激活后回滚仍不可用；本次不声称完成新的真实厂商或生产配置验收。
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 

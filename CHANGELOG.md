@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0-preview.2 — 2026-11-03
+
+- Fix rc.5 Host refusing to load preview.1: add only the exact published 0.2.1-rc.5 peer version, retaining the historical supported versions and refusing unverified rc.4/rc.6/alpha versions.
+- Pin the source SDK graph to 0.2.1-rc.5 and regenerate the unified client against it. Add a regression that reproduces preview.1 rejection without changing the Host gate or granting an exemption.
+- Preserve the immutable preview.1 package, original failed gates and full acceptance boundaries. This is a compatibility repair, not completion of C1–C10, clean Desktop installation, hosted CI or real-provider acceptance.
+
+See the [validation report](docs/releases/0.26.0-preview.2-validation.md), [isolated trial guide](docs/releases/0.26.0-preview.2-trial.md) and [unresolved-work register](docs/releases/0.26.0-preview.2-unfinished-work.zh.md). Actual publication requires separately verified registry and GitHub release receipts.
+
 ## 0.26.0-preview.1 — 2026-11-03
 
 - Harden private migration directories with an owner-only Windows ACL and share one implementation across archive, restore and preview paths.
