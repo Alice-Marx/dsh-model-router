@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.0-preview.1 — 2026-11-03
+
+- Harden private migration directories with an owner-only Windows ACL and share one implementation across archive, restore and preview paths.
+- Refuse worktree integration after internal HEAD commits, keep native peer verification local, install the browser/SQLite test prerequisites in CI and use normalized scheduled-task configuration fingerprints.
+- Document the feature difference and remaining acceptance gates. Hosted CI native-peer tests are explicitly skipped, not passed.
+- Extend bounded captured-configuration migration diagnostics without enabling production migration, and harden managed terminal and remote CLI lifecycle handling.
+- Isolate upstream-inclusion test Git metadata with init/fetch/read-tree instead of copying a linked worktree pointer; preserve the original failing evidence.
+- Publish an opt-in trial guide with explicit install, clean-install, test and platform limitations. This preview does not turn open acceptance gates or timed-out tests into passes.
+
+This remains a non-stable preview, not a production migration or full-platform acceptance release. See the [0.26.0-preview.1 acceptance report](docs/releases/0.26.0-preview.1-validation.md).
+
 ## 0.26.0-preview.0 — 2026-11-01
 
 - Publish the integrated DS Bot + Model Router product as an explicitly non-stable preview: one plugin composition, stable Bot identities, exact-model authorization, private state, managed dependency tasks, unified accounting and remote machine/browser controls.

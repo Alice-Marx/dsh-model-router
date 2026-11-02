@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify, isDeepStrictEqual } from 'node:util'
+import { assertNoInclusionTransaction, validateIncludedIncrements, validateIncludedRegressionEvidence } from './integration-progress.mjs'
 
 const execute = promisify(execFile)
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -61,15 +62,15 @@ export function featureSources(feature, tree) {
   return { side, files }
 }
 
-export async function buildInventory({ root = ROOT, dsRoot }) {
+export async function buildInventory({ root = ROOT, dsRoot, mrRoot = root, baseline: stagedBaseline }) {
   const base = join(root, 'docs/integration')
-  const baseline = JSON.parse(await readFile(join(base, 'baseline.json'), 'utf8'))
+  const baseline = stagedBaseline ?? JSON.parse(await readFile(join(base, 'baseline.json'), 'utf8'))
   const scope = JSON.parse(await readFile(join(base, 'scope.json'), 'utf8'))
   for (const side of ['MR', 'DS']) if (!/^[a-f0-9]{40}$/.test(baseline.repositories[side].commit)) throw new Error('Full frozen commit required')
   const { MR, DS } = baseline.repositories
   if ((await git(dsRoot, 'rev-parse', 'HEAD')).trim() !== DS.commit) throw new Error('DS checkout is not at the frozen commit')
   const [mrTree, dsTree] = await Promise.all([
-    git(root, 'ls-tree', '-r', '-l', MR.commit).then(parseTree),
+    git(mrRoot, 'ls-tree', '-r', '-l', MR.commit).then(parseTree),
     git(dsRoot, 'ls-tree', '-r', '-l', DS.commit).then(parseTree),
   ])
   const features = scope.features.map(feature => {
@@ -81,7 +82,7 @@ export async function buildInventory({ root = ROOT, dsRoot }) {
   })
   const namedToolRegistrations = []
   for (const [repository, directory, commit, paths] of [
-    ['MR', root, MR.commit, ['.dsh-plugin/index.mjs']],
+    ['MR', mrRoot, MR.commit, ['.dsh-plugin/index.mjs']],
     ['DS', dsRoot, DS.commit, [...dsTree.keys()].filter(path => path.startsWith('ds-bot/src/host/') && path.endsWith('.js'))],
   ]) {
     for (const path of paths) {
@@ -97,17 +98,43 @@ export async function buildInventory({ root = ROOT, dsRoot }) {
     features, namedToolRegistrations }
 }
 
-async function main(args) {
-  const index = args.indexOf('--ds-root')
-  if (index < 0 || !args[index + 1] || args.filter(item => item === '--write').length > 1
-    || args.length !== (args.includes('--write') ? 3 : 2)) {
-    throw new Error('Usage: node scripts/integration-inventory.mjs --ds-root <frozen-checkout> [--write]')
+function parseMainArgs(args) {
+  const options = { root: ROOT, write: false }
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]
+    if (arg === '--write') {
+      if (options.write) throw new Error('Duplicate --write')
+      options.write = true
+      continue
+    }
+    if (!['--root', '--mr-root', '--ds-root'].includes(arg) || !args[index + 1] || args[index + 1].startsWith('--')) {
+      throw new Error('Usage: node scripts/integration-inventory.mjs --ds-root <frozen-checkout> [--root <project-root>] [--mr-root <mr-checkout>] [--write]')
+    }
+    const key = { '--root': 'root', '--mr-root': 'mrRoot', '--ds-root': 'dsRoot' }[arg]
+    if (options[key] !== undefined && (key !== 'root' || options.root !== ROOT)) throw new Error(`Duplicate ${arg}`)
+    options[key] = resolve(args[index + 1])
+    index += 1
   }
-  const result = await buildInventory({ dsRoot: resolve(args[index + 1]) })
-  const file = join(ROOT, 'docs/integration/feature-inventory.json')
-  if (args.includes('--write')) await writeFile(file, JSON.stringify(result, null, 2)+'\n')
-  else if (!isDeepStrictEqual(JSON.parse(await readFile(file, 'utf8')), result)) throw new Error('Source inventory differs from frozen Git blobs; review before updating')
-  process.stdout.write(`Frozen inventory ${args.includes('--write') ? 'written' : 'verified'}: ${result.features.length} groups, ${result.namedToolRegistrations.length} static registrations.\n`)
+  if (!options.dsRoot) throw new Error('Usage: node scripts/integration-inventory.mjs --ds-root <frozen-checkout> [--root <project-root>] [--mr-root <mr-checkout>] [--write]')
+  return options
+}
+
+async function main(args) {
+  const options = parseMainArgs(args)
+  await assertNoInclusionTransaction(options.root)
+  const base = join(options.root, 'docs/integration')
+  const read = async name => JSON.parse(await readFile(join(base, name), 'utf8'))
+  const [baseline, inventory, includedIncrements] = await Promise.all([
+    read('baseline.json'), read('feature-inventory.json'), read('included-increments.json'),
+  ])
+  validateIncludedIncrements({ baseline, inventory, includedIncrements })
+  await validateIncludedRegressionEvidence(options.root, includedIncrements)
+  const result = await buildInventory(options)
+  validateIncludedIncrements({ baseline, inventory: result, includedIncrements })
+  const file = join(base, 'feature-inventory.json')
+  if (options.write) await writeFile(file, JSON.stringify(result, null, 2)+'\n')
+  else if (!isDeepStrictEqual(inventory, result)) throw new Error('Source inventory differs from frozen Git blobs; review before updating')
+  process.stdout.write(`Frozen inventory ${options.write ? 'written' : 'verified'}: ${result.features.length} groups, ${result.namedToolRegistrations.length} static registrations; included increments ${includedIncrements.increments.length}.\n`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

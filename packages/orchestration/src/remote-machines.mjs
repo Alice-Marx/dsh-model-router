@@ -2,11 +2,13 @@ import { randomUUID, createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
-export const REMOTE_TOOLS = Object.freeze(['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1',
+export const REMOTE_TOOLS = Object.freeze(['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1','cli_probe_v1','cli_task_v1',
   'operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate',
   'browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close',
   'desktop_screenshot','desktop_click','desktop_type','desktop_key','desktop_scroll'])
-const readonly = new Set(['machine_ping','fs_list','fs_read','operation_status','artifact_stat','artifact_read','worktree_diff','browser_snapshot'])
+// Cancelling an owned operation does not grant workspace mutation. Read-only CLI
+// tasks require this explicit control permission so their process can be stopped.
+const readonly = new Set(['machine_ping','fs_list','fs_read','cli_probe_v1','cli_task_v1','operation_status','operation_cancel','artifact_stat','artifact_read','worktree_diff','browser_snapshot'])
 const ref = value => typeof value === 'string' && /^[-A-Za-z0-9_.]{1,128}$/.test(value)
 const fail = code => { throw Object.assign(new Error(code), { code }) }
 const owner = context => { if (context?.kind !== 'owner') fail('REMOTE_OWNER_REQUIRED') }
@@ -24,8 +26,12 @@ export function normalizeMachineEndpoint(value, protectedTunnel = false) {
 }
 
 /** Host metadata only. Long-lived credentials stay in the existing DS secret UI. */
-export function openRemoteMachines({ Database, file, resolveSecret, botExists, authority, onChanged = () => {}, now = Date.now, fetchImpl = fetch }) {
+export function openRemoteMachines({ Database, file, resolveSecret, botExists, authority, cliProfiles = [], onChanged = () => {}, now = Date.now, fetchImpl = fetch }) {
   if (typeof Database !== 'function' || typeof resolveSecret !== 'function' || typeof botExists !== 'function') throw new TypeError('REMOTE_MACHINE_SERVICES_REQUIRED')
+  if (!Array.isArray(cliProfiles) || cliProfiles.length > 64 || new Set(cliProfiles.map(p=>`${p?.machineId}/${p?.rootId}`)).size !== cliProfiles.length
+    || cliProfiles.some(p=>!p||!['machineId','rootId','profileId'].every(k=>ref(p[k]))||!Number.isSafeInteger(p.profileRevision)||p.profileRevision<1
+      ||!/^[a-f0-9]{64}$/.test(p.entry?.sha256??'')||!/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(p.entry?.version??''))) throw new TypeError('REMOTE_CLI_PROFILES_INVALID')
+  cliProfiles=Object.freeze(cliProfiles.map(p=>Object.freeze({machineId:p.machineId,rootId:p.rootId,profileId:p.profileId,profileRevision:p.profileRevision,entry:Object.freeze({sha256:p.entry.sha256,version:p.entry.version})})))
   if (file !== ':memory:') { file = resolve(file); mkdirSync(dirname(file), { recursive: true }) }
   const db = new Database(file)
   db.pragma('busy_timeout=5000'); db.pragma('journal_mode=WAL'); db.pragma('synchronous=FULL')
@@ -57,7 +63,11 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
     try { while (true) { const item = await reader.read(); if (item.done) break; bytes += item.value.byteLength; if (bytes > 2 * 1024 * 1024) fail('MACHINE_RESPONSE_LIMIT'); chunks.push(Buffer.from(item.value)) } }
     finally { await reader.cancel().catch(() => {}) }
     let value; try { value = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { fail('MACHINE_PROTOCOL_INVALID') }
-    if (!response.ok) fail(/^[A-Z][A-Z0-9_]{0,80}$/.test(value?.error?.code) ? value.error.code : 'MACHINE_CONNECTION_FAILED')
+    if (!response.ok) {
+      const code=/^[A-Z][A-Z0-9_]{0,80}$/.test(value?.error?.code) ? value.error.code : 'MACHINE_CONNECTION_FAILED'
+      const retry=response.headers.get('retry-after'),seconds=/^[0-9]{1,2}$/.test(retry??'')?Number(retry):0
+      throw Object.assign(new Error(code),{code,...(response.status===429&&code==='AUTH_RATE_LIMIT'&&seconds>0&&seconds<=60?{retryAfterMs:seconds*1000}:{})})
+    }
     return value
   }
   const request = async (config,path,token,body,signal) => {
@@ -180,12 +190,21 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       return {remoteRevoked:results.every(r=>r.status==='fulfilled'),grantsRestored:false,...(results.some(r=>r.status==='rejected')?{warning:'REMOTE_REVOCATION_UNCONFIRMED'}:{})}
     },
     taskTarget(subject,input,{observe=false}={}) {
-      alive();keys(input,['machineId','rootId','tool'])
+      alive();keys(input,['machineId','rootId','tool','profileId','profileRevision','entry','workspaceRelativePath','model'])
       const botId=authority.describe(subject).botId,record=machine(input.machineId),grant=binding(record.id,botId)
       if(!grant.scope.roots.includes(input.rootId)||!grant.scope.tools.includes('operation_status'))fail('MACHINE_BOT_DENIED')
       const mutating=input.tool??'fs_write'
-      if(mutating!=='fs_write'&&mutating!=='container_command_v1')fail('INVALID_MACHINE_REQUEST')
-      if(!observe&&(grant.scope.mode!=='workspace-write'||![mutating,'operation_cancel'].every(t=>grant.scope.tools.includes(t))))fail('MACHINE_BOT_DENIED')
+      if(!['fs_write','container_command_v1','cli_probe_v1','cli_task_v1'].includes(mutating))fail('INVALID_MACHINE_REQUEST')
+      const cli=mutating==='cli_probe_v1'||mutating==='cli_task_v1'
+      if(cli){
+        const profile=cliProfiles.find(p=>p.machineId===record.id&&p.rootId===input.rootId&&p.profileId===input.profileId)
+        if(!profile||profile.profileRevision!==input.profileRevision||profile.entry.sha256!==input.entry?.sha256||profile.entry.version!==input.entry?.version
+          ||typeof input.workspaceRelativePath!=='string'||input.workspaceRelativePath.length>2048
+          ||!['cli_probe_v1','cli_task_v1','operation_status','operation_cancel'].every(t=>grant.scope.tools.includes(t)))fail('MACHINE_BOT_DENIED')
+        authority.assertTool(subject,'cli/codex')
+        if(!input.model||typeof input.model.provider!=='string'||typeof input.model.model!=='string')fail('CLI_MODEL_BINDING_REQUIRED')
+        authority.assertModel(subject,input.model.provider,input.model.model)
+      }else if(!observe&&(grant.scope.mode!=='workspace-write'||![mutating,'operation_cancel'].every(t=>grant.scope.tools.includes(t))))fail('MACHINE_BOT_DENIED')
       authority.assertTool(subject,observe?'remote/operation_status':'remote/'+mutating)
       return {machineId:record.id,rootId:input.rootId,remoteMachineRevision:record.revision,remoteBindingRevision:grant.revision}
     },
@@ -199,7 +218,8 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       const record=machine(input.machineId), grant=binding(record.id,botId)
       if(expectedTarget&&(expectedTarget.machineId!==record.id||expectedTarget.rootId!==input.rootId||expectedTarget.remoteMachineRevision!==record.revision||expectedTarget.remoteBindingRevision!==grant.revision))fail('MACHINE_GRANT_CHANGED')
       if(!grant.scope.tools.includes(input.tool)||!grant.scope.roots.includes(input.rootId)) fail('MACHINE_BOT_DENIED')
-      if(!plain(input.args)||['botId','taskId','attemptId','clientId','grantToken','secretRef','endpoint'].some(k=>Object.hasOwn(input.args,k))) fail('MACHINE_CONTEXT_FORGED')
+      if(!plain(input.args)||['botId','taskId','attemptId','clientId','grantToken','secretRef','endpoint'].some(k=>Object.hasOwn(input.args,k))
+        ||['cli_probe_v1','cli_task_v1'].includes(input.tool)&&['credentialRef','credentials','executable','runtimeRoot','env','argv'].some(k=>Object.hasOwn(input.args,k))) fail('MACHINE_CONTEXT_FORGED')
       const observation=['operation_status','operation_cancel'].includes(input.tool)
       if(observation? !ref(input.operationId)||input.args.operationId!==input.operationId: Object.hasOwn(input.args,'operationId'))fail('MACHINE_CONTEXT_FORGED')
       if(input.args.rootId&&input.args.rootId!==input.rootId||input.args.workspaceRef&&(input.args.workspaceRef.machineId!==record.id||input.args.workspaceRef.rootId!==input.rootId)) fail('MACHINE_BOT_DENIED')
@@ -221,7 +241,7 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       } finally { if(lease)authority.release(lease.token);active.delete(call) }
       }catch(error){
         const code=/^[A-Z][A-Z0-9_]{0,80}$/.test(error?.code??'')?error.code:'MACHINE_CONNECTION_FAILED'
-        throw Object.assign(new Error(error?.message??code),{code,remoteDispatchNotSent:!sent,...(error?.details?{details:error.details}:{})})
+        throw Object.assign(new Error(error?.message??code),{code,remoteDispatchNotSent:!sent,...(error?.details?{details:error.details}:{}),...(Number.isSafeInteger(error?.retryAfterMs)&&error.retryAfterMs>0&&error.retryAfterMs<=60000?{retryAfterMs:error.retryAfterMs}:{})})
       }
     },
     async probe(input,context) {

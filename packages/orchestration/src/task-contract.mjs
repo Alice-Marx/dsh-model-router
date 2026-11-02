@@ -90,6 +90,15 @@ export function parseRemoteTaskCommand(value){
  return {machineId:v.machineId,rootId:v.rootId,workspaceRelativePath:v.workspaceRelativePath,argv:v.argv,timeoutMs:v.timeoutMs}
 }
 
+/** Fixed remote Codex read input; the Host owns profile, entry, model and funding. */
+export function parseRemoteTaskCli(value){
+ const v=closed(value,['machineId','rootId','workspaceRelativePath','task'])
+ for(const key of ['machineId','rootId'])if(typeof v[key]!=='string'||!/^[-A-Za-z0-9_.]{1,128}$/.test(v[key]))throw new PolicyError('INVALID_REMOTE_TASK_INPUT')
+ if(typeof v.workspaceRelativePath!=='string'||v.workspaceRelativePath.length>2048||/^[\\/]|[\0-\x1f\x7f\\:]/.test(v.workspaceRelativePath)||(v.workspaceRelativePath!==''&&v.workspaceRelativePath.split('/').some(p=>!p||p==='.'||p==='..')))throw new PolicyError('INVALID_REMOTE_TASK_PATH')
+ if(typeof v.task!=='string'||!v.task.trim()||v.task.includes('\0')||Buffer.byteLength(v.task)>16000)throw new PolicyError('INVALID_CLI_TASK_INPUT')
+ return {machineId:v.machineId,rootId:v.rootId,workspaceRelativePath:v.workspaceRelativePath,task:v.task}
+}
+
 /**
  * Parse a structured plan. Packages are dependency-graph nodes: the model
  * proposes objectives, acceptance and reasons, and the Host judges legality,

@@ -1,7 +1,7 @@
 /**
  * "官方工具终端" card: interactive sessions of the user's shell or a fixed
  * registry CLI, including standalone ZCode CLI, rendered
- * with xterm.js. The Host owns the process (PTY, or pipes as a fallback);
+ * with xterm.js. The Host owns the managed Windows tree or legacy PTY/pipe;
  * this card only shows output and forwards keystrokes.
  */
 import React from 'react'
@@ -19,6 +19,7 @@ import {
   startTerminal,
   terminalTargets,
   terminalInfoTools,
+  unwrapTerminal,
 } from './cli-terminal-state.mjs'
 import { remoteErrorText } from './host-version.mjs'
 
@@ -38,7 +39,7 @@ const THEME = Object.freeze({
 })
 
 /** One live session: an xterm instance wired to a TerminalConnection. */
-function TerminalPane({ api, session, active, onEnded }) {
+function TerminalPane({ api, session, active, onEnded, onStatus }) {
   const host = React.useRef(null)
   const [error, setError] = React.useState('')
   React.useEffect(() => {
@@ -56,6 +57,7 @@ function TerminalPane({ api, session, active, onEnded }) {
         term.write(`\r\n\x1b[90m[${endDescription(event)}]\x1b[0m\r\n`)
         onEnded(session.sessionId, event)
       },
+      onStatus: status => onStatus(session.sessionId, status),
       onError: failure => setError(errorText(failure, '终端通信失败。')),
     })
     // Ctrl+C copies when text is selected (like Windows Terminal); otherwise it interrupts.
@@ -166,9 +168,14 @@ export function CliTerminalCard({ api, health, settingsSignature = '' }) {
 
   const onEnded = React.useCallback((sessionId, event) => {
     if (!mounted.current) return
-    setSessions(previous => previous.map(item => item.sessionId === sessionId ? { ...item, ended: event } : item))
+    setSessions(previous => previous.map(item => item.sessionId === sessionId ? { ...item, ...event, ended: event } : item))
     void loadInfo()
   }, [loadInfo])
+
+  const onStatus = React.useCallback((sessionId, status) => {
+    if (!mounted.current) return
+    setSessions(previous => previous.map(item => item.sessionId === sessionId ? { ...item, ...status } : item))
+  }, [])
 
   const closeTab = sessionId => {
     setSessions(previous => {
@@ -178,7 +185,12 @@ export function CliTerminalCard({ api, health, settingsSignature = '' }) {
     })
   }
 
-  const stopSession = sessionId => { void api.terminalStop({ sessionId }) }
+  const stopSession = async sessionId => {
+    try {
+      const status = unwrapTerminal(await api.terminalStop({ sessionId }), '无法停止终端会话。')
+      onStatus(sessionId, status)
+    } catch { /* the read loop reports transport failures and the Host retains stop responsibility */ }
+  }
   const active = sessions.find(item => item.sessionId === activeId)
   const history = info.value?.history ?? []
 
@@ -227,18 +239,26 @@ export function CliTerminalCard({ api, health, settingsSignature = '' }) {
           {sessions.map(item => (
             <div key={item.sessionId} className="mr-term-tab" role="tab" aria-selected={item.sessionId === activeId}>
               <button type="button" className="mr-term-tab-label" onClick={() => setActiveId(item.sessionId)} title={`${item.display} · ${item.cwd}`}>
-                {item.label}{item.mode === 'login' ? ' · 登录' : ''}{item.ended ? ' · 已结束' : ''}
+                {item.label}{item.mode === 'login' ? ' · 登录' : ''}{item.ended
+                  ? (item.stopRequested && !item.stopConfirmed ? ' · 已退出（派生进程未确认）' : ' · 已结束')
+                  : item.stopRequested
+                    ? (item.exited ? ' · 宿主已退出（停止未确认）' : ' · 停止中')
+                    : (item.exited && item.treeTracking ? ' · 宿主已退出（后代待确认）' : '')}
               </button>
               {item.ended
                 ? <button type="button" className="mr-term-tab-close" aria-label="关闭标签" onClick={() => closeTab(item.sessionId)}>×</button>
-                : <button type="button" className="mr-term-tab-close" aria-label="结束会话" title="结束会话" onClick={() => stopSession(item.sessionId)}>■</button>}
+                : <button type="button" className="mr-term-tab-close" aria-label={item.stopRequested ? '停止未确认' : '结束会话'} title={item.stopRequested ? '停止已请求，等待实际退出' : '结束会话'} disabled={item.stopRequested} onClick={() => { void stopSession(item.sessionId) }}>■</button>}
             </div>
           ))}
         </div>}
-        {sessions.map(item => <TerminalPane key={item.sessionId} api={api} session={item} active={item.sessionId === activeId} onEnded={onEnded} />)}
-        {active && <p className="mr-caption">{active.ended ? endDescription(active.ended) : `${active.display} · ${active.cwd} · 选中文字后 Ctrl+C 复制，Ctrl+Shift+V 粘贴；拖动右下角可调整高度。`}</p>}
+        {sessions.map(item => <TerminalPane key={item.sessionId} api={api} session={item} active={item.sessionId === activeId} onEnded={onEnded} onStatus={onStatus} />)}
+        {active && <p className="mr-caption">{active.ended
+          ? endDescription(active.ended)
+          : active.stopRequested || (active.exited && active.treeTracking)
+            ? endDescription(active)
+            : `${active.display} · ${active.cwd} · 选中文字后 Ctrl+C 复制，Ctrl+Shift+V 粘贴；拖动右下角可调整高度。`}</p>}
 
-        {history.length > 0 && <details className="mr-term-history"><summary>最近的终端会话（只记录工具、目录和时长）</summary>
+        {history.length > 0 && <details className="mr-term-history"><summary>最近的终端会话（不记录输入、输出或环境变量）</summary>
           <table className="mr-term-table"><thead><tr><th>开始</th><th>工具</th><th>工作目录</th><th>时长</th><th>结果</th></tr></thead><tbody>
             {history.map(item => <tr key={item.id}>
               <td>{item.startedAt ? new Date(item.startedAt).toLocaleString() : '—'}</td>

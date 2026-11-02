@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-02",
+  "workOrder": "K7",
+  "checkpoint": "E152",
+  "parentCheckpoint": "E151",
+  "parentHead": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+  "actualModelCalls": 0,
+  "level": "local diagnostic correction and regression evidence only; not activation, stop-write or production acceptance",
+  "componentAcceptance": "C9's fixed denial reason now matches the existing product admission implementation: unified product writers participate in the migration shared gate, but legacy, unknown, other-launcher, other-account, remote and restart writers are not proven to be in the closure.",
+  "productAcceptance": "No formal acceptance changed. C9 remains false, every C1-C10 criterion remains false, and formal status remains 0/20 work packages, 44/63 scenarios, M0 11/12 and G1-G4 in_progress.",
+  "change": {
+    "criterion": "C9",
+    "previousReason": "GATE_NOT_WIRED_TO_PRODUCT_ADMISSION",
+    "currentReason": "PRODUCT_ADMISSION_PARTICIPANTS_ONLY",
+    "okBefore": false,
+    "okAfter": false,
+    "criteriaOrderChanged": false,
+    "productEntryChanged": false,
+    "gateChanged": false,
+    "stateMachineChanged": false
+  },
+  "capabilities": {
+    "activationSupported": false,
+    "postActivationRollbackSupported": false,
+    "stopWriteProvable": false
+  },
+  "testRuns": [
+    {
+      "command": "node --test tests/migration-commit-orchestration.test.mjs",
+      "exitCode": 0,
+      "tests": 15,
+      "pass": 14,
+      "fail": 0,
+      "skipped": 1,
+      "skipReason": "Linux /proc writer enumeration is unavailable on win32; existing conditional skip."
+    },
+    {
+      "command": "node --test tests/product-composition.test.mjs tests/migration-fence.native.mjs tests/migration-fence-hardening.native.mjs",
+      "exitCode": 0,
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "command": "node --test tests/migration-commit-orchestration.native.mjs",
+      "exitCode": 0,
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "tests": 2001,
+      "pass": 1913,
+      "fail": 0,
+      "skipped": 88,
+      "phases": [
+        { "tests": 1609, "pass": 1605, "fail": 0, "skipped": 4 },
+        { "tests": 392, "pass": 308, "fail": 0, "skipped": 84 }
+      ]
+    },
+    {
+      "command": "npm run check:client",
+      "exitCode": 0,
+      "result": "build-client OK"
+    },
+    {
+      "command": "npm run integration:check",
+      "exitCode": 0,
+      "result": "32 requirements, 40 features, 63 acceptance scenarios and 20 work packages valid"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "result": "No whitespace errors; working-copy line-ending warnings remain."
+    }
+  ],
+  "artifacts": [
+    "packages/orchestration/src/migration-commit-orchestration.mjs",
+    "tests/migration-commit-orchestration.test.mjs",
+    "tmp/integration/codex-takeover-k6/post-e151-activation-gate-audit.md",
+    "tmp/integration/codex-takeover-k7/"
+  ],
+  "limitations": [
+    "The unified product admission covers protocol participants only; it does not prove all legacy, third-party, other-account, remote or restart writers are stopped.",
+    "C1-C8 and C10 remain false; no criterion was completed by this correction.",
+    "No activate-to-committed path, authority switch, production rollback or all-domain consistency proof was added.",
+    "No real account, model, production profile, production data, remote machine, hosted CI, commit, push, tag or publication was used."
+  ]
+}

@@ -13,11 +13,12 @@ import {WorkspacePin} from './workspace-identity.js'
 import {WorkspaceAdmissions} from './workspace-admission.js'
 import {reconcileRootsGeneration,rootsGeneration} from './workspace-generation.js'
 import {pinnedCreateNewFile,pinnedWriteSupported} from './pinned-write.js'
+import {CliTasks,validateCliProfiles,type CliProfileConfig} from './cli-task.js'
 const execFileAsync=promisify(execFile)
-export type AgentConfig={dataDir:string;roots:Record<string,string>;executables?:Record<string,string>;shell?:string;windowsJobRunner?:string;browserOrigins?:string[];browserExecutablePath?:string;browserProfiles?:Record<string,string>;isolation?:'os-account'|'container'|'application';container?:ContainerCommandConfig;desktop?:{pipeName:string;secretFile:string}}
+export type AgentConfig={dataDir:string;roots:Record<string,string>;executables?:Record<string,string>;shell?:string;windowsJobRunner?:string;browserOrigins?:string[];browserExecutablePath?:string;browserProfiles?:Record<string,string>;isolation?:'os-account'|'container'|'application';container?:ContainerCommandConfig;desktop?:{pipeName:string;secretFile:string};cliProfiles?:CliProfileConfig[]}
 export class Agent {
-  store:Store;roots:Roots;browser:BrowserTools;desktop:DesktopTools;workspaces:WorkspaceAdmissions;container?:ContainerCommands;rootsGeneration:string;private processes=new Map<string,any>();private jobs=new Map<string,Promise<any>>();private desktopJobs=new Map<string,{context:Context;cancel:(why:string)=>Promise<void>}>();private cancelRequested=new Set<string>();private writes=new Set<string>();private authTimer:any
-  constructor(public config:AgentConfig,Database?:any){this.store=new Store(resolve(config.dataDir),Database);this.roots=new Roots(config.roots,{protectedPaths:[resolve(config.dataDir),...(config.desktop?[resolve(config.desktop.secretFile)]:[])]});this.browser=new BrowserTools(config.browserOrigins??[],config.browserExecutablePath,undefined,config.browserProfiles);this.desktop=new DesktopTools(config.desktop,{validate:c=>this.store.validate(c)})
+  store:Store;roots:Roots;browser:BrowserTools;desktop:DesktopTools;workspaces:WorkspaceAdmissions;container?:ContainerCommands;cliTasks:CliTasks;rootsGeneration:string;private processes=new Map<string,any>();private jobs=new Map<string,Promise<any>>();private desktopJobs=new Map<string,{context:Context;cancel:(why:string)=>Promise<void>}>();private cancelRequested=new Set<string>();private writes=new Set<string>();private authTimer:any
+  constructor(public config:AgentConfig,Database?:any){const cliProfiles=validateCliProfiles(config.cliProfiles,config.dataDir,config.roots);this.store=new Store(resolve(config.dataDir),Database);this.roots=new Roots(config.roots,{protectedPaths:[resolve(config.dataDir),...(config.desktop?[resolve(config.desktop.secretFile)]:[])]});this.cliTasks=new CliTasks(cliProfiles,this.store,this.roots);this.browser=new BrowserTools(config.browserOrigins??[],config.browserExecutablePath,undefined,config.browserProfiles);this.desktop=new DesktopTools(config.desktop,{validate:c=>this.store.validate(c)})
     try{
      // Which roots configuration produced the persisted workspace state. A
      // changed mapping between runs fences unsettled admissions instead of
@@ -37,6 +38,7 @@ export class Agent {
   async call(name:string,args:any,c:Context,operationId?:string) {
     this.store.validate(c);if(!TOOL_NAMES.includes(name)||!c.tools.includes(name))fail('SCOPE_DENIED',403)
     if(args?.rootId&&!c.roots.includes(args.rootId))fail('SCOPE_DENIED',403)
+    if(name==='cli_probe_v1')return this.cliTasks.probe(args,c,operationId)
     if(name==='machine_ping')return {schemaVersion:1,machineId:this.store.machineId,agentVersion:AGENT_VERSION,agentApiMajor:AGENT_API_MAJOR,rootsGeneration:this.rootsGeneration,os:{platform:process.platform,arch:process.arch},node:process.version,isolation:this.config.isolation??'application',isolationStatus:this.container?'command-container':'configuration-only',container:this.container?await this.container.probe():null,capabilities:TOOL_NAMES.filter(n=>(!n.startsWith('desktop_')||!!this.config.desktop)&&(!this.container||!n.startsWith('worktree_'))),browser:await this.browser.probe(),shell:{configured:!!this.container||!!Object.keys(this.config.executables??{}).length||!!this.config.shell,processIsolation:this.container?'container':process.platform==='win32'?(this.config.windowsJobRunner?'job-object-configured':'unavailable'):'process-group'},desktop:{configured:!!this.config.desktop,status:this.config.desktop?'unverified':'unavailable'}}
     if(name==='operation_status'){if(this.container){await this.container.observe(args.operationId,c,(data,context)=>this.artifact(data,context,'text/plain'));this.store.validate(c)}return this.operationStatus(args.operationId,c)}
     if(name==='operation_cancel'){
@@ -65,6 +67,17 @@ export class Agent {
     if(!isMutating(name))return this.execute(name,args,c)
     if(!operationId)fail('OPERATION_ID_REQUIRED');const admitted=this.store.admit(operationId,c,name,args);if(!admitted.fresh)return name==='fs_write'?this.operationStatus(operationId,c):admitted.operation
     this.store.running(operationId)
+    if(name==='cli_task_v1'){
+      const job=(async()=>{
+        let settled
+        try{settled=await this.cliTasks.run(args,c,operationId,{setProcess:record=>this.processes.set(operationId,record),clearProcess:()=>this.processes.delete(operationId)})}
+        catch(e:any){settled={status:'unknown',result:{kind:'remote-cli',schemaVersion:1,receipt:null,stopConfirmed:false,stopEvidence:{treeStopped:false,status:'unconfirmed'}},error:'OUTCOME_UNKNOWN'}}
+        this.jobs.delete(operationId);this.processes.delete(operationId);this.cancelRequested.delete(operationId)
+        this.store.finish(operationId,settled.status,settled.result,settled.error)
+        return this.operationStatus(operationId,c)
+      })().finally(()=>{this.jobs.delete(operationId);this.processes.delete(operationId);this.cancelRequested.delete(operationId)})
+      this.jobs.set(operationId,job);return this.store.status(operationId,c)
+    }
     if(name==='shell_exec'||name==='container_command_v1'){
       // The versioned command backend is container-only by construction: a
       // non-container Agent settles the operation as never-started instead of

@@ -369,7 +369,9 @@
         "docs/integration/evidence/20261029_migration_supporting_domains.json",
         "docs/integration/evidence/20261031_migration_writer_inventory.json",
         "docs/integration/evidence/20261031_migration_fence.json",
-        "docs/integration/evidence/20261031_migration_rollback_readiness.json"
+        "docs/integration/evidence/20261031_migration_rollback_readiness.json",
+        "docs/integration/evidence/20261102_e161_c6_domain_inventory.json",
+        "docs/integration/evidence/20261102_e162_c6_provider_selection.json"
       ],
       "steps": [
         {
@@ -407,7 +409,9 @@
             "docs/integration/evidence/20261029_migration_configuration_commit.json",
             "docs/integration/evidence/20261029_migration_supporting_domains.json",
             "docs/integration/evidence/20261101_migration_restore.json",
-            "docs/integration/evidence/20261101_migration_restore_crash.json"
+            "docs/integration/evidence/20261101_migration_restore_crash.json",
+            "docs/integration/evidence/20261102_e161_c6_domain_inventory.json",
+            "docs/integration/evidence/20261102_e162_c6_provider_selection.json"
           ]
         },
         {
@@ -1297,8 +1301,7 @@
       "level": "integration",
       "verifiedOn": "2026-11-01",
       "environment": "DSH 0.2.1-rc.3 and frozen DS on isolated Win11 Node24; actual Host, native MCP, Loader search and generated client; offline fixture model",
-      "notes": "Default plugin, real AgentLoop/Sessions, tools/approvals, native MCP, search settings and full client lifecycle load and survive restart. Related suites pass 29/29 and source integrity is 297 files with zero drift. Offline fixture errors are preserved in logs; production migration and deployment remain separate gates.",
-      "verifiedOn": "2026-11-01"
+      "notes": "Default plugin, real AgentLoop/Sessions, tools/approvals, native MCP, search settings and full client lifecycle load and survive restart. Related suites pass 29/29 and source integrity is 297 files with zero drift. Offline fixture errors are preserved in logs; production migration and deployment remain separate gates."
     },
     {
       "id": "T02",
@@ -1480,7 +1483,6 @@
       "verifiedOn": "2026-11-01",
       "environment": "Win11 / Node24.20.0 / SQLite13.0.3; real process-exit native suites and actual rc.3 default Host cold start",
       "notes": "Real process exits cover pre-dispatch, post-dispatch and receipt-persistence boundaries. Recovery restores the original attempt/operation, keeps unknown work unreplayed, restores committed receipts without another model call or invoice and preserves original artifacts. The actual default Host reconstructs Bot identity, grants, machines and bindings. Current revalidation has 67 passing checks; the journal suite was run through integration-task-probe with the verified SQLite driver as required. T13 criteria are covered without claiming production power-loss or every external provider exactly-once."
-
     },
     {
       "id": "T14",
@@ -1495,7 +1497,6 @@
       "verifiedOn": "2026-11-01",
       "environment": "Win11 / Node24.20.0 / SQLite13.0.3; real independent Agent process killed after a successful write and restarted on a new loopback port",
       "notes": "The real Agent commits the file and succeeded receipt before its process is killed. The Host then loses the reply and becomes needs-reconciliation with outcome unknown. After a normal Agent restart and endpoint re-pair, the Host reconciles the original operation to succeeded with exactly one fs_write call and one operation row; the file is unchanged. This covers the real network break/restore criterion without replaying the action. Other command and deployment scenarios remain separate."
-
     },
     {
       "id": "T15",
@@ -1783,8 +1784,7 @@
       "level": "integration",
       "verifiedOn": "2026-11-01",
       "environment": "Native budget/finance/model accounting with real process competition and default-product usage UI; offline fixtures",
-      "notes": "Atomic run/hold/archive reservations prevent duplicate balance use across connections/processes. Front and auxiliary receipts stay distinct; budget denial has no dispatch/receipt and unknown holds fail closed. Product separates actual, reserved and unknown amounts. Related 65+14 checks and default product 45 checks pass.",
-      "verifiedOn": "2026-11-01"
+      "notes": "Atomic run/hold/archive reservations prevent duplicate balance use across connections/processes. Front and auxiliary receipts stay distinct; budget denial has no dispatch/receipt and unknown holds fail closed. Product separates actual, reserved and unknown amounts. Related 65+14 checks and default product 45 checks pass."
     },
     {
       "id": "T39",
@@ -1815,8 +1815,7 @@
       "level": "integration",
       "verifiedOn": "2026-11-01",
       "environment": "Verified native SQLite driver with offline receipt/history fixtures; zero real model calls",
-      "notes": "Bot/auxiliary/CLI/MR and legacy sources each bill once. Prune/reload does not recount; failure/cancel preserves usage and charges. Revised receipts replace contribution, archived replay and rewrites fail closed, cold recovery adds no dispatch/invoice. Related suites pass 67/67.",
-      "verifiedOn": "2026-11-01"
+      "notes": "Bot/auxiliary/CLI/MR and legacy sources each bill once. Prune/reload does not recount; failure/cancel preserves usage and charges. Revised receipts replace contribution, archived replay and rewrites fail closed, cold recovery adds no dispatch/invoice. Related suites pass 67/67."
     },
     {
       "id": "T41",
@@ -2039,11 +2038,12 @@
       "id": "T58",
       "status": "partial",
       "evidence": [
-        "docs/integration/evidence/20261101_preview_release_0_26_0.json"
+        "docs/integration/evidence/20261101_preview_release_0_26_0.json",
+        "docs/integration/evidence/20261102_preview_feature_difference.json"
       ],
       "level": "actual preview publication and anonymous online byte verification",
       "environment": "npm preview dist-tag and GitHub prerelease at de1ae86; stable latest remains 0.25.5",
-      "notes": "Preview naming, R/T status, known limits, platform boundaries and public artifacts are real; npm and GitHub download bytes match the 272-file Git-verified tarball. T52 remains open because CI run 41307437999 failed. T58 also needs an explicit F-difference appendix and CI follow-up, so it is not passed.",
+      "notes": "Preview naming, R/T status, known limits, platform boundaries and public artifacts are real; npm and GitHub download bytes match the 272-file Git-verified tarball. T52 remains open because CI run 41307437999 failed. T58 also needs an explicit F-difference appendix and CI follow-up, so it is not passed. E154 adds a locally recomputable preview.1 F01-F40 JSON/Markdown appendix bound to the five current inputs, generator and frozen/current source state; it does not publish preview.1, verify hosted CI, close CI follow-up or upgrade behavior acceptance, so T58 remains partial.",
       "verifiedOn": "2026-11-01"
     },
     {
@@ -2075,12 +2075,13 @@
       "status": "partial",
       "evidence": [
         "docs/integration/evidence/20261026_m0_baseline.json",
-        "docs/integration/evidence/20261027_m10_task_cli_default_product.json"
+        "docs/integration/evidence/20261027_m10_task_cli_default_product.json",
+        "docs/integration/evidence/20261102_e160_t61_retained_inclusion.json"
       ],
       "level": "actual rc.3 host / offline fixture model",
       "environment": "Real rc.3 host; frozen DS commit and tracked-source checks on Windows Node24",
-      "notes": "Every default-composition probe asserts the frozen DS commit and that frozen tracked sources are unchanged, and product-source verifies 297 files against the frozen commit. Incremental upstream handling and the full frozen-baseline inventory audit remain for W19.",
-      "verifiedOn": "2026-10-27"
+      "notes": "Every default-composition probe asserts the frozen DS commit and that frozen tracked sources are unchanged, and product-source verifies 297 files against the frozen commit. Incremental upstream handling and the full frozen-baseline inventory audit remain for W19. E160: full3 unfiltered inclusion 16/16 exit0, zero skipped; independent raw retention audit 14 bundles/34478 files/382 commands, 175 per-command captures/3184 files, 6 inclusion and 6 release bindings, 9 restored checkpoints, 6 full 40F snapshots; 18 exact candidate/harness-bound regressions and 36 raw streams, including two intentional failed candidate regressions. All original 15 criteria are mechanism_supported_by_local_evidence only. Local isolated real Git/CLI fixture; real baseline and empty ledger unchanged, all behaviorVerified=false. Full1/full2 overwritten-proposal gaps preserved. Current-source unified gate pending after tracking/F refresh. T61 remains partial; no full product, external, migration or release promotion.",
+      "verifiedOn": "2026-11-02"
     },
     {
       "id": "T62",

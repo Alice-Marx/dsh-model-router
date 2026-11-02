@@ -57,20 +57,30 @@ export function confirmationDetails({ target, mode = 'interactive', cwd, platfor
       target === TERMINAL_SHELL_ID
         ? '使用你的登录环境变量（PATH、代理、API Key 等）。'
         : '使用你自己的 CLI 登录状态和环境变量（PATH、代理、API Key 等）；产生的费用按该 CLI 的账号或套餐计费。',
-      '输入和输出不会被记录；执行历史只保存工具、工作目录、开始/结束时间和退出码。',
-      '关闭工作台面板、结束会话或长时间无人查看（约 2 分钟）时，终端进程会被结束。',
+      '输入、输出和环境变量不会被记录；执行历史只保存工具、工作目录、时间、退出码及进程树/输出状态等元数据。',
+      '关闭工作台面板、结束会话或长时间无人查看（约 2 分钟）时，会请求停止终端；实际退出前不会显示为已结束，派生进程停止可能无法确认。',
     ],
   }
 }
 
-export function endDescription({ endReason, exitCode }) {
+export function endDescription({ endReason, exitCode, stopRequested = false, stopConfirmed = false, exited = true,
+  treeTracking = false, treeClosed = false, controlLost = false, outputTruncated = false, bytesDropped = 0 }) {
   const code = exitCode === null || exitCode === undefined ? '' : `，退出码 ${exitCode}`
+  const truncation = outputTruncated ? `；输出不完整${bytesDropped > 0 ? `，已丢弃 ${bytesDropped} 字节` : ''}。` : ''
+  if (controlLost) return `终端控制连接已丢失，派生进程状态未知${code}${truncation}`
+  if (stopRequested && !stopConfirmed) {
+    if (!exited) return `停止请求已受理，正在停止；派生进程停止尚未确认${truncation}`
+    return `会话已退出${code}，但派生进程停止尚未确认${truncation}`
+  }
+  if (stopRequested && stopConfirmed && treeClosed) return `会话及派生进程树已确认停止${code}${truncation}`
+  if (treeTracking && exited && !treeClosed) return `宿主进程已退出${code}，派生进程树尚未确认关闭${truncation}`
   switch (endReason) {
-    case 'stopped': return `已由你结束${code}。`
-    case 'orphan': return '长时间没有面板读取输出，已自动结束。'
-    case 'lifetime': return '会话达到最长时长（6 小时），已自动结束。'
-    case 'dispose': return '插件已卸载或重新加载，会话已结束。'
-    default: return `进程已退出${code}。`
+    case 'stopped': return `已由你结束${code}${truncation}`
+    case 'orphan': return `长时间没有面板读取输出，已自动结束${truncation}`
+    case 'lifetime': return `会话达到最长时长（6 小时），已自动结束${truncation}`
+    case 'dispose': return `插件已卸载或重新加载，会话已结束${truncation}`
+    case 'lost': return `终端连接已丢失，进程状态未知${truncation}`
+    default: return `进程已退出${code}${truncation}`
   }
 }
 
@@ -105,7 +115,7 @@ const unwrap = unwrapTerminal
 /** Backend, limits, live sessions and metadata-only history. */
 export async function loadTerminalInfo(api) {
   const info = unwrap(await api.terminalInfo(), '无法读取终端状态。')
-  if (!info || typeof info !== 'object' || !['pty', 'pipe'].includes(info.backend)) throw new Error('终端状态格式无效。')
+  if (!info || typeof info !== 'object' || !['managed', 'pty', 'pipe'].includes(info.backend)) throw new Error('终端状态格式无效。')
   return info
 }
 
@@ -142,8 +152,8 @@ export async function startTerminal(api, request) {
  * writes (coalesced while one is in flight) and debounced resizes.
  */
 export class TerminalConnection {
-  constructor({ api, sessionId, onData, onExit, onError, waitMs = 800, retryMs = 1_000, resizeDelayMs = 120, setTimer = setTimeout, clearTimer = clearTimeout }) {
-    Object.assign(this, { api, sessionId, onData, onExit, onError, waitMs, retryMs, resizeDelayMs })
+  constructor({ api, sessionId, onData, onExit, onStatus, onError, waitMs = 800, retryMs = 1_000, resizeDelayMs = 120, setTimer = setTimeout, clearTimer = clearTimeout }) {
+    Object.assign(this, { api, sessionId, onData, onExit, onStatus, onError, waitMs, retryMs, resizeDelayMs })
     // Browser timer functions throw "Illegal invocation" when called as a
     // method of another object, so never call them through `this`.
     this.setTimer = (callback, ms) => setTimer(callback, ms)
@@ -184,15 +194,34 @@ export class TerminalConnection {
         continue
       }
       if (this.closed) return
+      const managed = output.backend === 'managed' || output.treeTracking === true
+      const status = {
+        stopRequested: output.stopRequested === true, stopConfirmed: output.stopConfirmed === true,
+        exited: output.exited === true, endReason: output.endReason ?? null,
+      }
+      if (output.backend !== undefined || output.treeTracking !== undefined) Object.assign(status, {
+        backend: output.backend ?? (managed ? 'managed' : 'pty'),
+        treeTracking: output.treeTracking === true, containment: output.containment ?? null,
+        treeClosed: output.treeClosed === true, outputClosed: output.outputClosed === true,
+        outputTruncated: output.outputTruncated === true,
+        bytesDropped: Number.isSafeInteger(output.bytesDropped) ? output.bytesDropped : 0,
+        controlLost: output.controlLost === true, controlError: output.controlError ?? null,
+      })
+      this.hostExited ||= status.exited
+      this.onStatus?.(status)
       if (output.dropped) this.onData?.('\r\n[部分较早的输出已丢弃]\r\n')
       if (output.data) this.onData?.(output.data)
       this.cursor = output.cursor
-      if (output.exited) { this.closed = true; this.onExit?.({ endReason: output.endReason, exitCode: output.exitCode }); return }
+      if (output.closed === true || (!managed && output.exited)) {
+        this.closed = true
+        this.onExit?.({ ...status, exitCode: output.exitCode })
+        return
+      }
     }
   }
 
   send(data) {
-    if (this.closed || !data) return
+    if (this.closed || this.hostExited || !data) return
     this.pendingInput += data
     if (!this.writing) this.writing = this.flush()
   }
@@ -229,7 +258,7 @@ export class TerminalConnection {
     this.closed = true
     if (this.resizeTimer) this.clearTimer(this.resizeTimer)
     if (wasOpen) {
-      try { await this.api.terminalStop({ sessionId: this.sessionId }) } catch { /* the Host orphan timeout still ends it */ }
+      try { await this.api.terminalStop({ sessionId: this.sessionId }) } catch { /* the Host retains orphan-sweep responsibility */ }
     }
   }
 }

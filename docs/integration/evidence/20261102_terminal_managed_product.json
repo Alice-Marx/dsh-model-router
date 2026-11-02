@@ -1,0 +1,327 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-02",
+  "workOrder": "K36 documentation-only Windows managed terminal product evidence and handoff",
+  "checkpoint": "E158",
+  "parentCheckpoint": "E157",
+  "actualModelCalls": 0,
+  "level": "local Windows isolated Node/ConPTY/JSON fixture and focused product wiring evidence plus current dirty-tree root regression; not T37/T54 completion, hosted CI, clean-checkout validation, real vendor/POSIX/remote matrix or release acceptance",
+  "formalizationGate": {
+    "status": "passed",
+    "gateResult": "tmp/integration/codex-takeover-k33/gate-result.json",
+    "rootResult": "tmp/integration/codex-takeover-k33/root-result.json",
+    "rootLog": "tmp/integration/codex-takeover-k33/gpt-root-npm-test.log",
+    "completedAt": "2026-11-02T06:49:15.481855+00:00",
+    "allPassed": true,
+    "rootSummaryVerified": true,
+    "originalExitAndCountsMatched": true,
+    "meaning": "Only the named local root and post-check commands; not all release hard gates."
+  },
+  "backend": {
+    "windowsDefault": "managed ConPTY in a Job",
+    "atomicSuspendedBirthInJob": true,
+    "explicitResumeAfterListenersRegistered": true,
+    "suspendedMarkerNegativeChecked": true,
+    "controlAndRawDataSeparated": true,
+    "identity": "pid plus creation start identity",
+    "treeProof": "windows-job-active-process-zero",
+    "typedActiveZeroRequiredForStopConfirmed": true,
+    "hostExitOrExternalPidDisappearanceIsTreeProof": false,
+    "posixBackend": "legacy PTY/pipe retained",
+    "posixTreeTracking": false,
+    "posixStopConfirmed": false,
+    "realPosixTreeProofExecuted": false
+  },
+  "productLifecycle": {
+    "hostExitTreeClosedOutputClosedIndependent": true,
+    "hostExitEndsManagedPolling": false,
+    "liveDescendantsAfterHostExitRetain": [
+      "session",
+      "capacity accounting",
+      "stop",
+      "orphan/lifetime sweep",
+      "long-poll"
+    ],
+    "lateMetadataUsesSameSessionId": true,
+    "lateMetadata": [
+      "treeClosed",
+      "outputClosed",
+      "outputTruncated",
+      "bytesDropped",
+      "controlLost/controlError"
+    ],
+    "onSessionEndExactlyOnceAtRealHostExit": true,
+    "finalCloseRequiresTreeOutputAndBufferDrain": true,
+    "persistentHistory": "same-id monotonic metadata upsert without input/output/env/control secrets"
+  },
+  "runtimeOwnershipAndProtocol": {
+    "callerCanonicalParentOwnedByFactory": false,
+    "uniqueOwnedChildPrefix": "dsh-managed-*",
+    "cleanupGuards": [
+      "canonical realpath",
+      "relative scope",
+      "directory type and non-symlink",
+      "parent and child dev/ino identity"
+    ],
+    "callerParentAndSentinelPreserved": true,
+    "ownerAcl": "owner-only protected DACL set by PowerShell Set-Acl and reverified by C#",
+    "creatorWatchdog": true,
+    "nativeBreakawayRejected": {
+      "attempted": true,
+      "created": false,
+      "win32": 5,
+      "escapedDescendant": false
+    },
+    "outputQueueDropAccounting": "explicit monotonic bytesDropped plus outputTruncated; not silent loss",
+    "resizeLateResponseProtection": "strict positive requestId matching",
+    "forgedRawControlJsonChangesState": false
+  },
+  "gptCorrections": [
+    "added the missing C# System.Diagnostics compile reference",
+    "used the actually working Set-Acl owner/DACL path and retained C# owner/DACL verification",
+    "made named-pipe client/server names consistent",
+    "set STARTF_USESTDHANDLES with null standard handles and bInheritHandles=false",
+    "corrected output draining and bounded control reads/cleanup"
+  ],
+  "fixtureCorrections": {
+    "inputDiagnostic": "tmp/integration/codex-takeover-k26/gpt-input-diagnostic-1.log",
+    "cookedInput": "CR and CRLF submit a line; LF alone does not",
+    "ansiInput": "color CSI is interpreted by the terminal and is not required as literal cooked stdin",
+    "exactFixtureInputJsonUsed": true,
+    "nodePublicGetWindowSize": "cached JS fields only; not actual geometry proof",
+    "finalGeometryQuery": "fixture queries process.stdout._handle.getWindowSize(dimensions) on the child's underlying TTY handle",
+    "helperAckUsedAsGeometryProof": false,
+    "changesLimitedToFixturesAndTests": true,
+    "productionBackendRelaxedForTests": false,
+    "hostExitDetachedUnrefMeansJobBreakaway": false,
+    "independentNativeBreakawayTestRetained": true
+  },
+  "frozenBackendSha256": {
+    "packages/cli-runtime/src/native-terminal.mjs": "b9f7c9cac6ec464f04725e961f186ec7333c53c0782b1a215980772e6d54c7a8",
+    "packages/cli-runtime/src/native-terminal-peer.ps1": "cfbaeca6226d7ff8b31517aa2a3f2de17f57a253684553a9fae2d234397109a7",
+    "verificationSource": "K31b final hash check and K33 gate tested/frozen hash equality"
+  },
+  "focusedRuns": [
+    {
+      "name": "native terminal protocol unit",
+      "command": "node --test tests/native-terminal-protocol.test.mjs",
+      "exitCode": 0,
+      "tests": 71,
+      "pass": 71,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "durationMs": 111.9594,
+      "log": "tmp/integration/codex-takeover-k26/kimicode-test-protocol-r2.log"
+    },
+    {
+      "name": "K27 manager gateway state protocol plugin-split focused",
+      "command": "node --test tests/cli-terminal.test.mjs tests/cli-terminal-gateway.test.mjs tests/router-state.test.mjs tests/native-terminal-protocol.test.mjs tests/plugin-split.test.mjs",
+      "exitCode": 0,
+      "tests": 135,
+      "pass": 133,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 2,
+      "durationMs": 1949.0873,
+      "log": "tmp/integration/codex-takeover-k27/kimicode-focused-unit-final-2.log",
+      "skipReason": "two existing POSIX-only cases skipped on Windows; not passes"
+    },
+    {
+      "name": "core A managed ConPTY native final",
+      "command": "node --test --test-concurrency=1 tests/cli-terminal-managed-pty.native.mjs",
+      "exitCode": 0,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "durationMs": 23100.4912,
+      "log": "tmp/integration/codex-takeover-k33/gpt-core-a-native-query.log"
+    },
+    {
+      "name": "managed product native final",
+      "command": "node --test --test-concurrency=1 tests/cli-terminal-managed-product.native.mjs",
+      "exitCode": 0,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "durationMs": 77496.1797,
+      "log": "tmp/integration/codex-takeover-k33/gpt-product-native-2.log",
+      "historicalFailure": "gpt-product-native-1.log exited 1 with 0/1 pass and child/grandchild identity timeout; retained as history"
+    },
+    {
+      "name": "C matrix full native final",
+      "command": "node --test --test-concurrency=1 tests/cli-terminal-managed-containment.native.mjs",
+      "exitCode": 0,
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "durationMs": 229160.3158,
+      "log": "tmp/integration/codex-takeover-k31/c-matrix-full-1.log",
+      "cleanupKillUsedForPass": false
+    }
+  ],
+  "testCounting": "The K27 135-test focused run already includes the 71 protocol tests. The early C 2/2 is included in final C 21/21. Legacy UTF-8/multisession runs use injected legacy PTY and are not managed product proof. Overlapping and historical runs are never summed into a new total.",
+  "cMatrixProductProof": {
+    "negativeTestPassMeansProductProofConfirmed": false,
+    "unknown": [
+      "preCreate creator death",
+      "preCreate helper death",
+      "created-suspended creator death",
+      "created-suspended helper death",
+      "resumed creator death",
+      "resumed helper death",
+      "hostExited creator death",
+      "hostExited helper death",
+      "QueryJob failure",
+      "QueryJob invalid return length",
+      "stop timeout",
+      "data channel dispose fault",
+      "duplicate started frame"
+    ],
+    "unknownDespiteActualRegisteredPidIdentityCleanup": true,
+    "externalPidDisappearancePromotedToTypedZero": false,
+    "controlledOrPreviouslyProvenPaths": {
+      "controlEof": "normal controlled stop: stopRequested.reason=control-ended, no controlLost, then real windows-job-active-process-zero",
+      "lateHostExit": "injected only after real stop produced typed active0; proof does not come from injected frame",
+      "forgedRawControlOutput": "state unchanged before real stop; typed active0 comes only from real stop",
+      "nativeBreakaway": "rejection negative evidence, not a substitute product stop proof"
+    }
+  },
+  "currentFullRootRegression": {
+    "kind": "local-current-dirty-tree-validation-only",
+    "status": "passed",
+    "command": "npm test",
+    "runByK36": false,
+    "executor": "GPT foreground root regression",
+    "head": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+    "startedAt": "2026-11-02T06:36:23.6859381Z",
+    "completedAt": "2026-11-02T06:42:21.899388+00:00",
+    "exitCode": 0,
+    "summaryVerified": true,
+    "phases": [
+      {
+        "tests": 1753,
+        "pass": 1748,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 5,
+        "todo": 0,
+        "durationMs": 60748.3734
+      },
+      {
+        "tests": 426,
+        "pass": 342,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 84,
+        "todo": 0,
+        "durationMs": 296606.5888
+      }
+    ],
+    "total": {
+      "tests": 2179,
+      "pass": 2090,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 89
+    },
+    "log": "tmp/integration/codex-takeover-k33/gpt-root-npm-test.log",
+    "result": "tmp/integration/codex-takeover-k33/root-result.json",
+    "gate": "tmp/integration/codex-takeover-k33/gate-result.json",
+    "focusedRunsAddedToTotal": false,
+    "historicalK18NumbersUsed": false,
+    "formalAcceptancePromoted": false,
+    "hostedCiRun": false,
+    "cleanCheckoutRun": false
+  },
+  "postRootChecks": [
+    {
+      "name": "client",
+      "command": "npm run check:client",
+      "exitCode": 0,
+      "log": "tmp/integration/codex-takeover-k33/gpt-post-check-client.log"
+    },
+    {
+      "name": "integration",
+      "command": "npm run integration:check",
+      "exitCode": 0,
+      "log": "tmp/integration/codex-takeover-k33/gpt-post-integration-check.log"
+    },
+    {
+      "name": "fDifference",
+      "command": "node scripts/integration-f-difference.mjs --check",
+      "exitCode": 0,
+      "log": "tmp/integration/codex-takeover-k33/gpt-post-f-difference-check.log"
+    },
+    {
+      "name": "diff",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "log": "tmp/integration/codex-takeover-k33/gpt-post-diff-check.log"
+    },
+    {
+      "name": "pack",
+      "command": "npm pack --dry-run --ignore-scripts --json",
+      "exitCode": 0,
+      "entryCount": 277,
+      "nativeFilesIncluded": true,
+      "log": "tmp/integration/codex-takeover-k33/gpt-post-pack.json"
+    }
+  ],
+  "formalStatus": {
+    "workPackagesCompleted": "0/20",
+    "acceptanceScenariosPassed": "44/63",
+    "m0StepsCompleted": "11/12",
+    "gates": {
+      "G1": "in_progress",
+      "G2": "in_progress",
+      "G3": "in_progress",
+      "G4": "in_progress"
+    },
+    "t37Promoted": false,
+    "t54Promoted": false,
+    "migrationC1ThroughC10AllFalse": true,
+    "activationSupported": false,
+    "postActivationRollbackSupported": false,
+    "stopWriteProvable": false,
+    "generationAvailable": false,
+    "jobTreeProofIsWholeMachineStopWriteCertificate": false
+  },
+  "worktreeAndRelease": {
+    "version": "0.26.0-preview.1",
+    "uncommitted": true,
+    "tagged": false,
+    "published": false,
+    "hostedCiVerified": false,
+    "cleanCheckoutVerified": false,
+    "releaseAcceptanceVerified": false,
+    "existingUserReleaseAuthorizationRetained": true,
+    "releaseAllowedWhileHardGatesOpen": false,
+    "newGeneralAuthorizationRequirementAdded": false
+  },
+  "documentationBoundary": {
+    "sourceTestsPackagesCiTasksScopeBaselineOrDerivedFChangedByK36": false,
+    "draftDirectory": "tmp/integration/codex-takeover-k36/",
+    "formalDocumentsWritten": true,
+    "allowedDocuments": [
+      "docs/integration/HANDOFF-20261102-E158.md",
+      "docs/integration/evidence/20261102_terminal_managed_product.json",
+      "docs/integration/PROGRESS.md",
+      "docs/releases/0.26.0-preview.1-validation.md"
+    ]
+  },
+  "limitations": [
+    "Only isolated Windows Node/ConPTY/JSON fixtures were executed; no real vendor CLI, login, account, model, production profile/data/process or remote machine was used.",
+    "No real POSIX or broader actual-platform matrix was run; POSIX legacy backend has no tree proof in this checkpoint.",
+    "C matrix negative-test passes with product proof unknown remain unknown even when registered PID identities were actually reclaimed.",
+    "T37/T54 and migration/global activation, rollback and stop-write capabilities are not promoted by this slice.",
+    "The passing root regression is local current-dirty-tree evidence, not hosted CI, clean-checkout validation or real release acceptance.",
+    "T59/T61 evidence from other Kimi reports is outside this terminal checkpoint."
+  ]
+}

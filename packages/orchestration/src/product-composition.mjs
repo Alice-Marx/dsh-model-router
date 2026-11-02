@@ -23,7 +23,8 @@ import { createMrReadBackend } from './mr-read-backend.mjs'
 import { createCliReadBackend } from './cli-execution.mjs'
 import { createRemoteWriteBackend } from './remote-execution.mjs'
 import { createRemoteCommandBackend } from './remote-command-execution.mjs'
-import { canonicalTaskJson, taskHash } from './task-contract.mjs'
+import { createRemoteCliReadBackend } from './remote-cli-execution.mjs'
+import { canonicalTaskJson, parseRemoteTaskCli, taskHash } from './task-contract.mjs'
 import { acquireMigrationShared } from './migration-fence.mjs'
 import { assertMigrationStartupAllowed } from './migration-startup-gate.mjs'
 
@@ -77,6 +78,14 @@ export function compileProductGrant(bot, { routes, hydrated }) {
     modelRoutes: hydrated && provider && model && routes.has(key) ? [{ provider, model }] : [] }
 }
 
+/** Subscription usage is not API spend; missing token evidence stays unknown. */
+export function projectModelCallAmount(receipt, resolution = null) {
+  if (resolution) return resolution.costUsd
+  if (receipt.funding === 'subscription') return 0
+  return actualCost({ usage: receipt.usage, usageIncomplete: !receipt.usageComplete,
+    reportedCostUsd: receipt.reportedCostUsd }, receipt.pricing).costUsd
+}
+
 const taskInput = input => {
   const value = JSON.parse(canonicalTaskJson(input))
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== 1
@@ -94,22 +103,30 @@ const taskInput = input => {
 export function normalizeTaskCli(value) {
   if (value === undefined || value === null) return null
   const entry = value.entry
-  if (!entry || typeof entry.executable !== 'string' || !isAbsolute(entry.executable)
+  const remote = (Array.isArray(value.remote) ? value.remote : []).map(profile => {
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)
+      || Object.keys(profile).some(key => !['machineId','rootId','profileId','profileRevision','entry'].includes(key))
+      || !['machineId','rootId','profileId'].every(key => typeof profile[key] === 'string' && /^[-A-Za-z0-9_.]{1,128}$/.test(profile[key]))
+      || !Number.isSafeInteger(profile.profileRevision) || profile.profileRevision < 1
+      || !profile.entry || Object.keys(profile.entry).some(key => !['sha256','version'].includes(key))
+      || !/^[a-f0-9]{64}$/.test(profile.entry.sha256 ?? '') || !CLI_ENTRY_VERSION.test(profile.entry.version ?? '')) throw new TypeError('TASK_CLI_REMOTE_PROFILE_INVALID')
+    return Object.freeze({ machineId: profile.machineId, rootId: profile.rootId, profileId: profile.profileId, profileRevision: profile.profileRevision,
+      entry: Object.freeze({ sha256: profile.entry.sha256, version: profile.entry.version }) })
+  })
+  if (new Set(remote.map(profile => `${profile.machineId}/${profile.rootId}`)).size !== remote.length) throw new TypeError('TASK_CLI_REMOTE_PROFILE_DUPLICATE')
+  if (!entry && !remote.length) throw new TypeError('TASK_CLI_ENTRY_REQUIRED')
+  if (entry && (typeof entry.executable !== 'string' || !isAbsolute(entry.executable)
     || typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256)
-    || typeof entry.version !== 'string' || !CLI_ENTRY_VERSION.test(entry.version)) {
-    throw new TypeError('TASK_CLI_ENTRY_REQUIRED')
-  }
+    || typeof entry.version !== 'string' || !CLI_ENTRY_VERSION.test(entry.version))) throw new TypeError('TASK_CLI_ENTRY_REQUIRED')
   const models = (Array.isArray(value.models) ? value.models : []).map(model => {
     if (!model || typeof model.provider !== 'string' || typeof model.model !== 'string'
       || typeof model.cliModel !== 'string' || !CLI_MODEL.test(model.cliModel)) throw new TypeError('TASK_CLI_MODEL_REQUIRED')
     return { provider: model.provider, model: model.model, cliModel: model.cliModel }
   })
-  if (new Set(models.map(model => `${model.provider}/${model.model}/${model.cliModel}`)).size !== models.length) {
-    throw new TypeError('TASK_CLI_MODEL_DUPLICATE')
-  }
+  if (new Set(models.map(model => `${model.provider}/${model.model}/${model.cliModel}`)).size !== models.length) throw new TypeError('TASK_CLI_MODEL_DUPLICATE')
   if (value.sessionFactory !== undefined && typeof value.sessionFactory !== 'string') throw new TypeError('TASK_CLI_SESSION_FACTORY_REQUIRED')
-  return Object.freeze({ entry: Object.freeze({ executable: entry.executable, sha256: entry.sha256, version: entry.version }),
-    models: Object.freeze(models), sessionFactory: value.sessionFactory ?? null })
+  return Object.freeze({ entry: entry ? Object.freeze({ executable: entry.executable, sha256: entry.sha256, version: entry.version }) : null,
+    models: Object.freeze(models), remote: Object.freeze(remote), sessionFactory: value.sessionFactory ?? null })
 }
 
 /**
@@ -182,6 +199,36 @@ export function createTaskBackends({ ctx, mr, authority, directory, store, machi
       capability: item.capability, label: index === 0 ? '模型路由只读任务' : '官方 CLI 只读任务' })) })
 }
 
+function createRemoteCliTaskBackend({machines,directory,store,authority,profiles,bindingFor}){
+ const inners=new Map()
+ const resolve=botId=>{
+  const binding=bindingFor(botId),settings=binding?.status==='available'?binding.settings:null,funding=settings?.funding??null
+  const tool=settings?.officialTools?.find(item=>item.toolId==='codex'&&item.mode==='read-only')
+  if(!settings?.model?.provider||!settings.model.model||!tool||!funding?.scopeId)return null
+  if(funding.mode==='api'&&(!funding.pricing||!funding.request))return null
+  if(funding.mode==='subscription'&&!(funding.subscription?.dailyCalls>=1))return null
+  const model={provider:settings.model.provider,model:settings.model.model},billing=funding.mode,pricing=billing==='api'?funding.pricing:null
+  const estimatedCostUsd=billing==='api'?(funding.request.maxInputTokens*pricing.input+funding.request.maxOutputTokens*pricing.output)/1e6:null
+  const dailyLimitUsd=funding.dailyBudgetUsd??0,monthlyLimitUsd=funding.monthlyBudgetUsd??0,subscriptionMaxCalls=billing==='subscription'?funding.subscription.dailyCalls:null
+  const key=taskHash({botId,model,cliModel:tool.cliModel,billing,pricing,dailyLimitUsd,monthlyLimitUsd,subscriptionMaxCalls})
+  if(inners.has(key))return inners.get(key)
+  if(inners.size>=TASK_BACKEND_LIMIT)return null
+  const inner=createRemoteCliReadBackend({machines,directory,store,authority,profiles,model,requestedModel:tool.cliModel,billing,pricing,estimatedCostUsd,dailyLimitUsd,monthlyLimitUsd,subscriptionMaxCalls,deadlineMs:CLI_DEADLINE_MS})
+  inners.set(key,inner);return inner
+ }
+ const forSubject=subject=>resolve(authority.describe(subject).botId)
+ const unavailable=()=>{throw Object.assign(new Error('TASK_BINDING_UNAVAILABLE'),{code:'TASK_BINDING_UNAVAILABLE'})}
+ return Object.freeze({id:'remote-codex-read',version:'remote-cli-read-product-v1',effect:'read',location:'remote',atomicAdmission:true,requiresExecutionInput:true,
+  machineId:'remote-target',workspaceId:'remote-root',capability:'remote/cli_task_v1',retryCapability:'remote/cli_task_v1',reconcileCapability:'remote/operation_status',parse:parseRemoteTaskCli,
+  targetFor(subject,input){return (forSubject(subject)??unavailable()).targetFor(subject,input)},
+  canObserve(subject,target,input){return forSubject(subject)?.canObserve(subject,target,input)??false},
+  run(context){const inner=resolve(context.ownerBotId);return inner?inner.run(context):{outcome:'failed',summary:{code:'TASK_BINDING_UNAVAILABLE'}}},
+  reconcile(context){const inner=resolve(context.ownerBotId);return inner?inner.reconcile(context):{outcome:'unknown',reason:'TASK_BINDING_UNAVAILABLE'}},
+  probe(subject,input){const inner=forSubject(subject);if(!inner)unavailable();return inner.probe(subject,input)},
+  async close(){await Promise.allSettled([...inners.values()].map(inner=>inner.close()))},
+ })
+}
+
 /**
  * Compose the frozen DS Bot runtime with the MR plugin body inside one Host.
  * The synchronous segment creates the shared authority/directory/policy and
@@ -251,7 +298,7 @@ export function startBotProduct(ctx, options = {}) {
 
   const grants = new Map()
   let machines, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting
-  let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, sharedAdmission
+  let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission
   const committedBots = new Map()
   let ownerCatalogStamp=''
   let routes = new Set(), hydrated = false, refreshing = false, lastRefresh = 0, timer = null
@@ -282,10 +329,16 @@ export function startBotProduct(ctx, options = {}) {
     // Grant compilation is synchronous and runs on every DS save/load: an
     // unavailable machine directory (not yet opened, or closed after a failed
     // boot) grants no machine access instead of suspending the lifecycle.
-    let scopes = []
+    let scopes = [],cliOfficial=false
     try { scopes = machines?.scopes(bot.id) ?? [] } catch { /* no machine access */ }
+    try { cliOfficial=botSettings?.get(bot.id,{publishChange:false}).settings?.officialTools?.some(item=>item.toolId==='codex'&&item.mode==='read-only')===true } catch {}
     for (const scope of scopes) for (const tool of scope.tools) {
       if(['operation_status','operation_cancel'].includes(tool)){grant.tools.push(`remote/${tool}`);continue}
+      if(['cli_probe_v1','cli_task_v1'].includes(tool)){
+        const profile=cliConfig?.remote.find(item=>item.machineId===scope.machineId&&scope.roots.includes(item.rootId))
+        if(cliOfficial&&profile&&['cli_probe_v1','cli_task_v1','operation_status','operation_cancel'].every(name=>scope.tools.includes(name)))grant.tools.push(`remote/${tool}`,...(tool==='cli_probe_v1'?['tool/remote_computer_cli_probe']:[]))
+        continue
+      }
       if(tool.startsWith('browser_')){if(scope.mode==='workspace-write')grant.tools.push(`remote/${tool}`,'tool/remote_computer_browser');continue}
       if(tool==='container_command_v1'){
         if(scope.mode==='workspace-write'&&['container_command_v1','operation_status','operation_cancel'].every(name=>scope.tools.includes(name)))grant.tools.push(`remote/${tool}`)
@@ -330,9 +383,14 @@ export function startBotProduct(ctx, options = {}) {
         if (mapping.provider === model.provider && mapping.model === model.model) model.cliModels.push({ toolId: 'codex', model: mapping.cliModel })
       }
     }
+    const remoteMachines=new Map()
+    for(const profile of cliConfig?.remote??[]){
+      if(!remoteMachines.has(profile.machineId))remoteMachines.set(profile.machineId,{machineId:profile.machineId,label:profile.machineId,location:'remote',status:'configured',roots:[]})
+      remoteMachines.get(profile.machineId).roots.push({rootId:profile.rootId,label:profile.rootId,modes:['read-only'],capabilities:[]})
+    }
     return { models, tools: cliConfig ? [{ toolId: 'codex', modes: ['read-only'], grantTools: [...CLI_GRANT_TOOLS] }] : [],
       machines: [{ machineId: localMachineId, label: '本机', location: 'local', status: 'ready',
-        roots: [{ rootId: 'default', label: '默认工作区', modes: ['read-only', 'workspace-write'], capabilities: [] }] }],
+        roots: [{ rootId: 'default', label: '默认工作区', modes: ['read-only', 'workspace-write'], capabilities: [] }] },...remoteMachines.values()],
       // The compiled grant takes its tools from the selected capabilities, so the
       // catalog must expose exactly the default product surface; execution facade
       // tools stay refused until their facades ship.
@@ -342,7 +400,7 @@ export function startBotProduct(ctx, options = {}) {
         { ...TASK_CAPABILITY },
       ],
       taskBackends: taskBackends ? taskBackends.catalog() : [],
-      fundingScopes: fundingAccounts ? fundingAccounts.catalog().filter(scope => scope.enabled).map(scope => ({ id: scope.id, label: scope.provider, modes: ['api'] })) : [] }
+      fundingScopes: fundingAccounts ? fundingAccounts.catalog().filter(scope => scope.enabled).map(scope => ({ id: scope.id, label: scope.provider, modes: ['api','subscription'] })) : [] }
   }
   // N06b: the Bot binding is the funding source of truth for its own model
   // calls. An unconfigured, mismatched or incomplete binding yields null and
@@ -377,7 +435,7 @@ export function startBotProduct(ctx, options = {}) {
         assertMigrationStartupAllowed({home:resolveStateHome()})
         funding=await openProductFunding({Database,file:storageFile,legacyFile,policy,authority,pricingFor:bindingFunding,now})
       }
-      machines = openRemoteMachines({ Database, file:storageFile, authority,
+      machines = openRemoteMachines({ Database, file:storageFile, authority, cliProfiles:cliConfig?.remote??[],
         botExists:id=>Boolean(product&&Object.hasOwn(product.rt.state?.bots??{},id)), now,
         resolveSecret:async secretRef=>{
           if(!product)throw new Error('MACHINE_SECRET_UNAVAILABLE')
@@ -427,7 +485,7 @@ export function startBotProduct(ctx, options = {}) {
         const managedRoot = join(dirname(storageFile), 'managed')
         const managedWorkspace = join(managedRoot, 'read-workspace')
         await mkdir(managedWorkspace, { recursive: true })
-        if (cliConfig?.sessionFactory) {
+        if (cliConfig?.entry&&cliConfig.sessionFactory) {
           const factory = await import(cliConfig.sessionFactory).then(module => module.createCliSession ?? module.default, () => null)
           if (typeof factory !== 'function') throw new TypeError('TASK_CLI_SESSION_FACTORY_REQUIRED')
           cliSessionFactory = factory
@@ -436,10 +494,12 @@ export function startBotProduct(ctx, options = {}) {
         const modelBackends = createTaskBackends({ ctx, mr, authority, directory, store: funding.store,
           machineId, workspaceId, workspace: managedWorkspace, runtimeRoot: join(managedRoot, 'cli-runtime'),
           bindingFor: botId => botSettings.get(botId, { publishChange: false }),
-          cli: cliConfig ? { entry: cliConfig.entry, sessionFactory: cliSessionFactory ?? (await import('../../cli-runtime/src/codex-runtime.mjs')).createCodexSession } : null })
+          cli: cliConfig?.entry ? { entry: cliConfig.entry, sessionFactory: cliSessionFactory ?? (await import('../../cli-runtime/src/codex-runtime.mjs')).createCodexSession } : null })
         const remoteWrite=createRemoteWriteBackend({machines:()=>machines,directory})
         const remoteCommand=createRemoteCommandBackend({machines:()=>machines,directory})
-        taskBackends=Object.freeze({backends:Object.freeze([...modelBackends.backends,remoteWrite,remoteCommand]),catalog:()=>[...modelBackends.catalog(),{id:remoteWrite.id,version:remoteWrite.version,effect:remoteWrite.effect,location:'remote',capability:remoteWrite.capability,label:'已授权远程文件写入任务'},{id:remoteCommand.id,version:remoteCommand.version,effect:remoteCommand.effect,location:'remote',capability:remoteCommand.capability,label:'已授权容器命令任务（仅别名argv）'}]})
+        if(cliConfig?.remote.length)remoteCliBackend=createRemoteCliTaskBackend({machines:()=>machines,directory,store:funding.store,authority,profiles:cliConfig.remote,bindingFor:botId=>botSettings.get(botId,{publishChange:false})})
+        const remoteBackends=[remoteWrite,remoteCommand,...(remoteCliBackend?[remoteCliBackend]:[])]
+        taskBackends=Object.freeze({backends:Object.freeze([...modelBackends.backends,...remoteBackends]),catalog:()=>[...modelBackends.catalog(),...remoteBackends.map(backend=>({id:backend.id,version:backend.version,effect:backend.effect,location:'remote',capability:backend.capability,label:backend.id==='remote-codex-read'?'已授权远程官方 CLI 只读任务':backend.id==='remote-write'?'已授权远程文件写入任务':'已授权容器命令任务（仅别名argv）'}))]})
         taskService = createTaskService({ journal, authority, directory, backends: [...taskBackends.backends],
           within: (subject, signal, work) => policy.executionContext(subject, signal, work),
           planTargetsFor: (subject,plan,caller) => {
@@ -552,12 +612,11 @@ export function startBotProduct(ctx, options = {}) {
               for (;;) {
                 const page = await funding.store.modelCalls({ botId: bot.id, after, limit: 100 })
                 for (const receipt of page.items) {
-                  const cost = actualCost({ usage: receipt.usage, usageIncomplete: !receipt.usageComplete, reportedCostUsd: receipt.reportedCostUsd }, receipt.pricing)
                   const resolution = resolutions.get(`${receipt.runId}/${receipt.packageId}`) ?? null
                   items.push({ id: receipt.id, botId: receipt.botId, botName: names.get(receipt.botId) ?? null,
                     sessionId: receipt.sessionId, taskId: receipt.taskId, runId: receipt.runId,
                     source: receipt.source, provider: receipt.provider, model: receipt.model, billing: receipt.funding,
-                    amountUsd: resolution ? resolution.costUsd : cost.costUsd, status: receipt.state, sequence: receipt.sequence,
+                    amountUsd: projectModelCallAmount(receipt, resolution), status: receipt.state, sequence: receipt.sequence,
                     resolution: resolution ? { kind: resolution.kind, costUsd: resolution.costUsd, note: resolution.note, resolvedAt: resolution.resolvedAt } : null,
                     inputTokens: receipt.usage?.inputTokens ?? null, outputTokens: receipt.usage?.outputTokens ?? null })
                 }
@@ -609,6 +668,11 @@ export function startBotProduct(ctx, options = {}) {
         }))
       }
       ctx.provide('botRemoteMachines', machines)
+      if(remoteCliBackend)ctx.tools.register(defineTool({name:'remote_computer_cli_probe',description:'Probe the Host-declared Codex profile only on the selected paired Agent/root. No executable, endpoint, credential, model or environment input is accepted.',
+        parameters:{machineId:{type:'string',required:true},rootId:{type:'string',required:true},workspaceRelativePath:{type:'string',required:true}},
+        output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]},
+        async execute(args,exec){await product.rt.load();return remoteCliBackend.probe(directory.forAgent(exec.agent),args)},
+      }))
       ctx.tools.register(defineTool({name:'remote_computer_write',description:'Submit a tracked UTF-8 file-write Task, at most 8192 bytes, to an owner-paired computer/root with explicit write, status and cancel grants. expectedHash is the current SHA256 or null only for a new file. No shell, endpoint, credential or automatic retry. Query the returned Task for its actual result.',
         parameters:{requestKey:{type:'string',required:true},machineId:{type:'string',required:true},rootId:{type:'string',required:true},relativePath:{type:'string',required:true},content:{type:'string',required:true},expectedHash:{type:'json',required:true}},
         output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]},
@@ -637,6 +701,7 @@ export function startBotProduct(ctx, options = {}) {
       for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close()])try{cleanup()}catch{}
       if(taskService)await taskService.close().catch(()=>{})
       else journal?.close()
+      if(remoteCliBackend)await remoteCliBackend.close().catch(()=>{})
       if(funding)await funding.close().catch(()=>{})
       if(deferredRouterState)try{deferredRouterState.reject(error)}catch{}
       if(sharedAdmission)await sharedAdmission.release().catch(()=>{})
@@ -662,6 +727,7 @@ export function startBotProduct(ctx, options = {}) {
         for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close()])try{cleanup()}catch{}
         if(taskService)await taskService.close().catch(()=>{})
         else journal?.close()
+        if(remoteCliBackend)await remoteCliBackend.close().catch(()=>{})
         if(funding)await funding.close()
       }finally{authority.dispose();if(sharedAdmission)await sharedAdmission.release()}
     },

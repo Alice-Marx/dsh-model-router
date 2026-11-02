@@ -290,12 +290,38 @@ test('Windows pipe fallback preserves a cmd shim command line in node spawn argu
   child.stderr = new EventEmitter()
   child.stdin = { write() {} }
   let request
-  spawnPipeProcess({ file: 'C:/Windows/System32/cmd.exe', args: '/d /s /c ""D:/Tools Space/mcode.cmd" login"', verbatim: true }, {
+  const proc = spawnPipeProcess({ file: 'C:/Windows/System32/cmd.exe', args: '/d /s /c ""D:/Tools Space/mcode.cmd" login"', verbatim: true }, {
     platform: 'win32', cwd: CWD, env: {}, spawnImpl: (...args) => { request = args; return child },
   })
   assert.deepEqual(request[1], ['/d /s /c ""D:/Tools Space/mcode.cmd" login"'])
   assert.equal(request[2].windowsVerbatimArguments, true)
   assert.equal(request[2].shell, false)
+  let exit = null
+  proc.onExit(event => { exit = event })
+  proc.kill()
+  assert.equal(exit, null, 'pipe kill/taskkill acceptance is not a host exit event')
+})
+
+test('Windows pipe fallback never kills a reused PID after the child exits before stdio closes', () => {
+  const child = new EventEmitter()
+  child.pid = 4242
+  child.exitCode = 0
+  child.signalCode = null
+  child.stdout = new EventEmitter()
+  child.stderr = new EventEmitter()
+  child.stdin = { write() {} }
+  let killCount = 0
+  child.kill = () => { killCount += 1 }
+  const spawns = []
+  const proc = spawnPipeProcess({ file: 'fixture.exe', args: [], verbatim: false }, {
+    platform: 'win32', cwd: CWD, env: {}, spawnImpl: (...args) => { spawns.push(args); return child },
+  })
+  let exit = null
+  proc.onExit(event => { exit = event })
+  proc.kill()
+  assert.equal(spawns.length, 1, 'an exited child must not spawn taskkill for its old PID')
+  assert.equal(killCount, 0, 'an exited child must not be killed again while stdio remains open')
+  assert.equal(exit, null, 'an exited parent with open stdio does not confirm the descendant tree')
 })
 
 /** A scriptable stand-in for @lydell/node-pty. */
@@ -337,6 +363,44 @@ function managerWith({ pty = fakePty(), ptyOk = true, clock = { now: 1_000 }, en
   return { manager, pty, clock, ended }
 }
 
+function fakeManaged() {
+  const spawned = []
+  const createManaged = async options => {
+    const listeners = { data: [], exit: [], tree: [], output: [], dropped: [], lost: [] }
+    let close
+    const proc = {
+      options, pid: 4242 + spawned.length, startIdentity: String(100 + spawned.length), containment: 'windows-job', treeTracking: true,
+      resumeCalls: 0, killCalls: 0, writes: [], sizes: [], closed: new Promise(resolve => { close = resolve }),
+      onData: listener => { listeners.data.push(listener) },
+      onExit: listener => { listeners.exit.push(listener) },
+      onTreeClosed: listener => { listeners.tree.push(listener) },
+      onOutputClosed: listener => { listeners.output.push(listener) },
+      onOutputDropped: listener => { listeners.dropped.push(listener) },
+      onControlLost: listener => { listeners.lost.push(listener) },
+      resume: async () => { proc.resumeCalls += 1; return { started: true } },
+      kill: async () => { proc.killCalls += 1; return true },
+      write: data => { proc.writes.push(data); return true },
+      resize: async (cols, rows) => { proc.sizes.push([cols, rows]); return true },
+      emit: data => listeners.data.forEach(listener => listener(data)),
+      exit: (exitCode = 0) => listeners.exit.forEach(listener => listener({ exitCode, signal: null })),
+      closeTree: () => listeners.tree.forEach(listener => listener({ proof: 'windows-job-active-process-zero', activeProcesses: 0 })),
+      dropOutput: bytesDropped => listeners.dropped.forEach(listener => listener({ bytesDropped })),
+      loseControl: (code = 'NATIVE_TERMINAL_CONTROL_LOST') => listeners.lost.forEach(listener => listener({ code })),
+      closeOutput: (event = {}) => listeners.output.forEach(listener => listener({ outputTruncated: false, bytesDropped: 0, ...event })),
+      resolveClosed: (event = {}) => close({ code: 0, signal: null, runtimeCleaned: true, outputTruncated: false, bytesDropped: 0, ...event }),
+    }
+    spawned.push(proc)
+    return proc
+  }
+  return { spawned, createManaged }
+}
+
+const managedOptions = managed => ({
+  platform: 'win32', useManaged: true, createManaged: managed.createManaged,
+  allocateOutputParent: async () => ({ path: 'D:/isolated/owned-parent' }),
+  releaseOutputParent: async () => {},
+})
+
 test('terminal manager reads current preferences after prepare and merges only fixed launch environment', async () => {
   const selections = []
   let preferences = { installDir: 'D:/AI/tools' }
@@ -377,7 +441,7 @@ test('manager: PTY session streams output by cursor, forwards input and resize, 
 
   manager.write({ sessionId: session.sessionId, data: 'my-secret-password\r' })
   assert.deepEqual(proc.written, ['my-secret-password\r'])
-  assert.deepEqual(manager.resize({ sessionId: session.sessionId, cols: 132, rows: 43 }), { resized: true })
+  assert.deepEqual(await manager.resize({ sessionId: session.sessionId, cols: 132, rows: 43 }), { resized: true })
   assert.deepEqual(proc.sizes, [[132, 43]])
 
   proc.exit(0)
@@ -386,7 +450,8 @@ test('manager: PTY session streams output by cursor, forwards input and resize, 
   assert.equal(output.exitCode, 0)
   assert.throws(() => manager.write({ sessionId: session.sessionId, data: 'x' }), /已结束/)
   assert.equal(ended.length, 1)
-  assert.deepEqual(Object.keys(ended[0]).sort(), ['backend', 'cwd', 'durationMs', 'endReason', 'exitCode', 'finishedAt', 'id', 'label', 'mode', 'startedAt', 'target'])
+  assert.deepEqual(Object.keys(ended[0]).sort(), ['backend', 'bytesDropped', 'containment', 'controlError', 'controlLost', 'cwd', 'durationMs', 'endReason', 'exitCode', 'exited', 'finishedAt', 'id', 'label', 'mode', 'outputClosed', 'outputTruncated', 'startedAt', 'stopConfirmed', 'stopRequested', 'target', 'treeClosed', 'treeTracking'])
+  assert.deepEqual({ stopRequested: ended[0].stopRequested, stopConfirmed: ended[0].stopConfirmed }, { stopRequested: false, stopConfirmed: false })
   const serialized = JSON.stringify(ended)
   for (const leaked of ['my-secret-password', 'ABCD-1234', 'Welcome', 'SECRET_TOKEN']) assert.equal(serialized.includes(leaked), false, leaked)
 })
@@ -397,10 +462,12 @@ test('manager: stop, orphan timeout, lifetime, session cap and dispose all kill 
   const first = await manager.start(startRequest())
   const second = await manager.start(startRequest())
   await assert.rejects(manager.start(startRequest()), /最多同时运行 2 个/)
-  assert.deepEqual(manager.stop({ sessionId: first.sessionId }), { stopped: true })
+  assert.deepEqual(manager.stop({ sessionId: first.sessionId }), {
+    stopped: false, stopRequested: true, stopConfirmed: false, exited: true, endReason: 'stopped',
+  })
   assert.equal(pty.spawned[0].killed, true)
   assert.equal(ended[0].endReason, 'stopped')
-  // The panel stopped reading (closed without a stop call): the sweep ends it.
+  // The panel stopped reading (closed without a stop call): the sweep requests a stop.
   clock.now += TERMINAL_LIMITS.orphanTimeoutMs + 1
   manager.sweep()
   assert.equal(pty.spawned[1].killed, true)
@@ -412,7 +479,334 @@ test('manager: stop, orphan timeout, lifetime, session cap and dispose all kill 
   manager.disposeAll()
   assert.equal(pty.spawned[2].killed, true)
   assert.equal(ended[2].endReason, 'dispose')
+  assert.ok(ended.every(record => record.stopRequested === true && record.stopConfirmed === false))
   await assert.rejects(manager.start(startRequest()), /卸载/)
+})
+
+function withoutExitOnKill(pty) {
+  const spawn = pty.module.spawn
+  pty.module.spawn = (...args) => {
+    const native = spawn(...args)
+    const proc = pty.spawned.at(-1)
+    proc.killCount = 0
+    return { ...native, kill: () => { proc.killed = true; proc.killCount += 1 } }
+  }
+  return pty
+}
+
+test('manager: a kill without an exit event does not invent a terminal after five seconds', async () => {
+  const pty = withoutExitOnKill(fakePty())
+  const timers = []
+  const { manager, ended } = managerWith({
+    pty,
+    setTimer: (callback, ms) => { const timer = { callback, ms, unref() {} }; timers.push(timer); return timer },
+    clearTimer: () => {},
+  })
+  const session = await manager.start(startRequest())
+  const stopped = manager.stop({ sessionId: session.sessionId })
+  const pending = manager.read({ sessionId: session.sessionId, cursor: 0, waitMs: 1_000 })
+  for (const timer of timers.filter(item => item.ms === 5_000)) timer.callback()
+  const output = await pending
+  const current = manager.info().sessions.find(item => item.sessionId === session.sessionId)
+  assert.equal(pty.spawned[0].killed, true)
+  assert.equal(current.exited, false, 'a timeout is not a backend exit event')
+  assert.equal(current.stopRequested, true)
+  assert.equal(current.stopConfirmed, false)
+  assert.deepEqual({ exited: output.exited, stopRequested: output.stopRequested, stopConfirmed: output.stopConfirmed },
+    { exited: false, stopRequested: true, stopConfirmed: false })
+  assert.equal(ended.length, 0, 'no history may be written without a real host exit')
+  assert.deepEqual(stopped, { stopped: false, stopRequested: true, stopConfirmed: false, exited: false, endReason: 'stopped' })
+
+  assert.deepEqual(manager.stop({ sessionId: session.sessionId }),
+    { stopped: false, stopRequested: true, stopConfirmed: false, exited: false, endReason: 'stopped' })
+  assert.equal(pty.spawned[0].killCount, 1, 'a repeated stop is idempotent')
+  assert.equal(timers.filter(item => item.ms === 5_000).length, 1)
+  pty.spawned[0].exit(7)
+  pty.spawned[0].exit(0)
+  assert.equal(ended.length, 1, 'only the first real host exit records history')
+  assert.deepEqual({ exitCode: ended[0].exitCode, endReason: ended[0].endReason, stopRequested: ended[0].stopRequested, stopConfirmed: ended[0].stopConfirmed },
+    { exitCode: 7, endReason: 'stopped', stopRequested: true, stopConfirmed: false })
+  const afterExit = await manager.read({ sessionId: session.sessionId, cursor: output.cursor })
+  assert.deepEqual({ exited: afterExit.exited, exitCode: afterExit.exitCode, stopRequested: afterExit.stopRequested, stopConfirmed: afterExit.stopConfirmed },
+    { exited: true, exitCode: 7, stopRequested: true, stopConfirmed: false })
+  assert.deepEqual(manager.stop({ sessionId: session.sessionId }), {
+    stopped: false, alreadyEnded: true, stopRequested: true, stopConfirmed: false, exited: true, endReason: 'stopped',
+  })
+})
+
+test('manager: disposeAll waits for a real exit instead of manufacturing history', async () => {
+  const pty = withoutExitOnKill(fakePty())
+  const { manager, ended } = managerWith({ pty })
+  const session = await manager.start(startRequest())
+  manager.disposeAll()
+  const current = manager.info().sessions.find(item => item.sessionId === session.sessionId)
+  assert.equal(pty.spawned[0].killed, true)
+  assert.equal(current.exited, false)
+  assert.equal(current.stopRequested, true)
+  assert.equal(current.stopConfirmed, false)
+  assert.equal(current.endReason, 'dispose')
+  assert.equal(ended.length, 0)
+  await assert.rejects(manager.start(startRequest()), /卸载/)
+  pty.spawned[0].exit(0)
+  assert.equal(ended.length, 1)
+  assert.deepEqual({ endReason: ended[0].endReason, stopRequested: ended[0].stopRequested, stopConfirmed: ended[0].stopConfirmed },
+    { endReason: 'dispose', stopRequested: true, stopConfirmed: false })
+})
+
+test('manager: orphan and lifetime timeouts stay unconfirmed until their real exit events', async () => {
+  for (const reason of ['orphan', 'lifetime']) {
+    const pty = withoutExitOnKill(fakePty())
+    const timers = []
+    const clock = { now: 1_000 }
+    const { manager, ended } = managerWith({
+      pty, clock,
+      limits: { ...TERMINAL_LIMITS, orphanTimeoutMs: reason === 'lifetime' ? TERMINAL_LIMITS.maxLifetimeMs + 10_000 : TERMINAL_LIMITS.orphanTimeoutMs },
+      setTimer: (callback, ms) => { const timer = { callback, ms, unref() {} }; timers.push(timer); return timer },
+      clearTimer: () => {},
+    })
+    const session = await manager.start(startRequest())
+    clock.now += (reason === 'lifetime' ? TERMINAL_LIMITS.maxLifetimeMs : TERMINAL_LIMITS.orphanTimeoutMs) + 1
+    manager.sweep()
+    for (const timer of timers.filter(item => item.ms === 5_000)) timer.callback()
+    const current = manager.info().sessions.find(item => item.sessionId === session.sessionId)
+    assert.deepEqual({ exited: current.exited, endReason: current.endReason, stopRequested: current.stopRequested, stopConfirmed: current.stopConfirmed },
+      { exited: false, endReason: reason, stopRequested: true, stopConfirmed: false })
+    assert.equal(ended.length, 0)
+    pty.spawned[0].exit(0)
+    assert.equal(ended.length, 1)
+    assert.equal(ended[0].stopConfirmed, false)
+  }
+})
+
+test('terminal manager reserves pending slots across concurrent starts', async () => {
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  let preparing = 0
+  const { manager, pty } = managerWith({
+    limits: { ...TERMINAL_LIMITS, maxSessions: 4 },
+    prepare: async () => { preparing += 1; await gate },
+  })
+  const starts = Array.from({ length: 5 }, () => manager.start(startRequest()))
+  const settled = Promise.allSettled(starts)
+  await new Promise(resolve => setImmediate(resolve))
+  release()
+  const results = await settled
+  assert.equal(results.filter(result => result.status === 'fulfilled').length, 4)
+  assert.equal(results.filter(result => result.status === 'rejected').length, 1)
+  assert.match(results.find(result => result.status === 'rejected').reason.message, /最多同时运行 4 个/)
+  assert.equal(preparing, 4)
+  assert.equal(pty.spawned.length, 4)
+  manager.disposeAll()
+})
+
+test('terminal manager releases a pending slot after every start failure boundary', async () => {
+  for (const boundary of ['stat', 'prepare', 'resolve', 'spawn']) {
+    const pty = fakePty()
+    const spawn = pty.module.spawn
+    let shouldFail = true
+    pty.module.spawn = (...args) => {
+      if (shouldFail) { shouldFail = false; throw new Error('injected spawn failure') }
+      return spawn(...args)
+    }
+    const { manager } = managerWith({
+      pty,
+      limits: { ...TERMINAL_LIMITS, maxSessions: 1 },
+      statPath: async () => {
+        if (boundary === 'stat' && shouldFail) { shouldFail = false; throw new Error('injected stat failure') }
+        return { isDirectory: () => true }
+      },
+      prepare: async () => {
+        if (boundary === 'prepare' && shouldFail) { shouldFail = false; throw new Error('injected prepare failure') }
+      },
+      resolveLaunch: async () => {
+        if (boundary === 'resolve' && shouldFail) { shouldFail = false; throw new Error('injected resolve failure') }
+        return { file: '/bin/shell', args: [], display: 'shell' }
+      },
+    })
+    await assert.rejects(manager.start(startRequest()), boundary === 'stat' ? /工作目录不存在/ : new RegExp(`injected ${boundary} failure`))
+    const session = await manager.start(startRequest())
+    assert.equal(session.backend, 'pty', `${boundary} failure releases its reservation`)
+    manager.disposeAll()
+  }
+})
+
+test('terminal manager refuses pending starts disposed during prepare or resolve', async () => {
+  for (const boundary of ['prepare', 'resolve']) {
+    let enter
+    const entered = new Promise(resolve => { enter = resolve })
+    let release
+    const gate = new Promise(resolve => { release = resolve })
+    const launch = async () => ({ file: '/bin/shell', args: [], display: 'shell' })
+    const { manager, pty } = managerWith({
+      prepare: boundary === 'prepare' ? async () => { enter(); await gate } : async () => {},
+      resolveLaunch: boundary === 'resolve' ? async () => { enter(); await gate; return launch() } : launch,
+    })
+    const pending = manager.start(startRequest())
+    await entered
+    manager.disposeAll()
+    release()
+    await assert.rejects(pending, /卸载/)
+    assert.equal(pty.spawned.length, 0, `${boundary} continuation cannot spawn after disposeAll`)
+  }
+})
+
+test('managed manager: host exit retains capacity and stop until late tree/output proof updates the same record', async () => {
+  const managed = fakeManaged()
+  const updates = []
+  const clock = { now: 1_000 }
+  const { manager, ended } = managerWith({
+    ...managedOptions(managed), clock, limits: { ...TERMINAL_LIMITS, maxSessions: 1 },
+    onSessionUpdate: record => updates.push(record),
+  })
+  const session = await manager.start(startRequest())
+  const proc = managed.spawned[0]
+  assert.equal(proc.resumeCalls, 1)
+  assert.equal(session.containment, 'windows-job')
+  proc.emit('host output')
+  proc.exit(0)
+  assert.equal(ended.length, 1)
+  let output = await manager.read({ sessionId: session.sessionId, cursor: 0 })
+  assert.deepEqual({ data: output.data, exited: output.exited, closed: output.closed, treeClosed: output.treeClosed },
+    { data: 'host output', exited: true, closed: false, treeClosed: false })
+  await assert.rejects(manager.start(startRequest()), /最多同时运行 1 个/)
+  const stopped = manager.stop({ sessionId: session.sessionId })
+  assert.deepEqual({ stopped: stopped.stopped, stopRequested: stopped.stopRequested, stopConfirmed: stopped.stopConfirmed, exited: stopped.exited },
+    { stopped: false, stopRequested: true, stopConfirmed: false, exited: true })
+  manager.stop({ sessionId: session.sessionId })
+  assert.equal(proc.killCalls, 1)
+  clock.now += 61_000
+  manager.sweep()
+  assert.ok(manager.info().sessions.some(item => item.sessionId === session.sessionId), 'host exit alone never sweeps a live tree')
+  proc.closeTree()
+  proc.dropOutput(9)
+  proc.closeOutput({ outputTruncated: true, bytesDropped: 9 })
+  proc.resolveClosed({ outputTruncated: true, bytesDropped: 9 })
+  await new Promise(resolve => setImmediate(resolve))
+  output = await manager.read({ sessionId: session.sessionId, cursor: output.cursor })
+  assert.deepEqual({ closed: output.closed, treeClosed: output.treeClosed, outputClosed: output.outputClosed,
+    stopConfirmed: output.stopConfirmed, outputTruncated: output.outputTruncated, bytesDropped: output.bytesDropped },
+    { closed: true, treeClosed: true, outputClosed: true, stopConfirmed: true, outputTruncated: true, bytesDropped: 9 })
+  assert.equal(ended.length, 1, 'late proof events never repeat the host-end callback')
+  assert.ok(updates.length >= 3)
+  assert.ok(updates.every(record => record.id === session.sessionId))
+  assert.equal(updates.at(-1).treeClosed, true)
+  assert.equal(updates.at(-1).outputTruncated, true)
+  const next = await manager.start(startRequest())
+  assert.equal(next.backend, 'managed', 'tree proof releases capacity even though the prior host already exited')
+  manager.disposeAll()
+  assert.equal(managed.spawned[1].killCalls, 1)
+})
+
+test('managed manager: control loss and kill acceptance never manufacture tree confirmation', async () => {
+  const managed = fakeManaged()
+  const { manager, ended } = managerWith(managedOptions(managed))
+  const session = await manager.start(startRequest())
+  const stopped = manager.stop({ sessionId: session.sessionId })
+  assert.equal(stopped.stopRequested, true)
+  assert.equal(stopped.stopConfirmed, false)
+  managed.spawned[0].loseControl('NATIVE_TERMINAL_STOP_TIMEOUT')
+  const output = await manager.read({ sessionId: session.sessionId, cursor: 0 })
+  assert.deepEqual({ exited: output.exited, controlLost: output.controlLost, controlError: output.controlError,
+    stopRequested: output.stopRequested, stopConfirmed: output.stopConfirmed, treeClosed: output.treeClosed },
+    { exited: false, controlLost: true, controlError: 'NATIVE_TERMINAL_STOP_TIMEOUT', stopRequested: true, stopConfirmed: false, treeClosed: false })
+  assert.equal(ended.length, 0)
+})
+
+test('managed manager: startup failure is explicit and never falls back to legacy PTY', async () => {
+  const managed = fakeManaged()
+  const { manager, pty } = managerWith({ ...managedOptions(managed),
+    createManaged: async () => { throw new Error('NATIVE_TERMINAL_UNSUPPORTED') } })
+  assert.equal(manager.info().backend, 'managed')
+  await assert.rejects(manager.start(startRequest()), /NATIVE_TERMINAL_UNSUPPORTED/)
+  assert.equal(pty.spawned.length, 0)
+})
+
+test('managed manager: orphan and dispose still stop the tree after host exit', async () => {
+  for (const reason of ['orphan', 'dispose']) {
+    const managed = fakeManaged()
+    const clock = { now: 1_000 }
+    const { manager } = managerWith({ ...managedOptions(managed), clock })
+    const session = await manager.start(startRequest())
+    managed.spawned[0].exit(0)
+    if (reason === 'orphan') {
+      clock.now += TERMINAL_LIMITS.orphanTimeoutMs + 1
+      manager.sweep()
+    } else manager.disposeAll()
+    assert.equal(managed.spawned[0].killCalls, 1)
+    const current = manager.info().sessions.find(item => item.sessionId === session.sessionId)
+    assert.deepEqual({ exited: current.exited, stopRequested: current.stopRequested, stopConfirmed: current.stopConfirmed },
+      { exited: true, stopRequested: true, stopConfirmed: false })
+  }
+})
+
+test('managed manager: listeners are installed before resume so immediate exit and closure are not lost', async () => {
+  const managed = fakeManaged()
+  const createManaged = async options => {
+    const proc = await managed.createManaged(options)
+    proc.resume = async () => {
+      proc.resumeCalls += 1
+      proc.exit(0)
+      proc.closeTree()
+      proc.closeOutput()
+      proc.resolveClosed()
+    }
+    return proc
+  }
+  const { manager, ended } = managerWith({ ...managedOptions(managed), createManaged })
+  const session = await manager.start(startRequest())
+  assert.equal(managed.spawned[0].resumeCalls, 1)
+  assert.equal(ended.length, 1)
+  const output = await manager.read({ sessionId: session.sessionId, cursor: 0 })
+  assert.deepEqual({ exited: output.exited, treeClosed: output.treeClosed, outputClosed: output.outputClosed, closed: output.closed },
+    { exited: true, treeClosed: true, outputClosed: true, closed: true })
+  assert.equal(session.exitCode, 0)
+})
+
+test('managed manager: dispose during async factory prevents resume and cleans the owned start', async () => {
+  const managed = fakeManaged()
+  let enter
+  const entered = new Promise(resolve => { enter = resolve })
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  const createManaged = async options => {
+    enter()
+    await gate
+    const proc = await managed.createManaged(options)
+    proc.resolveClosed()
+    return proc
+  }
+  const { manager } = managerWith({ ...managedOptions(managed), createManaged })
+  const pending = manager.start(startRequest())
+  await entered
+  manager.disposeAll()
+  release()
+  await assert.rejects(pending, /卸载/)
+  assert.equal(managed.spawned[0].resumeCalls, 0)
+  assert.equal(managed.spawned[0].killCalls, 1)
+  assert.equal(manager.info().sessions.length, 0)
+})
+
+test('managed manager: pending resume slots are reserved exactly once', async () => {
+  const managed = fakeManaged()
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  const createManaged = async options => {
+    const proc = await managed.createManaged(options)
+    proc.resume = async () => { proc.resumeCalls += 1; await gate }
+    return proc
+  }
+  const { manager } = managerWith({ ...managedOptions(managed), createManaged,
+    limits: { ...TERMINAL_LIMITS, maxSessions: 4 } })
+  const starts = Array.from({ length: 5 }, () => manager.start(startRequest()))
+  const settled = Promise.allSettled(starts)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(managed.spawned.length, 4)
+  release()
+  const results = await settled
+  assert.equal(results.filter(result => result.status === 'fulfilled').length, 4)
+  assert.equal(results.filter(result => result.status === 'rejected').length, 1)
+  assert.match(results.find(result => result.status === 'rejected').reason.message, /最多同时运行 4 个/)
+  manager.disposeAll()
 })
 
 test('manager: lifetime cap and bounded output buffer', async () => {
@@ -448,7 +842,7 @@ test('manager falls back to pipes with a clear limitation when the PTY cannot lo
   assert.equal(session.backend, 'pipe')
   assert.match(session.limitation, /管道模式/)
   assert.equal(pipes[0].launch.file, '/bin/codex')
-  assert.deepEqual(manager.resize({ sessionId: session.sessionId, cols: 100, rows: 30 }), { resized: false })
+  assert.deepEqual(await manager.resize({ sessionId: session.sessionId, cols: 100, rows: 30 }), { resized: false })
 })
 
 test('pipe process echoes input, maps Enter and turns Ctrl+C into a kill', { skip: process.platform === 'win32' }, async () => {
@@ -550,6 +944,14 @@ test('client: launch choices come from the health check; confirmation states the
   assert.match(details.points.join('\n'), /自己的 CLI 登录/)
   assert.match(details.points.join('\n'), /不会被记录/)
   assert.match(endDescription({ endReason: 'exit', exitCode: 2 }), /退出码 2/)
+  const stopping = endDescription({ endReason: 'stopped', stopRequested: true, stopConfirmed: false, exited: false })
+  assert.match(stopping, /正在停止/)
+  assert.match(stopping, /尚未确认/)
+  assert.doesNotMatch(stopping, /已由你结束|已自动结束|会话已结束/)
+  const exitedWithoutTreeProof = endDescription({ endReason: 'stopped', exitCode: 7, stopRequested: true, stopConfirmed: false, exited: true })
+  assert.match(exitedWithoutTreeProof, /会话已退出，退出码 7，但派生进程停止尚未确认/)
+  assert.doesNotMatch(exitedWithoutTreeProof, /已由你结束/)
+  assert.match(endDescription({ endReason: 'lost', exitCode: null }), /状态未知/)
 })
 
 test('terminal refresh ignores an earlier directory response arriving after a newer refresh', async () => {
@@ -602,7 +1004,7 @@ test('client transport: ordered coalesced input, long-poll output, single stop',
   release()
   await loop
   assert.equal(screen, 'hello world')
-  assert.deepEqual(exit, { endReason: 'exit', exitCode: 0 })
+  assert.deepEqual(exit, { endReason: 'exit', exitCode: 0, stopRequested: false, stopConfirmed: false, exited: true })
   assert.deepEqual(calls.filter(call => call[0] === 'write'), [['write', 'a'], ['write', 'bc']], 'input order is kept; keys typed during a write are batched')
   assert.deepEqual(calls.filter(call => call[0] === 'resize'), [['resize', 120, 40]], 'resizes are debounced')
   await connection.stop()
@@ -613,6 +1015,55 @@ test('client transport: ordered coalesced input, long-poll output, single stop',
   await live.stop()
   await live.stop()
   assert.equal(calls.filter(call => call[0] === 'stop').length, 1, 'closing the panel stops the session once')
+})
+
+test('client transport exposes stopping and host-exited tree-unconfirmed as distinct states', async () => {
+  const outputs = [
+    { data: '', cursor: 0, exited: false, endReason: 'stopped', stopRequested: true, stopConfirmed: false },
+    { data: '', cursor: 0, exited: true, exitCode: 7, endReason: 'stopped', stopRequested: true, stopConfirmed: false },
+  ]
+  const statuses = []
+  let exit = null
+  const connection = new TerminalConnection({
+    api: { terminalRead: async () => ({ ok: true, value: outputs.shift() }) },
+    sessionId: 'term-abcdef123456', onStatus: status => statuses.push(status), onExit: event => { exit = event },
+  })
+  await connection.start()
+  assert.deepEqual(statuses, [
+    { stopRequested: true, stopConfirmed: false, exited: false, endReason: 'stopped' },
+    { stopRequested: true, stopConfirmed: false, exited: true, endReason: 'stopped' },
+  ])
+  assert.deepEqual(exit, { stopRequested: true, stopConfirmed: false, exited: true, endReason: 'stopped', exitCode: 7 })
+})
+
+test('client transport: managed host exit keeps polling until tree/output closure and buffer drain', async () => {
+  const outputs = [
+    { backend: 'managed', treeTracking: true, containment: 'windows-job', data: 'tail', cursor: 4,
+      exited: true, exitCode: 0, endReason: 'exit', treeClosed: false, outputClosed: false, closed: false },
+    { backend: 'managed', treeTracking: true, containment: 'windows-job', data: '', cursor: 4,
+      exited: true, exitCode: 0, endReason: 'exit', treeClosed: true, stopConfirmed: true, outputClosed: false, closed: false },
+    { backend: 'managed', treeTracking: true, containment: 'windows-job', data: '', cursor: 4,
+      exited: true, exitCode: 0, endReason: 'exit', treeClosed: true, stopConfirmed: true, outputClosed: true,
+      outputTruncated: true, bytesDropped: 12, closed: true },
+  ]
+  const statuses = []
+  const exits = []
+  let screen = ''
+  const connection = new TerminalConnection({
+    api: { terminalRead: async () => ({ ok: true, value: outputs.shift() }) },
+    sessionId: 'term-abcdef123456', onData: data => { screen += data },
+    onStatus: status => statuses.push(status), onExit: event => exits.push(event),
+  })
+  await connection.start()
+  assert.equal(screen, 'tail')
+  assert.equal(statuses.length, 3)
+  assert.equal(statuses[0].exited, true)
+  assert.equal(statuses[0].treeClosed, false)
+  assert.equal(statuses[1].outputClosed, false)
+  assert.equal(exits.length, 1)
+  assert.deepEqual({ treeClosed: exits[0].treeClosed, outputClosed: exits[0].outputClosed,
+    outputTruncated: exits[0].outputTruncated, bytesDropped: exits[0].bytesDropped },
+    { treeClosed: true, outputClosed: true, outputTruncated: true, bytesDropped: 12 })
 })
 
 test('stale Host: a 404 for a new remote method becomes restart advice; list() reports the Host version', async () => {
