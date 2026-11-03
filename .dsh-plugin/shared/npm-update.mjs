@@ -99,9 +99,9 @@ export async function findInstalledPackageVersion(moduleUrl, read = readFile) {
   }
 }
 
-async function npmLatest(fetchImpl, signal) {
+async function npmTagVersion(fetchImpl, tag, signal) {
   const encoded = encodeURIComponent(ROUTER_PACKAGE_NAME)
-  const response = await fetchImpl(`${ROUTER_NPM_REGISTRY}${encoded}/latest`, {
+  const response = await fetchImpl(`${ROUTER_NPM_REGISTRY}${encoded}/${tag}`, {
     method: 'GET',
     redirect: 'error',
     cache: 'no-store',
@@ -117,6 +117,22 @@ async function npmLatest(fetchImpl, signal) {
     throw new Error('npm registry returned invalid latest metadata')
   }
   return metadata.version
+}
+
+/**
+ * The version this install should move to.
+ *
+ * A preview install follows the `preview` tag: `latest` is the stable channel, so comparing a
+ * prerelease against it reports "already up to date" and the panel never offers the preview
+ * release. A stable install keeps following `latest`.
+ */
+async function npmLatest(fetchImpl, { current = null, signal } = {}) {
+  const prerelease = (versionParts(current)?.prerelease.length ?? 0) > 0
+  if (prerelease) {
+    try { return await npmTagVersion(fetchImpl, 'preview', signal) }
+    catch (error) { if (signal?.aborted) throw error }
+  }
+  return npmTagVersion(fetchImpl, 'latest', signal)
 }
 
 function captureBoundedOutput(stream) {
@@ -241,8 +257,8 @@ export function createNpmUpdateHandler({
     const timeoutSignal = AbortSignal.timeout(timeoutMs)
     const signal = AbortSignal.any([requestSignal, timeoutSignal])
     try {
-      const version = await npmLatest(fetchImpl, signal)
       const currentVersion = await findInstalledPackageVersion(moduleUrl)
+      const version = await npmLatest(fetchImpl, { current: currentVersion, signal })
       const order = currentVersion === null ? null : compareVersions(currentVersion, version)
       if (order !== null && order >= 0) {
         return {
