@@ -28168,7 +28168,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.0-preview.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.26.0-preview.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -28313,24 +28313,42 @@ function confirmationDetails({ target, mode = "interactive", cwd, platform = "wi
     points: [
       "该终端不经过 Harness 进程沙箱：它和你自己打开的终端一样，能读写你账号可访问的所有文件、运行任何命令。",
       target === TERMINAL_SHELL_ID ? "使用你的登录环境变量（PATH、代理、API Key 等）。" : "使用你自己的 CLI 登录状态和环境变量（PATH、代理、API Key 等）；产生的费用按该 CLI 的账号或套餐计费。",
-      "输入和输出不会被记录；执行历史只保存工具、工作目录、开始/结束时间和退出码。",
-      "关闭工作台面板、结束会话或长时间无人查看（约 2 分钟）时，终端进程会被结束。"
+      "输入、输出和环境变量不会被记录；执行历史只保存工具、工作目录、时间、退出码及进程树/输出状态等元数据。",
+      "关闭工作台面板、结束会话或长时间无人查看（约 2 分钟）时，会请求停止终端；实际退出前不会显示为已结束，派生进程停止可能无法确认。"
     ]
   };
 }
-function endDescription({ endReason, exitCode }) {
-  let code = exitCode == null ? "" : `，退出码 ${exitCode}`;
+function endDescription({
+  endReason,
+  exitCode,
+  stopRequested = !1,
+  stopConfirmed = !1,
+  exited = !0,
+  treeTracking = !1,
+  treeClosed = !1,
+  controlLost = !1,
+  outputTruncated = !1,
+  bytesDropped = 0
+}) {
+  let code = exitCode == null ? "" : `，退出码 ${exitCode}`, truncation = outputTruncated ? `；输出不完整${bytesDropped > 0 ? `，已丢弃 ${bytesDropped} 字节` : ""}。` : "";
+  if (controlLost) return `终端控制连接已丢失，派生进程状态未知${code}${truncation}`;
+  if (stopRequested && !stopConfirmed)
+    return exited ? `会话已退出${code}，但派生进程停止尚未确认${truncation}` : `停止请求已受理，正在停止；派生进程停止尚未确认${truncation}`;
+  if (stopRequested && stopConfirmed && treeClosed) return `会话及派生进程树已确认停止${code}${truncation}`;
+  if (treeTracking && exited && !treeClosed) return `宿主进程已退出${code}，派生进程树尚未确认关闭${truncation}`;
   switch (endReason) {
     case "stopped":
-      return `已由你结束${code}。`;
+      return `已由你结束${code}${truncation}`;
     case "orphan":
-      return "长时间没有面板读取输出，已自动结束。";
+      return `长时间没有面板读取输出，已自动结束${truncation}`;
     case "lifetime":
-      return "会话达到最长时长（6 小时），已自动结束。";
+      return `会话达到最长时长（6 小时），已自动结束${truncation}`;
     case "dispose":
-      return "插件已卸载或重新加载，会话已结束。";
+      return `插件已卸载或重新加载，会话已结束${truncation}`;
+    case "lost":
+      return `终端连接已丢失，进程状态未知${truncation}`;
     default:
-      return `进程已退出${code}。`;
+      return `进程已退出${code}${truncation}`;
   }
 }
 var formatDuration = (ms2) => {
@@ -28352,7 +28370,7 @@ function unwrapTerminal(response, fallback) {
 var unwrap = unwrapTerminal;
 async function loadTerminalInfo(api) {
   let info = unwrap(await api.terminalInfo(), "无法读取终端状态。");
-  if (!info || typeof info != "object" || !["pty", "pipe"].includes(info.backend)) throw new Error("终端状态格式无效。");
+  if (!info || typeof info != "object" || !["managed", "pty", "pipe"].includes(info.backend)) throw new Error("终端状态格式无效。");
   return info;
 }
 var TerminalInfoRefresher = class {
@@ -28381,8 +28399,8 @@ async function startTerminal(api, request) {
   return session;
 }
 var TerminalConnection = class {
-  constructor({ api, sessionId, onData, onExit, onError, waitMs = 800, retryMs = 1e3, resizeDelayMs = 120, setTimer = setTimeout, clearTimer = clearTimeout }) {
-    Object.assign(this, { api, sessionId, onData, onExit, onError, waitMs, retryMs, resizeDelayMs }), this.setTimer = (callback, ms2) => setTimer(callback, ms2), this.clearTimer = (id2) => clearTimer(id2), this.cursor = 0, this.closed = !1, this.pendingInput = "", this.writing = null, this.resizeTimer = null, this.failures = 0;
+  constructor({ api, sessionId, onData, onExit, onStatus, onError, waitMs = 800, retryMs = 1e3, resizeDelayMs = 120, setTimer = setTimeout, clearTimer = clearTimeout }) {
+    Object.assign(this, { api, sessionId, onData, onExit, onStatus, onError, waitMs, retryMs, resizeDelayMs }), this.setTimer = (callback, ms2) => setTimer(callback, ms2), this.clearTimer = (id2) => clearTimer(id2), this.cursor = 0, this.closed = !1, this.pendingInput = "", this.writing = null, this.resizeTimer = null, this.failures = 0;
   }
   start() {
     return isTerminalSessionId(this.sessionId) ? (this.loop = this.readLoop(), this.loop) : (this.closed = !0, this.onError?.(new Error("终端会话 ID 无效，无法读取输出。")), this.onExit?.({ endReason: "lost", exitCode: null }), this.loop = Promise.resolve(), this.loop);
@@ -28402,16 +28420,32 @@ var TerminalConnection = class {
         continue;
       }
       if (this.closed) return;
-      if (output.dropped && this.onData?.(`\r
+      let managed = output.backend === "managed" || output.treeTracking === !0, status = {
+        stopRequested: output.stopRequested === !0,
+        stopConfirmed: output.stopConfirmed === !0,
+        exited: output.exited === !0,
+        endReason: output.endReason ?? null
+      };
+      if ((output.backend !== void 0 || output.treeTracking !== void 0) && Object.assign(status, {
+        backend: output.backend ?? (managed ? "managed" : "pty"),
+        treeTracking: output.treeTracking === !0,
+        containment: output.containment ?? null,
+        treeClosed: output.treeClosed === !0,
+        outputClosed: output.outputClosed === !0,
+        outputTruncated: output.outputTruncated === !0,
+        bytesDropped: Number.isSafeInteger(output.bytesDropped) ? output.bytesDropped : 0,
+        controlLost: output.controlLost === !0,
+        controlError: output.controlError ?? null
+      }), this.hostExited ||= status.exited, this.onStatus?.(status), output.dropped && this.onData?.(`\r
 [部分较早的输出已丢弃]\r
-`), output.data && this.onData?.(output.data), this.cursor = output.cursor, output.exited) {
-        this.closed = !0, this.onExit?.({ endReason: output.endReason, exitCode: output.exitCode });
+`), output.data && this.onData?.(output.data), this.cursor = output.cursor, output.closed === !0 || !managed && output.exited) {
+        this.closed = !0, this.onExit?.({ ...status, exitCode: output.exitCode });
         return;
       }
     }
   }
   send(data) {
-    this.closed || !data || (this.pendingInput += data, this.writing || (this.writing = this.flush()));
+    this.closed || this.hostExited || !data || (this.pendingInput += data, this.writing || (this.writing = this.flush()));
   }
   async flush() {
     try {
@@ -28466,7 +28500,7 @@ var THEME2 = Object.freeze({
   cursor: "#d4d4d4",
   selectionBackground: "#264f78"
 });
-function TerminalPane({ api, session, active, onEnded }) {
+function TerminalPane({ api, session, active, onEnded, onStatus }) {
   let host = import_react48.default.useRef(null), [error, setError] = import_react48.default.useState("");
   return import_react48.default.useEffect(() => {
     let term = new Dl({
@@ -28487,6 +28521,7 @@ function TerminalPane({ api, session, active, onEnded }) {
 \x1B[90m[${endDescription(event)}]\x1B[0m\r
 `), onEnded(session.sessionId, event);
       },
+      onStatus: (status) => onStatus(session.sessionId, status),
       onError: (failure) => setError(errorText(failure, "终端通信失败。"))
     });
     term.attachCustomKeyEventHandler((event) => {
@@ -28544,14 +28579,20 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
       mounted.current && setStarting(!1);
     }
   }, onEnded = import_react48.default.useCallback((sessionId, event) => {
-    mounted.current && (setSessions((previous) => previous.map((item) => item.sessionId === sessionId ? { ...item, ended: event } : item)), loadInfo());
-  }, [loadInfo]), closeTab = (sessionId) => {
+    mounted.current && (setSessions((previous) => previous.map((item) => item.sessionId === sessionId ? { ...item, ...event, ended: event } : item)), loadInfo());
+  }, [loadInfo]), onStatus = import_react48.default.useCallback((sessionId, status) => {
+    mounted.current && setSessions((previous) => previous.map((item) => item.sessionId === sessionId ? { ...item, ...status } : item));
+  }, []), closeTab = (sessionId) => {
     setSessions((previous) => {
       let next = previous.filter((item) => item.sessionId !== sessionId);
       return activeId === sessionId && setActiveId(next.at(-1)?.sessionId ?? ""), next;
     });
-  }, stopSession = (sessionId) => {
-    api.terminalStop({ sessionId });
+  }, stopSession = async (sessionId) => {
+    try {
+      let status = unwrapTerminal(await api.terminalStop({ sessionId }), "无法停止终端会话。");
+      onStatus(sessionId, status);
+    } catch {
+    }
   }, active = sessions.find((item) => item.sessionId === activeId), history = info.value?.history ?? [];
   return /* @__PURE__ */ import_react48.default.createElement("section", { className: "mr-card", "aria-label": "官方工具终端" }, /* @__PURE__ */ import_react48.default.createElement("style", null, xterm_default), /* @__PURE__ */ import_react48.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react48.default.createElement("div", null, /* @__PURE__ */ import_react48.default.createElement("h2", { className: "mr-card-title" }, "官方工具终端"), /* @__PURE__ */ import_react48.default.createElement("p", { className: "mr-card-copy" }, "在工作台里交互式运行 PowerShell、已安装的 CLI（包括独立 ZCode CLI TUI）（多轮对话、实时输出，可用于 ", /* @__PURE__ */ import_react48.default.createElement("code", null, "codex login"), " 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。")), /* @__PURE__ */ import_react48.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     loadInfo();
@@ -28577,7 +28618,9 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
     setStartError(""), setConfirming(!0);
   } }, "开始"), /* @__PURE__ */ import_react48.default.createElement("span", { className: "mr-caption" }, problem || (live >= maxSessions ? `最多同时运行 ${maxSessions} 个会话。` : `将运行：${details.command}`))), confirming && /* @__PURE__ */ import_react48.default.createElement("div", { className: "mr-term-confirm", role: "dialog", "aria-label": "确认启动终端" }, /* @__PURE__ */ import_react48.default.createElement("strong", null, details.title), /* @__PURE__ */ import_react48.default.createElement("p", { className: "mr-caption" }, "命令：", /* @__PURE__ */ import_react48.default.createElement("code", null, details.command), /* @__PURE__ */ import_react48.default.createElement("br", null), "工作目录：", /* @__PURE__ */ import_react48.default.createElement("code", null, details.cwd)), /* @__PURE__ */ import_react48.default.createElement("ul", null, details.points.map((point) => /* @__PURE__ */ import_react48.default.createElement("li", { key: point }, point))), /* @__PURE__ */ import_react48.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react48.default.createElement("button", { className: "mr-button", type: "button", disabled: starting, onClick: () => {
     start();
-  } }, starting ? "正在启动…" : "确认启动"), /* @__PURE__ */ import_react48.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: starting, onClick: () => setConfirming(!1) }, "取消"))), startError && /* @__PURE__ */ import_react48.default.createElement("p", { className: "mr-error", role: "alert" }, startError), sessions.length > 0 && /* @__PURE__ */ import_react48.default.createElement("div", { className: "mr-term-tabs", role: "tablist", "aria-label": "终端会话" }, sessions.map((item) => /* @__PURE__ */ import_react48.default.createElement("div", { key: item.sessionId, className: "mr-term-tab", role: "tab", "aria-selected": item.sessionId === activeId }, /* @__PURE__ */ import_react48.default.createElement("button", { type: "button", className: "mr-term-tab-label", onClick: () => setActiveId(item.sessionId), title: `${item.display} · ${item.cwd}` }, item.label, item.mode === "login" ? " · 登录" : "", item.ended ? " · 已结束" : ""), item.ended ? /* @__PURE__ */ import_react48.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": "关闭标签", onClick: () => closeTab(item.sessionId) }, "×") : /* @__PURE__ */ import_react48.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": "结束会话", title: "结束会话", onClick: () => stopSession(item.sessionId) }, "■")))), sessions.map((item) => /* @__PURE__ */ import_react48.default.createElement(TerminalPane, { key: item.sessionId, api, session: item, active: item.sessionId === activeId, onEnded })), active && /* @__PURE__ */ import_react48.default.createElement("p", { className: "mr-caption" }, active.ended ? endDescription(active.ended) : `${active.display} · ${active.cwd} · 选中文字后 Ctrl+C 复制，Ctrl+Shift+V 粘贴；拖动右下角可调整高度。`), history.length > 0 && /* @__PURE__ */ import_react48.default.createElement("details", { className: "mr-term-history" }, /* @__PURE__ */ import_react48.default.createElement("summary", null, "最近的终端会话（只记录工具、目录和时长）"), /* @__PURE__ */ import_react48.default.createElement("table", { className: "mr-term-table" }, /* @__PURE__ */ import_react48.default.createElement("thead", null, /* @__PURE__ */ import_react48.default.createElement("tr", null, /* @__PURE__ */ import_react48.default.createElement("th", null, "开始"), /* @__PURE__ */ import_react48.default.createElement("th", null, "工具"), /* @__PURE__ */ import_react48.default.createElement("th", null, "工作目录"), /* @__PURE__ */ import_react48.default.createElement("th", null, "时长"), /* @__PURE__ */ import_react48.default.createElement("th", null, "结果"))), /* @__PURE__ */ import_react48.default.createElement("tbody", null, history.map((item) => /* @__PURE__ */ import_react48.default.createElement("tr", { key: item.id }, /* @__PURE__ */ import_react48.default.createElement("td", null, item.startedAt ? new Date(item.startedAt).toLocaleString() : "—"), /* @__PURE__ */ import_react48.default.createElement("td", null, item.label, item.mode === "login" ? " · 登录" : "", item.backend === "pipe" ? " · 管道" : ""), /* @__PURE__ */ import_react48.default.createElement("td", { title: item.cwd }, item.cwd), /* @__PURE__ */ import_react48.default.createElement("td", null, formatDuration(item.durationMs)), /* @__PURE__ */ import_react48.default.createElement("td", null, endDescription(item)))))))));
+  } }, starting ? "正在启动…" : "确认启动"), /* @__PURE__ */ import_react48.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: starting, onClick: () => setConfirming(!1) }, "取消"))), startError && /* @__PURE__ */ import_react48.default.createElement("p", { className: "mr-error", role: "alert" }, startError), sessions.length > 0 && /* @__PURE__ */ import_react48.default.createElement("div", { className: "mr-term-tabs", role: "tablist", "aria-label": "终端会话" }, sessions.map((item) => /* @__PURE__ */ import_react48.default.createElement("div", { key: item.sessionId, className: "mr-term-tab", role: "tab", "aria-selected": item.sessionId === activeId }, /* @__PURE__ */ import_react48.default.createElement("button", { type: "button", className: "mr-term-tab-label", onClick: () => setActiveId(item.sessionId), title: `${item.display} · ${item.cwd}` }, item.label, item.mode === "login" ? " · 登录" : "", item.ended ? item.stopRequested && !item.stopConfirmed ? " · 已退出（派生进程未确认）" : " · 已结束" : item.stopRequested ? item.exited ? " · 宿主已退出（停止未确认）" : " · 停止中" : item.exited && item.treeTracking ? " · 宿主已退出（后代待确认）" : ""), item.ended ? /* @__PURE__ */ import_react48.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": "关闭标签", onClick: () => closeTab(item.sessionId) }, "×") : /* @__PURE__ */ import_react48.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": item.stopRequested ? "停止未确认" : "结束会话", title: item.stopRequested ? "停止已请求，等待实际退出" : "结束会话", disabled: item.stopRequested, onClick: () => {
+    stopSession(item.sessionId);
+  } }, "■")))), sessions.map((item) => /* @__PURE__ */ import_react48.default.createElement(TerminalPane, { key: item.sessionId, api, session: item, active: item.sessionId === activeId, onEnded, onStatus })), active && /* @__PURE__ */ import_react48.default.createElement("p", { className: "mr-caption" }, active.ended ? endDescription(active.ended) : active.stopRequested || active.exited && active.treeTracking ? endDescription(active) : `${active.display} · ${active.cwd} · 选中文字后 Ctrl+C 复制，Ctrl+Shift+V 粘贴；拖动右下角可调整高度。`), history.length > 0 && /* @__PURE__ */ import_react48.default.createElement("details", { className: "mr-term-history" }, /* @__PURE__ */ import_react48.default.createElement("summary", null, "最近的终端会话（不记录输入、输出或环境变量）"), /* @__PURE__ */ import_react48.default.createElement("table", { className: "mr-term-table" }, /* @__PURE__ */ import_react48.default.createElement("thead", null, /* @__PURE__ */ import_react48.default.createElement("tr", null, /* @__PURE__ */ import_react48.default.createElement("th", null, "开始"), /* @__PURE__ */ import_react48.default.createElement("th", null, "工具"), /* @__PURE__ */ import_react48.default.createElement("th", null, "工作目录"), /* @__PURE__ */ import_react48.default.createElement("th", null, "时长"), /* @__PURE__ */ import_react48.default.createElement("th", null, "结果"))), /* @__PURE__ */ import_react48.default.createElement("tbody", null, history.map((item) => /* @__PURE__ */ import_react48.default.createElement("tr", { key: item.id }, /* @__PURE__ */ import_react48.default.createElement("td", null, item.startedAt ? new Date(item.startedAt).toLocaleString() : "—"), /* @__PURE__ */ import_react48.default.createElement("td", null, item.label, item.mode === "login" ? " · 登录" : "", item.backend === "pipe" ? " · 管道" : ""), /* @__PURE__ */ import_react48.default.createElement("td", { title: item.cwd }, item.cwd), /* @__PURE__ */ import_react48.default.createElement("td", null, formatDuration(item.durationMs)), /* @__PURE__ */ import_react48.default.createElement("td", null, endDescription(item)))))))));
 }
 
 // .dsh-plugin/client/router-main.css

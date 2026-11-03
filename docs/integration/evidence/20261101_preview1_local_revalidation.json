@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-01",
+  "workOrders": ["K1", "K2"],
+  "parentCheckpoint": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+  "parentEvidence": "docs/integration/evidence/20261101_preview_release_0_26_0.json",
+  "actualModelCalls": 0,
+  "level": "local/integration revalidation only; not hosted CI or production product acceptance",
+  "componentAcceptance": "K1 corrected the CI-only upstream filter to an exactly anchored --test-skip-pattern and verified both CI-mode exclusion and non-CI full-suite execution. K2 completed frozen/strict dependency installation, root regression, client, default-product, migration-restore and integration-focused revalidation. All results are local to the uncommitted 0.26.0-preview.1 working tree.",
+  "productAcceptance": "No new formal acceptance is claimed. Formal status remains 0/20 work packages, 44/63 scenarios, M0 11/12, and G1-G4 in_progress. Production activation, all-domain stop-write, post-activation rollback and full platform/deployment acceptance remain open.",
+  "release": {
+    "version": "0.26.0-preview.1",
+    "branch": "feat/bot-integration",
+    "head": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+    "state": "local uncommitted working tree; untagged and unpublished",
+    "hostedGithubActionsRun": false,
+    "localCiSimulationIsHostedCi": false
+  },
+  "environment": {
+    "node": "v24.20.0",
+    "npm": "11.19.0",
+    "pinnedPnpm": "10.34.6",
+    "globalPnpmLauncher": "Known Corepack cache error remains; the pinned repository pnpm was invoked directly instead."
+  },
+  "skipPatternSemantics": "On Node 24.20.0, CLI --test-skip-pattern matches are omitted from spec/TAP output and the test total. They produce no additional SKIP line and do not increment skipped. The exactly excluded upstream path-redaction test is unverified in CI mode, not the reported skipped test and not passed there.",
+  "testRuns": [
+    {
+      "workOrder": "K1",
+      "mode": "local CI simulation",
+      "command": "GITHUB_ACTIONS=true node scripts/integration-product-upstream-tests.mjs",
+      "exitCode": 0,
+      "tests": 1061,
+      "pass": 1060,
+      "fail": 0,
+      "skipped": 1,
+      "targetTitle": "warnings are kept, cleaned, written to the log, and read back after a restart",
+      "targetTitlePresent": false,
+      "conclusion": "Exact CI exclusion; target unverified in this mode."
+    },
+    {
+      "workOrder": "K1",
+      "mode": "local non-CI full upstream",
+      "command": "node scripts/integration-product-upstream-tests.mjs",
+      "exitCode": 0,
+      "tests": 1062,
+      "pass": 1061,
+      "fail": 0,
+      "skipped": 1,
+      "targetTitlePresentAndPassed": true,
+      "rerunInK2": false,
+      "frozenSource": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "frozenFilesUnchanged": 297
+    },
+    {
+      "workOrder": "K2",
+      "command": "node tmp/pnpm-10.34.6/package/bin/pnpm.cjs install --frozen-lockfile --strict-peer-dependencies",
+      "exitCode": 0,
+      "result": "frozen/strict dependency installation passed"
+    },
+    {
+      "workOrder": "K2",
+      "command": "npm test",
+      "exitCode": 0,
+      "tests": 1989,
+      "pass": 1901,
+      "fail": 0,
+      "skipped": 88,
+      "phases": [
+        { "tests": 1600, "pass": 1596, "fail": 0, "skipped": 4 },
+        { "tests": 389, "pass": 305, "fail": 0, "skipped": 84 }
+      ]
+    },
+    {
+      "workOrder": "K2",
+      "command": "npm run check:client",
+      "exitCode": 0,
+      "result": "build-client OK"
+    },
+    {
+      "workOrder": "K2",
+      "command": "node scripts/integration-product-default.mjs",
+      "exitCode": 0,
+      "checks": 47,
+      "passedChecks": 47,
+      "failedChecks": 0,
+      "actualModelCalls": 0
+    },
+    {
+      "workOrder": "K2",
+      "command": "node --test tests/migration-restore.test.mjs tests/migration-restore.native.mjs",
+      "exitCode": 0,
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "workOrder": "K2",
+      "command": "node --test tests/integration-combined-host.test.mjs tests/integration-progress.test.mjs tests/integration-documents.test.mjs tests/integration-inventory.test.mjs tests/product-client-build.test.mjs",
+      "exitCode": 0,
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "workOrder": "K2",
+      "command": "npm run integration:check",
+      "exitCode": 0,
+      "result": "32 requirements, 40 features, 63 acceptance scenarios, 20 work packages valid"
+    },
+    {
+      "workOrder": "K2",
+      "command": "node scripts/integration-progress.mjs report",
+      "exitCode": 0,
+      "result": "0/20 work packages; 44/63 acceptance scenarios; 11/12 M0 steps; G1-G4 in_progress"
+    },
+    {
+      "workOrder": "K2",
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "workTreeProtection": {
+    "k2ModifiedTrackedFilesBeforeAndAfter": 6,
+    "k2UntrackedDocumentsBeforeAndAfter": 2,
+    "statusEntriesChangedByK2Validation": false
+  },
+  "limitations": [
+    "No real GitHub Actions run has executed against the current preview.1 working tree. Local CI simulation is not hosted CI.",
+    "The 13 hosted native-peer tests and the real AtLogOn writer lifecycle remain explicitly skipped and unverified in CI, not passed.",
+    "The upstream path-redaction test is precisely excluded and unverified in CI mode; its local non-CI pass does not change that boundary.",
+    "Platform-specific skips do not provide cross-platform evidence. No real model, real account, production profile, production data or production process was used.",
+    "This evidence does not change any task, scenario, feature or gate status and does not authorize commit, push, tag, npm publication or a GitHub Release."
+  ]
+}

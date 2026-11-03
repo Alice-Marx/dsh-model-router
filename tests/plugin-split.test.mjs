@@ -135,7 +135,7 @@ test('invalid Host install settings reject previews and actions before any CLI i
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.26.0-preview.0')
+  assert.equal(manifest.version, '0.26.0-preview.1')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)
@@ -165,6 +165,18 @@ test('0.13.0 package rename: the loader imports the new name, the profile entry 
   assert.equal(ROUTER_PACKAGE_NAME, manifest.name, 'update checks query the renamed package')
   const host = await import('../.dsh-plugin/index.mjs')
   assert.equal(host.name, 'model-router-galgame')
+})
+
+test('managed terminal backend and its product/protocol regressions are packaged and registered', () => {
+  for (const path of [
+    'packages/cli-runtime/src/native-process.mjs',
+    'packages/cli-runtime/src/native-terminal.mjs',
+    'packages/cli-runtime/src/native-terminal-peer.ps1',
+    '.dsh-plugin/shared/cli-terminal.mjs',
+  ]) assert.ok(manifest.files.includes(path), `${path} must ship`)
+  assert.match(manifest.scripts.test, /tests\/native-terminal-protocol\.test\.mjs/)
+  assert.match(manifest.scripts.test, /tests\/cli-terminal-managed-pty\.native\.mjs/)
+  assert.match(manifest.scripts.test, /tests\/cli-terminal-managed-product\.native\.mjs/)
 })
 
 test('router remote retains installer methods and owns no GAL endpoints', () => {

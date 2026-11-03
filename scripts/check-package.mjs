@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { isBuiltin } from 'node:module'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -9,6 +10,11 @@ const ROOT = resolve(import.meta.dirname, '..')
 const portable = path => path.replaceAll('\\', '/')
 const exportTargets = value => typeof value === 'string' ? [value]
   : value && typeof value === 'object' ? Object.values(value).flatMap(exportTargets) : []
+// These scripts are launched by path, so they are not import-graph edges.
+const launchedDependencies = {
+  'packages/capability-broker/src/cli-bootstrap.mjs': ['packages/capability-broker/src/cli-stdio-bridge.mjs'],
+  'packages/cli-runtime/src/native-terminal.mjs': ['packages/cli-runtime/src/native-terminal-peer.ps1'],
+}
 
 /** Check membership without importing or executing any plugin or vendor code. */
 export async function assertRuntimeClosure({ root = ROOT, files, manifest } = {}) {
@@ -24,23 +30,43 @@ export async function assertRuntimeClosure({ root = ROOT, files, manifest } = {}
   const entries = [...new Set([pkg.main, ...exportTargets(pkg.exports)]
     .filter(path => typeof path === 'string' && /\.(?:mjs|cjs)$/.test(path)))]
   assert.ok(entries.length, 'Package has no Node runtime entry point')
-  const graph = await esbuild.build({
-    absWorkingDir: sourceRoot,
-    entryPoints: entries,
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    packages: 'external',
-    write: false,
-    metafile: true,
-    logLevel: 'silent',
-    outdir: join(sourceRoot, 'dist', 'runtime-closure'),
-  })
-  const runtimeFiles = Object.keys(graph.metafile.inputs).map(path => portable(relative(sourceRoot, resolve(sourceRoot, path)))).sort()
-  for (const path of runtimeFiles) {
-    assert.ok(path !== '..' && !path.startsWith('../') && !isAbsolute(path), `Runtime import is outside the package: ${path}`)
-    assert.ok(packed.has(path), `Package is missing runtime dependency: ${path}`)
+  const runtime = new Set()
+  let pending = entries
+  while (pending.length) {
+    const graph = await esbuild.build({
+      absWorkingDir: sourceRoot,
+      entryPoints: pending,
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      packages: 'external',
+      write: false,
+      metafile: true,
+      logLevel: 'silent',
+      outdir: join(sourceRoot, 'dist', 'runtime-closure'),
+    })
+    const discovered = Object.keys(graph.metafile.inputs).map(path => portable(relative(sourceRoot, resolve(sourceRoot, path))))
+    for (const path of discovered) {
+      assert.ok(path !== '..' && !path.startsWith('../') && !isAbsolute(path), `Runtime import is outside the package: ${path}`)
+      assert.ok(packed.has(path), `Package is missing runtime dependency: ${path}`)
+      runtime.add(path)
+    }
+    pending = []
+    for (const path of discovered) {
+      for (const dependency of launchedDependencies[path] ?? []) {
+        assert.ok(packed.has(dependency), `Package is missing launched runtime dependency: ${dependency}`)
+        if (/\.(?:mjs|cjs)$/.test(dependency) && !runtime.has(dependency) && !pending.includes(dependency)) pending.push(dependency)
+      }
+    }
+    for (const input of Object.values(graph.metafile.inputs)) {
+      for (const dependency of input.imports.filter(item => item.external && !isBuiltin(item.path))) {
+        const name = dependency.path.startsWith('@') ? dependency.path.split('/').slice(0, 2).join('/') : dependency.path.split('/')[0]
+        assert.ok(pkg.dependencies?.[name] || pkg.optionalDependencies?.[name] || pkg.peerDependencies?.[name],
+          `Runtime external dependency is not declared for production: ${name} (${dependency.path})`)
+      }
+    }
   }
+  const runtimeFiles = [...runtime].sort()
   // The native peer scripts are launched as child processes, not imported;
   // esbuild cannot discover them in the module graph.
   if (runtimeFiles.includes('packages/cli-runtime/src/native-process.mjs')) {

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-02",
+  "workOrder": "K12 recomputable preview F-difference appendix",
+  "checkpoint": "E154",
+  "parentCheckpoint": "E153",
+  "level": "local mechanical provenance and acceptance-snapshot appendix; not behavior, platform, hosted-CI or release acceptance",
+  "release": "0.26.0-preview.1",
+  "previewPublished": false,
+  "onlineCiVerified": false,
+  "actualModelCalls": 0,
+  "artifacts": {
+    "generator": "scripts/integration-f-difference.mjs",
+    "tests": "tests/integration-f-difference.test.mjs",
+    "json": "docs/releases/0.26.0-preview.1-f-difference.json",
+    "markdown": "docs/releases/0.26.0-preview.1-f-difference.md"
+  },
+  "inputs": [
+    "docs/integration/scope.json",
+    "docs/integration/feature-inventory.json",
+    "docs/integration/behavior-audit.json",
+    "docs/integration/tasks.json",
+    "docs/integration/baseline.json"
+  ],
+  "sourceBinding": {
+    "ds": {
+      "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+      "manifest": "modules/bot-runtime/SOURCE.json",
+      "files": 297,
+      "rawSha256AndGitBlobVerified": true
+    },
+    "mr": {
+      "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "registeredSources": 36,
+      "comparison": "frozen blob/raw bytes versus current raw Buffer, current filtered Git blob and git diff numstat"
+    },
+    "f40": {
+      "frozenCommit": null,
+      "currentComponentTreeDigestIncluded": true
+    }
+  },
+  "acceptanceAuthority": {
+    "featureCount": 40,
+    "behaviorVerifiedTrue": 0,
+    "currentStatusLevelVerifiedOnEvidenceFrom": "docs/integration/tasks.json",
+    "historicalBehaviorSnapshot": "2026-10-31",
+    "historicalRemainingIsCurrentDefectFact": false,
+    "f13Equivalence": "unknown",
+    "f22Carrier": "unknown",
+    "missingPathImpliesUnsupported": false
+  },
+  "focusedTests": {
+    "command": "node --test tests/integration-f-difference.test.mjs",
+    "tests": 3,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+  },
+  "finalFocusedGates": {
+    "command": "node --test tests/integration-f-difference.test.mjs tests/integration-documents.test.mjs tests/integration-progress.test.mjs tests/plugin-split.test.mjs",
+    "tests": 32,
+    "passed": 32,
+    "failed": 0,
+    "skipped": 0,
+    "appendixCheck": "passed",
+    "frozenInventory": "40 groups and 37 static registrations verified",
+    "frozenSource": "297 files passed",
+    "integrationCheck": "passed",
+    "gitDiffCheck": "passed with pre-existing line-ending warnings only",
+    "npmPackDryRun": "two appendices included among 275 package files; no publish or install"
+  },
+  "latestCompletedFullRootRegression": {
+    "checkpoint": "E153",
+    "rerunInE154": false,
+    "tests": 2014,
+    "passed": 1926,
+    "failed": 0,
+    "skipped": 88,
+    "evidence": "docs/integration/evidence/20261102_migration_attestation_verifier.json"
+  },
+  "task58": {
+    "status": "partial",
+    "appendixPreparedLocally": true,
+    "releaseAttached": false,
+    "ciFollowUpClosed": false
+  },
+  "productAcceptance": "No formal scenario, work package, milestone, gate or capability flag was upgraded. Formal status remains 0/20 work packages, 44/63 scenarios, M0 11/12 and G1-G4 in_progress.",
+  "capabilityFlags": {
+    "c9": false,
+    "activationSupported": false,
+    "postActivationRollbackSupported": false,
+    "stopWriteProvable": false
+  },
+  "actionsNotPerformed": [
+    "commit, push, tag, publish or GitHub Release",
+    "real model, account, production profile/data/process or remote-machine access",
+    "full root npm test in E154"
+  ]
+}

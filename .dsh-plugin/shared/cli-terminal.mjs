@@ -1,11 +1,10 @@
 /**
  * Host session manager for the workbench "官方工具终端".
  *
- * Starts the user's own shell or one fixed registry CLI in a pseudo terminal
- * (prebuilt @lydell/node-pty, N-API, no build tools), outside the Harness
- * process sandbox and with the Host's full login environment so the CLI's own
- * account login works exactly as in the user's terminal. When the native PTY
- * cannot load, sessions fall back to plain pipes with documented limits.
+ * Starts the user's own shell or one fixed registry CLI outside the Harness
+ * process sandbox with the Host's full login environment. Windows uses the
+ * Job-contained managed ConPTY backend; other platforms retain the prebuilt
+ * node-pty backend and its documented pipe fallback.
  *
  * Output is buffered per session for the client's long-poll reads; input is
  * forwarded verbatim and never logged or persisted. Only session metadata
@@ -13,11 +12,12 @@
  */
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { readFile, readdir, realpath, stat } from 'node:fs/promises'
+import { lstat, mkdtemp, readFile, readdir, realpath, rm, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { StringDecoder } from 'node:string_decoder'
-import { homedir } from 'node:os'
-import { extname, isAbsolute, join, relative, sep } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
+import { basename, extname, isAbsolute, join, relative, sep } from 'node:path'
+import { createWindowsManagedTerminal } from '../../packages/cli-runtime/src/native-terminal.mjs'
 import { getOfficialTool, installMethodFor } from './official-tool-registry.mjs'
 import { resolveInstallPlan } from './tool-install-preferences.mjs'
 import { discoverZCodeBundle } from './zcode-bundle.mjs'
@@ -319,7 +319,7 @@ export function spawnPipeProcess(launch, { cwd, env, platform = process.platform
   child.on('close', (code, signal) => finish(code, signal))
   const newline = platform === 'win32' ? '\r\n' : '\n'
   const kill = () => {
-    if (exited) return
+    if (exited || Number.isInteger(child.exitCode) || typeof child.signalCode === 'string') return
     if (platform === 'win32' && child.pid) {
       try { spawnImpl('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }) } catch { /* fall through */ }
     }
@@ -345,12 +345,33 @@ function newSessionId(random = randomBytes) {
   return `term-${random(12).toString('hex')}`
 }
 
+async function allocateTerminalOutputParent() {
+  const created = await mkdtemp(join(tmpdir(), 'dsh-terminal-manager-'))
+  const path = await realpath(created)
+  const info = await lstat(path, { bigint: true })
+  return { path, dev: info.dev, ino: info.ino }
+}
+
+async function releaseTerminalOutputParent(owned) {
+  if (!owned) return
+  try {
+    const root = await realpath(tmpdir())
+    if (!within(root, owned.path) || !basename(owned.path).startsWith('dsh-terminal-manager-')) return
+    const current = await lstat(owned.path, { bigint: true })
+    if (!current.isDirectory() || current.isSymbolicLink() || current.dev !== owned.dev || current.ino !== owned.ino
+      || await realpath(owned.path) !== owned.path) return
+    await rm(owned.path, { recursive: true, force: true })
+  } catch { /* an already cleaned or replaced directory is never removed recursively */ }
+}
+
 /**
  * Create the per-Host session manager. Every dependency is injectable so the
  * test suite never spawns a real terminal.
  */
 export function createTerminalManager({
   loadPty = loadPtyModule,
+  createManaged = createWindowsManagedTerminal,
+  useManaged = platformDefaultManaged(loadPty),
   spawnPipe = spawnPipeProcess,
   resolveLaunch = resolveTerminalLaunch,
   statPath = stat,
@@ -359,6 +380,9 @@ export function createTerminalManager({
   preferences = () => ({}),
   launchOptions = () => ({}),
   onSessionEnd = () => {},
+  onSessionUpdate = () => {},
+  allocateOutputParent = allocateTerminalOutputParent,
+  releaseOutputParent = releaseTerminalOutputParent,
   now = Date.now,
   platform = process.platform,
   limits = TERMINAL_LIMITS,
@@ -368,11 +392,15 @@ export function createTerminalManager({
   setRepeating = setInterval,
   clearRepeating = clearInterval,
 } = {}) {
+  const managed = useManaged && platform === 'win32'
   const sessions = new Map()
+  const pendingControllers = new Set()
   let sweeper = null
   let disposed = false
+  let pendingStarts = 0
 
   const backendInfo = () => {
+    if (managed) return { backend: 'managed', containment: 'windows-job', treeTracking: true }
     const loaded = loadPty()
     return loaded.ok
       ? { backend: 'pty', package: loaded.package }
@@ -383,12 +411,30 @@ export function createTerminalManager({
     sessionId: session.id, target: session.target, label: terminalTargetLabel(session.target), mode: session.mode,
     cwd: session.cwd, backend: session.backend, display: session.display, startedAt: session.startedAt,
     exited: session.exited, exitCode: session.exitCode, endReason: session.endReason,
+    stopRequested: session.stopRequested, stopConfirmed: session.stopConfirmed,
+    treeTracking: session.treeTracking, containment: session.containment, treeClosed: session.treeClosed,
+    outputClosed: session.outputClosed, outputTruncated: session.outputTruncated, bytesDropped: session.bytesDropped,
+    controlLost: session.controlLost, controlError: session.controlError,
   })
+
+  const record = session => {
+    const { sessionId, display, ...metadata } = summary(session)
+    return {
+      ...metadata, id: sessionId, finishedAt: session.finishedAt,
+      durationMs: session.finishedAt === null ? null : Math.max(0, session.finishedAt - session.startedAt),
+    }
+  }
 
   const wake = session => {
     const waiters = [...session.waiters]
     session.waiters.clear()
     for (const resolve of waiters) resolve()
+  }
+
+  const updated = session => {
+    wake(session)
+    if (!session.endRecorded) return
+    try { onSessionUpdate(record(session)) } catch { /* recording must never break the terminal */ }
   }
 
   const append = (session, text) => {
@@ -402,39 +448,73 @@ export function createTerminalManager({
     wake(session)
   }
 
-  const finish = (session, { exitCode = null, signal = null } = {}) => {
+  const hostExited = (session, { exitCode = null, signal = null } = {}) => {
     if (session.exited) return
     session.exited = true
     session.exitCode = exitCode
     session.signal = signal
     session.finishedAt = now()
     session.endReason ??= 'exit'
+    if (!session.managed) session.outputClosed = true
+    session.endRecorded = true
     wake(session)
+    try { onSessionEnd(record(session)) } catch { /* recording must never break the terminal */ }
+  }
+
+  const treeClosed = (session, event = {}) => {
+    if (!session.managed || session.treeClosed || event.activeProcesses !== 0) return
+    session.treeClosed = true
+    session.stopConfirmed = true
+    session.closedAt = now()
+    updated(session)
+  }
+
+  const outputClosed = (session, event = {}) => {
+    if (!session.managed) return
+    session.outputClosed = true
+    session.outputTruncated ||= event.outputTruncated === true
+    if (Number.isSafeInteger(event.bytesDropped)) session.bytesDropped = Math.max(session.bytesDropped, event.bytesDropped)
+    updated(session)
+  }
+
+  const requestKill = session => {
     try {
-      onSessionEnd({
-        id: session.id, target: session.target, label: terminalTargetLabel(session.target), mode: session.mode,
-        cwd: session.cwd, backend: session.backend, startedAt: session.startedAt, finishedAt: session.finishedAt,
-        durationMs: Math.max(0, session.finishedAt - session.startedAt), exitCode, endReason: session.endReason,
-      })
-    } catch { /* recording must never break the terminal */ }
+      const result = session.proc.kill()
+      if (result && typeof result.then === 'function') {
+        void result.catch(error => {
+          session.controlError = String(error?.code ?? error?.message ?? error).slice(0, 160)
+          updated(session)
+        })
+      }
+    } catch (error) {
+      session.controlError = String(error?.code ?? error?.message ?? error).slice(0, 160)
+      updated(session)
+    }
   }
 
   const terminate = (session, reason) => {
-    if (session.exited) return
+    const done = session.managed ? session.treeClosed : session.exited
+    if (done) return false
     session.endReason ??= reason
-    try { session.proc.kill() } catch { /* already gone */ }
-    // Some processes ignore the kill; report the session as ended regardless.
-    session.killTimer = setTimer(() => finish(session, { exitCode: null }), 5_000)
-    session.killTimer?.unref?.()
+    if (session.stopRequested) return true
+    session.stopRequested = true
+    requestKill(session)
+    if (!session.managed && !session.exited) {
+      session.killTimer = setTimer(() => { session.killTimer = null; wake(session) }, 5_000)
+      session.killTimer?.unref?.()
+    }
+    updated(session)
+    return true
   }
 
   const sweep = () => {
     const at = now()
     for (const session of sessions.values()) {
-      if (!session.exited) {
+      const done = session.managed ? session.treeClosed && session.outputClosed : session.exited
+      if (!done) {
         if (at - session.lastReadAt > limits.orphanTimeoutMs) terminate(session, 'orphan')
         else if (at - session.startedAt > limits.maxLifetimeMs) terminate(session, 'lifetime')
-      } else if (at - session.finishedAt > REMOVE_EXITED_AFTER_MS) {
+      } else if (at - (session.closedAt ?? session.finishedAt) > REMOVE_EXITED_AFTER_MS) {
         sessions.delete(session.id)
       }
     }
@@ -461,46 +541,98 @@ export function createTerminalManager({
     async start(request) {
       if (disposed) throw new Error('插件正在卸载，无法启动终端。')
       if (request?.confirmed !== true) throw new Error('启动终端前需要你的确认。')
-      const live = [...sessions.values()].filter(session => !session.exited).length
-      if (live >= limits.maxSessions) throw new Error(`最多同时运行 ${limits.maxSessions} 个终端会话，请先结束一个。`)
-      let info
-      try { info = await statPath(request.cwd) } catch { info = null }
-      if (!info?.isDirectory?.()) throw new Error(`工作目录不存在或不是目录：${request.cwd}`)
-      await prepare()
-      const env = environment()
-      const launch = await resolveLaunch(request.target, request.mode, { ...launchOptions(), platform, env,
-        preferences: preferences(), cwd: request.cwd })
-      const backend = backendInfo()
-      const options = { cwd: request.cwd, cols: request.cols, rows: request.rows, env: { ...env, ...launch.env }, platform }
-      let proc
+      const live = [...sessions.values()].filter(session => !session.starting && (session.managed ? !session.treeClosed : !session.exited)).length
+      if (live + pendingStarts >= limits.maxSessions) throw new Error(`最多同时运行 ${limits.maxSessions} 个终端会话，请先结束一个。`)
+      pendingStarts += 1
+      const controller = new AbortController()
+      pendingControllers.add(controller)
+      let ownedOutput = null
+      let session = null
       try {
-        proc = backend.backend === 'pty'
-          ? spawnPtyProcess(loadPty().pty, launch, options)
-          : spawnPipe(launch, options)
-      } catch (error) {
-        throw new Error(`无法启动 ${launch.display}：${error instanceof Error ? error.message : String(error)}`)
+        let info
+        try { info = await statPath(request.cwd) } catch { info = null }
+        if (!info?.isDirectory?.()) throw new Error(`工作目录不存在或不是目录：${request.cwd}`)
+        await prepare()
+        const env = environment()
+        const launch = await resolveLaunch(request.target, request.mode, { ...launchOptions(), platform, env,
+          preferences: preferences(), cwd: request.cwd })
+        const backend = backendInfo()
+        const options = { cwd: request.cwd, cols: request.cols, rows: request.rows, env: { ...env, ...launch.env }, platform }
+        if (disposed) throw new Error('插件正在卸载，无法启动终端。')
+        if (managed) ownedOutput = await allocateOutputParent()
+        let proc
+        try {
+          proc = managed
+            ? await createManaged({ launch, ...options, ttlMs: limits.maxLifetimeMs, privateOutput: ownedOutput.path, signal: controller.signal })
+            : backend.backend === 'pty' ? spawnPtyProcess(loadPty().pty, launch, options) : spawnPipe(launch, options)
+        } catch (error) {
+          await releaseOutputParent(ownedOutput)
+          throw new Error(`无法启动 ${launch.display}：${error instanceof Error ? error.message : String(error)}`)
+        }
+        const at = now()
+        session = {
+          id: randomId(), target: request.target, mode: request.mode, cwd: request.cwd, display: launch.display,
+          backend: backend.backend, managed, proc, ownedOutput, startedAt: at, lastReadAt: at, finishedAt: null, closedAt: null,
+          text: '', base: 0, waiters: new Set(), exited: false, exitCode: null, signal: null, endReason: null, killTimer: null,
+          stopRequested: false, stopConfirmed: false, treeTracking: managed, containment: managed ? 'windows-job' : null,
+          treeClosed: false, outputClosed: false, outputTruncated: false, bytesDropped: 0,
+          controlLost: false, controlError: null, endRecorded: false, starting: managed,
+        }
+        sessions.set(session.id, session)
+        proc.onData(data => append(session, data))
+        proc.onExit(event => {
+          if (session.killTimer) clearTimer(session.killTimer)
+          hostExited(session, event)
+        })
+        if (managed) {
+          proc.onTreeClosed(event => treeClosed(session, event))
+          proc.onOutputClosed(event => outputClosed(session, event))
+          proc.onOutputDropped(event => {
+            session.outputTruncated = true
+            if (Number.isSafeInteger(event?.bytesDropped)) session.bytesDropped = Math.max(session.bytesDropped, event.bytesDropped)
+            updated(session)
+          })
+          proc.onControlLost(event => {
+            session.controlLost = true
+            session.controlError = String(event?.nativeCode ?? event?.code ?? 'NATIVE_TERMINAL_CONTROL_LOST').slice(0, 160)
+            session.endReason ??= 'lost'
+            updated(session)
+          })
+          void Promise.resolve(proc.closed).then(final => {
+            outputClosed(session, final)
+          }, error => {
+            session.controlError = String(error?.code ?? error?.message ?? error).slice(0, 160)
+            updated(session)
+          }).then(() => releaseOutputParent(ownedOutput)).catch(() => {})
+        }
+        ensureSweeper()
+        if (managed) {
+          try {
+            if (disposed) throw new Error('插件正在卸载，无法启动终端。')
+            await proc.resume()
+            session.starting = false
+            if (disposed) throw new Error('插件正在卸载，无法启动终端。')
+          } catch (error) {
+            terminate(session, 'dispose')
+            sessions.delete(session.id)
+            await Promise.resolve(proc.closed).catch(() => {})
+            await releaseOutputParent(ownedOutput)
+            throw error
+          }
+        }
+        return { ...summary(session), pid: proc.pid ?? null, ...(backend.backend === 'pipe' ? { limitation: PIPE_LIMITATION, ptyError: backend.ptyError } : {}) }
+      } finally {
+        pendingControllers.delete(controller)
+        pendingStarts -= 1
       }
-      const at = now()
-      const session = {
-        id: randomId(), target: request.target, mode: request.mode, cwd: request.cwd, display: launch.display,
-        backend: backend.backend, proc, startedAt: at, lastReadAt: at, finishedAt: null,
-        text: '', base: 0, waiters: new Set(), exited: false, exitCode: null, signal: null, endReason: null, killTimer: null,
-      }
-      sessions.set(session.id, session)
-      proc.onData(data => append(session, data))
-      proc.onExit(event => {
-        if (session.killTimer) clearTimer(session.killTimer)
-        finish(session, event)
-      })
-      ensureSweeper()
-      return { ...summary(session), pid: proc.pid ?? null, ...(backend.backend === 'pipe' ? { limitation: PIPE_LIMITATION, ptyError: backend.ptyError } : {}) }
     },
 
     async read({ sessionId, cursor = 0, waitMs = 0 }) {
       const session = get(sessionId)
       session.lastReadAt = now()
       const end = () => session.base + session.text.length
-      if (cursor >= end() && !session.exited && waitMs > 0) {
+      const complete = () => session.managed ? session.treeClosed && session.outputClosed : session.exited
+      if (cursor >= end() && !complete() && waitMs > 0) {
         await new Promise(resolve => {
           const timer = setTimer(() => { session.waiters.delete(done); resolve() }, waitMs)
           const done = () => { clearTimer(timer); resolve() }
@@ -513,8 +645,8 @@ export function createTerminalManager({
       const slice = session.text.slice(from - session.base, from - session.base + limits.readChars)
       const next = from + slice.length
       return {
-        sessionId, data: slice, cursor: next, dropped,
-        exited: session.exited && next >= end(), exitCode: session.exitCode, endReason: session.endReason,
+        ...summary(session), sessionId, data: slice, cursor: next, dropped,
+        exited: session.exited && next >= end(), closed: complete() && next >= end(),
       }
     },
 
@@ -528,31 +660,38 @@ export function createTerminalManager({
     resize({ sessionId, cols, rows }) {
       const session = get(sessionId)
       if (session.exited) return { resized: false }
-      let resized = false
-      try { resized = session.proc.resize(cols, rows) === true } catch { resized = false }
-      return { resized }
+      try {
+        const result = session.proc.resize(cols, rows)
+        if (session.managed) return Promise.resolve(result).then(resized => ({ resized: resized === true }), () => ({ resized: false }))
+        return { resized: result === true }
+      } catch { return { resized: false } }
     },
 
     stop({ sessionId }) {
       const session = sessions.get(sessionId)
       if (!session) return { stopped: false, alreadyEnded: true }
-      terminate(session, 'stopped')
-      return { stopped: true }
+      const accepted = terminate(session, 'stopped')
+      if (!session.managed) return {
+        stopped: false, ...(!accepted ? { alreadyEnded: true } : {}),
+        stopRequested: session.stopRequested, stopConfirmed: session.stopConfirmed,
+        exited: session.exited, endReason: session.endReason,
+      }
+      return { ...summary(session), stopped: session.stopConfirmed, ...(!accepted ? { alreadyEnded: true } : {}) }
     },
 
-    /** Kill every session (plugin unload, Host exit). */
+    /** Request every session to stop; only backend proof events finish them. */
     disposeAll(reason = 'dispose') {
       disposed = true
-      for (const session of sessions.values()) {
-        if (session.exited) continue
-        session.endReason ??= reason
-        try { session.proc.kill() } catch { /* gone */ }
-        finish(session, { exitCode: null })
-      }
+      for (const controller of pendingControllers) controller.abort()
+      for (const session of sessions.values()) terminate(session, reason)
       if (sweeper !== null) { clearRepeating(sweeper); sweeper = null }
     },
 
     /** Test hook: run the orphan/lifetime sweep now. */
     sweep,
   }
+}
+
+function platformDefaultManaged(loadPty) {
+  return loadPty === loadPtyModule
 }

@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-02",
+  "workOrder": "K18 documentation-only evidence handoff for K16/K16b",
+  "checkpoint": "E156",
+  "parentCheckpoint": "E155",
+  "parentHead": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+  "actualModelCalls": 0,
+  "level": "local private migration attestation component evidence only; not C6/C7 completion, financial zero-loss proof, authority-generation switching, activation or production acceptance",
+  "componentAcceptance": "Artifact and money now have automatic-observation support. Money verifies only captured-side marker-to-ledger epoch consistency and bounded source-derived observations against independently supplied expected context.",
+  "supportMatrix": {
+    "artifactAutomaticObservation": "supported as sources-reverified with public status observed",
+    "moneyAutomaticObservation": "supported only for captured-marker-ledger-epoch-only observation with public status observed",
+    "manualDeclaration": "declaration-only; actorId and text are bounded declarations, not authenticated identity or automatic proof",
+    "otherAutomaticTypesUnsupported": [
+      "stopped-hosts",
+      "complete-domains",
+      "consistent-backups",
+      "permissions"
+    ],
+    "platformEvidence": "unsupported for every attestation type",
+    "c6Completed": false,
+    "c7Completed": false
+  },
+  "moneyBoundary": {
+    "coverage": "captured-marker-ledger-epoch-only",
+    "meaning": "The archived capture marker and archived schema-5 ledger must agree on the captured migration epoch; source archives, marker bytes, ledger tables and the independently fixed context are reverified.",
+    "notProven": [
+      "zero financial loss",
+      "a complete or fully reconciled financial audit",
+      "unique money-authority generation switching or C7",
+      "all holds reconciled or all costs known",
+      "production activation, all-domain stop-write or post-activation rollback"
+    ],
+    "financeAuditStatusObserved": "needs-context",
+    "needsContextCodesInPositiveCase": [
+      "TIMEZONE_CONTEXT_REQUIRED",
+      "USAGE_EXPORT_REQUIRED"
+    ],
+    "needsContextCodesWithInterruptedHold": [
+      "ACTIVE_OR_INTERRUPTED_HOLDS",
+      "TIMEZONE_CONTEXT_REQUIRED",
+      "USAGE_EXPORT_REQUIRED"
+    ],
+    "unknownsRetained": "Timezone context and usage export remain required; active or interrupted holds remain explicit needs-context rather than being converted to audited/passed."
+  },
+  "privatePayload": {
+    "fields": [
+      "observation",
+      "coverage",
+      "financeAuditStatus",
+      "needsContextCodes",
+      "dataArchiveManifestDigest",
+      "ledgerArchiveManifestDigest",
+      "ledgerContentDigest",
+      "markerDigest",
+      "routerMigrationTableDigest",
+      "routerMetaTableDigest",
+      "ledgerTables",
+      "ledgerRows",
+      "runCount",
+      "holdCount",
+      "unassignedRunCount"
+    ],
+    "fixedObservation": "sources-reverified",
+    "fixedCoverage": "captured-marker-ledger-epoch-only",
+    "needsContextWhitelist": [
+      "ACTIVE_OR_INTERRUPTED_HOLDS",
+      "TIMEZONE_CONTEXT_REQUIRED",
+      "USAGE_EXPORT_REQUIRED"
+    ],
+    "boundedSortedUniqueDiagnostics": true,
+    "boundedCounts": true,
+    "excludes": [
+      "amounts or costUsd",
+      "epochId",
+      "runId",
+      "private paths",
+      "host",
+      "raw marker contents"
+    ],
+    "publicSummaryExcludesEntirePayload": true
+  },
+  "correctionHistory": {
+    "misread": "Kimi twice rolled back the usage-context behavior after misreading the comparison as === null; the actual pure-function condition is input.usageExport !== null.",
+    "gptProbe": {
+      "omittedUsageExport": [
+        "TIMEZONE_CONTEXT_REQUIRED",
+        "ROUTER_INPUT_REQUIRED",
+        "USAGE_EXPORT_REQUIRED"
+      ],
+      "explicitNullUsageExport": [
+        "TIMEZONE_CONTEXT_REQUIRED",
+        "ROUTER_INPUT_REQUIRED"
+      ],
+      "log": "tmp/integration/codex-takeover-k16/gpt-usage-context-proof.log"
+    },
+    "resolution": "GPT removed the erroneous explicit usageExport:null from the core call and froze the core. K16b only finished and verified tests/fixtures; it did not rewrite or re-audit the core.",
+    "guidance": "tmp/integration/codex-takeover-k16/gpt-guidance.md"
+  },
+  "schema5Fixture": {
+    "markerCreatedBy": "createRouterState",
+    "storeOpenedBy": "openSqliteRouterState",
+    "realDdlAppliedBy": "store.openTaskJournal()",
+    "cleanup": "journal.close() then store.close(); reopen and assert PRAGMA user_version = 5",
+    "manualPragmaForgery": false,
+    "unitAndNativeUseRealDdl": true
+  },
+  "focusedRuns": [
+    {
+      "command": "node --test tests/migration-attestation-verifier.test.mjs",
+      "exitCode": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k16/k16b-final-attestation-unit.log"
+    },
+    {
+      "command": "node --test tests/migration-attestation-verifier.native.mjs",
+      "exitCode": 0,
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k16/k16b-final-attestation-native.log"
+    },
+    {
+      "command": "node --test tests/migration-financial-audit.test.mjs tests/migration-domain-audit.test.mjs tests/migration-supporting-domains.test.mjs",
+      "exitCode": 0,
+      "tests": 61,
+      "pass": 61,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k16/k16b-final-financial-domain.log"
+    }
+  ],
+  "unitCoverage": [
+    "The money positive case is observed but remains needs-context with timezone and usage-export diagnostics; all five public capabilities are false.",
+    "Old markers, another epoch, missing or multiple captured ledger sources, inactive ledger authority and archived-marker drift fail closed.",
+    "Live original marker/database drift cannot replace the pinned archives; changing payload and recomputing bundle/completion digests cannot authorize it.",
+    "Interrupted holds retain ACTIVE_OR_INTERRUPTED_HOLDS plus timezone and usage-export context requirements.",
+    "Artifact source reverification, independent expected binding, replay/expiry, rollback-floor, source-drift and output-boundary coverage from E153 remains present."
+  ],
+  "nativeCoverage": {
+    "realChildExit": "The crash fixture really exits with code 86 at the bundle-written boundary; success is not simulated.",
+    "sameLivingOwnerRecovery": "Under the same living parent owner, a new process first rejects incomplete output with MIGRATION_ATTESTATION_OUTPUT_INCOMPLETE, then resumes without rewriting the bundle; child and parent cold verification succeed.",
+    "ownerDeathTakeover": "After the owner child dies, a new owner takes over the real fence. Old expected context and the old package fail with MIGRATION_ATTESTATION_BINDING_MISMATCH; old bytes and mtime remain unchanged. A new expected context and explicit new directory succeed.",
+    "artifactCasesRetained": "The original three artifact native cases remain and pass with the two money native cases.",
+    "cleanup": "Tests await real child close, close SQLite resources and release fences in after hooks; temporary audit directories remain available and were not destructively cleaned."
+  },
+  "publicCapabilities": {
+    "allowed": false,
+    "activationSupported": false,
+    "postActivationRollbackSupported": false,
+    "stopWriteProvable": false,
+    "generationAvailable": false
+  },
+  "latestCompletedFullRootRegression": {
+    "checkpoint": "K18 shared E155/E156 root result",
+    "command": "npm test",
+    "exitCode": 0,
+    "observedBy": "GPT unified exec session 50455 completed with exit 0",
+    "tests": 2030,
+    "pass": 1942,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 88,
+    "todo": 0,
+    "phases": [
+      {
+        "tests": 1633,
+        "pass": 1629,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 4,
+        "todo": 0
+      },
+      {
+        "tests": 397,
+        "pass": 313,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 84,
+        "todo": 0
+      }
+    ],
+    "log": "tmp/integration/codex-takeover-k18/final-npm-test.log",
+    "result": "tmp/integration/codex-takeover-k18/final-result.json"
+  },
+  "k18FinalGates": {
+    "checkClient": {
+      "exitCode": 0,
+      "result": "build-client OK",
+      "log": "tmp/integration/codex-takeover-k18/final-client.log"
+    },
+    "integrationCheck": {
+      "exitCode": 0,
+      "result": "32 requirements, 40 features, 63 acceptance scenarios and 20 work packages valid",
+      "log": "tmp/integration/codex-takeover-k18/final-integration.log"
+    },
+    "featureDifferenceCheck": {
+      "exitCode": 0,
+      "result": "40 features and DS 297 files verified after GPT refreshed the appendix for the source changes",
+      "log": "tmp/integration/codex-takeover-k18/f-difference-final.log"
+    },
+    "gitDiffCheck": {
+      "exitCode": 0,
+      "result": "No whitespace errors; existing line-ending warnings remain.",
+      "log": "tmp/integration/codex-takeover-k18/final-diff-check.log"
+    }
+  },
+  "testCounting": "The two root phases sum exactly once to 2030/1942/0/0/88 (tests/pass/fail/cancelled/skipped). The 18 unit, 5 native and 61 related financial/domain runs overlap the root suite and are never added to it or to each other as a root total.",
+  "formalStatus": {
+    "workPackagesCompleted": "0/20",
+    "acceptanceScenariosPassed": "44/63",
+    "m0StepsCompleted": "11/12",
+    "gates": {
+      "G1": "in_progress",
+      "G2": "in_progress",
+      "G3": "in_progress",
+      "G4": "in_progress"
+    },
+    "c6": false,
+    "c7": false,
+    "tasksJsonChangedByK18": false,
+    "scopeJsonChangedByK18": false,
+    "gateOrScenarioPromoted": false
+  },
+  "worktreeAndRelease": {
+    "head": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+    "currentChangesUncommitted": true,
+    "version": "0.26.0-preview.1",
+    "previewPublished": false,
+    "commitPushTagNpmOrGithubReleaseByK18": false,
+    "inheritedDirtyWorktreePreserved": true
+  },
+  "limitations": [
+    "Money observation is capture-side consistency evidence, not proof of zero money loss, authoritative generation switching or a complete financial reconciliation.",
+    "Manual remains declaration-only; the other four automatic attestation types and all platform evidence remain unsupported. C6 and C7 remain false.",
+    "Hashes do not authenticate a malicious local owner, clockFloorMs is not a trusted cross-restart clock, and generationAvailable remains false.",
+    "No real account, product model, production profile, production data, production process or remote machine was used.",
+    "No online GitHub Actions run is claimed. The preview.1 working tree remains uncommitted, untagged and unpublished."
+  ]
+}

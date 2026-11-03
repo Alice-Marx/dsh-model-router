@@ -5,6 +5,9 @@ import { spawn, spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import Database from 'better-sqlite3'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import { createRouterState } from '../.dsh-plugin/shared/router-state.mjs'
+import { openSqliteRouterState } from '../packages/orchestration/src/sqlite-router-state.mjs'
 import { previewProfileMigration } from '../packages/orchestration/src/profile-migration-plan.mjs'
 import { inspectMigrationSources } from '../packages/orchestration/src/migration-snapshot.mjs'
 import { abandonMigrationIntent, acquireMigrationShared, beginMigrationExclusive, readMigrationFence } from '../packages/orchestration/src/migration-fence.mjs'
@@ -21,6 +24,7 @@ const ROOT = resolve(import.meta.dirname, '..')
 const CWD = resolve('.')
 const PRODUCT = '@ljwei-stak/dsh-model-router'
 const FIXTURE = join(ROOT, 'tests', 'fixtures', 'migration-commit-orchestration-crash.mjs')
+const DOMAIN_FIXTURE = join(ROOT, 'tests', 'fixtures', 'migration-domain-evidence-crash.mjs')
 const parent = resolve('tmp/integration/migration-commit-orchestration')
 await mkdir(parent, { recursive: true })
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -28,13 +32,15 @@ const json = value => JSON.stringify(value) + '\n'
 const begin = beginOperation
 const resume = resumeOperation
 
-async function scenario (t) {
+async function scenario (t, { domainEvidence = false } = {}) {
   const dir = await mkdtemp(join(parent, 'crash-'))
   const home = join(dir, 'home')
   const profile = join(home, 'profiles', 'desktop')
   const bot = join(home, 'bot')
   const sessions = join(home, 'sessions')
-  for (const path of [profile, bot, sessions]) await mkdir(path, { recursive: true })
+  const attachments = join(home, 'attachments')
+  const ledgerSource = join(dir, 'ledger-source')
+  for (const path of [profile, bot, sessions, ...(domainEvidence ? [attachments] : []), ledgerSource]) await mkdir(path, { recursive: true })
   async function bundle (folder, name, patch) {
     const packageDir = join(dir, folder)
     await mkdir(packageDir)
@@ -47,18 +53,43 @@ async function scenario (t) {
   const target = await bundle('target-bundle', PRODUCT, await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8'))
   const profilePackage = json({ dsh: { profile: { bundles: [base.packageName, old.packageName] } } })
   await writeFile(join(profile, 'package.json'), profilePackage)
-  await writeFile(join(bot, 'state.json'), json({ id: 'bot-stable', secret: 'SECRET-DATA' }))
-  await writeFile(join(sessions, 'session-a.jsonl'), 'PRIVATE-SESSION\n')
+  if (domainEvidence) {
+    const team = { version: 1, mainBotIds: ['bot-a'], bots: { 'bot-a': { id: 'bot-a', sessionId: 'bot-a', segments: [], capabilities: [] } }, rooms: {}, agents: {}, capabilities: { items: {} } }
+    await writeFile(join(bot, 'state.json'), json(team))
+    await writeFile(join(bot, 'secrets.json'), json({ version: 1, secrets: [] }))
+    const sessionDirectory = join(sessions, '_no-cwd', 'bot-a')
+    await mkdir(sessionDirectory, { recursive: true })
+    const sessionHeader = sessionFormatCatalog.encodeCurrentHeader({ version: 4, id: 'bot-a', createdAt: 1, isSeeded: false, delegationDepth: 0 }, 0)
+    await writeFile(join(sessionDirectory, 'session.v4.jsonl'), json(sessionHeader))
+  } else {
+    await writeFile(join(bot, 'state.json'), json({ id: 'bot-stable', secret: 'SECRET-DATA' }))
+    await writeFile(join(sessions, 'session-a.jsonl'), 'PRIVATE-SESSION\n')
+  }
   const plan = await previewProfileMigration({ profileDir: profile, dshHome: home, launchCwd: profile, orderedBundleLayers: [base, old], launcherLayers: [], launchEnvironment: {}, targetBundleLayer: target })
   assert.equal(plan.status, 'ready')
-  const inventory = await inspectMigrationSources([{ id: 'bot', kind: 'bot-data', root: bot }, { id: 'sessions', kind: 'sessions', root: sessions }])
-  const ledgerSource = join(dir, 'ledger-source')
-  await mkdir(ledgerSource)
-  const dbFile = join(ledgerSource, 'ledger.sqlite')
+  const markerPath = join(ledgerSource, 'state.json')
+  const dbFile = join(ledgerSource, domainEvidence ? 'router.sqlite' : 'ledger.sqlite')
+  if (domainEvidence) {
+    const legacy = createRouterState({ file: markerPath })
+    await legacy.update(() => {})
+    const store = await openSqliteRouterState({ Database, file: dbFile, legacyFile: markerPath })
+    const journal = store.openTaskJournal()
+    journal.close()
+    await store.close()
+    assert.equal(JSON.parse(await readFile(markerPath, 'utf8')).version, 4)
+  }
   const database = new Database(dbFile)
-  database.exec('CREATE TABLE audit (id INTEGER PRIMARY KEY, note TEXT)')
-  database.prepare('INSERT INTO audit(note) VALUES(?)').run('PRIVATE-ROW')
-  t.after(() => database.close())
+  if (!domainEvidence) {
+    database.exec('CREATE TABLE audit (id INTEGER PRIMARY KEY, note TEXT)')
+    database.prepare('INSERT INTO audit(note) VALUES(?)').run('PRIVATE-ROW')
+  }
+  t.after(() => { if (database.open) database.close() })
+  const selected = [
+    { id: 'bot', kind: 'bot-data', root: bot },
+    { id: 'sessions', kind: 'sessions', root: sessions },
+    ...(domainEvidence ? [{ id: 'attachments', kind: 'attachments', root: attachments }, { id: 'router', kind: 'ledger', root: ledgerSource }] : []),
+  ]
+  const inventory = await inspectMigrationSources(selected)
   const changes = [{
     path: join(profile, 'package.json'),
     beforeSha256: sha(Buffer.from(profilePackage)),
@@ -68,12 +99,27 @@ async function scenario (t) {
   const fixture = {
     dir, home, profile, plan, inventory, database, dbFile, changes,
     operationId: randomUUID(),
-    domains: [{ name: 'bot', roots: [bot] }, { name: 'sessions', roots: [sessions] }],
+    domains: selected.map(source => ({ name: source.id, roots: [source.root] })),
     privateOutput: join(dir, 'owner-private'),
     dataArchiveRoot: join(dir, 'capture-data'),
     ledgerArchiveRoot: join(dir, 'capture-ledger'),
     commitOutput: join(dir, 'commit-private'),
     flag: join(dir, 'release.flag'),
+  }
+  if (domainEvidence) {
+    fixture.domainAuditInput = {
+      layout: {
+        team: { sourceId: 'bot', path: 'state.json' },
+        router: { sourceId: 'router', path: 'state.json' },
+        secrets: { sourceId: 'bot', path: 'secrets.json' },
+        usage: null,
+        sessions: [{ sourceId: 'sessions', compression: 'none' }],
+        attachments: [{ sourceId: 'attachments' }],
+        workspacePolicy: 'preserve-in-place',
+      },
+      finance: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      limits: { maxSessions: 100 },
+    }
   }
   fixture.input = (extra = {}) => ({
     home, operationId: fixture.operationId, privateOutput: fixture.privateOutput, domains: fixture.domains,
@@ -98,6 +144,9 @@ async function payloadFor (f, options) {
     changes: f.changes.map(change => ({ path: change.path, beforeSha256: change.beforeSha256, maintenanceB64: change.maintenance.toString('base64'), afterB64: change.after.toString('base64') })),
     drainTimeoutMs: options.drainTimeoutMs ?? 5000,
     remoteClients: options.remoteClients ?? [],
+    domainAuditInput: options.domainAuditInput ?? null,
+    domainAuditRoot: options.domainAuditRoot ?? null,
+    omitDomainAuditInput: options.omitDomainAuditInput === true,
     crashAt: options.crashAt ?? null,
     commitBoundary: options.commitBoundary ?? null,
     holdMs: options.holdMs ?? 0,
@@ -110,6 +159,25 @@ async function crash (f, options = {}) {
   const payload = await payloadFor(f, { ...options, mode })
   const result = spawnSync(process.execPath, [FIXTURE, mode, payload], { cwd: CWD, encoding: 'utf8', windowsHide: true, timeout: 60000 })
   assert.equal(result.status, 86, 'crash injection must exit after the boundary: ' + (result.stderr ?? ''))
+}
+
+const domainOptions = f => ({
+  domainAuditInput: f.domainAuditInput,
+  domainAuditRoot: join(f.dir, 'domain-evidence'),
+})
+
+async function domainCrash (f, crashAt, extra = {}) {
+  const options = { ...domainOptions(f), ...extra }
+  const payload = await payloadFor(f, { mode: 'begin', crashAt, ...options })
+  const result = spawnSync(process.execPath, [DOMAIN_FIXTURE, 'begin', payload], { cwd: CWD, encoding: 'utf8', windowsHide: true, timeout: 60000 })
+  assert.equal(result.status, 86, 'domain crash injection must exit 86: ' + (result.stderr ?? ''))
+  return options
+}
+
+async function domainResume (f, options, { omitInput = false } = {}) {
+  const payload = await payloadFor(f, { ...options, mode: 'resume', omitDomainAuditInput: omitInput })
+  const result = spawnSync(process.execPath, [DOMAIN_FIXTURE, 'resume', payload], { cwd: CWD, encoding: 'utf8', windowsHide: true, timeout: 60000 })
+  assert.equal(result.status, 87, 'cold domain resume must complete: ' + (result.stderr ?? ''))
 }
 
 async function holder (t, mode, f, operationId) {
@@ -542,4 +610,76 @@ test('orchestration drain: a real crashed Agent leaves a landed file unknown and
   assert.equal(resolvedDb.prepare('SELECT status FROM operations WHERE id=?').get(operation.id).status, 'unknown', 'reconciliation adds separate proof rather than forging an Agent success')
   assert.equal(resolvedDb.prepare('SELECT operation_id FROM migration_operation_resolutions WHERE operation_id=?').get(operation.id).operation_id, operation.id)
   resolvedDb.close()
+})
+
+test('domain evidence native: exit 86 before journal then cold resume without input preserves bytes and adds one step', async t => {
+  const f = await scenario(t, { domainEvidence: true }), options = await domainCrash(f, 'domain-artifact-verified')
+  const path = join(options.domainAuditRoot, 'domain-audit.private.json'), before = await readFile(path), metadata = await stat(path)
+  const interrupted = await stateOf(f)
+  assert.equal(interrupted.journal.some(row => row.step === 'domain-audit-verified'), false)
+  const fence = await readMigrationFence(f.home)
+  assert.equal(fence.maintenanceActive, true)
+  assert.equal(fence.exclusive.holderAlive, false)
+  await domainResume(f, options, { omitInput: true })
+  assert.equal((await stateOf(f)).summary.status, 'blocked-activation')
+  assert.deepEqual(await readFile(path), before)
+  assert.equal((await stat(path)).mtimeMs, metadata.mtimeMs)
+  assert.equal((await steps(f)).filter(step => step === 'domain-audit-verified').length, 1)
+  const artifact = JSON.parse(before)
+  assert.equal(artifact.schemaVersion, 2)
+  assert.equal(artifact.inventoryObservation.coverage, 'configuration-derived-captured-obligations-only')
+  assert.equal(artifact.inventoryObservation.complete, false)
+  assert.equal(artifact.inventoryObservation.captureEpochStatus, 'unproven')
+  assert.match(artifact.inventoryObservation.epochBindingDigest, /^[a-f0-9]{64}$/)
+  assert.equal(artifact.result.status, 'audited')
+  assert.notEqual(artifact.result.financial.ledger, null)
+})
+
+test('domain evidence native: exit 86 after the domain step before maintenance resumes through revalidation', async t => {
+  const f = await scenario(t, { domainEvidence: true }), options = await domainCrash(f, 'after-step:domain-audit-verified')
+  const interrupted = await stateOf(f)
+  assert.equal(interrupted.journal.at(-1).step, 'domain-audit-verified')
+  assert.equal(interrupted.journal.some(row => row.step === 'maintenance-started'), false)
+  assert.equal((await readMigrationFence(f.home)).exclusive.holderAlive, false)
+  assert.equal((await resume(f.input(options))).status, 'blocked-activation')
+  const recovered = await stateOf(f)
+  assert.equal(recovered.journal.filter(row => row.step === 'domain-audit-verified').length, 1)
+  const artifact = JSON.parse(await readFile(join(options.domainAuditRoot, 'domain-audit.private.json'), 'utf8'))
+  assert.equal(artifact.inventoryObservation.complete, false)
+  assert.equal(artifact.inventoryObservation.captureEpochStatus, 'unproven')
+  assert.ok(artifact.inventoryObservation.domains.some(row => row.state === 'unknown'))
+  assert.equal(recovered.summary.activationSupported, false)
+  assert.ok(recovered.summary.activation.criteria.every(criterion => criterion.ok === false))
+})
+
+test('domain evidence native: legacy schema-one artifact cold resumes without rewriting or inventing inventory', async t => {
+  const f = await scenario(t, { domainEvidence: true }), options = await domainCrash(f, 'domain-artifact-verified')
+  const path = join(options.domainAuditRoot, 'domain-audit.private.json')
+  const legacy = JSON.parse(await readFile(path, 'utf8'))
+  legacy.schemaVersion = 1
+  delete legacy.inventoryObservation
+  const bytes = Buffer.from(JSON.stringify(legacy) + '\n')
+  await writeFile(path, bytes)
+  const before = await stat(path)
+  await domainResume(f, options, { omitInput: true })
+  const state = await stateOf(f)
+  assert.equal(state.summary.status, 'blocked-activation')
+  assert.equal(state.summary.activationSupported, false)
+  assert.equal(state.journal.filter(row => row.step === 'domain-audit-verified').length, 1)
+  assert.deepEqual(await readFile(path), bytes)
+  assert.equal((await stat(path)).mtimeMs, before.mtimeMs)
+  assert.equal(Object.hasOwn(JSON.parse(await readFile(path, 'utf8')), 'inventoryObservation'), false)
+})
+
+test('domain evidence native: a partial artifact survives and recovery requires an explicit new directory before any pin', async t => {
+  const f = await scenario(t, { domainEvidence: true }), options = await domainCrash(f, 'domain-artifact-verified')
+  const path = join(options.domainAuditRoot, 'domain-audit.private.json'), original = await readFile(path), partial = original.subarray(0, 61)
+  await writeFile(path, partial)
+  await assert.rejects(resume(f.input(options)), { code: 'MIGRATION_DOMAIN_ARTIFACT_INCOMPLETE' })
+  assert.deepEqual(await readFile(path), partial)
+  assert.equal((await stateOf(f)).summary.status, 'blocked-capture')
+  const rebuilt = { ...options, domainAuditRoot: join(f.dir, 'explicit-new-domain-evidence') }
+  assert.equal((await resume(f.input(rebuilt))).status, 'blocked-activation')
+  assert.deepEqual(await readFile(path), partial)
+  assert.equal((await steps(f)).filter(step => step === 'domain-audit-verified').length, 1)
 })

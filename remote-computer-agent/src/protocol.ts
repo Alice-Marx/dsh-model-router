@@ -15,6 +15,7 @@ export const CATALOG = Object.freeze([
   // Versioned container-command Task backend. A distinct name means an older
   // Agent answers before any work instead of silently running a native shell.
   ['container_command_v1',true],
+  ['cli_probe_v1',false],['cli_task_v1',true],
   ['operation_status',false],['operation_cancel',true],['artifact_stat',false],['artifact_read',false],
   ['worktree_create',true],['worktree_diff',false],['worktree_integrate',true],
   ['browser_open',true],['browser_snapshot',false],['browser_click',true],['browser_type',true],['browser_script',true],['browser_upload',true],['browser_download',true],['browser_close',true],

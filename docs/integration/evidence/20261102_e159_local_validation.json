@@ -1,0 +1,380 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-02",
+  "workOrder": "K45 documentation-only consolidation of K37/K38/K39/GPT corrections/K41 with K43 T61 conclusion",
+  "checkpoint": "E159",
+  "parentCheckpoint": "E158",
+  "actualModelCalls": 0,
+  "snapshot": {
+    "kind": "K41-test-time-local-history-only",
+    "rootCompletedAt": "2026-11-02T07:58:11.308130+00:00",
+    "gateCompletedAt": "2026-11-02T08:04:43.338575+00:00",
+    "currentSourceFullyRegressed": false,
+    "allReleaseHardGatesPassed": false,
+    "writersInProgress": [
+      {
+        "ticket": "K42",
+        "scope": "remote CLI",
+        "unifiedNewRoot": "pending"
+      },
+      {
+        "ticket": "K44",
+        "scope": "T61 inclusion workflow isolated conditional branches",
+        "unifiedNewRoot": "pending"
+      }
+    ],
+    "historicalGreenMayCoverCurrentWriterSource": false
+  },
+  "provenance": {
+    "observedHead": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+    "headMeaning": "Observed in K37/K38 and used as the local downstream MR candidate in K39; not a clean-checkout or latest-upstream assertion for K41.",
+    "k37DistCliSha256": "b670817b50741e7357c729e3a460491b25e5451b7e91914aaa5853821c01c40c",
+    "k38NativeTerminalSha256": "b9f7c9cac6ec464f04725e961f186ec7333c53c0782b1a215980772e6d54c7a8",
+    "k38NativeTerminalPeerSha256": "cfbaeca6226d7ff8b31517aa2a3f2de17f57a253684553a9fae2d234397109a7",
+    "k39ProposalGeneratorSha256": "e3a8802e7e73f97c3ff1d29be3cd012728dd89337ce2270503509371fcafa1ce",
+    "k41ProtectedInputCount": 67,
+    "k41SourceSnapshotUnchangedDuringRun": true,
+    "k41TestedFileHashAuthority": "tmp/integration/codex-takeover-k41/gate-result.json#testedFileSha256",
+    "hostedCiRun": false,
+    "cleanCheckoutRun": false
+  },
+  "gptCorrections": [
+    {
+      "ticket": "K37",
+      "changed": "ignored harness artifact path construction only",
+      "productionAssertionsRelaxed": false,
+      "firstRunRetainedAsFailure": true
+    },
+    {
+      "ticket": "K38",
+      "changed": "ignored harness/fixture instrumentation: PID plus creation FILETIME identity, parent-chain helper discovery, ownership on factory creation and burst ready-file overwrite",
+      "productionBackendChanged": false,
+      "originalFailedRunRetained": true
+    },
+    {
+      "ticket": "K39",
+      "changed": "proposal generator directory-descendant matcher and its real Git fixture/test assertion",
+      "nestedRenameInAndSiblingPrefixCovered": true,
+      "baselineScopeOrAcceptanceChanged": false
+    }
+  ],
+  "localValidations": [
+    {
+      "ticket": "K37",
+      "kind": "real-independent-cli-loopback-single-instance",
+      "status": "passed_local_cases_only",
+      "completedAt": "2026-11-02T06:58:00.808Z",
+      "exitCode": 0,
+      "counts": {
+        "cases": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "notRun": 0
+      },
+      "coverage": [
+        "independent CLI pair and rotate",
+        "grant and protected MCP/control",
+        "paused streaming request body during rotation",
+        "serve restart and explicit grant reissuance",
+        "real HTTPS and mTLS including missing-client-certificate rejection",
+        "scoped serve/CLI log and all 11 SQLite user-table plaintext scans"
+      ],
+      "notCovered": [
+        "public/VPN/tunnel",
+        "real reverse proxy",
+        "multi-replica",
+        "multi-platform",
+        "capacity/DDoS",
+        "proxy/telemetry/crash-dump/production log chains"
+      ],
+      "evidence": [
+        "tmp/integration/codex-takeover-k37/REPORT.md",
+        "tmp/integration/codex-takeover-k37/results.json",
+        "tmp/integration/codex-takeover-k37/harness.tap.log"
+      ],
+      "t59Promoted": false
+    },
+    {
+      "ticket": "K38",
+      "kind": "finite-local-windows-managed-terminal-pressure",
+      "status": "passed_finite_local_contracts_only",
+      "completedAt": "2026-11-02T07:37:58.229Z",
+      "exitCode": 0,
+      "actualDurationMs": 570341,
+      "sessions": {
+        "warmup": 2,
+        "main": 54,
+        "sequential": 40,
+        "concurrencyBatches": 3,
+        "sessionsPerConcurrencyBatch": 4,
+        "concurrent": 12,
+        "bursts": 2
+      },
+      "failures": 0,
+      "fallbackCleanups": 0,
+      "cleanup": {
+        "identityObservationRecordsIncludingRepeatedHosts": 174,
+        "uniquePidCreationIdentities": 118,
+        "allOriginalIdentitiesGone": true,
+        "pidValuesReusedWithDistinctCreation": 2,
+        "runtimeChildrenRemaining": 0,
+        "callerParentsPreserved": true,
+        "sentinelsPreserved": true
+      },
+      "resources": {
+        "rssAndHeapRose": true,
+        "finalRssBytes": 126840832,
+        "finalHeapUsedBytes": 70886696,
+        "retainedHarnessContexts": 47,
+        "outputSamplesRetained": true,
+        "absenceOfLeakProven": false,
+        "unboundedLongTermGrowthExcluded": false
+      },
+      "dimensions": {
+        "diskFull": "not_run",
+        "trueLongRun": "not_run",
+        "globalSchedulingPerformance": "not_run",
+        "multiPlatform": "not_run",
+        "fullT54": "not_run"
+      },
+      "evidence": [
+        "tmp/integration/codex-takeover-k38/REPORT.md",
+        "tmp/integration/codex-takeover-k38/GPT-RESOLUTION.md",
+        "tmp/integration/codex-takeover-k38/gpt-final-verification.json",
+        "tmp/integration/codex-takeover-k38/run-MHuQro/result.json"
+      ],
+      "originalFailure": "tmp/integration/codex-takeover-k38/run-J97WM7/result.json",
+      "preFixBytes": "tmp/integration/codex-takeover-k38/gpt-before-fix/result.failed.json",
+      "t54Promoted": false
+    },
+    {
+      "ticket": "K39",
+      "kind": "readonly-candidate-increment-proposal",
+      "status": "focused_mechanism_passed_t61_partial",
+      "historicalGlmNewTests": 5,
+      "finalFocused": {
+        "newUpstreamProposalTests": 6,
+        "existingFdifferenceTests": 3,
+        "tests": 9,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "log": "tmp/integration/codex-takeover-k39/gpt-directory-focused-2.log"
+      },
+      "drills": [
+        {
+          "source": "DS",
+          "baseline": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "candidate": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+          "zeroDelta": true,
+          "decision": "not-included",
+          "manifest": "tmp/integration/codex-takeover-k39/ds-gpt-directory-fix/manifest.json"
+        },
+        {
+          "source": "MR",
+          "baseline": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+          "candidate": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+          "changedFiles": 924,
+          "localDownstreamBranchOnly": true,
+          "verifiedLatestUpstream": false,
+          "decision": "not-included",
+          "manifest": "tmp/integration/codex-takeover-k39/mr-gpt-directory-fix/manifest.json"
+        }
+      ],
+      "baselineChanged": false,
+      "npmPackageIncludesProposalTools": false,
+      "t61Promoted": false
+    }
+  ],
+  "k41LocalRootAndPostChecks": {
+    "kind": "local-current-dirty-tree-validation-only",
+    "runByK45": false,
+    "root": {
+      "command": "npm test",
+      "completedAt": "2026-11-02T07:58:11.308130+00:00",
+      "exitCode": 0,
+      "summaryVerified": true,
+      "phases": [
+        {
+          "name": "pure",
+          "tests": 1759,
+          "pass": 1754,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 5,
+          "durationMs": 65444.6657
+        },
+        {
+          "name": "native",
+          "tests": 426,
+          "pass": 342,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 84,
+          "durationMs": 282161.8189
+        }
+      ],
+      "total": {
+        "tests": 2185,
+        "pass": 2096,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 89
+      },
+      "log": "tmp/integration/codex-takeover-k41/root-npm-test.log",
+      "result": "tmp/integration/codex-takeover-k41/root-result.json"
+    },
+    "postChecks": [
+      {
+        "name": "client",
+        "command": "npm run check:client",
+        "exitCode": 0,
+        "log": "tmp/integration/codex-takeover-k41/post-client.log"
+      },
+      {
+        "name": "integration",
+        "command": "npm run integration:check",
+        "exitCode": 0,
+        "log": "tmp/integration/codex-takeover-k41/post-integration.log"
+      },
+      {
+        "name": "fDifference",
+        "command": "node scripts/integration-f-difference.mjs --check",
+        "exitCode": 0,
+        "log": "tmp/integration/codex-takeover-k41/post-f-difference.log"
+      },
+      {
+        "name": "diff",
+        "command": "git diff --check",
+        "exitCode": 0,
+        "log": "tmp/integration/codex-takeover-k41/post-diff.log"
+      },
+      {
+        "name": "pack",
+        "command": "npm pack --dry-run --ignore-scripts --json",
+        "exitCode": 0,
+        "entryCount": 277,
+        "log": "tmp/integration/codex-takeover-k41/post-pack.json"
+      }
+    ],
+    "gate": "tmp/integration/codex-takeover-k41/gate-result.json",
+    "allPassedMeaning": "Only the listed local root and post-check commands, not all release hard gates.",
+    "nativeFilesIncluded": [
+      "packages/cli-runtime/src/native-terminal.mjs",
+      "packages/cli-runtime/src/native-terminal-peer.ps1",
+      "packages/cli-runtime/src/native-process.mjs"
+    ],
+    "literalRelativeImportCheck": {
+      "result": "tmp/integration/codex-takeover-k41/pack-import-check.json",
+      "missing": 0,
+      "dynamicImportsProven": false,
+      "externalDependenciesExecutedOrProven": false
+    },
+    "repositoryOnlyToolsAndBaselineGitInputsExcludedFromNpm": true,
+    "focusedOrHarnessCountsAdded": false,
+    "formalAcceptancePromoted": false
+  },
+  "countingRule": "K37 cases, K38 sessions, K39 focused tests and K41 root/post results are different and sometimes overlapping scopes; never add them into one total. Unknown, skipped, excluded, partial and not_run are not passed.",
+  "t61ConclusionFromK43": {
+    "status": "partial",
+    "requiredByOriginalMasterSection2_1": [
+      "candidate-bound file and F/R/T impact review",
+      "interface/data migration, risk and proposed inclusion version review",
+      "explicit inclusion followed by baseline/ledger updates",
+      "affected regression after inclusion",
+      "release comparison against included-increment ledger"
+    ],
+    "normalEntryDriftGapRemainsAtSnapshot": true,
+    "isolatedImplementationDelegatedToK44": true,
+    "newRemoteUpdateRequired": false,
+    "realIncrementAdoptionRequiredForConditionalBranchValidation": false,
+    "newUserSuppliedShaRequiredForConditionalBranchValidation": false,
+    "report": "tmp/integration/codex-takeover-k43/REPORT.md"
+  },
+  "formalStatus": {
+    "workPackagesCompleted": "0/20",
+    "acceptanceScenariosPassed": "44/63",
+    "m0StepsCompleted": "11/12",
+    "gates": {
+      "G1": "in_progress",
+      "G2": "in_progress",
+      "G3": "in_progress",
+      "G4": "in_progress"
+    },
+    "promotedByE159": [],
+    "t35": "not_run",
+    "t37": "not_promoted",
+    "t54": "not_promoted",
+    "t59": "not_promoted",
+    "t61": "partial",
+    "migrationC1ThroughC10ProvenByThisSlice": false,
+    "activationSupportedProvenByThisSlice": false,
+    "postActivationRollbackSupportedProvenByThisSlice": false,
+    "stopWriteProvableProvenByThisSlice": false,
+    "generationAvailableProvenByThisSlice": false
+  },
+  "worktreeAndRelease": {
+    "version": "0.26.0-preview.1",
+    "uncommitted": true,
+    "tagged": false,
+    "published": false,
+    "hostedCiVerified": false,
+    "cleanCheckoutVerified": false,
+    "releaseAcceptanceVerified": false,
+    "existingUserReleaseAuthorizationRetained": true,
+    "releaseAllowedWhileHardGatesOpen": false,
+    "newGeneralAuthorizationRequirementAdded": false
+  },
+  "k45Verification": {
+    "allowedOnly": [
+      "JSON.parse and numeric/count assertions",
+      "referenced path existence and stored log byte hashes",
+      "original history byte preservation and exact prefix/suffix checks",
+      "git diff --check with concurrent-writer qualification"
+    ],
+    "inputVerification": "tmp/integration/codex-takeover-k45/input-verification.json",
+    "documentVerification": "tmp/integration/codex-takeover-k45/document-verification.json",
+    "originalBackups": [
+      "tmp/integration/codex-takeover-k45/PROGRESS.before.md",
+      "tmp/integration/codex-takeover-k45/0.26.0-preview.1-validation.before.md"
+    ],
+    "rootTestBuildClientFWriteOrIntegrationCheckRun": false,
+    "wholeTreeGitStatusEqualityRequired": false,
+    "currentGitDiffCheck": {
+      "status": "pending_concurrent_writer",
+      "exitCode": 2,
+      "log": "tmp/integration/codex-takeover-k45/git-diff-check.log",
+      "blockingPath": "packages/orchestration/src/cli-execution.mjs",
+      "blockingLine": 44,
+      "blockingReason": "trailing whitespace in K42 in-progress source; K45 did not modify it",
+      "e159ByteAndPathChecksPassed": true
+    }
+  },
+  "documentationBoundary": {
+    "sourceTestsPackagesCiTasksScopeBaselineLedgerDerivedFOrOldEvidenceChangedByK45": false,
+    "allowedWrites": [
+      {
+        "path": "tmp/integration/codex-takeover-k45/",
+        "mode": "new files only"
+      },
+      {
+        "path": "docs/integration/HANDOFF-20261102-E159.md",
+        "mode": "new file"
+      },
+      {
+        "path": "docs/integration/evidence/20261102_e159_local_validation.json",
+        "mode": "new file"
+      },
+      {
+        "path": "docs/integration/PROGRESS.md",
+        "mode": "top insertion only"
+      },
+      {
+        "path": "docs/releases/0.26.0-preview.1-validation.md",
+        "mode": "end append only"
+      }
+    ]
+  }
+}

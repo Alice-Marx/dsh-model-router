@@ -1,0 +1,1506 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-02",
+  "recordedAt": "2026-11-02T21:37:10.171414+08:00",
+  "checkpoint": "E160",
+  "parentCheckpoint": "E159",
+  "kind": "bounded-local-retained-upstream-inclusion-mechanism-evidence",
+  "actualModelCalls": 0,
+  "formalAcceptancePromoted": false,
+  "environment": "Windows local isolated real Git and Node CLI with synthetic candidates/explicit fixture approvals; no external adoption.",
+  "run": {
+    "path": "tmp/integration/apigpt-chief/t61-chief-retention-full-3.result.json",
+    "sha256": "879db2c0ee2b196de772faa7984be3f7cf1f9e4d9f3d99dbd0ac5f7fa7469b31",
+    "value": {
+      "name": "t61-chief-retention-full-3",
+      "argv": [
+        "node",
+        "--test",
+        "tests/integration-upstream-include.test.mjs"
+      ],
+      "pid": 65104,
+      "startedAt": "2026-11-02T21:08:37.645790+08:00",
+      "state": "finished",
+      "log": "tmp\\integration\\apigpt-chief\\t61-chief-retention-full-3.log",
+      "finishedAt": "2026-11-02T21:14:51.543072+08:00",
+      "exitCode": 0,
+      "logSha256": "c5889eff0eb4db6f85919520030b0b9c91ce3f1ab7548262e17cab696f1b0ee5",
+      "phases": [
+        {
+          "tests": 16,
+          "suites": 0,
+          "pass": 16,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 373806.612
+        }
+      ],
+      "protectedBefore": {
+        "docs/integration/baseline.json": "2e35e9aa04919234590fd0011ce3b310a39675f4f8131a9eab6a919793f65cd5",
+        "docs/integration/feature-inventory.json": "3f3446850974bca22605fe9a82ab1db79c18eb65f8baf09123edf4bdea0cda59",
+        "modules/bot-runtime/SOURCE.json": "057d7b0647566c777da58f4f595d0a372551124dacec47b9be47d5d2070f406b",
+        "pnpm-lock.yaml": "7e3f5ddda2f0149d429605369ca4385bf4739089fd4d6d9c873d6709c58ad012"
+      },
+      "protectedAfter": {
+        "docs/integration/baseline.json": "2e35e9aa04919234590fd0011ce3b310a39675f4f8131a9eab6a919793f65cd5",
+        "docs/integration/feature-inventory.json": "3f3446850974bca22605fe9a82ab1db79c18eb65f8baf09123edf4bdea0cda59",
+        "modules/bot-runtime/SOURCE.json": "057d7b0647566c777da58f4f595d0a372551124dacec47b9be47d5d2070f406b",
+        "pnpm-lock.yaml": "7e3f5ddda2f0149d429605369ca4385bf4739089fd4d6d9c873d6709c58ad012"
+      },
+      "protectedUnchanged": true,
+      "formalAcceptancePromoted": false,
+      "hostedCiRun": false,
+      "total": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryVerified": true
+    }
+  },
+  "independentRunVerification": {
+    "path": "tmp/integration/apigpt-chief/t61-chief-retention-full-3-independent-1.json",
+    "sha256": "96e586329d7fb004f5c17386b773d0c110195081a5acc98a308bc56bbdbde1f0",
+    "value": {
+      "kind": "independent-retained-inclusion-run-verification",
+      "verifiedAt": "2026-11-02T21:16:45.693251+08:00",
+      "shellId": "sh_19c604553001TNAwHHRlP5OLHd",
+      "result": "tmp/integration/apigpt-chief/t61-chief-retention-full-3.result.json",
+      "resultSha256": "879db2c0ee2b196de772faa7984be3f7cf1f9e4d9f3d99dbd0ac5f7fa7469b31",
+      "log": "tmp\\integration\\apigpt-chief\\t61-chief-retention-full-3.log",
+      "logSha256": "c5889eff0eb4db6f85919520030b0b9c91ce3f1ab7548262e17cab696f1b0ee5",
+      "counts": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "sourceFilesVerified": 5,
+      "sourceSnapshotUnchanged": true,
+      "protectedUnchanged": true,
+      "completeArtifactVerification": "pending",
+      "formalAcceptancePromoted": false,
+      "priorAttempt": "Read-only count parser failed because PowerShell mangled a literal U+2139; no receipt was created. Parser now uses ASCII Unicode escapes."
+    }
+  },
+  "artifactVerification": {
+    "path": "tmp/integration/apigpt-chief/t61-chief-retention-artifact-verification-3.json",
+    "sha256": "be70b6cdc06346b5de37bf60792b0d5079068bf703c812865d9635456efe067a",
+    "value": {
+      "kind": "independent-retained-inclusion-artifact-verification",
+      "verifiedAt": "2026-11-02T21:19:04.116260+08:00",
+      "artifactRoot": "tmp/integration/apigpt-chief/t61-chief-retention-artifacts-20261102-3",
+      "bundles": [
+        {
+          "bundle": "DS-include-CLI-candidate-behavior-failure-retains-staged-candidate-and-r-e1c3d7fbf5",
+          "testName": "DS include CLI: candidate behavior failure retains staged candidate and restores original SOURCE vendor and all locks",
+          "manifestSha256": "578b629e97b222fbad345025f53a71759004df29ac908cad601d8794e69794ff",
+          "files": 1458,
+          "commands": 19,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 3,
+          "snapshots": 0,
+          "regressionStreams": 2,
+          "exceptionPoints": [],
+          "candidateManifests": 1,
+          "commandArtifactAudit": {
+            "capturedCommands": 2,
+            "capturedFiles": 41,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "DS-include-CLI-exact-candidate-add-change-delete-publishes-vendor-SOURCE-7b911eeac0",
+          "testName": "DS include CLI: exact candidate add/change/delete publishes vendor SOURCE and locks while retaining original bytes",
+          "manifestSha256": "038ff45457771840c6043178ea16979c86b1a090a44330e34fe8015b8dd1a788",
+          "files": 1530,
+          "commands": 23,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 3,
+          "snapshots": 1,
+          "regressionStreams": 2,
+          "exceptionPoints": [],
+          "candidateManifests": 1,
+          "commandArtifactAudit": {
+            "capturedCommands": 6,
+            "capturedFiles": 105,
+            "successfulInclusionBindings": [
+              {
+                "command": 19,
+                "output": "tmp/integration/ds-include-valid",
+                "id": "DS:a2044f7ee81582b0fce445e7fab5549efe12ba84",
+                "commits": {
+                  "baseline": "de55888a93983fc51c94f7d22bc94b4f8293205d",
+                  "candidate": "a2044f7ee81582b0fce445e7fab5549efe12ba84"
+                },
+                "proposalSha256": "5ca3802c8d88a782ba6922c38cde8943c0b1da52874366d5e6ab3113f8ca5414",
+                "approvalSha256": "e4a57302dc219a34944d152e3e38b858c9c685177c8e4e470c1805acda03fe05",
+                "snapshotSha256": "24ba85f82055658b3a3e544c82e36b26c9ae32fd8afd22689d4f35b2e3b30a4f",
+                "ledgerSha256": "fefc7045d8323d39eae49270df1e86a04419a88449986814652949013dc20f2d",
+                "effectiveImpact": {
+                  "sourceRepository": "DS",
+                  "features": [
+                    "F01"
+                  ],
+                  "requirements": [
+                    "R03",
+                    "R19",
+                    "R22",
+                    "R25",
+                    "R29"
+                  ],
+                  "acceptance": [
+                    "T02",
+                    "T04"
+                  ],
+                  "addedFeatures": [],
+                  "addedRequirements": [],
+                  "addedAcceptance": [],
+                  "fileDispositions": [],
+                  "behaviorVerified": false
+                },
+                "regressionIds": [
+                  "DS-vendor-contract"
+                ]
+              }
+            ],
+            "releaseLedgerBindings": [
+              {
+                "command": 22,
+                "ids": [
+                  "DS:a2044f7ee81582b0fce445e7fab5549efe12ba84"
+                ],
+                "ledgerSha256": "fefc7045d8323d39eae49270df1e86a04419a88449986814652949013dc20f2d"
+              }
+            ]
+          },
+          "verified": true
+        },
+        {
+          "bundle": "DS-include-CLI-hard-process-exits-block-normal-gates-until-explicit-mark-a28a5f05b4",
+          "testName": "DS include CLI: hard process exits block normal gates until explicit marker-bound recovery restores original bytes",
+          "manifestSha256": "df2a7d8f6350e6cf5bed7fe836ef8c183bcb433c41968a92e952d0762d5fb6a0",
+          "files": 11565,
+          "commands": 69,
+          "states": [
+            "before-inclusion",
+            "crash-candidate-staged-before-recovery",
+            "crash-candidate-staged-after-recovery",
+            "crash-vendor-original-moved-before-recovery",
+            "crash-vendor-original-moved-after-recovery",
+            "crash-vendor-published-before-recovery",
+            "crash-vendor-published-after-recovery",
+            "crash-source-published-before-recovery",
+            "crash-source-published-after-recovery",
+            "crash-baseline-published-before-recovery",
+            "crash-baseline-published-stale-marker-rejected",
+            "crash-baseline-published-unrelated-bytes-rejected",
+            "crash-baseline-published-after-recovery",
+            "crash-inventory-published-before-recovery",
+            "crash-inventory-published-after-recovery",
+            "crash-ledger-published-before-recovery",
+            "crash-ledger-published-after-recovery",
+            "final"
+          ],
+          "restoredCheckpoints": [
+            "crash-candidate-staged-after-recovery",
+            "crash-vendor-original-moved-after-recovery",
+            "crash-vendor-published-after-recovery",
+            "crash-source-published-after-recovery",
+            "crash-baseline-published-after-recovery",
+            "crash-inventory-published-after-recovery",
+            "crash-ledger-published-after-recovery"
+          ],
+          "fault": null,
+          "vendorManifests": 25,
+          "snapshots": 0,
+          "regressionStreams": 0,
+          "exceptionPoints": [],
+          "candidateManifests": 7,
+          "commandArtifactAudit": {
+            "capturedCommands": 45,
+            "capturedFiles": 860,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "DS-include-CLI-missing-or-stale-manifest-bindings-reject-without-changin-92d52912a6",
+          "testName": "DS include CLI: missing or stale manifest bindings reject without changing any lock SOURCE or vendor bytes",
+          "manifestSha256": "67445081b025e5e36640965739c900908e5123104892e1c304d17a1f719f8bed",
+          "files": 1696,
+          "commands": 22,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 0,
+          "regressionStreams": 0,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 5,
+            "capturedFiles": 104,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "DS-include-CLI-partial-publication-exceptions-restore-every-original-byt-1c9e368497",
+          "testName": "DS include CLI: partial publication exceptions restore every original byte and retain the failed candidate",
+          "manifestSha256": "0117322b57e488c99d4ff691294d78b0b66085a1fe99b9b764cdc34143a3ea75",
+          "files": 7129,
+          "commands": 24,
+          "states": [
+            "before-inclusion",
+            "exception-vendor-original-moved",
+            "exception-vendor-published",
+            "exception-source-published",
+            "exception-baseline-published",
+            "exception-inventory-published",
+            "exception-ledger-published",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 14,
+          "snapshots": 0,
+          "regressionStreams": 12,
+          "exceptionPoints": [
+            "vendor-original-moved",
+            "vendor-published",
+            "source-published",
+            "baseline-published",
+            "inventory-published",
+            "ledger-published"
+          ],
+          "candidateManifests": 6,
+          "commandArtifactAudit": {
+            "capturedCommands": 1,
+            "capturedFiles": 18,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "DS-include-CLI-recovery-write-failure-keeps-gates-blocked-and-a-new-mark-2d507885e7",
+          "testName": "DS include CLI: recovery-write failure keeps gates blocked and a new marker-bound recovery restores original bytes",
+          "manifestSha256": "63342b114547b5f3717610116e81f262f18b988a0974862ce6bfa2e3de1d8841",
+          "files": 2451,
+          "commands": 25,
+          "states": [
+            "before-inclusion",
+            "recovery-write-before-failed-recovery",
+            "recovery-write-failed-blocked",
+            "recovery-write-after-recovery",
+            "final"
+          ],
+          "restoredCheckpoints": [
+            "recovery-write-after-recovery"
+          ],
+          "fault": "recovery-write",
+          "vendorManifests": 6,
+          "snapshots": 0,
+          "regressionStreams": 0,
+          "exceptionPoints": [],
+          "candidateManifests": 1,
+          "commandArtifactAudit": {
+            "capturedCommands": 6,
+            "capturedFiles": 110,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "DS-include-CLI-rollback-write-failure-keeps-gates-blocked-and-a-new-mark-de86ddb4b5",
+          "testName": "DS include CLI: rollback-write failure keeps gates blocked and a new marker-bound recovery restores original bytes",
+          "manifestSha256": "72c734d8b4425630b6efe8bc7746e3d175ccbb26652ad243741cfe015cc20e1b",
+          "files": 2150,
+          "commands": 24,
+          "states": [
+            "before-inclusion",
+            "rollback-write-failed-blocked",
+            "rollback-write-after-recovery",
+            "final"
+          ],
+          "restoredCheckpoints": [
+            "rollback-write-after-recovery"
+          ],
+          "fault": "rollback-write",
+          "vendorManifests": 5,
+          "snapshots": 0,
+          "regressionStreams": 2,
+          "exceptionPoints": [],
+          "candidateManifests": 1,
+          "commandArtifactAudit": {
+            "capturedCommands": 6,
+            "capturedFiles": 112,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "include-CLI-a-reviewer-added-nonexistent-scope-id-is-rejected-before-any-9601c3ea58",
+          "testName": "include CLI: a reviewer-added nonexistent scope id is rejected before any write",
+          "manifestSha256": "eddbc7d36b649265f10d160f1464fb326a3a38b65363ea5f7b6d385021262ac0",
+          "files": 665,
+          "commands": 10,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 0,
+          "regressionStreams": 0,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 2,
+            "capturedFiles": 38,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "include-CLI-failed-affected-regression-is-recorded-failed-and-all-three--dd0507d23f",
+          "testName": "include CLI: failed affected regression is recorded failed and all three locks roll back before gates pass again",
+          "manifestSha256": "c35a09ae3fc922edab2e70948dba409f06855d20baac469428d7e179fb92ef16",
+          "files": 712,
+          "commands": 12,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 0,
+          "regressionStreams": 4,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 4,
+            "capturedFiles": 72,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "include-CLI-missing-stale-unresolved-incomplete-approvals-and-wrong-cand-aecf157990",
+          "testName": "include CLI: missing/stale/unresolved/incomplete approvals and wrong candidate leave every isolated lock byte-identical",
+          "manifestSha256": "369e3ef4433e9ab36f6f380ca8d7fc4e45fd85b4e7101900fbeb454b188749c0",
+          "files": 961,
+          "commands": 23,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 0,
+          "regressionStreams": 0,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 15,
+            "capturedFiles": 296,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "include-CLI-unknown-only-and-mixed-candidates-select-reviewer-added-F-R--c249bff38b",
+          "testName": "include CLI: unknown-only and mixed candidates select reviewer-added F R or T regressions and reject illegal ids",
+          "manifestSha256": "c919167c814198a3e4d756016f730b3b7e1f20ffda01b4e4c4336efc9ecac694",
+          "files": 1149,
+          "commands": 45,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 4,
+          "regressionStreams": 10,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 21,
+            "capturedFiles": 410,
+            "successfulInclusionBindings": [
+              {
+                "command": 17,
+                "output": "tmp/integration/unknown-f23",
+                "id": "MR:440ba2a722a81805e1c7de3b9357489e69e5c57f",
+                "commits": {
+                  "baseline": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+                  "candidate": "440ba2a722a81805e1c7de3b9357489e69e5c57f"
+                },
+                "proposalSha256": "5931dbdab3f34f72388adcc2ff25115b1e4827370a39e936e2d6fca6936fa2bc",
+                "approvalSha256": "958f0aa9bb8894ad663bd625cecd662c1193deff2091109cf55a6fea741afcbb",
+                "snapshotSha256": "1760bd7bd5f9d89a59a395d45b9e04f20ab3d44665ac6b8b41145dc687ce7f4e",
+                "ledgerSha256": "a64813aacbb2cc6eac8bccf0baecf6923fca9408df607f47942efc93de28e16e",
+                "effectiveImpact": {
+                  "sourceRepository": "MR",
+                  "features": [
+                    "F23"
+                  ],
+                  "requirements": [],
+                  "acceptance": [],
+                  "addedFeatures": [
+                    "F23"
+                  ],
+                  "addedRequirements": [],
+                  "addedAcceptance": [],
+                  "fileDispositions": [
+                    {
+                      "path": "k44-unknown.txt",
+                      "disposition": "frt-impact-confirmed",
+                      "featureIds": [
+                        "F23"
+                      ],
+                      "requirementIds": [],
+                      "acceptanceIds": []
+                    }
+                  ],
+                  "behaviorVerified": false
+                },
+                "regressionIds": [
+                  "F23-router-contract"
+                ]
+              },
+              {
+                "command": 27,
+                "output": "tmp/integration/unknown-r-only",
+                "id": "MR:e6ebad496bfc7afcc924a816c02abd8fede86558",
+                "commits": {
+                  "baseline": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+                  "candidate": "e6ebad496bfc7afcc924a816c02abd8fede86558"
+                },
+                "proposalSha256": "6256d4807788d2940a357f0a5d5cb58d7f1fdaa1104c9e2d10253376db63bbe0",
+                "approvalSha256": "3f4a4f78340b57d5a9fe73f5a2cd0c6969f351495cd1add3aa2f052c2bb48f1f",
+                "snapshotSha256": "b41a54517836b632c9fd81a0e8b059ca58bd1b0c791b00cf7001e1959f48e253",
+                "ledgerSha256": "60251c825d0ccfc904a7809a2e6783fdbe08fcd32aadf229b175bd4f460d8631",
+                "effectiveImpact": {
+                  "sourceRepository": "MR",
+                  "features": [],
+                  "requirements": [
+                    "R14"
+                  ],
+                  "acceptance": [],
+                  "addedFeatures": [],
+                  "addedRequirements": [
+                    "R14"
+                  ],
+                  "addedAcceptance": [],
+                  "fileDispositions": [
+                    {
+                      "path": "k44-unknown.txt",
+                      "disposition": "frt-impact-confirmed",
+                      "featureIds": [],
+                      "requirementIds": [
+                        "R14"
+                      ],
+                      "acceptanceIds": []
+                    }
+                  ],
+                  "behaviorVerified": false
+                },
+                "regressionIds": [
+                  "F23-router-contract"
+                ]
+              },
+              {
+                "command": 37,
+                "output": "tmp/integration/unknown-t-only",
+                "id": "MR:6ebd15e82c0566a675171fe22841aca687a1cd0f",
+                "commits": {
+                  "baseline": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+                  "candidate": "6ebd15e82c0566a675171fe22841aca687a1cd0f"
+                },
+                "proposalSha256": "e7dd9022003f005d72a3e2626ddb237b7598f441cd2b8e6fe0cd115b0bb383b2",
+                "approvalSha256": "3f3d5eca3998b488a41299be4b5bcf5492702a95d71778fb751bdbbf024f8478",
+                "snapshotSha256": "1b8cb94f2c5b2178e6f3b10525e2532a78428de2eff2c0bd286f6afef4edb68f",
+                "ledgerSha256": "3e841cd77d92e09f631c1a87dc344324ef41c37fd96f03a654f012f3dbc0d782",
+                "effectiveImpact": {
+                  "sourceRepository": "MR",
+                  "features": [],
+                  "requirements": [],
+                  "acceptance": [
+                    "T55"
+                  ],
+                  "addedFeatures": [],
+                  "addedRequirements": [],
+                  "addedAcceptance": [
+                    "T55"
+                  ],
+                  "fileDispositions": [
+                    {
+                      "path": "k44-unknown.txt",
+                      "disposition": "frt-impact-confirmed",
+                      "featureIds": [],
+                      "requirementIds": [],
+                      "acceptanceIds": [
+                        "T55"
+                      ]
+                    }
+                  ],
+                  "behaviorVerified": false
+                },
+                "regressionIds": [
+                  "F23-router-contract"
+                ]
+              },
+              {
+                "command": 44,
+                "output": "tmp/integration/mixed-f40-and-f23",
+                "id": "MR:d723ae7afa266659adb04309a4c5a4f75d2b413e",
+                "commits": {
+                  "baseline": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+                  "candidate": "d723ae7afa266659adb04309a4c5a4f75d2b413e"
+                },
+                "proposalSha256": "fa1824197ac49f93a3a0cff7b4e3ae586ae1a8bfc0ccd42ed0c7006bd74e8978",
+                "approvalSha256": "790b2233fbe006a6383bfbd17656513448d9ad94a7e1c0c5aea04c89c2a8e421",
+                "snapshotSha256": "e9648f7fd6d73aa4813921b501c32bfeb980c908e1aaaba817a7d782c4cd5e48",
+                "ledgerSha256": "745ebcd3d754c21fc1e5b9d8ae179d4139cc5aa0970d30ec369e8a08b967005c",
+                "effectiveImpact": {
+                  "sourceRepository": "MR",
+                  "features": [
+                    "F23",
+                    "F40"
+                  ],
+                  "requirements": [
+                    "R03",
+                    "R04",
+                    "R05",
+                    "R07",
+                    "R08",
+                    "R09",
+                    "R10",
+                    "R11",
+                    "R12",
+                    "R13",
+                    "R16",
+                    "R17",
+                    "R18",
+                    "R20",
+                    "R22",
+                    "R23",
+                    "R24",
+                    "R27",
+                    "R28",
+                    "R29",
+                    "R30",
+                    "R31"
+                  ],
+                  "acceptance": [
+                    "T14",
+                    "T15",
+                    "T16",
+                    "T17",
+                    "T18",
+                    "T19",
+                    "T20",
+                    "T21",
+                    "T22",
+                    "T23",
+                    "T24",
+                    "T25",
+                    "T26",
+                    "T27",
+                    "T28",
+                    "T29",
+                    "T30",
+                    "T31",
+                    "T32",
+                    "T33",
+                    "T34",
+                    "T35",
+                    "T50",
+                    "T52"
+                  ],
+                  "addedFeatures": [
+                    "F23"
+                  ],
+                  "addedRequirements": [],
+                  "addedAcceptance": [],
+                  "fileDispositions": [
+                    {
+                      "path": "k44-unknown.txt",
+                      "disposition": "frt-impact-confirmed",
+                      "featureIds": [
+                        "F23"
+                      ],
+                      "requirementIds": [],
+                      "acceptanceIds": []
+                    }
+                  ],
+                  "behaviorVerified": false
+                },
+                "regressionIds": [
+                  "F23-router-contract",
+                  "F40-cli-runtime-contract"
+                ]
+              }
+            ],
+            "releaseLedgerBindings": [
+              {
+                "command": 18,
+                "ids": [
+                  "MR:440ba2a722a81805e1c7de3b9357489e69e5c57f"
+                ],
+                "ledgerSha256": "a64813aacbb2cc6eac8bccf0baecf6923fca9408df607f47942efc93de28e16e"
+              },
+              {
+                "command": 28,
+                "ids": [
+                  "MR:e6ebad496bfc7afcc924a816c02abd8fede86558"
+                ],
+                "ledgerSha256": "60251c825d0ccfc904a7809a2e6783fdbe08fcd32aadf229b175bd4f460d8631"
+              },
+              {
+                "command": 38,
+                "ids": [
+                  "MR:6ebd15e82c0566a675171fe22841aca687a1cd0f"
+                ],
+                "ledgerSha256": "3e841cd77d92e09f631c1a87dc344324ef41c37fd96f03a654f012f3dbc0d782"
+              },
+              {
+                "command": 45,
+                "ids": [
+                  "MR:d723ae7afa266659adb04309a4c5a4f75d2b413e"
+                ],
+                "ledgerSha256": "745ebcd3d754c21fc1e5b9d8ae179d4139cc5aa0970d30ec369e8a08b967005c"
+              }
+            ]
+          },
+          "verified": true
+        },
+        {
+          "bundle": "include-CLI-valid-explicit-inclusion-runs-affected-regression-rebuilds-l-bb677f1da5",
+          "testName": "include CLI: valid explicit inclusion runs affected regression, rebuilds locks, compares release and rejects later manual drift",
+          "manifestSha256": "7ab5d621a5efa25cff9b0757035abf38988650b9d8d478fa7b48dc8870bf6da1",
+          "files": 1468,
+          "commands": 54,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 1,
+          "regressionStreams": 4,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 46,
+            "capturedFiles": 744,
+            "successfulInclusionBindings": [
+              {
+                "command": 10,
+                "output": "tmp/integration/include-valid",
+                "id": "MR:da50f068e917a7c7c91e97540ba86693db10bb55",
+                "commits": {
+                  "baseline": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+                  "candidate": "da50f068e917a7c7c91e97540ba86693db10bb55"
+                },
+                "proposalSha256": "6c8697a31ed82cf52c20be0b8160e1ca6d3195938f3fe0facf05d413d10f7b6b",
+                "approvalSha256": "0e19d5dc6a41b6b1920c335091d93a990133a112af08cbeb077ef62ec22a2daa",
+                "snapshotSha256": "1724464cf3241bea7969d593e5edddc617b341c5dd9c357eea603127dd5aaf8f",
+                "ledgerSha256": "1026d7509ec1def0ec4137bacbca9ee88efc9c94c5bddc9f36f68342b3e6c9b0",
+                "effectiveImpact": {
+                  "sourceRepository": "MR",
+                  "features": [
+                    "F23",
+                    "F40"
+                  ],
+                  "requirements": [
+                    "R01",
+                    "R03",
+                    "R04",
+                    "R05",
+                    "R06",
+                    "R07",
+                    "R08",
+                    "R09",
+                    "R10",
+                    "R11",
+                    "R12",
+                    "R13",
+                    "R14",
+                    "R16",
+                    "R17",
+                    "R18",
+                    "R20",
+                    "R22",
+                    "R23",
+                    "R24",
+                    "R27",
+                    "R28",
+                    "R29",
+                    "R30",
+                    "R31"
+                  ],
+                  "acceptance": [
+                    "T06",
+                    "T08",
+                    "T14",
+                    "T15",
+                    "T16",
+                    "T17",
+                    "T18",
+                    "T19",
+                    "T20",
+                    "T21",
+                    "T22",
+                    "T23",
+                    "T24",
+                    "T25",
+                    "T26",
+                    "T27",
+                    "T28",
+                    "T29",
+                    "T30",
+                    "T31",
+                    "T32",
+                    "T33",
+                    "T34",
+                    "T35",
+                    "T50",
+                    "T52",
+                    "T55"
+                  ],
+                  "addedFeatures": [],
+                  "addedRequirements": [],
+                  "addedAcceptance": [],
+                  "fileDispositions": [],
+                  "behaviorVerified": false
+                },
+                "regressionIds": [
+                  "F23-router-contract",
+                  "F40-cli-runtime-contract"
+                ]
+              }
+            ],
+            "releaseLedgerBindings": [
+              {
+                "command": 13,
+                "ids": [
+                  "MR:da50f068e917a7c7c91e97540ba86693db10bb55"
+                ],
+                "ledgerSha256": "1026d7509ec1def0ec4137bacbca9ee88efc9c94c5bddc9f36f68342b3e6c9b0"
+              }
+            ]
+          },
+          "verified": true
+        },
+        {
+          "bundle": "normal-entry-points-reject-malformed-and-recovery-required-markers-witho-74b3abcff8",
+          "testName": "normal entry points reject malformed and recovery-required markers without changing locked bytes",
+          "manifestSha256": "a0f3a278b77ed45a3a98499762cd991da47dc1f0c2ca4e38f6fab859651ca658",
+          "files": 799,
+          "commands": 17,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 0,
+          "regressionStreams": 0,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 9,
+            "capturedFiles": 162,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        },
+        {
+          "bundle": "normal-progress-inventory-F-difference-gates-reject-genesis-drift-and-a--6109ee2e75",
+          "testName": "normal progress/inventory/F-difference gates reject genesis drift and a regression-pending ledger increment",
+          "manifestSha256": "7500335f058cb7f6494f75c4b033154fb69b3b78b202f8f1be486e3be797cf88",
+          "files": 745,
+          "commands": 15,
+          "states": [
+            "before-inclusion",
+            "final"
+          ],
+          "restoredCheckpoints": [],
+          "fault": null,
+          "vendorManifests": 2,
+          "snapshots": 0,
+          "regressionStreams": 0,
+          "exceptionPoints": [],
+          "candidateManifests": 0,
+          "commandArtifactAudit": {
+            "capturedCommands": 7,
+            "capturedFiles": 112,
+            "successfulInclusionBindings": [],
+            "releaseLedgerBindings": []
+          },
+          "verified": true
+        }
+      ],
+      "bundleCount": 14,
+      "allVerified": true,
+      "priorVerifierFailures": [
+        "AssertionError retained: rollback EEXIST belongs to recoveryError, not necessarily top-level stderr",
+        "Original SOURCE backup and vendor are stored separately; verify original vendor against before-inclusion",
+        "A hard crash can intentionally leave vendor absent or candidate vendor published before SOURCE; verify each boundary separately"
+      ],
+      "formalAcceptancePromoted": false,
+      "scope": "Windows local synthetic fixture, not external/full product/release acceptance"
+    }
+  },
+  "regressionCommandBindings": {
+    "path": "tmp/integration/apigpt-chief/t61-chief-retention-regression-bindings-3.json",
+    "sha256": "eed7dedd895a16f2a838cecba34af816e5b90f8d94da9c2bb33f24e7dc51b057",
+    "value": {
+      "kind": "independent-retained-regression-command-binding-verification",
+      "verifiedAt": "2026-11-02T21:31:00.677365+08:00",
+      "artifactReceiptSha256": "be70b6cdc06346b5de37bf60792b0d5079068bf703c812865d9635456efe067a",
+      "allVerified": true,
+      "regressionCount": 18,
+      "rawStreamsVerified": 36,
+      "intentionallyFailedRegressions": [
+        {
+          "bundle": "DS-include-CLI-candidate-behavior-failure-retains-staged-candidate-and-r-e1c3d7fbf5",
+          "result": "cli-output/ds-behavior-failed/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "5525fc030c68ae3c0e2a421b05f7ecad34477914",
+          "status": "failed",
+          "exitCode": 1,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "d42295082a2dbbe6c3133bd3fee907a96e9e08088bb424bb016154e81dc2b781",
+          "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderrSha256": "5bdcc92a128389b6e3a54024c7e1bd842c0f66dbbe849f01ce91d4ede0eb4891"
+        },
+        {
+          "bundle": "include-CLI-failed-affected-regression-is-recorded-failed-and-all-three--dd0507d23f",
+          "result": "cli-output/include-regression-failed/inclusion-result.json",
+          "id": "F40-cli-runtime-contract",
+          "candidate": "598ad2789be92402ecbb22e8b2461906782455af",
+          "status": "failed",
+          "exitCode": 1,
+          "harnessSha256": "19ff98945db0f7ff7ccb7e0ea7eb2ec8f9bfcf487685353ab3b8c8960995b275",
+          "candidateTreeSha256": "18eaa91e8609649d3f4027bda171eee1f35f4c96aaf939a6499f10382f832e35",
+          "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderrSha256": "b8f65686d64194cc394c66cde3b3c3b0afd9d5babeae8a4c2c13420c0c8e8e57"
+        }
+      ],
+      "regressions": [
+        {
+          "bundle": "DS-include-CLI-candidate-behavior-failure-retains-staged-candidate-and-r-e1c3d7fbf5",
+          "result": "cli-output/ds-behavior-failed/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "5525fc030c68ae3c0e2a421b05f7ecad34477914",
+          "status": "failed",
+          "exitCode": 1,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "d42295082a2dbbe6c3133bd3fee907a96e9e08088bb424bb016154e81dc2b781",
+          "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderrSha256": "5bdcc92a128389b6e3a54024c7e1bd842c0f66dbbe849f01ce91d4ede0eb4891"
+        },
+        {
+          "bundle": "DS-include-CLI-exact-candidate-add-change-delete-publishes-vendor-SOURCE-7b911eeac0",
+          "result": "cli-output/ds-include-valid/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "a2044f7ee81582b0fce445e7fab5549efe12ba84",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "92684b41abaaa1e5452030f28eecc79f87bd940dacfd9a25279161f154e6b423",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "DS-include-CLI-partial-publication-exceptions-restore-every-original-byt-1c9e368497",
+          "result": "cli-output/ds-partial-baseline-published/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "8cd124eae2639cdbbc9525559c3e6372b03e1a01",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "a838c144f208fb29fb21a3565b559a8272442e55e21ee84ebde2d74f5bff8aaa",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "DS-include-CLI-partial-publication-exceptions-restore-every-original-byt-1c9e368497",
+          "result": "cli-output/ds-partial-inventory-published/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "8cd124eae2639cdbbc9525559c3e6372b03e1a01",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "7b7f598a322d97c6e5de0a5981b05903bbd85ff8777ed4c7462d6985c7c9721b",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "DS-include-CLI-partial-publication-exceptions-restore-every-original-byt-1c9e368497",
+          "result": "cli-output/ds-partial-ledger-published/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "8cd124eae2639cdbbc9525559c3e6372b03e1a01",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "1e22285c4161123d5d8e64390645f7137bf20d066d849441c6fed34891aa0a23",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "DS-include-CLI-partial-publication-exceptions-restore-every-original-byt-1c9e368497",
+          "result": "cli-output/ds-partial-source-published/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "8cd124eae2639cdbbc9525559c3e6372b03e1a01",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "6668c6977cdec8e55d279c7cc46a39d477cbb323f22a3044f6352d6f34c3da5d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "DS-include-CLI-partial-publication-exceptions-restore-every-original-byt-1c9e368497",
+          "result": "cli-output/ds-partial-vendor-original-moved/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "8cd124eae2639cdbbc9525559c3e6372b03e1a01",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "21c0b2eaba23a653e2f735dbe00a7ca548ed8937429f223b2cdc75efb65c0016",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "DS-include-CLI-partial-publication-exceptions-restore-every-original-byt-1c9e368497",
+          "result": "cli-output/ds-partial-vendor-published/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "8cd124eae2639cdbbc9525559c3e6372b03e1a01",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "d69bc0a4ad1580553f21b63eaf86e81fd5fbaa1ab38e01d3f36e4ff9bf1a45e0",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "DS-include-CLI-rollback-write-failure-keeps-gates-blocked-and-a-new-mark-de86ddb4b5",
+          "result": "cli-output/ds-rollback-write-failure/inclusion-result.json",
+          "id": "DS-vendor-contract",
+          "candidate": "b49a9ddfd584035e60b5a7c8ba34b9e73e751912",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+          "candidateTreeSha256": "877b1b5e3745459289e45e210e93bc8ac8a7770449e15c135f3bca9736147fca",
+          "stdoutSha256": "0d1cd3a1ccd3e5ed2bd7aca005a96c3d85dec8b6e6365d41ca0e7b1d386191e8",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-failed-affected-regression-is-recorded-failed-and-all-three--dd0507d23f",
+          "result": "cli-output/include-regression-failed/inclusion-result.json",
+          "id": "F23-router-contract",
+          "candidate": "598ad2789be92402ecbb22e8b2461906782455af",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "9e09a94eb4b245bd911bf5ff470b8c80d237a11d348207c15bb1197163c02bc1",
+          "candidateTreeSha256": "18eaa91e8609649d3f4027bda171eee1f35f4c96aaf939a6499f10382f832e35",
+          "stdoutSha256": "cce14e2d3d3d94cef16eae66831e5b12aaa34bc8c422850c56a7313d408d7e50",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-failed-affected-regression-is-recorded-failed-and-all-three--dd0507d23f",
+          "result": "cli-output/include-regression-failed/inclusion-result.json",
+          "id": "F40-cli-runtime-contract",
+          "candidate": "598ad2789be92402ecbb22e8b2461906782455af",
+          "status": "failed",
+          "exitCode": 1,
+          "harnessSha256": "19ff98945db0f7ff7ccb7e0ea7eb2ec8f9bfcf487685353ab3b8c8960995b275",
+          "candidateTreeSha256": "18eaa91e8609649d3f4027bda171eee1f35f4c96aaf939a6499f10382f832e35",
+          "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderrSha256": "b8f65686d64194cc394c66cde3b3c3b0afd9d5babeae8a4c2c13420c0c8e8e57"
+        },
+        {
+          "bundle": "include-CLI-unknown-only-and-mixed-candidates-select-reviewer-added-F-R--c249bff38b",
+          "result": "cli-output/mixed-f40-and-f23/inclusion-result.json",
+          "id": "F23-router-contract",
+          "candidate": "d723ae7afa266659adb04309a4c5a4f75d2b413e",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "9e09a94eb4b245bd911bf5ff470b8c80d237a11d348207c15bb1197163c02bc1",
+          "candidateTreeSha256": "1873d3767cc100156fcd1eb696cfb3f273551ae704ffcaa2a00491a2dbefdb70",
+          "stdoutSha256": "bb12fca1e92e8c53b31da2dab63786b91f47ac73b04e85294a8d1502ec4fbfac",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-unknown-only-and-mixed-candidates-select-reviewer-added-F-R--c249bff38b",
+          "result": "cli-output/mixed-f40-and-f23/inclusion-result.json",
+          "id": "F40-cli-runtime-contract",
+          "candidate": "d723ae7afa266659adb04309a4c5a4f75d2b413e",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "19ff98945db0f7ff7ccb7e0ea7eb2ec8f9bfcf487685353ab3b8c8960995b275",
+          "candidateTreeSha256": "1873d3767cc100156fcd1eb696cfb3f273551ae704ffcaa2a00491a2dbefdb70",
+          "stdoutSha256": "920361cfca0de65af57495a0215626bb5c51f318d9eaefb9fbbf8d1e0ffaef46",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-unknown-only-and-mixed-candidates-select-reviewer-added-F-R--c249bff38b",
+          "result": "cli-output/unknown-f23/inclusion-result.json",
+          "id": "F23-router-contract",
+          "candidate": "440ba2a722a81805e1c7de3b9357489e69e5c57f",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "9e09a94eb4b245bd911bf5ff470b8c80d237a11d348207c15bb1197163c02bc1",
+          "candidateTreeSha256": "e12b13033b15d7a950e7c6e971daa247698a13bdecaf664e6b320fbe75aaaeb6",
+          "stdoutSha256": "cafe833020e7917e3ce91027c60c540181d1032b25c5db18a618d085956d499d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-unknown-only-and-mixed-candidates-select-reviewer-added-F-R--c249bff38b",
+          "result": "cli-output/unknown-r-only/inclusion-result.json",
+          "id": "F23-router-contract",
+          "candidate": "e6ebad496bfc7afcc924a816c02abd8fede86558",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "9e09a94eb4b245bd911bf5ff470b8c80d237a11d348207c15bb1197163c02bc1",
+          "candidateTreeSha256": "e12b13033b15d7a950e7c6e971daa247698a13bdecaf664e6b320fbe75aaaeb6",
+          "stdoutSha256": "f57eea8229f31def86183d5e2aca47cad9ed380581ee009ce64ed3925fc85ff3",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-unknown-only-and-mixed-candidates-select-reviewer-added-F-R--c249bff38b",
+          "result": "cli-output/unknown-t-only/inclusion-result.json",
+          "id": "F23-router-contract",
+          "candidate": "6ebd15e82c0566a675171fe22841aca687a1cd0f",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "9e09a94eb4b245bd911bf5ff470b8c80d237a11d348207c15bb1197163c02bc1",
+          "candidateTreeSha256": "e12b13033b15d7a950e7c6e971daa247698a13bdecaf664e6b320fbe75aaaeb6",
+          "stdoutSha256": "8b453aa2e999dd1b18c86da708d2eadd90365792769f395ae8a5ef3f5cc8923d",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-valid-explicit-inclusion-runs-affected-regression-rebuilds-l-bb677f1da5",
+          "result": "cli-output/include-valid/inclusion-result.json",
+          "id": "F23-router-contract",
+          "candidate": "da50f068e917a7c7c91e97540ba86693db10bb55",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "9e09a94eb4b245bd911bf5ff470b8c80d237a11d348207c15bb1197163c02bc1",
+          "candidateTreeSha256": "002f6b5e4e0b94b804339a9f30beb3fcc30c108d8f05eee21ec2140beea39345",
+          "stdoutSha256": "352e373924699a7438d999eab53413273f891d1c9fe20c07b97853cd40d125b6",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bundle": "include-CLI-valid-explicit-inclusion-runs-affected-regression-rebuilds-l-bb677f1da5",
+          "result": "cli-output/include-valid/inclusion-result.json",
+          "id": "F40-cli-runtime-contract",
+          "candidate": "da50f068e917a7c7c91e97540ba86693db10bb55",
+          "status": "passed",
+          "exitCode": 0,
+          "harnessSha256": "19ff98945db0f7ff7ccb7e0ea7eb2ec8f9bfcf487685353ab3b8c8960995b275",
+          "candidateTreeSha256": "002f6b5e4e0b94b804339a9f30beb3fcc30c108d8f05eee21ec2140beea39345",
+          "stdoutSha256": "cb5490464fc6f5a4ba7204babd4c38931e6426b22bd8f8176e63f12762a981e5",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "harnessMeaning": "Exact current allowlisted harness byte digests match the retained run evidence; no new regression was executed.",
+      "formalAcceptancePromoted": false
+    }
+  },
+  "artifactCounts": {
+    "bundles": 14,
+    "files": 34478,
+    "commands": 382,
+    "perCommandCapturedCommands": 175,
+    "perCommandCapturedFiles": 3184,
+    "successfulInclusionBindings": 6,
+    "releaseLedgerBindings": 6,
+    "restoredCheckpoints": 9,
+    "functionalSnapshots": 6,
+    "rawRegressionStreams": 36
+  },
+  "criteriaReview": {
+    "path": "tmp/integration/apigpt-chief/t61-criteria-c03-20261102-1/criteria.json",
+    "sha256": "71a103bef505986fd65aedd419efe0bcf2ea70443c0daedda9dca9db693e719d",
+    "kind": "chief-original-fifteen-criteria-local-audit",
+    "authority": [
+      "docs/integration/scope.json:T61",
+      "docs/integration/plan/20261026_master_plan.md:48-52,764",
+      "tmp/integration/codex-takeover-k43/NEXT-WORKORDER.md:50-123"
+    ],
+    "criteria": [
+      {
+        "id": "C01",
+        "originalCriterion": "Frozen baselines use complete SHAs.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-progress.mjs:18-53"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:965-1001"
+        ],
+        "rationale": "Approved MR/DS full-SHA genesis is pinned exactly; chain and SOURCE:candidate identities are checked. Real project ledger remains empty and frozen locks unchanged.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C02",
+        "originalCriterion": "Code diff is based on complete baseline and candidate SHAs.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-proposal.mjs:477-634"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-proposal.test.mjs:179-307"
+        ],
+        "rationale": "Full commit objects drive Git name-status/numstat/tree reads; post-candidate dirty/untracked bytes are excluded. Include rebuilds the proposal before writing.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C03",
+        "originalCriterion": "Functional diff/review is based on complete SHAs.",
+        "previousFinding": "partial",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-proposal.mjs:365-474,634-712"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-proposal.test.mjs:324-417",
+          "tests/integration-upstream-include.test.mjs:398-454,708-751,796-809"
+        ],
+        "rationale": "Independent exact-object candidate-functional-source-snapshot retains all forty F rows, source ownership, full baseline/candidate SHA, tree/object metadata and nested digests. Include rebuilds and persists it exactly. Selected repository is observed; other repositories remain lock-only-not-observed. This is source review, NOT complete behavior or equivalence.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C04",
+        "originalCriterion": "Changed files are listed before inclusion.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-proposal.mjs:477-634"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-proposal.test.mjs:179-307",
+          "tests/integration-upstream-include.test.mjs:677-704"
+        ],
+        "rationale": "Real isolated Git candidate lists every changed file before explicit approval, including nested add, rename, binary and unknown; DS also exercises add/change/delete.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C05",
+        "originalCriterion": "Rename, binary, unusual paths, and line statistics are preserved without fabrication.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-proposal.mjs:113-174"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-proposal.test.mjs:179-307,504-521"
+        ],
+        "rationale": "NUL streams preserve old/new rename paths and spaces; binary line counts stay null. Tab parser coverage is synthetic, not a real Windows tab filename.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C06",
+        "originalCriterion": "Affected F/R/T are listed before inclusion and drive the inclusion workflow.",
+        "previousFinding": "partial",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-include.mjs:200-287,365-438,684-691"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:888-964"
+        ],
+        "rationale": "Frozen scope validates reviewer-added F/R/T before selection. One effectiveImpact merges mechanical and reviewer additions, binds approval reviews, and persists in ledger/release. Unknown-only F/R/T, mixed and illegal-ID branches are exercised. Catalog is intentionally bounded, not all R/T acceptance.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C07",
+        "originalCriterion": "Unknown files remain visible and are not silently converted to no impact or verified behavior.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-include.mjs:381-410"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:631-675,888-964"
+        ],
+        "rationale": "Every diff row requires a reason/disposition; unknowns explicitly choose no-frt-impact or frt-impact-confirmed. No automatic verified behavior or silent unknown removal.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C08",
+        "originalCriterion": "Registered source-directory filtering and F mapping use consistent real path boundaries.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-proposal.mjs:252-279,380-385,443-460"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-proposal.test.mjs:75-105"
+        ],
+        "rationale": "Registered path boundaries cover directory descendants and incoming renames while refusing sibling prefixes. Snapshot objects must stay within each registration.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C09",
+        "originalCriterion": "Proposal Markdown accurately describes directory-descendant matching.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-proposal.mjs:740-827"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-proposal.test.mjs:179-307"
+        ],
+        "rationale": "Generated Markdown describes registered file/directory-descendant matching and separately explains candidate source snapshot coverage and non-behavior boundary.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C10",
+        "originalCriterion": "Interface/data migration and risk review occur before inclusion.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-include.mjs:412-438,444-472"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:631-675,708-715"
+        ],
+        "rationale": "Interface/data migration review requires a plan or reasoned none; all five risks require explicit disposition. DS additionally binds candidate SOURCE/vendor before/after manifest. Actual production migration is not established.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C11",
+        "originalCriterion": "A non-empty target inclusion version is required and associated with the increment.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-include.mjs:378-379,747-760,821-839"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:651,712,763-772"
+        ],
+        "rationale": "Non-empty semantic targetVersion is required and associated with candidate, ledger and release comparison; missing version refuses writes.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C12",
+        "originalCriterion": "Explicit inclusion precedes controlled baseline, inventory, and ledger updates.",
+        "previousFinding": "partial",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-include.mjs:643-845"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:398-512,534-603,631-675,677-849"
+        ],
+        "rationale": "Explicit candidate-bound approval precedes controlled publication. MR leaves DS bytes unchanged. DS stages exact raw blobs and binds SOURCE/vendor/locks in one exclusive-marker transaction. Six caught partial publications and seven hard process exits restore original bytes through explicit recovery. Main baseline is not adopted.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C13",
+        "originalCriterion": "After explicit inclusion, update records and really run the candidate-bound affected regressions; failure must not become passed.",
+        "previousFinding": "partial",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-include.mjs:37-58,291-349,490-575,768-793"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:225-255,398-512,677-849,852-887"
+        ],
+        "rationale": "Checked-in allowlisted harnesses execute real candidate router/CLI/DS behavior from an isolated tree verified file-by-file against raw Git blobs. Candidate-only behavior faults fail; dirty governance bytes do not replace candidate. Exit/count/log/hash/candidate/harness bindings are checked and failed regression rolls back. Bounded regressions are not full product tests.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C14",
+        "originalCriterion": "Release output compares included increments, not only README or package version.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-f-difference.mjs"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-include.test.mjs:754-772,959"
+        ],
+        "rationale": "Empty and isolated nonempty included-increment ledger comparisons are exercised; candidate, target version, effective impact and regressions appear in release output. Real current F write/check receipts passed before unified run. General worktree preview remains distinct from candidate snapshot.",
+        "formalAcceptance": "not_promoted"
+      },
+      {
+        "id": "C15",
+        "originalCriterion": "Automatic HEAD tracking cannot silently change acceptance scope.",
+        "previousFinding": "passed",
+        "finding": "mechanism_supported_by_local_evidence",
+        "sourceAnchors": [
+          "scripts/integration-upstream-proposal.mjs:73-110,206-214",
+          "scripts/integration-upstream-include.mjs:90-126,648-665"
+        ],
+        "testAnchors": [
+          "tests/integration-upstream-proposal.test.mjs:439-503",
+          "tests/integration-upstream-include.test.mjs:1003-1015"
+        ],
+        "rationale": "HEAD, branches and short SHAs are refused. No upstream fetch/adoption is inferred; inventory HEAD equality is a guard, not automatic tracking. Real baseline/scope remains frozen.",
+        "formalAcceptance": "not_promoted"
+      }
+    ],
+    "formalAcceptance": "not_promoted",
+    "historyBoundary": "Original review is immutable and predates full3. Its retained-artifact/write-fault not_run caveats are superseded only by the exact full3 evidence here; full current-source unified gate is still pending."
+  },
+  "transactionCoverage": {
+    "caughtPartialPublicationExceptions": [
+      "vendor-original-moved",
+      "vendor-published",
+      "source-published",
+      "baseline-published",
+      "inventory-published",
+      "ledger-published"
+    ],
+    "hardExit86Boundaries": [
+      "candidate-staged",
+      "vendor-original-moved",
+      "vendor-published",
+      "source-published",
+      "baseline-published",
+      "inventory-published",
+      "ledger-published"
+    ],
+    "isolatedRealAtomicWriterFaults": [
+      "rollback-write",
+      "recovery-write"
+    ],
+    "faultMechanism": "Temporary-path EEXIST collision in isolated child-process fixture only; production include/recover assertions unchanged.",
+    "recovery": "Marker-bound recovery restores original vendor/SOURCE/lock bytes; stale marker and unrelated bytes rejected; SOURCE/vendor publication sides bound independently.",
+    "preRecoveryInclusionResultMayBeAbsent": true
+  },
+  "historicalFailures": {
+    "full1": {
+      "result": "tmp/integration/apigpt-chief/t61-chief-retention-full-1.result.json",
+      "meaning": "16 tests,15 pass,1 fail,exit1; missing commandStreams TypeError retained."
+    },
+    "full2": {
+      "result": "tmp/integration/apigpt-chief/t61-chief-retention-full-2.result.json",
+      "meaning": "16/16 exit0 but overwritten earlier proposal bytes prevented complete historical artifact audit."
+    },
+    "oldProposalGapBackfilled": false,
+    "nonexistentCompleteArtifactReceipts": [
+      "t61-chief-retention-artifact-verification-1.json",
+      "t61-chief-retention-artifact-verification-2.json"
+    ],
+    "intentionalCandidateBehaviorRegressionFailures": [
+      {
+        "bundle": "DS-include-CLI-candidate-behavior-failure-retains-staged-candidate-and-r-e1c3d7fbf5",
+        "result": "cli-output/ds-behavior-failed/inclusion-result.json",
+        "id": "DS-vendor-contract",
+        "candidate": "5525fc030c68ae3c0e2a421b05f7ecad34477914",
+        "status": "failed",
+        "exitCode": 1,
+        "harnessSha256": "36a347308ec23a29e513959d85962242a8975440b8cb249feb0642808bb4b6bc",
+        "candidateTreeSha256": "d42295082a2dbbe6c3133bd3fee907a96e9e08088bb424bb016154e81dc2b781",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "5bdcc92a128389b6e3a54024c7e1bd842c0f66dbbe849f01ce91d4ede0eb4891"
+      },
+      {
+        "bundle": "include-CLI-failed-affected-regression-is-recorded-failed-and-all-three--dd0507d23f",
+        "result": "cli-output/include-regression-failed/inclusion-result.json",
+        "id": "F40-cli-runtime-contract",
+        "candidate": "598ad2789be92402ecbb22e8b2461906782455af",
+        "status": "failed",
+        "exitCode": 1,
+        "harnessSha256": "19ff98945db0f7ff7ccb7e0ea7eb2ec8f9bfcf487685353ab3b8c8960995b275",
+        "candidateTreeSha256": "18eaa91e8609649d3f4027bda171eee1f35f4c96aaf939a6499f10382f832e35",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "b8f65686d64194cc394c66cde3b3c3b0afd9d5babeae8a4c2c13420c0c8e8e57"
+      }
+    ],
+    "parserFailure": "Read-only count parser failed because PowerShell mangled a literal U+2139; no receipt was created. Parser now uses ASCII Unicode escapes."
+  },
+  "realProjectState": {
+    "genesis": {
+      "MR": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
+      "DS": "de55888a93983fc51c94f7d22bc94b4f8293205d"
+    },
+    "includedIncrements": 0,
+    "fixtureCandidatesAdopted": false,
+    "allFortyBehaviorVerified": false,
+    "selectedCandidateRepositoryObserved": true,
+    "otherRepositories": "lock-only-not-observed"
+  },
+  "sourceBoundary": {
+    "currentUnifiedRootAndSevenPostChecks": "pending_after_tracking_and_F_refresh",
+    "historicalRoot2": {
+      "tests": 2240,
+      "pass": 2151,
+      "fail": 0,
+      "skipped": 89,
+      "sourceFilesDuringRun": 1236,
+      "coversLaterRetentionEdits": false
+    },
+    "rawArtifactsDurability": "Raw local receipts and fixture bundles remain in ignored tmp; this tracked record embeds their receipts and digest bindings but is not a portable full raw-artifact archive."
+  },
+  "notProven": [
+    "full F01-F40 behavior equivalence",
+    "complete migration C1-C10 and activation/rollback/stop-write/generation",
+    "real remote/vendor/login/POSIX/platform matrix",
+    "full installed DSH Host",
+    "full performance/deployment",
+    "hosted CI/clean checkout/release acceptance"
+  ],
+  "formalStatus": {
+    "workPackagesCompleted": "0/20",
+    "acceptanceScenariosPassed": "44/63",
+    "m0StepsCompleted": "11/12",
+    "gates": {
+      "G1": "in_progress",
+      "G2": "in_progress",
+      "G3": "in_progress",
+      "G4": "in_progress"
+    },
+    "T61": "partial",
+    "promotedByE160": []
+  },
+  "authorizationBoundary": "No main-repository commit/push/tag/npm publish/GitHub Release, credentials, real business accounts/product inference/production/remote machine operations, goals/schedules/heartbeats.",
+  "backupManifest": "tmp/integration/apigpt-chief/before-chief-e160-tracking-20261102-1/manifest.json"
+}

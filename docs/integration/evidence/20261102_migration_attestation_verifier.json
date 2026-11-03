@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-11-02",
+  "workOrder": "K10 evidence handoff for K9/K9b implementation",
+  "checkpoint": "E153",
+  "parentCheckpoint": "E152",
+  "parentHead": "e2a5367c28fc7ddbc92c2b7afa4aac04d771e6ad",
+  "actualModelCalls": 0,
+  "level": "local private artifact attestation bundle and verification component evidence only; not C6 completion, activation, stop-write proof or production acceptance",
+  "componentAcceptance": "K9 added a private attestation bundle/verification slice. Artifact automatic observation re-verifies the actual operation, configuration transaction, both archives, both journals and current fence against independently supplied expected context. Manual declarations remain declaration-only; the other five automatic attestation types and all platform evidence are unsupported.",
+  "productAcceptance": "No formal scenario, work package, milestone, gate, activation criterion or product entry changed. C6 and C1-C10 remain incomplete/false as before; formal status remains 0/20 work packages, 44/63 scenarios, M0 11/12 and G1-G4 in_progress.",
+  "implementation": {
+    "module": "packages/orchestration/src/migration-attestation-verifier.mjs",
+    "privateApi": [
+      "observeMigrationAttestationContext",
+      "createMigrationAttestationBundle",
+      "verifyMigrationAttestationBundle"
+    ],
+    "commonInputs": [
+      "Database",
+      "operationDirectory",
+      "configurationDirectory",
+      "dataArchive",
+      "ledgerArchive",
+      "fenceHome",
+      "assertExclusive",
+      "signal"
+    ],
+    "createOnlyInputs": [
+      "privateOutput",
+      "expected",
+      "attestationType",
+      "evidenceClass",
+      "declaration",
+      "nowMs",
+      "clockFloorMs",
+      "ttlMs",
+      "onBoundary"
+    ],
+    "verifyOnlyInputs": [
+      "privateOutput",
+      "expected",
+      "nowMs",
+      "clockFloorMs"
+    ],
+    "privateFiles": {
+      "bundle": "attestation.private.json",
+      "completion": "completed.json",
+      "encoding": "canonical UTF-8 JSON plus newline",
+      "bundleFields": [
+        "schemaVersion",
+        "kind",
+        "verifierVersion",
+        "attestationType",
+        "evidenceClass",
+        "binding",
+        "generation",
+        "collectedAt",
+        "expiresAt",
+        "payload",
+        "bundleDigest"
+      ],
+      "completionFields": [
+        "schemaVersion",
+        "kind",
+        "bundleDigest"
+      ],
+      "overwriteExistingConflicts": false
+    },
+    "expectedContext": {
+      "required": true,
+      "independentlySupplied": true,
+      "derivedFromPersistedBundle": false,
+      "fields": [
+        "schemaVersion",
+        "kind",
+        "operationId",
+        "operationDigest",
+        "profilePlanDigest",
+        "configurationPlanDigest",
+        "orchestrationJournalHead",
+        "configurationJournalHead",
+        "dataArchiveManifestDigest",
+        "ledgerArchiveManifestDigest",
+        "ledgerContentDigest",
+        "host",
+        "platform",
+        "fenceIntentDigest",
+        "fenceExclusiveDigest"
+      ]
+    },
+    "sourceReverification": [
+      "Re-read and validate the operation record and orchestration journal, configuration transaction and journal, startup gate, data archive, schema-5 ledger archive and current fence using the existing verifiers.",
+      "Bind the supplied archives to the original operation's capture-started/capture-verified manifest, content and resolved-root evidence, and bind maintenance-installed to the current gate and configuration journal evidence.",
+      "Observe context and automatic payload twice with exclusive-guard checks before, between and after observations; reject source, context, payload or guard drift.",
+      "At verification, compare both the independently supplied expected context and the persisted automatic payload with fresh observations; recomputing bundle or completion self-hashes does not bypass either comparison."
+    ],
+    "artifactAutomaticPayloadFields": [
+      "observation",
+      "operationJournalEntries",
+      "configurationJournalEntries",
+      "dataSources",
+      "dataFiles",
+      "dataDirectories",
+      "dataBytes",
+      "rawSqliteFiles",
+      "ledgerTables",
+      "ledgerRows",
+      "dataArchiveManifestDigest",
+      "ledgerArchiveManifestDigest",
+      "ledgerContentDigest"
+    ]
+  },
+  "supportMatrix": {
+    "artifactAutomaticObservation": "supported as sources-reverified with public status observed",
+    "manualDeclaration": "declaration-only; actorId and text are bounded declarations, not authenticated identity or automatic proof",
+    "otherAutomaticTypesUnsupported": [
+      "stopped-hosts",
+      "complete-domains",
+      "consistent-backups",
+      "permissions",
+      "money"
+    ],
+    "platformEvidence": "unsupported",
+    "c6Completed": false
+  },
+  "timeAndOwnership": {
+    "createRequires": [
+      "nowMs",
+      "clockFloorMs",
+      "ttlMs"
+    ],
+    "verifyRequires": [
+      "nowMs",
+      "clockFloorMs"
+    ],
+    "clockFloorTrust": "clockFloorMs is an independent caller-trusted input; it is not derived from the bundle and is not a trusted cross-restart clock service.",
+    "clockRollbackCoverage": "Only nowMs below the supplied floor is detected as rollback, in addition to not-yet-valid and expired bundle checks. Rollback that remains above the supplied floor is not proven detectable.",
+    "replay": "Same-request replay inside the original expiry preserves collectedAt, expiresAt, bytes and mtime; it does not renew evidence. Expired or conflicting requests do not overwrite the bundle.",
+    "ownerIncarnation": "fenceIntentDigest and fenceExclusiveDigest bind the currently observed owner incarnation. Owner death/takeover invalidates the old expected context and old package; a new owner must re-observe and use an explicit new output directory.",
+    "generation": null,
+    "generationAvailable": false,
+    "crossMachineFencingProven": false,
+    "maliciousLocalOwnerAuthenticatedByHashes": false
+  },
+  "publicSummary": {
+    "fields": [
+      "schemaVersion",
+      "kind",
+      "status",
+      "attestationType",
+      "evidenceClass",
+      "observations",
+      "replayed",
+      "allowed",
+      "activationSupported",
+      "postActivationRollbackSupported",
+      "stopWriteProvable",
+      "generationAvailable"
+    ],
+    "kind": "migration-attestation-summary",
+    "statusValues": [
+      "observed",
+      "declaration-only"
+    ],
+    "observations": 1,
+    "capabilities": {
+      "allowed": false,
+      "activationSupported": false,
+      "postActivationRollbackSupported": false,
+      "stopWriteProvable": false,
+      "generationAvailable": false
+    },
+    "excludes": [
+      "private paths",
+      "payload",
+      "host",
+      "actorId",
+      "ownerToken",
+      "private digests",
+      "ledger amounts"
+    ],
+    "committedClaimed": false,
+    "globalStopWriteClaimed": false,
+    "productionRollbackClaimed": false
+  },
+  "nativeAndConcurrencyCoverage": [
+    "A parent holds the real fence while a delegated child validates the parent owner context, writes the bundle and really exits with code 86 before completion. A new child under the same living owner and expected context observes verify rejecting the incomplete output, completes the record without rewriting the bundle, and cold verification succeeds.",
+    "After an owner child dies, a new owner takes over the fence. Old expected context and old output fail, old bytes remain untouched, and only a newly observed context with an explicit new directory succeeds.",
+    "Four in-process same-directory create requests leave exactly one bundle and one completion record; rejected requests are explicit conflicts and a differing TTL cannot overwrite the persisted bytes. This is not a claim of multi-process concurrency coverage."
+  ],
+  "testRuns": [
+    {
+      "command": "node --test tests/migration-attestation-verifier.test.mjs",
+      "exitCode": 0,
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k9/unit-glm-fixes-2.log"
+    },
+    {
+      "command": "node --test tests/migration-attestation-verifier.native.mjs",
+      "exitCode": 0,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k9/native-glm-2.log"
+    },
+    {
+      "command": "related pure migration focus suite",
+      "exitCode": 0,
+      "tests": 63,
+      "pass": 62,
+      "fail": 0,
+      "skipped": 1,
+      "skipReason": "One existing platform-conditional skip; skipped is not counted as passed.",
+      "log": "tmp/integration/codex-takeover-k9/focus-migration-unit.log"
+    },
+    {
+      "command": "related native migration and fence focus suite",
+      "exitCode": 0,
+      "tests": 39,
+      "pass": 39,
+      "fail": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k9/focus-migration-native.log"
+    },
+    {
+      "command": "node --test tests/migration-attestation-verifier.native.mjs tests/migration-attestation-verifier.test.mjs",
+      "exitCode": 0,
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k9/final-attestation.log"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "tests": 2014,
+      "pass": 1926,
+      "fail": 0,
+      "skipped": 88,
+      "phases": [
+        {
+          "tests": 1619,
+          "pass": 1615,
+          "fail": 0,
+          "skipped": 4
+        },
+        {
+          "tests": 395,
+          "pass": 311,
+          "fail": 0,
+          "skipped": 84
+        }
+      ],
+      "log": "tmp/integration/codex-takeover-k9/final-npm-test.log"
+    },
+    {
+      "command": "npm run check:client",
+      "exitCode": 0,
+      "result": "build-client OK",
+      "log": "tmp/integration/codex-takeover-k9/final-client.log"
+    },
+    {
+      "command": "npm run integration:check",
+      "exitCode": 0,
+      "result": "32 requirements, 40 features, 63 acceptance scenarios and 20 work packages valid",
+      "log": "tmp/integration/codex-takeover-k9/final-integration.log"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "result": "No whitespace errors; existing LF-to-CRLF working-copy warnings remain.",
+      "log": "tmp/integration/codex-takeover-k9/final-diff-check.log"
+    }
+  ],
+  "testCounting": "Counts are copied from the cited raw logs. Overlapping focused and full runs are separate evidence and must not be summed. Platform skips are reported separately and never counted as passes.",
+  "k10Validation": [
+    {
+      "command": "JSON.parse docs/integration/evidence/20261102_migration_attestation_verifier.json and check checkpoint=E153",
+      "exitCode": 0,
+      "log": "tmp/integration/codex-takeover-k10/json-validation.log"
+    },
+    {
+      "command": "node --test tests/integration-progress.test.mjs tests/integration-documents.test.mjs",
+      "exitCode": 0,
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "skipped": 0,
+      "log": "tmp/integration/codex-takeover-k10/focused-documents.log"
+    },
+    {
+      "command": "npm run integration:check",
+      "exitCode": 0,
+      "result": "32 requirements, 40 features, 63 acceptance scenarios and 20 work packages valid",
+      "log": "tmp/integration/codex-takeover-k10/integration-check.log"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "result": "No whitespace errors; existing LF-to-CRLF working-copy warnings remain.",
+      "log": "tmp/integration/codex-takeover-k10/git-diff-check.log"
+    }
+  ],
+  "developmentChannels": {
+    "kimiCode": "Kimi produced the minimal core and initial unit tests. During K8 it repeated clock-state design exploration; GPT stopped and converged that design, so this is not recorded as a one-pass independent Kimi audit.",
+    "gpt": "GPT owned the K8 design, directed K9 review, supplied targeted corrections and completed the final gates and REPORT.md.",
+    "glm": "GLM 5.3 implemented directed corrections, ten unit tests, three native tests, test registration and related regression runs.",
+    "productModelCallsSeparated": true,
+    "productActualModelCalls": 0
+  },
+  "formalStatus": {
+    "workPackagesCompleted": "0/20",
+    "acceptanceScenariosPassed": "44/63",
+    "m0StepsCompleted": "11/12",
+    "gates": {
+      "G1": "in_progress",
+      "G2": "in_progress",
+      "G3": "in_progress",
+      "G4": "in_progress"
+    },
+    "tasksJsonChanged": false,
+    "scopeJsonChanged": false,
+    "gateOrScenarioPromoted": false
+  },
+  "worktreeAndRelease": {
+    "inheritedDirtyWorktreePreserved": true,
+    "k9NewFiles": [
+      "packages/orchestration/src/migration-attestation-verifier.mjs",
+      "tests/migration-attestation-verifier.test.mjs",
+      "tests/migration-attestation-verifier.native.mjs",
+      "tests/fixtures/migration-attestation-verifier-crash.mjs"
+    ],
+    "k9PackageChange": "Relative to the inherited dirty package.json, K9 added only the pure and native attestation test registrations; it did not change version or files.",
+    "k10DocumentChanges": [
+      "docs/integration/evidence/20261102_migration_attestation_verifier.json",
+      "docs/integration/HANDOFF-20261102-E153.md",
+      "docs/integration/PROGRESS.md top checkpoint only"
+    ],
+    "version": "0.26.0-preview.1",
+    "versionChangedByK10": false,
+    "commitPushTagNpmOrGithubReleaseByK10": false
+  },
+  "artifacts": [
+    "tmp/integration/codex-takeover-k8/c6-attestation-verifier-audit.md",
+    "tmp/integration/codex-takeover-k9/REPORT.md",
+    "tmp/integration/codex-takeover-k9/gpt-review-notes.md",
+    "tmp/integration/codex-takeover-k9/final-attestation.log",
+    "tmp/integration/codex-takeover-k9/final-npm-test.log",
+    "tmp/integration/codex-takeover-k9/final-client.log",
+    "tmp/integration/codex-takeover-k9/final-integration.log",
+    "tmp/integration/codex-takeover-k9/final-diff-check.log",
+    "tmp/integration/codex-takeover-k10/"
+  ],
+  "limitations": [
+    "Hashes verify content and binding; they do not authenticate a malicious local owner with file access and do not prove actor or host identity.",
+    "The artifact observation is not proof of live all-domain freshness, complete domains, money authority, permissions recovery, every writer stopping or cross-machine fencing.",
+    "No committed/activation path, global stop-write state, production rollback or post-activation rollback is claimed or enabled.",
+    "No real account, product model, production profile, production data, production process or remote machine was used. Development model activity is separate from product actualModelCalls=0.",
+    "K10 did not rerun the full root suite; it preserves K9's final full-suite result and runs only the requested document/tracking gates.",
+    "The next work must advance remaining verifier coverage, real gates or other genuine acceptance work; this component pass is not overall engineering completion."
+  ]
+}

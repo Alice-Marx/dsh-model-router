@@ -164,7 +164,8 @@ export async function withRouterStateLock(file,operation,{staleMs=LOCK_STALE_MS,
 
 function sanitizeTerminalSessions(value) {
   return Array.isArray(value)
-    ? value.filter(item => item && typeof item.id === 'string' && typeof item.target === 'string' && Number.isFinite(item.startedAt)).slice(-MAX_TERMINAL_SESSIONS)
+    ? value.filter(item => item && typeof item.id === 'string' && typeof item.target === 'string' && Number.isFinite(item.startedAt))
+      .map(item => terminalSessionRecord(item)).slice(-MAX_TERMINAL_SESSIONS)
     : []
 }
 
@@ -174,9 +175,18 @@ export function terminalSessionRecord(record) {
   return {
     id: String(record.id), target: String(record.target), label: String(record.label ?? record.target).slice(0, 80),
     mode: record.mode === 'login' ? 'login' : 'interactive', cwd: String(record.cwd ?? '').slice(0, 4_096),
-    backend: record.backend === 'pipe' ? 'pipe' : 'pty', startedAt: finite(record.startedAt), finishedAt: finite(record.finishedAt),
-    durationMs: finite(record.durationMs), exitCode: Number.isInteger(record.exitCode) ? record.exitCode : null,
-    endReason: ['exit', 'stopped', 'orphan', 'lifetime', 'dispose'].includes(record.endReason) ? record.endReason : 'exit',
+    backend: ['pipe', 'pty', 'managed'].includes(record.backend) ? record.backend : 'pty',
+    startedAt: finite(record.startedAt), finishedAt: finite(record.finishedAt), durationMs: finite(record.durationMs),
+    exited: record.exited === undefined ? Number.isFinite(record.finishedAt) : record.exited === true,
+    exitCode: Number.isInteger(record.exitCode) ? record.exitCode : null,
+    endReason: ['exit', 'stopped', 'orphan', 'lifetime', 'dispose', 'lost'].includes(record.endReason) ? record.endReason : 'exit',
+    stopRequested: record.stopRequested === true, stopConfirmed: record.stopConfirmed === true,
+    treeTracking: record.treeTracking === true, containment: record.containment === 'windows-job' ? 'windows-job' : null,
+    treeClosed: record.treeClosed === true, outputClosed: record.outputClosed === true,
+    outputTruncated: record.outputTruncated === true,
+    bytesDropped: Number.isSafeInteger(record.bytesDropped) && record.bytesDropped >= 0 ? record.bytesDropped : 0,
+    controlLost: record.controlLost === true,
+    controlError: typeof record.controlError === 'string' ? record.controlError.slice(0, 160) : null,
   }
 }
 
@@ -362,6 +372,28 @@ export function createRouterState({ file = defaultStatePath(), maxRuns = MAX_RUN
 /** Business operations shared by the JSON and transactional SQLite drivers. */
 export function createRouterStateAPI({file,read,update,now=Date.now}) {
   const pure=change=>update(change,{retrySafe:true})
+  const saveTerminal = record => pure(current => {
+    const sessions = current.terminalSessions ?? []
+    const index = sessions.findIndex(item => item.id === record.id)
+    const previous = index >= 0 ? sessions[index] : null
+    const entry = terminalSessionRecord({ ...previous, ...record,
+      exited: previous?.exited === true || record.exited === true,
+      finishedAt: previous?.finishedAt ?? record.finishedAt,
+      durationMs: previous?.durationMs ?? record.durationMs,
+      exitCode: previous?.exitCode ?? record.exitCode,
+      endReason: previous?.endReason ?? record.endReason,
+      stopRequested: previous?.stopRequested === true || record.stopRequested === true,
+      stopConfirmed: previous?.stopConfirmed === true || record.stopConfirmed === true,
+      treeClosed: previous?.treeClosed === true || record.treeClosed === true,
+      outputClosed: previous?.outputClosed === true || record.outputClosed === true,
+      outputTruncated: previous?.outputTruncated === true || record.outputTruncated === true,
+      bytesDropped: Math.max(previous?.bytesDropped ?? 0, record.bytesDropped ?? 0),
+      controlLost: previous?.controlLost === true || record.controlLost === true,
+      controlError: record.controlError ?? previous?.controlError ?? null,
+    })
+    current.terminalSessions = index >= 0 ? sessions.with(index, entry) : [...sessions, entry]
+    return entry
+  })
   return {
     file,
     read,
@@ -384,11 +416,8 @@ export function createRouterStateAPI({file,read,update,now=Date.now}) {
       else delete current.authFailures[toolId]
       return current.authFailures
     }),
-    appendTerminalSession: record => pure(current => {
-      const entry = terminalSessionRecord(record)
-      current.terminalSessions = [...(current.terminalSessions ?? []), entry]
-      return entry
-    }),
+    appendTerminalSession: saveTerminal,
+    upsertTerminalSession: saveTerminal,
     appendRun: run => pure(current => { current.runs.push(run); return run }),
     updateRun: (id, change) => update(async current => {
       const run = current.runs.find(item => item.id === id)

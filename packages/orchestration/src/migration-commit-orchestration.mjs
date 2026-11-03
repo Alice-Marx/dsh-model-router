@@ -1,4 +1,5 @@
-import { lstat, readFile, readdir, realpath } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { lstat, open, readFile, readdir, realpath } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { hostname } from 'node:os'
@@ -9,6 +10,7 @@ import { inspectMigrationConfigurationCommit, prepareMigrationConfigurationCommi
 import { inventoryMigrationWriters } from './migration-writer-inventory.mjs'
 import { createMigrationDataArchive, verifyMigrationDataArchive } from './migration-data-archive.mjs'
 import { createMigrationLedgerArchive, verifyMigrationLedgerArchive } from './migration-ledger-export.mjs'
+import { createMigrationDomainAuditArtifact, migrationDomainAuditInputDigests, verifyMigrationDomainAuditArtifact } from './migration-domain-evidence.mjs'
 import { quarantineMigrationRemoteClients } from './migration-remote-client-quarantine.mjs'
 import { assertMigrationRemoteOperationsSettled } from './migration-remote-operation-drain.mjs'
 
@@ -34,6 +36,7 @@ const FORWARD_STEPS = new Map(Object.entries({
   'remote-operation-drain-completed': 'drain',
   'capture-started': 'capture',
   'capture-verified': 'capture',
+  'domain-audit-verified': 'capture',
   'maintenance-started': 'maintenance',
   'maintenance-installed': 'maintenance',
   'activation-evaluated': 'activate',
@@ -94,7 +97,7 @@ export const ACTIVATION_CRITERIA = Object.freeze([
   criterion('C6', 'ATTESTATIONS_DECLARED_NOT_VERIFIED'),
   criterion('C7', 'NO_FUNDING_AUTHORITY_GENERATION_SWITCH'),
   criterion('C8', 'NO_POST_ACTIVATION_DATA_ROLLBACK'),
-  criterion('C9', 'GATE_NOT_WIRED_TO_PRODUCT_ADMISSION'),
+  criterion('C9', 'PRODUCT_ADMISSION_PARTICIPANTS_ONLY'),
   criterion('C10', 'NO_NATIVE_COMMAND_SURFACE'),
 ])
 export const ACTIVATION_SUPPORTED = false
@@ -185,6 +188,8 @@ function validateOperation (operation) {
   for (const key of ['home', 'privateOutput']) if (typeof operation[key] !== 'string' || !isAbsolute(operation[key])) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (!Array.isArray(operation.domains) || !operation.domains.length || operation.domains.length > 32) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (operation.domainsDigest !== sha(encode(operation.domains))) fail('MIGRATION_ORCH_OPERATION_INVALID')
+  const domainDigests = [operation.domainLayoutDigest, operation.domainAuditInputDigest]
+  if (domainDigests.some(value => value !== undefined) && domainDigests.some(value => typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value))) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (typeof operation.profilePlanDigest !== 'string' || !/^[a-f0-9]{64}$/.test(operation.profilePlanDigest)) fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (operation.profilePlanStatus !== 'ready') fail('MIGRATION_ORCH_OPERATION_INVALID')
   if (!record(operation.limits) || Object.keys(operation.limits).some(key => !Object.hasOwn(DEFAULTS, key))) fail('MIGRATION_ORCH_OPERATION_INVALID')
@@ -297,7 +302,7 @@ function deriveState (steps) {
  * record is re-attempted by the phase that produced it, so one verdict is never
  * silently replaced by another.
  */
-function nextAction (state) {
+function nextAction (state, operation) {
   if (state.status === 'idle') return 'inspect'
   if (state.status === 'released' || state.status === 'cancelled') return null
   if (state.status === 'blocked') {
@@ -324,7 +329,8 @@ function nextAction (state) {
     case 'remote-revoke-completed':
     case 'remote-operation-drain-completed':
     case 'capture-started': return 'capture'
-    case 'capture-verified':
+    case 'capture-verified': return operation.domainAuditInputDigest === undefined ? 'maintenance' : 'domainAudit'
+    case 'domain-audit-verified':
     case 'maintenance-started': return 'maintenance'
     case 'maintenance-installed':
     case 'activation-evaluated': return 'activate'
@@ -605,6 +611,168 @@ async function recheckCapture (ctx) {
   }
 }
 
+const domainEnabled = operation => operation.domainAuditInputDigest !== undefined
+
+function domainBinding (ctx, recorded = ctx.steps.find(row => row.step === 'capture-verified')) {
+  if (!recorded) fail('MIGRATION_DOMAIN_CAPTURE_MISMATCH')
+  const operation = ctx.operation
+  return {
+    operationId: operation.operationId,
+    operationDigest: ctx.operationDigest,
+    domains: operation.domains,
+    domainsDigest: operation.domainsDigest,
+    profilePlanDigest: operation.profilePlanDigest,
+    captureManifestSha256: recorded.evidence.captureManifestSha256,
+    captureJournalDigest: recorded.digest,
+    ledgerManifestSha256: recorded.evidence.ledgerManifestSha256,
+    ledgerContentDigest: recorded.evidence.ledgerContentDigest,
+    domainLayoutDigest: operation.domainLayoutDigest,
+    domainAuditInputDigest: operation.domainAuditInputDigest,
+  }
+}
+
+async function domainAuditRootFor (ctx) {
+  requireInputs(ctx, ['domainAuditRoot'])
+  const path = ctx.options.domainAuditRoot
+  const root = await lstat(path).then(() => canonicalDirectory(path), error => {
+    if (error?.code === 'ENOENT') return canonicalNewPath(path)
+    throw error
+  })
+  const digest = sha(Buffer.from(resolve(root)))
+  const pinned = ctx.steps.find(row => row.step === 'domain-audit-verified')
+  if (pinned && pinned.evidence.domainAuditRootDigest !== digest) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: 'domainAuditRoot' })
+  return { root, digest }
+}
+
+const domainFileIdentity = info => ['dev', 'ino', 'nlink', 'size', 'mtimeNs', 'ctimeNs'].map(key => String(info[key])).join(':')
+const domainDirectoryIdentity = info => ['dev', 'ino', 'mtimeNs', 'ctimeNs'].map(key => String(info[key])).join(':')
+
+async function domainArtifactEvidence (root) {
+  let handle
+  try {
+    const canonicalRoot = await realpath(root)
+    if (canonicalRoot !== resolve(root)) fail('MIGRATION_DOMAIN_ARTIFACT_INVALID')
+    const directoryBefore = await lstat(canonicalRoot, { bigint: true })
+    if (!directoryBefore.isDirectory() || directoryBefore.isSymbolicLink()) fail('MIGRATION_DOMAIN_ARTIFACT_INVALID')
+    const path = join(canonicalRoot, 'domain-audit.private.json')
+    const before = await lstat(path, { bigint: true })
+    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) fail('MIGRATION_DOMAIN_ARTIFACT_INVALID')
+    if (before.size > BigInt(MAX_CAPTURE_MANIFEST)) fail('MIGRATION_DOMAIN_ARTIFACT_LIMIT')
+    if (await realpath(path) !== path) fail('MIGRATION_DOMAIN_ARTIFACT_INVALID')
+    handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+    const opened = await handle.stat({ bigint: true })
+    if (!opened.isFile() || opened.nlink !== 1n || domainFileIdentity(before) !== domainFileIdentity(opened)) fail('MIGRATION_DOMAIN_ARTIFACT_CHANGED')
+    const expectedSize = Number(before.size), block = Buffer.alloc(65536), chunks = []
+    let size = 0
+    while (size <= expectedSize) {
+      const read = await handle.read(block, 0, Math.min(block.length, expectedSize + 1 - size), null)
+      if (!read.bytesRead) break
+      chunks.push(Buffer.from(block.subarray(0, read.bytesRead)))
+      size += read.bytesRead
+      if (size > MAX_CAPTURE_MANIFEST) fail('MIGRATION_DOMAIN_ARTIFACT_LIMIT')
+    }
+    const after = await handle.stat({ bigint: true }), named = await lstat(path, { bigint: true }), directoryAfter = await lstat(canonicalRoot, { bigint: true })
+    if (size !== expectedSize || domainFileIdentity(before) !== domainFileIdentity(after) || domainFileIdentity(before) !== domainFileIdentity(named) || domainDirectoryIdentity(directoryBefore) !== domainDirectoryIdentity(directoryAfter) || await realpath(path) !== path || await realpath(root) !== canonicalRoot) fail('MIGRATION_DOMAIN_ARTIFACT_CHANGED')
+    const bytes = Buffer.concat(chunks, size)
+    let artifact
+    try { artifact = JSON.parse(bytes.toString('utf8')) } catch { fail('MIGRATION_DOMAIN_ARTIFACT_INCOMPLETE') }
+    return {
+      domainAuditSha256: sha(bytes),
+      domainAuditStatus: artifact.result.status,
+      domainFingerprint: artifact.result.fingerprint,
+    }
+  } catch (error) {
+    if (/^MIGRATION_DOMAIN_ARTIFACT_(INVALID|INCOMPLETE|CHANGED|LIMIT)$/.test(error?.code ?? '')) throw error
+    if (error?.code === 'ENOENT') fail('MIGRATION_DOMAIN_ARTIFACT_INCOMPLETE')
+    fail('MIGRATION_DOMAIN_ARTIFACT_INVALID')
+  } finally {
+    if (handle) await handle.close().catch(() => fail('MIGRATION_DOMAIN_ARTIFACT_INVALID'))
+  }
+}
+
+function domainJournalMatches (row, expected, rootDigest, artifact) {
+  return row.evidence.domainAuditSha256 === artifact.domainAuditSha256 &&
+    row.evidence.domainLayoutDigest === expected.domainLayoutDigest &&
+    row.evidence.domainAuditInputDigest === expected.domainAuditInputDigest &&
+    row.evidence.domainAuditRootDigest === rootDigest &&
+    row.evidence.domainAuditStatus === artifact.domainAuditStatus &&
+    row.evidence.domainFingerprint === artifact.domainFingerprint &&
+    row.evidence.domainCoverage === 'captured-declared-roots-only' &&
+    row.evidence.crossDomainConsistent === false
+}
+
+async function recheckDomainEvidence (ctx) {
+  if (!domainEnabled(ctx.operation)) return { ok: true }
+  const recorded = ctx.steps.find(row => row.step === 'domain-audit-verified')
+  if (!recorded) return { ok: false, reason: 'domain-audit-missing' }
+  try {
+    const { root, digest } = await domainAuditRootFor(ctx)
+    const expected = domainBinding(ctx)
+    await verifyMigrationDomainAuditArtifact({ privateOutput: root, dataArchive: ctx.options.dataArchiveRoot, ledgerArchive: ctx.options.ledgerArchiveRoot, Database: ctx.options.Database, expected, signal: ctx.signal })
+    const artifact = await domainArtifactEvidence(root)
+    if (!domainJournalMatches(recorded, expected, digest, artifact)) return { ok: false, reason: 'domain-audit-journal-mismatch' }
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, reason: error?.code ?? 'domain-audit-unverifiable' }
+  }
+}
+
+async function recheckSources (ctx) {
+  const capture = await recheckCapture(ctx)
+  if (!capture.ok) return capture
+  return recheckDomainEvidence(ctx)
+}
+
+const DOMAIN_CODES = /^(MIGRATION_DOMAIN_|MIGRATION_PRIVATE_)/
+
+async function domainAuditPhase (ctx) {
+  await acquireFence(ctx, 'capture')
+  await assertOwnerAndFence(ctx)
+  await observeGate(ctx, 'capture')
+  const capture = await recheckCapture(ctx)
+  if (!capture.ok) {
+    await block(ctx, 'capture', 'blocked-capture', capture.reason, {})
+    fail('MIGRATION_ORCH_CAPTURE_MISMATCH', { reason: capture.reason })
+  }
+  try {
+    const { root, digest } = await domainAuditRootFor(ctx)
+    const expected = domainBinding(ctx)
+    const recorded = ctx.steps.find(row => row.step === 'domain-audit-verified')
+    const artifactExists = await lstat(join(root, 'domain-audit.private.json')).then(() => true, error => {
+      if (error?.code === 'ENOENT') return false
+      fail('MIGRATION_DOMAIN_ARTIFACT_INVALID')
+    })
+    if (recorded || artifactExists) {
+      await verifyMigrationDomainAuditArtifact({ privateOutput: root, dataArchive: ctx.options.dataArchiveRoot, ledgerArchive: ctx.options.ledgerArchiveRoot, Database: ctx.options.Database, expected, signal: ctx.signal })
+    } else {
+      requireInputs(ctx, ['domainAuditInput'])
+      await createMigrationDomainAuditArtifact({ privateOutput: root, dataArchive: ctx.options.dataArchiveRoot, ledgerArchive: ctx.options.ledgerArchiveRoot, Database: ctx.options.Database, input: ctx.options.domainAuditInput, binding: expected, signal: ctx.signal })
+    }
+    await assertFenceHeld(ctx)
+    const artifact = await domainArtifactEvidence(root)
+    if (recorded) {
+      if (!domainJournalMatches(recorded, expected, digest, artifact)) fail('MIGRATION_DOMAIN_AUDIT_MISMATCH')
+      return maintenancePhase(ctx)
+    }
+    await ctx.boundary({ point: 'domain-artifact-verified', step: 'domain-audit-verified', index: ctx.steps.length })
+    await appendStep(ctx, 'capture', 'domain-audit-verified', {
+      domainAuditSha256: artifact.domainAuditSha256,
+      domainLayoutDigest: expected.domainLayoutDigest,
+      domainAuditInputDigest: expected.domainAuditInputDigest,
+      domainAuditRootDigest: digest,
+      domainAuditStatus: artifact.domainAuditStatus,
+      domainFingerprint: artifact.domainFingerprint,
+      domainCoverage: 'captured-declared-roots-only',
+      crossDomainConsistent: false,
+    })
+  } catch (error) {
+    const code = error?.code
+    if (typeof code !== 'string' || !DOMAIN_CODES.test(code)) throw error
+    await block(ctx, 'capture', 'blocked-capture', code, {})
+    throw error
+  }
+}
+
 const CAPTURE_CODES = /^(MIGRATION_CAPTURE_|MIGRATION_LEDGER_|MIGRATION_PRIVATE_|MIGRATION_INVENTORY_|MIGRATION_SCAN_|MIGRATION_SOURCE_|MIGRATION_LINK_|MIGRATION_SPECIAL_)/
 
 async function capturePhase (ctx) {
@@ -613,6 +781,7 @@ async function capturePhase (ctx) {
   await acquireFence(ctx, 'capture')
   await assertOwnerAndFence(ctx)
   await observeGate(ctx, 'capture')
+  if (domainEnabled(operation) && ctx.steps.some(row => row.step === 'capture-verified')) return domainAuditPhase(ctx)
   requireInputs(ctx, ['inventory', 'configurationPlan', 'dataArchiveRoot', 'ledgerArchiveRoot', 'Database', 'ledgerDatabase'])
   const plan = ctx.options.configurationPlan
   if (!record(plan) || plan.status !== 'ready') fail('MIGRATION_ORCH_INPUT_INVALID')
@@ -661,7 +830,7 @@ async function maintenancePhase (ctx) {
   const operation = ctx.operation
   await acquireFence(ctx, 'maintenance')
   await assertOwnerAndFence(ctx)
-  const capture = await recheckCapture(ctx)
+  const capture = await recheckSources(ctx)
   if (!capture.ok) {
     await block(ctx, 'capture', 'blocked-capture', capture.reason, {})
     fail('MIGRATION_ORCH_CAPTURE_MISMATCH', { reason: capture.reason })
@@ -746,7 +915,7 @@ async function activatePhase (ctx) {
 async function releasePreconditions (ctx) {
   const steps = ctx.steps
   const drained = steps.some(row => row.step === 'drain-completed')
-  const capture = await recheckCapture(ctx)
+  const capture = await recheckSources(ctx)
   const gate = await observeGate(ctx, 'release')
   let commit = false
   let commitReason = 'commit-missing'
@@ -827,7 +996,7 @@ async function ensureFence (ctx) {
   return ctx.fence
 }
 
-const ACTIONS = { inspect: inspectPhase, fence: fencePhase, capture: capturePhase, maintenance: maintenancePhase, activate: activatePhase, release: releasePhase }
+const ACTIONS = { inspect: inspectPhase, fence: fencePhase, capture: capturePhase, domainAudit: domainAuditPhase, maintenance: maintenancePhase, activate: activatePhase, release: releasePhase }
 
 async function advance (ctx) {
   for (let turn = 0; turn <= 64; turn++) {
@@ -837,7 +1006,7 @@ async function advance (ctx) {
       fail('MIGRATION_ORCH_CANCELLED')
     }
     const state = deriveState(ctx.steps)
-    const action = nextAction(state)
+    const action = nextAction(state, ctx.operation)
     if (!action) return
     await ACTIONS[action](ctx)
     // A refused activation is the deliberate end of the forward path: release
@@ -869,6 +1038,19 @@ async function createOperation (options) {
   const configurationPlan = options.profilePlan ?? options.configurationPlan
   if (!record(configurationPlan) || configurationPlan.status !== 'ready') fail('MIGRATION_ORCH_INPUT_INVALID')
   for (const domain of domains) for (const path of domain.roots) if (inside(root, path) || inside(path, root)) fail('MIGRATION_ORCH_INPUT_INVALID')
+  const domainOptIn = options.domainAuditInput !== undefined || options.domainAuditRoot !== undefined
+  let domainDigests
+  if (domainOptIn) {
+    if (options.domainAuditInput === undefined || options.domainAuditRoot === undefined) fail('MIGRATION_ORCH_INPUT_REQUIRED', { missing: [options.domainAuditInput === undefined ? 'domainAuditInput' : 'domainAuditRoot'] })
+    domainDigests = migrationDomainAuditInputDigests(options.domainAuditInput)
+    const domainRoot = await canonicalNewPath(options.domainAuditRoot)
+    const sources = [home, root, ...domains.flatMap(domain => domain.roots)]
+    for (const key of ['profileDir', 'dshHome', 'launchCwd']) if (typeof configurationPlan.context?.[key] === 'string') sources.push(configurationPlan.context[key])
+    for (const key of ['effectiveHome', 'effectiveWorkspace']) if (typeof configurationPlan.runtimePaths?.[key] === 'string') sources.push(configurationPlan.runtimePaths[key])
+    for (const source of configurationPlan.sources ?? []) if (typeof source.path === 'string') sources.push(dirname(source.path))
+    for (const key of ['dataArchiveRoot', 'ledgerArchiveRoot', 'commitOutput']) if (options[key] !== undefined) sources.push(await canonicalNewPath(options[key]))
+    for (const source of sources) if (inside(source, domainRoot) || inside(domainRoot, source)) fail('MIGRATION_ORCH_INPUT_INVALID')
+  }
   const operation = {
     schemaVersion: 1,
     kind: OPERATION_KIND,
@@ -882,6 +1064,7 @@ async function createOperation (options) {
     profilePlanDigest: sha(encode(configurationPlan)),
     profilePlanStatus: 'ready',
     limits: validateLimits(options.limits ?? {}),
+    ...domainDigests,
     createdAt: Date.now(),
     host: hostname(),
     activationSupported: false,
@@ -920,7 +1103,7 @@ async function ensureOperation (options) {
     return ctx
   }
   const read = await readOperation(created.root)
-  for (const key of ['operationId', 'home', 'domainsDigest', 'profilePlanDigest', 'profilePlanStatus']) {
+  for (const key of ['operationId', 'home', 'domainsDigest', 'profilePlanDigest', 'profilePlanStatus', 'domainLayoutDigest', 'domainAuditInputDigest']) {
     if (read.operation[key] !== created.operation[key]) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: key })
   }
   for (const key of Object.keys(created.operation.limits)) {
@@ -942,6 +1125,7 @@ async function ensureOperation (options) {
  */
 export async function beginMigrationCommitOperation (options = {}) {
   const ctx = await ensureOperation(options)
+  if (domainEnabled(ctx.operation)) await domainAuditRootFor(ctx)
   await advance(ctx)
   return describe(ctx)
 }
@@ -954,7 +1138,14 @@ export async function resumeMigrationCommitOperation (options = {}) {
     if (home !== resumed.operation.home) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: 'home' })
   }
   if (options.operationId !== undefined && options.operationId !== resumed.operation.operationId) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: 'operationId' })
+  if (domainEnabled(resumed.operation)) {
+    if (options.domainAuditInput !== undefined) {
+      const digests = migrationDomainAuditInputDigests(options.domainAuditInput)
+      for (const key of ['domainLayoutDigest', 'domainAuditInputDigest']) if (digests[key] !== resumed.operation[key]) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: key })
+    }
+  } else if (options.domainAuditInput !== undefined || options.domainAuditRoot !== undefined) fail('MIGRATION_ORCH_OPERATION_MISMATCH', { field: 'domainAuditInput' })
   const ctx = context({ ...options, home: resumed.operation.home }, resumed.root, resumed.operation, resumed.digest, resumed.steps)
+  if (domainEnabled(resumed.operation)) await domainAuditRootFor(ctx)
   await advance(ctx)
   return describe(ctx)
 }
@@ -981,7 +1172,7 @@ export async function inspectMigrationCommitOperation (options = {}) {
     operationDigest: read.digest,
     journal: Object.freeze(read.steps.map(row => Object.freeze({ index: row.index, phase: row.phase, step: row.step, evidence: Object.freeze({ ...row.evidence }) }))),
     summary: summarizeState(read.operation, read.steps, state),
-    next: nextAction(state),
+    next: nextAction(state, read.operation),
     world,
   })
 }

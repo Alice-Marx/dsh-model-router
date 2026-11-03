@@ -129,9 +129,15 @@ export const Config = z.object({
   // 未配置时默认产品不注册 CLI 任务后端。sessionFactory 仅供宿主级隔离验证
   // 覆盖真实 createCodexSession，默认不设置。
   taskCli: z.object({
-    entry: z.object({ executable: z.string().max(4_096), sha256: z.string().pattern(/^[a-f0-9]{64}$/), version: z.string().max(64) }),
+    // Schemastery fields are optional by default; normalizeTaskCli validates
+    // exact profile/entry keys before any CLI backend can be registered.
+    entry: z.object({ executable: z.string().max(4_096), sha256: z.string().pattern(/^[a-f0-9]{64}$/), version: z.string().max(64) }).default(null),
     models: z.array(z.object({ provider: z.string().max(256), model: z.string().max(256), cliModel: z.string().max(128) })).max(64).default([]),
     sessionFactory: z.string().max(4_096).default(''),
+    remote: z.array(z.object({
+      machineId: z.string().max(128), rootId: z.string().max(128), profileId: z.string().max(128), profileRevision: z.number().step(1).min(1),
+      entry: z.object({ sha256: z.string().pattern(/^[a-f0-9]{64}$/), version: z.string().max(64) }),
+    })).max(64).default([]),
   }).default(null),
 })
 
@@ -2190,7 +2196,8 @@ export function createRouterTerminals(options = {}) {
     prepare: () => ensureNpmPrefixOnPath(),
     preferences: () => installPreferences(),
     launchOptions: () => currentInstallOptions(),
-    onSessionEnd: record => { void routerStateStore().appendTerminalSession(record).catch(() => {}) },
+    onSessionEnd: record => { void routerStateStore().upsertTerminalSession(record).catch(() => {}) },
+    onSessionUpdate: record => { void routerStateStore().upsertTerminalSession(record).catch(() => {}) },
     ...options,
   })
 }

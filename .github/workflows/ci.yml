@@ -25,6 +25,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -45,6 +46,12 @@ jobs:
       - name: Exercise native Windows UTF-8 terminal
         if: runner.os == 'Windows'
         run: node scripts/check-terminal-utf8.mjs
+      - name: Exercise native Windows terminal multisession
+        if: runner.os == 'Windows'
+        run: node scripts/check-terminal-multisession.mjs
+      - name: Exercise managed Windows terminal backend and product
+        if: runner.os == 'Windows'
+        run: node --test --test-concurrency=1 tests/cli-terminal-managed-pty.native.mjs tests/cli-terminal-managed-product.native.mjs tests/cli-terminal-managed-containment.native.mjs
       - name: Test package verification failures
         run: node --test tests/ci-contract.test.mjs
       - name: Verify the committed client before rebuilding
@@ -143,6 +150,9 @@ jobs:
         run: node scripts/integration-cli-execution.mjs
       - name: Verify the remote computer agent native tool catalog
         run: node scripts/integration-remote-agent.mjs
+      - name: Verify remote CLI default product with owned loopback Agent and native fixture
+        if: runner.os == 'Windows'
+        run: node --test --test-concurrency=1 tests/remote-cli-product.native.mjs
       - name: Verify kernel-held Agent ownership, stale-PID races and real controller death
         run: node --test tests/remote-agent-instance.native.mjs
       - name: Verify cancellation reports only evidenced process stops

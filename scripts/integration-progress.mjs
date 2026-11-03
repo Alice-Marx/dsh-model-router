@@ -1,12 +1,204 @@
-import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { lstat, readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateFunctionalSnapshot } from './integration-upstream-proposal.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const TASK_STATES = new Set(['planned', 'in_progress', 'blocked', 'completed'])
 const RESULT_STATES = new Set(['not_run', 'partial', 'passed', 'failed', 'blocked'])
 const COUNTS = { requirements: 32, features: 40, acceptance: 63 }
+const FULL_SHA = /^[0-9a-f]{40}$/
+const HASH = /^[0-9a-f]{64}$/
+const RISK_AREAS = ['config', 'data', 'cli', 'native', 'platform']
+const INCREMENT_INPUTS = ['baseline.json', 'feature-inventory.json', 'scope.json', 'tasks.json']
+  .map(file => `docs/integration/${file}`).sort()
+const portable = path => typeof path === 'string' && path && !path.includes('\\') && !path.includes(':')
+  && !isAbsolute(path) && !path.split('/').some(part => !part || part === '.' || part === '..')
+// Approved frozen genesis. MR is the approved master-plan genesis; DS is read from the
+// current baseline lock and master plan §2.1 (de55888a...). Every ledger must continue from
+// exactly these two commits; this pins the named genesis instead of only shape-checking it.
+const APPROVED_GENESIS = Object.freeze({
+  MR: 'de82df4e737954ba0458d597ea82f9a6666c1a9b',
+  DS: 'de55888a93983fc51c94f7d22bc94b4f8293205d',
+})
+
+function requireFullCommits(commits, label) {
+  requireValue(commits && FULL_SHA.test(commits.MR ?? '') && FULL_SHA.test(commits.DS ?? ''),
+    `${label}: complete MR and DS commit SHAs are required`)
+}
+
+export function validateIncludedIncrements({ baseline, inventory, includedIncrements }) {
+  const ledger = includedIncrements
+  requireValue(baseline?.schemaVersion === 1 && inventory?.schemaVersion === 1,
+    'Baseline and inventory are required for increment-ledger validation')
+  requireValue(ledger?.schemaVersion === 1 && ledger.kind === 'included-increment-ledger'
+    && ledger.planVersion === baseline.planVersion, 'Invalid included-increment ledger identity')
+  requireValue(ledger.genesis?.MR === APPROVED_GENESIS.MR && ledger.genesis?.DS === APPROVED_GENESIS.DS,
+    `ledger genesis must equal the approved frozen genesis (MR ${APPROVED_GENESIS.MR}, DS ${APPROVED_GENESIS.DS}); `
+    + `got MR ${ledger.genesis?.MR ?? 'missing'}, DS ${ledger.genesis?.DS ?? 'missing'}`)
+  requireValue(Array.isArray(ledger.increments), 'ledger increments must be an array')
+  const current = { MR: ledger.genesis.MR, DS: ledger.genesis.DS }
+  const ids = new Set()
+  for (const increment of ledger.increments) {
+    requireValue(increment && typeof increment.id === 'string' && increment.id && !ids.has(increment.id),
+      'ledger increment ids must be unique and non-empty')
+    ids.add(increment.id)
+    const source = increment.sourceRepository
+    requireValue(source === 'MR' || source === 'DS', `${increment.id}: invalid source repository`)
+    requireValue(increment.id === `${source}:${increment.commits?.candidate ?? ''}`,
+      `${increment.id}: increment id must be exactly SOURCE:candidate`)
+    requireValue(FULL_SHA.test(increment.commits?.baseline ?? '') && FULL_SHA.test(increment.commits?.candidate ?? '')
+      && increment.commits.baseline === current[source] && increment.commits.candidate !== increment.commits.baseline,
+    `${increment.id}: increment does not continue the ${source} baseline chain`)
+    requireValue(increment.status === 'included' && increment.regressionSummary?.status === 'passed',
+      `${increment.id}: only increments with passed affected regressions may be ledgered`)
+    requireValue(typeof increment.targetVersion === 'string' && increment.targetVersion.trim(),
+      `${increment.id}: target version is required`)
+    requireValue(HASH.test(increment.proposal?.sha256 ?? '') && HASH.test(increment.proposal?.mechanicalSha256 ?? '')
+      && HASH.test(increment.approvalSha256 ?? ''), `${increment.id}: proposal/approval hashes are required`)
+    requireValue(increment.proposal.generator?.path === 'scripts/integration-upstream-proposal.mjs'
+      && HASH.test(increment.proposal.generator?.sha256 ?? '')
+      && Array.isArray(increment.proposal.inputs) && increment.proposal.inputs.length === 4
+      && increment.proposal.inputs.every(input => HASH.test(input.sha256 ?? ''))
+      && JSON.stringify(increment.proposal.inputs.map(input => input.path).sort()) === JSON.stringify(INCREMENT_INPUTS),
+    `${increment.id}: generator and source-input bindings are incomplete`)
+    const snapshot = increment.functionalSnapshot
+    requireValue(snapshot?.schemaVersion === 1 && snapshot.kind === 'candidate-functional-source-snapshot'
+      && snapshot.sourceRepository === source && snapshot.includesDirtyWorktree === false
+      && snapshot.behaviorVerified === false && snapshot.commits?.baseline === increment.commits.baseline
+      && snapshot.commits?.candidate === increment.commits.candidate,
+    `${increment.id}: functional snapshot candidate binding is incomplete`)
+    try {
+      validateFunctionalSnapshot(snapshot, { sourceRepository: source, commits: increment.commits })
+    } catch (error) {
+      throw new Error(`${increment.id}: functional snapshot validation failed: ${error.message}`)
+    }
+    const featureIds = Array.from({ length: COUNTS.features }, (_value, index) => `F${String(index + 1).padStart(2, '0')}`)
+    requireValue(Array.isArray(snapshot.features)
+      && JSON.stringify(snapshot.featureIds) === JSON.stringify(featureIds)
+      && JSON.stringify(snapshot.features.map(feature => feature.id)) === JSON.stringify(featureIds)
+      && snapshot.features.every(feature => feature.behaviorVerified === false && Array.isArray(feature.sources)
+        && ['candidate-source-reviewed-not-behavior-verified', 'other-source-lock-only-not-observed'].includes(feature.status)
+        && (feature.status !== 'other-source-lock-only-not-observed' || feature.sources.length === 0)),
+    `${increment.id}: functional snapshot must cover all forty frozen F rows without behavioral promotion`)
+    const { sha256: snapshotDigest, ...snapshotContents } = snapshot
+    requireValue(HASH.test(snapshotDigest ?? '')
+      && createHash('sha256').update(`${JSON.stringify(snapshotContents)}\n`).digest('hex') === snapshotDigest,
+    `${increment.id}: functional snapshot content digest mismatch`)
+    for (const side of ['baseline', 'candidate']) {
+      const tree = snapshot.trees?.[side]
+      requireValue(tree?.commit === increment.commits[side] && FULL_SHA.test(tree.tree ?? '')
+        && Number.isSafeInteger(tree.files) && tree.files >= 0 && HASH.test(tree.entriesSha256 ?? ''),
+      `${increment.id}: functional snapshot ${side} tree binding is incomplete`)
+    }
+    requireValue(typeof increment.review?.reviewer?.id === 'string' && increment.review.reviewer.id.trim()
+      && !Number.isNaN(Date.parse(increment.review.reviewer.reviewedAt ?? '')),
+    `${increment.id}: reviewer identity and review time are required`)
+    requireValue(Array.isArray(increment.review.files) && Array.isArray(increment.review.features)
+      && Array.isArray(increment.review.requirements) && Array.isArray(increment.review.acceptance),
+    `${increment.id}: candidate-bound file/F/R/T reviews are required`)
+    for (const kind of ['interface', 'data']) {
+      const migration = increment.review.migrations?.[kind]
+      requireValue(migration && ['required', 'none'].includes(migration.status)
+        && typeof migration.reason === 'string' && migration.reason.trim()
+        && (migration.status === 'none' || (typeof migration.plan === 'string' && migration.plan.trim())),
+      `${increment.id}: ${kind} migration review is incomplete`)
+    }
+    const risks = increment.review.risks
+    requireValue(Array.isArray(risks) && risks.length === RISK_AREAS.length
+      && RISK_AREAS.every(area => risks.some(risk => risk.area === area
+        && ['accepted', 'mitigated', 'none'].includes(risk.status)
+        && typeof risk.reason === 'string' && risk.reason.trim())),
+    `${increment.id}: all five risk areas need an explicit reviewer disposition`)
+    requireValue(Array.isArray(increment.regressions) && increment.regressions.length > 0
+      && increment.regressions.every(regression => regression.status === 'passed' && regression.exitCode === 0
+        && HASH.test(regression.stdoutSha256 ?? '') && HASH.test(regression.stderrSha256 ?? '')
+        && regression.command?.executable && Array.isArray(regression.command?.args)),
+    `${increment.id}: passed affected-regression evidence is incomplete`)
+    const summary = increment.regressionSummary, regressions = increment.regressions
+    requireValue(summary.total === regressions.length && summary.passed === regressions.length && summary.failed === 0,
+      `${increment.id}: regression summary counts differ from the evidence`)
+    const regressionIds = new Set(), candidateTrees = new Set()
+    for (const regression of regressions) {
+      const label = `${increment.id}: regression ${regression.id}`
+      requireValue(typeof regression.id === 'string' && /^[A-Za-z0-9.-]+$/.test(regression.id)
+        && !regressionIds.has(regression.id), `${label}: regression ids must be unique and portable`)
+      regressionIds.add(regression.id)
+      requireValue(HASH.test(regression.candidateTreeSha256 ?? '') && HASH.test(regression.harnessSha256 ?? '')
+        && typeof regression.candidateRoot === 'string' && regression.candidateRoot.trim(),
+      `${label}: candidate-tree and harness regression bindings are required`)
+      candidateTrees.add(regression.candidateTreeSha256)
+      requireValue(regression.signal === null && regression.error === null,
+        `${label}: signalled or erroneous regression cannot be passed`)
+      requireValue(Number.isFinite(Date.parse(regression.startedAt)) && Number.isFinite(Date.parse(regression.finishedAt))
+        && Date.parse(regression.finishedAt) >= Date.parse(regression.startedAt), `${label}: regression timing is invalid`)
+      const command = regression.command, args = command.args
+      const expectedArgs = ['--source', source.toLowerCase(), '--baseline', increment.commits.baseline,
+        '--candidate', increment.commits.candidate, '--increment-id', increment.id, '--candidate-root', regression.candidateRoot]
+      requireValue(typeof command.executable === 'string' && command.executable.trim()
+        && command.shell === false && command.cwd === 'candidate-root' && command.timeoutMs === 30_000
+        && args.length === expectedArgs.length + 1 && portable(args[0])
+        && args[0].startsWith('tests/fixtures/increment-regressions/') && args[0].endsWith('.mjs')
+        && args.slice(1).every((arg, index) => arg === expectedArgs[index]), `${label}: regression command is not candidate-bound`)
+      for (const stream of ['stdout', 'stderr']) {
+        const path = regression.logFiles?.[stream]
+        requireValue(portable(path) && path.startsWith('tmp/integration/')
+          && path.endsWith(`/${regression.id}.${stream}.log`), `${label}: regression ${stream} log binding is invalid`)
+      }
+    }
+    requireValue(candidateTrees.size === 1, `${increment.id}: regression candidate-tree bindings differ`)
+    current[source] = increment.commits.candidate
+  }
+  for (const source of ['MR', 'DS']) {
+    requireValue(baseline.repositories?.[source]?.commit === current[source],
+      `${source} baseline drift: baseline ${baseline.repositories?.[source]?.commit ?? 'missing'} has no matching ledger chain (expected ${current[source]})`)
+    requireValue(inventory.baseline?.[source] === current[source],
+      `${source} inventory baseline differs from the ledgered baseline`)
+  }
+  for (const feature of inventory.features ?? []) {
+    if (feature.repository === 'new') requireValue(feature.commit === null, `${feature.id}: new component commit must be null`)
+    else requireValue(feature.commit === current[feature.repository], `${feature.id}: feature commit differs from ledgered baseline`)
+  }
+  return { current, count: ledger.increments.length }
+}
+
+// Shape validation is not byte evidence: normal gates also require the recorded
+// stdout/stderr artifacts to exist unchanged, with no linked path components.
+export async function validateIncludedRegressionEvidence(root, includedIncrements) {
+  const canonicalRoot = await realpath(root)
+  for (const increment of includedIncrements.increments) {
+    for (const regression of increment.regressions) {
+      for (const stream of ['stdout', 'stderr']) {
+        const path = regression.logFiles[stream]
+        requireValue(portable(path), `${increment.id}: invalid regression log path`)
+        let current = canonicalRoot
+        for (const [index, part] of path.split('/').entries()) {
+          current = join(current, part)
+          const info = await lstat(current)
+          requireValue(!info.isSymbolicLink() && (index === path.split('/').length - 1 ? info.isFile() : info.isDirectory()),
+            `${increment.id}: linked or invalid regression log path`)
+        }
+        requireValue(createHash('sha256').update(await readFile(current)).digest('hex') === regression[`${stream}Sha256`],
+          `${increment.id}: regression ${stream} bytes differ from recorded evidence`)
+      }
+    }
+  }
+}
+
+// An exclusive marker covers the multi-file publication window, including a hard
+// process exit before any ledger write. Never infer recovery from partial bytes.
+export async function assertNoInclusionTransaction(root) {
+  const path = join(root, 'docs/integration/inclusion-transaction.json')
+  let bytes
+  try { bytes = await readFile(path) } catch (error) {
+    if (error.code === 'ENOENT') return
+    throw error
+  }
+  let state = 'malformed'
+  try { state = JSON.parse(bytes.toString('utf8')).state ?? state } catch { /* fail closed */ }
+  throw new Error(`Inclusion transaction requires bounded recovery inspection: ${state}`)
+}
 
 function requireValue(ok, message) {
   if (!ok) throw new Error(message)
@@ -39,8 +231,10 @@ export async function validateEvidence(root, entries, label) {
   }
 }
 
-export async function validateProject({ board, scope, inventory, root = ROOT }) {
+export async function validateProject({ board, scope, inventory, baseline, includedIncrements, root = ROOT }) {
   requireValue(board?.schemaVersion === 1 && scope?.schemaVersion === 1 && inventory?.schemaVersion === 1, 'Unsupported project schema')
+  validateIncludedIncrements({ baseline, inventory, includedIncrements })
+  await validateIncludedRegressionEvidence(root, includedIncrements)
   requireValue(board.planVersion === '1.1' && scope.planVersion === board.planVersion, 'Plan versions differ')
   requireValue(scope.source?.path === 'docs/integration/plan/20261026_requirements_acceptance.md', 'Missing approved scope source')
   await validateEvidence(root, [scope.source.path], 'approved scope')
@@ -171,23 +365,36 @@ export function statusText(board, scope) {
 }
 
 export async function readProject(root = ROOT) {
+  await assertNoInclusionTransaction(root)
   const base = join(root, 'docs', 'integration')
   const read = async name => JSON.parse(await readFile(join(base, name), 'utf8'))
-  const [board, scope, inventory] = await Promise.all([read('tasks.json'), read('scope.json'), read('feature-inventory.json')])
-  return { root, board, scope, inventory }
+  const [board, scope, inventory, baseline, includedIncrements] = await Promise.all([
+    read('tasks.json'), read('scope.json'), read('feature-inventory.json'),
+    read('baseline.json'), read('included-increments.json'),
+  ])
+  return { root, board, scope, inventory, baseline, includedIncrements }
 }
 
 export async function main(args = process.argv.slice(2)) {
-  const command = args[0] ?? 'status'
-  requireValue(['status', 'check', 'report'].includes(command) && args.length <= 1, 'Usage: node scripts/integration-progress.mjs [status|check|report]')
-  const project = await readProject()
+  let root = ROOT
+  const positional = []
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === '--root' && args[index + 1] && !args[index + 1].startsWith('--')) {
+      root = resolve(args[index + 1])
+      index += 1
+    } else positional.push(args[index])
+  }
+  const command = positional[0] ?? 'status'
+  requireValue(['status', 'check', 'report'].includes(command) && positional.length <= 1,
+    'Usage: node scripts/integration-progress.mjs [status|check|report] [--root <project-root>]')
+  const project = await readProject(root)
   await validateProject(project)
   if (command === 'check') {
-    process.stdout.write('Integration tracking valid: 32 requirements, 40 features, 63 acceptance scenarios, 20 work packages.\n')
+    process.stdout.write(`Integration tracking valid: 32 requirements, 40 features, 63 acceptance scenarios, 20 work packages; included increments ${project.includedIncrements.increments.length}.\n`)
     return
   }
   const report = statusText(project.board, project.scope)
-  if (command === 'report') await writeFile(join(ROOT, 'docs/integration/STATUS.txt'), report)
+  if (command === 'report') await writeFile(join(root, 'docs/integration/STATUS.txt'), report)
   process.stdout.write(report)
 }
 
