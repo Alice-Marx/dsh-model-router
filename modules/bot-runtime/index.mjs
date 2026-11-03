@@ -3,6 +3,7 @@ import { isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
 import { attachDsLifecycle } from '../../packages/orchestration/src/ds-lifecycle.mjs'
 import { guardDsWorkspaceReads } from '../../packages/orchestration/src/ds-workspace-privacy.mjs'
 import { createProductReadModel, registerProductChannel } from './read-model.mjs'
+import { needsBotPolicy } from './policy-scope.mjs'
 
 export { inject }
 export const contractVersion = 1
@@ -48,6 +49,11 @@ export function createBotProduct(ctx, options = {}) {
   const offAgent = ctx.on('agent/created', ({ agent }) => lifecycle.observeAgent(agent))
   const offStream = ctx.on('llm/stream', (options, next) => (async function* () {
     await rt.load()
+    // Only Bot turns belong to this product. An ordinary Harness session (the user's own chat,
+    // another plugin) has no committed Bot grant, so policing it would refuse the call with
+    // UNKNOWN_SUBJECT instead of letting the Harness answer. An admitted MR frame is always the
+    // product's own work, whatever Session it carries.
+    if (!needsBotPolicy({ admitted: Boolean(policy.activeIdentity()), isBotSession: id => rt.isBotSession(id), sessionId: options.sessionId })) { yield* next(); return }
     // The policy also understands its AsyncLocalStorage execution context.
     // Resolve identity within the guarded next() call, after policy admission.
     const guarded = () => {
