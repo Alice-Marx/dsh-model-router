@@ -346,7 +346,7 @@ export function statusText(board, scope) {
   const passed = board.acceptanceResults.filter(item => item.status === 'passed').length
   const steps = board.tasks.filter(item => item.milestone === 'M0').flatMap(item => item.steps)
   const lines = [
-    `DSH Bot integration · plan ${board.planVersion} · active ${board.activeMilestone}`,
+    `DS Bot integration · plan ${board.planVersion} · active ${board.activeMilestone}`,
     `Work packages completed: ${taskCount}/20; acceptance scenarios passed: ${passed}/${scope.acceptance.length}`,
     `Passed evidence levels: ${[...new Set(board.acceptanceResults.filter(item => item.status === 'passed').map(item => item.level))].sort().map(level => `${level} ${board.acceptanceResults.filter(item => item.status === 'passed' && item.level === level).length}`).join(', ') || 'none'}`,
     `Recorded M0 steps completed: ${steps.filter(item => item.status === 'completed').length}/${steps.length}`,

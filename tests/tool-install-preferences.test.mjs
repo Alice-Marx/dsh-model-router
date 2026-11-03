@@ -56,7 +56,7 @@ test('an install directory must be an absolute path and never a root', () => {
   assert.equal(expandInstallDir('D:/AI/tools', { home: HOME, env }), 'D:/AI/tools')
   assert.equal(expandInstallDir('%TOOLS%/cli', { home: HOME, env }), 'D:\\Apps/cli', 'expands %VAR%')
   assert.equal(expandInstallDir('$TOOLS/cli', { home: HOME, env }), 'D:\\Apps/cli', 'expands $VAR')
-  assert.equal(expandInstallDir('~/cli', { home: '/home/tester', env: {} }), '/home/tester/cli')
+  assert.equal(expandInstallDir('~/cli', { home: '/home/user', env: {} }), '/home/user/cli')
   assert.throws(() => expandInstallDir('relative/path', { home: HOME }), /绝对路径/)
   assert.throws(() => expandInstallDir('/'), /根目录/)
   assert.throws(() => expandInstallDir('D:\\'), /根目录/)
@@ -124,13 +124,13 @@ test('package-manager installs use npm prefixes and pnpm global directories', ()
 test('a script install never exposes its directory when the vendor hardcodes one', () => {
   const opencode = getOfficialTool('opencode')
   const preferences = { ...clean, installDir: 'D:/AI/tools' }
-  const plan = resolveInstallPlan(opencode, 'script-bash', preferences, { platform: 'linux', home: '/home/tester' })
+  const plan = resolveInstallPlan(opencode, 'script-bash', preferences, { platform: 'linux', home: '/home/user' })
   assert.equal(plan.kind, 'script')
   assert.equal(plan.installDir, '', 'the opencode script has no directory argument')
   assert.match(plan.notices.join(''), /写死了安装路径/)
   // The binary still lands where the vendor puts it, so uninstall finds it there.
-  const location = resolveInstallLocation(opencode, plan.method, preferences, { home: '/home/tester' })
-  assert.equal(location.dir, '/home/tester/.opencode/bin')
+  const location = resolveInstallLocation(opencode, plan.method, preferences, { home: '/home/user' })
+  assert.equal(location.dir, '/home/user/.opencode/bin')
   assert.deepEqual(location.binaries, ['opencode', 'opencode.exe'])
 })
 
@@ -155,9 +155,9 @@ test('Step Code honours the configured directory and a script mirror', () => {
   assert.deepEqual(invocation.args.slice(-2), ['-InstallDir', 'D:/AI/tools/stepcode'])
   assert.equal(invocation.file.endsWith('powershell.exe'), true)
 
-  const bash = resolveInstallPlan(stepcode, 'script-bash', clean, { platform: 'linux', home: '/home/tester' })
-  assert.deepEqual(vendorScriptInvocation(bash, '/tmp/install.sh').args, ['/tmp/install.sh', '--install-dir', '/home/tester/.stepcode/bin'])
-  assert.equal(scriptInstallDir(stepcode, clean, { home: '/home/tester' }), '/home/tester/.stepcode/bin')
+  const bash = resolveInstallPlan(stepcode, 'script-bash', clean, { platform: 'linux', home: '/home/user' })
+  assert.deepEqual(vendorScriptInvocation(bash, '/tmp/install.sh').args, ['/tmp/install.sh', '--install-dir', '/home/user/.stepcode/bin'])
+  assert.equal(scriptInstallDir(stepcode, clean, { home: '/home/user' }), '/home/user/.stepcode/bin')
 })
 
 test('every configurable vendor script owns a tool directory while npm keeps the shared prefix', () => {
@@ -270,7 +270,7 @@ test('removal mirrors how the tool was installed', () => {
   assert.equal(stepcode.dir, 'D:/AI/tools/stepcode')
   assert.deepEqual(stepcode.binaries, ['step', 'step.exe'])
 
-  const zcode = resolveUninstallPlan(getOfficialTool('zcode'), undefined, preferences, { platform: 'win32', home: 'C:/Users/test' })
+  const zcode = resolveUninstallPlan(getOfficialTool('zcode'), undefined, preferences, { platform: 'win32', home: 'C:/Users/Shared' })
   assert.equal(zcode.kind, 'archive')
   assert.equal(zcode.installDir, 'D:/AI/tools/zcode-cli')
 })
@@ -332,18 +332,18 @@ test('chosen script methods pass the configured directory and nothing else', () 
   assert.equal(unset.env.MCODE_INSTALL_DIR, unset.installDir)
   // Windows one-click update is the official script unless the user pins npm/pnpm.
   assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, clean, { platform: 'win32', home: HOME }).methodId, 'script-powershell')
-  assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, clean, { platform: 'linux', home: '/home/tester' }).methodId, 'npm')
+  assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, clean, { platform: 'linux', home: '/home/user' }).methodId, 'npm')
   assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), 'npm', clean, { platform: 'win32', home: HOME }).methodId, 'npm')
   assert.equal(resolveInstallPlan(getOfficialTool('minimax-code'), undefined, { ...clean, allowScriptInstall: false }, { platform: 'win32', home: HOME }).methodId, 'npm')
 
-  const codex = resolveInstallPlan(getOfficialTool('codex'), 'script-sh', preferences, { platform: 'linux', home: '/home/tester' })
+  const codex = resolveInstallPlan(getOfficialTool('codex'), 'script-sh', preferences, { platform: 'linux', home: '/home/user' })
   assert.equal(codex.env.CODEX_INSTALL_DIR, 'D:/AI/tools/codex/bin')
-  const claude = resolveInstallPlan(getOfficialTool('claude-code'), 'script-bash', preferences, { platform: 'linux', home: '/home/tester' })
+  const claude = resolveInstallPlan(getOfficialTool('claude-code'), 'script-bash', preferences, { platform: 'linux', home: '/home/user' })
   assert.equal(claude.installDir, '')
   assert.match(claude.notices.join(''), /写死了安装路径/)
-  assert.equal(resolveInstallLocation(getOfficialTool('claude-code'), claude.method, preferences, { home: '/home/tester' }).dir, '/home/tester/.local/bin')
+  assert.equal(resolveInstallLocation(getOfficialTool('claude-code'), claude.method, preferences, { home: '/home/user' }).dir, '/home/user/.local/bin')
 
-  const kimi = resolveInstallLocation(getOfficialTool('kimi-code'), installMethodFor(getOfficialTool('kimi-code'), 'script-bash'), preferences, { home: '/home/tester' })
+  const kimi = resolveInstallLocation(getOfficialTool('kimi-code'), installMethodFor(getOfficialTool('kimi-code'), 'script-bash'), preferences, { home: '/home/user' })
   assert.equal(kimi.dir, 'D:/AI/tools/kimi-code/bin')
   assert.deepEqual(kimi.binaries, ['kimi'])
   assert.equal(minimaxScriptRegistry('https://example.invalid/npm'), '')
@@ -392,10 +392,10 @@ test('environment-only native installers map root directories to actual binary d
   assert.equal(nativeWindows.env.MCODE_INSTALL_DIR, 'D:/AI/tools/minimax-code')
   assert.equal(nativeWindows.env.MCODE_NPM_REGISTRY, clean.registry)
   assert.deepEqual(resolveInstallLocation(minimax, nativeWindows.method, preferences, { platform: 'win32', home: HOME }).binaries, ['mcode.cmd', 'mcode.ps1', 'mcode-tools.cmd', 'mcode-tools.ps1'])
-  const nativeUnix = resolveInstallPlan(minimax, 'script-bash', clean, { platform: 'linux', home: '/home/tester' })
-  assert.equal(nativeUnix.installDir, '/home/tester/.minimax-code')
-  assert.equal(nativeUnix.binDir, '/home/tester/.minimax-code/bin')
-  assert.match(planCommandLine(nativeUnix), /\| MCODE_INSTALL_DIR='\/home\/tester\/\.minimax-code'/, 'variables belong to bash, rather than the downloader')
+  const nativeUnix = resolveInstallPlan(minimax, 'script-bash', clean, { platform: 'linux', home: '/home/user' })
+  assert.equal(nativeUnix.installDir, '/home/user/.minimax-code')
+  assert.equal(nativeUnix.binDir, '/home/user/.minimax-code/bin')
+  assert.match(planCommandLine(nativeUnix), /\| MCODE_INSTALL_DIR='\/home\/user\/\.minimax-code'/, 'variables belong to bash, rather than the downloader')
 })
 
 test('Codex native Windows junction stays inside its tool subdirectory and has explicit removal guidance', () => {
@@ -407,7 +407,7 @@ test('Codex native Windows junction stays inside its tool subdirectory and has e
   const defaultWindows = resolveInstallPlan(codex, 'script-powershell', clean, { platform: 'win32', home: HOME, env: { LOCALAPPDATA: 'D:/UserData/Local' } })
   assert.equal(defaultWindows.binDir, 'D:/UserData/Local/Programs/OpenAI/Codex/bin')
   assert.throws(() => resolveUninstallPlan(codex, 'script-powershell', clean, { platform: 'win32' }), /目录联接/)
-  const unix = resolveInstallPlan(codex, 'script-sh', clean, { platform: 'linux', home: '/home/tester' })
+  const unix = resolveInstallPlan(codex, 'script-sh', clean, { platform: 'linux', home: '/home/user' })
   assert.equal(vendorScriptInvocation(unix, '/tmp/install.sh').file, 'sh')
 })
 
@@ -764,7 +764,7 @@ test('the upstream installer decoder keeps BOM and bare UTF-16 script bytes equi
 test('a saved legacy Codex bash method is canonicalized to the actual sh installer', () => {
   const parsed = parseInstallPreferences({ toolInstallMethodsJson: '{"codex":"script-bash"}' }, { tools: OFFICIAL_TOOLS })
   assert.equal(parsed.methods.codex, 'script-sh')
-  const plan = resolveInstallPlan(getOfficialTool('codex'), undefined, parsed, { platform: 'linux', home: '/home/tester' })
+  const plan = resolveInstallPlan(getOfficialTool('codex'), undefined, parsed, { platform: 'linux', home: '/home/user' })
   assert.equal(plan.methodId, 'script-sh')
   assert.equal(vendorScriptInvocation(plan, '/tmp/install.sh').file, 'sh')
 })

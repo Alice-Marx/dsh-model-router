@@ -9,12 +9,15 @@ import css from './product.css'
 export const inject = [...new Set([...dsInject, 'remote'])]
 export { ProductPage, ProductNavigation, PRODUCT_PANELS }
 
-/** Add navigation through a public slot wrapper; vendored DS files stay exact. */
 export function productSlots(slots, openPanel) {
   return new Proxy(slots, { get(target, key) {
     if (key === 'register') return (options, component) => {
       if (component !== TeamSidebar) return target.register(options, component)
-      const Sidebar = props => <div className="bp-sidebar"><TeamSidebar {...props} /><ProductNavigation panels={PRODUCT_PANELS} openPanel={openPanel} compact={!props.wide} /></div>
+      const Sidebar = props => {
+        const sidebarAddon = () => <ProductNavigation panels={PRODUCT_PANELS} openPanel={openPanel} compact={!props.wide} />
+        return <TeamSidebar {...props} actions={{ ...props.actions, sidebarAddon }} />
+      }
+      Sidebar.dsBotTeamSidebar = TeamSidebar
       return target.register(options, Sidebar)
     }
     const value = Reflect.get(target, key, target)

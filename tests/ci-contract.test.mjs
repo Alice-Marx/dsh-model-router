@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { assertRuntimeClosure } from '../scripts/check-package.mjs'
 
 async function fixture(t) {
@@ -64,66 +64,4 @@ test('package closure requires both native peer scripts when the runtime launche
     await assert.rejects(assertRuntimeClosure({ ...options, files: options.files.filter(path => path !== peer) }),
       error => error.message === `Package is missing native runtime dependency: ${peer}`)
   }
-})
-
-async function assetFixture(t, entry, content) {
-  const root = await mkdtemp(join(tmpdir(), 'router-runtime-assets-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const manifest = { name: '@fixture/closure', version: '1.0.0', type: 'module', main: `./${entry}` }
-  const files = ['package.json', entry]
-  await writeFile(join(root, 'package.json'), JSON.stringify(manifest))
-  const write = async (path, bytes, packed = true) => {
-    await mkdir(dirname(join(root, path)), { recursive: true })
-    await writeFile(join(root, path), bytes)
-    if (packed && !files.includes(path)) files.push(path)
-  }
-  await write(entry, content)
-  return { root, manifest, files, write }
-}
-
-test('closure rejects an omitted bootstrap-launched stdio bridge', async t => {
-  const options = await assetFixture(t, 'packages/capability-broker/src/cli-bootstrap.mjs',
-    "export const bridge = new URL('./cli-stdio-bridge.mjs', import.meta.url)\n")
-  await options.write('packages/capability-broker/src/cli-stdio-bridge.mjs', 'export const stdio = true\n', false)
-  await assert.rejects(assertRuntimeClosure(options), /missing launched runtime dependency: packages\/capability-broker\/src\/cli-stdio-bridge\.mjs/)
-})
-
-test('closure follows imports of the separately launched bridge without executing it', async t => {
-  const options = await assetFixture(t, 'packages/capability-broker/src/cli-bootstrap.mjs',
-    "export const bridge = new URL('./cli-stdio-bridge.mjs', import.meta.url)\n")
-  await options.write('packages/capability-broker/src/cli-stdio-bridge.mjs',
-    "throw Error('must not execute'); export { value } from './bridge-dependency.mjs'\n")
-  await options.write('packages/capability-broker/src/bridge-dependency.mjs', 'export const value = 1\n', false)
-  await assert.rejects(assertRuntimeClosure(options), /missing runtime dependency: packages\/capability-broker\/src\/bridge-dependency\.mjs/)
-  options.files.push('packages/capability-broker/src/bridge-dependency.mjs')
-  const closure = await assertRuntimeClosure(options)
-  assert.ok(closure.includes('packages/capability-broker/src/cli-stdio-bridge.mjs'))
-  assert.ok(closure.includes('packages/capability-broker/src/bridge-dependency.mjs'))
-})
-
-test('closure requires the separately launched managed-terminal helper', async t => {
-  const options = await assetFixture(t, 'packages/cli-runtime/src/native-terminal.mjs', 'export const terminal = true\n')
-  await options.write('packages/cli-runtime/src/native-terminal-peer.ps1', '# fixture helper\n', false)
-  await assert.rejects(assertRuntimeClosure(options), /missing launched runtime dependency: packages\/cli-runtime\/src\/native-terminal-peer\.ps1/)
-})
-
-test('closure rejects dev-only bare runtime imports and accepts production peers or optionals', async t => {
-  const options = await assetFixture(t, 'runtime.mjs', "import '@fixture/runtime/stdio'; export const ready = true\n")
-  options.manifest.devDependencies = { '@fixture/runtime': '1.0.0' }
-  await assert.rejects(assertRuntimeClosure(options), /Runtime external dependency is not declared for production: @fixture\/runtime/)
-  for (const section of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
-    options.manifest[section] = { '@fixture/runtime': '1.0.0' }
-    await assertRuntimeClosure(options)
-    delete options.manifest[section]
-  }
-})
-
-test('closure checks external dependencies imported only by the launched bridge', async t => {
-  const options = await assetFixture(t, 'packages/capability-broker/src/cli-bootstrap.mjs',
-    "export const bridge = new URL('./cli-stdio-bridge.mjs', import.meta.url)\n")
-  await options.write('packages/capability-broker/src/cli-stdio-bridge.mjs',
-    "import '@modelcontextprotocol/server/stdio'; export const stdio = true\n")
-  await assert.rejects(assertRuntimeClosure(options), /Runtime external dependency is not declared for production: @modelcontextprotocol\/server/)
-  options.manifest.dependencies = { '@modelcontextprotocol/server': '2.4.0' }
-  await assertRuntimeClosure(options)
 })

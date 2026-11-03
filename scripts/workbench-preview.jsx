@@ -41,7 +41,7 @@ const ok = value => ({ ok: true, value })
 const blocked = async () => ({ ok: false, error: { message: '本地 UI 演示不会安装工具、启动终端或运行外部命令。' } })
 
 function demoInstallSummary(settings) {
-  const options = { platform: 'win32', home: 'C:/Users/demo', env: { LOCALAPPDATA: 'C:/Users/demo/AppData/Local' } }
+  const options = { platform: 'win32', home: 'C:/Users/Shared', env: { LOCALAPPDATA: 'C:/Users/Shared/AppData/Local' } }
   const preferences = parseInstallPreferences(settings, { tools: OFFICIAL_TOOLS, ...options })
   const command = plan => plan.kind === 'archive'
     ? `下载并校验 SHA-256：https://github.com/Alice-Marx/zcode-cli/releases/latest → ${plan.installDir}`

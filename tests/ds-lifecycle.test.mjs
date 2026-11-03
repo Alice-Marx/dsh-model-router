@@ -90,6 +90,18 @@ test('DS lifecycle: deferred saves use their captured snapshot and never grant l
   assert.equal(saves[0].required,true)
 })
 
+test('DS lifecycle: concurrent saves from one revision commit the actual durable snapshots',async()=>{
+  const {runtime,directory,bridge,authority}=await fixture()
+  const own=await runtime.resolveAgent('a-current')
+  runtime.state.bots.a.model='gpt-first'
+  const first=runtime.save()
+  runtime.state.bots.a.model='gpt-second'
+  const second=runtime.save()
+  await Promise.all([first,second])
+  assert.equal(bridge.status().healthy,true)
+  authority.assertModel(directory.forAgent(own),'fixture','gpt-second')
+})
+
 test('DS lifecycle: failed writes suspend existing grants and detach all active Sessions',async()=>{
   const {runtime,directory,bridge,failSave,authority}=await fixture()
   const own=await runtime.resolveAgent('a-current'),subject=directory.forAgent(own)

@@ -43,13 +43,13 @@ test('ZCode CLI uses the shared root across platforms and ignores the legacy des
   for (const platform of ['win32', 'linux', 'darwin']) {
     const preferences = parseInstallPreferences({ toolInstallDir: 'D:/AI/tools', zcodeInstallDir: 'D:/OldDesktop/ZCode.exe' })
     assert.equal(preferences.zcodeInstallDir, undefined)
-    const plan = resolveInstallPlan(getOfficialTool('zcode'), undefined, preferences, { platform, home: '/home/test' })
+    const plan = resolveInstallPlan(getOfficialTool('zcode'), undefined, preferences, { platform, home: '/home/user' })
     assert.equal(plan.installDir, 'D:/AI/tools/zcode-cli')
     assert.equal(plan.binDir, 'D:/AI/tools/zcode-cli/bin')
     assert.equal(plan.kind, 'archive')
-    assert.deepEqual(resolveUninstallPlan(getOfficialTool('zcode'), undefined, preferences, { platform, home: '/home/test' }), plan)
+    assert.deepEqual(resolveUninstallPlan(getOfficialTool('zcode'), undefined, preferences, { platform, home: '/home/user' }), plan)
   }
-  assert.equal(resolveInstallPlan(getOfficialTool('zcode'), undefined, {}, { home: '/home/test' }).installDir, '/home/test/.zcode/runtime')
+  assert.equal(resolveInstallPlan(getOfficialTool('zcode'), undefined, {}, { home: '/home/user' }).installDir, '/home/user/.zcode/runtime')
 })
 
 test('verified complete runtime installs, is discovered offline, repairs and uninstalls without touching sibling tools or user data', async t => {

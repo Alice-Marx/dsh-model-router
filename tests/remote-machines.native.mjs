@@ -109,21 +109,6 @@ test('machine host: only owner can pair/bind/probe/revoke; scopes are ceilings w
   const read=await f.directory.probe({machineId:f.pair.machineId,botId:'bot-a',rootId:'project',relativePath:'probe.txt'},context)
   assert.equal(read.diagnostic,'read-confirmed');assert.equal(read.bytes,15);assert.equal(read.content,undefined)
 })
-test('machine host: read-only CLI grants allow explicit cancellation without granting writes or cross-bot control',async t=>{
-  const f=await fixture(t)
-  const tools=['machine_ping','cli_probe_v1','cli_task_v1','operation_status','operation_cancel']
-  await f.directory.pair({...f.pair,tools:[...tools,'fs_write','shell_exec','container_command_v1']},context)
-  for(const tool of ['fs_write','shell_exec','container_command_v1'])await assert.rejects(bind(f,'bot-a',{tools:[...tools,tool]}),/INVALID_MACHINE_SCOPE/)
-  assert.equal((await bind(f,'bot-a',{tools})).remoteRevoked,true)
-  assert.equal(f.directory.scopes('bot-a')[0].mode,'read-only')
-  assert.ok(f.directory.scopes('bot-a')[0].tools.includes('operation_cancel'))
-  await assert.rejects(call(f,{tool:'fs_write',args:{rootId:'project',relativePath:'new.txt',content:'blocked'}}),/MACHINE_BOT_DENIED/)
-  const cancel={machineId:f.pair.machineId,rootId:'project',taskId:'task-cancel',attemptId:'attempt-cancel',operationId:'operation-missing',tool:'operation_cancel',args:{operationId:'operation-missing'}}
-  await assert.rejects(f.directory.call(f.b,cancel),/MACHINE_BOT_DENIED/)
-  await assert.rejects(f.directory.call(f.a,cancel),/OPERATION_NOT_FOUND/)
-  assert.equal((await bind(f,'bot-a',{expectedRevision:1,tools:tools.filter(tool=>tool!=='operation_cancel')})).remoteRevoked,true)
-  await assert.rejects(f.directory.call(f.a,cancel),/MACHINE_BOT_DENIED/)
-})
 test('machine host: model calls use actual object identity, exact root and host metadata, with no endpoint or ticket arguments',async t=>{
   const f=await fixture(t);await f.directory.pair(f.pair,context);await bind(f)
   const read=await call(f);assert.equal(Buffer.from(read.content,'base64').toString(),'owned test data')

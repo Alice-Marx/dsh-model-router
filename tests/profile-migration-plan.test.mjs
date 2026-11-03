@@ -32,10 +32,10 @@ async function fixture() {
   const mr = await bundle('mr-old', PRODUCT, [{ insert: [{ id: MR, name: PRODUCT }] }])
   const target = await bundle('target', PRODUCT, await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8'))
   const runtime = { home: './自定义团队 ~', workspace: './旧 workspace', mainName: '旧名字', mainRole: '旧角色', browser: false,
-    memory: false, github: false, future: { secret: 'SENTINEL-PRIVATE-CREDENTIAL' } }
-  const mrConfig = { dailyBudgetUsd: 17, modelProfilesJson: '[{"model":"fixture/exact"}]', privateExtension: 'SENTINEL-MR-SECRET' }
+    memory: false, github: false, future: { secret: 'mock-PRIVATE-CREDENTIAL' } }
+  const mrConfig = { dailyBudgetUsd: 17, modelProfilesJson: '[{"model":"fixture/exact"}]', privateExtension: 'mock-MR-SECRET' }
   const patches = [{ id: 'bot', name: 'ds-bot', config: runtime }, { id: MR, name: PRODUCT, config: mrConfig },
-    { id: AUTO, name: 'ds-bot/web-search', config: { native: false, fallback: false, custom: 'SENTINEL-SEARCH' } }]
+    { id: AUTO, name: 'ds-bot/web-search', config: { native: false, fallback: false, custom: 'mock-SEARCH' } }]
   const options = { profileDir: profile, dshHome: home, launchCwd: cwd, orderedBundleLayers: [base, ds, mr],
     launcherLayers: [], launchEnvironment: {}, targetBundleLayer: target }
   const manifestPath = join(profile, 'package.json'), patchPath = join(profile, 'cordis.patch.yml')
@@ -129,10 +129,10 @@ test('disabled group ancestry does not reactivate a retired runtime in the plan'
 
 test('!!js remains an AST node and dynamic home requires launch context without evaluation', async () => {
   const f = await fixture()
-  await writeFile(f.patchPath, '- id: bot\n  config:\n    home: !!js "(() => { throw new Error(\'SENTINEL-NEVER-RUN\') })()"\n')
+  await writeFile(f.patchPath, '- id: bot\n  config:\n    home: !!js "(() => { throw new Error(\'mock-NEVER-RUN\') })()"\n')
   const before = await readFile(f.patchPath), plan = await previewProfileMigration(f.options)
   assert.equal(plan.status, 'needs-launch-context')
-  assert.match(find(plan.effectiveBefore, 'bot').config.home.__jsExpr, /SENTINEL-NEVER-RUN/)
+  assert.match(find(plan.effectiveBefore, 'bot').config.home.__jsExpr, /mock-NEVER-RUN/)
   assert.deepEqual(await readFile(f.patchPath), before)
   assert.equal(plan.proposal, null)
 })
@@ -152,7 +152,7 @@ test('frozen home semantics use the explicit old cwd, with literal tilde and exp
 })
 
 test('search name/disabled and complete user web config survive an explicit provider selection', async () => {
-  const f = await fixture(), web = { searchProvider: 'chosen-provider', fetchProvider: 'chosen-fetch', privateOption: 'SENTINEL-WEB' }
+  const f = await fixture(), web = { searchProvider: 'chosen-provider', fetchProvider: 'chosen-fetch', privateOption: 'mock-WEB' }
   f.patches[2].disabled = true
   f.patches.push({ id: 'web', config: web })
   f.options.availableSearchProviderIds = ['chosen-provider']
@@ -225,7 +225,7 @@ test('two previews are deterministic and public summaries contain only whitelist
   assert.deepEqual(Object.keys(summary).sort(), ['schemaVersion', 'status', 'sourceCount', 'sourceDigest', 'planDigest', 'bundleCountBefore', 'bundleCountAfter',
     'runtimeCountBefore', 'searchCountBefore', 'suggestedChangeCount', 'diagnostics', 'intent'].sort())
   assert.deepEqual(first.summary, summary)
-  assert.ok(first.sources.some(source => source.text.includes('SENTINEL-MR-SECRET')), 'raw source exists only in private plan')
+  assert.ok(first.sources.some(source => source.text.includes('mock-MR-SECRET')), 'raw source exists only in private plan')
 })
 
 test('missing launch layers/cwd and mismatched bundle order yield actionable diagnostics', async () => {
@@ -249,7 +249,7 @@ test('home and ordered launcher layers override profile config in actual SDK ord
 
 test('selected bundle symlink cannot read a patch outside its explicitly selected root', async t => {
   const f = await fixture(), external = join(f.dir, 'external.patch.yml')
-  await writeFile(external, json([{ id: 'bot', config: { token: 'SENTINEL-UNSELECTED' } }]))
+  await writeFile(external, json([{ id: 'bot', config: { token: 'mock-UNSELECTED' } }]))
   const linked = join(f.ds.packageDir, 'linked.patch.yml')
   try { await symlink(external, linked, 'file') } catch (error) {
     if (error.code === 'EPERM') { t.skip('This host does not permit creating a file symlink'); return }
@@ -260,7 +260,7 @@ test('selected bundle symlink cannot read a patch outside its explicitly selecte
   const plan = await previewProfileMigration(f.options)
   assert.equal(plan.status, 'blocked')
   assert.ok(plan.diagnostics.some(item => item.code === 'SOURCE_LINK_OUTSIDE_ROOT'))
-  assert.ok(!plan.sources.some(source => source.text.includes('SENTINEL-UNSELECTED')))
+  assert.ok(!plan.sources.some(source => source.text.includes('mock-UNSELECTED')))
 })
 
 test('captured-byte YAML dialect agrees with the actual rc.3 SDK parser without evaluating !!js', async () => {
@@ -292,8 +292,8 @@ test('preview rejects file, total source, inline layer and data depth limits wit
 })
 
 test('public status, diagnostic values and hashes are also whitelisted for tampered saved plans', () => {
-  const summary = summarizeProfileMigration({ status: 'SENTINEL-STATUS', sources: [], sourceDigest: 'SENTINEL-DIGEST', planDigest: 'SENTINEL-PLAN',
-    diagnostics: [{ code: 'SENTINEL-CODE', severity: 'SENTINEL-SEVERITY', path: 'SENTINEL-PATH' }] })
+  const summary = summarizeProfileMigration({ status: 'mock-STATUS', sources: [], sourceDigest: 'mock-DIGEST', planDigest: 'mock-PLAN',
+    diagnostics: [{ code: 'mock-CODE', severity: 'mock-SEVERITY', path: 'mock-PATH' }] })
   assert.equal(summary.status, 'blocked')
   assert.deepEqual(summary.diagnostics, [{ code: 'UNKNOWN_DIAGNOSTIC', severity: 'error', action: 'review-private-plan' }])
   assert.equal(summary.sourceDigest, null); assert.equal(summary.planDigest, null)
@@ -324,7 +324,7 @@ test('a missing explicitly selected launcher layer requests launch context', asy
 
 test('untouched non-target disabled expressions remain identical ASTs without evaluating a throw sentinel', async () => {
   const f = await fixture()
-  const expression = { __jsExpr: '(() => { throw new Error("SENTINEL-DISABLED-MUST-NOT-RUN") })()' }
+  const expression = { __jsExpr: '(() => { throw new Error("mock-DISABLED-MUST-NOT-RUN") })()' }
   const rows = Array.from({ length: 10 }, (_, index) => ({ id: `sdk-unrelated-${index}`, name: `fixture-sdk-${index}`,
     disabled: expression, config: { preserved: index } }))
   rows.push({ id: 'unrelated-parent', name: 'cordis:group', group: true, disabled: expression,
@@ -344,7 +344,7 @@ test('untouched non-target disabled expressions remain identical ASTs without ev
 })
 
 test('target disabled expressions and target ancestry still require explicit launch context', async () => {
-  const expression = { __jsExpr: '(() => { throw new Error("SENTINEL-TARGET-MUST-NOT-RUN") })()' }
+  const expression = { __jsExpr: '(() => { throw new Error("mock-TARGET-MUST-NOT-RUN") })()' }
   for (const id of ['bot', MR, AUTO, 'web']) {
     const f = await fixture()
     f.patches.push({ id, disabled: expression }); await f.save()
@@ -366,7 +366,7 @@ test('target disabled expressions and target ancestry still require explicit lau
 test('non-target dynamic id/name/group structure is still conservatively blocked', async () => {
   for (const field of ['id', 'name', 'group']) {
     const f = await fixture(), row = { id: 'unrelated', name: 'fixture-plugin', config: [] }
-    row[field] = { __jsExpr: '(() => { throw new Error("SENTINEL-STRUCTURE") })()' }
+    row[field] = { __jsExpr: '(() => { throw new Error("mock-STRUCTURE") })()' }
     f.patches.push({ insert: [row] }); await f.save()
     assert.equal((await previewProfileMigration(f.options)).status, 'needs-launch-context', field)
   }

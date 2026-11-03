@@ -68,15 +68,17 @@ test('model/native: exact zero paid cap rejects even a sub-epsilon amount before
   assert.equal(dispatched,false);assert.equal((await store.modelCalls()).items.length,0)
 })
 
-test('model/native: output is clamped in the actual provider envelope and the caller descriptor is restored',async t=>{
+test('model/native: output is clamped where the request allows it and a frozen bound is reserved as it is',async t=>{
   const {accounting,identity,store}=await setup(t)
   const options=request();options.maxTokens=10000;const descriptor=Object.getOwnPropertyDescriptor(options,'maxTokens')
   await drain(accounting.stream(options,()=>{assert.equal(options.maxTokens,100);return chunks()},identity))
   assert.deepEqual(Object.getOwnPropertyDescriptor(options,'maxTokens'),descriptor)
   await assert.rejects(drain(accounting.stream({...request(),maxTokens:'20'},chunks,identity)),/MODEL_OUTPUT_BOUNDARY_REQUIRED/)
+  // The SDK AgentLoop freezes its request, so the model's own bound cannot be lowered. It is
+  // admitted unchanged and reserved at the bound the provider will receive; the budget decides.
   const immutable=Object.defineProperty(request(),'maxTokens',{value:10000,writable:false})
-  await assert.rejects(drain(accounting.stream(immutable,chunks,identity)),/MODEL_OUTPUT_BOUNDARY_REQUIRED/)
-  assert.equal((await store.modelCalls()).items.filter(row=>row.finishKind!==null).length,1)
+  await drain(accounting.stream(immutable,()=>{assert.equal(immutable.maxTokens,10000);return chunks()},identity))
+  assert.equal((await store.modelCalls()).items.filter(row=>row.finishKind!==null).length,2)
 })
 
 test('model/native: an unverified input allowance cannot reserve less than the trusted model capacity',async t=>{
@@ -171,11 +173,12 @@ test('model/native: a linked MR request writes source evidence but neither a sec
 test('model/native: copied actor, foreign managed marker and receipt rewrites fail closed',async t=>{
   const {store,accounting,identity}=await setup(t)
   await assert.rejects(drain(accounting.stream(request(),chunks,{...identity,subject:{}})),/UNKNOWN_SUBJECT/)
-  // A frozen caller request is admitted: the lease gates the iteration instead
-  // of the request signal (see the dedicated frozen-request check); one that
-  // also needs output clamping still fails closed.
+  // A frozen caller request is admitted: the lease gates the iteration instead of the request
+  // signal (see the dedicated frozen-request check). A frozen bound above the allowance cannot
+  // be clamped and is admitted too, estimated at the allowance; the daily/monthly budget is the
+  // hard limit (decision: usability first).
   await drain(accounting.stream(Object.freeze(request()),chunks,identity))
-  await assert.rejects(drain(accounting.stream(Object.freeze({...request(),maxTokens:10000}),chunks,identity)),/MODEL_OUTPUT_BOUNDARY_REQUIRED/)
+  await drain(accounting.stream(Object.freeze({...request(),maxTokens:10000}),chunks,identity))
   const options=request();markManagedModelRequest(options,{botId:'other',...model})
   await assert.rejects(drain(accounting.stream(options,chunks,identity)),/MODEL_MANAGED_OWNER_MISMATCH/)
   const row=(await store.modelCalls()).items[0]

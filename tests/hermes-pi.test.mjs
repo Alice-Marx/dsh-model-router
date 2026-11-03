@@ -25,7 +25,7 @@ test('pi package plans and hermes script defaults', () => {
   for (const manager of ['npm', 'pnpm']) {
     const method = installMethodFor(pi, manager)
     assert.ok(method)
-    const plan = resolveInstallPlan(pi, manager, { installDir: 'D:/AI/tools' }, { platform: 'win32', home: 'C:/Users/test', env: {} })
+    const plan = resolveInstallPlan(pi, manager, { installDir: 'D:/AI/tools' }, { platform: 'win32', home: 'C:/Users/Shared', env: {} })
     assert.equal(plan.kind, 'package-manager')
     assert.ok(Array.isArray(plan.args))
     assert.equal('spec' in plan, false)
@@ -35,10 +35,10 @@ test('pi package plans and hermes script defaults', () => {
     assert.equal(normalize(plan.binDir), 'D:/AI/tools')
   }
 
-  const winPlan = resolveInstallPlan(hermes, undefined, {}, { platform: 'win32', home: 'C:/Users/test', env: { LOCALAPPDATA: 'C:/Users/test/AppData/Local' } })
+  const winPlan = resolveInstallPlan(hermes, undefined, {}, { platform: 'win32', home: 'C:/Users/Shared', env: { LOCALAPPDATA: 'C:/Users/Shared/AppData/Local' } })
   assert.equal(winPlan.kind, 'script')
   assert.equal(winPlan.shell, 'powershell')
-  const linuxPlan = resolveInstallPlan(hermes, undefined, {}, { platform: 'linux', home: '/home/test', env: {} })
+  const linuxPlan = resolveInstallPlan(hermes, undefined, {}, { platform: 'linux', home: '/home/user', env: {} })
   assert.equal(linuxPlan.shell, 'bash')
 
   const invocation = vendorScriptInvocation(winPlan, 'C:/temp/install.ps1')
@@ -48,29 +48,29 @@ test('pi package plans and hermes script defaults', () => {
   assert.match(planCommandLine(winPlan), /scriptblock.*-NonInteractive/)
   assert.match(planCommandLine(linuxPlan), /bash -s -- --non-interactive/)
 
-  assert.throws(() => resolveInstallPlan(hermes, 'script-powershell', {}, { platform: 'linux', home: '/home/test', env: {} }), /仅支持/)
+  assert.throws(() => resolveInstallPlan(hermes, 'script-powershell', {}, { platform: 'linux', home: '/home/user', env: {} }), /仅支持/)
 })
 
 test('hermes binary locations and uninstall rejection', () => {
   const hermes = getOfficialTool('hermes')
   const cases = [
-    [{ platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/test' }, 'C:/data/hermes/bin'],
-    [{ platform: 'win32', env: { LOCALAPPDATA: 'C:/Users/test/AppData/Local' }, home: 'C:/Users/test' }, 'C:/Users/test/AppData/Local/hermes/bin'],
-    [{ platform: 'win32', env: {}, home: 'C:/Users/test' }, 'C:/Users/test/AppData/Local/hermes/bin'],
-    [{ platform: 'linux', env: {}, home: '/home/test' }, '/home/test/.local/bin'],
-    [{ platform: 'linux', env: { HERMES_HOME: '/data/hermes' }, home: '/home/test' }, '/home/test/.local/bin'],
+    [{ platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/Shared' }, 'C:/data/hermes/bin'],
+    [{ platform: 'win32', env: { LOCALAPPDATA: 'C:/Users/Shared/AppData/Local' }, home: 'C:/Users/Shared' }, 'C:/Users/Shared/AppData/Local/hermes/bin'],
+    [{ platform: 'win32', env: {}, home: 'C:/Users/Shared' }, 'C:/Users/Shared/AppData/Local/hermes/bin'],
+    [{ platform: 'linux', env: {}, home: '/home/user' }, '/home/user/.local/bin'],
+    [{ platform: 'linux', env: { HERMES_HOME: '/data/hermes' }, home: '/home/user' }, '/home/user/.local/bin'],
   ]
   for (const [options, expected] of cases) {
     assert.equal(normalize(resolveInstallPlan(hermes, undefined, {}, options).binDir), expected)
   }
 
-  const custom = resolveInstallPlan(hermes, undefined, { installDir: 'D:/AI/tools' }, { platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/test' })
+  const custom = resolveInstallPlan(hermes, undefined, { installDir: 'D:/AI/tools' }, { platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/Shared' })
   assert.equal(normalize(custom.installDir), 'D:/AI/tools/hermes-agent')
   assert.equal(normalize(custom.binDir), 'D:/AI/tools/hermes-agent/.hermes/bin')
   assert.equal('HERMES_HOME' in custom.env, false)
   assert.ok(custom.notices.some(note => note.includes('源码安装目录') && note.includes('插件启动器目录') && note.includes('不迁移')))
 
-  assert.throws(() => resolveUninstallPlan(hermes, undefined, { installDir: 'D:/AI/tools' }, { platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/test' }), /hermes uninstall/)
+  assert.throws(() => resolveUninstallPlan(hermes, undefined, { installDir: 'D:/AI/tools' }, { platform: 'win32', env: { HERMES_HOME: 'C:/data/hermes' }, home: 'C:/Users/Shared' }), /hermes uninstall/)
 })
 
 test('terminal and health contracts', async () => {
@@ -104,7 +104,7 @@ test('windows hermes terminal launch uses injected file checks', async () => {
   const launch = await resolveTerminalLaunch('hermes', 'login', {
     platform: 'win32',
     env: { HERMES_HOME: 'C:/data/hermes' },
-    home: 'C:/Users/test',
+    home: 'C:/Users/Shared',
     preferences: { installDir: 'D:/AI/tools' },
     fileExists: async path => normalize(path) === 'D:/AI/tools/hermes-agent/.hermes/bin/hermes.exe',
     locate: throwFn,
@@ -136,7 +136,7 @@ test('hermes installer argv and locations keep custom source separate from exist
 })
 
 test('hermes default installation preserves its original global launcher and omits source flags', async () => {
-  const options = { platform: 'win32', home: 'C:/Users/test', env: { HERMES_HOME: 'C:/data/hermes' } }
+  const options = { platform: 'win32', home: 'C:/Users/Shared', env: { HERMES_HOME: 'C:/data/hermes' } }
   const plan = resolveInstallPlan(getOfficialTool('hermes'), undefined, {}, options)
   assert.equal(plan.installDir, '')
   assert.equal(plan.binDir, 'C:/data/hermes/bin')
@@ -152,7 +152,7 @@ test('hermes default installation preserves its original global launcher and omi
 
 test('hermes custom terminal refuses the old global copy when the selected launcher is absent', async () => {
   await assert.rejects(resolveTerminalLaunch('hermes', 'interactive', {
-    platform: 'win32', home: 'C:/Users/test', env: { HERMES_HOME: 'C:/data/hermes' },
+    platform: 'win32', home: 'C:/Users/Shared', env: { HERMES_HOME: 'C:/data/hermes' },
     preferences: { installDir: 'D:/AI/tools' }, locate: throwFn,
     fileExists: async path => normalize(path) === 'C:/data/hermes/bin/hermes.exe',
   }), /hermes-agent.*重新体检或安装/)

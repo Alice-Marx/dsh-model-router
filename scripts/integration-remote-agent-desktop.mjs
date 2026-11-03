@@ -50,7 +50,12 @@ try{
   const peerContext=peer.store.grant(peer.store.issue(peer.store.client(peerPair.token),{botId:'bot-a',taskId:context.taskId,attemptId:context.attemptId,roots:['fixture'],tools:TOOL_NAMES}).grantToken)
   const peerBusy=await peer.call('desktop_screenshot',target,peerContext,'peer-capture');assert.equal(peerBusy.error.code,'DESKTOP_BUSY');await peer.close();peer=null
   await capture();summary.checks.push('two-Agent-helper-arbitration-and-independent-close')
-  await click(target.buttonScreenX,target.buttonScreenY);await waitFor(stateFile,s=>s.clicks===1);summary.checks.push('real-button-click-counter')
+  // A human using this desktop takes the foreground away from the fixture, and the product
+  // rightly refuses to type into a window that is no longer the target. Say so instead of
+  // failing with an unexplained TARGET_STALE.
+  const idle=await waitFor(stateFile,s=>s.foreground===true).catch(()=>null)
+  assert.ok(idle, 'DESKTOP_IN_USE: the fixture window must hold the foreground; do not use this desktop during the run')
+  await click(target.buttonScreenX,target.buttonScreenY);await waitFor(stateFile,s=>s.clicks===1).catch(async()=>{const now=await readJson(stateFile);assert.fail(`DESKTOP_IN_USE: the click did not reach the fixture (foreground ${String(now.foreground)})`)});summary.checks.push('real-button-click-counter')
   await click(target.inputScreenX,target.inputScreenY);await input('desktop_type',{text:'中文✓'});await waitFor(stateFile,s=>s.text==='中文✓');summary.checks.push('real-Unicode-SendInput-no-clipboard')
   await input('desktop_key',{key:'End'});await input('desktop_key',{key:'Backspace'});await waitFor(stateFile,s=>s.text==='中文');summary.checks.push('real-allowed-key-effect')
   await input('desktop_scroll',{delta:120});await waitFor(stateFile,s=>s.wheelEvents>0);summary.checks.push('real-target-wheel-event')

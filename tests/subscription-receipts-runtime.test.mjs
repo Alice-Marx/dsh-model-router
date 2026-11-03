@@ -32,13 +32,13 @@ test('a subscription receipt is checkpointed before API fallback and keeps indep
       assert.deepEqual(event.usage, subUsage)
       assert.equal(event.billing, 'subscription')
       assert.equal(event.subscriptionAttempts.length, 1)
-      assert.equal(JSON.stringify(event).includes('fixture-private-value'), false)
+      assert.equal(JSON.stringify(event).includes('fixture-mock-value'), false)
       assert.equal(event.reportedCostUsd, undefined)
       event.usage.inputTokens = 999 // callbacks receive snapshots, not retained evidence
     },
     apiFallback(request) {
       if (request.subscription) return { ...quotaFailure(subUsage), reportedCostUsd: 42,
-        apiKey: 'fixture-private-value', answer: 'fixture-private-value', usage: { ...subUsage, apiKey: 'fixture-private-value' } }
+        apiKey: 'fixture-mock-value', answer: 'fixture-mock-value', usage: { ...subUsage, apiKey: 'fixture-mock-value' } }
       assert.deepEqual(order, ['subscription-saved'])
       order.push('api-started')
       return { ok: true, answer: 'API result', usage: apiUsage }

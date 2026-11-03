@@ -1,10 +1,9 @@
 # 内置 Bot Runtime
 
-本目录把冻结 DS Bot 迁入 MR 的一个插件中。`vendor/ds-bot/` 来自
-`de55888a93983fc51c94f7d22bc94b4f8293205d` 的 Git 对象，没有修改源码、测试或 SDK。
-源仓库为 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)，核对镜像为
-[Alice-Marx/DS-Bot-model-router](https://github.com/Alice-Marx/DS-Bot-model-router)。
-`SOURCE.json` 记录全部 297 个迁入文件的来源路径及 SHA-256。保留了包内
+本目录把当前 DS Bot 迁入 MR 的一个插件中。`vendor/ds-bot/` 由
+`scripts/sync-ds-bot.mjs` 从本仓库 `ds-bot/` 同步，构建前更新，`--check` 按字节拒绝旧副本。
+源仓库为 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)。
+`SOURCE.json` 记录全部迁入文件的来源路径及 SHA-256。保留了包内
 `LICENSE`、仓库 `UPSTREAM_LICENSE` 和 `UPSTREAM_NOTICE`；其 Apache-2.0 许可继续适用。
 本仓自有组合器与投影代码沿用本仓许可。生成的客户端也包含上述 Apache 来源代码。
 
@@ -75,10 +74,9 @@ UI 字段：bindings.items 每项以 botId 关联工具/权限/workspace/budgetS
 默认组合已提供机器目录与 `machine.secret/pair/bind/probe/revoke/reconcile` 拥有者操作。
 机器页秘密表单复用原DS秘密库及脱敏，保留 `REMOTE_AGENT_*` 命名空间且Bot scope为空；
 秘密界面和Bot的request_secret不能把控制面凭据交给Bot。目录只存secretRef，不存Token。
-受授予Bot可通过真实Agent对象调用 `remote_computer_read/list/ping`；机器、根目录、工具和
+受授予Bot可通过真实Agent对象调用远程读取、写入、浏览器、命令与桌面工具；机器、根目录、工具和
 revision逐次校验。离线撤销保留持久的停止未确认状态，重试核对不恢复授权。
-见[产品机器证据](../../docs/integration/evidence/20261027_m4_product_machines.json)。
-这不是远程写入/CLI/桌面Task执行或生产网络部署验收。
+生产网络部署与外部账户仍需按部署指南验收。
 
 ```sh
 node scripts/integration-product-source.mjs

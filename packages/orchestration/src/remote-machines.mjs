@@ -10,6 +10,8 @@ export const REMOTE_TOOLS = Object.freeze(['machine_ping','fs_list','fs_read','f
 // tasks require this explicit control permission so their process can be stopped.
 const readonly = new Set(['machine_ping','fs_list','fs_read','cli_probe_v1','cli_task_v1','operation_status','operation_cancel','artifact_stat','artifact_read','worktree_diff','browser_snapshot'])
 const ref = value => typeof value === 'string' && /^[-A-Za-z0-9_.]{1,128}$/.test(value)
+const DOWNLOAD_LIMIT_BYTES = 8 * 1024 * 1024
+const DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 const fail = code => { throw Object.assign(new Error(code), { code }) }
 const owner = context => { if (context?.kind !== 'owner') fail('REMOTE_OWNER_REQUIRED') }
 const plain = value => value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype
@@ -267,11 +269,19 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       try {
         const metadata=await this.call(subject,{...input,tool:'artifact_stat',args:{artifactId:input.artifactId}},{signal})
         if(metadata?.artifactId!==input.artifactId||!/^[a-f0-9]{64}$/.test(metadata.sha256??'')||!Number.isSafeInteger(metadata.size)||metadata.size<0)fail('ARTIFACT_CORRUPT')
-        if(metadata.size>1048576)fail('ARTIFACT_DOWNLOAD_LIMIT')
-        const value=await this.call(subject,{...input,tool:'artifact_read',args:{artifactId:input.artifactId,offset:0,length:Math.max(1,metadata.size)}},{signal})
-        const bytes=Buffer.from(value?.content??'','base64')
-        if(value.eof!==true||bytes.length!==metadata.size||createHash('sha256').update(bytes).digest('hex')!==metadata.sha256)fail('ARTIFACT_CORRUPT')
-        return {artifactId:metadata.artifactId,sha256:metadata.sha256,size:metadata.size,mediaType:metadata.mediaType,content:value.content}
+        // One screenshot of a 1080p window is routinely larger than the 1 MiB single-read
+        // limit, so the content is read in bounded chunks up to the artifact ceiling.
+        if(metadata.size>DOWNLOAD_LIMIT_BYTES)fail('ARTIFACT_DOWNLOAD_LIMIT')
+        const chunks=[];let offset=0
+        while(offset<metadata.size){
+          const value=await this.call(subject,{...input,tool:'artifact_read',args:{artifactId:input.artifactId,offset,length:Math.min(DOWNLOAD_CHUNK_BYTES,metadata.size-offset)}},{signal})
+          const chunk=Buffer.from(value?.content??'','base64')
+          if(!chunk.length||chunk.length>metadata.size-offset)fail('ARTIFACT_CORRUPT')
+          chunks.push(chunk);offset+=chunk.length
+        }
+        const bytes=Buffer.concat(chunks)
+        if(bytes.length!==metadata.size||createHash('sha256').update(bytes).digest('hex')!==metadata.sha256)fail('ARTIFACT_CORRUPT')
+        return {artifactId:metadata.artifactId,sha256:metadata.sha256,size:metadata.size,mediaType:metadata.mediaType,content:bytes.toString('base64')}
       } catch(error) {
         if(error?.code==='ARTIFACT_NOT_FOUND')fail('ARTIFACT_DOWNLOAD_EXPIRED')
         throw error

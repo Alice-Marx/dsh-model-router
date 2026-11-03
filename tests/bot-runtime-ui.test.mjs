@@ -161,8 +161,9 @@ test('bot product UI: Bot identity, exact model and permission blocker remain se
 
 test('bot product UI: missing receipts never display zero; offline desktop reports actionable reason', async () => {
   await withDom(async ({ root, container }) => {
-    await act(async () => root.render(React.createElement(Usage, { snapshot: { usage: { status: 'available', items: [{ id: 'receipt-unknown', botId: 'main', source: 'cli', status: 'unknown', model: 'fixture/gpt-exact', amountUsd: null }] } }, openAdvanced: () => {} })))
+    await act(async () => root.render(React.createElement(Usage, { snapshot: { usage: { status: 'available', summary: { subscriptionSummary: { callsToday: 2, callsMonth: 7 } }, items: [{ id: 'receipt-unknown', botId: 'main', source: 'cli', status: 'unknown', model: 'fixture/gpt-exact', amountUsd: null }] } }, openAdvanced: () => {} })))
     assert.match(container.textContent, /未知（待收据核对）/); assert.ok(!container.textContent.includes('USD 0.000000'))
+    assert.match(container.textContent, /今日 2 次 · 本月 7 次/)
     await act(async () => root.render(React.createElement(Machines, { snapshot: { machines: { status: 'available', items: [{ id: 'win-fixture', status: 'offline', platform: 'win32', desktop: { status: 'locked' }, blockedReason: 'Windows 用户桌面已锁定', nextAction: '登录并解锁配对用户的桌面。' }] } } })))
     assert.match(container.textContent, /Windows 用户桌面已锁定/); assert.match(container.textContent, /登录并解锁/)
   })
@@ -206,7 +207,7 @@ test('bot product UI: machine grants, controlled read and revoke use the selecte
     await act(async()=>root.render(React.createElement(Machines,{snapshot,busy:false,dispatch:async(action,payload)=>{calls.push({action,payload})}})))
     const secret=container.querySelector('input[aria-label="远程配对凭据"]')
     assert.equal(secret.type,'password');assert.equal(secret.autocomplete,'new-password');assert.equal(secret.value,'')
-    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='授予此 Bot 只读访问'))
+    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='保存此 Bot 的机器授权'))
     assert.deepEqual(calls[0],{action:'machine.bind',payload:{machineId:'machine-fixture',botId:'bot-main',roots:['project'],tools:['machine_ping','fs_list','fs_read'],mode:'read-only',expectedRevision:3}})
     await click([...container.querySelectorAll('button')].find(button=>button.textContent==='检查 Agent 在线状态'))
     assert.equal(calls[1].action,'machine.probe');assert.equal(calls[1].payload.rootId,'project')
@@ -215,7 +216,7 @@ test('bot product UI: machine grants, controlled read and revoke use the selecte
     snapshot.machines.items[0].bindings[0].revoked=true
     await act(async()=>root.render(React.createElement(Machines,{snapshot,busy:false,dispatch:async(action,payload)=>{calls.push({action,payload})}})))
     assert.equal([...container.querySelectorAll('button')].find(button=>button.textContent==='检查 Agent 在线状态').disabled,true)
-    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='授予此 Bot 只读访问'))
+    await click([...container.querySelectorAll('button')].find(button=>button.textContent==='保存此 Bot 的机器授权'))
     assert.equal(calls.at(-1).payload.expectedRevision,3,'revoked bindings retain CAS revision for explicit regrant')
     snapshot.availableActions.push('machine.reconcile');snapshot.machines.items[0].revocations=[{botId:'bot-main',status:'unconfirmed'}]
     await act(async()=>root.render(React.createElement(Machines,{snapshot,busy:false,dispatch:async(action,payload)=>{calls.push({action,payload})}})))

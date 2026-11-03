@@ -1,1 +1,13 @@
-{"name":"dsh-bot-integration-host-fixture","private":true,"type":"module","packageManager":"pnpm@10.34.6","dependencies":{"@deepseek-ai/dsh":"0.2.1-rc.3","jsdom":"29.1.1","oxlint":"1.76.0"},"pnpm":{"overrides":{"@opentelemetry/api":"1.9.0"}}}
+{
+  "name": "dsh-integration-host-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.1-rc.3",
+    "jsdom": "29.1.1",
+    "oxlint": "1.76.0"
+  },
+  "overrides": {
+    "@opentelemetry/api": "1.9.0"
+  }
+}

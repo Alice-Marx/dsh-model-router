@@ -442,6 +442,6 @@ test('the published file list contains every module the Host entry imports', asy
     for (const match of source.matchAll(/(?:from|import\()\s*'(\.{1,2}\/[^']+)'/g)) visit(resolve(dirname(file), match[1]))
   }
   visit(joinPath(root, '.dsh-plugin/index.mjs'))
-  const missing = [...seen].map(file => relative(root, file).split('\\').join('/')).filter(file => !files.has(file))
+  const missing = [...seen].map(file => relative(root, file).split('\\').join('/')).filter(file => ![...files].some(entry => entry.endsWith('/') ? file.startsWith(entry) : file === entry))
   assert.deepEqual(missing, [])
 })

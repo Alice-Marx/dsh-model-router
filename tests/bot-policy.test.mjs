@@ -82,12 +82,13 @@ test('Bot policy: bound auxiliary and nested model calls reject route and subjec
   assert.equal(dispatches, 2)
 })
 
-test('Bot policy: a tool grant cannot open native execution or install through a slash command', async () => {
+test('Bot policy: only granted execution tools and slash commands can run', async () => {
   const { policy, a } = fixture()
   let calls = 0
-  await assert.rejects(policy.run({ kind: 'tool', name: 'model_router_execute', agent: a }, () => { calls++ }), /EXECUTION_FACADE_REQUIRED/)
-  await assert.rejects(policy.run({ kind: 'command', name: 'tools', agent: a, rawInput: 'install codex' }, () => { calls++ }), /EXECUTION_FACADE_REQUIRED/)
-  assert.equal(calls, 0)
+  await policy.run({ kind: 'tool', name: 'model_router_execute', agent: a }, () => { calls++ })
+  await policy.run({ kind: 'command', name: 'tools', agent: a, rawInput: 'install codex' }, () => { calls++ })
+  await assert.rejects(policy.run({ kind: 'tool', name: 'model_router_tool_run', agent: a }, () => { calls++ }), /TOOL_DENIED/)
+  assert.equal(calls, 2)
 })
 
 test('Bot policy: revocation between stream construction and first pull prevents adapter dispatch', async () => {
@@ -102,15 +103,17 @@ test('Bot policy: revocation between stream construction and first pull prevents
   assert.equal(dispatches,0)
 })
 
-test('Bot policy: RPC uses authenticated host peer identity; unknown peers and owner background launches fail closed', async () => {
+test('Bot policy: RPC uses authenticated host peer identity and owner-only execution', async () => {
   const { policy } = fixture()
   let calls = 0
   const operation = () => ++calls
   for (const invocation of [undefined, { peer: { principal: { kind: 'bot', botId: 'bot-a' } } }]) {
     await assert.rejects(policy.run({ kind: 'remote', name: 'boundaries', invocation }, operation), /REMOTE_OWNER_REQUIRED/)
+    await assert.rejects(policy.run({ kind: 'remote', name: 'startRun', invocation }, operation), /REMOTE_OWNER_REQUIRED/)
   }
   const invocation = { peer: { principal: { kind: 'owner' } } }
   assert.equal(await policy.run({ kind: 'remote', name: 'boundaries', invocation }, operation), 1)
-  await assert.rejects(policy.run({ kind: 'remote', name: 'startRun', invocation }, operation), /BACKGROUND_TASK_FACADE_REQUIRED/)
-  assert.equal(calls, 1)
+  assert.equal(await policy.run({ kind: 'remote', name: 'startRun', invocation }, operation), 2)
+  await assert.rejects(policy.run({ kind: 'remote', name: 'terminalWrite', invocation }, operation), /TOOL_DENIED/)
+  assert.equal(calls, 2)
 })
