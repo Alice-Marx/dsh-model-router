@@ -5,10 +5,11 @@ import { BotBindingEditor } from './binding-editor.jsx'
 export function ProductNavigation({ openPanel, panels, compact = false }) {
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
     {[
-      [panels.bindings, 'Bot 绑定', '◈'], [panels.tasks, '任务', '☑'], [panels.machines, '远程电脑', '▣'],
-      [panels.usage, '费用与用量', '◷'], ['model-router-galgame', '高级工作台', '⚙'],
-    ].map(([id, label, icon]) => <button key={id} type="button" onClick={() => openPanel(id)} title={label} aria-label={label}>
-      <span aria-hidden="true">{icon}</span>{!compact && <span>{label}</span>}
+      [panels.bindings, 'Bot 绑定', '◈', '绑定'], [panels.tasks, '任务', '☑', '任务'], [panels.machines, '远程电脑', '▣', '电脑'],
+      [panels.usage, '费用与用量', '◷', '费用'], ['model-router-galgame', '高级工作台', '⚙', '工作台'],
+    ].map(([id, label, icon, caption]) => <button key={id} type="button" onClick={() => openPanel(id)} title={label} aria-label={label}>
+      {/* A narrow column still says what each icon opens, so the row is readable without hovering. */}
+      <span aria-hidden="true">{icon}</span>{compact ? <span className="bp-nav-caption">{caption}</span> : <span>{label}</span>}
     </button>)}
   </nav>
 }
