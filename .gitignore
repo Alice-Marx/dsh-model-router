@@ -20,3 +20,6 @@ tmp/
 *.tgz
 .DS_Store
 Thumbs.db
+
+# Leftover from an interrupted vendor sync.
+/modules/bot-runtime/vendor/ds-bot.next/

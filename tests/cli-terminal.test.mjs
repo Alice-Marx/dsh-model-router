@@ -935,7 +935,7 @@ test('client: launch choices come from the health check; confirmation states the
   const targets = terminalTargets([{ id: 'codex', installed: true }, { id: 'claude-code', installed: false }, { id: 'zcode', installed: true }, { id: 'gemini', installed: true }], 'win32')
   assert.deepEqual(targets.map(item => item.id), ['shell', ...OFFICIAL_TOOLS.filter(item => ['codex', 'gemini', 'zcode'].includes(item.id)).map(item => item.id)])
   assert.equal(targets.find(item => item.id === 'gemini').canLogin, false)
-  assert.equal(startProblem({ target: 'codex', cwd: 'demo', targets }), '工作目录必须是绝对路径，例如 D:\\projects\\demo 或 /home/me/project。')
+  assert.equal(startProblem({ target: 'codex', cwd: 'demo', targets }), '工作目录必须是绝对路径，例如 D:\\projects\\demo 或 /home/user/project。')
   assert.equal(startProblem({ target: 'claude-code', cwd: 'D:\\x', targets }), '请选择要启动的终端。')
   assert.equal(startProblem({ target: 'codex', cwd: 'D:\\x', targets }), '')
   const details = confirmationDetails({ target: 'codex', mode: 'login', cwd: 'D:\\x', platform: 'win32' })
