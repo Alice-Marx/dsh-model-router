@@ -1,5 +1,15 @@
 # 一体化工程进度
 
+## 2026-11-03: E164 user-authorized trial delivery
+
+用户最新明确要求先上传 GitHub prerelease 与 npm `preview` 供本人隔离试用；该授权覆盖必要的范围内 commit/push/tag/publish，优先于下方旧历史的禁止发布文字，但不扩大到真实模型、账户、生产数据或远程机器。试用发布不等于稳定版发布或完整产品验收。
+
+E164 首候选 root `npm test` exit1：pure1845/1826 pass/14 fail/5 skipped；native阶段 not_run。14失败均在上游纳入夹具：缺少冻结DS对象及复制worktree `.git`指针导致候选Git元数据污染；源1327文件哈希未变，原工作区索引不变。失败候选保留，独立仓库候选改为init/fetch/read-tree并增加Git归属断言。修复后定向日志已有4个pass，但整组调用超时无最终收据，记 interrupted_without_exit_receipt，不能报整组通过。新离线默认产品探针也无最终收据，不替代历史结果。
+
+客户端构建/一致性、README结构配对、集成跟踪、Agent构建已通过；严格冻结安装因SQLite隐式node-gyp/VS18识别失败，ignore-scripts解析成功不冒充严格安装通过。实际tarball隔离npm安装（ignore-scripts/legacy-peer-deps）成功，固定rc.3 Host解析桥下插件导入、SQLite3.53.4加载成功，actualModelCalls=0；不是干净Desktop安装或生产验收。
+
+正式0/20、44/63、M0 11/12、G1–G4 in_progress、T61 partial、40F behaviorVerified=false、真实ledger空及全部迁移activation/rollback/stop-write能力保持原状。详细证据边界及未完成项见[试用指南](../releases/0.26.0-preview.1-trial.md)和[验证报告](../releases/0.26.0-preview.1-validation.md)。下方E162及更早pending/禁发语句保留为当时历史，不表示E162未运行，也不覆盖最新试用授权。
+
 ## 2026-11-02: E162 bounded C6 provider selection
 
 New private source-only selection diagnostic implemented; captured source texts independently replayed with fixed rc.3 SDK against saved layers/effectiveBefore and owner plan/capture SHA. All plugin declarations retained, no dynamic expression evaluation or plugin/Host loading. Workspace values are configured-selector-only; sessions/attachments/workspace concrete provider identity/path/generation remain unknown and epoch unproven.

@@ -1,9 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import Database from 'better-sqlite3'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import { createRouterState } from '../.dsh-plugin/shared/router-state.mjs'
+import { openSqliteRouterState } from '../packages/orchestration/src/sqlite-router-state.mjs'
 import { previewProfileMigration } from '../packages/orchestration/src/profile-migration-plan.mjs'
 import { inspectMigrationSources } from '../packages/orchestration/src/migration-snapshot.mjs'
 import { readMigrationFence } from '../packages/orchestration/src/migration-fence.mjs'
@@ -29,13 +32,15 @@ const json = value => JSON.stringify(value) + '\n'
 const begin = beginOperation
 const resume = resumeOperation
 
-async function scenario (t, { breakCapture = false } = {}) {
+async function scenario (t, { breakCapture = false, domainEvidence = false, domainFault = null } = {}) {
   const dir = await mkdtemp(join(parent, 'case-'))
   const home = join(dir, 'home')
   const profile = join(home, 'profiles', 'desktop')
   const bot = join(home, 'bot')
   const sessions = join(home, 'sessions')
-  for (const path of [profile, bot, sessions]) await mkdir(path, { recursive: true })
+  const attachments = join(home, 'attachments')
+  const ledgerSource = join(dir, 'ledger-source')
+  for (const path of [profile, bot, sessions, ...(domainEvidence ? [attachments] : []), ledgerSource]) await mkdir(path, { recursive: true })
   async function bundle (folder, name, patch) {
     const packageDir = join(dir, folder)
     await mkdir(packageDir)
@@ -48,18 +53,44 @@ async function scenario (t, { breakCapture = false } = {}) {
   const target = await bundle('target-bundle', PRODUCT, await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8'))
   const profilePackage = json({ dsh: { profile: { bundles: [base.packageName, old.packageName] } } })
   await writeFile(join(profile, 'package.json'), profilePackage)
-  await writeFile(join(bot, 'state.json'), json({ id: 'bot-stable', secret: 'SECRET-DATA' }))
-  await writeFile(join(sessions, 'session-a.jsonl'), 'PRIVATE-SESSION\n')
+  if (domainEvidence) {
+    const team = { version: 1, mainBotIds: ['bot-a'], bots: { 'bot-a': { id: 'bot-a', sessionId: 'bot-a', segments: [], capabilities: [] } }, rooms: {}, agents: {}, capabilities: { items: {} } }
+    await writeFile(join(bot, 'state.json'), json(team))
+    await writeFile(join(bot, 'secrets.json'), json({ version: 1, secrets: [] }))
+    const sessionDirectory = join(sessions, '_no-cwd', 'bot-a')
+    await mkdir(sessionDirectory, { recursive: true })
+    const sessionHeader = sessionFormatCatalog.encodeCurrentHeader({ version: 4, id: 'bot-a', createdAt: 1, isSeeded: false, delegationDepth: 0 }, 0)
+    await writeFile(join(sessionDirectory, 'session.v4.jsonl'), json(sessionHeader))
+  } else {
+    await writeFile(join(bot, 'state.json'), json({ id: 'bot-stable', secret: 'SECRET-DATA' }))
+    await writeFile(join(sessions, 'session-a.jsonl'), 'PRIVATE-SESSION\n')
+  }
   const plan = await previewProfileMigration({ profileDir: profile, dshHome: home, launchCwd: profile, orderedBundleLayers: [base, old], launcherLayers: [], launchEnvironment: {}, targetBundleLayer: target })
   assert.equal(plan.status, 'ready')
-  const inventory = await inspectMigrationSources([{ id: 'bot', kind: 'bot-data', root: bot }, { id: 'sessions', kind: 'sessions', root: sessions }])
-  const ledgerSource = join(dir, 'ledger-source')
-  await mkdir(ledgerSource)
-  const dbFile = join(ledgerSource, 'ledger.sqlite')
+  const markerPath = join(ledgerSource, 'state.json')
+  const dbFile = join(ledgerSource, domainEvidence ? 'router.sqlite' : 'ledger.sqlite')
+  if (domainEvidence && domainFault !== 'invalid-ledger') {
+    const legacy = createRouterState({ file: markerPath })
+    await legacy.update(() => {})
+    const store = await openSqliteRouterState({ Database, file: dbFile, legacyFile: markerPath })
+    const journal = store.openTaskJournal()
+    journal.close()
+    await store.close()
+    assert.equal(JSON.parse(await readFile(markerPath, 'utf8')).version, 4)
+    if (domainFault === 'missing-marker') await unlink(markerPath)
+  }
   const database = new Database(dbFile)
-  database.exec('CREATE TABLE audit (id INTEGER PRIMARY KEY, note TEXT)')
-  database.prepare('INSERT INTO audit(note) VALUES(?)').run('PRIVATE-ROW')
-  t.after(() => database.close())
+  if (!domainEvidence || domainFault === 'invalid-ledger') {
+    database.exec('CREATE TABLE audit (id INTEGER PRIMARY KEY, note TEXT)')
+    database.prepare('INSERT INTO audit(note) VALUES(?)').run('PRIVATE-ROW')
+  }
+  t.after(() => { if (database.open) database.close() })
+  const selected = [
+    { id: 'bot', kind: 'bot-data', root: bot },
+    { id: 'sessions', kind: 'sessions', root: sessions },
+    ...(domainEvidence ? [{ id: 'attachments', kind: 'attachments', root: attachments }, { id: 'router', kind: 'ledger', root: ledgerSource }] : []),
+  ]
+  const inventory = await inspectMigrationSources(selected)
   const before = Buffer.from(profilePackage)
   const changes = [{
     path: join(profile, 'package.json'),
@@ -70,11 +101,26 @@ async function scenario (t, { breakCapture = false } = {}) {
   const fixture = {
     dir, home, profile, bot, sessions, plan, inventory, database, changes,
     operationId: randomUUID(),
-    domains: [{ name: 'bot', roots: [bot] }, { name: 'sessions', roots: [sessions] }],
+    domains: selected.map(source => ({ name: source.id, roots: [source.root] })),
     privateOutput: join(dir, 'owner-private'),
-    dataArchiveRoot: breakCapture ? join(dir, 'capture-data') : join(dir, 'capture-data'),
+    dataArchiveRoot: join(dir, 'capture-data'),
     ledgerArchiveRoot: join(dir, 'capture-ledger'),
     commitOutput: join(dir, 'commit-private'),
+  }
+  if (domainEvidence) {
+    fixture.domainAuditInput = {
+      layout: {
+        team: { sourceId: 'bot', path: 'state.json' },
+        router: domainFault === 'invalid-ledger' ? null : { sourceId: 'router', path: 'state.json' },
+        secrets: { sourceId: 'bot', path: 'secrets.json' },
+        usage: null,
+        sessions: [{ sourceId: 'sessions', compression: 'none' }],
+        attachments: [{ sourceId: 'attachments' }],
+        workspacePolicy: 'preserve-in-place',
+      },
+      finance: domainFault === 'missing-timezone' ? {} : { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      limits: { maxSessions: 100 },
+    }
   }
   fixture.input = (extra = {}) => ({
     home, operationId: fixture.operationId, privateOutput: fixture.privateOutput, domains: fixture.domains,
@@ -149,6 +195,12 @@ test('orchestration: re-entry with another plan or id never rewrites the operati
   await assert.rejects(begin({ ...f.input(), operationId: 'operation-1' }), { code: 'MIGRATION_ORCH_OPERATION_ID_UNSUPPORTED' })
   await assert.rejects(begin({ ...f.input(), privateOutput: join(f.home, 'inside') }), { code: 'MIGRATION_ORCH_INPUT_INVALID' })
   await assert.rejects(resume({ privateOutput: join(f.dir, 'absent') }), { code: 'MIGRATION_ORCH_INPUT_INVALID' })
+  const lateDomain = {
+    domainAuditInput: { layout: { team: null, router: null, secrets: null, usage: null, sessions: [], attachments: [] }, finance: { timeZone: 'UTC' }, limits: { maxSessions: 100 } },
+    domainAuditRoot: join(f.dir, 'late-domain'),
+  }
+  await assert.rejects(begin(f.input(lateDomain)), { code: 'MIGRATION_ORCH_OPERATION_MISMATCH' })
+  await assert.rejects(resume(f.input(lateDomain)), { code: 'MIGRATION_ORCH_OPERATION_MISMATCH' })
 })
 
 test('orchestration invariant: an unverified capture never releases the fence', async t => {
@@ -212,6 +264,7 @@ test('orchestration invariant: every terminal state keeps activation, rollback a
   assert.equal(POST_ACTIVATION_ROLLBACK_SUPPORTED, false)
   assert.deepEqual(ACTIVATION_CRITERIA.map(entry => entry.id), ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10'])
   assert.ok(ACTIVATION_CRITERIA.every(entry => entry.ok === false && typeof entry.reason === 'string' && entry.reason.length > 0))
+  assert.deepEqual(ACTIVATION_CRITERIA.find(entry => entry.id === 'C9'), { id: 'C9', ok: false, reason: 'PRODUCT_ADMISSION_PARTICIPANTS_ONLY' })
 })
 
 test('orchestration invariant: cancellation keeps the fence and never writes the gate', async t => {
@@ -386,4 +439,202 @@ test('orchestration drain: an active remote operation blocks capture until its o
   const recovered = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
   assert.equal(stepNames(recovered).filter(step => step === 'remote-operation-drain-requested').length, 1)
   assert.equal(stepNames(recovered).filter(step => step === 'remote-operation-drain-completed').length, 1)
+})
+
+const domainOptions = (f, extra = {}) => ({
+  domainAuditInput: f.domainAuditInput ?? {
+    layout: { team: null, router: null, secrets: null, usage: null, sessions: [], attachments: [] },
+    finance: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    limits: { maxSessions: 100 },
+  },
+  domainAuditRoot: join(f.dir, 'domain-evidence'),
+  ...extra,
+})
+
+test('orchestration domain evidence: opt-in adds one independently verified capture step without granting capabilities', async t => {
+  const f = await scenario(t, { domainEvidence: true })
+  const options = domainOptions(f)
+  const summary = await begin(f.input(options))
+  assert.equal(summary.status, 'blocked-activation')
+  assert.equal(summary.steps, 13)
+  const inspection = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.deepEqual(stepNames(inspection).slice(6, 11), ['capture-started', 'capture-verified', 'domain-audit-verified', 'maintenance-started', 'maintenance-installed'])
+  const row = inspection.journal.find(row => row.step === 'domain-audit-verified')
+  const capture = inspection.journal.find(row => row.step === 'capture-verified')
+  assert.equal(row.evidence.domainAuditStatus, 'audited')
+  assert.equal(row.evidence.domainCoverage, 'captured-declared-roots-only')
+  assert.equal(row.evidence.crossDomainConsistent, false)
+  const operation = await readOperationRecord({ privateOutput: f.privateOutput })
+  assert.equal(operation.domainLayoutDigest, sha(json(options.domainAuditInput.layout)))
+  assert.equal(operation.domainAuditInputDigest, sha(json(options.domainAuditInput)))
+  assert.equal(row.evidence.domainLayoutDigest, operation.domainLayoutDigest)
+  assert.equal(row.evidence.domainAuditInputDigest, operation.domainAuditInputDigest)
+  const artifact = JSON.parse(await readFile(join(options.domainAuditRoot, 'domain-audit.private.json'), 'utf8'))
+  const captureStep = JSON.parse(await readFile(join(f.privateOutput, 'step-' + String(capture.index).padStart(5, '0') + '.json'), 'utf8'))
+  assert.deepEqual(artifact.input, options.domainAuditInput)
+  assert.equal(artifact.binding.operationDigest, operation.operationDigest)
+  assert.equal(artifact.binding.captureJournalDigest, captureStep.digest)
+  assert.equal(artifact.binding.captureManifestSha256, capture.evidence.captureManifestSha256)
+  assert.equal(artifact.binding.ledgerManifestSha256, capture.evidence.ledgerManifestSha256)
+  assert.equal(artifact.binding.ledgerContentDigest, capture.evidence.ledgerContentDigest)
+  assert.deepEqual(artifact.binding.domains, operation.domains)
+  assert.deepEqual(operation.domains.map(domain => domain.name), ['bot', 'sessions', 'attachments', 'router'])
+  assert.equal(artifact.result.status, 'audited')
+  assert.equal(artifact.result.financial.status, 'audited')
+  assert.notEqual(artifact.result.financial.ledger, null)
+  assert.equal(artifact.result.financial.ledger.contentDigest, capture.evidence.ledgerContentDigest)
+  assert.ok(artifact.result.financial.ledger.rows > 0)
+  assert.equal(artifact.result.applySupported, false)
+  assert.equal(summary.activationSupported, false)
+  assert.equal(summary.postActivationRollbackSupported, false)
+  assert.ok(summary.activation.criteria.every(criterion => criterion.ok === false))
+
+  await resumeMigrationConfigurationCommit({ privateOutput: f.commitOutput, phase: 'install' })
+  await resumeMigrationConfigurationCommit({ privateOutput: f.commitOutput, phase: 'rollback', recover: true })
+  assert.equal((await resume(f.input(options))).status, 'released')
+  assert.equal((await readMigrationFence(f.home)).maintenanceActive, false)
+})
+
+test('orchestration domain evidence: a complete artifact survives a pre-journal crash byte-for-byte and gains one step', async t => {
+  class Pause extends Error {}
+  const f = await scenario(t, { domainEvidence: true }), options = domainOptions(f)
+  await assert.rejects(begin(f.input({ ...options, onBoundary: async ({ point }) => { if (point === 'domain-artifact-verified') throw new Pause('pause') } })), error => error instanceof Pause)
+  const path = join(options.domainAuditRoot, 'domain-audit.private.json')
+  const before = await readFile(path), metadata = await stat(path)
+  assert.ok(!(await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })).journal.some(row => row.step === 'domain-audit-verified'))
+  const { domainAuditInput, ...locations } = options
+  assert.equal((await resume(f.input(locations))).status, 'blocked-activation')
+  assert.deepEqual(await readFile(path), before)
+  assert.equal((await stat(path)).mtimeMs, metadata.mtimeMs)
+  const inspection = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.equal(stepNames(inspection).filter(step => step === 'domain-audit-verified').length, 1)
+})
+
+test('orchestration domain evidence: only a missing artifact requires input and partial bytes are never overwritten', async t => {
+  class Pause extends Error {}
+  const missing = await scenario(t, { domainEvidence: true }), missingOptions = domainOptions(missing)
+  await assert.rejects(begin(missing.input({ ...missingOptions, onBoundary: async ({ point }) => { if (point === 'after-step:capture-verified') throw new Pause('pause') } })), error => error instanceof Pause)
+  const { domainAuditInput, ...missingLocations } = missingOptions
+  await assert.rejects(resume(missing.input(missingLocations)), { code: 'MIGRATION_ORCH_INPUT_REQUIRED' })
+  await assert.rejects(stat(join(missingOptions.domainAuditRoot, 'domain-audit.private.json')), { code: 'ENOENT' })
+  assert.equal((await resume(missing.input(missingOptions))).status, 'blocked-activation')
+
+  const partial = await scenario(t, { domainEvidence: true }), partialOptions = domainOptions(partial)
+  await assert.rejects(begin(partial.input({ ...partialOptions, onBoundary: async ({ point }) => { if (point === 'domain-artifact-verified') throw new Pause('pause') } })), error => error instanceof Pause)
+  const path = join(partialOptions.domainAuditRoot, 'domain-audit.private.json'), original = await readFile(path), bytes = original.subarray(0, 61)
+  await writeFile(path, bytes)
+  const { domainAuditInput: fixedInput, ...partialLocations } = partialOptions
+  await assert.rejects(resume(partial.input(partialLocations)), { code: 'MIGRATION_DOMAIN_ARTIFACT_INCOMPLETE' })
+  assert.deepEqual(await readFile(path), bytes)
+  const rebuilt = { ...partialLocations, domainAuditRoot: join(partial.dir, 'explicit-new-domain-evidence') }
+  await assert.rejects(resume(partial.input(rebuilt)), { code: 'MIGRATION_ORCH_INPUT_REQUIRED' })
+  assert.deepEqual(await readFile(path), bytes)
+  assert.equal((await resume(partial.input({ ...rebuilt, domainAuditInput: fixedInput }))).status, 'blocked-activation')
+  assert.deepEqual(await readFile(path), bytes)
+})
+
+test('orchestration domain evidence: fixed input and a pinned root reject re-entry drift', async t => {
+  class Pause extends Error {}
+  const f = await scenario(t, { domainEvidence: true }), options = domainOptions(f)
+  await assert.rejects(begin(f.input({ ...options, onBoundary: async ({ point }) => { if (point === 'after-step:domain-audit-verified') throw new Pause('pause') } })), error => error instanceof Pause)
+  for (const mutate of [
+    input => { input.layout.sessions = [{ sourceId: 'sessions', compression: 'zstd' }] },
+    input => { input.finance.timeZone = 'Pacific/Honolulu' },
+    input => { input.limits.maxSessions = 99 },
+  ]) {
+    const changed = structuredClone(options.domainAuditInput)
+    mutate(changed)
+    await assert.rejects(resume(f.input({ ...options, domainAuditInput: changed })), { code: 'MIGRATION_ORCH_OPERATION_MISMATCH' })
+  }
+  await assert.rejects(resume(f.input({ ...options, domainAuditRoot: join(f.dir, 'other-evidence') })), { code: 'MIGRATION_ORCH_OPERATION_MISMATCH' })
+  assert.equal((await resume(f.input(options))).status, 'blocked-activation')
+})
+
+test('orchestration domain evidence: maintenance and release reverify the current artifact and preserve the raw verdict', async t => {
+  class Pause extends Error {}
+  const f = await scenario(t, { domainEvidence: true }), options = domainOptions(f)
+  await assert.rejects(begin(f.input({ ...options, onBoundary: async ({ point }) => { if (point === 'after-step:domain-audit-verified') throw new Pause('pause') } })), error => error instanceof Pause)
+  const path = join(options.domainAuditRoot, 'domain-audit.private.json'), original = await readFile(path)
+  const changed = JSON.parse(original)
+  changed.result.status = 'needs-context'
+  changed.result.fingerprint = '0'.repeat(64)
+  await writeFile(path, json(changed))
+  await assert.rejects(resume(f.input(options)), { code: 'MIGRATION_ORCH_CAPTURE_MISMATCH' })
+  assert.ok(!stepNames(await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })).includes('maintenance-started'))
+  await writeFile(path, original)
+  assert.equal((await resume(f.input(options))).status, 'blocked-activation')
+  assert.equal((await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })).journal.find(row => row.step === 'domain-audit-verified').evidence.domainAuditStatus, 'audited')
+
+  const g = await scenario(t, { domainEvidence: true }), other = domainOptions(g)
+  await begin(g.input(other))
+  await resumeMigrationConfigurationCommit({ privateOutput: g.commitOutput, phase: 'install' })
+  await resumeMigrationConfigurationCommit({ privateOutput: g.commitOutput, phase: 'rollback', recover: true })
+  const releasePath = join(other.domainAuditRoot, 'domain-audit.private.json'), releaseOriginal = await readFile(releasePath), tampered = JSON.parse(releaseOriginal)
+  tampered.result.status = 'blocked'
+  await writeFile(releasePath, json(tampered))
+  await assert.rejects(resume(g.input(other)), { code: 'MIGRATION_ORCH_RELEASE_BLOCKED' })
+  assert.equal((await readMigrationFence(g.home)).maintenanceActive, true)
+  assert.equal((await inspectMigrationCommitOperation({ privateOutput: g.privateOutput })).summary.activationSupported, false)
+})
+
+test('orchestration domain evidence: raw needs-context and blocked verdicts are never relabelled', async t => {
+  for (const [domainFault, status] of [['missing-timezone', 'needs-context'], ['missing-marker', 'blocked'], ['invalid-ledger', 'blocked']]) {
+    const f = await scenario(t, { domainEvidence: true, domainFault }), options = domainOptions(f)
+    assert.equal((await begin(f.input(options))).status, 'blocked-activation')
+    const inspection = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+    const row = inspection.journal.find(row => row.step === 'domain-audit-verified')
+    const artifact = JSON.parse(await readFile(join(options.domainAuditRoot, 'domain-audit.private.json'), 'utf8'))
+    assert.equal(artifact.result.status, status, domainFault)
+    assert.equal(row.evidence.domainAuditStatus, status, domainFault)
+    if (status === 'blocked') {
+      assert.equal(artifact.result.financial.status, 'blocked', domainFault)
+      assert.equal(artifact.result.financial.ledger, null, domainFault)
+    } else {
+      assert.equal(artifact.result.financial.status, 'needs-context')
+      assert.notEqual(artifact.result.financial.ledger, null)
+    }
+  }
+})
+
+test('orchestration domain evidence: operation, capture and pinned-step authority reject substitution', async t => {
+  class Pause extends Error {}
+  const pause = async ({ point }) => { if (point === 'after-step:domain-audit-verified') throw new Pause('pause') }
+  const f = await scenario(t, { domainEvidence: true }), options = domainOptions(f)
+  const g = await scenario(t, { domainEvidence: true }), other = domainOptions(g)
+  await assert.rejects(begin(f.input({ ...options, onBoundary: pause })), error => error instanceof Pause)
+  await begin(g.input(other))
+  const path = join(options.domainAuditRoot, 'domain-audit.private.json'), original = await readFile(path)
+  const foreign = await readFile(join(other.domainAuditRoot, 'domain-audit.private.json'))
+  await writeFile(path, foreign)
+  const crossOperation = await rejection(resume(f.input(options)))
+  assert.equal(crossOperation.code, 'MIGRATION_ORCH_CAPTURE_MISMATCH')
+  assert.equal(crossOperation.details.reason, 'MIGRATION_DOMAIN_OPERATION_MISMATCH')
+  assert.deepEqual(await readFile(join(other.domainAuditRoot, 'domain-audit.private.json')), foreign)
+  await writeFile(path, original)
+
+  await rename(f.dataArchiveRoot, join(f.dir, 'bound-data-archive'))
+  await rename(g.dataArchiveRoot, f.dataArchiveRoot)
+  const replacedArchive = await rejection(resume(f.input(options)))
+  assert.equal(replacedArchive.code, 'MIGRATION_ORCH_CAPTURE_MISMATCH')
+  assert.equal(replacedArchive.details.reason, 'capture-digest-mismatch')
+  assert.deepEqual(await readFile(path), original)
+
+  const h = await scenario(t, { domainEvidence: true }), pinned = domainOptions(h)
+  await assert.rejects(begin(h.input({ ...pinned, onBoundary: pause })), error => error instanceof Pause)
+  const inspection = await inspectMigrationCommitOperation({ privateOutput: h.privateOutput })
+  const domainIndex = inspection.journal.find(row => row.step === 'domain-audit-verified').index
+  const stepPath = join(h.privateOutput, 'step-' + String(domainIndex).padStart(5, '0') + '.json')
+  const step = JSON.parse(await readFile(stepPath, 'utf8'))
+  step.evidence.domainFingerprint = '0'.repeat(64)
+  await writeFile(stepPath, json(step))
+  await assert.rejects(resume(h.input(pinned)), { code: 'MIGRATION_ORCH_JOURNAL_INVALID' })
+  assert.equal((await inspectMigrationCommitOperation({ privateOutput: h.privateOutput })).valid, false)
+})
+
+test('orchestration domain evidence: capture roots must equal the immutable declared roots', async t => {
+  const f = await scenario(t, { domainEvidence: true }), options = domainOptions(f)
+  await assert.rejects(begin(f.input({ ...options, domains: [f.domains[0]] })), { code: 'MIGRATION_DOMAIN_ROOT_COVERAGE_MISMATCH' })
+  const inspection = await inspectMigrationCommitOperation({ privateOutput: f.privateOutput })
+  assert.equal(inspection.summary.status, 'blocked-capture')
+  assert.ok(!stepNames(inspection).includes('maintenance-started'))
 })

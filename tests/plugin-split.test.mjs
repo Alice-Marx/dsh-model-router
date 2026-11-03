@@ -30,7 +30,7 @@ test('install settings return current saved commands synchronously without tool 
 test('install summary uses the host platform and reports the configured update destination', () => {
   const preferences = { installDir: 'D:/AI/tools', registry: 'https://registry.npmjs.org/',
     methods: {}, scriptUrls: {}, allowScriptInstall: true }
-  const windows = installSummary(preferences, { platform: 'win32', home: 'C:/Users/Shared' })
+  const windows = installSummary(preferences, { platform: 'win32', home: 'C:/Users/tester' })
   const step = windows.tools.find(tool => tool.id === 'stepcode')
   assert.match(step.methods.find(method => method.id === 'script-bash').blocked, /仅支持/)
   assert.equal(step.methods.find(method => method.id === 'script-powershell').blocked, null)
@@ -46,7 +46,7 @@ test('install summary uses the host platform and reports the configured update d
   assert.match(zcode.notices.join(' '), /SHA256/)
   assert.ok(zcode.uninstallCommand)
   assert.equal(zcode.uninstallError, undefined)
-  const linux = installSummary(preferences, { platform: 'linux', home: '/home/user' })
+  const linux = installSummary(preferences, { platform: 'linux', home: '/home/tester' })
   const unixStep = linux.tools.find(tool => tool.id === 'stepcode')
   assert.equal(unixStep.methods.find(method => method.id === 'script-bash').blocked, null)
   assert.match(unixStep.methods.find(method => method.id === 'script-powershell').blocked, /仅支持/)
@@ -99,7 +99,7 @@ test('selecting ZCode npm changes install and uninstall previews to the saved np
   const base = { installDir: 'D:/AI/npm-tools', registry: 'https://registry.npmmirror.com/',
     methods: { zcode: 'npm' }, scriptUrls: {}, allowScriptInstall: false }
   for (const platform of ['win32', 'linux', 'darwin']) {
-    const summary = installSummary(base, { platform, home: '/home/user' })
+    const summary = installSummary(base, { platform, home: '/home/tester' })
     const zcode = summary.tools.find(tool => tool.id === 'zcode')
     assert.equal(zcode.savedMethodId, 'npm')
     assert.equal(zcode.methodId, 'npm')
@@ -135,7 +135,7 @@ test('invalid Host install settings reject previews and actions before any CLI i
 
 test('router upgrade retains its package identity and contains no GAL payload', () => {
   assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
-  assert.equal(manifest.version, '0.26.0-preview.1')
+  assert.equal(manifest.version, '0.26.0-preview.2')
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
   assert.match(client, /export const ROUTER_NAMESPACE = 'model-router-galgame'/)
@@ -165,6 +165,18 @@ test('0.13.0 package rename: the loader imports the new name, the profile entry 
   assert.equal(ROUTER_PACKAGE_NAME, manifest.name, 'update checks query the renamed package')
   const host = await import('../.dsh-plugin/index.mjs')
   assert.equal(host.name, 'model-router-galgame')
+})
+
+test('managed terminal backend and its product/protocol regressions are packaged and registered', () => {
+  for (const path of [
+    'packages/cli-runtime/src/native-process.mjs',
+    'packages/cli-runtime/src/native-terminal.mjs',
+    'packages/cli-runtime/src/native-terminal-peer.ps1',
+    '.dsh-plugin/shared/cli-terminal.mjs',
+  ]) assert.ok(manifest.files.includes(path), `${path} must ship`)
+  assert.match(manifest.scripts.test, /tests\/native-terminal-protocol\.test\.mjs/)
+  assert.match(manifest.scripts.test, /tests\/cli-terminal-managed-pty\.native\.mjs/)
+  assert.match(manifest.scripts.test, /tests\/cli-terminal-managed-product\.native\.mjs/)
 })
 
 test('router remote retains installer methods and owns no GAL endpoints', () => {

@@ -282,9 +282,18 @@ async function makeFixture(t, { breakCandidateBehavior = false } = {}) {
   const archive = join(home, 'mr-baseline.tar')
   await checked(fixture, 'git', ['-C', ROOT, 'archive', '--format=tar', `--output=${archive}`, MR_BASELINE], { cwd: home })
   await checked(fixture, 'tar', ['-xf', 'mr-baseline.tar', '-C', root], { cwd: home })
-  await cp(join(ROOT, '.git'), join(root, '.git'), { recursive: true })
+  // A linked worktree has a .git pointer file. Copying that file redirects
+  // fixture refs/index writes into the source worktree instead of isolating it.
+  // Import only the frozen objects into a fresh, fixture-owned repository.
+  await checked(fixture, 'git', ['init', '-q', root], { cwd: home })
+  await checked(fixture, 'git', ['-C', root, 'config', 'core.autocrlf', 'false'], { cwd: home })
+  await checked(fixture, 'git', ['-C', root, 'fetch', '--no-tags', ROOT, MR_BASELINE], { cwd: home })
+  assert.equal((await lstat(join(root, '.git'))).isDirectory(), true, 'Fixture must own its Git directory')
+  const fixtureGit = await checked(fixture, 'git', ['-C', root, 'rev-parse', '--absolute-git-dir'], { cwd: home })
+  assert.equal(resolve(fixtureGit.stdout.trim()), resolve(root, '.git'), 'Fixture Git must not point at source metadata')
   await checked(fixture, 'git', ['-C', root, 'update-ref', 'refs/heads/k44-fixture', MR_BASELINE], { cwd: root })
   await checked(fixture, 'git', ['-C', root, 'symbolic-ref', 'HEAD', 'refs/heads/k44-fixture'], { cwd: root })
+  await checked(fixture, 'git', ['-C', root, 'read-tree', MR_BASELINE], { cwd: root })
 
   const write = async (path, content) => {
     const absolute = join(root, path)

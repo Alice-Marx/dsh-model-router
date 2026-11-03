@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "preview-feature-difference",
   "release": "0.26.0-preview.1",
-  "generatedAt": "2026-11-02T15:34:19.115Z",
+  "generatedAt": "2026-11-02T16:48:00.884Z",
   "coverageMeaning": "Recomputable source/provenance difference and current acceptance snapshots; behaviorVerified remains false for every feature.",
   "baselines": {
     "DS": {
@@ -15,11 +15,11 @@
     }
   },
   "inputSha256": {
-    "docs/integration/scope.json": "41890433fb8a44ee84271b719985905f05c116ff976287c54ce982a88097874b",
-    "docs/integration/feature-inventory.json": "3f3446850974bca22605fe9a82ab1db79c18eb65f8baf09123edf4bdea0cda59",
-    "docs/integration/behavior-audit.json": "cf414eaa115afdbdca610dbf64cddbcda91cbdfb21281ef1dba70e69c280053c",
+    "docs/integration/scope.json": "2ef0f46ce2a91cf2626f3e0506a458c4e3a42bec5afe4693b546b51323cab744",
+    "docs/integration/feature-inventory.json": "e3f52e8811c83f1b03bb0caf3e75756e526261394da50a9fa1da189f3f2c7b0a",
+    "docs/integration/behavior-audit.json": "998523ab61c42a3d4926007865eaf09556eb10eb187a4458cbefdddc415f2fec",
     "docs/integration/tasks.json": "d8e13aa616bf419f5072860b58fceb7b311f5271d8a2feed224c5fd44b153fa2",
-    "docs/integration/baseline.json": "2e35e9aa04919234590fd0011ce3b310a39675f4f8131a9eab6a919793f65cd5",
+    "docs/integration/baseline.json": "9d26a6ec6eea8b2b73a1e992f49c44b88bb1a6114ad4aca0bade72fce3880c76",
     "docs/integration/included-increments.json": "7d6eda914c18bba20e54ec1b1b97ce595ecadba1da9a37c7081c68554bd975d0"
   },
   "generator": {
@@ -99,7 +99,7 @@
     "DS": {
       "commit": "de55888a93983fc51c94f7d22bc94b4f8293205d",
       "manifestPath": "modules/bot-runtime/SOURCE.json",
-      "manifestSha256": "057d7b0647566c777da58f4f595d0a372551124dacec47b9be47d5d2070f406b",
+      "manifestSha256": "299f336c42ed1d5230b460e24199f5412fc5cf873b616beeb79b4d1ae8639ecd",
       "expectedFiles": 297,
       "verifiedFiles": 297,
       "status": "passed"
@@ -107,7 +107,7 @@
     "MR": {
       "commit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
       "registeredSources": 36,
-      "rawIdentical": 29,
+      "rawIdentical": 30,
       "gitNormalizedIdentical": 30,
       "changedOrMissing": 6,
       "numstat": {
@@ -3987,7 +3987,7 @@
       "repository": "MR",
       "frozenCommit": "de82df4e737954ba0458d597ea82f9a6666c1a9b",
       "integrationDecision": "改；关联持久 Task，兼容旧 job 响应",
-      "difference": "保留（Git 内容一致；原始字节/行尾不同）",
+      "difference": "保留（原始字节与 Git 内容一致）",
       "behaviorVerified": false,
       "sources": [
         {
@@ -4017,16 +4017,16 @@
           "frozenRawSha256": "d0d30b92eea79694736eb35ae56b8664b83b6ea986610666c4e1c2991bc05fce",
           "currentPath": ".dsh-plugin/client/run-launcher.jsx",
           "currentPathKind": "file",
-          "currentRawSha256": "dce67d32402949d3938eaf4d9bc7bed69ebfc012cd7ca208d252515f5351b79b",
-          "currentRawGitBlob": "f65ff1d32ef7f7c63f340a340dbdad733c461c8e",
+          "currentRawSha256": "d0d30b92eea79694736eb35ae56b8664b83b6ea986610666c4e1c2991bc05fce",
+          "currentRawGitBlob": "cb90620bcfcb17ced9e3b01a4a9603988f393c20",
           "currentGitBlob": "cb90620bcfcb17ced9e3b01a4a9603988f393c20",
-          "rawBytesEqual": false,
+          "rawBytesEqual": true,
           "gitNormalizedEqual": true,
           "numstat": {
             "added": 0,
             "deleted": 0
           },
-          "status": "raw-bytes-differ-git-normalized-identical"
+          "status": "raw-and-git-identical"
         }
       ],
       "currentComponents": null,

@@ -19,13 +19,13 @@ const host = await import('../.dsh-plugin/index.mjs')
 const CWD = process.platform === 'win32' ? 'F:\\everyAI\\testall' : '/work'
 const TERMINAL_METHODS = ['terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop']
 
-function fakePty() {
+function fakePty({ exitOnKill = true } = {}) {
   const spawned = []
   return {
     spawned,
     module: {
       spawn(file, args, options) {
-        const proc = { file, args, options, written: [], sizes: [], dataListeners: [], exitListeners: [] }
+        const proc = { file, args, options, written: [], sizes: [], dataListeners: [], exitListeners: [], killCount: 0 }
         proc.emit = data => proc.dataListeners.forEach(listener => listener(data))
         proc.exit = (exitCode = 0) => proc.exitListeners.forEach(listener => listener({ exitCode, signal: 0 }))
         spawned.push(proc)
@@ -35,16 +35,38 @@ function fakePty() {
           onExit: listener => { proc.exitListeners.push(listener); return { dispose() {} } },
           write: data => proc.written.push(data),
           resize: (cols, rows) => proc.sizes.push([cols, rows]),
-          kill: () => proc.exit(null),
+          kill: () => { proc.killCount += 1; if (exitOnKill) proc.exit(null) },
         }
       },
     },
   }
 }
 
+function fakeManaged() {
+  const spawned = []
+  const createManaged = async () => {
+    const listeners = { data: [], exit: [], tree: [], output: [], dropped: [], lost: [] }
+    let close
+    const proc = {
+      pid: 4242, startIdentity: '100', closed: new Promise(resolve => { close = resolve }), killCount: 0,
+      onData: listener => listeners.data.push(listener), onExit: listener => listeners.exit.push(listener),
+      onTreeClosed: listener => listeners.tree.push(listener), onOutputClosed: listener => listeners.output.push(listener),
+      onOutputDropped: listener => listeners.dropped.push(listener), onControlLost: listener => listeners.lost.push(listener),
+      resume: async () => ({}), kill: async () => { proc.killCount += 1 }, write: () => true, resize: async () => true,
+      emit: data => listeners.data.forEach(listener => listener(data)),
+      exit: code => listeners.exit.forEach(listener => listener({ exitCode: code, signal: null })),
+      closeTree: () => listeners.tree.forEach(listener => listener({ activeProcesses: 0 })),
+      closeOutput: () => listeners.output.forEach(listener => listener({ outputTruncated: false, bytesDropped: 0 })),
+      resolveClosed: () => close({ outputTruncated: false, bytesDropped: 0 }),
+    }
+    spawned.push(proc)
+    return proc
+  }
+  return { spawned, createManaged }
+}
+
 /** Real Host services + real remote service envelope + gateway boundary. */
-function harness({ resolveLaunch } = {}) {
-  const pty = fakePty()
+function harness({ resolveLaunch, pty = fakePty(), managed = null, timers = [] } = {}) {
   const terminals = host.createRouterTerminals({
     loadPty: () => ({ ok: true, pty: pty.module, package: '@lydell/node-pty' }),
     resolveLaunch: resolveLaunch ?? (async (target, mode) => ({ file: 'kimi', args: mode === 'login' ? ['login'] : [], verbatim: false, display: mode === 'login' ? 'kimi login' : 'kimi' })),
@@ -53,6 +75,10 @@ function harness({ resolveLaunch } = {}) {
     environment: () => ({ PATH: '/bin' }),
     setRepeating: () => ({ unref() {} }),
     clearRepeating: () => {},
+    setTimer: (callback, ms) => { const timer = { callback, ms, unref() {} }; timers.push(timer); return timer },
+    clearTimer: () => {},
+    ...(managed ? { platform: 'win32', useManaged: true, createManaged: managed.createManaged,
+      allocateOutputParent: async () => ({ path: 'D:/isolated/owned-parent' }), releaseOutputParent: async () => {} } : {}),
   })
   const ctx = strictCtx({ typert: {}, sandbox: {}, sandboxPolicy: {}, commands: {}, llm: {}, tools: {} })
   const service = Object.create(OfficialToolsRemoteService.prototype)
@@ -112,17 +138,94 @@ test('gateway: every client terminal payload passes boundary validation and unwr
   await loop
   assert.deepEqual(errors, [], 'no call failed boundary validation')
   assert.match(screen, /ABCD-1234/)
-  assert.equal(exit.endReason, 'exit')
-  assert.equal(exit.exitCode, 0)
-  assert.equal(exit.exited, true)
-  assert.equal(exit.stopConfirmed, false)
+  assert.deepEqual(exit, { backend: 'pty', treeTracking: false, containment: null, treeClosed: false, outputClosed: true,
+    outputTruncated: false, bytesDropped: 0, controlLost: false, controlError: null,
+    endReason: 'exit', exitCode: 0, stopRequested: false, stopConfirmed: false, exited: true })
 
   // Stop is a plain {sessionId} payload; info lists no live sessions afterwards.
   const second = await startTerminal(api, { target: 'shell', mode: 'interactive', cwd: CWD, cols: 100, rows: 30 })
   const stopped = unwrapTerminal(await api.terminalStop({ sessionId: second.sessionId }), 'stop')
+  assert.equal(stopped.stopped, false)
   assert.equal(stopped.stopRequested, true)
   assert.equal(stopped.stopConfirmed, false)
   assert.equal((await loadTerminalInfo(api)).sessions.filter(item => !item.exited).length, 0)
+  terminals.disposeAll('test')
+})
+
+test('gateway: stop acceptance and host exit never imply descendant-tree confirmation', async () => {
+  const pty = fakePty({ exitOnKill: false })
+  const timers = []
+  const { api, terminals } = harness({ pty, timers })
+  const session = await startTerminal(api, { target: 'shell', mode: 'interactive', cwd: CWD, cols: 100, rows: 30 })
+  const stopped = unwrapTerminal(await api.terminalStop({ sessionId: session.sessionId }), 'stop')
+  assert.deepEqual(stopped, { stopped: false, stopRequested: true, stopConfirmed: false, exited: false, endReason: 'stopped' })
+  let info = await loadTerminalInfo(api)
+  let current = info.sessions.find(item => item.sessionId === session.sessionId)
+  assert.deepEqual({ exited: current.exited, stopRequested: current.stopRequested, stopConfirmed: current.stopConfirmed },
+    { exited: false, stopRequested: true, stopConfirmed: false })
+  assert.equal(info.history.some(item => item.id === session.sessionId), false)
+
+  for (const timer of timers.filter(item => item.ms === 5_000)) timer.callback()
+  const waiting = unwrapTerminal(await api.terminalRead({ sessionId: session.sessionId, cursor: 0, waitMs: 0 }), 'read')
+  assert.deepEqual({ exited: waiting.exited, stopRequested: waiting.stopRequested, stopConfirmed: waiting.stopConfirmed },
+    { exited: false, stopRequested: true, stopConfirmed: false })
+  const repeated = unwrapTerminal(await api.terminalStop({ sessionId: session.sessionId }), 'stop')
+  assert.deepEqual(repeated, { stopped: false, stopRequested: true, stopConfirmed: false, exited: false, endReason: 'stopped' })
+  assert.equal(pty.spawned[0].killCount, 1)
+
+  pty.spawned[0].exit(7)
+  pty.spawned[0].exit(0)
+  const exited = unwrapTerminal(await api.terminalRead({ sessionId: session.sessionId, cursor: 0, waitMs: 0 }), 'read')
+  assert.deepEqual({ exited: exited.exited, exitCode: exited.exitCode, stopRequested: exited.stopRequested, stopConfirmed: exited.stopConfirmed },
+    { exited: true, exitCode: 7, stopRequested: true, stopConfirmed: false })
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    info = await loadTerminalInfo(api)
+    if (info.history.some(item => item.id === session.sessionId)) break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  const records = info.history.filter(item => item.id === session.sessionId)
+  assert.equal(records.length, 1)
+  assert.deepEqual({ exitCode: records[0].exitCode, stopRequested: records[0].stopRequested, stopConfirmed: records[0].stopConfirmed },
+    { exitCode: 7, stopRequested: true, stopConfirmed: false })
+  terminals.disposeAll('test')
+})
+
+test('gateway: managed host exit keeps client polling and late proof updates one history record', async () => {
+  const managed = fakeManaged()
+  const { api, terminals } = harness({ managed })
+  const session = await startTerminal(api, { target: 'shell', mode: 'interactive', cwd: CWD, cols: 100, rows: 30 })
+  const proc = managed.spawned[0]
+  const exits = []
+  const statuses = []
+  const connection = new TerminalConnection({ api, sessionId: session.sessionId, waitMs: 50,
+    onStatus: status => statuses.push(status), onExit: event => exits.push(event) })
+  const loop = connection.start()
+  proc.exit(0)
+  await new Promise(resolve => setTimeout(resolve, 30))
+  assert.equal(exits.length, 0)
+  assert.ok(statuses.some(status => status.exited && !status.treeClosed))
+  const stopped = unwrapTerminal(await api.terminalStop({ sessionId: session.sessionId }), 'stop')
+  assert.equal(stopped.stopRequested, true)
+  assert.equal(stopped.stopConfirmed, false)
+  proc.closeTree()
+  proc.closeOutput()
+  proc.resolveClosed()
+  await loop
+  assert.equal(exits.length, 1)
+  assert.equal(exits[0].stopConfirmed, true)
+  assert.equal(exits[0].outputClosed, true)
+  let info
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    info = await loadTerminalInfo(api)
+    const record = info.history.find(item => item.id === session.sessionId)
+    if (record?.treeClosed && record?.outputClosed) break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  const records = info.history.filter(item => item.id === session.sessionId)
+  assert.equal(records.length, 1)
+  assert.deepEqual({ stopRequested: records[0].stopRequested, stopConfirmed: records[0].stopConfirmed,
+    treeClosed: records[0].treeClosed, outputClosed: records[0].outputClosed },
+    { stopRequested: true, stopConfirmed: true, treeClosed: true, outputClosed: true })
   terminals.disposeAll('test')
 })
 

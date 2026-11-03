@@ -1,12 +1,23 @@
 # Changelog
 
-## 0.26.0-preview.4 — 2026-11-03
+## 0.26.0-preview.2 — 2026-11-03
 
-- Ship the unified product inside the DS Bot desktop app: one plugin composition, the Bot team runtime, model routing, tasks, budgets, official CLIs, remote machines and the Windows desktop helper.
-- Desktop control is usable end to end: a screenshot reaches the model as an image attachment, one Bot chat keeps one durable remote identity (so a screenshot and the click that follows belong to the same owner), captures larger than 1 MiB download in chunks, unused artifacts are evicted instead of wedging the Agent, and a cancelled action no longer disables desktop control for the rest of the chat.
-- Harden the Windows helper: strict argument validation, SetCursorPos-based clicks (no virtual-screen DPI math), right/middle click and repeated clicks, ctrl/alt/shift chords, extended-key flags, newline/tab mapped to Enter/Tab, scroll with an explicit target point, and a blank-capture flag.
-- Fix the first-run flow: saving a Bot binding now syncs the Bot model, holds its greeting until the compiled grant carries the binding's model route, and admits a frozen model request whose output bound cannot be lowered (the daily/monthly budget remains the hard limit).
-- The desktop package is packed as plain files on every platform because the Host runs on the payload's ordinary Node, which cannot read an asar archive.
+- Fix rc.5 Host refusing to load preview.1: add only the exact published 0.2.1-rc.5 peer version, retaining the historical supported versions and refusing unverified rc.4/rc.6/alpha versions.
+- Pin the source SDK graph to 0.2.1-rc.5 and regenerate the unified client against it. Add a regression that reproduces preview.1 rejection without changing the Host gate or granting an exemption.
+- Preserve the immutable preview.1 package, original failed gates and full acceptance boundaries. This is a compatibility repair, not completion of C1–C10, clean Desktop installation, hosted CI or real-provider acceptance.
+
+See the [validation report](docs/releases/0.26.0-preview.2-validation.md), [isolated trial guide](docs/releases/0.26.0-preview.2-trial.md) and [unresolved-work register](docs/releases/0.26.0-preview.2-unfinished-work.zh.md). Actual publication requires separately verified registry and GitHub release receipts.
+
+## 0.26.0-preview.1 — 2026-11-03
+
+- Harden private migration directories with an owner-only Windows ACL and share one implementation across archive, restore and preview paths.
+- Refuse worktree integration after internal HEAD commits, keep native peer verification local, install the browser/SQLite test prerequisites in CI and use normalized scheduled-task configuration fingerprints.
+- Document the feature difference and remaining acceptance gates. Hosted CI native-peer tests are explicitly skipped, not passed.
+- Extend bounded captured-configuration migration diagnostics without enabling production migration, and harden managed terminal and remote CLI lifecycle handling.
+- Isolate upstream-inclusion test Git metadata with init/fetch/read-tree instead of copying a linked worktree pointer; preserve the original failing evidence.
+- Publish an opt-in trial guide with explicit install, clean-install, test and platform limitations. This preview does not turn open acceptance gates or timed-out tests into passes.
+
+This remains a non-stable preview, not a production migration or full-platform acceptance release. See the [0.26.0-preview.1 acceptance report](docs/releases/0.26.0-preview.1-validation.md).
 
 ## 0.26.0-preview.0 — 2026-11-01
 

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": "E164",
+  "recordedOn": "2026-11-03",
+  "decision": "user-authorized-isolated-trial-before-full-acceptance",
+  "version": "0.26.0-preview.1",
+  "publication": "pending_remote_verification_separate_receipts",
+  "formalAcceptancePromoted": false,
+  "actualModelCalls": 0,
+  "results": {
+    "firstRoot": {
+      "exit": 1,
+      "tests": 1845,
+      "passed": 1826,
+      "failed": 14,
+      "skipped": 5,
+      "nativePhase": "not_run",
+      "sourceFilesStable": 1327,
+      "gitMetadataStable": false
+    },
+    "fixtureFollowup": {
+      "status": "interrupted_without_exit_receipt",
+      "partialPassesLogged": 4,
+      "wholeSuitePassed": false
+    },
+    "defaultProductProbe": {
+      "status": "interrupted_without_exit_receipt"
+    },
+    "coreFocused": {
+      "exit": 0,
+      "tests": 59,
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0
+    },
+    "clientConsistency": {
+      "exit": 0
+    },
+    "readmeStructure": {
+      "exit": 0,
+      "pairedFormulas": 6,
+      "pairedInlineExpressions": 33,
+      "newGitHubRenderingVerified": false
+    },
+    "integrationTracking": {
+      "exit": 0
+    },
+    "agentBuild": {
+      "exit": 0
+    },
+    "strictFrozenInstall": {
+      "exit": 1,
+      "cause": "better-sqlite3 implicit node-gyp rebuild cannot recognize local Visual Studio18"
+    },
+    "frozenResolutionOnly": {
+      "exit": 0,
+      "installScripts": "skipped"
+    },
+    "tarballInstall": {
+      "exit": 0,
+      "installScripts": "skipped",
+      "peerMode": "legacy-peer-deps"
+    },
+    "tarballFixedHostImport": {
+      "exit": 0,
+      "sdk": "0.2.1-rc.3",
+      "sqlite": "3.53.4",
+      "pluginApplyInvoked": false
+    }
+  },
+  "fix": "Upstream-inclusion fixtures use independent init/fetch/read-tree and assert Git metadata ownership; never copy a linked worktree .git pointer.",
+  "limits": [
+    "no current full green regression",
+    "no hosted CI acceptance",
+    "no clean full Desktop installation acceptance",
+    "no real account/vendor/login/model/production or remote-machine verification",
+    "full migration/provider authority/activation/stop-write/post-activation rollback unproven",
+    "all 40 features behaviorVerified=false; ledger empty"
+  ],
+  "retainedLocalEvidence": "tmp/integration/apigpt-chief/e164-preview-delivery-20261103-1; local-only raw failures are not automatically release assets"
+}

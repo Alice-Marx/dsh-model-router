@@ -52,3 +52,12 @@
 # Preserve immutable approved source snapshots, including their original whitespace.
 /docs/integration/plan/** -text -whitespace
 /tests/fixtures/integration-host/pnpm-lock.yaml text eol=lf
+
+# E164 preview additions preserve published source bytes across checkouts.
+/apps/desktop-client/** -text
+/packages/orchestration/src/** -text
+/packages/cli-runtime/src/** -text
+/packages/capability-broker/src/** -text
+/modules/bot-runtime/** -text
+/docs/releases/0.26.0-preview.* -text
+/docs/integration/** -text -whitespace
