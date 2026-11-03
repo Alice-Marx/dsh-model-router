@@ -71,6 +71,42 @@ test('does not reinstall or downgrade a current or newer running package', async
   assert.equal(runs, 0)
 })
 
+test('a preview install follows the preview tag, not the stable latest', async t => {
+  const fixture = await packageFixture(t, '0.26.0-preview.6')
+  const requested = []
+  const handler = createNpmUpdateHandler({
+    moduleUrl: fixture.moduleUrl,
+    pnpm: successfulPnpm(),
+    profileDir: 'C:\\profile',
+    fetchImpl: async url => {
+      requested.push(String(url))
+      return npmResponse('0.26.0-preview.7')
+    },
+  })
+  const result = await invoke(handler)
+  assert.equal(result.ok, true)
+  assert.equal(result.value.version, '0.26.0-preview.7')
+  assert.equal(result.value.restartRequired, true)
+  assert.ok(requested[0].endsWith('/preview'), `requested ${requested[0]}`)
+})
+
+test('a stable install keeps following the latest tag', async t => {
+  const fixture = await packageFixture(t, '0.25.5')
+  const requested = []
+  const handler = createNpmUpdateHandler({
+    moduleUrl: fixture.moduleUrl,
+    pnpm: successfulPnpm(),
+    profileDir: 'C:\\profile',
+    fetchImpl: async url => {
+      requested.push(String(url))
+      return npmResponse('0.25.6')
+    },
+  })
+  const result = await invoke(handler)
+  assert.equal(result.value.version, '0.25.6')
+  assert.ok(requested[0].endsWith('/latest'), `requested ${requested[0]}`)
+})
+
 test('authenticated RPC resolves npm latest and runs one exact command in the active profile', async t => {
   const fixture = await packageFixture(t)
   let invocation
