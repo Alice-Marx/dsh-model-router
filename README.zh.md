@@ -8,15 +8,15 @@
 
 想跟进版本更新？点右上角 **Watch → Custom → 勾选 Releases**（不必 Watching 全部活动）。
 
-**手动试用版：0.26.0-preview.2。** 本次兼容更新新增精确的 **0.2.1-rc.5** Host peer 版本，并将源码 SDK 固定到 rc.5；preview.1 在加载插件前即被 rc.5 拒绝。是否已发布以实际 registry 条目为准，本文不构成发布收据。此模型路由插件预览版仅用于隔离试用，不用于生产配置自动升级；DS Bot 桌面应用及电脑操作整合仍在开发，尚未作为完整应用交付。请先准备独立测试 profile/home 和备份，再在 **Harness Desktop → 插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.26.0-preview.2`。下文稳定版安装说明仍为 0.25.5，`latest` 不是试用通道。安装前阅读[试用指南](docs/releases/0.26.0-preview.2-trial.md)和[验证限制](docs/releases/0.26.0-preview.2-validation.md)。完整迁移激活、全域停写及激活后回滚仍不可用；本次不声称完成新的真实厂商或生产配置验收。
+**手动试用版：0.26.0-preview.2。** 本次兼容更新新增精确的 **0.2.1-rc.5** Host peer 版本，并将源码 SDK 固定到 rc.5；preview.1 在加载插件前即被 rc.5 拒绝。是否已发布以实际 registry 条目为准，本文不构成发布收据。此模型路由插件预览版仅用于隔离试用，不用于生产配置自动升级；DS Bot 桌面应用及电脑操作整合仍在开发，尚未作为完整应用交付。请先准备独立测试 profile/home 和备份，再在 **Harness Desktop → 插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.26.0-preview.2`。下文稳定版安装说明仍为 0.25.5，`latest` 不是试用通道。安装前阅读[试用指南](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.26.0-preview.2-trial.md)和[验证限制](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.26.0-preview.2-validation.md)。完整迁移激活、全域停写及激活后回滚仍不可用；本次不声称完成新的真实厂商或生产配置验收。
 
 面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
 
 稳定版：**0.25.5**（`@ljwei-stak/dsh-model-router`）。本次修复 Windows 内嵌终端中 ZCode TUI 的框线、中文乱码和残留颜色控制序列：在每个新建 ZCode PTY 中先设置 UTF-8，再启动 Node，系统设置不变。独立社区 ZCode CLI 继续提供 npm 和 GitHub Release 两种安装方式。沿用 **0.2.1-rc.3** SDK 与已有 Host peer 范围。API 按金额核算并检查日/月预算和预占；订阅独立统计调用次数与已报告 token 用量。已确认的订阅通道不会仅因 API 预算用满或缺少 API 单价而被阻止；真正转 API 前须对实际路线重新估价并通过预算预占，混合结果分别保留两个通道的收据。工作台把 API 支出/预占与订阅用量分开，缺失用量保持未知。工作台支持实时耗时、逐工作包进度和取消，保留已完成结果与已报告费用；关闭重开面板可接管原任务。支持“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
 
-官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
+官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.20.0-validation.md)。
 
-两个 README 版本同步说明接口、公式、默认值与限制。[更新日志](CHANGELOG.md)保留版本历史。更多操作说明：[工作台](docs/WORKBENCH_USER_GUIDE.zh.md)、[安装](docs/INSTALLATION_GUIDE.zh.md)、[迁移](docs/archive/MIGRATION.md)、[实验规程](docs/ROUTING_SELFTEST_STEPS.zh.md)。
+两个 README 版本同步说明接口、公式、默认值与限制。[更新日志](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/CHANGELOG.md)保留版本历史。更多操作说明：[工作台](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/WORKBENCH_USER_GUIDE.zh.md)、[安装](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/INSTALLATION_GUIDE.zh.md)、[迁移](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/archive/MIGRATION.md)、[实验规程](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_SELFTEST_STEPS.zh.md)。
 
 <a id="quick-evaluation"></a>
 
@@ -44,7 +44,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.5
 
 **配置文件与配置入口：** 当前不支持导入用户编写的 JSON/YAML 配置文件。Provider、模型和凭据在 Harness **模型**页面配置；路由档案与偏好在插件设置中配置。路由器持久状态存于 `$DSH_HOME/model-router/state.json`（默认：`~/.dsh/model-router/state.json`）。Provider CLI 沿用各自的登录和配置；路由器不会把 API 密钥复制进模型档案或终端日志。
 
-**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.25.5 尚无经过验证的端到端厂商运行。[实时进度截图](docs/assets/workbench-run-progress.png)是离线模拟；API/订阅分开计算与检查点见[0.25.0 验收报告](docs/releases/0.25.0-validation.md)，SDK 兼容与验证边界见[0.25.1 验收报告](docs/releases/0.25.1-validation.md)。
+**截图与证据：** [工作台截图](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.25.5 尚无经过验证的端到端厂商运行。[实时进度截图](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workbench-run-progress.png)是离线模拟；API/订阅分开计算与检查点见[0.25.0 验收报告](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.25.0-validation.md)，SDK 兼容与验证边界见[0.25.1 验收报告](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.25.1-validation.md)。
 
 **权限与风险：** 任务规划在本地完成，不调用模型。实际执行会把选定任务和上下文发送到所选模型 API 或厂商 CLI，并可能产生费用。默认使用 Harness 受限环境；只读运行不修改工作区，`workspace-write` 需要用户明确批准。明确选择 `cli-native` 的可编辑团队会在 Harness 进程沙箱之外，以当前操作系统用户权限运行；Git worktree 只收集修改，不限制操作系统访问。外部 Provider 和 CLI 服务各自适用其数据处理及计费规则。
 
@@ -71,7 +71,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.5
 
 生成路由建议在本地完成：不会启动厂商 CLI，也不会调用付费模型。实际执行可能产生费用。
 
-![本地规划与官方工具执行](docs/assets/routing-workflow.svg)
+![本地规划与官方工具执行](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/routing-workflow.svg)
 
 <a id="install"></a>
 
@@ -91,7 +91,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.5
 
 旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.25.5`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
 
-从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
+从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/archive/MIGRATION.md)。
 
 <a id="workbench"></a>
 
@@ -108,7 +108,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.5
 
 切换页签时面板保持挂载，正在进行的安装与终端状态不会因此丢失。
 
-![0.15.0 工作台预览：任务规划与路由建议](docs/assets/workbench-task-preview.jpg)
+![0.15.0 工作台预览：任务规划与路由建议](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workbench-task-preview.jpg)
 
 *截图来自本地 UI 预览，使用预置模型、价格与健康数据，未连接真实模型或 Harness。展开工作包可查看目标、依赖和验收项。*
 
@@ -121,7 +121,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.5
 
 执行开始后，工作台显示已耗时、当前工作包与每包状态。**取消执行**会请求停止当前调用，并阻止后续工作包启动；执行器完成收尾前持续显示**正在取消**。已完成结果和已报告用量仍保留在历史中。取消不能撤销已经产生的费用或已经整合的改动。关闭面板不会取消执行；同一浏览器会话重新打开后，可在 Host 仍保留该任务时重新连接。Host 重启会清除内存任务，已落盘的工作包结果与预算预占仍保留。确认执行进程已经退出后标记为 `interrupted`，不会自动续跑调用或释放预占。
 
-预览、进度和取消请求最长等待 15 秒。进度读取超时后继续查询同一任务；取消未确认时可手动重试。网络等待超时不代表 Host 任务已停止，也不会自动重发 `startRun`。重跑历史步骤前，预算覆盖该步及实际会执行的全部未完成下游；改派使用所选路线估价，未知价格仍保持未知。[超时恢复截图](docs/assets/workbench-run-timeout.png)为离线模拟。
+预览、进度和取消请求最长等待 15 秒。进度读取超时后继续查询同一任务；取消未确认时可手动重试。网络等待超时不代表 Host 任务已停止，也不会自动重发 `startRun`。重跑历史步骤前，预算覆盖该步及实际会执行的全部未完成下游；改派使用所选路线估价，未知价格仍保持未知。[超时恢复截图](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workbench-run-timeout.png)为离线模拟。
 
 历史将活动/中断的预算预占与实际支出分别显示；有预占的运行不能重跑或改派。Host 崩溃或检查点保存失败后，请先核对原任务、保留的 worktree 和供应商账单；本版没有手工核对并释放预占的操作入口。不要通过删除状态把占用当成可用额度。
 
@@ -281,7 +281,7 @@ Hermes 使用[官方源码安装器](https://hermes-agent.nousresearch.com/docs/
 
 **Windows 旧 ZCode 启动入口。** npm 安装前，插件会备份识别出的旧桌面版 `zcode`、`zcode.cmd` 和 `zcode.ps1` 启动脚本，并在安装日志中记录备份位置，再让 npm 创建自己的命令入口。安装失败时会尝试安全恢复旧入口。无法识别的冲突文件保持原样并报错，插件不会添加 `--force`。桌面程序资源、账号配置、登录和会话历史均保留。
 
-[工作台指南](./docs/WORKBENCH_USER_GUIDE.zh.md#厂商安装渠道)列出各厂商的实际渠道与原生安装执行限制。
+[工作台指南](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/WORKBENCH_USER_GUIDE.zh.md#厂商安装渠道)列出各厂商的实际渠道与原生安装执行限制。
 
 未设置统一目录时，普通检查会在 PATH 上查找所选包管理器的包。安装、更新、修复或移除任务，会先解析并锁定该管理器的默认全局目标，再比较版本。如果无法安全解析，请先填写并保存统一目录。
 
@@ -386,7 +386,7 @@ $`C_a`$ 对应 `actualUsd`；$`I_u`$、$`O`$、$`R`$、$`W`$ 分别对应 `input
 
 ## 路由算法
 
-手动分配：生成任务建议后，可选择按算法推荐执行，或逐包指定模型 API / 官方工具。参见[手动分配使用说明](docs/MANUAL_TASK_ASSIGNMENT.zh.md)。
+手动分配：生成任务建议后，可选择按算法推荐执行，或逐包指定模型 API / 官方工具。参见[手动分配使用说明](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/MANUAL_TASK_ASSIGNMENT.zh.md)。
 
 规划器是确定性的本地启发式算法，不是训练得到的成功率预测器。它对文本分类、估计复杂度、创建适当的分析/执行/验证/汇总工作包，发现精确的已配置路线，叠加路线配置，并应用能力/质量约束。显式指定路线会跳过与其他路线的比较。目录质量/延迟/风险提示是实验性先验，不是实测成功概率或厂商实时报价。执行当前以文本为主；vision 标签不能证明已有端到端多模态流水线。
 
@@ -449,9 +449,9 @@ $`L`$ 为延迟效用：$`t`$ 是匹配历史的 P90 耗时，单位为毫秒；
 4. 按字典序比较分配：更少放宽包、更小质量缺口、更高效用、更低费用、更少路线切换，最后稳定的路线顺序。最小费用模式先比较费用，再比较效用。每条跨越 `provider/model` 路线的依赖边从效用中扣除 0.015。
 5. 报告搜索元数据与可行性。正预算下若不存在可行分配，仍可返回最小费用备选，但标记 `budgetFeasible: false`。显示了计划不代表预算已满足。
 
-“精确”仅适用于保留下来的候选空间与代理目标。候选上限和 beam 裁剪意味着不能声称在所有已配置模型上全局最优。单元/合成测试验证机制，不证明真实回答质量提升。研究审查使用的公开 2026-06-25 LiveBench 分数/费用表属于汇总数据；未取得逐题配对的质量/费用矩阵，因此不主张真实路由收益。参见[研究](docs/ROUTING_RESEARCH.zh.md)、[推导/实验](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)与[验证规程](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)。
+“精确”仅适用于保留下来的候选空间与代理目标。候选上限和 beam 裁剪意味着不能声称在所有已配置模型上全局最优。单元/合成测试验证机制，不证明真实回答质量提升。研究审查使用的公开 2026-06-25 LiveBench 分数/费用表属于汇总数据；未取得逐题配对的质量/费用矩阵，因此不主张真实路由收益。参见[研究](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_RESEARCH.zh.md)、[推导/实验](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)与[验证规程](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)。
 
-证据导入、回退条件、推理档位与可选 JSON 验收升级的设置参见[算法优化使用说明](docs/ROUTING_ALGORITHM_OPTIMIZATION.zh.md)。验收升级默认关闭，启用后仍需通过计费与预算检查，最多增加一次普通 API 调用。
+证据导入、回退条件、推理档位与可选 JSON 验收升级的设置参见[算法优化使用说明](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_ALGORITHM_OPTIMIZATION.zh.md)。验收升级默认关闭，启用后仍需通过计费与预算检查，最多增加一次普通 API 调用。
 
 实现：[router.mjs](.dsh-plugin/shared/router.mjs)、[assignment-solver.mjs](.dsh-plugin/shared/assignment-solver.mjs)、[routing-evidence.mjs](.dsh-plugin/shared/routing-evidence.mjs)、[harness-plan.mjs](.dsh-plugin/shared/harness-plan.mjs) 与 [quality-gates.mjs](.dsh-plugin/shared/quality-gates.mjs)。
 
@@ -516,7 +516,7 @@ npm run preview:ui
 
 GitHub Actions 通过 Windows/Linux Node 24 矩阵执行冻结锁文件严格依赖安装、全量测试、已提交客户端一致性、实际客户端构建和离线预览编译。打包后逐文件对比原始 Git blob，并检查运行时 import 依赖是否完整。这些检查使用本地预置数据，不验证真实供应商计费。提交本地候选后，可先运行 `npm run pack:local`，再运行 `node scripts/check-package.mjs` 复现包验证。
 
-旧兼容/研究文件和带日期报告保留作参考；它们的存在不代表当前发行插件仍启用所有旧集成。发布与同步遵循 [AGENTS.md](AGENTS.md)；重现某次发布请使用带版本号的包或已验证的发布 tag。
+旧兼容/研究文件和带日期报告保留作参考；它们的存在不代表当前发行插件仍启用所有旧集成。发布与同步遵循 [AGENTS.md](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/AGENTS.md)；重现某次发布请使用带版本号的包或已验证的发布 tag。
 
 ### 验证层次与已知局限
 
@@ -528,7 +528,7 @@ GitHub Actions 通过 Windows/Linux Node 24 矩阵执行冻结锁文件严格依
 | 生产运行时 CLI 团队 | 该次调用的真实厂商进程、依赖上下文和文件；不自动等于 UI 或自动路线选择测试。 |
 | 源文件读回 | 预期产物已到达源工作区；业务正确性仍取决于选定的检查。 |
 
-0.20.0 Windows 记录包含真实 Claude 工作台 RPC 运行，以及另一次通过已安装生产运行时执行的 Claude → MiniMax 交接，检查了文件/shell 工具和补丁合入。交接使用显式选择的工作包，不证明自动路由质量。该批 Codex 连接检查失败。其他厂商、所有 skill/MCP 服务、跨平台行为、已结算总费用和质量–成本提升，并未全部由这些运行验收。[带日期报告](docs/releases/0.20.0-validation.md)保留准确范围。0.20.1 的续跑确认修复有契约/回归检查；本版不增加模型实验或费用。
+0.20.0 Windows 记录包含真实 Claude 工作台 RPC 运行，以及另一次通过已安装生产运行时执行的 Claude → MiniMax 交接，检查了文件/shell 工具和补丁合入。交接使用显式选择的工作包，不证明自动路由质量。该批 Codex 连接检查失败。其他厂商、所有 skill/MCP 服务、跨平台行为、已结算总费用和质量–成本提升，并未全部由这些运行验收。[带日期报告](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.20.0-validation.md)保留准确范围。0.20.1 的续跑确认修复有契约/回归检查；本版不增加模型实验或费用。
 
 维护文档时应在同一改动中更新两种语言：同步稳定章节锚点、API 字段、默认值、公式、能力表、示例与证据边界。在 [README.i18n.yaml](README.i18n.yaml) 中记录成对的 Git blob 哈希；哈希标识经过审阅的文本，不证明翻译正确。历史实验报告应始终关联实际测试的运行时版本。
 
