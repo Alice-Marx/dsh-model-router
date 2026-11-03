@@ -2,12 +2,20 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const PROJECT = resolve(import.meta.dirname, '..')
-const REPOSITORY = resolve(PROJECT, '..')
+// Inside the DS Bot repository the sibling checkout is the source of truth. This package also
+// ships on its own (its own git repository, no ../ds-bot): there the vendored tree and its
+// recorded SOURCE.json are the source, and only their integrity can be checked.
+const REPOSITORY = (() => {
+  try { return execFileSync('git', ['-C', PROJECT, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim() }
+  catch { return resolve(PROJECT, '..') }
+})()
 const SOURCE = join(REPOSITORY, 'ds-bot')
+const SOURCE_FILE = join(PROJECT, 'modules/bot-runtime/SOURCE.json')
 const RUNTIME = join(PROJECT, 'modules/bot-runtime')
 const VENDOR = join(RUNTIME, 'vendor/ds-bot')
 const excluded = new Set(['node_modules', 'harness'])
@@ -25,8 +33,13 @@ async function files(root, base = root) {
   return result.sort()
 }
 
-async function manifest() {
-  const commit = execFileSync('git', ['-C', REPOSITORY, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+const hasSource = () => existsSync(join(SOURCE, 'package.json'))
+const recorded = async () => JSON.parse(await readFile(SOURCE_FILE, 'utf8'))
+
+async function manifest(commitOverride) {
+  const commit = commitOverride ?? (hasSource()
+    ? execFileSync('git', ['-C', REPOSITORY, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+    : (await recorded()).commit)
   const records = []
   for (const path of await files(VENDOR)) {
     const bytes = await readFile(join(VENDOR, path))
@@ -37,7 +50,7 @@ async function manifest() {
 }
 
 export async function syncDsBot({ check = false } = {}) {
-  if (!check) {
+  if (!check && hasSource()) {
     const temporary = `${VENDOR}.next`
     await rm(temporary, { recursive: true, force: true })
     await mkdir(dirname(temporary), { recursive: true })
@@ -48,11 +61,12 @@ export async function syncDsBot({ check = false } = {}) {
     await cp(temporary, VENDOR, { recursive: true })
     await rm(temporary, { recursive: true, force: true })
   }
-  const next = await manifest()
+  const current = await recorded()
+  const next = await manifest(current.commit)
   if (check) {
-    const current = JSON.parse(await readFile(join(RUNTIME, 'SOURCE.json'), 'utf8'))
     assert.deepEqual(current, next, 'The vendored DS Bot source or SOURCE.json is stale')
     for (const file of next.files) {
+      if (!hasSource()) break
       if (file.sourcePath === 'LICENSE' || file.sourcePath === 'NOTICE') continue
       const source = await readFile(join(REPOSITORY, file.sourcePath))
       assert.equal(digest(source), file.sha256, `DS Bot source is stale: ${file.sourcePath}`)
