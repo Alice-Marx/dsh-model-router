@@ -27,14 +27,17 @@ import { createRemoteCliReadBackend } from './remote-cli-execution.mjs'
 import { canonicalTaskJson, parseRemoteTaskCli, taskHash } from './task-contract.mjs'
 import { acquireMigrationShared } from './migration-fence.mjs'
 import { assertMigrationStartupAllowed } from './migration-startup-gate.mjs'
+import { registerRemoteComputerTools } from './remote-computer-tools.mjs'
 
-// M1 default grant: the read-only MR surface plus this Bot's exact configured
-// model. Execution facade tools stay refused by the policy (EXECUTION_FACADE_REQUIRED)
-// until their facade ships; task capabilities arrive with the Task Service wiring.
+// The default Bot grant exposes the complete router through the same policy.
+// Exact model routes and side-effect approvals remain independently enforced.
 export const PRODUCT_TOOLS = Object.freeze(['model/infer',
-  'tool/model_router_routes', 'tool/model_router_plan', 'tool/model_router_consult',
+  'tool/model_router_routes', 'tool/model_router_plan', 'tool/model_router_consult', 'tool/model_router_health', 'tool/model_router_tools',
+  'tool/model_router_execute', 'tool/model_router_team_execute', 'tool/model_router_tool_run', 'tool/model_router_rerun_step',
+  'tool/model_router_tool_install', 'tool/model_router_tool_repair', 'tool/model_router_tool_uninstall', 'tool/model_router_rate',
   'command/router'])
 export const PRODUCT_OWNER_READ_METHODS = Object.freeze(['list','installSettings','status','health','ledger','boundaries','previewRun','runStatus','terminalInfo','terminalRead'])
+export const PRODUCT_OWNER_WRITE_METHODS = Object.freeze(['completeOnboarding','rateResult','rerunStep','startRun','cancelRun','installTool','uninstallTool','repairTool','cancel','terminalStart','terminalWrite','terminalResize','terminalStop'])
 // The Bot runtime reports descriptive call origins; the durable receipt schema
 // keeps its closed vocabulary. The adapter is explicit: an unmapped origin is
 // refused by the accounting layer instead of being invented.
@@ -284,7 +287,7 @@ export function startBotProduct(ctx, options = {}) {
   }
   const authority = createAuthority()
   const directory = createPrincipalDirectory(authority)
-  const ownerTools=PRODUCT_OWNER_READ_METHODS.map(name=>`remote/${name}`)
+  const ownerTools=[...PRODUCT_OWNER_READ_METHODS,...PRODUCT_OWNER_WRITE_METHODS].map(name=>`remote/${name}`)
   const policy = createBotPolicy({ authority, directory, machineId, workspaceId,ownerGrant:{tools:ownerTools} })
   ctx.provide('botIntegrationPolicy', policy)
   const describeBot = subject => { try { return authority.describe(subject).botId } catch { return null } }
@@ -333,15 +336,20 @@ export function startBotProduct(ctx, options = {}) {
     try { scopes = machines?.scopes(bot.id) ?? [] } catch { /* no machine access */ }
     try { cliOfficial=botSettings?.get(bot.id,{publishChange:false}).settings?.officialTools?.some(item=>item.toolId==='codex'&&item.mode==='read-only')===true } catch {}
     for (const scope of scopes) for (const tool of scope.tools) {
-      if(['operation_status','operation_cancel'].includes(tool)){grant.tools.push(`remote/${tool}`);continue}
+      if(['operation_status','operation_cancel'].includes(tool)){grant.tools.push(`remote/${tool}`,'tool/remote_computer_operation');continue}
+      if(tool==='artifact_stat'||tool==='artifact_read'){grant.tools.push(`remote/${tool}`);continue}
       if(['cli_probe_v1','cli_task_v1'].includes(tool)){
         const profile=cliConfig?.remote.find(item=>item.machineId===scope.machineId&&scope.roots.includes(item.rootId))
         if(cliOfficial&&profile&&['cli_probe_v1','cli_task_v1','operation_status','operation_cancel'].every(name=>scope.tools.includes(name)))grant.tools.push(`remote/${tool}`,...(tool==='cli_probe_v1'?['tool/remote_computer_cli_probe']:[]))
         continue
       }
       if(tool.startsWith('browser_')){if(scope.mode==='workspace-write')grant.tools.push(`remote/${tool}`,'tool/remote_computer_browser');continue}
+      if(tool.startsWith('desktop_')){
+        if(scope.mode==='workspace-write'&&['artifact_stat','artifact_read','operation_status','operation_cancel'].every(name=>scope.tools.includes(name)))grant.tools.push(`remote/${tool}`,'tool/remote_computer_desktop')
+        continue
+      }
       if(tool==='container_command_v1'){
-        if(scope.mode==='workspace-write'&&['container_command_v1','operation_status','operation_cancel'].every(name=>scope.tools.includes(name)))grant.tools.push(`remote/${tool}`)
+        if(scope.mode==='workspace-write'&&['container_command_v1','operation_status','operation_cancel'].every(name=>scope.tools.includes(name)))grant.tools.push(`remote/${tool}`,'tool/remote_computer_command')
         continue
       }
       if (!names[tool]) continue
@@ -388,15 +396,17 @@ export function startBotProduct(ctx, options = {}) {
       if(!remoteMachines.has(profile.machineId))remoteMachines.set(profile.machineId,{machineId:profile.machineId,label:profile.machineId,location:'remote',status:'configured',roots:[]})
       remoteMachines.get(profile.machineId).roots.push({rootId:profile.rootId,label:profile.rootId,modes:['read-only'],capabilities:[]})
     }
+    for(const machine of machines?.readModel().items??[]){
+      if(machine.status==='revoked')continue
+      const roots=machine.roots.map(rootId=>({rootId,label:rootId,modes:['read-only','workspace-write'],capabilities:[]}))
+      remoteMachines.set(machine.id,{machineId:machine.id,label:machine.name,location:'remote',status:machine.status,roots})
+    }
     return { models, tools: cliConfig ? [{ toolId: 'codex', modes: ['read-only'], grantTools: [...CLI_GRANT_TOOLS] }] : [],
       machines: [{ machineId: localMachineId, label: '本机', location: 'local', status: 'ready',
         roots: [{ rootId: 'default', label: '默认工作区', modes: ['read-only', 'workspace-write'], capabilities: [] }] },...remoteMachines.values()],
-      // The compiled grant takes its tools from the selected capabilities, so the
-      // catalog must expose exactly the default product surface; execution facade
-      // tools stay refused until their facades ship.
       capabilities: [
         { id: 'model-inference', label: '模型推理', tools: ['model/infer'] },
-        { id: 'mr-routing', label: '模型路由与咨询', tools: ['tool/model_router_routes', 'tool/model_router_plan', 'tool/model_router_consult', 'command/router'] },
+        { id: 'mr-routing', label: '模型路由', tools: PRODUCT_TOOLS.filter(name=>name!=='model/infer') },
         { ...TASK_CAPABILITY },
       ],
       taskBackends: taskBackends ? taskBackends.catalog() : [],
@@ -632,7 +642,24 @@ export function startBotProduct(ctx, options = {}) {
                 subscriptionSummary: { callsToday: subscription.today.calls, callsMonth: subscription.month.calls, usdToday: totals.subscriptionToday, usdMonth: totals.subscriptionMonth } } }
           } } : {}) },
         actions: { ...actions, ...machineActions,
-          ...(botSettings ? { 'binding.save': (payload, context) => botSettings.save(payload, context) } : {}),
+          ...(botSettings ? { 'binding.save': async (payload, context) => {
+            // A Bot holds its greeting until its model is picked, and the model change releases it
+            // immediately. Saving a binding changes both the model and its authority, so hold the
+            // greeting across that change: otherwise the greeting turn runs before the compiled
+            // grant carries the binding's model route and is refused as MODEL_DENIED.
+            const bot = product.rt.botOf(payload.botId)
+            const held = bot?.kickoff
+            if (bot && held) delete bot.kickoff
+            let result
+            try { result = await botSettings.save(payload, context) }
+            catch (error) { if (bot && held) bot.kickoff = held; throw error }
+            const model = result.settings?.model
+            const ref = model ? `${model.provider}/${model.model}` : null
+            if (result.status === 'available' && bot && ref && bot.model !== ref) await product.rt.updateBot(payload.botId, { model: ref })
+            await product.lifecycle.refreshGrants()
+            if (bot && held) { bot.kickoff = held; await product.rt.updateBot(payload.botId, { model: bot.model }).catch(() => {}) }
+            return result
+          } } : {}),
           ...(fundingAccounts ? { 'funding.account.save': (payload, context) => fundingAccounts.save(payload, context) } : {}),
           // N09: owner task management runs on the owning Bot's own subject, so
           // the Bot's committed grant authorizes every cancel/retry/reconcile.
@@ -654,41 +681,8 @@ export function startBotProduct(ctx, options = {}) {
           } } : {}) },
         authorizeRequest })
       releaseMachineSecrets=guardMachineSecrets(ctx,product.rt,machines)
-      for(const [name,tool] of [['remote_computer_ping','machine_ping'],['remote_computer_list','fs_list'],['remote_computer_read','fs_read']]){
-        ctx.tools.register(defineTool({name,description:'Use an explicitly paired remote computer and the current Bot\'s granted root. Machine IDs and root IDs come from owner bindings. No credentials or arbitrary endpoints are accepted.',
-          parameters:{machineId:{type:'string',required:true},rootId:{type:'string',required:true},...(tool==='machine_ping'?{}:{relativePath:{type:'string',...(tool==='fs_read'?{required:true}:{})}})},
-          output:{schema:{type:'string'},render:(_args,value)=>[{type:'text',text:String(value)}]},
-          async execute(args,exec){
-            await product.rt.load()
-            const subject=directory.forAgent(exec.agent)
-            const value=await machines.call(subject,{machineId:args.machineId,rootId:args.rootId,taskId:`read-${randomUUID()}`,attemptId:`attempt-${randomUUID()}`,tool,
-              args:tool==='machine_ping'?{}:{rootId:args.rootId,relativePath:args.relativePath??'',...(tool==='fs_read'?{length:65536}:{limit:100})}},{signal:exec.signal})
-            return JSON.stringify(value)
-          },
-        }))
-      }
       ctx.provide('botRemoteMachines', machines)
-      if(remoteCliBackend)ctx.tools.register(defineTool({name:'remote_computer_cli_probe',description:'Probe the Host-declared Codex profile only on the selected paired Agent/root. No executable, endpoint, credential, model or environment input is accepted.',
-        parameters:{machineId:{type:'string',required:true},rootId:{type:'string',required:true},workspaceRelativePath:{type:'string',required:true}},
-        output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]},
-        async execute(args,exec){await product.rt.load();return remoteCliBackend.probe(directory.forAgent(exec.agent),args)},
-      }))
-      ctx.tools.register(defineTool({name:'remote_computer_write',description:'Submit a tracked UTF-8 file-write Task, at most 8192 bytes, to an owner-paired computer/root with explicit write, status and cancel grants. expectedHash is the current SHA256 or null only for a new file. No shell, endpoint, credential or automatic retry. Query the returned Task for its actual result.',
-        parameters:{requestKey:{type:'string',required:true},machineId:{type:'string',required:true},rootId:{type:'string',required:true},relativePath:{type:'string',required:true},content:{type:'string',required:true},expectedHash:{type:'json',required:true}},
-        output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]},
-        async execute(args,exec){await product.rt.load();const {requestKey,...input}=args;return taskService.submit(directory.forAgent(exec.agent),{requestKey,backend:'remote-write',input})},
-      }))
-      ctx.tools.register(defineTool({name:'remote_computer_browser',description:'Use the current Bot\'s explicitly granted remote browser. open/snapshot/click/type/script/upload/download/close stay on one owner task/attempt. Scripts run only inside the approved page; uploads are in-memory bytes up to 1 MiB, never disk paths.',
-        parameters:{machineId:{type:'string',required:true},rootId:{type:'string',required:true},tool:{type:'string',required:true},args:{type:'json',required:true},taskId:{type:'string'},attemptId:{type:'string'}},
-        output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]},
-        async execute(args,exec){
-          await product.rt.load()
-          if(!['browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close'].includes(args.tool))throw new Error('INVALID_MACHINE_REQUEST')
-          const taskId=args.taskId??`browser-${randomUUID()}`,attemptId=args.attemptId??`attempt-${randomUUID()}`,operationId=`operation-${randomUUID()}`
-          const value=await machines.call(directory.forAgent(exec.agent),{machineId:args.machineId,rootId:args.rootId,taskId,attemptId,operationId,tool:args.tool,args:args.args},{signal:exec.signal})
-          return {...value,taskId,attemptId,operationId}
-        },
-      }))
+      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend})
       // The MR execution paths project their routes through the same Bot
       // binding, so a consult run carries the binding price instead of an
       // unknown-cost package.

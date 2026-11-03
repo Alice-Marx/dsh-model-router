@@ -55,6 +55,10 @@ export class DesktopTools {
     if(process.platform!=='win32'&&!this.options.connect||!this.config)fail('DESKTOP_UNAVAILABLE',503)
     if(!/^dsh-desktop-[-a-zA-Z0-9]{1,64}$/.test(this.config.pipeName))fail('DESKTOP_UNAVAILABLE',503)
     const row=this.owner(c),signal=AbortSignal.any([this.closing.signal,...(external?[external]:[])])
+    // A stop request fences the owner, but a fresh capture has no side effect and proves the
+    // desktop is reachable under the current grant again. Without this, one cancelled action
+    // would refuse every later desktop call of that Bot chat.
+    if(name==='desktop_screenshot'&&row.blocked&&!this.closing.signal.aborted){row.blocked=false;row.stop=undefined;row.stopAttempts=0}
     const check=()=>{if(signal.aborted||row.blocked)throw error('DESKTOP_CANCELLED',false,true);if(!Number.isSafeInteger(c.expiresAt)||c.expiresAt<=Date.now())throw error('GRANT_REVOKED');this.options.validate?.(c)}
     const work=(async()=>{
       let sent=false,notApplied=false

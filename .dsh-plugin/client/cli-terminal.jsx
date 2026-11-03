@@ -216,7 +216,7 @@ export function CliTerminalCard({ api, health, settingsSignature = '' }) {
             <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setConfirming(false) }}>登录</button>
           </div></div>}
           <div className="mr-control-group mr-term-cwd"><label className="mr-control-label" htmlFor="mr-term-cwd">工作目录（绝对路径）</label>
-            <input className="mr-input" id="mr-term-cwd" value={cwd} spellCheck={false} placeholder={platform === 'win32' ? 'D:\\projects\\demo' : '/home/me/project'}
+            <input className="mr-input" id="mr-term-cwd" value={cwd} spellCheck={false} placeholder={platform === 'win32' ? 'D:\\projects\\demo' : '/home/user/project'}
               onChange={event => { setCwd(event.target.value); setConfirming(false) }} /></div>
         </div>
         {targets.length === 1 && <p className="mr-caption">尚未发现已安装的官方 CLI；安装或配置目录后点本卡片“刷新”或“官方工具 · 体检”的“重新体检”，这里会出现对应选项。</p>}

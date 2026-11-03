@@ -2,6 +2,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { syncDsBot } from './sync-ds-bot.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 // One shipped client bundle: the unified product (DS surface + MR panel +
@@ -35,6 +36,7 @@ export async function bundleProductClient({root=ROOT}={}) {
 }
 
 export async function generateProductClient({ output = DEFAULT_OUTPUT, check = false } = {}) {
+  await syncDsBot({ check })
   const result = await bundleProductClient()
   if (check) {
     let current = ''

@@ -15,13 +15,13 @@ async function fixture(){
   const mr=await bundle('mr',PRODUCT,[{insert:[{id:'model-router-galgame',name:PRODUCT}]}])
   const target=await bundle('target',PRODUCT,await readFile(join(ROOT,'cordis.patch.yml'),'utf8'))
   await writeFile(join(profile,'package.json'),json({private:true,dsh:{profile:{bundles:[base.packageName,ds.packageName,mr.packageName]}}}))
-  await writeFile(join(profile,'cordis.patch.yml'),json([{id:'bot',name:'ds-bot',config:{home:bot,workspace,memory:false,browser:false}},{id:'model-router-galgame',name:PRODUCT,config:{dailyBudgetUsd:23,privateOption:'SENTINEL-PRIVATE-CONFIG'}}]))
-  await writeFile(join(bot,'state.json'),'{"botId":"stable","secret":"SENTINEL-PRIVATE-DATA"}\n')
+  await writeFile(join(profile,'cordis.patch.yml'),json([{id:'bot',name:'ds-bot',config:{home:bot,workspace,memory:false,browser:false}},{id:'model-router-galgame',name:PRODUCT,config:{dailyBudgetUsd:23,privateOption:'mock-PRIVATE-CONFIG'}}]))
+  await writeFile(join(bot,'state.json'),'{"botId":"stable","secret":"mock-PRIVATE-DATA"}\n')
   const request={profile:{profileDir:profile,dshHome:home,launchCwd:workspace,orderedBundleLayers:[base,ds,mr],targetBundleLayer:target,launcherLayers:[]},dataSources:[{id:'PRIVATE_DATA_LABEL',kind:'bot-data',root:bot}]},file=join(dir,'request.private.json');await writeFile(file,json(request))
   return{dir,home,profile,bot,workspace,target,request,file}
 }
 function run(args){const result=spawnSync(process.execPath,[CLI,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:1024*1024});assert.equal(result.error,undefined);assert.equal(result.stderr,'');return{...result,summary:JSON.parse(result.stdout)}}
-function redacted(f,result){for(const value of [f.dir,'SENTINEL-PRIVATE','PRIVATE_DATA_LABEL','state.json','request.private.json'])assert.ok(!result.stdout.includes(value),value)}
+function redacted(f,result){for(const value of [f.dir,'mock-PRIVATE','PRIVATE_DATA_LABEL','state.json','request.private.json'])assert.ok(!result.stdout.includes(value),value)}
 
 test('migration CLI: explicit offline preview emits only redacted summaries and keeps source bytes',async()=>{
   const f=await fixture(),before=await readFile(join(f.profile,'cordis.patch.yml')),data=await readFile(join(f.bot,'state.json')),result=run(['--request',f.file])
@@ -36,7 +36,7 @@ test('migration CLI: configuration-only readiness remains needs-data-selection',
 test('migration CLI: private output uses a new restricted directory and preserves full private plan',async()=>{
   const f=await fixture(),output=join(f.dir,'private-output'),result=run(['--request',f.file,'--private-output',output])
   assert.equal(result.status,0,result.stdout);assert.equal(result.summary.savedPrivatePlan,true);redacted(f,result)
-  const saved=await readFile(join(output,'plan.private.json'),'utf8');assert.ok(saved.includes('SENTINEL-PRIVATE-CONFIG'));assert.ok(saved.includes(f.home.replaceAll('\\','\\\\')))
+  const saved=await readFile(join(output,'plan.private.json'),'utf8');assert.ok(saved.includes('mock-PRIVATE-CONFIG'));assert.ok(saved.includes(f.home.replaceAll('\\','\\\\')))
   const artifact=JSON.parse(saved);assert.equal(artifact.kind,'migration-preview');assert.equal(artifact.consistentSnapshot,false);assert.equal(artifact.requiresStopProof,true);assert.equal(artifact.applySupported,false)
   if(process.platform==='win32'){
     const probe=join(f.dir,'acl-probe.ps1');await writeFile(probe,'param([string]$Target)\n$ErrorActionPreference="Stop"\n$acl=[IO.Directory]::GetAccessControl($Target)\n$sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value\n$rules=@($acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]))\n[PSCustomObject]@{isProtected=$acl.AreAccessRulesProtected;allowsCurrent=@($rules | Where-Object {$_.IdentityReference.Value -eq $sid -and $_.AccessControlType -eq "Allow"}).Count;otherAllows=@($rules | Where-Object {$_.IdentityReference.Value -ne $sid -and $_.AccessControlType -eq "Allow"}).Count} | ConvertTo-Json -Compress\n')
@@ -56,7 +56,7 @@ test('migration CLI: output through a junction into a selected tree is refused',
 })
 test('migration CLI: malformed and oversized requests fail without disclosing content or paths',async()=>{
   const f=await fixture()
-  for(const text of ['{"private":"SENTINEL-PRIVATE','x'.repeat(1048577),json({...f.request,secret:'SENTINEL-PRIVATE'})]){
+  for(const text of ['{"private":"mock-PRIVATE','x'.repeat(1048577),json({...f.request,secret:'mock-PRIVATE'})]){
     await writeFile(f.file,text);const result=run(['--request',f.file]);assert.equal(result.status,1);assert.equal(result.summary.status,'failed');assert.ok(/^MIGRATION_REQUEST_/.test(result.summary.code));redacted(f,result)
   }
 })

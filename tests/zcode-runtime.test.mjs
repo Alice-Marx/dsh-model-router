@@ -89,7 +89,7 @@ test('a selected npm probe inspects its package instead of the archive or a comm
 
 test('npm ZCode install, repair and removal bind the npm prefix rather than its archive subdirectory', async () => {
   const tool = getOfficialTool('zcode'), preferences = { methods: { zcode: 'npm' } }
-  const options = { platform: 'win32', home: 'C:/Users/test' }
+  const options = { platform: 'win32', home: 'C:/Users/Shared' }
   for (const operation of ['install', 'repair', 'uninstall']) {
     const original = operation === 'uninstall' ? resolveUninstallPlan(tool, 'npm', preferences, options) : resolveInstallPlan(tool, 'npm', preferences, options)
     const plan = await resolvePackageJobPlan(tool, original, preferences, { operation, options,

@@ -11,9 +11,10 @@ function runtime() {
 }
 const lifecycle = { status: () => ({ healthy: true, revision: 3 }) }
 
-test('bot product: vendored source matches every frozen byte and has no hidden additions', async () => {
+test('bot product: vendored source matches the current DS Bot bytes and has no hidden additions', async () => {
   const result = await verifyProductSource()
-  assert.equal(result.files, 297)
+  assert.equal(result.status, 'passed')
+  assert.ok(result.files > 297)
 })
 
 test('bot product: missing services are explicit blockers; Bot identity comes from persisted runtime', async () => {

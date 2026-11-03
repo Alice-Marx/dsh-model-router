@@ -15,6 +15,7 @@ import {reconcileRootsGeneration,rootsGeneration} from './workspace-generation.j
 import {pinnedCreateNewFile,pinnedWriteSupported} from './pinned-write.js'
 import {CliTasks,validateCliProfiles,type CliProfileConfig} from './cli-task.js'
 const execFileAsync=promisify(execFile)
+const ARTIFACT_QUOTA_BYTES=256*1024*1024
 export type AgentConfig={dataDir:string;roots:Record<string,string>;executables?:Record<string,string>;shell?:string;windowsJobRunner?:string;browserOrigins?:string[];browserExecutablePath?:string;browserProfiles?:Record<string,string>;isolation?:'os-account'|'container'|'application';container?:ContainerCommandConfig;desktop?:{pipeName:string;secretFile:string};cliProfiles?:CliProfileConfig[]}
 export class Agent {
   store:Store;roots:Roots;browser:BrowserTools;desktop:DesktopTools;workspaces:WorkspaceAdmissions;container?:ContainerCommands;cliTasks:CliTasks;rootsGeneration:string;private processes=new Map<string,any>();private jobs=new Map<string,Promise<any>>();private desktopJobs=new Map<string,{context:Context;cancel:(why:string)=>Promise<void>}>();private cancelRequested=new Set<string>();private writes=new Set<string>();private authTimer:any
@@ -149,9 +150,26 @@ export class Agent {
   }
   async artifact(data:Buffer,c:Context,media='application/octet-stream'){
     if(data.length>8*1024*1024)fail('ARTIFACT_LIMIT',413)
-    const usage=this.store.db.prepare('SELECT coalesce(sum(size),0) AS size FROM artifacts').get().size;if(usage+data.length>256*1024*1024)fail('ARTIFACT_QUOTA',507)
+    // Artifacts are delivery objects (one screenshot, one stream tail), not history. Without a
+    // sweep the quota is a one-way stop: every later screenshot and command would fail
+    // ARTIFACT_QUOTA with nothing able to free space. The oldest rows go first, and only when
+    // the new artifact would not fit.
+    const usage=await this.evictArtifacts(data.length)
+    if(usage+data.length>ARTIFACT_QUOTA_BYTES)fail('ARTIFACT_QUOTA',507)
     const id=`artifact-${randomUUID()}`;await mkdir(join(this.config.dataDir,'artifacts'),{recursive:true,mode:0o700});await writeFile(join(this.config.dataDir,'artifacts',id),data,{flag:'wx',mode:0o600})
     this.store.db.prepare('INSERT INTO artifacts VALUES (?,?,?,?,?)').run(id,canonical(c),sha(data),data.length,media);return {artifactId:id,sha256:sha(data),size:data.length,mediaType:media}
+  }
+  private async evictArtifacts(needed:number){
+    let usage:number=this.store.db.prepare('SELECT coalesce(sum(size),0) AS size FROM artifacts').get().size
+    if(usage+needed<=ARTIFACT_QUOTA_BYTES)return usage
+    const rows:any[]=this.store.db.prepare('SELECT id,size FROM artifacts ORDER BY rowid ASC').all()
+    for(const row of rows){
+      if(usage+needed<=ARTIFACT_QUOTA_BYTES)break
+      this.store.db.prepare('DELETE FROM artifacts WHERE id=?').run(row.id)
+      usage-=row.size
+      await unlink(join(this.config.dataDir,'artifacts',row.id)).catch(()=>{})
+    }
+    return usage
   }
   async execute(name:string,a:any,c:Context,signal?:AbortSignal,pin?:WorkspacePin):Promise<any>{
     if(name==='fs_list'){const all=await this.roots.list(a.rootId,a.relativePath??'');all.sort((x,y)=>x.name.localeCompare(y.name));const offset=integer(a.cursor?Number(a.cursor):0,0,1e9),limit=integer(a.limit,1,1000,100);return {entries:all.slice(offset,offset+limit).map(x=>({name:x.name,type:x.isSymbolicLink()?'link':x.isDirectory()?'directory':'file'})),cursor:offset+limit<all.length?String(offset+limit):null}}

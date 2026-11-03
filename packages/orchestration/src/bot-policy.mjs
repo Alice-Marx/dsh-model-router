@@ -2,10 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { PolicyError } from '../../capability-broker/src/authority.mjs'
 
-const pendingExecutionFacade = new Set(['model_router_execute', 'model_router_tool_run', 'model_router_team_execute',
-  'model_router_rerun_step', 'model_router_tool_install', 'model_router_tool_repair', 'model_router_tool_uninstall', 'model_router_rate'])
-
-/** Opt-in adapter. Bot native execution remains closed until its Execution facade exists. */
+/** One policy for model-originated tools and authenticated human RPC. */
 export function createBotPolicy({ authority, directory, machineId, workspaceId, ownerGrant = { tools: [] }, ttlMs = 120_000 }) {
   const owner = Object.freeze({})
   authority.register(owner, { ...ownerGrant, botId: 'host-owner' })
@@ -21,11 +18,6 @@ export function createBotPolicy({ authority, directory, machineId, workspaceId, 
   const check = call => {
     const who = actor(call)
     authority.assertTool(who.subject, capability(call))
-    if (call.kind === 'remote' && call.name === 'startRun') throw new PolicyError('BACKGROUND_TASK_FACADE_REQUIRED')
-    if (!who.owner && (pendingExecutionFacade.has(call.name) ||
-        (call.kind === 'command' && call.name === 'tools' && /^(install|uninstall|repair|cancel)\b/i.test(call.rawInput?.trim() ?? '')))) {
-      throw new PolicyError('EXECUTION_FACADE_REQUIRED')
-    }
     return who
   }
   const activeSubject = () => {

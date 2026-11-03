@@ -52,8 +52,8 @@ test('task plan/native: a work package cannot smuggle a runnable path, an MCP UR
     'run ../bin/deploy.ps1',
     'run ..\\bin\\deploy.ps1',
     'call https://evil.example/mcp',
-    'use sk-abcdefghijklmnopqrst',
-    'Bearer abcdefghijklmnopqrstuvwxyz012345',
+    'use sk-mock-mock-mock-mock-mock',
+    'Bearer mock-mock-mock-mock-mock-mock',
   ]) {
     assert.ok(['TASK_PLAN_EXECUTABLE_PATH', 'TASK_PLAN_MCP_URL', 'TASK_PLAN_SECRET'].includes(rejected(plan([pkg('a', objective)]))), objective)
   }

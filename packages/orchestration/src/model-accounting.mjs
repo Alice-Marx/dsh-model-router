@@ -78,8 +78,15 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
       }
       const outputBound=config.maxOutputTokens
       const effectiveOutput=Number.isSafeInteger(outputBound)&&outputBound>0?Math.min(options.maxTokens??outputBound,outputBound):options.maxTokens
+      // The SDK AgentLoop hands the adapter a frozen request that already carries the model's own
+      // output bound, so the Host cannot lower it. Such a request is admitted with the configured
+      // allowance as its estimate (decision: usability first); the daily/monthly budget stays the
+      // hard limit, and the per-call output bound is advisory where the request cannot be changed.
+      const descriptor=Object.getOwnPropertyDescriptor(options,'signal'),tokenDescriptor=Object.getOwnPropertyDescriptor(options,'maxTokens')
+      const carrier=descriptor?descriptor.writable:Object.isExtensible(options)
+      const clampable=carrier&&!(tokenDescriptor&&!tokenDescriptor.writable)&&Boolean(tokenDescriptor||Object.isExtensible(options))
       const record=receiptBase(identity,{...options,...(effectiveOutput!==undefined?{maxTokens:effectiveOutput}:{})},config,managed)
-      let manager,accepted,binding,lease,guard,inner,estimate,previousSignal=options.signal,descriptor=Object.getOwnPropertyDescriptor(options,'signal'),tokenDescriptor=Object.getOwnPropertyDescriptor(options,'maxTokens'),changedOutput=false,leaseSignal=null
+      let manager,accepted,binding,lease,guard,inner,estimate,previousSignal=options.signal,changedOutput=false,leaseSignal=null
       let started=false,exhausted=false,terminal=false,finishKind=null,observed={usage:null,complete:false},primaryError,cleanupError,propagated=false,aborted=false,consumerClosed=false
       const controller=new AbortController();controllerSet.add(controller);active.add(options)
       const build=()=>{
@@ -117,15 +124,14 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
         // mutable request carries the combined lease signal so the provider
         // aborts directly; a frozen request cannot, so the lease gates the
         // iteration instead and cleanup still returns the provider iterator.
-        const carrier=descriptor?descriptor.writable:Object.isExtensible(options)
-        // Clamping is only required when the request explicitly specifies an
-        // output above the configured allowance; the estimate already uses the
-        // allowance, so a request without any bound keeps that conservative
-        // estimate and a frozen request can still be admitted.
+        // Clamping happens when the request allows it; when it does not, the
+        // reservation above already covers the bound the provider will see.
         const clampNeeded=effectiveOutput!==undefined&&options.maxTokens!==undefined&&options.maxTokens!==effectiveOutput
-        const adoptNeeded=carrier&&effectiveOutput!==undefined&&options.maxTokens===undefined
-        if(clampNeeded||adoptNeeded){
-          if(!carrier||tokenDescriptor&&!tokenDescriptor.writable||!tokenDescriptor&&!Object.isExtensible(options))fail('MODEL_OUTPUT_BOUNDARY_REQUIRED')
+        if(clampNeeded&&clampable){
+          options.maxTokens=effectiveOutput;changedOutput=true
+        }else if(carrier&&effectiveOutput!==undefined&&options.maxTokens===undefined&&(!tokenDescriptor||tokenDescriptor.writable)&&Object.isExtensible(options)){
+          // Adoption is best effort: the estimate above already uses the full allowance, so a
+          // sealed request without an output bound is admitted as it is instead of failing.
           options.maxTokens=effectiveOutput;changedOutput=true
         }
         guard=authority.run(lease.token,binding,'model/infer',async({signal})=>{

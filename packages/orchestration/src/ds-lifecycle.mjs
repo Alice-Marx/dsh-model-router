@@ -158,9 +158,10 @@ export function attachDsLifecycle({ runtime, directory, grantFor, readSaved = ()
       try {
         // required=true prevents DS's read-only/no-write success path from granting memory-only changes.
         pending = originals.save.call(runtime,{...options,required:true})
-        const captured = compileDsOwnership(JSON.parse(JSON.stringify(runtime.state)),grantFor)
         const result = await pending
-        commit(captured)
+        // Current DS may queue several saves from one revision. Commit the bytes
+        // that actually landed, not a stale pre-call snapshot with that revision.
+        adoptDisk(await readSaved())
         return result
       } catch(error) { suspend(); if (pending) await Promise.resolve(pending).catch(()=>{}); throw error }
     },

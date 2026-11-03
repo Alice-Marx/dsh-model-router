@@ -1,6 +1,6 @@
 {
   "name": "ds-bot",
-  "version": "0.2.2",
+  "version": "0.2.6",
   "description": "DS Bot: a team of long-lived Bots for DeepSeek Harness, with Main Bots, Bot-to-Bot messages and group chats",
   "keywords": [
     "dsh-plugin",
@@ -11,13 +11,13 @@
     "multi-agent",
     "agents"
   ],
-  "homepage": "https://github.com/Fei2411/DeepSeek-Bot#readme",
+  "homepage": "https://github.com/Fei2411/DS-Bot#readme",
   "bugs": {
-    "url": "https://github.com/Fei2411/DeepSeek-Bot/issues"
+    "url": "https://github.com/Fei2411/DS-Bot/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Fei2411/DeepSeek-Bot.git",
+    "url": "git+https://github.com/Fei2411/DS-Bot.git",
     "directory": "ds-bot"
   },
   "license": "Apache-2.0",
@@ -33,7 +33,9 @@
     "index.js",
     "src/host/",
     "src/shared/",
+    "src/office/",
     "client.js",
+    "office.js",
     "web-search.js",
     "cordis.patch.yml",
     "README.md",
@@ -49,6 +51,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
     "@deepseek-ai/dsh-llm": "*",
+    "@deepseek-ai/dsh-scope": "*",
     "@deepseek-ai/dsh-tools": "*",
     "@deepseek-ai/dsh-web": "*"
   },
@@ -61,6 +64,10 @@
     }
   },
   "devDependencies": {
+    "@xmldom/xmldom": "0.9.12",
     "esbuild": "0.28.2"
+  },
+  "dependencies": {
+    "deep-view": "0.1.0"
   }
 }

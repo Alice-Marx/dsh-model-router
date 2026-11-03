@@ -1,6 +1,7 @@
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { generateProductClient } from './integration-product-client.mjs'
+import { syncDsBot } from './sync-ds-bot.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 // One shipped client bundle: the unified product client (DS surface + MR panel +
@@ -14,6 +15,7 @@ const OUTPUT = join(ROOT, '.dsh-plugin', 'client.js')
  * can never drift apart.
  */
 export async function generate({ check = false } = {}) {
+  await syncDsBot({ check })
   const result = await generateProductClient({ check, output: OUTPUT })
   if (result.status !== 'passed') {
     return { ok: false, output: OUTPUT, errors: [check ? 'client.js is stale; run npm run build:client' : 'product client generation failed'] }

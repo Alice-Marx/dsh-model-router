@@ -41,7 +41,7 @@ export function terminalTargets(healthTools = [], platform = 'win32') {
 export function startProblem({ target, cwd, targets }) {
   if (!targets.some(item => item.id === target)) return '请选择要启动的终端。'
   if (!text(cwd)) return '请填写工作目录（绝对路径）。'
-  if (!isAbsoluteDirectoryText(cwd)) return '工作目录必须是绝对路径，例如 D:\\projects\\demo 或 /home/me/project。'
+  if (!isAbsoluteDirectoryText(cwd)) return '工作目录必须是绝对路径，例如 D:\\projects\\demo 或 /home/user/project。'
   return ''
 }
 

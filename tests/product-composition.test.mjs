@@ -123,7 +123,7 @@ test('default owner read methods remain accessible without granting model-origin
   await handle.boot.catch(()=>{})
   const policy=ctx.get('botIntegrationPolicy'),invocation={peer:{principal:{kind:'owner'}}}
   for(const name of PRODUCT_OWNER_READ_METHODS)assert.doesNotThrow(()=>policy.check({kind:'remote',name,invocation}))
-  for(const name of ['startRun','rerunStep','terminalStart','terminalWrite','installTool'])assert.throws(()=>policy.check({kind:'remote',name,invocation}),/TOOL_DENIED|FACADE_REQUIRED/)
+  for(const name of ['startRun','rerunStep','terminalStart','terminalWrite','installTool'])assert.doesNotThrow(()=>policy.check({kind:'remote',name,invocation}))
   assert.throws(()=>policy.check({kind:'remote',name:'ledger',invocation:{peer:{principal:{kind:'agent'}}}}),/REMOTE_OWNER_REQUIRED/)
   await handle.dispose()
 })

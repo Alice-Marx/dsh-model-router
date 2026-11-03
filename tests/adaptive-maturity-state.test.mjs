@@ -106,7 +106,7 @@ test('unknown lock ownership fails closed and fixed wall-clock still has a bound
 
 test('a releasing writer cannot remove a replacement ownership token', async t => {
   const { file, store } = await fixture(t)
-  const replacement = JSON.stringify({ pid: process.pid, token: 'replacement-fixture' })
+  const replacement = JSON.stringify({ pid: process.pid, token: 'replacement-mock-fixture' })
   await store.update(async state => {
     await writeFile(`${file}.lock`, replacement)
     state.runs.push({ id: 'committed', packages: [] })

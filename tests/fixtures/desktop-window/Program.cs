@@ -21,6 +21,20 @@ class WheelEntry : TextBox {
 class Fixture {
   [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window,int mode);
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
+  [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr window);
+  [DllImport("user32.dll")] static extern IntPtr SetFocus(IntPtr window);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,IntPtr processId);
+  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint attach,uint attachTo,bool attachFlag);
+  // A background process may not raise itself, so borrow the foreground thread's input queue for
+  // the call. Without this the fixture only takes the foreground when a human clicks it.
+  static void Claim(Form form) {
+    if(GetForegroundWindow()==form.Handle)return;
+    uint foreground=GetWindowThreadProcessId(GetForegroundWindow(),IntPtr.Zero),current=GetCurrentThreadId();
+    bool attached=foreground!=current&&AttachThreadInput(foreground,current,true);
+    try{ShowWindow(form.Handle,5);BringWindowToTop(form.Handle);SetForegroundWindow(form.Handle);SetFocus(form.Handle);form.Activate();}
+    finally{if(attached)AttachThreadInput(foreground,current,false);}
+  }
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
@@ -50,7 +64,11 @@ class Fixture {
       if(ticks>2400)form.Close();
     };
     form.Shown+=delegate {
-      ShowWindow(form.Handle,5);SetForegroundWindow(form.Handle);form.Activate();entry.Focus();
+      Claim(form);entry.Focus();
+      // The desktop can be busy; a few retries make the precondition dependable.
+      System.Windows.Forms.Timer claim=new System.Windows.Forms.Timer{Interval=400};int attempts=0;
+      claim.Tick+=delegate{if(++attempts>10){claim.Stop();claim.Dispose();return;}Claim(form);entry.Focus();};
+      claim.Start();
       Point input=entry.PointToScreen(new Point(10,10)),click=button.PointToScreen(new Point(20,12));
       File.WriteAllText(args[0],json.Serialize(new{targetWindow=form.Handle.ToInt64().ToString(),sessionSelector=Process.GetCurrentProcess().SessionId,displayId=Screen.FromHandle(form.Handle).DeviceName,inputScreenX=input.X,inputScreenY=input.Y,buttonScreenX=click.X,buttonScreenY=click.Y}));
       timer.Start();

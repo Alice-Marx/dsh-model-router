@@ -377,7 +377,7 @@ test('a later adapter exception preserves earlier charges and the editable workt
         async readiness(id) { return { id, ready: true, readyModes: ['workspace-write'] } },
         async runTool(options) {
           calls.push(options)
-          if (calls.length > 1) throw new TypeError('prompt rejected api_key=sk-private-fixture-secret')
+          if (calls.length > 1) throw new TypeError('prompt rejected api_key=sk-mock-fixture-secret')
           await writeFile(join(options.workspace, 'partial.txt'), 'prior delivered work\n')
           return { status: 'succeeded', finalText: 'first package evidence', usage, reportedCostUsd: 0.07 }
         },
@@ -391,7 +391,7 @@ test('a later adapter exception preserves earlier charges and the editable workt
     assert.equal(result.results[1].status, 'failed')
     assert.match(result.results[1].error, /执行器异常.*prompt rejected/)
     assert.match(result.results[1].outputTail, /prompt rejected/)
-    assert.doesNotMatch(JSON.stringify(result), /sk-private-fixture-secret/)
+    assert.doesNotMatch(JSON.stringify(result), /sk-mock-fixture-secret/)
     assert.equal(result.results[1].exitCode, null)
     assert.match(result.baseCommit, /^[0-9a-f]{40,64}$/)
     assert.equal(await readFile(join(result.workspace, 'partial.txt'), 'utf8'), 'prior delivered work\n')

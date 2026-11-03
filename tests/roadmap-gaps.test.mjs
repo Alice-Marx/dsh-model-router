@@ -28,12 +28,12 @@ const tempDir = async (t, prefix = 'model-router-gaps-ws-') => {
 
 // ---------------------------------------------------------------- item 4
 test('Kimi, MiMo and Grok login comes from their verified credential files (existence only)', async () => {
-  const home = '/home/u'
-  assert.equal(credentialFileFor('kimi-code', { home, env: {} }), '/home/u/.kimi-code/credentials/kimi-code.json')
+  const home = '/home/user'
+  assert.equal(credentialFileFor('kimi-code', { home, env: {} }), '/home/user/.kimi-code/credentials/kimi-code.json')
   assert.equal(credentialFileFor('kimi-code', { home, env: { KIMI_CODE_HOME: '/opt/kimi/' } }), '/opt/kimi/credentials/kimi-code.json')
-  assert.equal(credentialFileFor('mimo-code', { home, env: {} }), '/home/u/.local/share/mimocode/auth.json')
+  assert.equal(credentialFileFor('mimo-code', { home, env: {} }), '/home/user/.local/share/mimocode/auth.json')
   assert.equal(credentialFileFor('mimo-code', { home, env: { XDG_DATA_HOME: '/data' } }), '/data/mimocode/auth.json')
-  assert.equal(credentialFileFor('grok-build', { home, env: {} }), '/home/u/.grok/auth.json')
+  assert.equal(credentialFileFor('grok-build', { home, env: {} }), '/home/user/.grok/auth.json')
   assert.equal(credentialFileFor('grok-build', { home, env: { GROK_HOME: '/g' } }), '/g/auth.json')
   const seen = []
   const present = path => { seen.push(path); return true }
@@ -46,7 +46,7 @@ test('Kimi, MiMo and Grok login comes from their verified credential files (exis
   const mimo = await checkLogin('mimo-code', { home, env: {}, exists: present })
   assert.equal(mimo.state, 'logged-in')
   assert.equal(subscriptionLoginOf(mimo), 'unknown', 'MiMo auth.json may hold only provider API keys')
-  assert.deepEqual(seen, ['/home/u/.kimi-code/credentials/kimi-code.json', '/home/u/.grok/auth.json', '/home/u/.local/share/mimocode/auth.json'])
+  assert.deepEqual(seen, ['/home/user/.kimi-code/credentials/kimi-code.json', '/home/user/.grok/auth.json', '/home/user/.local/share/mimocode/auth.json'])
   for (const toolId of ['kimi-code', 'grok-build', 'mimo-code']) {
     const missing = await checkLogin(toolId, { home, env: {}, exists: () => false })
     assert.equal(missing.state, 'unknown', `${toolId}: a missing file is not proof of logout (custom providers / free channel)`)

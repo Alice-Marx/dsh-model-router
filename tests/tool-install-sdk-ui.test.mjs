@@ -201,7 +201,7 @@ test('ZCode can switch from the default GitHub archive to npm using the shared s
     return { ...preferences, requestedInstallDir: value.toolInstallDir,
       tools: [{ id: 'zcode', savedMethodId: preferences.methods.zcode ?? null, methodId,
         command: npm ? 'npm install -g @ljwei-stak/zcode-cli@latest --registry=https://registry.npmjs.org/' : 'GitHub Release archive → ~/.zcode/runtime',
-        installDir: npm ? '/shared/npm/bin' : '/home/tester/.zcode/runtime', uninstallCommand: npm ? 'npm uninstall -g @ljwei-stak/zcode-cli' : 'remove archive runtime',
+        installDir: npm ? '/shared/npm/bin' : '/home/user/.zcode/runtime', uninstallCommand: npm ? 'npm uninstall -g @ljwei-stak/zcode-cli' : 'remove archive runtime',
         methods: installMethodsFor(getOfficialTool('zcode')).map(method => ({ id: method.id, label: method.label })) }] }
   }
   const ui = await cardHarness({ settingsScope: fixture.scope, onProbes() {},
@@ -331,7 +331,7 @@ test('unified settings bound a delayed SDK save while retaining draft mutual exc
 test('Host-expanded install directories match the original browser settings without local home access', () => {
   for (const directory of ['~/AI/tools', '%USERPROFILE%/AI/tools']) {
     const value = { toolInstallDir: directory, toolInstallMethodsJson: '{ "codex" : "npm" }', toolScriptUrlsJson: '{}' }
-    assert.equal(installSummaryMatchesSettings({ requestedInstallDir: directory, installDir: 'C:/Users/Host/AI/tools',
+    assert.equal(installSummaryMatchesSettings({ requestedInstallDir: directory, installDir: 'C:/Users/Shared/AI/tools',
       registry: 'https://registry.npmjs.org/', methods: { codex: 'npm' }, scriptUrls: {}, allowScriptInstall: true }, value), true)
   }
 })

@@ -355,7 +355,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
             </div>
           </div>
           <div className="mr-control-group mr-launch-workspace"><label className="mr-control-label" htmlFor="mr-launch-workspace">工作区（绝对路径）</label>
-            <input className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '例如 D:\\projects\\demo 或 /home/me/demo'} onChange={event => setWorkspace(event.target.value)} />
+            <input className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '例如 D:\\projects\\demo 或 /home/user/demo'} onChange={event => setWorkspace(event.target.value)} />
           </div>
         </div>
         <p className="mr-caption">{manual ? '手动分配按包执行只读任务，可混合模型 API 与官方工具；工具使用默认模型。所选目标、就绪状态和费用以执行预览为准。' : executor === 'official-team'

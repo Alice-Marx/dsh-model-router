@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { TASK_STATES, modelName, money } from './api.mjs'
+import { BotBindingEditor } from './binding-editor.jsx'
 
 export function ProductNavigation({ openPanel, panels, compact = false }) {
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
@@ -18,12 +19,15 @@ export function Blocked({ value }) {
 }
 const Value = ({ label, children }) => <div className="bp-value"><dt>{label}</dt><dd>{children ?? '未配置'}</dd></div>
 const Tag = ({ children }) => <span className="bp-tag">{children}</span>
+const subscriptionText = value => value && typeof value === 'object'
+  ? `今日 ${value.callsToday ?? '未知'} 次 · 本月 ${value.callsMonth ?? '未知'} 次`
+  : value ?? '见逐来源收据'
 
-export function BotBindings({ snapshot, openSession }) {
+export function BotBindings({ snapshot, openSession, dispatch, busy }) {
   const bots = snapshot.bots ?? []
   const [selected, setSelected] = useState(bots[0]?.id ?? '')
   const bot = bots.find(row => row.id === selected) ?? bots[0]
-  const section = snapshot.bindings
+  const section = snapshot.botBindings ?? snapshot.bindings
   const binding = section?.items?.find(row => row.botId === bot?.id)
   if (!bots.length) return <p>还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。</p>
   return <div className="bp-columns">
@@ -41,6 +45,7 @@ export function BotBindings({ snapshot, openSession }) {
         {binding.blockedReason && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
       </> : <Blocked value={{ reason: '此 Bot 尚未取得有效绑定。', nextAction: '在宿主 Bot 绑定配置中授予明确工具、机器与工作区。' }} />}
       <p className="bp-muted">角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。</p>
+      {dispatch && <BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} />}
     </article>
   </div>
 }
@@ -98,32 +103,58 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       <button disabled={busy||!secretValue} type="submit">保存宿主专用凭据</button>
       <p className="bp-muted">secretRef：ds-secret/{secretName}。替换已有凭据会撤销使用它的机器授权，需要重新配对。</p>
     </form>}
-    {available.includes('machine.pair')&&<form className="bp-form" onSubmit={event=>{event.preventDefault();const existing=snapshot.machines.items.find(item=>item.id===pair.machineId);void dispatch('machine.pair',{...pair,roots:pair.roots.split(',').map(v=>v.trim()).filter(Boolean),tools:['machine_ping','fs_list','fs_read'],expectedRevision:existing?.revision??0})}}>
+    {available.includes('machine.pair')&&<form className="bp-form" onSubmit={event=>{event.preventDefault();const existing=snapshot.machines.items.find(item=>item.id===pair.machineId);void dispatch('machine.pair',{...pair,roots:pair.roots.split(',').map(v=>v.trim()).filter(Boolean),tools:['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1','cli_probe_v1','cli_task_v1','operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate','browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close','desktop_screenshot','desktop_click','desktop_type','desktop_key','desktop_scroll'],expectedRevision:existing?.revision??0})}}>
       {[['name','电脑名称'],['machineId','Agent machineId'],['endpoint','Agent 地址'],['secretRef','凭据 secretRef'],['roots','已配对根目录 ID（逗号分隔）']].map(([key,label])=><label key={key}>{label}<input aria-label={label} value={pair[key]} onChange={event=>change(key,event.target.value)} required autoComplete="off" spellCheck={false} /></label>)}
       <label>用于核验的 Bot<select aria-label="配对核验 Bot" value={pair.probeBotId} onChange={event=>change('probeBotId',event.target.value)} required>{snapshot.bots.map(bot=><option key={bot.id} value={bot.id}>{bot.name??bot.id}</option>)}</select></label>
       <label><input type="checkbox" checked={pair.protectedTunnel} onChange={event=>change('protectedTunnel',event.target.checked)} />地址位于已配置的 WireGuard / Tailscale 受保护隧道</label>
-      <p className="bp-muted">HTTPS 或本机回环地址可直接连接。远程 HTTP 需要已实际配置的受保护隧道；此选项不会创建 VPN。此入口先登记 ping、列目录和读取能力。</p>
+      <p className="bp-muted">HTTPS 或本机回环地址可直接连接。远程 HTTP 需要已实际配置的受保护隧道；此选项不会创建 VPN。配对后，请在下方按 Bot 明确授予读取、写入、命令、浏览器或桌面能力。</p>
       <button type="submit" disabled={busy}>核验并配对</button>
     </form>}
   </details>
 }
 
 function MachineControls({ machine, snapshot, dispatch, busy }) {
+  const groups = [
+    ['read','文件读取',['machine_ping','fs_list','fs_read']],
+    ['write','文件写入',['fs_write']],
+    ['command','容器命令',['container_command_v1']],
+    ['browser','远程浏览器',['browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close']],
+    ['desktop','Windows 桌面',['desktop_screenshot','desktop_click','desktop_type','desktop_key','desktop_scroll']],
+    ['cli','远程 Codex',['cli_probe_v1','cli_task_v1']],
+  ]
   const [botId,setBotId]=useState(snapshot.bots?.[0]?.id??'')
   const [rootId,setRootId]=useState(machine.roots?.[0]??'')
   const [relativePath,setRelativePath]=useState('')
+  const [mode,setMode]=useState('read-only')
+  const [selected,setSelected]=useState(['read'])
   const available=snapshot.availableActions??[],savedBinding=machine.bindings?.find(item=>item.botId===botId),binding=savedBinding&&!savedBinding.revoked?savedBinding:null
+  useEffect(()=>{
+    const tools=savedBinding?.tools??[]
+    setMode(savedBinding?.mode??'read-only')
+    setSelected(groups.filter(([, ,names])=>names.some(name=>tools.includes(name))).map(([id])=>id))
+  },[botId,savedBinding?.revision])
   const run=(action,payload)=>dispatch(action,{machineId:machine.id,...payload})
+  const save=()=>{
+    const tools=new Set(['machine_ping','fs_list','fs_read','operation_status','operation_cancel','artifact_stat','artifact_read'])
+    for(const [id, ,names] of groups)if(selected.includes(id))for(const name of names)tools.add(name)
+    run('machine.bind',{botId,roots:[rootId],tools:[...tools].filter(tool=>machine.tools.includes(tool)),mode,expectedRevision:savedBinding?.revision??0})
+  }
   return <div className="bp-form">
     <label>Bot<select aria-label={`机器 ${machine.id} 的 Bot`} value={botId} onChange={event=>setBotId(event.target.value)}>{snapshot.bots.map(bot=><option key={bot.id} value={bot.id}>{bot.name??bot.id}</option>)}</select></label>
     <label>根目录<select aria-label={`机器 ${machine.id} 的根目录`} value={rootId} onChange={event=>setRootId(event.target.value)}>{(machine.roots??[]).map(id=><option key={id}>{id}</option>)}</select></label>
-    {available.includes('machine.bind')&&<button type="button" disabled={busy||!botId||!rootId} onClick={()=>run('machine.bind',{botId,roots:[rootId],tools:['machine_ping','fs_list','fs_read'].filter(tool=>machine.tools.includes(tool)),mode:'read-only',expectedRevision:savedBinding?.revision??0})}>授予此 Bot 只读访问</button>}
+    <fieldset><legend>授予此 Bot 的能力</legend>{groups.map(([id,label,names])=><label key={id}><input type="checkbox" disabled={!names.some(name=>machine.tools.includes(name))} checked={selected.includes(id)} onChange={event=>{
+      const next=event.target.checked?[...selected,id]:selected.filter(value=>value!==id)
+      setSelected(next)
+      if(id!=='read'&&event.target.checked)setMode('workspace-write')
+    }} />{label}<small>{names.filter(name=>machine.tools.includes(name)).join('、')||'此 Agent 未提供'}</small></label>)}</fieldset>
+    <label>权限模式<select value={mode} onChange={event=>setMode(event.target.value)}><option value="read-only">只读</option><option value="workspace-write">允许写入及已勾选的控制操作</option></select></label>
+    {available.includes('machine.bind')&&<button type="button" disabled={busy||!botId||!rootId||selected.length===0} onClick={save}>保存此 Bot 的机器授权</button>}
     {available.includes('machine.probe')&&<><button type="button" disabled={busy||!binding} onClick={()=>run('machine.probe',{botId,rootId})}>检查 Agent 在线状态</button>
       <label>受控读测试的相对路径<input aria-label={`机器 ${machine.id} 的测试路径`} value={relativePath} onChange={event=>setRelativePath(event.target.value)} placeholder="README.md" /></label>
       <button type="button" disabled={busy||!binding||!relativePath} onClick={()=>run('machine.probe',{botId,rootId,relativePath})}>验证可读（不显示文件内容）</button></>}
     {available.includes('machine.revoke')&&<><button type="button" disabled={busy||!binding} onClick={()=>run('machine.revoke',{botId,expectedRevision:binding.revision})}>撤销此 Bot 的机器访问</button>
       <button type="button" disabled={busy} onClick={()=>run('machine.revoke',{expectedRevision:machine.revision})}>撤销电脑配对</button></>}
-    <p className="bp-muted">桌面可用性单独报告。撤销若因离线无法在远程确认，会保留“停止未确认”，宿主立即拒绝新调用。</p>
+    <p className="bp-muted">每次保存都会先撤销旧票据再按新范围授权。桌面截图也需要 artifact 权限；撤销离线时会保留“停止未确认”。</p>
   </div>
 }
 
@@ -186,7 +217,7 @@ export function Usage({ snapshot, dispatch, busy, openAdvanced }) {
   const unresolved = section.unresolved ?? []
   return <><p className="bp-muted">以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。</p>
     {section.summary && <dl className="bp-facts bp-card"><Value label="已知 API 费用">{money(section.summary.apiUsd)}</Value><Value label="当前预占">{money(section.summary.reservedUsd)}</Value>
-      <Value label="未知费用记录">{section.summary.unknownCount ?? '未报告'}</Value><Value label="订阅用量">{section.summary.subscriptionSummary ?? '见逐来源收据'}</Value></dl>}
+      <Value label="未知费用记录">{section.summary.unknownCount ?? '未报告'}</Value><Value label="订阅用量">{subscriptionText(section.summary.subscriptionSummary)}</Value></dl>}
     {unresolved.length ? <section className="bp-card" aria-label="待人工核对的未确认费用">
       <h2>待人工核对的未确认费用</h2>
       <p className="bp-muted">以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。</p>
@@ -253,7 +284,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <p role="status">正在读取宿主状态…</p>}
-    {snapshot && <>{section === 'bindings' && <BotBindings snapshot={snapshot} openSession={openSession} />}
+    {snapshot && <>{section === 'bindings' && <BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} openAdvanced={() => openPanel('model-router-galgame')} />}
