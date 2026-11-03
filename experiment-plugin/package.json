@@ -1,8 +1,0 @@
-{
-  "name": "model-router-experiment-plugin",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "Offline reproducible experiments for QCG-Router, AMO-Router and DAG-Assign",
-  "scripts": { "start": "node src/index.mjs", "test": "node --test tests/*.test.mjs" }
-}
