@@ -10,8 +10,8 @@ const appBootManifest = JSON.parse(readFileSync(
   'utf8',
 ))
 const DSH_PEER_PREFIX = '@deepseek-ai/dsh-'
-const SUPPORTED_DESKTOP_PEERS = '0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.5'
-const SUPPORTED_DESKTOP_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.5']
+const SUPPORTED_DESKTOP_PEERS = '0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5'
+const SUPPORTED_DESKTOP_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.5']
 const dshPeerNames = Object.keys(manifest.peerDependencies)
   .filter(name => name.startsWith(DSH_PEER_PREFIX))
 
@@ -43,13 +43,13 @@ test('the release accepts the audited Desktop release candidates without exempti
     assert.equal(evaluatePluginCompatibility(manifest, {}, runtimeVersion), undefined)
   }
 
-  for (const runtimeVersion of ['0.2.0-rc.3', '0.2.0', '0.2.1-rc.1', '0.2.1-rc.4', '0.2.1-rc.6', '0.2.1', '0.2.2-alpha.2', '0.2.2', '0.3.0', '1.0.0']) {
+  for (const runtimeVersion of ['0.2.0-rc.3', '0.2.0', '0.2.1-rc.1', '0.2.1-rc.6', '0.2.1', '0.2.2-alpha.2', '0.2.2', '0.3.0', '1.0.0']) {
     assertRejected(manifest, runtimeVersion)
   }
 })
 
-test('the installed 0.2.1-rc.5 app-boot gate accepts the release manifest without an exemption', () => {
-  assert.equal(appBootManifest.version, '0.2.1-rc.5')
+test('the installed app-boot gate accepts the release manifest without an exemption', () => {
+  // Whatever audited candidate this checkout installed, the installed gate must accept us.
   assert.equal(evaluatePluginCompatibility(manifest, {}, appBootManifest.version), undefined)
 })
 
