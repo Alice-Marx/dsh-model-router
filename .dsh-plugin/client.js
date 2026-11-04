@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.30.7", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.30.8", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -31382,6 +31382,15 @@ var terminalStartCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalS
   let limit = request.limit === void 0 ? 20 : request.limit;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new TypeError("limit must be 1..100");
   return { botId, limit };
+}), botRuntimeMessageCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeMessage`, (value) => {
+  let request = plainObject2(value, "bot runtime message");
+  for (let key of Object.keys(request))
+    if (key !== "botId" && key !== "index") throw new TypeError(`unknown field ${key} in bot runtime message`);
+  let botId = text6(request.botId);
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError("botId is invalid");
+  let index = request.index === void 0 ? 0 : request.index;
+  if (!Number.isSafeInteger(index) || index < 0 || index > 2e3) throw new TypeError("index must be 0..2000");
+  return { botId, index };
 }), runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest);
 function descriptor(method, parameters, result, cancellable = !1) {
   return Object.freeze({
@@ -31421,6 +31430,7 @@ var toolIdParameter = Object.freeze({
   descriptor("botRuntimeStatus", [], anyObjectCodec("BotRuntimeStatus")),
   descriptor("botRuntimeMove", [jsonParameter("request", botRuntimeMoveCodec)], anyObjectCodec("BotRuntimeMoved")),
   descriptor("botRuntimeHistory", [jsonParameter("request", botRuntimeHistoryCodec)], anyObjectCodec("BotRuntimeHistory")),
+  descriptor("botRuntimeMessage", [jsonParameter("request", botRuntimeMessageCodec)], anyObjectCodec("BotRuntimeMessage")),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview"), !0),
   descriptor("startRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunStarted")),
@@ -32144,6 +32154,13 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       } catch (failure) {
         setHistory([]), setHistoryError(String(failure?.message ?? failure));
       }
+  }, [botId, dispatch]), [full2, setFull] = import_react60.default.useState(null), openFull = import_react60.default.useCallback(async (index) => {
+    try {
+      let message = await dispatch("botRuntimeMessage", { botId, index });
+      setFull({ index, ...message }), setHistoryError("");
+    } catch (failure) {
+      setHistoryError(String(failure?.message ?? failure)), setFull(null);
+    }
   }, [botId, dispatch]);
   if (import_react60.default.useEffect(() => {
     load();
@@ -32160,7 +32177,11 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
   };
   return /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || working, onClick: () => {
     move();
-  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error));
+  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error), state ? /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-log" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "最近会话（仅预览）"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: working, onClick: () => {
+    loadHistory();
+  } }, "读取预览"), historyError && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, historyError), history.length === 0 ? /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "点“读取预览”加载最近 20 条。") : /* @__PURE__ */ import_react60.default.createElement("ul", { className: "bp-checklist" }, history.map((row, index) => /* @__PURE__ */ import_react60.default.createElement("li", { key: index }, /* @__PURE__ */ import_react60.default.createElement("strong", null, row.role), row.name ? ` · ${row.name}` : "", " · ", row.chars, " 字", row.at ? ` · ${new Date(row.at).toLocaleTimeString("zh-CN")}` : "", /* @__PURE__ */ import_react60.default.createElement("small", null, row.preview, String(row.preview ?? "").length < row.chars ? "…" : ""), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", onClick: () => {
+    openFull(index);
+  } }, "查看全文")))), full2 ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-fulltext" }, /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "第 ", full2.index + 1, " 条（从最新往前数）· ", full2.role, " · ", full2.chars, " 字"), /* @__PURE__ */ import_react60.default.createElement("pre", null, full2.content)) : null) : null);
 }
 function BotBindings({ snapshot, openSession, dispatch, busy }) {
   let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react60.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id);

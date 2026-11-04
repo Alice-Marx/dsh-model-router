@@ -100,6 +100,23 @@ export function createIndependentRuntime({
       })
     },
 
+    /**
+     * One message's full text, by position from the end (0 = newest).
+     * The store has no opinion about who may ask: the Host gates this behind an explicit switch.
+     */
+    readMessage(botId, index = 0) {
+      const messages = store.get(botId).messages
+      if (!Number.isSafeInteger(index) || index < 0 || index >= messages.length) fail('MESSAGE_NOT_FOUND')
+      const message = messages[messages.length - 1 - index]
+      return {
+        role: message.role,
+        at: message.at ?? null,
+        chars: String(message.content ?? '').length,
+        content: String(message.content ?? ''),
+        ...(message.name ? { name: message.name } : {}),
+      }
+    },
+
     /** Inventory for a panel: runtime plus transcript size, never message bodies. */
     inventory: botIds => {
       const rows = store.list(Array.isArray(botIds) ? botIds : [])

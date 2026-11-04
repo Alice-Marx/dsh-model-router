@@ -130,6 +130,9 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** A bounded, redacted view of one Bot transcript (previews only). */
   botRuntimeHistory(request) { return settled(() => (this.services.botRuntimeHistory ?? unavailable)(request)) }
 
+  /** One message's full text; refused unless the operator enabled full-text history. */
+  botRuntimeMessage(request) { return settled(() => (this.services.botRuntimeMessage ?? unavailable)(request)) }
+
   /** Move one Bot between the integration path and the independent runtime. */
   botRuntimeMove(request) { return settled(() => (this.services.botRuntimeMove ?? unavailable)(request)) }
 

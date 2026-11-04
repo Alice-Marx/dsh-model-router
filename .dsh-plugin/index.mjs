@@ -2274,6 +2274,12 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
       botRuntimeStatus: async () => botRuntime.list(),
       botRuntimeMove: async request => botRuntime.move(request.botId, request.mode),
       botRuntimeHistory: async request => botRuntime.history(request.botId, { limit: request.limit }),
+      // Full text is a separate, opt-in permission: the same call that shows previews must not
+      // quietly return bodies when the operator never asked for that.
+      botRuntimeMessage: async request => {
+        if (valueOf(config, 'independentRuntime.fullTextHistory', false) !== true) throw new Error('HISTORY_FULLTEXT_DISABLED')
+        return botRuntime.readMessage(request.botId, request.index)
+      },
     } : {}),
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })

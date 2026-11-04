@@ -61,6 +61,17 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       setHistoryError(String(failure?.message ?? failure))
     }
   }, [botId, dispatch])
+  const [full, setFull] = React.useState(null)
+  const openFull = React.useCallback(async index => {
+    try {
+      const message = await dispatch('botRuntimeMessage', { botId, index })
+      setFull({ index, ...message })
+      setHistoryError('')
+    } catch (failure) {
+      setHistoryError(String(failure?.message ?? failure))
+      setFull(null)
+    }
+  }, [botId, dispatch])
   React.useEffect(() => { void load() }, [load])
   if (!state && !error) return null
   const target = state?.runtime === 'independent' ? 'integration' : 'independent'
@@ -81,6 +92,18 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
     <div className="bp-actions"><button disabled={busy || working} onClick={() => { void move() }}>{working ? '切换中…' : target === 'independent' ? '迁移到独立运行时' : '迁回 Harness 会话'}</button></div>
     <p className="bp-muted">迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。</p>
     {error && <p className="bp-error" role="alert">{error}</p>}
+    {state ? <details className="bp-log"><summary>最近会话（仅预览）</summary>
+      <button type="button" disabled={working} onClick={() => { void loadHistory() }}>读取预览</button>
+      {historyError && <p className="bp-error" role="alert">{historyError}</p>}
+      {history.length === 0 ? <p className="bp-muted">点“读取预览”加载最近 20 条。</p> : <ul className="bp-checklist">{history.map((row, index) => (
+        <li key={index}><strong>{row.role}</strong>{row.name ? ` · ${row.name}` : ''} · {row.chars} 字
+          {row.at ? ` · ${new Date(row.at).toLocaleTimeString('zh-CN')}` : ''}
+          <small>{row.preview}{String(row.preview ?? '').length < row.chars ? '…' : ''}</small>
+          <button type="button" onClick={() => { void openFull(index) }}>查看全文</button></li>
+      ))}</ul>}
+      {full ? <div className="bp-fulltext"><p className="bp-muted">第 {full.index + 1} 条（从最新往前数）· {full.role} · {full.chars} 字</p>
+        <pre>{full.content}</pre></div> : null}
+    </details> : null}
   </div>
 }
 
