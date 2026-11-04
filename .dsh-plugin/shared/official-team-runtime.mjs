@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { runOfficialTool, officialToolExecutionCapabilities, officialToolReadiness } from './official-tool-executor.mjs'
 import { toolForProvider } from './official-tool-registry.mjs'
+import { workspaceChanged, readOnlyViolation } from './read-only-guard.mjs'
 import { awaitExecutionCheckpoint, observeExecutionProgress, redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
 import { unsupportedCliReasoning } from './reasoning-execution.mjs'
 
@@ -183,6 +184,12 @@ async function excludeNestedWorktrees(workspace, signal) {
 }
 
 /** Source authorization is independent from the Host's isolated output storage. */
+/** Read-only runs prove themselves: the Host lists the workspace before and after. */
+async function workspaceFingerprint(workspace, signal) {
+  try { return await git(['status', '--porcelain=v1', '--untracked-files=all'], { cwd: workspace, signal }) }
+  catch { return null }
+}
+
 async function isolatedWorktree(workspace, signal, allowedRoot) {
   workspace = await approvedSource(workspace, allowedRoot)
   await cleanRepoRoot(workspace, signal)
@@ -470,6 +477,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
     ...(isolated ? { baseCommit: isolated.baseCommit } : {}), ...(seeded ? { seeded } : {}) })
   const context = retry ? (Array.isArray(previous) ? previous : []).filter(item => item?.id && typeof item.finalText === 'string') : []
   if (!signal?.aborted) await observeExecutionProgress(onStage, 'executing')
+  const readOnlyBaseline = mode === 'read-only' ? await workspaceFingerprint(source, signal) : null
   for (const item of assigned) {
     if (signal?.aborted) return cancelledRun()
     const cliModel = teamCliModel(item, configuredCliModels)
@@ -495,6 +503,11 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
         executionEnvironment,
       })
       if (!result || typeof result.status !== 'string') throw new TypeError('官方 CLI 执行器没有返回有效状态。')
+      // A read-only step that changed the workspace is a failed step, not a successful read.
+      if (mode === 'read-only' && result.status === 'succeeded' && readOnlyBaseline !== null
+        && workspaceChanged(readOnlyBaseline, await workspaceFingerprint(source, signal))) {
+        result = readOnlyViolation(result)
+      }
     } catch (error) {
       // Keep earlier paid results and the isolated worktree available for the
       // ledger and retry even when a later adapter rejects before returning.

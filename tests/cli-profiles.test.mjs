@@ -14,13 +14,16 @@ test('cli profiles: every profile states its read scope, write ability and confi
   }
 })
 
-test('cli profiles: Claude read-only stays read-only, and its write mode may use normal tools', () => {
+test('cli profiles: Claude read-only keeps its normal tools and proves it wrote nothing', () => {
   const read = cliProfile('claude-code', 'read-only')
   assert.equal(read.writes, false)
-  assert.ok(read.args.includes('--restricted'))
-  assert.ok(read.args.includes('--tools'))
-  assert.ok(read.args.includes('Read,Glob,Grep'))
-  assert.equal(read.args[read.args.indexOf('--permission-mode') + 1], 'dontAsk')
+  // C: the tool list is no longer the guarantee; plan mode + workspace + the no-write proof are.
+  assert.equal(read.args.includes('--restricted'), false)
+  assert.equal(read.args.includes('Read,Glob,Grep'), false)
+  assert.equal(read.args[read.args.indexOf('--permission-mode') + 1], 'plan')
+  assert.equal(read.args.includes('<workspace>'), true)
+  assert.equal(read.verifyNoWrites, true)
+  assert.equal(read.requiresConfinement, true)
   const write = cliProfile('claude-code', 'workspace-write')
   assert.equal(write.writes, true)
   assert.ok(write.args.includes('bypassPermissions'))

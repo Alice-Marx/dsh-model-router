@@ -519,7 +519,7 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
       args: [
         '--no-session-persistence',
         // The mode fragment lives in cli-profiles.mjs, so a limit is a reviewed row, not a literal.
-        ...(cliProfile('claude-code', mode)?.args ?? []),
+        ...(cliProfile('claude-code', mode)?.args ?? []).map(value => value === '<workspace>' ? workspace : value),
         ...(modelId ? ['--model', modelId] : []),
         '-p', '--output-format', 'json',
         mode === 'workspace-write'
