@@ -1,3 +1,4 @@
+import { createBotRoutingService } from './bot-routing-service.mjs'
 import { hostname } from 'node:os'
 import { join, dirname, isAbsolute } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -291,6 +292,17 @@ export function startBotProduct(ctx, options = {}) {
   const ownerTools=[...PRODUCT_OWNER_READ_METHODS,...PRODUCT_OWNER_WRITE_METHODS].map(name=>`remote/${name}`)
   const policy = createBotPolicy({ authority, directory, machineId, workspaceId,ownerGrant:{tools:ownerTools} })
   ctx.provide('botIntegrationPolicy', policy)
+  // Bot routing reads the same committed state everything else obeys: the Bot list, each Bot's
+  // saved settings, and machine reachability from health. It never invents a candidate.
+  const botRouting = createBotRoutingService({
+    bots: () => product?.rt?.state?.bots ?? [],
+    settingsFor: botId => { try { return botSettings?.get(botId, { publishChange: false })?.settings ?? null } catch { return null } },
+    machineHealth: machineId => {
+      try { const row = machines?.readModel?.().items?.find(item => item.id === machineId); return { online: row?.status === 'available' || row?.health?.lastSeenAt !== undefined } } catch { return null }
+    },
+    routing: () => config?.botRouting,
+  })
+  ctx.provide('botRouting', botRouting)
   const describeBot = subject => { try { return authority.describe(subject).botId } catch { return null } }
   // Operator passthrough: a session that is not a Bot (the operator's own agent session) would
   // otherwise be refused as UNKNOWN_SUBJECT by every Bot-shaped tool. When the operator turns this

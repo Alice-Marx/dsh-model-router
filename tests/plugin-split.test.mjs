@@ -183,7 +183,7 @@ test('router remote retains installer methods and owns no GAL endpoints', () => 
   assert.equal(OFFICIAL_TOOLS_REMOTE_NAMESPACE, 'modelRouterOfficialTools')
   assert.deepEqual(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.map(item => item.method), [
     'list', 'installSettings', 'installTool', 'uninstallTool', 'repairTool', 'cancel', 'status',
-    'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'tuiPrompt', 'boundaries', 'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage', 'previewRun', 'startRun', 'runStatus', 'cancelRun',
+    'health', 'completeOnboarding', 'ledger', 'rateResult', 'rerunStep', 'tuiPrompt', 'boundaries', 'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage', 'botRoutingInspect', 'botRoutingDecide', 'previewRun', 'startRun', 'runStatus', 'cancelRun',
     'terminalInfo', 'terminalStart', 'terminalRead', 'terminalWrite', 'terminalResize', 'terminalStop',
   ])
   for (const method of ['installTool', 'uninstallTool', 'repairTool']) {

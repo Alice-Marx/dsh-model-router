@@ -133,6 +133,12 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** One message's full text; refused unless the operator enabled full-text history. */
   botRuntimeMessage(request) { return settled(() => (this.services.botRuntimeMessage ?? unavailable)(request)) }
 
+  /** The candidates Bot routing would score, for a table in the workbench. */
+  botRoutingInspect() { return settled(() => (this.services.botRoutingInspect ?? unavailable)()) }
+
+  /** Who should take this task, and why — a preview only; nothing runs. */
+  botRoutingDecide(request) { return settled(() => (this.services.botRoutingDecide ?? unavailable)(request)) }
+
   /** Move one Bot between the integration path and the independent runtime. */
   botRuntimeMove(request) { return settled(() => (this.services.botRuntimeMove ?? unavailable)(request)) }
 

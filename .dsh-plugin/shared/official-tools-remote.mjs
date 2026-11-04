@@ -246,6 +246,27 @@ const botRuntimeHistoryCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#Bot
   return { botId, limit }
 })
 
+const botRoutingDecideCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRoutingDecide`, value => {
+  const request = plainObject(value, 'bot routing')
+  for (const key of Object.keys(request)) {
+    if (!['text', 'pinnedBotId', 'requiresMachine', 'machineId', 'requiredTools'].includes(key)) throw new TypeError(`unknown field ${key} in bot routing`)
+  }
+  const text = string(request.text).trim()
+  if (!text || text.length > 4000) throw new TypeError('text must be 1..4000 characters')
+  const result = { text }
+  if (request.pinnedBotId !== undefined) result.pinnedBotId = text(request.pinnedBotId)
+  if (request.machineId !== undefined) result.machineId = text(request.machineId)
+  if (request.requiresMachine !== undefined) {
+    if (typeof request.requiresMachine !== 'boolean') throw new TypeError('requiresMachine must be a boolean')
+    result.requiresMachine = request.requiresMachine
+  }
+  if (request.requiredTools !== undefined) {
+    if (!Array.isArray(request.requiredTools) || request.requiredTools.length > 32) throw new TypeError('requiredTools must be an array of at most 32 names')
+    result.requiredTools = request.requiredTools.map(name => text(name))
+  }
+  return result
+})
+
 const botRuntimeMessageCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeMessage`, value => {
   const request = plainObject(value, 'bot runtime message')
   for (const key of Object.keys(request)) {
@@ -300,6 +321,8 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('botRuntimeMove', [jsonParameter('request', botRuntimeMoveCodec)], anyObjectCodec('BotRuntimeMoved')),
   descriptor('botRuntimeHistory', [jsonParameter('request', botRuntimeHistoryCodec)], anyObjectCodec('BotRuntimeHistory')),
   descriptor('botRuntimeMessage', [jsonParameter('request', botRuntimeMessageCodec)], anyObjectCodec('BotRuntimeMessage')),
+  descriptor('botRoutingInspect', [], anyObjectCodec('BotRoutingInspect')),
+  descriptor('botRoutingDecide', [jsonParameter('request', botRoutingDecideCodec)], anyObjectCodec('BotRoutingDecision')),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview'), true),
   descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),

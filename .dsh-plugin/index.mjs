@@ -2262,7 +2262,7 @@ function terminalServices(terminals, assertPreferences = () => {}) {
   }
 }
 
-export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences, runJobs = createRunJobs(), runOptions = {}, botRuntime = null } = {}) {
+export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences, runJobs = createRunJobs(), runOptions = {}, botRuntime = null, botRouting = null } = {}) {
   // Terminal tools (dsh-TUI) have no headless mode: the Host types into the managed PTY and
   // returns what it rendered. Built once, reused by every call of this Host fiber.
   const tuiRunner = terminals ? createTuiPromptRunner({ terminals, locate: (name, options) => defaultLocate(name, options) }) : null
@@ -2270,6 +2270,10 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
     ...terminalServices(terminals, assertPreferences),
     ...(tuiRunner ? { tuiPrompt: request => tuiRunner.run({ tool: getOfficialTool(request.tool), prompt: request.prompt }) } : {}),
     // The independent Bot runtime is opt-in; without it these stay empty instead of pretending.
+    ...(botRouting ? {
+      botRoutingInspect: async () => botRouting.inspect(),
+      botRoutingDecide: async request => botRouting.decide(request),
+    } : {}),
     ...(botRuntime ? {
       botRuntimeStatus: async () => botRuntime.list(),
       botRuntimeMove: async request => botRuntime.move(request.botId, request.mode),
@@ -2368,6 +2372,8 @@ export function apply(ctx, config = {}) {
     }, 'model-router-galgame: interactive terminals')
     // Opt-in independent Bot runtime. A failure here leaves the product on the integration path
     // instead of taking the plugin down.
+    let botRouting = null
+    try { botRouting = ctx.get?.('botRouting') ?? null } catch { botRouting = null }
     let botRuntime = null
     try {
       const runtime = createPluginRuntime({
@@ -2384,7 +2390,7 @@ export function apply(ctx, config = {}) {
       ctx.logger?.('model-router: independent runtime unavailable: %s', error?.message ?? error)
     }
     registerOfficialToolsRemote(ctx, {
-      ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences, botRuntime }),
+      ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences, botRuntime, botRouting }),
       requireBotPolicy: () => policyRequired(config),
       installSettingsError: () => installPreferenceError,
       installRequestedDirectory: () => valueOf(config, 'toolInstallDir', ''),

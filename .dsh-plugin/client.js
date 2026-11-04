@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.36.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.37.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -31538,6 +31538,22 @@ var terminalStartCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalS
   let limit = request.limit === void 0 ? 20 : request.limit;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new TypeError("limit must be 1..100");
   return { botId, limit };
+}), botRoutingDecideCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRoutingDecide`, (value) => {
+  let request = plainObject2(value, "bot routing");
+  for (let key of Object.keys(request))
+    if (!["text", "pinnedBotId", "requiresMachine", "machineId", "requiredTools"].includes(key)) throw new TypeError(`unknown field ${key} in bot routing`);
+  let text7 = string(request.text).trim();
+  if (!text7 || text7.length > 4e3) throw new TypeError("text must be 1..4000 characters");
+  let result = { text: text7 };
+  if (request.pinnedBotId !== void 0 && (result.pinnedBotId = text7(request.pinnedBotId)), request.machineId !== void 0 && (result.machineId = text7(request.machineId)), request.requiresMachine !== void 0) {
+    if (typeof request.requiresMachine != "boolean") throw new TypeError("requiresMachine must be a boolean");
+    result.requiresMachine = request.requiresMachine;
+  }
+  if (request.requiredTools !== void 0) {
+    if (!Array.isArray(request.requiredTools) || request.requiredTools.length > 32) throw new TypeError("requiredTools must be an array of at most 32 names");
+    result.requiredTools = request.requiredTools.map((name) => text7(name));
+  }
+  return result;
 }), botRuntimeMessageCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeMessage`, (value) => {
   let request = plainObject2(value, "bot runtime message");
   for (let key of Object.keys(request))
@@ -31587,6 +31603,8 @@ var toolIdParameter = Object.freeze({
   descriptor("botRuntimeMove", [jsonParameter("request", botRuntimeMoveCodec)], anyObjectCodec("BotRuntimeMoved")),
   descriptor("botRuntimeHistory", [jsonParameter("request", botRuntimeHistoryCodec)], anyObjectCodec("BotRuntimeHistory")),
   descriptor("botRuntimeMessage", [jsonParameter("request", botRuntimeMessageCodec)], anyObjectCodec("BotRuntimeMessage")),
+  descriptor("botRoutingInspect", [], anyObjectCodec("BotRoutingInspect")),
+  descriptor("botRoutingDecide", [jsonParameter("request", botRoutingDecideCodec)], anyObjectCodec("BotRoutingDecision")),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview"), !0),
   descriptor("startRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunStarted")),
