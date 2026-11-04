@@ -189,6 +189,24 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
   }, [dispatch])
   React.useEffect(() => { void load() }, [load])
 
+  const [dispatched, setDispatched] = React.useState(null)
+  const submitRouted = async () => {
+    if (!decision?.chosen || working) return
+    setWorking(true)
+    setError('')
+    try {
+      const request = { text: text.trim(), requestKey: crypto.randomUUID(), requiresMachine: machine !== '' }
+      if (pin) request.pinnedBotId = pin
+      if (machine) request.machineId = machine
+      const next = await dispatch('botRouting.dispatch', request)
+      if (next && next.ok === false) throw new Error(next.error?.message ?? next.error)
+      setDispatched(next)
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    } finally {
+      setWorking(false)
+    }
+  }
   const decide = async () => {
     if (!text.trim() || working) return
     setWorking(true)
@@ -243,6 +261,10 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
       <strong>选中：{decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? '（手动指定）' : ''}` : '没有可用的 Bot'}</strong>
       {decision.binding ? <p>将授予该 Bot：{decision.binding.mode} · {decision.binding.tools.length} 项工具（{decision.binding.tools.join('、')}）</p> : null}
       {decision.rejected?.length ? <p>落选：{decision.rejected.map(row => `${row.botId}（${row.reason}）`).join('；')}</p> : null}
+      {decision.chosen ? <div className="bp-actions">
+        <button type="button" disabled={busy} onClick={() => { void submitRouted() }}>按此路由创建任务</button>
+        {dispatched ? <small role="status">已提交：{dispatched.plan?.taskId ?? dispatched.submitted?.taskId ?? '已受理'}</small> : null}
+      </div> : null}
     </div> : null}
   </article>
 }

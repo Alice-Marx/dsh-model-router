@@ -79,3 +79,31 @@ export async function routeTaskToBot({
 
   return { botId: decision.chosen.botId, preset: settings.preset, pinned: false, binding: null, decision }
 }
+
+/**
+ * The plan a routed task becomes.
+ *
+ * One package, one target Bot, no dependencies: Bot routing decides *who*, and this turns that
+ * decision into something the task service can accept. The acceptance list stays empty on purpose —
+ * the caller supplies it when it knows what "done" means, and an invented check would pass itself.
+ */
+export function buildRoutedPlan({ decision, text, taskId, requesterBotId = '', acceptance = [], effectClass = 'read', packageId = 'p1' }) {
+  if (!decision || typeof decision !== 'object' || !decision.chosen?.botId) fail('ROUTING_DECISION_REQUIRED')
+  if (typeof text !== 'string' || text.trim() === '') fail('ROUTING_REQUIRES_TASK')
+  if (typeof taskId !== 'string' || taskId === '') fail('ROUTING_REQUIRES_TASK_ID')
+  if (!['read', 'workspace-write'].includes(effectClass)) fail('ROUTING_INVALID_EFFECT_CLASS')
+  return {
+    schemaVersion: 1,
+    taskId,
+    origin: { kind: 'private', botId: requesterBotId === '' ? decision.chosen.botId : requesterBotId, sessionId: null },
+    planRevision: 1,
+    packages: [{
+      id: packageId,
+      targetBotId: decision.chosen.botId,
+      objective: text.trim(),
+      dependsOn: [],
+      acceptance: Array.isArray(acceptance) ? acceptance : [],
+      effectClass,
+    }],
+  }
+}
