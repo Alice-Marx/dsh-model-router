@@ -2273,6 +2273,7 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
     ...(botRuntime ? {
       botRuntimeStatus: async () => botRuntime.list(),
       botRuntimeMove: async request => botRuntime.move(request.botId, request.mode),
+      botRuntimeHistory: async request => botRuntime.history(request.botId, { limit: request.limit }),
     } : {}),
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })
