@@ -16,9 +16,10 @@
  */
 
 const CLAUDE_READ_ARGS = Object.freeze([
-  '--restricted', '--disable-slash-commands', '--strict-mcp-config',
-  '--tools', 'Read,Glob,Grep', '--disallowedTools', 'mcp__*',
-  '--permission-mode', 'dontAsk',
+  // Plan mode keeps Claude from writing while it may still use its normal reading tools.
+  // The workspace boundary and the "nothing changed" proof are enforced by the Host, not by
+  // withholding tools: see read-only-guard.mjs.
+  "--permission-mode", "plan", "--add-dir", "<workspace>",
 ])
 
 const CLAUDE_WRITE_ARGS = Object.freeze(['--permission-mode', 'bypassPermissions'])
@@ -29,7 +30,7 @@ const CLAUDE_WRITE_ARGS = Object.freeze(['--permission-mode', 'bypassPermissions
  */
 export const CLI_PROFILES = Object.freeze({
   'claude-code': Object.freeze({
-    readOnly: Object.freeze({ args: CLAUDE_READ_ARGS, readScope: 'workspace', writes: false, requiresConfinement: false }),
+    readOnly: Object.freeze({ args: CLAUDE_READ_ARGS, readScope: 'workspace', writes: false, requiresConfinement: true, verifyNoWrites: true }),
     workspaceWrite: Object.freeze({ args: CLAUDE_WRITE_ARGS, readScope: 'workspace', writes: true, requiresConfinement: false }),
   }),
   codex: Object.freeze({
