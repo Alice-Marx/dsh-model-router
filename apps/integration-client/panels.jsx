@@ -9,7 +9,7 @@ export function ProductNavigation({ openPanel, panels, compact = false }) {
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
     {[
       [panels.bindings, 'Bot 绑定', '◈', '绑定'], [panels.tasks, '任务', '☑', '任务'], [panels.machines, '远程电脑', '▣', '电脑'],
-      [panels.library, '资料库', '▤', '资料'], [panels.usage, '费用与用量', '◷', '费用'], ['model-router-galgame', '高级工作台', '⚙', '工作台'],
+      [panels.library, '资料库', '▤', '资料'], [panels.routine, '例行任务', '↻', '例行'], [panels.usage, '费用与用量', '◷', '费用'], ['model-router-galgame', '高级工作台', '⚙', '工作台'],
     ].map(([id, label, icon, caption]) => <button key={id} type="button" onClick={() => openPanel(id)} title={label} aria-label={label}>
       {/* A narrow column still says what each icon opens, so the row is readable without hovering. */}
       <span aria-hidden="true">{icon}</span>{compact ? <span className="bp-nav-caption">{caption}</span> : <span>{label}</span>}
@@ -682,6 +682,61 @@ export function Library({ snapshot, dispatch, busy }) {
   </article>
 }
 
+
+/**
+ * Saved routines: what a Bot was shown once and can run again.
+ *
+ * Running needs a machine, because a routine is a sequence of desktop actions. The panel picks the
+ * machine and asks the Host to run it; the Host still decides whether this caller may act there.
+ */
+export function Routines({ snapshot, dispatch, busy }) {
+  const bots = snapshot.bots ?? []
+  const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
+  const [botId, setBotId] = React.useState(bots[0]?.id ?? '')
+  const [machineId, setMachineId] = React.useState(machines[0]?.id ?? '')
+  const [rows, setRows] = React.useState(null)
+  const [result, setResult] = React.useState(null)
+  const [error, setError] = React.useState('')
+  const call = async (action, payload) => {
+    if (typeof dispatch !== 'function') return null
+    const value = await dispatch(action, payload)
+    if (value && value.ok === false) throw new Error(value.error?.message ?? value.error ?? '宿主拒绝了这一步。')
+    return value
+  }
+  const list = async () => {
+    setError(''); setResult(null)
+    try { setRows(await call('routine.list', { botId })) } catch (failure) { setError(String(failure?.message ?? failure)) }
+  }
+  const run = async routineId => {
+    setError(''); setResult(null)
+    try {
+      setResult({ routineId, ...(await call('routine.run', { botId, routineId, machineId, rootId: machines.find(m => m.id === machineId)?.roots?.[0] ?? 'project' })) })
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+  }
+  if (!bots.length) return <p className="bp-empty">还没有 Bot。</p>
+  return <article className="bp-card"><div className="bp-card-title"><h2>例行任务</h2><Tag>{botId || '未选择'}</Tag></div>
+    <p className="bp-muted">例行任务是一串验证过的桌面动作；运行会在选定的电脑上逐条执行，失败即停并说明停在第几步。</p>
+    <div className="bp-form">
+      <label>Bot<select value={botId} onChange={event => { setBotId(event.target.value); setRows(null) }}>
+        {bots.map(bot => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>
+      <label>电脑<select value={machineId} onChange={event => setMachineId(event.target.value)}>
+        {machines.length === 0 ? <option value="">还没有配对的电脑</option> : machines.map(item => <option key={item.id} value={item.id}>{item.name ?? item.id}</option>)}</select></label>
+      <button type="button" disabled={busy} onClick={() => { void list() }}>读取例行任务</button>
+      {error && <p className="bp-error" role="alert">{error}</p>}
+    </div>
+    {rows ? (rows.length === 0 ? <p className="bp-muted">这个 Bot 还没有保存过例行任务。</p> : <div className="bp-table-wrap"><table>
+      <thead><tr><th>名称</th><th>步数</th><th>保存时间</th><th>操作</th></tr></thead>
+      <tbody>{rows.map(row => <tr key={row.id}>
+        <td>{row.name}<small>{row.id}</small></td><td>{row.steps}</td>
+        <td>{row.createdAt ? new Date(row.createdAt).toLocaleString('zh-CN') : '—'}</td>
+        <td><button type="button" disabled={busy || !machineId} onClick={() => { void run(row.id) }}>运行</button></td>
+      </tr>)}</tbody></table></div>) : null}
+    {result ? <div className="bp-blocked"><strong>运行结果：{result.status ?? result.result?.status ?? '已提交'}</strong>
+      <p>{result.stoppedAt !== undefined && result.stoppedAt !== null ? `停在第 ${result.stoppedAt + 1} 步` : '全部步骤完成'}</p>
+      {result.error ? <p className="bp-error">{result.error}</p> : null}</div> : null}
+  </article>
+}
+
 export function ProductPage({ section, productApi, openSession, openPanel }) {
   const [snapshot, setSnapshot] = useState(null)
   const [error, setError] = useState('')
@@ -729,7 +784,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     } catch (cause) { if (current()) { state.request++; setSnapshotStale(true); setError(cause.message) } } finally { if (current()) setBusy(false) }
   }
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
-  const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', usage: '费用与用量' }[section]
+  const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
   return <main className="bp-page"><header><div><p className="bp-eyebrow">BOT 工作系统</p><h1>{title}</h1></div><button disabled={busy} onClick={() => refresh()}>刷新</button></header>
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
@@ -737,6 +792,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {snapshot && <>{section === 'bindings' && <BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
+      {section === 'routine' && <Routines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} openAdvanced={() => openPanel('model-router-galgame')} />}
       <footer className="bp-muted">宿主读取时间：{new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
