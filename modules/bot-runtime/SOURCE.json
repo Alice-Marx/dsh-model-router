@@ -455,10 +455,16 @@
       "gitBlob": "4d8cbb194d396f27c6f5feabc3addbc0ddad3998"
     },
     {
+      "path": "vendor/ds-bot/src/client/desktop-pane.js",
+      "sourcePath": "ds-bot/src/client/desktop-pane.js",
+      "sha256": "bee074d5efc1b4b05a24779d902fb7eae44fa71f0f7a69863a943a89e196769b",
+      "gitBlob": "10448ce17f8c2a6a84e9924b2744a59cb86402a7"
+    },
+    {
       "path": "vendor/ds-bot/src/client/details-drawer.js",
       "sourcePath": "ds-bot/src/client/details-drawer.js",
-      "sha256": "8f5071ebe2d17d5f740da42cd2bbc49adfd1ce43be083f878d1764882d169f6c",
-      "gitBlob": "29db490df1850227ad675dde14beab8d053f8c3d"
+      "sha256": "00e992020c46901c99f07e688e5ad252928e5b79ab2f9e61b447eb239572ac6d",
+      "gitBlob": "c5a3a7160cb1930b00a7f3d52c7ca88053cd9e8d"
     },
     {
       "path": "vendor/ds-bot/src/client/diagnostics.js",

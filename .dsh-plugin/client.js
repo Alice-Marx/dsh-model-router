@@ -38,7 +38,7 @@ __export(index_exports, {
   productSlots: () => productSlots
 });
 module.exports = __toCommonJS(index_exports);
-var import_react61 = __toESM(require("react"), 1);
+var import_react62 = __toESM(require("react"), 1);
 
 // modules/bot-runtime/vendor/ds-bot/src/client/i18n.js
 var NAMESPACE = "ds-bot", ZH = {
@@ -1413,7 +1413,7 @@ function bodyOf(def, paint, flat = !1) {
     return "";
   }
 }
-var eyeMarkup = ([cx, cy, w, h51, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h51 / 2}" width="${w}" height="${h51}" rx="${w / 2}"/></g>`, happyEyeMarkup = ([cx, cy, w, h51, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h51 * 0.14}Q0 ${-h51 * 0.42} ${w * 0.62} ${h51 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`, maskBox = (size) => `maskUnits="userSpaceOnUse" x="${-size}" y="${-size}" width="${size * 3}" height="${size * 3}"`, holes = (def, eyes) => `<rect x="${-def.size}" y="${-def.size}" width="${def.size * 3}" height="${def.size * 3}" fill="#fff"/>${eyes}`, MASK_ID = "%MASK%", markSerial = 0, nextMarkSerial = () => markSerial += 1, markupCache = /* @__PURE__ */ new Map();
+var eyeMarkup = ([cx, cy, w, h52, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h52 / 2}" width="${w}" height="${h52}" rx="${w / 2}"/></g>`, happyEyeMarkup = ([cx, cy, w, h52, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h52 * 0.14}Q0 ${-h52 * 0.42} ${w * 0.62} ${h52 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`, maskBox = (size) => `maskUnits="userSpaceOnUse" x="${-size}" y="${-size}" width="${size * 3}" height="${size * 3}"`, holes = (def, eyes) => `<rect x="${-def.size}" y="${-def.size}" width="${def.size * 3}" height="${def.size * 3}" fill="#fff"/>${eyes}`, MASK_ID = "%MASK%", markSerial = 0, nextMarkSerial = () => markSerial += 1, markupCache = /* @__PURE__ */ new Map();
 function characterMarkup(shape, color) {
   let key = `${shape}|${color}`, markup = markupCache.get(key);
   if (markup === void 0) {
@@ -2000,10 +2000,10 @@ function liveSprings(apply4) {
   let values = /* @__PURE__ */ new Map(), frame = 0, last = 0, read = () => Object.fromEntries([...values].map(([key, value]) => [key, value.x])), step = (now) => {
     let dt2 = Math.min(0.5, Math.max(1e-3, (now - last) / 1e3));
     last = now;
-    let steps = Math.ceil(dt2 * 240), h51 = dt2 / steps, moving = !1;
+    let steps = Math.ceil(dt2 * 240), h52 = dt2 / steps, moving = !1;
     for (let value of values.values()) {
       for (let index = 0; index < steps; index += 1)
-        value.v += (-value.k * (value.x - value.to) - value.c * value.v) * h51, value.x += value.v * h51;
+        value.v += (-value.k * (value.x - value.to) - value.c * value.v) * h52, value.x += value.v * h52;
       Math.abs(value.x - value.to) < 0.05 && Math.abs(value.v) < 1 ? (value.x = value.to, value.v = 0) : moving = !0;
     }
     apply4(read()), frame = moving ? requestAnimationFrame(step) : 0;
@@ -9195,7 +9195,7 @@ function installHeaderNavigation(slots, face, component, priority) {
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/overlays.js
-var import_react50 = require("react"), import_react_dom9 = require("react-dom");
+var import_react51 = require("react"), import_react_dom9 = require("react-dom");
 
 // modules/bot-runtime/vendor/ds-bot/src/client/palette.js
 var import_react24 = require("react");
@@ -14058,13 +14058,114 @@ function AgentMenu({ menu, roster, actions, leaving }) {
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/browser-pane.js
-var import_react49 = require("react"), import_react_dom8 = require("react-dom");
+var import_react50 = require("react"), import_react_dom8 = require("react-dom");
 
 // modules/bot-runtime/vendor/ds-bot/src/client/details-drawer.js
-var import_react48 = require("react");
+var import_react49 = require("react");
+
+// modules/bot-runtime/vendor/ds-bot/src/client/desktop-pane.js
+var import_react47 = require("react"), bridge = () => {
+  let value = globalThis.__dshDesktop;
+  return value && typeof value.view == "function" ? value : null;
+};
+function DesktopPane({ bot }) {
+  let [machines, setMachines] = (0, import_react47.useState)([]), [machineId, setMachineId] = (0, import_react47.useState)(""), [frame, setFrame] = (0, import_react47.useState)(null), [status, setStatus] = (0, import_react47.useState)("idle"), [error, setError] = (0, import_react47.useState)(""), [live, setLive] = (0, import_react47.useState)(!1), imageRef = (0, import_react47.useRef)(null), api = bridge();
+  (0, import_react47.useEffect)(() => {
+    if (!api) return;
+    let current = !0;
+    return Promise.resolve(api.machines?.()).then(
+      (rows2) => {
+        !current || !Array.isArray(rows2) || (setMachines(rows2), setMachineId((before) => before || rows2[0]?.machineId || ""));
+      },
+      () => {
+      }
+    ), () => {
+      current = !1;
+    };
+  }, [api]);
+  let capture = (0, import_react47.useCallback)(async () => {
+    if (!(!api || !machineId)) {
+      setStatus("capturing"), setError("");
+      try {
+        let next = await api.view(bot.id, machineId);
+        if (next?.unavailable) {
+          setFrame(null), setStatus("unavailable"), setError(next.reason === "FRAME_MISSING" ? "没有拿到画面帧。" : "桌面暂不可用：检查那台机器是否在线、是否锁屏。");
+          return;
+        }
+        setFrame(next), setStatus("ready");
+      } catch (failure) {
+        setStatus("error"), setError(String(failure?.message ?? failure));
+      }
+    }
+  }, [api, bot.id, machineId]);
+  (0, import_react47.useEffect)(() => {
+    if (!live || !api || !machineId) return;
+    capture();
+    let timer = setInterval(() => {
+      capture();
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [live, api, machineId, capture]);
+  let act = async (action) => {
+    if (!api || !frame?.screenshotId) {
+      setError("先取一帧，再操作。");
+      return;
+    }
+    try {
+      let result = await api.act(bot.id, machineId, frame.screenshotId, action);
+      result?.status && result.status !== "succeeded" && setError(`操作未成功：${result.status}`), live || await capture();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+  }, click = (event) => {
+    if (!frame?.base64 || !frame?.width || !imageRef.current) return;
+    let rect = imageRef.current.getBoundingClientRect(), ratio = Math.min(rect.width / frame.width, rect.height / frame.height), x = Math.floor((event.clientX - rect.left - (rect.width - frame.width * ratio) / 2) / ratio), y = Math.floor((event.clientY - rect.top - (rect.height - frame.height * ratio) / 2) / ratio);
+    x < 0 || y < 0 || x >= frame.width || y >= frame.height || act({ tool: "click", x, y });
+  };
+  return api ? (0, import_react47.createElement)(
+    "div",
+    { className: "bt-desktop-pane" },
+    (0, import_react47.createElement)("div", { className: "bt-section-title" }, "远程桌面"),
+    (0, import_react47.createElement)(
+      "div",
+      { className: "bt-desktop-row" },
+      (0, import_react47.createElement)("select", {
+        className: "bt-input",
+        value: machineId,
+        "aria-label": "电脑",
+        onChange: (event) => {
+          setMachineId(event.target.value), setFrame(null);
+        }
+      }, machines.length === 0 ? (0, import_react47.createElement)("option", { value: "" }, "还没有配对的电脑") : machines.map((item) => (0, import_react47.createElement)("option", { key: item.machineId, value: item.machineId }, item.label ?? item.machineId))),
+      (0, import_react47.createElement)(
+        "button",
+        { type: "button", className: "bt-btn", disabled: status === "capturing" || !machineId, onClick: () => {
+          capture();
+        } },
+        status === "capturing" ? "截取中…" : "截取画面"
+      ),
+      (0, import_react47.createElement)(
+        "label",
+        { className: "bt-muted bt-desktop-live" },
+        (0, import_react47.createElement)("input", { type: "checkbox", checked: live, onChange: (event) => setLive(event.target.checked) }),
+        " 实时"
+      ),
+      (0, import_react47.createElement)("span", { className: "bt-muted" }, frame?.screenshotId ? `帧 ${String(frame.screenshotId).slice(-6)}` : "")
+    ),
+    error ? (0, import_react47.createElement)("div", { className: "bt-error" }, error) : null,
+    frame?.base64 ? (0, import_react47.createElement)("img", {
+      ref: imageRef,
+      className: "bt-desktop-frame",
+      alt: "远程桌面画面",
+      src: `data:${frame.mediaType ?? "image/png"};base64,${frame.base64}`,
+      onClick: click,
+      style: { cursor: "crosshair" }
+    }) : (0, import_react47.createElement)("div", { className: "bt-muted bt-desktop-empty" }, machineId ? "点「截取画面」查看桌面，点画面即点击。" : "先配对一台电脑。")
+  ) : (0, import_react47.createElement)("div", { className: "bt-muted" }, "远程桌面需要工作台已加载：打开一次「电脑」页，再回到这里。");
+}
 
 // modules/bot-runtime/vendor/ds-bot/src/client/member-status.js
-var import_react47 = require("react");
+var import_react48 = require("react");
 var NO_WORK = { bots: {}, rooms: {}, approvals: [] }, FACES_MAX = 3, DOCK_EXIT_MS = 160;
 function memberWork(room2, work = NO_WORK) {
   let here = work.rooms?.[room2.id] ?? [];
@@ -14114,93 +14215,93 @@ function dockModel(sessionId, roster, work) {
   };
 }
 function Face({ bot, ask, state }) {
-  return (0, import_react47.createElement)(
+  return (0, import_react48.createElement)(
     "span",
     { className: "bt-mw-face", "data-ask": ask || void 0 },
-    (0, import_react47.createElement)(BotMark, { bot, size: 20, state: ask ? "alert" : state })
+    (0, import_react48.createElement)(BotMark, { bot, size: 20, state: ask ? "alert" : state })
   );
 }
 function useFitWidth(inner, key) {
-  let [width, setWidth] = (0, import_react47.useState)(null);
-  return (0, import_react47.useLayoutEffect)(() => {
+  let [width, setWidth] = (0, import_react48.useState)(null);
+  return (0, import_react48.useLayoutEffect)(() => {
     setWidth(key && inner.current ? inner.current.offsetWidth : null);
   }, [key]), width;
 }
 function MemberDock({ sessionId, useRoster, useWork, actions }) {
-  let roster = useRoster((value) => value), work = useWork((value) => value), live = dockModel(sessionId, roster, work), [kept, leaving] = useLinger(live ? JSON.stringify(live) : null, DOCK_EXIT_MS), model = kept ? JSON.parse(kept) : null, inner = (0, import_react47.useRef)(null), width = useFitWidth(inner, kept);
+  let roster = useRoster((value) => value), work = useWork((value) => value), live = dockModel(sessionId, roster, work), [kept, leaving] = useLinger(live ? JSON.stringify(live) : null, DOCK_EXIT_MS), model = kept ? JSON.parse(kept) : null, inner = (0, import_react48.useRef)(null), width = useFitWidth(inner, kept);
   if (!model) return null;
   let faces = model.faces.map((face) => ({ ...face, bot: roster.byId[face.id] })).filter((face) => face.bot), label = [model.waiting, model.doing].filter(Boolean).join(" · ");
-  return (0, import_react47.createElement)(
+  return (0, import_react48.createElement)(
     "div",
     { className: "bt-mw-dock", "data-leaving": leaving || void 0 },
-    (0, import_react47.createElement)(
+    (0, import_react48.createElement)(
       "button",
       { type: "button", className: "bt-mw-pill", "aria-label": label, onClick: () => model.open.details ? actions.showDetails(model.open.details) : actions.openSession(model.open.session), disabled: leaving, style: width ? { width } : void 0 },
-      (0, import_react47.createElement)(
+      (0, import_react48.createElement)(
         "span",
         { ref: inner, className: "bt-mw-pill-in" },
-        (0, import_react47.createElement)("span", { className: "bt-mw-faces", "aria-hidden": !0 }, faces.map((face) => (0, import_react47.createElement)(Face, { key: face.id, ...face }))),
-        (0, import_react47.createElement)(
+        (0, import_react48.createElement)("span", { className: "bt-mw-faces", "aria-hidden": !0 }, faces.map((face) => (0, import_react48.createElement)(Face, { key: face.id, ...face }))),
+        (0, import_react48.createElement)(
           "span",
           { key: label, className: "bt-mw-label", "aria-hidden": !0 },
-          model.waiting ? (0, import_react47.createElement)("span", { className: "bt-mw-ask" }, model.waiting) : null,
-          model.waiting && model.doing ? (0, import_react47.createElement)("span", { className: "bt-mw-dot" }, "·") : null,
-          model.doing ? (0, import_react47.createElement)("span", { className: "bt-mw-doing" }, (0, import_react47.createElement)(Shimmer, null, model.doing)) : null
+          model.waiting ? (0, import_react48.createElement)("span", { className: "bt-mw-ask" }, model.waiting) : null,
+          model.waiting && model.doing ? (0, import_react48.createElement)("span", { className: "bt-mw-dot" }, "·") : null,
+          model.doing ? (0, import_react48.createElement)("span", { className: "bt-mw-doing" }, (0, import_react48.createElement)(Shimmer, null, model.doing)) : null
         )
       )
     )
   );
 }
-var stateLine = (className, at2, ...what) => (0, import_react47.createElement)(
+var stateLine = (className, at2, ...what) => (0, import_react48.createElement)(
   "span",
   { className },
-  (0, import_react47.createElement)("span", { className: "bt-member-what" }, ...what),
-  typeof at2 == "number" ? (0, import_react47.createElement)(Elapsed, { at: at2, className: "bt-member-time" }) : null
+  (0, import_react48.createElement)("span", { className: "bt-member-what" }, ...what),
+  typeof at2 == "number" ? (0, import_react48.createElement)(Elapsed, { at: at2, className: "bt-member-time" }) : null
 );
 function ApprovalCard({ approval, bot, actions }) {
-  let [busy, setBusy] = (0, import_react47.useState)(!1), answer = (choice) => {
+  let [busy, setBusy] = (0, import_react48.useState)(!1), answer = (choice) => {
     setBusy(!0), Promise.resolve(actions.answerApproval(approval.id, choice)).catch((error) => actions.reportError(error, "approval")).finally(() => setBusy(!1));
   };
-  return (0, import_react47.createElement)(
+  return (0, import_react48.createElement)(
     "div",
     { className: "bt-mw-card", role: "group", "aria-label": t("{name} is waiting for your approval", { name: bot.name }) },
-    (0, import_react47.createElement)("div", { className: "bt-mw-tool" }, approval.tool),
-    approval.detail?.text ? (0, import_react47.createElement)("div", { className: "bt-mw-text" }, approval.detail.text) : null,
-    approval.reason ? (0, import_react47.createElement)("div", { className: "bt-mw-reason" }, approval.reason) : null,
-    approval.detail?.code ? (0, import_react47.createElement)("code", { className: "bt-mw-code", title: approval.detail.code }, approval.detail.code) : null,
-    approval.answerable ? (0, import_react47.createElement)(
+    (0, import_react48.createElement)("div", { className: "bt-mw-tool" }, approval.tool),
+    approval.detail?.text ? (0, import_react48.createElement)("div", { className: "bt-mw-text" }, approval.detail.text) : null,
+    approval.reason ? (0, import_react48.createElement)("div", { className: "bt-mw-reason" }, approval.reason) : null,
+    approval.detail?.code ? (0, import_react48.createElement)("code", { className: "bt-mw-code", title: approval.detail.code }, approval.detail.code) : null,
+    approval.answerable ? (0, import_react48.createElement)(
       "div",
       { className: "bt-mw-actions" },
-      (0, import_react47.createElement)("button", { type: "button", className: "bt-q-btn", disabled: busy, onClick: () => answer("reject") }, t("Reject")),
-      (0, import_react47.createElement)("button", { type: "button", className: "bt-q-submit", disabled: busy, onClick: () => answer("allow") }, t("Allow once"))
-    ) : (0, import_react47.createElement)(
+      (0, import_react48.createElement)("button", { type: "button", className: "bt-q-btn", disabled: busy, onClick: () => answer("reject") }, t("Reject")),
+      (0, import_react48.createElement)("button", { type: "button", className: "bt-q-submit", disabled: busy, onClick: () => answer("allow") }, t("Allow once"))
+    ) : (0, import_react48.createElement)(
       "div",
       { className: "bt-mw-actions" },
-      (0, import_react47.createElement)("button", { type: "button", className: "bt-q-btn", onClick: () => actions.openSession(bot.id) }, t("Open {name}'s chat", { name: bot.name }))
+      (0, import_react48.createElement)("button", { type: "button", className: "bt-q-btn", onClick: () => actions.openSession(bot.id) }, t("Open {name}'s chat", { name: bot.name }))
     )
   );
 }
 function MemberState({ entry, bot }) {
-  return entry?.state === "ask" ? stateLine("bt-member-state bt-mw-ask", entry.approvals[0].at, t("Waiting for your approval")) : entry?.state !== "work" ? bot.role ? stateLine("bt-member-state", void 0, bot.role) : null : stateLine("bt-member-state", entry.doing.since, (0, import_react47.createElement)(Shimmer, null, `${workPhrase(entry.doing)}…`));
+  return entry?.state === "ask" ? stateLine("bt-member-state bt-mw-ask", entry.approvals[0].at, t("Waiting for your approval")) : entry?.state !== "work" ? bot.role ? stateLine("bt-member-state", void 0, bot.role) : null : stateLine("bt-member-state", entry.doing.since, (0, import_react48.createElement)(Shimmer, null, `${workPhrase(entry.doing)}…`));
 }
 function StopMemberWork({ entry, bot, room: room2, actions }) {
-  let [stopping, setStopping] = (0, import_react47.useState)(!1);
+  let [stopping, setStopping] = (0, import_react48.useState)(!1);
   if (!entry?.here || entry.state !== "work" && entry.state !== "ask") return null;
   let stop = () => {
     setStopping(!0), Promise.resolve(actions.stopMemberWork(room2.id, bot.id)).catch((error) => actions.reportError(error, "stop")).finally(() => setStopping(!1));
   };
-  return (0, import_react47.createElement)("button", { type: "button", className: "bt-member-stop", disabled: stopping, "aria-label": `${t("Stop")} · ${bot.name}`, onClick: stop }, t("Stop"));
+  return (0, import_react48.createElement)("button", { type: "button", className: "bt-member-stop", disabled: stopping, "aria-label": `${t("Stop")} · ${bot.name}`, onClick: stop }, t("Stop"));
 }
 function StopRoomWork({ room: room2, entries: entries2, actions }) {
-  let [stopping, setStopping] = (0, import_react47.useState)(!1);
+  let [stopping, setStopping] = (0, import_react48.useState)(!1);
   if (!entries2.some((entry) => entry.here)) return null;
   let stop = () => {
     setStopping(!0), Promise.resolve(actions.stopRoomWork(room2.id)).catch((error) => actions.reportError(error, "stop")).finally(() => setStopping(!1));
   }, label = t("Stop all work in this group");
-  return (0, import_react47.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", disabled: stopping, "aria-label": label, title: label, onClick: stop }, t("Stop all"));
+  return (0, import_react48.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", disabled: stopping, "aria-label": label, title: label, onClick: stop }, t("Stop all"));
 }
 function MemberApprovals({ entry, bot, actions }) {
-  return entry?.state !== "ask" ? null : (0, import_react47.createElement)("div", { className: "bt-member-cards" }, entry.approvals.map((approval) => (0, import_react47.createElement)(ApprovalCard, { key: approval.id, approval, bot, actions })));
+  return entry?.state !== "ask" ? null : (0, import_react48.createElement)("div", { className: "bt-member-cards" }, entry.approvals.map((approval) => (0, import_react48.createElement)(ApprovalCard, { key: approval.id, approval, bot, actions })));
 }
 function useMemberWork(room2, useWork) {
   let work = useWork?.((value) => value) ?? NO_WORK;
@@ -14274,7 +14375,7 @@ function transcriptOf(list, id2, name, hiddenTurns = []) {
 
 `);
 }
-var TAB_LABELS = { details: "Details", browser: "Browser" }, hostOf2 = (url) => {
+var TAB_LABELS = { details: "Details", browser: "Browser", desktop: "Computer" }, hostOf2 = (url) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
@@ -14283,17 +14384,17 @@ var TAB_LABELS = { details: "Details", browser: "Browser" }, hostOf2 = (url) => 
 }, shortUrl = (url) => String(url ?? "").replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, ""), EMPTY_TABS = { ids: [], active: null };
 function PermissionRow({ bot, roster, actions, run: run2 }) {
   let catalog = roster.permissions;
-  return catalog?.options?.length ? (0, import_react48.createElement)(
+  return catalog?.options?.length ? (0, import_react49.createElement)(
     "div",
     { className: "bt-drawer-permission" },
-    (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Permissions")),
+    (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Permissions")),
     // A Bot without its own preset may run on another one set in DSH, so its first pick always applies.
-    (0, import_react48.createElement)(PermissionPicker, { catalog, saved: bot.permission ?? catalog.defaultPreset, repick: bot.permission === void 0, onPick: (permission) => run2(actions.updateBot(bot.id, { permission })) })
+    (0, import_react49.createElement)(PermissionPicker, { catalog, saved: bot.permission ?? catalog.defaultPreset, repick: bot.permission === void 0, onPick: (permission) => run2(actions.updateBot(bot.id, { permission })) })
   ) : null;
 }
 function RunStats({ bot, part, running, actions }) {
-  let [values, setValues] = (0, import_react48.useState)(null);
-  (0, import_react48.useEffect)(() => {
+  let [values, setValues] = (0, import_react49.useState)(null);
+  (0, import_react49.useEffect)(() => {
     if (!actions.runStats) return;
     let current = !0;
     return actions.runStats(bot.id).then(
@@ -14308,47 +14409,47 @@ function RunStats({ bot, part, running, actions }) {
     };
   }, [bot.id, part, running]);
   let shown = runStatsOf(values);
-  return shown.length === 0 ? null : (0, import_react48.createElement)(
+  return shown.length === 0 ? null : (0, import_react49.createElement)(
     "div",
     { className: "bt-run-stats" },
-    shown.map((entry, index) => (0, import_react48.createElement)(
-      import_react48.Fragment,
+    shown.map((entry, index) => (0, import_react49.createElement)(
+      import_react49.Fragment,
       { key: entry.key },
-      index > 0 ? (0, import_react48.createElement)("span", { className: "bt-run-sep", "aria-hidden": !0 }, "·") : null,
-      (0, import_react48.createElement)("span", { title: entry.title }, entry.text)
+      index > 0 ? (0, import_react49.createElement)("span", { className: "bt-run-sep", "aria-hidden": !0 }, "·") : null,
+      (0, import_react49.createElement)("span", { title: entry.title }, entry.text)
     ))
   );
 }
 function BrowserCards({ bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) {
   let state = useBrowserTabs((map) => map[bot.id] ?? EMPTY_TABS), pages = useBrowserPages((map) => map);
-  return (0, import_react48.useEffect)(() => {
+  return (0, import_react49.useEffect)(() => {
     actions.browserEnsure?.(bot.id);
-  }, [bot.id]), roster.browser !== !0 || !actions.browserShow ? (0, import_react48.createElement)("div", { className: "bt-muted" }, t("The browser is in DSH Desktop and the DS Bot app.")) : state.ids.length === 0 ? (0, import_react48.createElement)(
+  }, [bot.id]), roster.browser !== !0 || !actions.browserShow ? (0, import_react49.createElement)("div", { className: "bt-muted" }, t("The browser is in DSH Desktop and the DS Bot app.")) : state.ids.length === 0 ? (0, import_react49.createElement)(
     "div",
     { className: "bt-browser-empty-mark" },
-    (0, import_react48.createElement)(BotMark, { bot, size: 40, state: "idle", live: !0 }),
-    (0, import_react48.createElement)("div", { className: "bt-browser-empty-title" }, t("{name}'s browser", { name: bot.name })),
-    (0, import_react48.createElement)("div", { className: "bt-muted" }, t("Open a page here and {name} can read it with you. Logins and cookies stay with {name}; other Bots never see them.", { name: bot.name })),
-    (0, import_react48.createElement)("button", { type: "button", className: "bt-browser-retry", onClick: () => actions.openBrowser(sessionId) }, t("Open browser"))
-  ) : (0, import_react48.createElement)(
+    (0, import_react49.createElement)(BotMark, { bot, size: 40, state: "idle", live: !0 }),
+    (0, import_react49.createElement)("div", { className: "bt-browser-empty-title" }, t("{name}'s browser", { name: bot.name })),
+    (0, import_react49.createElement)("div", { className: "bt-muted" }, t("Open a page here and {name} can read it with you. Logins and cookies stay with {name}; other Bots never see them.", { name: bot.name })),
+    (0, import_react49.createElement)("button", { type: "button", className: "bt-browser-retry", onClick: () => actions.openBrowser(sessionId) }, t("Open browser"))
+  ) : (0, import_react49.createElement)(
     "div",
     { className: "bt-bcards" },
     state.ids.map((tabId, index) => {
       let page = pages[tabId] ?? {}, label = page.title || shortUrl(page.url) || t("New tab");
-      return (0, import_react48.createElement)(
+      return (0, import_react49.createElement)(
         "div",
         { key: tabId, className: "bt-bcard", "data-active": state.active === tabId || void 0, style: { animationDelay: `${index * 30}ms` } },
-        (0, import_react48.createElement)(
+        (0, import_react49.createElement)(
           "button",
           { type: "button", className: "bt-bcard-shot", "aria-label": t("Open {title}", { title: label }), title: page.url, onClick: () => actions.browserPick(sessionId, tabId) },
-          page.excerpt ? (0, import_react48.createElement)(
+          page.excerpt ? (0, import_react49.createElement)(
             "span",
             { className: "bt-bcard-preview" },
-            (0, import_react48.createElement)("span", { className: "bt-bcard-ptitle" }, label),
-            (0, import_react48.createElement)("span", { className: "bt-bcard-excerpt" }, page.excerpt)
-          ) : (0, import_react48.createElement)("span", { className: "bt-bcard-blank" }, (0, import_react48.createElement)(GlobeIcon2), (0, import_react48.createElement)("span", null, label))
+            (0, import_react49.createElement)("span", { className: "bt-bcard-ptitle" }, label),
+            (0, import_react49.createElement)("span", { className: "bt-bcard-excerpt" }, page.excerpt)
+          ) : (0, import_react49.createElement)("span", { className: "bt-bcard-blank" }, (0, import_react49.createElement)(GlobeIcon2), (0, import_react49.createElement)("span", null, label))
         ),
-        (0, import_react48.createElement)("button", {
+        (0, import_react49.createElement)("button", {
           type: "button",
           className: "bt-bcard-x",
           "aria-label": t("Close tab"),
@@ -14357,82 +14458,82 @@ function BrowserCards({ bot, sessionId, roster, actions, useBrowserTabs, useBrow
             actions.browserCloseTab(bot.id, tabId);
           }
         }, "×"),
-        (0, import_react48.createElement)(
+        (0, import_react49.createElement)(
           "div",
           { className: "bt-bcard-row" },
-          (0, import_react48.createElement)(Favicon, { src: page.favicon, className: "bt-bcard-fav" }),
-          (0, import_react48.createElement)("span", { className: "bt-bcard-title" }, label),
-          page.url ? (0, import_react48.createElement)("span", { className: "bt-bcard-host" }, hostOf2(page.url)) : null
+          (0, import_react49.createElement)(Favicon, { src: page.favicon, className: "bt-bcard-fav" }),
+          (0, import_react49.createElement)("span", { className: "bt-bcard-title" }, label),
+          page.url ? (0, import_react49.createElement)("span", { className: "bt-bcard-host" }, hostOf2(page.url)) : null
         )
       );
     }),
-    (0, import_react48.createElement)("button", { type: "button", className: "bt-bcard-new", style: { animationDelay: `${state.ids.length * 30}ms` }, onClick: () => actions.browserNewTab(sessionId) }, (0, import_react48.createElement)(PlusIcon), t("New tab"))
+    (0, import_react49.createElement)("button", { type: "button", className: "bt-bcard-new", style: { animationDelay: `${state.ids.length * 30}ms` }, onClick: () => actions.browserNewTab(sessionId) }, (0, import_react49.createElement)(PlusIcon), t("New tab"))
   );
 }
 function About({ text: text7, title = "About" }) {
-  let [open, setOpen] = (0, import_react48.useState)(!1), long = text7.split(`
-`).length > 5 || text7.length > 240, body = (0, import_react48.useRef)(null);
-  return useMorph(body, open), (0, import_react48.createElement)(
+  let [open, setOpen] = (0, import_react49.useState)(!1), long = text7.split(`
+`).length > 5 || text7.length > 240, body = (0, import_react49.useRef)(null);
+  return useMorph(body, open), (0, import_react49.createElement)(
     "div",
     null,
-    (0, import_react48.createElement)("div", { className: "bt-section-title" }, t(title)),
-    (0, import_react48.createElement)("div", { ref: body, className: "bt-about", "data-open": open || void 0 }, text7),
-    long ? (0, import_react48.createElement)("button", { type: "button", className: "bt-more", onClick: () => setOpen((value) => !value) }, open ? t("Show less") : t("Show more")) : null
+    (0, import_react49.createElement)("div", { className: "bt-section-title" }, t(title)),
+    (0, import_react49.createElement)("div", { ref: body, className: "bt-about", "data-open": open || void 0 }, text7),
+    long ? (0, import_react49.createElement)("button", { type: "button", className: "bt-more", onClick: () => setOpen((value) => !value) }, open ? t("Show less") : t("Show more")) : null
   );
 }
 var PILE_MAX = 4;
 function MemberPile({ room: room2, roster }) {
   let members = room2.members.map((id2) => roster.byId[id2]).filter(Boolean), shown = members.length > PILE_MAX ? members.slice(0, PILE_MAX - 1) : members, more = members.length - shown.length;
-  return (0, import_react48.createElement)(
+  return (0, import_react49.createElement)(
     "span",
     { className: "bt-pile", "aria-hidden": !0 },
-    shown.map((bot, index) => (0, import_react48.createElement)("span", { key: bot.id, className: "bt-pile-face", style: { animationDelay: `${index * 40}ms` } }, (0, import_react48.createElement)(BotMark, { bot, size: 44, live: !0 }))),
-    more > 0 ? (0, import_react48.createElement)("span", { key: "more", className: "bt-pile-face bt-pile-more", style: { animationDelay: `${shown.length * 40}ms` } }, `+${more}`) : null
+    shown.map((bot, index) => (0, import_react49.createElement)("span", { key: bot.id, className: "bt-pile-face", style: { animationDelay: `${index * 40}ms` } }, (0, import_react49.createElement)(BotMark, { bot, size: 44, live: !0 }))),
+    more > 0 ? (0, import_react49.createElement)("span", { key: "more", className: "bt-pile-face bt-pile-more", style: { animationDelay: `${shown.length * 40}ms` } }, `+${more}`) : null
   );
 }
 var markOf = (entry) => entry?.state === "ask" ? "alert" : entry?.state === "work" ? workState(entry.doing) : "idle";
 function MemberRow({ member, entry, room: room2, roster, actions }) {
-  return (0, import_react48.createElement)(
+  return (0, import_react49.createElement)(
     "div",
     { role: "listitem", className: "bt-member" },
-    (0, import_react48.createElement)(
+    (0, import_react49.createElement)(
       "div",
       { className: "bt-member-row" },
-      (0, import_react48.createElement)(
+      (0, import_react49.createElement)(
         "button",
         { type: "button", className: "bt-member-open", title: t("Open {name}'s chat", { name: member.name }), onClick: () => actions.openSession(member.id) },
-        (0, import_react48.createElement)(BotMark, { bot: member, size: 32, state: markOf(entry) }),
-        (0, import_react48.createElement)(
+        (0, import_react49.createElement)(BotMark, { bot: member, size: 32, state: markOf(entry) }),
+        (0, import_react49.createElement)(
           "span",
           { className: "bt-member-text" },
-          (0, import_react48.createElement)(
+          (0, import_react49.createElement)(
             "span",
             { className: "bt-member-line" },
-            (0, import_react48.createElement)("span", { className: "bt-member-name" }, member.name),
-            room2.admin === member.id ? (0, import_react48.createElement)("span", { className: "bt-tag" }, t("Admin")) : null
+            (0, import_react49.createElement)("span", { className: "bt-member-name" }, member.name),
+            room2.admin === member.id ? (0, import_react49.createElement)("span", { className: "bt-tag" }, t("Admin")) : null
           ),
-          (0, import_react48.createElement)(MemberState, { entry, bot: member, room: room2, roster })
+          (0, import_react49.createElement)(MemberState, { entry, bot: member, room: room2, roster })
         )
       ),
-      (0, import_react48.createElement)(StopMemberWork, { entry, bot: member, room: room2, actions })
+      (0, import_react49.createElement)(StopMemberWork, { entry, bot: member, room: room2, actions })
     ),
-    (0, import_react48.createElement)(MemberApprovals, { entry, bot: member, actions })
+    (0, import_react49.createElement)(MemberApprovals, { entry, bot: member, actions })
   );
 }
 function GroupOverview({ room: room2, roster, actions, usage, useWork, openSettings }) {
   let members = room2.members.map((id2) => roster.byId[id2]).filter(Boolean), { entries: entries2 } = useMemberWork(room2, useWork);
   return [
-    room2.notice ? (0, import_react48.createElement)(About, { key: "notice", title: "Notice", text: room2.notice }) : (0, import_react48.createElement)("button", { key: "notice", type: "button", className: "bt-more", onClick: openSettings }, t("Add a notice in group settings")),
-    (0, import_react48.createElement)(
+    room2.notice ? (0, import_react49.createElement)(About, { key: "notice", title: "Notice", text: room2.notice }) : (0, import_react49.createElement)("button", { key: "notice", type: "button", className: "bt-more", onClick: openSettings }, t("Add a notice in group settings")),
+    (0, import_react49.createElement)(
       "div",
       { key: "members" },
-      (0, import_react48.createElement)(
+      (0, import_react49.createElement)(
         "div",
         { className: "bt-members-head" },
-        (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Members · {count}", { count: members.length })),
-        (0, import_react48.createElement)(StopRoomWork, { room: room2, entries: entries2, actions })
+        (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Members · {count}", { count: members.length })),
+        (0, import_react49.createElement)(StopRoomWork, { room: room2, entries: entries2, actions })
       ),
-      (0, import_react48.createElement)("div", { className: "bt-members", role: "list" }, members.map((member) => (0, import_react48.createElement)(MemberRow, {
+      (0, import_react49.createElement)("div", { className: "bt-members", role: "list" }, members.map((member) => (0, import_react49.createElement)(MemberRow, {
         key: member.id,
         member,
         entry: entries2.find((item) => item.id === member.id),
@@ -14441,29 +14542,29 @@ function GroupOverview({ room: room2, roster, actions, usage, useWork, openSetti
         actions
       })))
     ),
-    (0, import_react48.createElement)(
+    (0, import_react49.createElement)(
       "div",
       { key: "mode" },
-      (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Who answers")),
-      (0, import_react48.createElement)("div", { className: "bt-kv" }, (0, import_react48.createElement)("span", null, t(ROOM_MODES.find(([id2]) => id2 === shownMode(room2, roster))?.[1] ?? "Everyone")))
+      (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Who answers")),
+      (0, import_react49.createElement)("div", { className: "bt-kv" }, (0, import_react49.createElement)("span", null, t(ROOM_MODES.find(([id2]) => id2 === shownMode(room2, roster))?.[1] ?? "Everyone")))
     ),
-    room2.permission ? (0, import_react48.createElement)(
+    room2.permission ? (0, import_react49.createElement)(
       "div",
       { key: "permission" },
-      (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Permissions")),
-      (0, import_react48.createElement)("div", { className: "bt-kv" }, (0, import_react48.createElement)("span", { className: presetDanger(room2.permission) ? "bt-perm-danger" : void 0 }, presetName(room2.permission, roster.permissions)))
+      (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Permissions")),
+      (0, import_react49.createElement)("div", { className: "bt-kv" }, (0, import_react49.createElement)("span", { className: presetDanger(room2.permission) ? "bt-perm-danger" : void 0 }, presetName(room2.permission, roster.permissions)))
     ) : null,
-    roster.memory === !1 ? null : (0, import_react48.createElement)(MemoryRow, { key: "memory", owner: { id: room2.id, name: room2.name, group: !0 }, actions }),
-    usage ? (0, import_react48.createElement)(
+    roster.memory === !1 ? null : (0, import_react49.createElement)(MemoryRow, { key: "memory", owner: { id: room2.id, name: room2.name, group: !0 }, actions }),
+    usage ? (0, import_react49.createElement)(
       "div",
       { key: "usage" },
-      (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Usage")),
-      (0, import_react48.createElement)("div", { className: "bt-kv" }, (0, import_react48.createElement)("span", null, room2.name), (0, import_react48.createElement)("span", null, usage))
+      (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Usage")),
+      (0, import_react49.createElement)("div", { className: "bt-kv" }, (0, import_react49.createElement)("span", null, room2.name), (0, import_react49.createElement)("span", null, usage))
     ) : null
   ];
 }
 function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages }) {
-  let owner = roster.byId[sessionId], part = owner ? currentPart(owner) : sessionId, isMainBot = isMainOf(roster, owner?.id), [tab, setTab] = (0, import_react48.useState)("details"), room2 = roster.roomsById[sessionId], [view, setView] = (0, import_react48.useState)(startTab === "settings" && (owner || room2) ? "settings" : "overview"), [editing, setEditing] = (0, import_react48.useState)(!!(startRenaming && (roster.byId[sessionId] || roster.roomsById[sessionId]))), [draftName, setDraftName] = (0, import_react48.useState)(roster.byId[sessionId]?.name ?? (roster.roomsById[sessionId]?.named ? roster.roomsById[sessionId].name : "")), [copied, setCopied] = (0, import_react48.useState)(!1), [error, setError] = (0, import_react48.useState)(""), glide = useGlide(tab), last = (0, import_react48.useRef)({ view, tab, move: void 0 });
+  let owner = roster.byId[sessionId], part = owner ? currentPart(owner) : sessionId, isMainBot = isMainOf(roster, owner?.id), [tab, setTab] = (0, import_react49.useState)("details"), room2 = roster.roomsById[sessionId], [view, setView] = (0, import_react49.useState)(startTab === "settings" && (owner || room2) ? "settings" : "overview"), [editing, setEditing] = (0, import_react49.useState)(!!(startRenaming && (roster.byId[sessionId] || roster.roomsById[sessionId]))), [draftName, setDraftName] = (0, import_react49.useState)(roster.byId[sessionId]?.name ?? (roster.roomsById[sessionId]?.named ? roster.roomsById[sessionId].name : "")), [copied, setCopied] = (0, import_react49.useState)(!1), [error, setError] = (0, import_react49.useState)(""), glide = useGlide(tab), last = (0, import_react49.useRef)({ view, tab, move: void 0 });
   last.current.view !== view ? last.current = { view, tab, move: view === "settings" ? "in" : "out" } : last.current.tab !== tab && (last.current = { view, tab, move: "tab" });
   let move = last.current.move, side = move === "tab" ? void 0 : move, close = () => actions.closeOverlay();
   useEscape(close);
@@ -14471,21 +14572,21 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, a
     navigator.clipboard?.writeText(transcript).then(() => {
       setCopied(!0), setTimeout(() => setCopied(!1), 1600);
     });
-  }, errorLine = error ? (0, import_react48.createElement)("div", { className: "bt-error", role: "alert", style: { padding: 0 } }, error) : null;
+  }, errorLine = error ? (0, import_react49.createElement)("div", { className: "bt-error", role: "alert", style: { padding: 0 } }, error) : null;
   if ((bot || room2) && view === "settings")
     return [
-      (0, import_react48.createElement)(
+      (0, import_react49.createElement)(
         "div",
         { key: "head", className: "bt-subhead", "data-move": move },
-        (0, import_react48.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Back to details"), onClick: () => setView("overview") }, (0, import_react48.createElement)(ChevronLeftIcon)),
-        (0, import_react48.createElement)("span", { className: "bt-subhead-title" }, bot ? t("Settings") : t("Group settings")),
-        hasStrip ? null : (0, import_react48.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Close details"), onClick: close }, (0, import_react48.createElement)(CloseIcon))
+        (0, import_react49.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Back to details"), onClick: () => setView("overview") }, (0, import_react49.createElement)(ChevronLeftIcon)),
+        (0, import_react49.createElement)("span", { className: "bt-subhead-title" }, bot ? t("Settings") : t("Group settings")),
+        hasStrip ? null : (0, import_react49.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Close details"), onClick: close }, (0, import_react49.createElement)(CloseIcon))
       ),
-      (0, import_react48.createElement)(
+      (0, import_react49.createElement)(
         "div",
         { key: "set-body", className: "bt-drawer-body bt-set-body", "data-move": move },
         errorLine,
-        bot ? (0, import_react48.createElement)(BotSettingsForm, { bot, roster, actions, run: run2 }) : (0, import_react48.createElement)(GroupSettingsForm, { room: room2, roster, actions, run: run2, onDeleted: close })
+        bot ? (0, import_react49.createElement)(BotSettingsForm, { bot, roster, actions, run: run2 }) : (0, import_react49.createElement)(GroupSettingsForm, { room: room2, roster, actions, run: run2, onDeleted: close })
       )
     ];
   let more = drawerMenuKeys({
@@ -14494,31 +14595,31 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, a
     canBrowse: bot !== void 0 && roster.browser === !0 && actions.openBrowser !== void 0,
     canTerminal: actions.canOpenTerminal?.() === !0,
     canFiles: actions.canOpenFiles?.() === !0
-  }).map((key) => menuItemFor(key, actions, sessionId)), top = (0, import_react48.createElement)(
+  }).map((key) => menuItemFor(key, actions, sessionId)), top = (0, import_react49.createElement)(
     "div",
     { className: "bt-drawer-top", "data-move": side },
-    bot || room2 ? (0, import_react48.createElement)("button", { type: "button", className: "bt-round", "aria-label": bot ? t("Edit Bot") : t("Group settings"), title: bot ? t("Edit Bot") : t("Group settings"), "data-info-row": "settings", onClick: () => setView("settings") }, (0, import_react48.createElement)(GearIcon)) : null,
-    more.length > 0 ? (0, import_react48.createElement)("span", { "data-info-row": "more" }, (0, import_react48.createElement)(PanelMenu, { items: more, className: "bt-round", "aria-label": t("More") })) : null,
-    bot || room2 ? (0, import_react48.createElement)("button", { type: "button", className: "bt-round", "aria-label": copied ? t("Copied conversation") : t("Share conversation"), title: copied ? t("Copied") : t("Copy conversation as Markdown"), onClick: share }, copied ? (0, import_react48.createElement)("span", { key: "copied", className: "bt-pop-in" }, "✓") : (0, import_react48.createElement)(ShareIcon)) : null,
-    hasStrip ? null : (0, import_react48.createElement)("button", { type: "button", className: "bt-round", "aria-label": t("Close details"), onClick: close }, (0, import_react48.createElement)(CloseIcon))
+    bot || room2 ? (0, import_react49.createElement)("button", { type: "button", className: "bt-round", "aria-label": bot ? t("Edit Bot") : t("Group settings"), title: bot ? t("Edit Bot") : t("Group settings"), "data-info-row": "settings", onClick: () => setView("settings") }, (0, import_react49.createElement)(GearIcon)) : null,
+    more.length > 0 ? (0, import_react49.createElement)("span", { "data-info-row": "more" }, (0, import_react49.createElement)(PanelMenu, { items: more, className: "bt-round", "aria-label": t("More") })) : null,
+    bot || room2 ? (0, import_react49.createElement)("button", { type: "button", className: "bt-round", "aria-label": copied ? t("Copied conversation") : t("Share conversation"), title: copied ? t("Copied") : t("Copy conversation as Markdown"), onClick: share }, copied ? (0, import_react49.createElement)("span", { key: "copied", className: "bt-pop-in" }, "✓") : (0, import_react49.createElement)(ShareIcon)) : null,
+    hasStrip ? null : (0, import_react49.createElement)("button", { type: "button", className: "bt-round", "aria-label": t("Close details"), onClick: close }, (0, import_react49.createElement)(CloseIcon))
   );
   if (!bot && !room2)
     return [
-      (0, import_react48.createElement)(import_react48.Fragment, { key: "top" }, top),
-      (0, import_react48.createElement)("div", { key: "body", className: "bt-drawer-body" }, (0, import_react48.createElement)("div", { className: "bt-muted" }, t("This conversation is not part of your Bot team.")))
+      (0, import_react49.createElement)(import_react49.Fragment, { key: "top" }, top),
+      (0, import_react49.createElement)("div", { key: "body", className: "bt-drawer-body" }, (0, import_react49.createElement)("div", { className: "bt-muted" }, t("This conversation is not part of your Bot team.")))
     ];
   let current = bot?.name ?? room2.name, saveName = async () => {
     setEditing(!1);
     let next = draftName.trim();
     next === current || room2 && !room2.named && next === "" || (bot && next && await run2(actions.updateBot(bot.id, { name: next })), room2 && await run2(actions.updateRoom(room2.id, { name: next })));
-  }, subtitle = bot ? bot.role : roomSubtitle(room2, roster), tabs = bot ? ["details", "browser"] : ["details"];
+  }, subtitle = bot ? bot.role : roomSubtitle(room2, roster), tabs = bot ? globalThis.__dshDesktop ? ["details", "browser", "desktop"] : ["details", "browser"] : ["details"];
   return [
-    (0, import_react48.createElement)(import_react48.Fragment, { key: "top" }, top),
-    (0, import_react48.createElement)(
+    (0, import_react49.createElement)(import_react49.Fragment, { key: "top" }, top),
+    (0, import_react49.createElement)(
       "div",
       { key: "id", className: "bt-drawer-id", "data-move": side },
-      bot ? (0, import_react48.createElement)(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== void 0), main: isMainBot, badge: !1, gaze: !0, pokeable: !0 }) : (0, import_react48.createElement)(MemberPile, { room: room2, roster }),
-      editing ? (0, import_react48.createElement)("input", {
+      bot ? (0, import_react49.createElement)(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== void 0), main: isMainBot, badge: !1, gaze: !0, pokeable: !0 }) : (0, import_react49.createElement)(MemberPile, { room: room2, roster }),
+      editing ? (0, import_react49.createElement)("input", {
         className: "bt-drawer-name-input",
         autoFocus: !0,
         value: draftName,
@@ -14529,49 +14630,50 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, a
         onKeyDown: (event) => {
           event.key === "Enter" && saveName(), event.key === "Escape" && (event.stopPropagation(), setEditing(!1));
         }
-      }) : (0, import_react48.createElement)("button", { type: "button", className: "bt-drawer-name", "aria-label": t("Rename {name}", { name: current }), title: t("Rename"), onClick: () => {
+      }) : (0, import_react49.createElement)("button", { type: "button", className: "bt-drawer-name", "aria-label": t("Rename {name}", { name: current }), title: t("Rename"), onClick: () => {
         setDraftName(room2 && !room2.named ? "" : current), setEditing(!0);
       } }, current),
-      subtitle ? (0, import_react48.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null
+      subtitle ? (0, import_react49.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null
     ),
-    tabs.length > 1 ? (0, import_react48.createElement)(
+    tabs.length > 1 ? (0, import_react49.createElement)(
       "div",
       { key: "tabs", ref: glide.box, className: "bt-tabs", role: "tablist", "data-move": side },
-      (0, import_react48.createElement)("span", { ref: glide.thumb, className: "bt-thumb", "aria-hidden": !0 }),
-      tabs.map((key) => (0, import_react48.createElement)("button", { key, type: "button", role: "tab", className: "bt-tab", "aria-selected": tab === key, onClick: () => setTab(key) }, t(TAB_LABELS[key])))
+      (0, import_react49.createElement)("span", { ref: glide.thumb, className: "bt-thumb", "aria-hidden": !0 }),
+      tabs.map((key) => (0, import_react49.createElement)("button", { key, type: "button", role: "tab", className: "bt-tab", "aria-selected": tab === key, onClick: () => setTab(key) }, t(TAB_LABELS[key])))
     ) : null,
-    (0, import_react48.createElement)(
+    (0, import_react49.createElement)(
       "div",
       { key: `body:${tab}`, className: "bt-drawer-body", "data-move": move },
       errorLine,
-      room2 && tab === "details" ? (0, import_react48.createElement)(GroupOverview, { room: room2, roster, actions, usage, useWork, openSettings: () => setView("settings") }) : null,
+      room2 && tab === "details" ? (0, import_react49.createElement)(GroupOverview, { room: room2, roster, actions, usage, useWork, openSettings: () => setView("settings") }) : null,
       bot && tab === "details" ? [
-        (0, import_react48.createElement)(RunStats, { key: "stats", bot, part, running, actions }),
-        (0, import_react48.createElement)(
+        (0, import_react49.createElement)(RunStats, { key: "stats", bot, part, running, actions }),
+        (0, import_react49.createElement)(
           "div",
           { key: "model", className: "bt-drawer-model" },
-          (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Model")),
-          (0, import_react48.createElement)(ModelMenu, { bot, roster, actions, run: run2, wide: !0 }),
-          modelOf(bot, roster) ? null : (0, import_react48.createElement)("div", { className: "bt-note" }, t("Pick a model and {name} can start.", { name: bot.name }))
+          (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Model")),
+          (0, import_react49.createElement)(ModelMenu, { bot, roster, actions, run: run2, wide: !0 }),
+          modelOf(bot, roster) ? null : (0, import_react49.createElement)("div", { className: "bt-note" }, t("Pick a model and {name} can start.", { name: bot.name }))
         ),
-        (0, import_react48.createElement)(PermissionRow, { key: "permission", bot, roster, actions, run: run2 }),
-        (0, import_react48.createElement)(
+        (0, import_react49.createElement)(PermissionRow, { key: "permission", bot, roster, actions, run: run2 }),
+        (0, import_react49.createElement)(
           "div",
           { key: "folder", className: "bt-drawer-model" },
-          (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Working folder")),
-          (0, import_react48.createElement)(FolderMenu, { value: bot.workDir, actions, run: run2, wide: !0, onPick: (workDir) => run2(actions.updateBot(bot.id, { workDir })) })
+          (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Working folder")),
+          (0, import_react49.createElement)(FolderMenu, { value: bot.workDir, actions, run: run2, wide: !0, onPick: (workDir) => run2(actions.updateBot(bot.id, { workDir })) })
         ),
-        bot.instructions ? (0, import_react48.createElement)(About, { key: "about", text: bot.instructions }) : (0, import_react48.createElement)("button", { key: "about", type: "button", className: "bt-more", onClick: () => setView("settings") }, t("Add instructions in Bot settings")),
-        roster.memory === !1 ? null : (0, import_react48.createElement)(MemoryRow, { key: "memory", owner: { id: bot.id, name: bot.name }, actions }),
-        usage ? (0, import_react48.createElement)(
+        bot.instructions ? (0, import_react49.createElement)(About, { key: "about", text: bot.instructions }) : (0, import_react49.createElement)("button", { key: "about", type: "button", className: "bt-more", onClick: () => setView("settings") }, t("Add instructions in Bot settings")),
+        roster.memory === !1 ? null : (0, import_react49.createElement)(MemoryRow, { key: "memory", owner: { id: bot.id, name: bot.name }, actions }),
+        usage ? (0, import_react49.createElement)(
           "div",
           { key: "usage" },
-          (0, import_react48.createElement)("div", { className: "bt-section-title" }, t("Usage")),
-          (0, import_react48.createElement)("div", { className: "bt-kv" }, (0, import_react48.createElement)("span", null, bot.name), (0, import_react48.createElement)("span", null, usage))
+          (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Usage")),
+          (0, import_react49.createElement)("div", { className: "bt-kv" }, (0, import_react49.createElement)("span", null, bot.name), (0, import_react49.createElement)("span", null, usage))
         ) : null,
-        (0, import_react48.createElement)(ScheduleSummary, { key: "routines", bot, actions })
+        (0, import_react49.createElement)(ScheduleSummary, { key: "routines", bot, actions })
       ] : null,
-      bot && tab === "browser" ? (0, import_react48.createElement)(BrowserCards, { bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) : null
+      bot && tab === "browser" ? (0, import_react49.createElement)(BrowserCards, { bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) : null,
+      bot && tab === "desktop" ? (0, import_react49.createElement)(DesktopPane, { bot }) : null
     )
   ];
 }
@@ -14583,15 +14685,15 @@ function rectsOverlap(a, b2) {
 
 // modules/bot-runtime/vendor/ds-bot/src/client/browser-pane.js
 var PANEL_LINGER_MS = 300, WIDTH_KEY = STORAGE.browserWidth, DEFAULT_WIDTH = 520, DETAILS_WIDTH = 320, DETAILS_MAX = 520, MIN_WIDTH = 360, READ_FLASH_MS = 2400, EMPTY_PAGE = { url: "", title: "", favicon: null, loading: !1, canGoBack: !1, canGoForward: !1, error: null, excerpt: "" }, EMPTY_TABS2 = { ids: [], active: null }, SPRING_LEAD2 = springEasing(576, 39.4), SPRING_TRAIL2 = springEasing(144, 19.7), icon = (paths) => function() {
-  return (0, import_react49.createElement)(
+  return (0, import_react50.createElement)(
     "svg",
     { width: 16, height: 16, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": !0 },
-    paths.map((d, index) => (0, import_react49.createElement)("path", { key: index, d }))
+    paths.map((d, index) => (0, import_react50.createElement)("path", { key: index, d }))
   );
 }, GlobeIcon2 = icon(["M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "M3 10h14", "M10 3c2 2.2 2.9 4.5 2.9 7S12 14.8 10 17c-2-2.2-2.9-4.5-2.9-7S8 5.2 10 3z"]), BackIcon = icon(["M12.5 4.5L7 10l5.5 5.5"]), ForwardIcon = icon(["M7.5 4.5L13 10l-5.5 5.5"]), ReloadIcon = icon(["M15.5 10a5.5 5.5 0 1 1-1.6-3.9", "M15.5 3.5v3.5H12"]), StopIcon = icon(["M5.5 5.5l9 9M14.5 5.5l-9 9"]), CloseIcon3 = icon(["M5.5 5.5l9 9M14.5 5.5l-9 9"]), PlusTabIcon = icon(["M10 5v10M5 10h10"]), LockIcon2 = icon(["M6.5 9V7a3.5 3.5 0 0 1 7 0v2", "M5.5 9h9v7h-9z"]), ImportIcon = icon(["M10 3.5v8.5", "M6 8.5l4 4 4-4", "M4.5 14v1.5a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5V14"]), FileIcon = icon(["M6 3.5h5.5L14.5 6.5v10H6z", "M11 3.5v3.5h3.5"]), WindowIcon = icon(["M4 5h12v9.5H4z", "M4 7.5h12"]);
 function Favicon({ src, className }) {
-  let [failed, setFailed] = (0, import_react49.useState)(null);
-  return !src || failed === src ? (0, import_react49.createElement)("span", { className: `${className} bt-ptab-globe` }, (0, import_react49.createElement)(GlobeIcon2)) : (0, import_react49.createElement)("img", { className, src, alt: "", "aria-hidden": !0, onError: () => setFailed(src) });
+  let [failed, setFailed] = (0, import_react50.useState)(null);
+  return !src || failed === src ? (0, import_react50.createElement)("span", { className: `${className} bt-ptab-globe` }, (0, import_react50.createElement)(GlobeIcon2)) : (0, import_react50.createElement)("img", { className, src, alt: "", "aria-hidden": !0, onError: () => setFailed(src) });
 }
 var savedWidth = () => {
   try {
@@ -14602,8 +14704,8 @@ var savedWidth = () => {
   }
 }, widthRange = (view, room2) => view === "browser" ? [MIN_WIDTH, room2 - MIN_CHAT] : [DETAILS_WIDTH, Math.min(DETAILS_MAX, room2 - MIN_CHAT)], fitWidth = (width, [low, high]) => Math.round(Math.max(low, Math.min(width, high))), shortAddress = (url) => String(url ?? "").replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, ""), reducedMotion2 = () => typeof matchMedia == "function" && matchMedia("(prefers-reduced-motion: reduce)").matches, tabLabel = (page) => page.title || shortAddress(page.url) || t("New tab");
 function PanelMenu({ items, className, "aria-label": label }) {
-  let [open, setOpen] = (0, import_react49.useState)(!1), wrap = (0, import_react49.useRef)(null);
-  return (0, import_react49.useEffect)(() => {
+  let [open, setOpen] = (0, import_react50.useState)(!1), wrap = (0, import_react50.useRef)(null);
+  return (0, import_react50.useEffect)(() => {
     if (!open) return;
     let onDown = (event) => {
       wrap.current && !wrap.current.contains(event.target) && setOpen(!1);
@@ -14613,10 +14715,10 @@ function PanelMenu({ items, className, "aria-label": label }) {
     return window.addEventListener("pointerdown", onDown), window.addEventListener("keydown", onKey), () => {
       window.removeEventListener("pointerdown", onDown), window.removeEventListener("keydown", onKey);
     };
-  }, [open]), items.length === 0 ? null : (0, import_react49.createElement)(
+  }, [open]), items.length === 0 ? null : (0, import_react50.createElement)(
     "span",
     { className: "bt-pmenu", ref: wrap },
-    (0, import_react49.createElement)("button", {
+    (0, import_react50.createElement)("button", {
       type: "button",
       className,
       "aria-label": label,
@@ -14624,11 +14726,11 @@ function PanelMenu({ items, className, "aria-label": label }) {
       "aria-haspopup": "menu",
       "aria-expanded": open,
       onClick: () => setOpen((value) => !value)
-    }, (0, import_react49.createElement)(DotsIcon)),
-    open ? (0, import_react49.createElement)(
+    }, (0, import_react50.createElement)(DotsIcon)),
+    open ? (0, import_react50.createElement)(
       "div",
       { className: "bt-pmenu-pop", role: "menu" },
-      items.map((item, index) => item.sep ? (0, import_react49.createElement)("span", { key: `sep-${index}`, className: "bt-pmenu-sep", role: "separator" }) : (0, import_react49.createElement)("button", {
+      items.map((item, index) => item.sep ? (0, import_react50.createElement)("span", { key: `sep-${index}`, className: "bt-pmenu-sep", role: "separator" }) : (0, import_react50.createElement)("button", {
         key: item.key,
         type: "button",
         role: "menuitem",
@@ -14636,7 +14738,7 @@ function PanelMenu({ items, className, "aria-label": label }) {
         onClick: () => {
           setOpen(!1), item.onPick();
         }
-      }, (0, import_react49.createElement)(item.icon), (0, import_react49.createElement)("span", null, item.label)))
+      }, (0, import_react50.createElement)(item.icon), (0, import_react50.createElement)("span", null, item.label)))
     ) : null
   );
 }
@@ -14661,8 +14763,8 @@ function menuItemFor(key, actions, subject) {
 }
 var sideTitle = (chat) => chat?.entries?.[0]?.question?.trim() || t("Side chat");
 function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, reading, onView, actions, useBrowserPages }) {
-  let pages = useBrowserPages((map) => map), wrap = (0, import_react49.useRef)(null), ind = (0, import_react49.useRef)(null), spot = (0, import_react49.useRef)(null), under = (0, import_react49.useRef)(null), watcher = (0, import_react49.useRef)(null);
-  (0, import_react49.useLayoutEffect)(() => {
+  let pages = useBrowserPages((map) => map), wrap = (0, import_react50.useRef)(null), ind = (0, import_react50.useRef)(null), spot = (0, import_react50.useRef)(null), under = (0, import_react50.useRef)(null), watcher = (0, import_react50.useRef)(null);
+  (0, import_react50.useLayoutEffect)(() => {
     let box = wrap.current, capsule = ind.current;
     if (!box || !capsule) return;
     let node = view === "details" ? box.querySelector(".bt-ptab-bot") : view === "side" ? box.querySelector(`[data-side="${side}"]`) : box.querySelector(`[data-tab="${active}"]`);
@@ -14677,7 +14779,7 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
     return () => {
       lead.cancel(), trail.cancel();
     };
-  }), (0, import_react49.useEffect)(() => {
+  }), (0, import_react50.useEffect)(() => {
     let box = wrap.current;
     if (!box) return;
     let observer = new ResizeObserver(() => {
@@ -14693,13 +14795,13 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
     canTerminal: actions.canOpenTerminal?.() === !0,
     canFiles: actions.canOpenFiles?.() === !0
   }).map((key) => menuItemFor(key, actions, subject));
-  return (0, import_react49.createElement)(
+  return (0, import_react50.createElement)(
     "div",
     { className: "bt-ptabs", role: "tablist", "aria-label": t("Panel tabs") },
-    (0, import_react49.createElement)(
+    (0, import_react50.createElement)(
       "div",
       { className: "bt-ptabs-in", ref: wrap },
-      (0, import_react49.createElement)(
+      (0, import_react50.createElement)(
         "button",
         {
           type: "button",
@@ -14709,12 +14811,12 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
           title: bot.name,
           onClick: () => onView("details")
         },
-        (0, import_react49.createElement)(BotMark, { bot, size: 20, state: reading ? "searching" : "idle" }),
-        view === "details" ? (0, import_react49.createElement)("span", { className: "bt-ptab-name" }, bot.name) : null
+        (0, import_react50.createElement)(BotMark, { bot, size: 20, state: reading ? "searching" : "idle" }),
+        view === "details" ? (0, import_react50.createElement)("span", { className: "bt-ptab-name" }, bot.name) : null
       ),
       ids.map((tabId) => {
         let page = pages[tabId] ?? EMPTY_PAGE;
-        return (0, import_react49.createElement)(
+        return (0, import_react50.createElement)(
           "button",
           {
             key: tabId,
@@ -14731,9 +14833,9 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
               event.button === 1 && (event.preventDefault(), actions.browserCloseTab(bot.id, tabId));
             }
           },
-          (0, import_react49.createElement)(Favicon, { src: page.favicon, className: "bt-ptab-fav" }),
-          (0, import_react49.createElement)("span", { className: "bt-ptab-title" }, tabLabel(page)),
-          (0, import_react49.createElement)("span", {
+          (0, import_react50.createElement)(Favicon, { src: page.favicon, className: "bt-ptab-fav" }),
+          (0, import_react50.createElement)("span", { className: "bt-ptab-title" }, tabLabel(page)),
+          (0, import_react50.createElement)("span", {
             className: "bt-ptab-x",
             role: "button",
             "aria-label": t("Close tab"),
@@ -14746,7 +14848,7 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
       }),
       sides.map((chat) => {
         let on2 = view === "side" && chat.id === side;
-        return (0, import_react49.createElement)(
+        return (0, import_react50.createElement)(
           "button",
           {
             key: chat.id,
@@ -14761,9 +14863,9 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
               event.button === 1 && (event.preventDefault(), actions.closeSideChat(chat.id));
             }
           },
-          (0, import_react49.createElement)("span", { className: "bt-ptab-globe", "aria-hidden": !0 }, (0, import_react49.createElement)(SideIcon)),
-          (0, import_react49.createElement)("span", { className: "bt-ptab-title" }, sideTitle(chat)),
-          (0, import_react49.createElement)("span", {
+          (0, import_react50.createElement)("span", { className: "bt-ptab-globe", "aria-hidden": !0 }, (0, import_react50.createElement)(SideIcon)),
+          (0, import_react50.createElement)("span", { className: "bt-ptab-title" }, sideTitle(chat)),
+          (0, import_react50.createElement)("span", {
             className: "bt-ptab-x",
             role: "button",
             "aria-label": t("Close side chat"),
@@ -14774,18 +14876,18 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
           }, "×")
         );
       }),
-      (0, import_react49.createElement)("span", { ref: ind, className: "bt-ptab-ind", "aria-hidden": !0 })
+      (0, import_react50.createElement)("span", { ref: ind, className: "bt-ptab-ind", "aria-hidden": !0 })
     ),
     // The `···` and Close stay outside the scrolling tabs, so a narrow panel keeps both.
-    (0, import_react49.createElement)(PanelMenu, { items, className: "bt-ptab-new", "aria-label": t("More") }),
-    (0, import_react49.createElement)("button", { type: "button", className: "bt-icon-btn bt-ptab-close", "aria-label": t("Close panel"), title: t("Close panel"), onClick: () => actions.closePanel() }, (0, import_react49.createElement)(CloseIcon3))
+    (0, import_react50.createElement)(PanelMenu, { items, className: "bt-ptab-new", "aria-label": t("More") }),
+    (0, import_react50.createElement)("button", { type: "button", className: "bt-icon-btn bt-ptab-close", "aria-label": t("Close panel"), title: t("Close panel"), onClick: () => actions.closePanel() }, (0, import_react50.createElement)(CloseIcon3))
   );
 }
 function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, hold }) {
-  let page = useBrowserPages((pages) => pages[tabId ?? ""]) ?? EMPTY_PAGE, frame = (0, import_react49.useRef)(null), input = (0, import_react49.useRef)(null), [draft, setDraft] = (0, import_react49.useState)(null), [covered, setCovered] = (0, import_react49.useState)(!1), imports = actions.browserImport, [flow, setFlow] = (0, import_react49.useState)(null), flowRef = (0, import_react49.useRef)(null), [sources, setSources] = (0, import_react49.useState)(null), [busy, setBusy] = (0, import_react49.useState)(!1), setFlowTracked = (next) => {
+  let page = useBrowserPages((pages) => pages[tabId ?? ""]) ?? EMPTY_PAGE, frame = (0, import_react50.useRef)(null), input = (0, import_react50.useRef)(null), [draft, setDraft] = (0, import_react50.useState)(null), [covered, setCovered] = (0, import_react50.useState)(!1), imports = actions.browserImport, [flow, setFlow] = (0, import_react50.useState)(null), flowRef = (0, import_react50.useRef)(null), [sources, setSources] = (0, import_react50.useState)(null), [busy, setBusy] = (0, import_react50.useState)(!1), setFlowTracked = (next) => {
     flowRef.current = typeof next == "function" ? next(flowRef.current) : next, setFlow(flowRef.current);
   }, showGuest = landed && !leaving && !covered && !!page.url && !page.error && flow === null;
-  (0, import_react49.useEffect)(() => {
+  (0, import_react50.useEffect)(() => {
     let update = () => {
       let panel = frame.current?.getBoundingClientRect(), overlaps2 = panel && [...document.querySelectorAll('[role="dialog"],[role="menu"],[role="listbox"]')].some((element) => rectsOverlap(panel, element.getBoundingClientRect()));
       setCovered(!!overlaps2);
@@ -14793,7 +14895,7 @@ function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, ho
     return observer.observe(document.body, { subtree: !0, childList: !0, attributes: !0, attributeFilter: ["role", "data-leaving"] }), window.addEventListener("resize", update), update(), () => {
       observer.disconnect(), window.removeEventListener("resize", update);
     };
-  }, []), (0, import_react49.useEffect)(() => (setFlowTracked(null), () => {
+  }, []), (0, import_react50.useEffect)(() => (setFlowTracked(null), () => {
     let id2 = typeof flowRef.current == "object" && flowRef.current !== null ? flowRef.current.id : null;
     id2 && imports?.cancel(id2).catch(() => {
     });
@@ -14822,7 +14924,7 @@ function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, ho
     setFlowTracked(null), id2 && imports?.cancel(id2).catch(() => {
     });
   };
-  (0, import_react49.useLayoutEffect)(() => {
+  (0, import_react50.useLayoutEffect)(() => {
     let element = frame.current;
     if (!element || leaving || !tabId) {
       actions.browserShow(null);
@@ -14840,7 +14942,7 @@ function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, ho
     return observer.observe(element), window.addEventListener("resize", schedule), () => {
       cancelAnimationFrame(raf), observer.disconnect(), window.removeEventListener("resize", schedule);
     };
-  }, [tabId, showGuest, leaving]), (0, import_react49.useEffect)(() => {
+  }, [tabId, showGuest, leaving]), (0, import_react50.useEffect)(() => {
     setDraft(null), landed && !page.url && input.current?.focus();
   }, [tabId, landed]);
   let go2 = (event) => {
@@ -14850,44 +14952,44 @@ function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, ho
       opened && actions.browserFocus(tabId);
     }));
   }, editing = draft !== null, secure = /^https:/i.test(page.url);
-  return (0, import_react49.createElement)(
+  return (0, import_react50.createElement)(
     "div",
     { className: "bt-panel-view bt-panel-browser", "aria-label": t("{name}'s browser", { name: bot.name }) },
-    actions.browserTakeover ? (0, import_react49.createElement)(
+    actions.browserTakeover ? (0, import_react50.createElement)(
       "div",
       { className: "bt-browser-takeover", "data-held": hold?.by === "user" || void 0 },
-      (0, import_react49.createElement)("span", null, hold?.by === "user" ? t("You control this browser") : hold?.by === "bot" ? t("The Bot handed this browser to you: {reason}", { reason: hold.reason }) : t("The Bot controls this browser")),
-      hold?.by ? (0, import_react49.createElement)("button", { type: "button", onClick: () => {
+      (0, import_react50.createElement)("span", null, hold?.by === "user" ? t("You control this browser") : hold?.by === "bot" ? t("The Bot handed this browser to you: {reason}", { reason: hold.reason }) : t("The Bot controls this browser")),
+      hold?.by ? (0, import_react50.createElement)("button", { type: "button", onClick: () => {
         actions.browserGiveBack(bot.id);
-      } }, t("Give back")) : (0, import_react49.createElement)(
+      } }, t("Give back")) : (0, import_react50.createElement)(
         "span",
         { className: "bt-browser-takeover-actions" },
-        (0, import_react49.createElement)("button", { type: "button", onClick: () => {
+        (0, import_react50.createElement)("button", { type: "button", onClick: () => {
           actions.browserTakeover(bot.id);
         } }, t("Take over")),
-        (0, import_react49.createElement)("button", { type: "button", onClick: () => {
+        (0, import_react50.createElement)("button", { type: "button", onClick: () => {
           actions.browserStop(bot.id);
         } }, t("Stop"))
       )
     ) : null,
-    (0, import_react49.createElement)(
+    (0, import_react50.createElement)(
       "div",
       { className: "bt-browser-bar" },
-      (0, import_react49.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Back"), title: t("Back"), disabled: !page.canGoBack, onClick: () => actions.browserCommand(tabId, "back") }, (0, import_react49.createElement)(BackIcon)),
-      (0, import_react49.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Forward"), title: t("Forward"), disabled: !page.canGoForward, onClick: () => actions.browserCommand(tabId, "forward") }, (0, import_react49.createElement)(ForwardIcon)),
-      (0, import_react49.createElement)("button", {
+      (0, import_react50.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Back"), title: t("Back"), disabled: !page.canGoBack, onClick: () => actions.browserCommand(tabId, "back") }, (0, import_react50.createElement)(BackIcon)),
+      (0, import_react50.createElement)("button", { type: "button", className: "bt-icon-btn", "aria-label": t("Forward"), title: t("Forward"), disabled: !page.canGoForward, onClick: () => actions.browserCommand(tabId, "forward") }, (0, import_react50.createElement)(ForwardIcon)),
+      (0, import_react50.createElement)("button", {
         type: "button",
         className: "bt-icon-btn",
         disabled: !page.url,
         "aria-label": page.loading ? t("Stop") : t("Reload"),
         title: page.loading ? t("Stop") : t("Reload"),
         onClick: () => actions.browserCommand(tabId, page.loading ? "stop" : "reload")
-      }, (0, import_react49.createElement)(page.loading ? StopIcon : ReloadIcon)),
-      (0, import_react49.createElement)(
+      }, (0, import_react50.createElement)(page.loading ? StopIcon : ReloadIcon)),
+      (0, import_react50.createElement)(
         "form",
         { className: "bt-browser-address", onSubmit: go2, "data-editing": editing || void 0 },
-        (0, import_react49.createElement)("span", { className: "bt-browser-scheme", "aria-hidden": !0 }, (0, import_react49.createElement)(secure && !editing ? LockIcon2 : GlobeIcon2)),
-        (0, import_react49.createElement)("input", {
+        (0, import_react50.createElement)("span", { className: "bt-browser-scheme", "aria-hidden": !0 }, (0, import_react50.createElement)(secure && !editing ? LockIcon2 : GlobeIcon2)),
+        (0, import_react50.createElement)("input", {
           ref: input,
           type: "text",
           spellCheck: !1,
@@ -14907,14 +15009,14 @@ function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, ho
           }
         })
       ),
-      (0, import_react49.createElement)("button", {
+      (0, import_react50.createElement)("button", {
         type: "button",
         className: "bt-icon-btn",
         "aria-label": t("New browser tab"),
         title: t("New browser tab"),
         onClick: () => actions.browserNewTab(bot.id)
-      }, (0, import_react49.createElement)(PlusTabIcon)),
-      imports ? (0, import_react49.createElement)("button", {
+      }, (0, import_react50.createElement)(PlusTabIcon)),
+      imports ? (0, import_react50.createElement)("button", {
         type: "button",
         className: "bt-icon-btn bt-import-btn",
         "aria-label": t("Import cookies"),
@@ -14924,29 +15026,29 @@ function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, ho
         onClick: () => {
           flow === "menu" ? setFlowTracked(null) : openImport();
         }
-      }, (0, import_react49.createElement)(ImportIcon)) : null,
-      page.loading ? (0, import_react49.createElement)("span", { className: "bt-browser-progress", "aria-hidden": !0 }) : null
+      }, (0, import_react50.createElement)(ImportIcon)) : null,
+      page.loading ? (0, import_react50.createElement)("span", { className: "bt-browser-progress", "aria-hidden": !0 }) : null
     ),
-    (0, import_react49.createElement)(
+    (0, import_react50.createElement)(
       "div",
       { ref: frame, className: "bt-browser-frame", "data-guest": showGuest || void 0 },
-      flow === "menu" ? (0, import_react49.createElement)(ImportMenu, { sources, busy, onFile: pickFile, onSource: pickSource, onClose: () => setFlowTracked(null) }) : null,
-      typeof flow == "object" && flow !== null ? (0, import_react49.createElement)(ImportCard, { flow, page, busy, onApply: applyImport, onCancel: cancelImport, onCloseAndImport: closeAndImport, onDone: () => setFlowTracked(null), onReload: () => actions.browserCommand(tabId, "reload") }) : null,
-      flow === null && page.error ? (0, import_react49.createElement)(
+      flow === "menu" ? (0, import_react50.createElement)(ImportMenu, { sources, busy, onFile: pickFile, onSource: pickSource, onClose: () => setFlowTracked(null) }) : null,
+      typeof flow == "object" && flow !== null ? (0, import_react50.createElement)(ImportCard, { flow, page, busy, onApply: applyImport, onCancel: cancelImport, onCloseAndImport: closeAndImport, onDone: () => setFlowTracked(null), onReload: () => actions.browserCommand(tabId, "reload") }) : null,
+      flow === null && page.error ? (0, import_react50.createElement)(
         "div",
         { className: "bt-browser-empty" },
-        (0, import_react49.createElement)("div", { className: "bt-browser-empty-title" }, t("This page didn’t load")),
-        (0, import_react49.createElement)("div", { className: "bt-browser-empty-text" }, t(page.error)),
-        page.url ? (0, import_react49.createElement)("button", { type: "button", className: "bt-browser-retry", onClick: () => {
+        (0, import_react50.createElement)("div", { className: "bt-browser-empty-title" }, t("This page didn’t load")),
+        (0, import_react50.createElement)("div", { className: "bt-browser-empty-text" }, t(page.error)),
+        page.url ? (0, import_react50.createElement)("button", { type: "button", className: "bt-browser-retry", onClick: () => {
           actions.browserNavigate(tabId, page.url);
         } }, t("Try again")) : null
-      ) : flow === null && !page.url ? (0, import_react49.createElement)(
+      ) : flow === null && !page.url ? (0, import_react50.createElement)(
         "div",
         { className: "bt-browser-empty" },
-        (0, import_react49.createElement)(BotMark, { bot, size: 48, state: "idle", live: !0 }),
-        (0, import_react49.createElement)("div", { className: "bt-browser-empty-title" }, t("{name}'s browser", { name: bot.name })),
-        (0, import_react49.createElement)("div", { className: "bt-browser-empty-text" }, t("Open a page here and {name} can read it with you. Logins and cookies stay with {name}; other Bots never see them.", { name: bot.name })),
-        imports ? (0, import_react49.createElement)("button", { type: "button", className: "bt-browser-retry", onClick: openImport }, t("Import cookies")) : null
+        (0, import_react50.createElement)(BotMark, { bot, size: 48, state: "idle", live: !0 }),
+        (0, import_react50.createElement)("div", { className: "bt-browser-empty-title" }, t("{name}'s browser", { name: bot.name })),
+        (0, import_react50.createElement)("div", { className: "bt-browser-empty-text" }, t("Open a page here and {name} can read it with you. Logins and cookies stay with {name}; other Bots never see them.", { name: bot.name })),
+        imports ? (0, import_react50.createElement)("button", { type: "button", className: "bt-browser-retry", onClick: openImport }, t("Import cookies")) : null
       ) : null
     )
   );
@@ -14955,23 +15057,23 @@ function importError(error) {
   return error === "too-large" ? t("That file is too large to be a cookie export.") : error === "unreadable" ? t("That file could not be read.") : error === "app-bound" ? t("This browser encrypts its cookies so only it can read them. Export them to a file first, then import that file.") : String(error);
 }
 function ImportMenu({ sources, busy, onFile, onSource, onClose }) {
-  return (0, import_react49.useEffect)(() => {
+  return (0, import_react50.useEffect)(() => {
     let close = (event) => {
       event.key === "Escape" && onClose();
     };
     return window.addEventListener("keydown", close), () => window.removeEventListener("keydown", close);
-  }, [onClose]), (0, import_react49.createElement)(
+  }, [onClose]), (0, import_react50.createElement)(
     "div",
     { className: "bt-import-menu", role: "menu", "aria-label": t("Import cookies") },
-    (0, import_react49.createElement)("div", { className: "bt-import-menu-title" }, t("Import cookies")),
-    (0, import_react49.createElement)(
+    (0, import_react50.createElement)("div", { className: "bt-import-menu-title" }, t("Import cookies")),
+    (0, import_react50.createElement)(
       "button",
       { type: "button", className: "bt-import-item", role: "menuitem", disabled: busy, onClick: onFile },
-      (0, import_react49.createElement)(FileIcon, { className: "bt-import-item-icon" }),
-      (0, import_react49.createElement)("span", { className: "bt-import-item-name" }, t("From a file…")),
-      (0, import_react49.createElement)("span", { className: "bt-import-item-sub" }, t("cookies.txt, JSON, storageState"))
+      (0, import_react50.createElement)(FileIcon, { className: "bt-import-item-icon" }),
+      (0, import_react50.createElement)("span", { className: "bt-import-item-name" }, t("From a file…")),
+      (0, import_react50.createElement)("span", { className: "bt-import-item-sub" }, t("cookies.txt, JSON, storageState"))
     ),
-    sources === null ? (0, import_react49.createElement)("div", { className: "bt-import-menu-note" }, t("Loading…")) : sources.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-import-menu-note" }, t("No browsers found")) : sources.map((source) => (0, import_react49.createElement)(
+    sources === null ? (0, import_react50.createElement)("div", { className: "bt-import-menu-note" }, t("Loading…")) : sources.length === 0 ? (0, import_react50.createElement)("div", { className: "bt-import-menu-note" }, t("No browsers found")) : sources.map((source) => (0, import_react50.createElement)(
       "button",
       {
         key: source.id,
@@ -14981,80 +15083,80 @@ function ImportMenu({ sources, busy, onFile, onSource, onClose }) {
         disabled: busy,
         onClick: () => onSource(source)
       },
-      (0, import_react49.createElement)(WindowIcon, { className: "bt-import-item-icon" }),
-      (0, import_react49.createElement)("span", { className: "bt-import-item-name" }, source.label),
-      (0, import_react49.createElement)("span", { className: "bt-import-item-sub" }, t("Copy of its cookies"))
+      (0, import_react50.createElement)(WindowIcon, { className: "bt-import-item-icon" }),
+      (0, import_react50.createElement)("span", { className: "bt-import-item-name" }, source.label),
+      (0, import_react50.createElement)("span", { className: "bt-import-item-sub" }, t("Copy of its cookies"))
     ))
   );
 }
 function ImportCard({ flow, page, busy, onApply, onCancel, onCloseAndImport, onDone, onReload }) {
   let { stage } = flow;
   if (stage === "running")
-    return (0, import_react49.createElement)("div", { className: "bt-import-card" }, (0, import_react49.createElement)(
+    return (0, import_react50.createElement)("div", { className: "bt-import-card" }, (0, import_react50.createElement)(
       "div",
       { className: "bt-import-box" },
-      (0, import_react49.createElement)("div", { className: "bt-import-title" }, t("{name} is running", { name: flow.source.name })),
-      (0, import_react49.createElement)("div", { className: "bt-import-text" }, t("It must close for a moment so its cookies can be copied. It will reopen with your tabs.")),
-      (0, import_react49.createElement)(
+      (0, import_react50.createElement)("div", { className: "bt-import-title" }, t("{name} is running", { name: flow.source.name })),
+      (0, import_react50.createElement)("div", { className: "bt-import-text" }, t("It must close for a moment so its cookies can be copied. It will reopen with your tabs.")),
+      (0, import_react50.createElement)(
         "div",
         { className: "bt-import-actions" },
-        (0, import_react49.createElement)("button", { type: "button", className: "bt-import-primary", disabled: busy, onClick: onCloseAndImport }, busy ? t("Closing…") : t("Close {name} and import", { name: flow.source.name })),
-        (0, import_react49.createElement)("button", { type: "button", className: "bt-import-plain", disabled: busy, onClick: onCancel }, t("Cancel"))
+        (0, import_react50.createElement)("button", { type: "button", className: "bt-import-primary", disabled: busy, onClick: onCloseAndImport }, busy ? t("Closing…") : t("Close {name} and import", { name: flow.source.name })),
+        (0, import_react50.createElement)("button", { type: "button", className: "bt-import-plain", disabled: busy, onClick: onCancel }, t("Cancel"))
       )
     ));
   if (stage === "error")
-    return (0, import_react49.createElement)("div", { className: "bt-import-card" }, (0, import_react49.createElement)(
+    return (0, import_react50.createElement)("div", { className: "bt-import-card" }, (0, import_react50.createElement)(
       "div",
       { className: "bt-import-box" },
-      (0, import_react49.createElement)("div", { className: "bt-import-title" }, t("Import failed")),
-      (0, import_react49.createElement)("div", { className: "bt-import-text" }, flow.message),
-      (0, import_react49.createElement)("div", { className: "bt-import-actions" }, (0, import_react49.createElement)("button", { type: "button", className: "bt-import-plain", onClick: onCancel }, t("Close")))
+      (0, import_react50.createElement)("div", { className: "bt-import-title" }, t("Import failed")),
+      (0, import_react50.createElement)("div", { className: "bt-import-text" }, flow.message),
+      (0, import_react50.createElement)("div", { className: "bt-import-actions" }, (0, import_react50.createElement)("button", { type: "button", className: "bt-import-plain", onClick: onCancel }, t("Close")))
     ));
   if (stage === "result") {
     let { report } = flow, problems = [...report.dropped ?? [], ...report.failed ?? []];
-    return (0, import_react49.createElement)("div", { className: "bt-import-card" }, (0, import_react49.createElement)(
+    return (0, import_react50.createElement)("div", { className: "bt-import-card" }, (0, import_react50.createElement)(
       "div",
       { className: "bt-import-box" },
-      (0, import_react49.createElement)("div", { className: "bt-import-title" }, report.stored > 0 ? t("Imported {count} cookies", { count: report.stored }) : t("No cookies were stored")),
-      flow.label ? (0, import_react49.createElement)("div", { className: "bt-import-sub" }, flow.label) : null,
-      problems.length ? (0, import_react49.createElement)(
+      (0, import_react50.createElement)("div", { className: "bt-import-title" }, report.stored > 0 ? t("Imported {count} cookies", { count: report.stored }) : t("No cookies were stored")),
+      flow.label ? (0, import_react50.createElement)("div", { className: "bt-import-sub" }, flow.label) : null,
+      problems.length ? (0, import_react50.createElement)(
         "div",
         { className: "bt-import-list" },
-        problems.slice(0, 8).map((item, index) => (0, import_react49.createElement)(
+        problems.slice(0, 8).map((item, index) => (0, import_react50.createElement)(
           "div",
           { key: index, className: "bt-import-line" },
-          (0, import_react49.createElement)("span", { className: "bt-import-line-name" }, item.name ?? "—"),
-          (0, import_react49.createElement)("span", { className: "bt-import-line-reason" }, item.reason)
+          (0, import_react50.createElement)("span", { className: "bt-import-line-name" }, item.name ?? "—"),
+          (0, import_react50.createElement)("span", { className: "bt-import-line-reason" }, item.reason)
         )),
-        problems.length > 8 ? (0, import_react49.createElement)("div", { className: "bt-import-line" }, (0, import_react49.createElement)("span", { className: "bt-import-line-reason" }, t("and {count} more", { count: problems.length - 8 }))) : null
+        problems.length > 8 ? (0, import_react50.createElement)("div", { className: "bt-import-line" }, (0, import_react50.createElement)("span", { className: "bt-import-line-reason" }, t("and {count} more", { count: problems.length - 8 }))) : null
       ) : null,
-      (0, import_react49.createElement)(
+      (0, import_react50.createElement)(
         "div",
         { className: "bt-import-actions" },
-        page.url ? (0, import_react49.createElement)("button", { type: "button", className: "bt-import-plain", onClick: onReload }, t("Reload the page")) : null,
-        (0, import_react49.createElement)("button", { type: "button", className: "bt-import-primary", onClick: onDone }, t("Done"))
+        page.url ? (0, import_react50.createElement)("button", { type: "button", className: "bt-import-plain", onClick: onReload }, t("Reload the page")) : null,
+        (0, import_react50.createElement)("button", { type: "button", className: "bt-import-primary", onClick: onDone }, t("Done"))
       )
     ));
   }
   let { preview } = flow;
-  return (0, import_react49.createElement)("div", { className: "bt-import-card" }, (0, import_react49.createElement)(
+  return (0, import_react50.createElement)("div", { className: "bt-import-card" }, (0, import_react50.createElement)(
     "div",
     { className: "bt-import-box" },
-    (0, import_react49.createElement)("div", { className: "bt-import-title" }, t("Import {count} cookies", { count: preview.cookies })),
-    (0, import_react49.createElement)(
+    (0, import_react50.createElement)("div", { className: "bt-import-title" }, t("Import {count} cookies", { count: preview.cookies })),
+    (0, import_react50.createElement)(
       "div",
       { className: "bt-import-sub" },
       preview.source?.label ?? "",
       flow.restarted ? ` · ${t("the browser was restarted")}` : ""
     ),
-    preview.sites.length ? (0, import_react49.createElement)(
+    preview.sites.length ? (0, import_react50.createElement)(
       "div",
       { className: "bt-import-list" },
-      preview.sites.map((site) => (0, import_react49.createElement)(
+      preview.sites.map((site) => (0, import_react50.createElement)(
         "div",
         { key: site.site, className: "bt-import-line" },
-        (0, import_react49.createElement)("span", { className: "bt-import-line-name" }, site.site),
-        (0, import_react49.createElement)(
+        (0, import_react50.createElement)("span", { className: "bt-import-line-name" }, site.site),
+        (0, import_react50.createElement)(
           "span",
           { className: "bt-import-line-count" },
           t("{count}", { count: site.cookies }),
@@ -15062,56 +15164,56 @@ function ImportCard({ flow, page, busy, onApply, onCancel, onCloseAndImport, onD
         )
       ))
     ) : null,
-    preview.skipped.length ? (0, import_react49.createElement)(
+    preview.skipped.length ? (0, import_react50.createElement)(
       "div",
       { className: "bt-import-list" },
-      (0, import_react49.createElement)("div", { className: "bt-import-note" }, t("{count} skipped", { count: preview.skipped.length })),
-      preview.skipped.slice(0, 5).map((item, index) => (0, import_react49.createElement)(
+      (0, import_react50.createElement)("div", { className: "bt-import-note" }, t("{count} skipped", { count: preview.skipped.length })),
+      preview.skipped.slice(0, 5).map((item, index) => (0, import_react50.createElement)(
         "div",
         { key: index, className: "bt-import-line" },
-        (0, import_react49.createElement)("span", { className: "bt-import-line-name" }, item.name ?? item.where),
-        (0, import_react49.createElement)("span", { className: "bt-import-line-reason" }, item.reason)
+        (0, import_react50.createElement)("span", { className: "bt-import-line-name" }, item.name ?? item.where),
+        (0, import_react50.createElement)("span", { className: "bt-import-line-reason" }, item.reason)
       )),
-      preview.skipped.length > 5 ? (0, import_react49.createElement)("div", { className: "bt-import-line" }, (0, import_react49.createElement)("span", { className: "bt-import-line-reason" }, t("and {count} more", { count: preview.skipped.length - 5 }))) : null
+      preview.skipped.length > 5 ? (0, import_react50.createElement)("div", { className: "bt-import-line" }, (0, import_react50.createElement)("span", { className: "bt-import-line-reason" }, t("and {count} more", { count: preview.skipped.length - 5 }))) : null
     ) : null,
-    preview.warnings.length ? (0, import_react49.createElement)(
+    preview.warnings.length ? (0, import_react50.createElement)(
       "details",
       { className: "bt-import-warns" },
-      (0, import_react49.createElement)("summary", null, t("{count} adjusted", { count: preview.warnings.reduce((n, w) => n + w.count, 0) })),
-      preview.warnings.map((w, index) => (0, import_react49.createElement)(
+      (0, import_react50.createElement)("summary", null, t("{count} adjusted", { count: preview.warnings.reduce((n, w) => n + w.count, 0) })),
+      preview.warnings.map((w, index) => (0, import_react50.createElement)(
         "div",
         { key: index, className: "bt-import-line" },
-        (0, import_react49.createElement)("span", { className: "bt-import-line-reason" }, `${w.count} × ${w.message}`)
+        (0, import_react50.createElement)("span", { className: "bt-import-line-reason" }, `${w.count} × ${w.message}`)
       ))
     ) : null,
-    preview.notes.includes("session-cookies") ? (0, import_react49.createElement)("div", { className: "bt-import-note" }, t("Cookies without an expiry stay until the app closes.")) : null,
-    preview.notes.includes("local-storage-left") ? (0, import_react49.createElement)("div", { className: "bt-import-note" }, t("Some sites also keep sign-in outside cookies; you may need to sign in again there.")) : null,
-    (0, import_react49.createElement)(
+    preview.notes.includes("session-cookies") ? (0, import_react50.createElement)("div", { className: "bt-import-note" }, t("Cookies without an expiry stay until the app closes.")) : null,
+    preview.notes.includes("local-storage-left") ? (0, import_react50.createElement)("div", { className: "bt-import-note" }, t("Some sites also keep sign-in outside cookies; you may need to sign in again there.")) : null,
+    (0, import_react50.createElement)(
       "div",
       { className: "bt-import-actions" },
-      (0, import_react49.createElement)("button", { type: "button", className: "bt-import-primary", disabled: busy, onClick: onApply }, busy ? t("Importing…") : t("Import")),
-      (0, import_react49.createElement)("button", { type: "button", className: "bt-import-plain", disabled: busy, onClick: onCancel }, t("Cancel"))
+      (0, import_react50.createElement)("button", { type: "button", className: "bt-import-primary", disabled: busy, onClick: onApply }, busy ? t("Importing…") : t("Import")),
+      (0, import_react50.createElement)("button", { type: "button", className: "bt-import-plain", disabled: busy, onClick: onCancel }, t("Cancel"))
     )
   ));
 }
 function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages, useBrowserHolds }) {
-  let bot = roster.byId[pane.id], canBrowse = !!(bot && roster.browser === !0 && actions.browserShow), sideChats = bot ? sideChatsOf(roster, bot.id) : [], sideChat = sideChats.find((chat) => chat?.id === pane.side), view = pane.view === "browser" && canBrowse ? "browser" : pane.view === "side" && sideChat !== void 0 ? "side" : "details", tabState = useBrowserTabs((map) => bot ? map[bot.id] ?? EMPTY_TABS2 : EMPTY_TABS2), active = tabState.active, page = useBrowserPages((pages) => (active ? pages[active] : null) ?? EMPTY_PAGE), hold = useBrowserHolds?.((map) => bot ? map[bot.id] ?? null : null) ?? null, root = (0, import_react49.useRef)(null), fly = (0, import_react49.useRef)(null), [landed, setLanded] = (0, import_react49.useState)(!1), [settling, setSettling] = (0, import_react49.useState)(!1), [width, setWidth] = (0, import_react49.useState)(savedWidth), [dragging, setDragging] = (0, import_react49.useState)(!1), [resizing, setResizing] = (0, import_react49.useState)(!1), instant = dragging || resizing, [reading, setReading] = (0, import_react49.useState)(!1), panelWidth = fitWidth(width ?? (view === "browser" ? DEFAULT_WIDTH : DETAILS_WIDTH), widthRange(view, room2));
-  (0, import_react49.useLayoutEffect)(() => {
+  let bot = roster.byId[pane.id], canBrowse = !!(bot && roster.browser === !0 && actions.browserShow), sideChats = bot ? sideChatsOf(roster, bot.id) : [], sideChat = sideChats.find((chat) => chat?.id === pane.side), view = pane.view === "browser" && canBrowse ? "browser" : pane.view === "side" && sideChat !== void 0 ? "side" : "details", tabState = useBrowserTabs((map) => bot ? map[bot.id] ?? EMPTY_TABS2 : EMPTY_TABS2), active = tabState.active, page = useBrowserPages((pages) => (active ? pages[active] : null) ?? EMPTY_PAGE), hold = useBrowserHolds?.((map) => bot ? map[bot.id] ?? null : null) ?? null, root = (0, import_react50.useRef)(null), fly = (0, import_react50.useRef)(null), [landed, setLanded] = (0, import_react50.useState)(!1), [settling, setSettling] = (0, import_react50.useState)(!1), [width, setWidth] = (0, import_react50.useState)(savedWidth), [dragging, setDragging] = (0, import_react50.useState)(!1), [resizing, setResizing] = (0, import_react50.useState)(!1), instant = dragging || resizing, [reading, setReading] = (0, import_react50.useState)(!1), panelWidth = fitWidth(width ?? (view === "browser" ? DEFAULT_WIDTH : DETAILS_WIDTH), widthRange(view, room2));
+  (0, import_react50.useLayoutEffect)(() => {
     view === "browser" && width === null && setWidth(DEFAULT_WIDTH);
-  }, [view, width]), (0, import_react49.useLayoutEffect)(() => {
+  }, [view, width]), (0, import_react50.useLayoutEffect)(() => {
     chatRoom.hold(instant);
   }, [instant]);
-  let [last, setLast] = (0, import_react49.useState)({ view, width: panelWidth });
+  let [last, setLast] = (0, import_react50.useState)({ view, width: panelWidth });
   (last.view !== view || last.width !== panelWidth) && (setLast({ view, width: panelWidth }), last.view !== view && setSettling(last.width !== panelWidth && !instant));
-  let shownView = (0, import_react49.useRef)(view);
-  (0, import_react49.useLayoutEffect)(() => {
+  let shownView = (0, import_react50.useRef)(view);
+  (0, import_react50.useLayoutEffect)(() => {
     let switched = settling && shownView.current !== view;
     shownView.current = view, switched && chatRoom.hold(!0), chatRoom.setRight(leaving || overlay ? null : panelWidth), switched && chatRoom.hold(!1);
-  }, [view, panelWidth, leaving, overlay]), (0, import_react49.useEffect)(() => () => {
+  }, [view, panelWidth, leaving, overlay]), (0, import_react50.useEffect)(() => () => {
     chatRoom.setRight(null), chatRoom.hold(!1);
   }, []);
-  let mounted = (0, import_react49.useRef)(!1);
-  (0, import_react49.useEffect)(() => {
+  let mounted = (0, import_react50.useRef)(!1);
+  (0, import_react50.useEffect)(() => {
     if (!mounted.current) {
       mounted.current = !0;
       return;
@@ -15119,24 +15221,24 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
     setResizing(!0);
     let timer = setTimeout(() => setResizing(!1), 160);
     return () => clearTimeout(timer);
-  }, [room2]), (0, import_react49.useEffect)(() => {
+  }, [room2]), (0, import_react50.useEffect)(() => {
     if (!settling) return;
     let timer = setTimeout(() => setSettling(!1), SPRING_SHAPE.duration + 40);
     return () => clearTimeout(timer);
-  }, [settling, view]), (0, import_react49.useEffect)(() => {
+  }, [settling, view]), (0, import_react50.useEffect)(() => {
     let timer = setTimeout(() => setLanded(!0), 360);
     return () => clearTimeout(timer);
-  }, []), (0, import_react49.useEffect)(() => {
+  }, []), (0, import_react50.useEffect)(() => {
     canBrowse && actions.browserEnsure(bot.id);
-  }, [bot?.id, canBrowse]), (0, import_react49.useEffect)(() => {
+  }, [bot?.id, canBrowse]), (0, import_react50.useEffect)(() => {
     view === "browser" && (active === null || !tabState.ids.includes(active)) && actions.setPanelView("details");
-  }, [view, active, tabState.ids.length]), (0, import_react49.useEffect)(() => {
+  }, [view, active, tabState.ids.length]), (0, import_react50.useEffect)(() => {
     pane.view === "side" && sideChat === void 0 && actions.setPanelView("details");
-  }, [pane.view, sideChat]), (0, import_react49.useEffect)(() => {
+  }, [pane.view, sideChat]), (0, import_react50.useEffect)(() => {
     (view !== "browser" || leaving) && actions.browserShow?.(null);
-  }, [view, leaving]), (0, import_react49.useEffect)(() => () => {
+  }, [view, leaving]), (0, import_react50.useEffect)(() => () => {
     actions.browserShow?.(null);
-  }, []), (0, import_react49.useEffect)(() => {
+  }, []), (0, import_react50.useEffect)(() => {
     if (!page.readAt || Date.now() - page.readAt > READ_FLASH_MS) return;
     setReading(!0);
     let timer = setTimeout(() => setReading(!1), READ_FLASH_MS);
@@ -15162,7 +15264,7 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
     actions[name] && (panelActions[name] = (...args) => (view !== "browser" && beginSwitch("browser"), actions[name](...args)));
   for (let name of ["openSideChat", "newSideChat"])
     actions[name] && (panelActions[name] = (...args) => (view !== "side" && beginSwitch("side"), actions[name](...args)));
-  (0, import_react49.useLayoutEffect)(() => {
+  (0, import_react50.useLayoutEffect)(() => {
     let move = fly.current;
     if (!move) return;
     fly.current = null;
@@ -15225,7 +15327,7 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
     grip.addEventListener("pointermove", onMove);
     for (let name of ends) grip.addEventListener(name, onEnd);
   }, hasStrip = panelHasStrip(canBrowse, tabState.ids.length, sideChats.length);
-  return (0, import_react49.createElement)(
+  return (0, import_react50.createElement)(
     "aside",
     {
       ref: root,
@@ -15243,15 +15345,15 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
         event.target === event.currentTarget && setLanded(!0);
       }
     },
-    leaving || overlay ? null : (0, import_react49.createElement)("div", { className: "bt-panel-grip", role: "separator", "aria-orientation": "vertical", "aria-label": t("Resize panel"), onPointerDown: startResize }),
+    leaving || overlay ? null : (0, import_react50.createElement)("div", { className: "bt-panel-grip", role: "separator", "aria-orientation": "vertical", "aria-label": t("Resize panel"), onPointerDown: startResize }),
     // Over the whole window while dragging: the cursor stays a resize cursor and the
     // pages underneath (the chat, the guest) see no pointer.
-    dragging ? (0, import_react_dom8.createPortal)((0, import_react49.createElement)("div", { className: "bt-drag-shield", "aria-hidden": !0 }), document.body) : null,
-    hasStrip ? (0, import_react49.createElement)(PanelStrip, { bot, subject: pane.id, view, ids: tabState.ids, active, sides: sideChats, side: pane.side, canBrowse, reading, onView: switchView, actions: panelActions, useBrowserPages }) : null,
-    view === "browser" && bot ? (0, import_react49.createElement)(BrowserView, { key: `browser:${active}`, bot, tabId: active, leaving, landed: landed && !settling, actions, useBrowserPages, hold }) : view === "side" && sideChat ? (0, import_react49.createElement)("div", { key: `side:${sideChat.id}`, className: "bt-panel-view" }, (0, import_react49.createElement)(SideChatView, { subject: pane.id, chat: sideChat, actions: panelActions })) : (0, import_react49.createElement)(
+    dragging ? (0, import_react_dom8.createPortal)((0, import_react50.createElement)("div", { className: "bt-drag-shield", "aria-hidden": !0 }), document.body) : null,
+    hasStrip ? (0, import_react50.createElement)(PanelStrip, { bot, subject: pane.id, view, ids: tabState.ids, active, sides: sideChats, side: pane.side, canBrowse, reading, onView: switchView, actions: panelActions, useBrowserPages }) : null,
+    view === "browser" && bot ? (0, import_react50.createElement)(BrowserView, { key: `browser:${active}`, bot, tabId: active, leaving, landed: landed && !settling, actions, useBrowserPages, hold }) : view === "side" && sideChat ? (0, import_react50.createElement)("div", { key: `side:${sideChat.id}`, className: "bt-panel-view" }, (0, import_react50.createElement)(SideChatView, { subject: pane.id, chat: sideChat, actions: panelActions })) : (0, import_react50.createElement)(
       "div",
       { key: `details:${pane.id}:${pane.renaming ? "rename" : ""}:${pane.tab ?? ""}`, className: "bt-panel-view" },
-      (0, import_react49.createElement)(DetailsDrawer, {
+      (0, import_react50.createElement)(DetailsDrawer, {
         sessionId: pane.id,
         startRenaming: pane.renaming,
         startTab: pane.tab,
@@ -15396,8 +15498,8 @@ var DIALOG_EXIT_MS = 160, MENU_EXIT_MS3 = 120;
 function Overlays({ useRoster, useUi, useSessions, useSessionStatus, useActivity, useWork, useRegistry, useBrowserPages, useBrowserTabs, useBrowserHolds, useUpdate, useFrame, useSidebarPref, actions }) {
   let roster = useRoster((value) => value), ui3 = useUi((value) => value);
   useRegistry((value) => value);
-  let frameSnap = useFrame ? useFrame((value) => value) : { viewport: window.innerWidth, sidebarWidth: FALLBACK_SIDEBAR_WIDTH, collapsedWidth: 0 }, pref = useSidebarPref ? useSidebarPref((value) => value) : "open", current = useSessions((list) => Object.values(list.byId).find((session) => (session?.retainedBy?.mainView ?? 0) > 0)?.id ?? null), previous = (0, import_react50.useRef)(current);
-  (0, import_react50.useEffect)(() => {
+  let frameSnap = useFrame ? useFrame((value) => value) : { viewport: window.innerWidth, sidebarWidth: FALLBACK_SIDEBAR_WIDTH, collapsedWidth: 0 }, pref = useSidebarPref ? useSidebarPref((value) => value) : "open", current = useSessions((list) => Object.values(list.byId).find((session) => (session?.retainedBy?.mainView ?? 0) > 0)?.id ?? null), previous = (0, import_react51.useRef)(current);
+  (0, import_react51.useEffect)(() => {
     previous.current !== current && (previous.current = current, current && actions.followPanel?.(current));
   }, [current]);
   let open = ui3.details ? { id: ui3.details, view: ui3.view ?? "details", renaming: ui3.renaming, tab: ui3.tab, side: ui3.side } : null, layout = frameLayout({
@@ -15406,8 +15508,8 @@ function Overlays({ useRoster, useUi, useSessions, useSessionStatus, useActivity
     pref,
     drawer: ui3.leftDrawer === !0,
     panel: open ? { view: open.view, yielded: ui3.panelYield === !0 } : null
-  }), shown = open !== null && layout.panel !== "folded" ? open : null, [kept, setKept] = (0, import_react50.useState)(shown);
-  (0, import_react50.useEffect)(() => {
+  }), shown = open !== null && layout.panel !== "folded" ? open : null, [kept, setKept] = (0, import_react51.useState)(shown);
+  (0, import_react51.useEffect)(() => {
     if (shown) {
       setKept(shown);
       return;
@@ -15421,17 +15523,17 @@ function Overlays({ useRoster, useUi, useSessions, useSessionStatus, useActivity
     let room2 = roster.roomsById[id2];
     return room2 ? { id: room2.id, name: room2.name, group: !0 } : null;
   }, [memory, memoryLeaving] = useLinger(ui3.memory && memoryOwner(ui3.memory) ? ui3.memory : null, DIALOG_EXIT_MS), owner = memory ? memoryOwner(memory) : null, [menu, menuLeaving] = useLinger(ui3.menu, MENU_EXIT_MS3);
-  return (0, import_react50.createElement)(
-    import_react50.Fragment,
+  return (0, import_react51.createElement)(
+    import_react51.Fragment,
     null,
-    pane ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(BotPanel, { pane, leaving: shown === null, room: layout.room, overlay: layout.panel === "overlay", roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages, useBrowserHolds }), document.body) : null,
-    ui3.newChat ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(NewChat, { key: ui3.newChat, mode: ui3.newChat, roster, actions }), document.body) : null,
-    ui3.palette ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(CommandPalette, { key: ui3.palette.token, start: ui3.palette.query, token: ui3.palette.token, roster, actions, useSessions }), document.body) : null,
-    ui3.exchange ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(ExchangeDialog, { pair: ui3.exchange, roster, actions }), document.body) : null,
-    ui3.voice ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(VoiceMode, { key: ui3.voice, sessionId: ui3.voice, roster, actions, useSessions, useSessionStatus }), document.body) : null,
-    menu ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(ContextMenu, { key: `${menu.kind ?? ""}:${menu.id}:${menu.x}:${menu.y}`, menu, roster, actions, leaving: menuLeaving }), document.body) : null,
-    settings ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(SettingsDialog, { page: settings.page, id: settings.id, roster, actions, useUpdate, leaving: settingsLeaving }), document.body) : null,
-    owner ? (0, import_react_dom9.createPortal)((0, import_react50.createElement)(MemoryDialog, { key: owner.id, owner, actions, leaving: memoryLeaving }), document.body) : null
+    pane ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(BotPanel, { pane, leaving: shown === null, room: layout.room, overlay: layout.panel === "overlay", roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages, useBrowserHolds }), document.body) : null,
+    ui3.newChat ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(NewChat, { key: ui3.newChat, mode: ui3.newChat, roster, actions }), document.body) : null,
+    ui3.palette ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(CommandPalette, { key: ui3.palette.token, start: ui3.palette.query, token: ui3.palette.token, roster, actions, useSessions }), document.body) : null,
+    ui3.exchange ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(ExchangeDialog, { pair: ui3.exchange, roster, actions }), document.body) : null,
+    ui3.voice ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(VoiceMode, { key: ui3.voice, sessionId: ui3.voice, roster, actions, useSessions, useSessionStatus }), document.body) : null,
+    menu ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(ContextMenu, { key: `${menu.kind ?? ""}:${menu.id}:${menu.x}:${menu.y}`, menu, roster, actions, leaving: menuLeaving }), document.body) : null,
+    settings ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(SettingsDialog, { page: settings.page, id: settings.id, roster, actions, useUpdate, leaving: settingsLeaving }), document.body) : null,
+    owner ? (0, import_react_dom9.createPortal)((0, import_react51.createElement)(MemoryDialog, { key: owner.id, owner, actions, leaving: memoryLeaving }), document.body) : null
   );
 }
 
@@ -15738,7 +15840,7 @@ var STORE_KEY = STORAGE.browsers, MAX_LIVE = 6, READ_TIMEOUT_MS = 1e4, PREVIEW_T
   const text = meta('description') || meta('og:description') || paragraph || document.body?.innerText || ''
   return text.replace(/\\s+/g, ' ').trim().slice(0, 200)
 })()`, EMPTY = { url: "", title: "", favicon: null, loading: !1, canGoBack: !1, canGoForward: !1, error: null, live: !1, excerpt: "" };
-function createAppViewProxy(bridge, botId, tabId) {
+function createAppViewProxy(bridge2, botId, tabId) {
   let listeners2 = /* @__PURE__ */ new Map(), state = { url: "", title: "", loading: !1, canGoBack: !1, canGoForward: !1 }, fire = (name, event = {}) => {
     for (let listener of listeners2.get(name) ?? []) listener({ type: name, ...event });
   };
@@ -15755,7 +15857,7 @@ function createAppViewProxy(bridge, botId, tabId) {
     setAttribute() {
     },
     remove() {
-      bridge.views.place(tabId, null, !1);
+      bridge2.views.place(tabId, null, !1);
     },
     getURL() {
       return state.url;
@@ -15773,25 +15875,25 @@ function createAppViewProxy(bridge, botId, tabId) {
       return state.canGoForward;
     },
     loadURL(url) {
-      return bridge.views.navigate(botId, tabId, url);
+      return bridge2.views.navigate(botId, tabId, url);
     },
     executeJavaScript(script) {
-      return bridge.views.read(botId, tabId, script);
+      return bridge2.views.read(botId, tabId, script);
     },
     goBack() {
-      return bridge.views.command(botId, tabId, "back");
+      return bridge2.views.command(botId, tabId, "back");
     },
     goForward() {
-      return bridge.views.command(botId, tabId, "forward");
+      return bridge2.views.command(botId, tabId, "forward");
     },
     reload() {
-      return bridge.views.command(botId, tabId, "reload");
+      return bridge2.views.command(botId, tabId, "reload");
     },
     stop() {
-      return bridge.views.command(botId, tabId, "stop");
+      return bridge2.views.command(botId, tabId, "stop");
     },
     focus() {
-      return bridge.views.focus(botId, tabId);
+      return bridge2.views.focus(botId, tabId);
     },
     update(next) {
       Object.assign(state, next), fire("did-navigate"), fire("did-stop-loading"), fire("page-title-updated"), state.loading || fire("dom-ready");
@@ -15807,8 +15909,8 @@ function browserAddress(input) {
   let host = text7.split(/[/?#]/)[0], local = /^(localhost|127(\.\d+){3}|10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2}|\[[\da-f:]+\])(:\d+)?$/i.test(host);
   return !/\s/.test(text7) && (local || /^[^\s.]+(\.[^\s.]+)+(:\d+)?$/.test(host)) && URL.canParse(`http://${text7}`) ? new URL(`${local ? "http" : "https"}://${text7}`).href : `${SEARCH_URL}${encodeURIComponent(text7)}`;
 }
-function createBotBrowsers({ bridge, createSource: createSource2, storage = globalThis.localStorage, document: doc = globalThis.document, guestFactory }) {
-  let views = /* @__PURE__ */ new Map(), owner = /* @__PURE__ */ new Map(), tabs = createSource2({}), pages = createSource2({}), holds = createSource2({}), store = sharedMap(STORE_KEY, storage), saved = store.read(), seen = /* @__PURE__ */ new Set(), layer, shown = null, rect = null, visible = !1, resizeLater = 0, disposed = !1, serial = 0, makeGuest = guestFactory ?? (bridge.views ? ({ botId, tabId }) => ({ element: createAppViewProxy(bridge, botId, tabId), appView: !0 }) : ({ document: document2 }) => ({ element: document2.createElement("webview"), appView: !1 })), appViewEvents = bridge.views?.subscribe?.((change) => {
+function createBotBrowsers({ bridge: bridge2, createSource: createSource2, storage = globalThis.localStorage, document: doc = globalThis.document, guestFactory }) {
+  let views = /* @__PURE__ */ new Map(), owner = /* @__PURE__ */ new Map(), tabs = createSource2({}), pages = createSource2({}), holds = createSource2({}), store = sharedMap(STORE_KEY, storage), saved = store.read(), seen = /* @__PURE__ */ new Set(), layer, shown = null, rect = null, visible = !1, resizeLater = 0, disposed = !1, serial = 0, makeGuest = guestFactory ?? (bridge2.views ? ({ botId, tabId }) => ({ element: createAppViewProxy(bridge2, botId, tabId), appView: !0 }) : ({ document: document2 }) => ({ element: document2.createElement("webview"), appView: !1 })), appViewEvents = bridge2.views?.subscribe?.((change) => {
     let { botId, tabId } = change ?? {};
     if (!botId || !tabId) return;
     if (change.type === "closed") {
@@ -15853,7 +15955,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
   }, ensureLayer = () => (layer?.isConnected || (layer = doc.createElement("div"), layer.className = "bt-browser-layer", Object.assign(layer.style, { position: "fixed", inset: "0", zIndex: "41", pointerEvents: "none" }), doc.body.append(layer)), layer), place = (entry) => {
     let box = rect ?? { left: 0, top: 0, width: 800, height: 600 };
     if (entry.appView) {
-      bridge.views.place(entry.tabId, box, shown === entry.tabId && visible && !!rect);
+      bridge2.views.place(entry.tabId, box, shown === entry.tabId && visible && !!rect);
       return;
     }
     Object.assign(entry.element.style, {
@@ -15889,21 +15991,21 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     publish2(entry.tabId, { url, title, loading: element.isLoading(), canGoBack: element.canGoBack(), canGoForward: element.canGoForward(), live: !0 }), persist(entry.botId);
   };
   async function create(tabId) {
-    let botId = owner.get(tabId), guest = await makeGuest({ bridge, document: doc, botId, tabId }), pending = pages.getSnapshot()[tabId]?.url || savedTab(botId, tabId)?.url, reservation = guest.appView ? void 0 : await bridge.acquire(`bot:${botId}`);
+    let botId = owner.get(tabId), guest = await makeGuest({ bridge: bridge2, document: doc, botId, tabId }), pending = pages.getSnapshot()[tabId]?.url || savedTab(botId, tabId)?.url, reservation = guest.appView ? void 0 : await bridge2.acquire(`bot:${botId}`);
     if (disposed) {
-      reservation ? await bridge.release(reservation.lease).catch(() => {
-      }) : await bridge.views.close(botId, tabId).catch(() => {
+      reservation ? await bridge2.release(reservation.lease).catch(() => {
+      }) : await bridge2.views.close(botId, tabId).catch(() => {
       });
       return;
     }
-    guest.appView && await bridge.views.create(botId, tabId, pending ?? "");
+    guest.appView && await bridge2.views.create(botId, tabId, pending ?? "");
     let element = guest.element;
     element.dataset.sidebarBrowserFrame = "webview", Object.assign(element.style, { position: "fixed", display: "flex", border: "0", pointerEvents: "auto", background: "#fff" }), element.dataset.btBrowser = tabId, guest.appView || (element.setAttribute("name", reservation.lease), element.setAttribute("partition", reservation.partition), element.setAttribute("allowpopups", ""), element.setAttribute("src", `about:blank#${reservation.lease}`));
     let entry = { botId, tabId, element, lease: reservation?.lease, appView: guest.appView, botAttached: !1, ready: !1, fresh: !guest.appView, pending: guest.appView ? void 0 : pending, usedAt: Date.now() }, lifetime = new AbortController();
     entry.stop = () => lifetime.abort();
     let { signal } = lifetime;
     if (!guest.appView) {
-      let unsubscribe = bridge.onOpenRequested(reservation.lease, (url) => {
+      let unsubscribe = bridge2.onOpenRequested(reservation.lease, (url) => {
         openTab(botId, url);
       });
       signal.addEventListener("abort", unsubscribe, { once: !0 });
@@ -15935,7 +16037,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     }, { signal }), element.addEventListener("render-process-gone", () => {
       views.get(tabId) !== void 0 && (release(tabId), publish2(tabId, { loading: !1, error: "The page crashed." }));
     }, { signal }), views.set(tabId, entry), guest.appView || ensureLayer().append(element), place(entry), publish2(tabId, { live: !0, loading: !!entry.pending }), guest.appView) {
-      let state = (await bridge.views.sync(botId)).find((view) => view.tabId === tabId);
+      let state = (await bridge2.views.sync(botId)).find((view) => view.tabId === tabId);
       state && (entry.botAttached = state.botAttached === !0, element.update(state));
     }
     return entry;
@@ -15957,10 +16059,10 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     let entry = views.get(tabId);
     if (entry !== void 0) {
       if (entry.appView) {
-        await bridge.views.place(tabId, rect ?? { left: 0, top: 0, width: 800, height: 600 }, !1);
+        await bridge2.views.place(tabId, rect ?? { left: 0, top: 0, width: 800, height: 600 }, !1);
         return;
       }
-      views.delete(tabId), entry.stop(), entry.element.remove(), publish2(tabId, { live: !1, loading: !1 }), await bridge.release(entry.lease).catch((error) => console.warn("[ds-bot] browser release", error));
+      views.delete(tabId), entry.stop(), entry.element.remove(), publish2(tabId, { live: !1, loading: !1 }), await bridge2.release(entry.lease).catch((error) => console.warn("[ds-bot] browser release", error));
     }
   }
   function openTab(botId, url) {
@@ -15974,7 +16076,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
   async function closeTab(botId, tabId) {
     let state = tabs.getSnapshot()[botId];
     state === void 0 || !state.ids.includes(tabId) || (await opening.get(tabId)?.catch(() => {
-    }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), tabs.set((snapshot) => {
+    }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge2.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), tabs.set((snapshot) => {
       let current = snapshot[botId];
       if (current === void 0 || !current.ids.includes(tabId)) return snapshot;
       let at2 = current.ids.indexOf(tabId), ids = current.ids.filter((id2) => id2 !== tabId), active = current.active === tabId ? ids[Math.min(at2, ids.length - 1)] ?? null : current.active, next = { ...snapshot };
@@ -16018,7 +16120,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     ensureTabs(botId);
     for (let tabId of tabs.getSnapshot()[botId]?.ids ?? [])
       await opening.get(tabId)?.catch(() => {
-      }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), owner.delete(tabId), pages.set((snapshot) => {
+      }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge2.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), owner.delete(tabId), pages.set((snapshot) => {
         if (snapshot[tabId] === void 0) return snapshot;
         let { [tabId]: _2, ...rest } = snapshot;
         return rest;
@@ -16027,7 +16129,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
       if (snapshot[botId] === void 0) return snapshot;
       let { [botId]: _2, ...rest } = snapshot;
       return rest;
-    }), save(botId, void 0), seen.delete(botId), await bridge.forget?.(`bot:${botId}`)?.catch((error) => console.warn("[ds-bot] browser forget", error));
+    }), save(botId, void 0), seen.delete(botId), await bridge2.forget?.(`bot:${botId}`)?.catch((error) => console.warn("[ds-bot] browser forget", error));
   }
   return {
     tabs,
@@ -16089,7 +16191,7 @@ function createBotBrowsers({ bridge, createSource: createSource2, storage = glob
     dispose() {
       disposed = !0, clearTimeout(resizeLater);
       for (let entry of views.values())
-        entry.appView ? bridge.views.place(entry.tabId, rect ?? { left: 0, top: 0, width: 800, height: 600 }, !1) : release(entry.tabId);
+        entry.appView ? bridge2.views.place(entry.tabId, rect ?? { left: 0, top: 0, width: 800, height: 600 }, !1) : release(entry.tabId);
       appViewEvents?.(), layer?.remove();
     }
   };
@@ -16132,7 +16234,7 @@ function serveBrowserReads({ browsers, post, clientId = globalThis.crypto.random
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/learning-card.js
-var import_react51 = require("react");
+var import_react52 = require("react");
 
 // modules/bot-runtime/vendor/ds-bot/src/client/learning-card-model.js
 function proposalPlacement(proposal, turns) {
@@ -16180,103 +16282,103 @@ function lineDiff(before, after) {
 // modules/bot-runtime/vendor/ds-bot/src/client/learning-card.js
 var failedAnswers = /* @__PURE__ */ new Map();
 function ProposalCard({ proposal, initialError = "", onFailure, onResolved, actions }) {
-  let [busy, setBusy] = (0, import_react51.useState)(!1), [error, setError] = (0, import_react51.useState)(initialError), busyRef = (0, import_react51.useRef)(!1), titleId = (0, import_react51.useId)(), answer = (approve) => {
+  let [busy, setBusy] = (0, import_react52.useState)(!1), [error, setError] = (0, import_react52.useState)(initialError), busyRef = (0, import_react52.useRef)(!1), titleId = (0, import_react52.useId)(), answer = (approve) => {
     busyRef.current || (busyRef.current = !0, setBusy(!0), setError(""), Promise.resolve().then(() => actions.learningAnswer(proposal.id, approve)).then(() => onResolved(proposal.id), (failure) => {
       let message = failure?.message ?? String(failure);
       setError(message), onFailure(proposal, message);
     }).finally(() => {
       busyRef.current = !1, setBusy(!1);
     }));
-  }, update = proposal.action === "update", rows2 = (0, import_react51.useMemo)(() => lineDiff(update ? proposal.previous?.content : "", proposal.content), [update, proposal.previous?.content, proposal.content]);
+  }, update = proposal.action === "update", rows2 = (0, import_react52.useMemo)(() => lineDiff(update ? proposal.previous?.content : "", proposal.content), [update, proposal.previous?.content, proposal.content]);
   if (proposal.kind === "agents") {
     let blocks = proposal.edits.map((edit) => [
       ...(edit.op === "add" ? [] : editLines(edit.old)).map((line) => ({ kind: "removed", line })),
       ...(edit.op === "remove" ? [] : editLines(edit.text)).map((line) => ({ kind: "added", line }))
     ]);
-    return (0, import_react51.createElement)(
+    return (0, import_react52.createElement)(
       "section",
       { className: "bt-q bt-learning-card", role: "group", "aria-labelledby": titleId, "aria-busy": busy },
-      (0, import_react51.createElement)(ProposalHead, { titleId, icon: PencilIcon, title: t("AGENTS.md update") }),
-      (0, import_react51.createElement)(FileBox, { name: "AGENTS.md", path: proposal.folder, state: proposal.exists === !1 ? "Added" : "Modified", blocks }),
-      proposal.edits.map((edit, index) => edit.why ? (0, import_react51.createElement)("p", { className: "bt-learning-why", key: index }, edit.why) : null),
-      error ? (0, import_react51.createElement)("div", { className: "bt-learning-error", role: "alert" }, error) : null,
-      (0, import_react51.createElement)(ProposalFoot, { busy, answer })
+      (0, import_react52.createElement)(ProposalHead, { titleId, icon: PencilIcon, title: t("AGENTS.md update") }),
+      (0, import_react52.createElement)(FileBox, { name: "AGENTS.md", path: proposal.folder, state: proposal.exists === !1 ? "Added" : "Modified", blocks }),
+      proposal.edits.map((edit, index) => edit.why ? (0, import_react52.createElement)("p", { className: "bt-learning-why", key: index }, edit.why) : null),
+      error ? (0, import_react52.createElement)("div", { className: "bt-learning-error", role: "alert" }, error) : null,
+      (0, import_react52.createElement)(ProposalFoot, { busy, answer })
     );
   }
   let oldDetail = update && typeof proposal.previous?.description == "string" && proposal.previous.description !== proposal.description ? proposal.previous.description : void 0;
-  return (0, import_react51.createElement)(
+  return (0, import_react52.createElement)(
     "section",
     { className: "bt-q bt-learning-card", role: "group", "aria-labelledby": titleId, "aria-busy": busy },
-    (0, import_react51.createElement)(ProposalHead, { titleId, title: proposal.name, kind: t(update ? "Skill update" : "New skill"), detail: proposal.description, oldDetail }),
-    (0, import_react51.createElement)(FileBox, { name: "SKILL.md", path: `skills/${proposal.name}`, state: update ? "Updated" : "Added", blocks: [rows2] }),
-    proposal.why ? (0, import_react51.createElement)("p", { className: "bt-learning-why" }, proposal.why) : null,
-    error ? (0, import_react51.createElement)("div", { className: "bt-learning-error", role: "alert" }, error) : null,
-    (0, import_react51.createElement)(ProposalFoot, { busy, answer })
+    (0, import_react52.createElement)(ProposalHead, { titleId, title: proposal.name, kind: t(update ? "Skill update" : "New skill"), detail: proposal.description, oldDetail }),
+    (0, import_react52.createElement)(FileBox, { name: "SKILL.md", path: `skills/${proposal.name}`, state: update ? "Updated" : "Added", blocks: [rows2] }),
+    proposal.why ? (0, import_react52.createElement)("p", { className: "bt-learning-why" }, proposal.why) : null,
+    error ? (0, import_react52.createElement)("div", { className: "bt-learning-error", role: "alert" }, error) : null,
+    (0, import_react52.createElement)(ProposalFoot, { busy, answer })
   );
 }
 function ProposalHead({ titleId, icon: icon2 = MemoryIcon, title, kind, detail, oldDetail }) {
-  return (0, import_react51.createElement)(
+  return (0, import_react52.createElement)(
     "div",
     { className: "bt-q-head" },
-    (0, import_react51.createElement)("span", { className: "bt-learning-icon", "aria-hidden": !0 }, (0, import_react51.createElement)(icon2)),
-    (0, import_react51.createElement)(
+    (0, import_react52.createElement)("span", { className: "bt-learning-icon", "aria-hidden": !0 }, (0, import_react52.createElement)(icon2)),
+    (0, import_react52.createElement)(
       "div",
       { className: "bt-q-text" },
-      (0, import_react51.createElement)("p", { className: "bt-q-title", id: titleId }, title),
-      kind ? (0, import_react51.createElement)("div", { className: "bt-q-detail" }, kind) : null,
-      oldDetail ? (0, import_react51.createElement)("p", { className: "bt-learning-description bt-learning-old" }, (0, import_react51.createElement)("del", null, oldDetail)) : null,
-      detail ? (0, import_react51.createElement)("p", { className: "bt-learning-description" }, detail) : null
+      (0, import_react52.createElement)("p", { className: "bt-q-title", id: titleId }, title),
+      kind ? (0, import_react52.createElement)("div", { className: "bt-q-detail" }, kind) : null,
+      oldDetail ? (0, import_react52.createElement)("p", { className: "bt-learning-description bt-learning-old" }, (0, import_react52.createElement)("del", null, oldDetail)) : null,
+      detail ? (0, import_react52.createElement)("p", { className: "bt-learning-description" }, detail) : null
     ),
-    (0, import_react51.createElement)("span", { className: "bt-q-badge bt-learning-status" }, (0, import_react51.createElement)("span", { className: "bt-learning-dot", "aria-hidden": !0 }), t("Awaiting approval"))
+    (0, import_react52.createElement)("span", { className: "bt-q-badge bt-learning-status" }, (0, import_react52.createElement)("span", { className: "bt-learning-dot", "aria-hidden": !0 }), t("Awaiting approval"))
   );
 }
 function ProposalFoot({ busy, answer }) {
-  return (0, import_react51.createElement)(
+  return (0, import_react52.createElement)(
     "div",
     { className: "bt-q-foot bt-learning-foot" },
-    (0, import_react51.createElement)("button", { type: "button", className: "bt-learning-btn bt-learning-decline", disabled: busy, onClick: () => answer(!1) }, t("Decline")),
-    (0, import_react51.createElement)(
+    (0, import_react52.createElement)("button", { type: "button", className: "bt-learning-btn bt-learning-decline", disabled: busy, onClick: () => answer(!1) }, t("Decline")),
+    (0, import_react52.createElement)(
       "button",
       { type: "button", className: "bt-learning-btn bt-learning-approve", disabled: busy, onClick: () => answer(!0) },
-      (0, import_react51.createElement)(CheckIcon),
+      (0, import_react52.createElement)(CheckIcon),
       t("Approve")
     )
   );
 }
 var COLLAPSE_ROWS = 8, SIGNS = { added: "+", removed: "−", same: "" };
 function FileBox({ name, path, state, blocks }) {
-  let [open, setOpen] = (0, import_react51.useState)(!1), all = blocks.flat(), added = all.filter((row) => row.kind === "added").length, removed = all.filter((row) => row.kind === "removed").length, folds = all.length > COLLAPSE_ROWS, shut = folds && !open;
-  return (0, import_react51.createElement)(
+  let [open, setOpen] = (0, import_react52.useState)(!1), all = blocks.flat(), added = all.filter((row) => row.kind === "added").length, removed = all.filter((row) => row.kind === "removed").length, folds = all.length > COLLAPSE_ROWS, shut = folds && !open;
+  return (0, import_react52.createElement)(
     "div",
     { className: "bt-learning-file" },
-    (0, import_react51.createElement)(
+    (0, import_react52.createElement)(
       "div",
       { className: "bt-learning-filehead" },
-      (0, import_react51.createElement)("span", { className: "bt-learning-name" }, name),
-      path ? (0, import_react51.createElement)("span", { className: "bt-learning-path" }, path) : null,
-      (0, import_react51.createElement)("span", { className: "bt-learning-spacer" }),
-      added > 0 ? (0, import_react51.createElement)("span", { className: "bt-learning-plus" }, `+${added}`) : null,
-      removed > 0 ? (0, import_react51.createElement)("span", { className: "bt-learning-minus" }, `−${removed}`) : null,
-      (0, import_react51.createElement)("span", { className: `bt-learning-state bt-learning-state-${state.toLowerCase()}` }, t(state))
+      (0, import_react52.createElement)("span", { className: "bt-learning-name" }, name),
+      path ? (0, import_react52.createElement)("span", { className: "bt-learning-path" }, path) : null,
+      (0, import_react52.createElement)("span", { className: "bt-learning-spacer" }),
+      added > 0 ? (0, import_react52.createElement)("span", { className: "bt-learning-plus" }, `+${added}`) : null,
+      removed > 0 ? (0, import_react52.createElement)("span", { className: "bt-learning-minus" }, `−${removed}`) : null,
+      (0, import_react52.createElement)("span", { className: `bt-learning-state bt-learning-state-${state.toLowerCase()}` }, t(state))
     ),
-    (0, import_react51.createElement)(
+    (0, import_react52.createElement)(
       "div",
       { className: shut ? "bt-learning-code bt-learning-shut" : "bt-learning-code" },
       blocks.map((rows2, blockIndex) => [
-        blockIndex > 0 ? (0, import_react51.createElement)("div", { className: "bt-learning-gap", key: `gap-${blockIndex}` }) : null,
-        ...rows2.map((row, rowIndex) => (0, import_react51.createElement)(
+        blockIndex > 0 ? (0, import_react52.createElement)("div", { className: "bt-learning-gap", key: `gap-${blockIndex}` }) : null,
+        ...rows2.map((row, rowIndex) => (0, import_react52.createElement)(
           "div",
           { className: `bt-learning-row bt-learning-${row.kind}`, key: `${blockIndex}-${rowIndex}` },
-          (0, import_react51.createElement)("span", { className: "bt-learning-num", "aria-hidden": !0 }, row.number ?? ""),
-          (0, import_react51.createElement)("span", { className: "bt-learning-sign", "aria-hidden": !0 }, SIGNS[row.kind]),
-          (0, import_react51.createElement)("span", { className: "bt-learning-text" }, row.line || " ")
+          (0, import_react52.createElement)("span", { className: "bt-learning-num", "aria-hidden": !0 }, row.number ?? ""),
+          (0, import_react52.createElement)("span", { className: "bt-learning-sign", "aria-hidden": !0 }, SIGNS[row.kind]),
+          (0, import_react52.createElement)("span", { className: "bt-learning-text" }, row.line || " ")
         ))
       ])
     ),
-    folds ? (0, import_react51.createElement)(
+    folds ? (0, import_react52.createElement)(
       "div",
       { className: shut ? "bt-learning-morebar bt-learning-morebar-shut" : "bt-learning-morebar" },
-      (0, import_react51.createElement)(
+      (0, import_react52.createElement)(
         "button",
         { type: "button", className: "bt-learning-more", "aria-expanded": open, onClick: () => setOpen(!open) },
         t(open ? "Show less" : "Show all {count} lines", { count: all.length })
@@ -16285,7 +16387,7 @@ function FileBox({ name, path, state, blocks }) {
   );
 }
 function LearningProposals({ turn, dock, sessionId, useRoster, actions }) {
-  let roster = useRoster((value) => value), facts = useTurnFacts(sessionId, actions), [failed, setFailed] = (0, import_react51.useState)({}), bot = roster.byId?.[sessionId];
+  let roster = useRoster((value) => value), facts = useTurnFacts(sessionId, actions), [failed, setFailed] = (0, import_react52.useState)({}), bot = roster.byId?.[sessionId];
   if (!bot || currentPart(bot) !== sessionId) return null;
   let proposals = roster.learning?.[bot.id] ?? [], visible = [...proposals];
   for (let entry of Object.values(failed))
@@ -16304,10 +16406,10 @@ function LearningProposals({ turn, dock, sessionId, useRoster, actions }) {
     let next = { ...current };
     return delete next[id2], next;
   });
-  return (0, import_react51.createElement)("div", { className: dock ? "bt-learning-stack bt-learning-dock" : "bt-learning-stack" }, cards.map((proposal) => (0, import_react51.createElement)(
+  return (0, import_react52.createElement)("div", { className: dock ? "bt-learning-stack bt-learning-dock" : "bt-learning-stack" }, cards.map((proposal) => (0, import_react52.createElement)(
     "div",
     { className: "bt-q-inline", key: proposal.id },
-    (0, import_react51.createElement)(ProposalCard, {
+    (0, import_react52.createElement)(ProposalCard, {
       proposal,
       initialError: failed[proposal.id]?.error ?? failedAnswers.get(proposal.id)?.error,
       onFailure,
@@ -16317,10 +16419,10 @@ function LearningProposals({ turn, dock, sessionId, useRoster, actions }) {
   )));
 }
 function LearningTurnTail(props) {
-  return (0, import_react51.createElement)(LearningProposals, { ...props, dock: !1 });
+  return (0, import_react52.createElement)(LearningProposals, { ...props, dock: !1 });
 }
 function LearningDock(props) {
-  return (0, import_react51.createElement)(LearningProposals, { ...props, dock: !0 });
+  return (0, import_react52.createElement)(LearningProposals, { ...props, dock: !0 });
 }
 var LEARNING_CSS = `
 .bt-learning-stack{display:flex;flex-direction:column;gap:4px}
@@ -16400,7 +16502,7 @@ function createSwitchWindow(settle) {
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/user-message.js
-var import_react52 = require("react"), ui = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
+var import_react53 = require("react"), ui = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
 var canDrawUserMessages = () => typeof ui.projectUserText == "function";
 function contentParts(content) {
   let texts2 = [], attachments = [], rest = [];
@@ -16420,39 +16522,39 @@ function userTextParts(text7, bots, referenceLabels = []) {
   return cursor < text7.length && parts.push({ text: text7.slice(cursor) }), parts;
 }
 function UserText({ text: text7, bots, referenceLabels, skillNames, references, actions }) {
-  return userTextParts(text7, bots, referenceLabels).map((part, index) => part.bot ? (0, import_react52.createElement)(
+  return userTextParts(text7, bots, referenceLabels).map((part, index) => part.bot ? (0, import_react53.createElement)(
     "button",
     { key: index, type: "button", className: "bt-umention", title: `@${part.bot.name}`, onClick: () => actions.openSession(part.bot.id) },
-    (0, import_react52.createElement)(BotMark, { bot: part.bot, size: 16 }),
+    (0, import_react53.createElement)(BotMark, { bot: part.bot, size: 16 }),
     part.label
-  ) : (0, import_react52.createElement)(import_react52.Fragment, { key: index }, ui.projectUserText(part.text, referenceLabels, skillNames, "skill", references)));
+  ) : (0, import_react53.createElement)(import_react53.Fragment, { key: index }, ui.projectUserText(part.text, referenceLabels, skillNames, "skill", references)));
 }
 function Attachments({ attachments, renderMessageImages }) {
   let compact2 = attachments.length > 1;
-  return (0, import_react52.createElement)("div", { className: "bt-uattach" }, attachments.map((block, index) => {
+  return (0, import_react53.createElement)("div", { className: "bt-uattach" }, attachments.map((block, index) => {
     if (block.type === "image")
-      return renderMessageImages ? (0, import_react52.createElement)(import_react52.Fragment, { key: index }, renderMessageImages({ images: [{ attachment: block.attachment }], align: "end", compact: compact2 })) : null;
+      return renderMessageImages ? (0, import_react53.createElement)(import_react53.Fragment, { key: index }, renderMessageImages({ images: [{ attachment: block.attachment }], align: "end", compact: compact2 })) : null;
     let file = block.attachment, meta = [ui.fileExtension?.(file.name)?.toUpperCase().slice(0, 8), ui.fileSizeText?.(file.bytes)].filter(Boolean).join(" · ");
-    return (0, import_react52.createElement)(
+    return (0, import_react53.createElement)(
       "span",
       { key: index, className: "bt-ufile", title: file.name },
-      ui.FileTypeIcon ? (0, import_react52.createElement)(ui.FileTypeIcon, { path: file.name, className: "bt-ufile-icon" }) : null,
-      (0, import_react52.createElement)("span", { className: "bt-ufile-text" }, (0, import_react52.createElement)("span", { className: "bt-ufile-name" }, file.name), meta ? (0, import_react52.createElement)("span", { className: "bt-ufile-meta" }, meta) : null)
+      ui.FileTypeIcon ? (0, import_react53.createElement)(ui.FileTypeIcon, { path: file.name, className: "bt-ufile-icon" }) : null,
+      (0, import_react53.createElement)("span", { className: "bt-ufile-text" }, (0, import_react53.createElement)("span", { className: "bt-ufile-name" }, file.name), meta ? (0, import_react53.createElement)("span", { className: "bt-ufile-meta" }, meta) : null)
     );
   }));
 }
 function CopyButton({ text: text7 }) {
-  let [copied, setCopied] = (0, import_react52.useState)(!1), copy2 = () => {
+  let [copied, setCopied] = (0, import_react53.useState)(!1), copy2 = () => {
     navigator.clipboard?.writeText(text7).then(() => {
       setCopied(!0), setTimeout(() => setCopied(!1), 1e3);
     });
   };
-  return (0, import_react52.createElement)("button", { type: "button", className: "bt-tool", "aria-label": copied ? t("Copied") : t("Copy"), title: copied ? t("Copied") : t("Copy"), onClick: copy2 }, copied ? (0, import_react52.createElement)(CheckIcon) : (0, import_react52.createElement)(CopyIcon));
+  return (0, import_react53.createElement)("button", { type: "button", className: "bt-tool", "aria-label": copied ? t("Copied") : t("Copy"), title: copied ? t("Copied") : t("Copy"), onClick: copy2 }, copied ? (0, import_react53.createElement)(CheckIcon) : (0, import_react53.createElement)(CopyIcon));
 }
 var clock3 = (time) => typeof time == "number" ? new Date(time).toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit" }) : void 0;
 function UserMessageCell({ node, sessionId, useRoster, actions, renderMessageImages, openFile, openSkill }) {
-  let roster = useRoster((value) => value), data = node.data ?? {}, { text: text7, attachments, rest } = contentParts(data.content), referenceLabels = data.referenceLabels ?? [], references = openFile && openSkill ? { openFile, openSkill } : void 0, steering = node.kind === "steering", groupTime = roster.roomsById?.[sessionId] && Number.isFinite(data.time) ? messageClock(data.time) : void 0, { shown, folded, control } = useFold(text7, { markdown: !1 }), body = (0, import_react52.createElement)(UserText, { text: shown, bots: mentionableBots(roster, sessionId), referenceLabels, skillNames: data.skillNames ?? [], references, actions }), row = (0, import_react52.useRef)(null), [toolsOpen, setToolsOpen] = (0, import_react52.useState)(!1);
-  (0, import_react52.useEffect)(() => {
+  let roster = useRoster((value) => value), data = node.data ?? {}, { text: text7, attachments, rest } = contentParts(data.content), referenceLabels = data.referenceLabels ?? [], references = openFile && openSkill ? { openFile, openSkill } : void 0, steering = node.kind === "steering", groupTime = roster.roomsById?.[sessionId] && Number.isFinite(data.time) ? messageClock(data.time) : void 0, { shown, folded, control } = useFold(text7, { markdown: !1 }), body = (0, import_react53.createElement)(UserText, { text: shown, bots: mentionableBots(roster, sessionId), referenceLabels, skillNames: data.skillNames ?? [], references, actions }), row = (0, import_react53.useRef)(null), [toolsOpen, setToolsOpen] = (0, import_react53.useState)(!1);
+  (0, import_react53.useEffect)(() => {
     if (!toolsOpen) return;
     let onDown = (event) => {
       row.current?.contains(event.target) || setToolsOpen(!1);
@@ -16464,24 +16566,24 @@ function UserMessageCell({ node, sessionId, useRoster, actions, renderMessageIma
   let tapTools = (event) => {
     !noHover() || event.target instanceof Element && event.target.closest("a,button,input,textarea,select,pre,code,[role=button],[role=link]") || setToolsOpen((value) => !value);
   };
-  return (0, import_react52.createElement)(
+  return (0, import_react53.createElement)(
     "div",
     { ref: row, className: "bt-umsg", "data-steering": steering || void 0 },
-    (0, import_react52.createElement)(
+    (0, import_react53.createElement)(
       "div",
       { className: "bt-ustack" },
-      attachments.length > 0 ? (0, import_react52.createElement)(Attachments, { attachments, renderMessageImages }) : null,
-      text7 !== "" || rest.length > 0 ? (0, import_react52.createElement)(
+      attachments.length > 0 ? (0, import_react53.createElement)(Attachments, { attachments, renderMessageImages }) : null,
+      text7 !== "" || rest.length > 0 ? (0, import_react53.createElement)(
         "div",
         { className: "bt-ubody", title: clock3(data.time), "data-folded": folded || void 0, onClick: tapTools },
-        control ? (0, import_react52.createElement)("div", { className: "bt-fold-body" }, body) : body,
+        control ? (0, import_react53.createElement)("div", { className: "bt-fold-body" }, body) : body,
         control,
-        rest.map((block, index) => ui.JsonBlock ? (0, import_react52.createElement)(ui.JsonBlock, { key: index, label: t("Content"), payload: block }) : null)
+        rest.map((block, index) => ui.JsonBlock ? (0, import_react53.createElement)(ui.JsonBlock, { key: index, label: t("Content"), payload: block }) : null)
       ) : null,
-      referenceLabels.length > 0 ? (0, import_react52.createElement)("div", { className: "bt-urefs" }, t("Referenced {labels}", { labels: referenceLabels.join(t(", ")) })) : null,
-      groupTime ? (0, import_react52.createElement)("div", { className: "bt-utime", title: clockLabel(data.time) }, groupTime) : null
+      referenceLabels.length > 0 ? (0, import_react53.createElement)("div", { className: "bt-urefs" }, t("Referenced {labels}", { labels: referenceLabels.join(t(", ")) })) : null,
+      groupTime ? (0, import_react53.createElement)("div", { className: "bt-utime", title: clockLabel(data.time) }, groupTime) : null
     ),
-    text7 === "" ? null : (0, import_react52.createElement)("div", { className: "bt-utools", "data-open": toolsOpen || void 0 }, (0, import_react52.createElement)(CopyButton, { text: text7 }))
+    text7 === "" ? null : (0, import_react53.createElement)("div", { className: "bt-utools", "data-open": toolsOpen || void 0 }, (0, import_react53.createElement)(CopyButton, { text: text7 }))
   );
 }
 var USER_MESSAGE_CSS = `
@@ -16675,7 +16777,7 @@ function apply(ctx) {
       stopped = !0, unsubscribe?.();
     };
   }, "ds-bot: own app update state");
-  let bridge = (window.dshDesktop?.protocolVersion === 1 ? window.dshDesktop.browser : globalThis.dsBotApp?.browser) ?? null, browsers = bridge ? createBotBrowsers({ bridge, createSource }) : null;
+  let bridge2 = (window.dshDesktop?.protocolVersion === 1 ? window.dshDesktop.browser : globalThis.dsBotApp?.browser) ?? null, browsers = bridge2 ? createBotBrowsers({ bridge: bridge2, createSource }) : null;
   browsers && ctx.effect(() => {
     let stopReads = null, sync = () => {
       let snapshot = roster.getSnapshot();
@@ -16910,27 +17012,27 @@ function apply(ctx) {
     browserNavigate: (tabId, input) => browsers.navigate(tabId, input),
     browserCommand: (tabId, name) => browsers.command(tabId, name),
     browserFocus: (tabId) => browsers.focus(tabId),
-    browserTakeover: bridge.views ? async (botId) => {
+    browserTakeover: bridge2.views ? async (botId) => {
       let result = await call("browser-takeover", { botId });
-      return await bridge.views.hold(botId, !0), result;
+      return await bridge2.views.hold(botId, !0), result;
     } : void 0,
-    browserStop: bridge.views ? async (botId) => {
+    browserStop: bridge2.views ? async (botId) => {
       let result = await call("browser-stop", { botId });
-      return await bridge.views.hold(botId, !0), result;
+      return await bridge2.views.hold(botId, !0), result;
     } : void 0,
     // `answer` is a handoff card's { callId, outcome }; the panel's Give back sends none.
-    browserGiveBack: bridge.views ? async (botId, answer = {}) => {
+    browserGiveBack: bridge2.views ? async (botId, answer = {}) => {
       let result = await call("browser-give-back", { botId, ...answer });
-      return await bridge.views.hold(botId, !1), result;
+      return await bridge2.views.hold(botId, !1), result;
     } : void 0,
     // Cookie imports, only where the bridge offers them (the desktop app): a file or an
     // installed browser's profile is previewed, then applied into the Bot's storage key.
-    browserImport: typeof bridge.importSources == "function" ? {
-      sources: () => bridge.importSources(),
-      pick: () => bridge.importPick(),
-      live: (source, close) => bridge.importLive(source, close),
-      apply: (botId, pending) => bridge.importApply(`bot:${botId}`, pending),
-      cancel: (pending) => bridge.importCancel(pending)
+    browserImport: typeof bridge2.importSources == "function" ? {
+      sources: () => bridge2.importSources(),
+      pick: () => bridge2.importPick(),
+      live: (source, close) => bridge2.importLive(source, close),
+      apply: (botId, pending) => bridge2.importApply(`bot:${botId}`, pending),
+      cancel: (pending) => bridge2.importCancel(pending)
     } : null
   }), actions.signInEntry = () => ctx.slots.entries?.("settings.models.sign-in")?.[0] ?? null, actions.canSignIn = () => !!actions.signInEntry(), actions.signIn = () => ui3.set((state) => ({ ...state, signIn: (state.signIn ?? 0) + 1 })), actions.closeSignIn = () => ui3.set((state) => ({ ...state, signIn: null })), actions.accountT = () => ctx.get("locale").bind("settings.account"), actions.speech = () => ctx.get("remote.speech") ?? void 0, actions.openHarnessSettings = openHarnessSettings, actions.openHarnessOnboarding = openHarnessOnboarding, actions.voiceSetup = (providerId) => {
     let navigation = ctx.get("pluginNavigation");
@@ -17220,7 +17322,7 @@ function apply(ctx) {
 }
 
 // .dsh-plugin/client/official-harness.jsx
-var import_react58 = __toESM(require("react"), 1);
+var import_react59 = __toESM(require("react"), 1);
 
 // .dsh-plugin/shared/official-tool-registry.mjs
 var DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org/";
@@ -18116,7 +18218,7 @@ function parseInstallPreferences(config = {}, { tools = [], home = "", env = {} 
 }
 
 // .dsh-plugin/client/router-main.jsx
-var import_react57 = __toESM(require("react"), 1);
+var import_react58 = __toESM(require("react"), 1);
 
 // .dsh-plugin/shared/routing-presets.mjs
 var DEFAULT_ROUTING_PRESET = "balanced", ROUTING_PRESETS = Object.freeze({
@@ -18370,10 +18472,10 @@ function isCjkCode(c) {
   return c >= 13312 && c <= 19903 || c >= 19968 && c <= 40959 || c >= 63744 && c <= 64255;
 }
 function hashIndex(tok) {
-  let h51 = 2166136261;
+  let h52 = 2166136261;
   for (let i = 0; i < tok.length; i++)
-    h51 ^= tok.charCodeAt(i), h51 = Math.imul(h51, 16777619) >>> 0;
-  return h51 % 4096;
+    h52 ^= tok.charCodeAt(i), h52 = Math.imul(h52, 16777619) >>> 0;
+  return h52 % 4096;
 }
 function buildFeatures(text7) {
   let s15 = text7.length > 2e4 ? text7.slice(0, 2e4) : text7, idxCounts = /* @__PURE__ */ new Map(), seen = /* @__PURE__ */ new Set(), addToken = (tok) => {
@@ -18381,8 +18483,8 @@ function buildFeatures(text7) {
       if (seen.size >= 512) return;
       seen.add(tok);
     }
-    let h51 = hashIndex(tok);
-    idxCounts.set(h51, (idxCounts.get(h51) || 0) + 1);
+    let h52 = hashIndex(tok);
+    idxCounts.set(h52, (idxCounts.get(h52) || 0) + 1);
   }, word = "", cjk = "", flushWord = () => {
     word && (addToken(word.toLowerCase()), word = "");
   }, flushCjk = () => {
@@ -19713,7 +19815,7 @@ function createWorkspacePlan(task, catalog, options = {}) {
 }
 
 // .dsh-plugin/client/model-profile-editor.jsx
-var import_react53 = __toESM(require("react"), 1);
+var import_react54 = __toESM(require("react"), 1);
 
 // .dsh-plugin/client/model-profile-editor-state.mjs
 var PROFILE_SPECIALTY_HINT = "code, math, research, summarization, writing, vision, reasoning", profileRouteKey = (route2) => `${String(route2?.provider ?? "")}\0${String(route2?.model ?? "")}`, field = (value) => String(value ?? "").trim();
@@ -19793,8 +19895,8 @@ function updateProfileJson(rawJson, route2, draft) {
 // .dsh-plugin/client/model-profile-editor.jsx
 var messageOf = (error) => typeof error?.message == "string" ? error.message : "模型配置保存失败。";
 function ModelProfileEditor({ routes, settingsScope, onSaved }) {
-  let [snapshot, setSnapshot] = import_react53.default.useState(() => settingsScope.getSnapshot()), [selected, setSelected] = import_react53.default.useState(""), [drafts, setDrafts] = import_react53.default.useState({}), [saving, setSaving] = import_react53.default.useState(!1), [notice, setNotice] = import_react53.default.useState(null);
-  import_react53.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
+  let [snapshot, setSnapshot] = import_react54.default.useState(() => settingsScope.getSnapshot()), [selected, setSelected] = import_react54.default.useState(""), [drafts, setDrafts] = import_react54.default.useState({}), [saving, setSaving] = import_react54.default.useState(!1), [notice, setNotice] = import_react54.default.useState(null);
+  import_react54.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
   let route2 = routes.find((item) => profileRouteKey(item) === selected) ?? routes[0], routeKey4 = route2 ? profileRouteKey(route2) : "", rawJson = snapshot.value?.modelProfilesJson ?? "[]", profiles = [], loadError = "";
   try {
     profiles = parseModelProfilesJson(rawJson);
@@ -19838,13 +19940,13 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
       return delete next[routeKey4], next;
     }), setNotice(null);
   };
-  return /* @__PURE__ */ import_react53.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "逐模型价格与能力配置" }, /* @__PURE__ */ import_react53.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react53.default.createElement("div", null, /* @__PURE__ */ import_react53.default.createElement("h2", { className: "mr-card-title" }, "逐模型价格与能力"), /* @__PURE__ */ import_react53.default.createElement("p", { className: "mr-card-copy" }, "选择官方模型目录中的准确路线，填写你掌握的质量评分与单价。配置由你提供，插件不会读取账号密钥。"))), /* @__PURE__ */ import_react53.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react53.default.createElement("p", { className: "mr-error", role: "alert" }, "已有配置无法解析：", loadError, "。请先在插件设置页修正 JSON。"), snapshot.status !== "ready" && /* @__PURE__ */ import_react53.default.createElement("p", { className: "mr-caption" }, "设置状态：", snapshot.status === "loading" ? "正在加载" : "当前不可用"), snapshot.status === "ready" && !snapshot.writable && /* @__PURE__ */ import_react53.default.createElement("p", { className: "mr-error", role: "status" }, "当前设置为只读，请在可写的本机环境配置。"), routes.length === 0 ? /* @__PURE__ */ import_react53.default.createElement("p", { className: "mr-empty" }, "请先在 DeepSeek Harness 的“模型”页添加模型，再返回这里填写价格与能力。") : /* @__PURE__ */ import_react53.default.createElement(import_react53.default.Fragment, null, /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "模型路线"), /* @__PURE__ */ import_react53.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey4, onChange: (event) => {
+  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "逐模型价格与能力配置" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "逐模型价格与能力"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "选择官方模型目录中的准确路线，填写你掌握的质量评分与单价。配置由你提供，插件不会读取账号密钥。"))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, "已有配置无法解析：", loadError, "。请先在插件设置页修正 JSON。"), snapshot.status !== "ready" && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "设置状态：", snapshot.status === "loading" ? "正在加载" : "当前不可用"), snapshot.status === "ready" && !snapshot.writable && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "status" }, "当前设置为只读，请在可写的本机环境配置。"), routes.length === 0 ? /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-empty" }, "请先在 DeepSeek Harness 的“模型”页添加模型，再返回这里填写价格与能力。") : /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "模型路线"), /* @__PURE__ */ import_react54.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey4, onChange: (event) => {
     setSelected(event.target.value), setNotice(null);
-  } }, routes.map((item) => /* @__PURE__ */ import_react53.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react53.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `已配置${saved.pricing ? "单价" : "能力，价格未知"}` : "未配置，价格与质量来源未知", pending ? " · 当前有未保存输入" : "", unmatched > 0 ? ` · 另有 ${unmatched} 条配置不在当前模型目录中，保存时会保留` : ""), /* @__PURE__ */ import_react53.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "质量评分（0–100，自报）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "例如 85；留空表示未知" })), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "输入单价（USD / 百万 token）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "留空表示未知" })), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "输出单价（USD / 百万 token）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "留空表示未知" })), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "擅长方向（英文标签，逗号分隔）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "text", value: draft.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "官方 CLI 模型名（可选）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "text", value: draft.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "仅在厂商 CLI 支持该准确名称时填写" })), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "LiveBench 准确模型名称（可选）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "text", value: draft.benchmarkModel ?? "", disabled: !writable, onChange: (event) => edit("benchmarkModel", event.target.value), placeholder: "确认版本与推理档位一致；不自动猜测别名" })), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "执行方式"), /* @__PURE__ */ import_react53.default.createElement("select", { className: "mr-input", value: draft.execution || "auto", disabled: !writable, onChange: (event) => edit("execution", event.target.value) }, /* @__PURE__ */ import_react53.default.createElement("option", { value: "auto" }, "自动：优先尝试支持当前模式的官方工具"), /* @__PURE__ */ import_react53.default.createElement("option", { value: "official" }, "优先官方工具：API 回退依计费与失败设置"), /* @__PURE__ */ import_react53.default.createElement("option", { value: "api" }, "仅模型目录 API"))), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "计费方式"), /* @__PURE__ */ import_react53.default.createElement("select", { className: "mr-input", value: draft.billing, disabled: !writable, onChange: (event) => edit("billing", event.target.value) }, /* @__PURE__ */ import_react53.default.createElement("option", { value: "subscription-first" }, "订阅优先：额度用尽或限流时切换 API Key"), /* @__PURE__ */ import_react53.default.createElement("option", { value: "api-only" }, "只用 API Key"), /* @__PURE__ */ import_react53.default.createElement("option", { value: "subscription-only" }, "只用订阅：额度用尽时不切换"))), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "订阅来源"), /* @__PURE__ */ import_react53.default.createElement("select", { className: "mr-input", value: draft.subscription, disabled: !writable, onChange: (event) => edit("subscription", event.target.value) }, /* @__PURE__ */ import_react53.default.createElement("option", { value: "auto" }, "自动：有官方 CLI 时用 CLI 账号登录"), /* @__PURE__ */ import_react53.default.createElement("option", { value: "plan-key" }, "编程套餐 Key：该路线本身是套餐端点"), /* @__PURE__ */ import_react53.default.createElement("option", { value: "cli-login" }, "官方 CLI 账号登录"), /* @__PURE__ */ import_react53.default.createElement("option", { value: "none" }, "无订阅：始终按 API 计费"))), draft.subscription === "plan-key" && /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "额度用尽时回退的 API 路线"), /* @__PURE__ */ import_react53.default.createElement("select", { className: "mr-input", value: draft.apiRoute, disabled: !writable, onChange: (event) => edit("apiRoute", event.target.value) }, /* @__PURE__ */ import_react53.default.createElement("option", { value: "" }, "不回退（未配置 API 路线）"), routes.filter((item) => profileRouteKey(item) !== routeKey4).map((item) => /* @__PURE__ */ import_react53.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))))), /* @__PURE__ */ import_react53.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react53.default.createElement("summary", null, "缓存单价（可选）"), /* @__PURE__ */ import_react53.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "缓存读取（USD / 百万 token）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "留空按普通输入价格估算" })), /* @__PURE__ */ import_react53.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react53.default.createElement("span", null, "缓存写入（USD / 百万 token）"), /* @__PURE__ */ import_react53.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "留空按普通输入价格估算" })))), /* @__PURE__ */ import_react53.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react53.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
+  } }, routes.map((item) => /* @__PURE__ */ import_react54.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `已配置${saved.pricing ? "单价" : "能力，价格未知"}` : "未配置，价格与质量来源未知", pending ? " · 当前有未保存输入" : "", unmatched > 0 ? ` · 另有 ${unmatched} 条配置不在当前模型目录中，保存时会保留` : ""), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "质量评分（0–100，自报）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "例如 85；留空表示未知" })), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "输入单价（USD / 百万 token）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "留空表示未知" })), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "输出单价（USD / 百万 token）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "留空表示未知" })), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "擅长方向（英文标签，逗号分隔）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "text", value: draft.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "官方 CLI 模型名（可选）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "text", value: draft.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "仅在厂商 CLI 支持该准确名称时填写" })), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "LiveBench 准确模型名称（可选）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "text", value: draft.benchmarkModel ?? "", disabled: !writable, onChange: (event) => edit("benchmarkModel", event.target.value), placeholder: "确认版本与推理档位一致；不自动猜测别名" })), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "执行方式"), /* @__PURE__ */ import_react54.default.createElement("select", { className: "mr-input", value: draft.execution || "auto", disabled: !writable, onChange: (event) => edit("execution", event.target.value) }, /* @__PURE__ */ import_react54.default.createElement("option", { value: "auto" }, "自动：优先尝试支持当前模式的官方工具"), /* @__PURE__ */ import_react54.default.createElement("option", { value: "official" }, "优先官方工具：API 回退依计费与失败设置"), /* @__PURE__ */ import_react54.default.createElement("option", { value: "api" }, "仅模型目录 API"))), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "计费方式"), /* @__PURE__ */ import_react54.default.createElement("select", { className: "mr-input", value: draft.billing, disabled: !writable, onChange: (event) => edit("billing", event.target.value) }, /* @__PURE__ */ import_react54.default.createElement("option", { value: "subscription-first" }, "订阅优先：额度用尽或限流时切换 API Key"), /* @__PURE__ */ import_react54.default.createElement("option", { value: "api-only" }, "只用 API Key"), /* @__PURE__ */ import_react54.default.createElement("option", { value: "subscription-only" }, "只用订阅：额度用尽时不切换"))), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "订阅来源"), /* @__PURE__ */ import_react54.default.createElement("select", { className: "mr-input", value: draft.subscription, disabled: !writable, onChange: (event) => edit("subscription", event.target.value) }, /* @__PURE__ */ import_react54.default.createElement("option", { value: "auto" }, "自动：有官方 CLI 时用 CLI 账号登录"), /* @__PURE__ */ import_react54.default.createElement("option", { value: "plan-key" }, "编程套餐 Key：该路线本身是套餐端点"), /* @__PURE__ */ import_react54.default.createElement("option", { value: "cli-login" }, "官方 CLI 账号登录"), /* @__PURE__ */ import_react54.default.createElement("option", { value: "none" }, "无订阅：始终按 API 计费"))), draft.subscription === "plan-key" && /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "额度用尽时回退的 API 路线"), /* @__PURE__ */ import_react54.default.createElement("select", { className: "mr-input", value: draft.apiRoute, disabled: !writable, onChange: (event) => edit("apiRoute", event.target.value) }, /* @__PURE__ */ import_react54.default.createElement("option", { value: "" }, "不回退（未配置 API 路线）"), routes.filter((item) => profileRouteKey(item) !== routeKey4).map((item) => /* @__PURE__ */ import_react54.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))))), /* @__PURE__ */ import_react54.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react54.default.createElement("summary", null, "缓存单价（可选）"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "缓存读取（USD / 百万 token）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "留空按普通输入价格估算" })), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react54.default.createElement("span", null, "缓存写入（USD / 百万 token）"), /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "留空按普通输入价格估算" })))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
     write(!1);
-  } }, saving ? "保存中…" : "保存此模型"), /* @__PURE__ */ import_react53.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !pending || saving, onClick: reload }, "重新加载此路线"), saved && /* @__PURE__ */ import_react53.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable, onClick: () => {
+  } }, saving ? "保存中…" : "保存此模型"), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !pending || saving, onClick: reload }, "重新加载此路线"), saved && /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable, onClick: () => {
     write(!0);
-  } }, "删除此模型配置")), notice && /* @__PURE__ */ import_react53.default.createElement("p", { className: notice.tone === "error" ? "mr-error" : "mr-profile-success", role: notice.tone === "error" ? "alert" : "status" }, notice.text), /* @__PURE__ */ import_react53.default.createElement("p", { className: "mr-caption" }, "质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算估算不能限制实际账单。CLI 模型名须与厂商工具核对。官方工具须支持当前任务模式；失败后的 API 回退依计费与失败处理设置执行。订阅优先会先尝试 CLI 账号或编程套餐 Key；额度用尽或限流时按设置切换 API，其他故障默认暂停询问。只用订阅不会切换 API。"))));
+  } }, "删除此模型配置")), notice && /* @__PURE__ */ import_react54.default.createElement("p", { className: notice.tone === "error" ? "mr-error" : "mr-profile-success", role: notice.tone === "error" ? "alert" : "status" }, notice.text), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "质量评分和价格都是用户提供的估值。未填写单价时显示“价格待配置”；预算估算不能限制实际账单。CLI 模型名须与厂商工具核对。官方工具须支持当前任务模式；失败后的 API 回退依计费与失败处理设置执行。订阅优先会先尝试 CLI 账号或编程套餐 Key；额度用尽或限流时按设置切换 API，其他故障默认暂停询问。只用订阅不会切换 API。"))));
 }
 
 // .dsh-plugin/shared/version-order.mjs
@@ -20042,7 +20144,7 @@ function attentionSummary(rows2 = []) {
 }
 
 // .dsh-plugin/client/router-insights.jsx
-var import_react54 = __toESM(require("react"), 1);
+var import_react55 = __toESM(require("react"), 1);
 
 // .dsh-plugin/client/insights-state.mjs
 var tokenCounter = (value) => typeof value == "number" && Number.isFinite(value) && value >= 0, usageCount = (value) => Number.isSafeInteger(value) && value >= 0, formatUsageTokens = (value) => usageCount(value) ? value.toLocaleString("zh-CN") : "未报告";
@@ -20470,10 +20572,10 @@ function dynamicSourceView(source, enabled = !0) {
 var text = (value) => typeof value == "string" ? value.trim() : "", BAND = { simple: "简单", balanced: "中等", complex: "困难" }, SUBSCRIPTION_FAILURE_OPTIONS = [["ask", "暂停并询问"], ["api", "自动改用 API"], ["fail", "直接失败"]], SUBSCRIPTION_CHOICE_BUTTONS = [["api", "改用 API 重试", !1], ["subscription", "重试订阅", !0], ["cancel", "取消", !0]];
 function OnboardingBanner({ health, onDone, onRefresh, refreshing, error }) {
   let summary = healthSummary(health?.tools), problems = (health?.tools ?? []).filter((item) => item.installed && item.login?.state === "logged-out"), updates = (health?.tools ?? []).filter((item) => item.installed && item.versionStatus === "update-available");
-  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-onboarding", "aria-label": "开箱体检" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "开箱体检"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "首次打开时检测官方工具的安装、版本与登录状态。未登录时按计费设置暂停或使用模型目录 API；任务模式的执行支持见各工具说明。")), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: refreshing, onClick: onRefresh }, refreshing ? "检测中…" : "重新体检")), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, error), !health && !error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-empty", role: "status" }, "正在体检本机官方工具…"), health && /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "已安装"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, summary.installed, " / ", summary.total)), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "已登录"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, summary.ready)), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "未登录"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, summary.loggedOut)), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "登录状态未知"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, summary.unknown))), problems.length > 0 ? /* @__PURE__ */ import_react54.default.createElement("ul", { className: "mr-checklist" }, problems.map((item) => /* @__PURE__ */ import_react54.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react54.default.createElement("strong", null, item.label), "：未登录，可在下方点“去登录”查看登录方法（", item.login.command ?? "见说明", "）。"))) : /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "已安装的工具没有发现未登录的问题。未安装的工具可在下方一键安装。"), updates.length > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "有新版本：", updates.map((item) => `${item.label} ${item.version ?? "?"} → ${item.latestVersion}`).join("；"), "。可在下方“官方工具”中更新（可选）。"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, UNTESTED_VERSION_NOTE), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button", type: "button", onClick: onDone }, "完成体检"), /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "之后可随时在“官方工具”卡片中重新体检。")))));
+  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card mr-onboarding", "aria-label": "开箱体检" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "开箱体检"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "首次打开时检测官方工具的安装、版本与登录状态。未登录时按计费设置暂停或使用模型目录 API；任务模式的执行支持见各工具说明。")), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: refreshing, onClick: onRefresh }, refreshing ? "检测中…" : "重新体检")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, error), !health && !error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty", role: "status" }, "正在体检本机官方工具…"), health && /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "已安装"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, summary.installed, " / ", summary.total)), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "已登录"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, summary.ready)), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "未登录"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, summary.loggedOut)), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "登录状态未知"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, summary.unknown))), problems.length > 0 ? /* @__PURE__ */ import_react55.default.createElement("ul", { className: "mr-checklist" }, problems.map((item) => /* @__PURE__ */ import_react55.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react55.default.createElement("strong", null, item.label), "：未登录，可在下方点“去登录”查看登录方法（", item.login.command ?? "见说明", "）。"))) : /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "已安装的工具没有发现未登录的问题。未安装的工具可在下方一键安装。"), updates.length > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "有新版本：", updates.map((item) => `${item.label} ${item.version ?? "?"} → ${item.latestVersion}`).join("；"), "。可在下方“官方工具”中更新（可选）。"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, UNTESTED_VERSION_NOTE), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button", type: "button", onClick: onDone }, "完成体检"), /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "之后可随时在“官方工具”卡片中重新体检。")))));
 }
 function ToolLoginLine({ entry }) {
-  let [open, setOpen] = import_react54.default.useState(!1), [copied, setCopied] = import_react54.default.useState(!1);
+  let [open, setOpen] = import_react55.default.useState(!1), [copied, setCopied] = import_react55.default.useState(!1);
   if (!entry?.installed) return null;
   let state = entry.login?.state ?? "unknown", copy2 = async () => {
     try {
@@ -20482,18 +20584,18 @@ function ToolLoginLine({ entry }) {
       setCopied(!1);
     }
   };
-  return /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-login" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-tool-status" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: `mr-tool-dot ${state === "logged-in" ? "installed" : state === "logged-out" ? "missing-strong" : ""}` }), LOGIN_LABEL[state], " · ", versionLine(entry)), entry.login?.detail && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-tool-detail" }, entry.login.detail), state === "logged-in" && entry.login?.billing === "subscription" && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "订阅账号登录：单独统计调用与 token 用量，不计入 API 费用预算。"), state === "logged-in" && entry.login?.billing === "api-key" && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "API Key 计费：费用计入每日/每月预算。"), state !== "logged-in" && /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button mr-login-button", type: "button", "aria-expanded": open, onClick: () => setOpen((value) => !value) }, "去登录"), open && /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-login-guide" }, /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, entry.login.steps), entry.login.command && /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-login-command" }, /* @__PURE__ */ import_react54.default.createElement("code", { className: "mr-tool-command" }, entry.login.command), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
+  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-login" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-tool-status" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: `mr-tool-dot ${state === "logged-in" ? "installed" : state === "logged-out" ? "missing-strong" : ""}` }), LOGIN_LABEL[state], " · ", versionLine(entry)), entry.login?.detail && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-tool-detail" }, entry.login.detail), state === "logged-in" && entry.login?.billing === "subscription" && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "订阅账号登录：单独统计调用与 token 用量，不计入 API 费用预算。"), state === "logged-in" && entry.login?.billing === "api-key" && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "API Key 计费：费用计入每日/每月预算。"), state !== "logged-in" && /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button mr-login-button", type: "button", "aria-expanded": open, onClick: () => setOpen((value) => !value) }, "去登录"), open && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-login-guide" }, /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, entry.login.steps), entry.login.command && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-login-command" }, /* @__PURE__ */ import_react55.default.createElement("code", { className: "mr-tool-command" }, entry.login.command), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     copy2();
-  } }, copied ? "已复制" : "复制命令")), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "插件不会替你启动交互式登录。登录完成后点“重新体检”。")));
+  } }, copied ? "已复制" : "复制命令")), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "插件不会替你启动交互式登录。登录完成后点“重新体检”。")));
 }
 function Meter({ label, meter }) {
-  return /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-meter" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-meter-top" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-control-label" }, label), /* @__PURE__ */ import_react54.default.createElement("span", { className: meter.over ? "mr-meter-over" : "" }, meter.text)), meter.limited && /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-meter-track", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(meter.share * 100) }, /* @__PURE__ */ import_react54.default.createElement("div", { className: `mr-meter-fill ${meter.over ? "over" : meter.share > 0.8 ? "near" : ""}`, style: { width: `${Math.round(meter.share * 100)}%` } })));
+  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-meter" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-meter-top" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label" }, label), /* @__PURE__ */ import_react55.default.createElement("span", { className: meter.over ? "mr-meter-over" : "" }, meter.text)), meter.limited && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-meter-track", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(meter.share * 100) }, /* @__PURE__ */ import_react55.default.createElement("div", { className: `mr-meter-fill ${meter.over ? "over" : meter.share > 0.8 ? "near" : ""}`, style: { width: `${Math.round(meter.share * 100)}%` } })));
 }
 function useSettingsWriter(settingsScope) {
-  let [snapshot, setSnapshot] = import_react54.default.useState(() => settingsScope.getSnapshot()), [notice, setNotice] = import_react54.default.useState(""), [busy, setBusy] = import_react54.default.useState(!1), pending = import_react54.default.useRef(!1), mounted = import_react54.default.useRef(!0);
-  import_react54.default.useEffect(() => (mounted.current = !0, () => {
+  let [snapshot, setSnapshot] = import_react55.default.useState(() => settingsScope.getSnapshot()), [notice, setNotice] = import_react55.default.useState(""), [busy, setBusy] = import_react55.default.useState(!1), pending = import_react55.default.useRef(!1), mounted = import_react55.default.useRef(!0);
+  import_react55.default.useEffect(() => (mounted.current = !0, () => {
     mounted.current = !1;
-  }), []), import_react54.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
+  }), []), import_react55.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
   let writable = snapshot.status === "ready" && snapshot.writable === !0 && !busy, write = async (key, value) => {
     let current = settingsScope.getSnapshot();
     if (pending.current || current.status !== "ready" || current.writable !== !0) return !1;
@@ -20516,7 +20618,7 @@ var ADAPTIVE_FIELD_LABEL = {
   dynamicDataTtlMinutes: "公共快照检查间隔（分钟）"
 };
 function AdaptiveNumberControl({ field: field2, value, writable, onSave }) {
-  let [draft, setDraft] = import_react54.default.useState(""), [notice, setNotice] = import_react54.default.useState(""), save = async () => {
+  let [draft, setDraft] = import_react55.default.useState(""), [notice, setNotice] = import_react55.default.useState(""), save = async () => {
     let next;
     try {
       next = parseAdaptiveNumber(field2.key, draft);
@@ -20531,7 +20633,7 @@ function AdaptiveNumberControl({ field: field2, value, writable, onSave }) {
       setNotice("设置保存失败，请重试。");
     }
   };
-  return /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${field2.key}` }, ADAPTIVE_FIELD_LABEL[field2.key]), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react54.default.createElement(
+  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${field2.key}` }, ADAPTIVE_FIELD_LABEL[field2.key]), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react55.default.createElement(
     "input",
     {
       className: "mr-input mr-budget",
@@ -20545,12 +20647,12 @@ function AdaptiveNumberControl({ field: field2, value, writable, onSave }) {
       disabled: !writable,
       onChange: (event) => setDraft(event.target.value)
     }
-  ), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || draft === "", onClick: () => {
+  ), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || draft === "", onClick: () => {
     save();
-  } }, "保存")), notice && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-error", role: "alert" }, notice));
+  } }, "保存")), notice && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-error", role: "alert" }, notice));
 }
 function PublicEndpointControl({ name, label, value, writable, onSave }) {
-  let [draft, setDraft] = import_react54.default.useState(null), [notice, setNotice] = import_react54.default.useState(""), current = publicEndpointDraft(name, value), save = async () => {
+  let [draft, setDraft] = import_react55.default.useState(null), [notice, setNotice] = import_react55.default.useState(""), current = publicEndpointDraft(name, value), save = async () => {
     let next;
     try {
       next = parsePublicEndpoint(name, draft ?? current);
@@ -20565,7 +20667,7 @@ function PublicEndpointControl({ name, label, value, writable, onSave }) {
       setNotice("地址保存失败，请重试。");
     }
   };
-  return /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${name}` }, label), /* @__PURE__ */ import_react54.default.createElement(
+  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-control-label", htmlFor: `mr-${name}` }, label), /* @__PURE__ */ import_react55.default.createElement(
     "input",
     {
       className: "mr-input",
@@ -20577,20 +20679,20 @@ function PublicEndpointControl({ name, label, value, writable, onSave }) {
       placeholder: name === "liveBenchEndpoint" ? "https://livebench.ai" : "留空：不读取远程价格快照",
       onChange: (event) => setDraft(event.target.value)
     }
-  ), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || draft === null, onClick: () => {
+  ), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || draft === null, onClick: () => {
     save();
-  } }, "保存地址"), notice && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-error", role: "alert" }, notice));
+  } }, "保存地址"), notice && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-error", role: "alert" }, notice));
 }
 function PublicSourceStatus({ label, source, enabled }) {
   let view = dynamicSourceView(source, enabled);
-  return /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-control-label" }, label, "：", view.label), view.status !== "disabled" && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, view.version ? `版本 ${view.version} · ` : "", view.count, " 条记录", view.verifiedAt ? ` · 最近校验 ${new Date(view.verifiedAt).toLocaleString()}` : ""), view.source && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "公开来源：", view.source), (view.refreshing || view.pending) && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption", role: "status" }, "公开源正在刷新；上面的版本仍是最近一次已保存快照，不是本次请求已成功。"), view.lastAttemptAt && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "最近尝试 ", new Date(view.lastAttemptAt).toLocaleString(), view.lastSuccessAt ? ` · 最近成功 ${new Date(view.lastSuccessAt).toLocaleString()}` : ""), view.status === "error" && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "更新失败；是否可用由 Host 校验，不将缺失数据当作零成本或满分。"), view.status === "stale" && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "上次有效快照已过期或本次更新失败；Host 可能沿用旧数据，不能当作最新价格或能力。"), view.errorCode === "storage-failed" && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "本次状态保存失败；只能使用此前已保存的当前源快照，请重试刷新。"), view.errorCode === "refresh-interrupted" && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "上次公开数据刷新中断；请刷新摘要查看 Host 的后续重试状态。"), view.lastGoodEndpoint && view.endpoint && view.lastGoodEndpoint !== view.endpoint && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "此前来源的有效快照仍保留在本地，但不应用到当前公开源。"), view.status === "disabled" && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "当前设置不使用此公开源；保留的历史快照不代表正在使用。"));
+  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label" }, label, "：", view.label), view.status !== "disabled" && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, view.version ? `版本 ${view.version} · ` : "", view.count, " 条记录", view.verifiedAt ? ` · 最近校验 ${new Date(view.verifiedAt).toLocaleString()}` : ""), view.source && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "公开来源：", view.source), (view.refreshing || view.pending) && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption", role: "status" }, "公开源正在刷新；上面的版本仍是最近一次已保存快照，不是本次请求已成功。"), view.lastAttemptAt && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "最近尝试 ", new Date(view.lastAttemptAt).toLocaleString(), view.lastSuccessAt ? ` · 最近成功 ${new Date(view.lastSuccessAt).toLocaleString()}` : ""), view.status === "error" && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "更新失败；是否可用由 Host 校验，不将缺失数据当作零成本或满分。"), view.status === "stale" && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "上次有效快照已过期或本次更新失败；Host 可能沿用旧数据，不能当作最新价格或能力。"), view.errorCode === "storage-failed" && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "本次状态保存失败；只能使用此前已保存的当前源快照，请重试刷新。"), view.errorCode === "refresh-interrupted" && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "上次公开数据刷新中断；请刷新摘要查看 Host 的后续重试状态。"), view.lastGoodEndpoint && view.endpoint && view.lastGoodEndpoint !== view.endpoint && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "此前来源的有效快照仍保留在本地，但不应用到当前公开源。"), view.status === "disabled" && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "当前设置不使用此公开源；保留的历史快照不代表正在使用。"));
 }
 function LearningEvidence({ learning }) {
   let evidence = learningEvidenceRows(learning), exclusions = learningExclusionRows(learning);
-  return /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, evidence.total > 0 && /* @__PURE__ */ import_react54.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react54.default.createElement("summary", null, "查看分模型 / 任务类型的已观察反馈（", evidence.total, " 组）"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "只描述已选择并获得评价的结果，不代表所有模型的真实质量或收益；有效样本量反映权重集中程度，不是质量置信度。"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react54.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react54.default.createElement("thead", null, /* @__PURE__ */ import_react54.default.createElement("tr", null, /* @__PURE__ */ import_react54.default.createElement("th", null, "路线 / 任务类型"), /* @__PURE__ */ import_react54.default.createElement("th", null, "有用 / 不好"), /* @__PURE__ */ import_react54.default.createElement("th", null, "偏好效用调整"))), /* @__PURE__ */ import_react54.default.createElement("tbody", null, evidence.rows.map((row) => /* @__PURE__ */ import_react54.default.createElement("tr", { key: row.id }, /* @__PURE__ */ import_react54.default.createElement("td", null, row.route, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-caption" }, row.domain)), /* @__PURE__ */ import_react54.default.createElement("td", null, row.positiveCount, " / ", row.negativeCount, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-caption" }, "已观察 ", row.feedbackCount, " · 有效权重 ", row.effectiveWeight.toFixed(2), " · 有效样本量 ", row.effectiveSampleSize.toFixed(2))), /* @__PURE__ */ import_react54.default.createElement("td", null, row.adjustment > 0 ? "+" : "", row.adjustment.toFixed(4), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-caption" }, "收缩系数 ", row.shrinkage.toFixed(2)))))))), evidence.total > evidence.rows.length && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "仅展示前 ", evidence.rows.length, " 组；不是所有模型的覆盖率。")), exclusions.length > 0 && /* @__PURE__ */ import_react54.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react54.default.createElement("summary", null, "查看未参与学习的原因"), /* @__PURE__ */ import_react54.default.createElement("ul", { className: "mr-checklist" }, exclusions.map((row) => /* @__PURE__ */ import_react54.default.createElement("li", { key: row.reason }, row.label, "：", row.count)))));
+  return /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, evidence.total > 0 && /* @__PURE__ */ import_react55.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react55.default.createElement("summary", null, "查看分模型 / 任务类型的已观察反馈（", evidence.total, " 组）"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "只描述已选择并获得评价的结果，不代表所有模型的真实质量或收益；有效样本量反映权重集中程度，不是质量置信度。"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react55.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react55.default.createElement("thead", null, /* @__PURE__ */ import_react55.default.createElement("tr", null, /* @__PURE__ */ import_react55.default.createElement("th", null, "路线 / 任务类型"), /* @__PURE__ */ import_react55.default.createElement("th", null, "有用 / 不好"), /* @__PURE__ */ import_react55.default.createElement("th", null, "偏好效用调整"))), /* @__PURE__ */ import_react55.default.createElement("tbody", null, evidence.rows.map((row) => /* @__PURE__ */ import_react55.default.createElement("tr", { key: row.id }, /* @__PURE__ */ import_react55.default.createElement("td", null, row.route, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-caption" }, row.domain)), /* @__PURE__ */ import_react55.default.createElement("td", null, row.positiveCount, " / ", row.negativeCount, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-caption" }, "已观察 ", row.feedbackCount, " · 有效权重 ", row.effectiveWeight.toFixed(2), " · 有效样本量 ", row.effectiveSampleSize.toFixed(2))), /* @__PURE__ */ import_react55.default.createElement("td", null, row.adjustment > 0 ? "+" : "", row.adjustment.toFixed(4), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-caption" }, "收缩系数 ", row.shrinkage.toFixed(2)))))))), evidence.total > evidence.rows.length && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "仅展示前 ", evidence.rows.length, " 组；不是所有模型的覆盖率。")), exclusions.length > 0 && /* @__PURE__ */ import_react55.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react55.default.createElement("summary", null, "查看未参与学习的原因"), /* @__PURE__ */ import_react55.default.createElement("ul", { className: "mr-checklist" }, exclusions.map((row) => /* @__PURE__ */ import_react55.default.createElement("li", { key: row.reason }, row.label, "：", row.count)))));
 }
 function AdaptiveControls({ ledger, settings, onChanged, refreshing }) {
-  let value = settings.value, learning = learningView(ledger?.learning, value), [resetBusy, setResetBusy] = import_react54.default.useState(!1), [refreshNotice, setRefreshNotice] = import_react54.default.useState(""), resetPending = import_react54.default.useRef(!1), save = async (key, next) => {
+  let value = settings.value, learning = learningView(ledger?.learning, value), [resetBusy, setResetBusy] = import_react55.default.useState(!1), [refreshNotice, setRefreshNotice] = import_react55.default.useState(""), resetPending = import_react55.default.useRef(!1), save = async (key, next) => {
     let accepted = await settings.write(key, next);
     if (accepted) {
       setRefreshNotice("");
@@ -20612,7 +20714,7 @@ function AdaptiveControls({ ledger, settings, onChanged, refreshing }) {
       }
     }
   };
-  return /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("h3", { className: "mr-section-title" }, "持续反馈与本地偏好"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "只使用你对已记录结果的点赞 / 不好 / 撤回，按任务类型和时间衰减调整偏好效用；不抬高质量硬门槛。系统执行成功不等于你满意，模型复核也不作为人工评分。不会为了学习发起付费探索。"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "范围：本地 DSH_HOME 工作室共享，不是按账号隔离；最多最近 200 次运行的滑动窗口，不上传反馈或任务内容。"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react54.default.createElement(
+  return /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("h3", { className: "mr-section-title" }, "持续反馈与本地偏好"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "只使用你对已记录结果的点赞 / 不好 / 撤回，按任务类型和时间衰减调整偏好效用；不抬高质量硬门槛。系统执行成功不等于你满意，模型复核也不作为人工评分。不会为了学习发起付费探索。"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "范围：本地 DSH_HOME 工作室共享，不是按账号隔离；最多最近 200 次运行的滑动窗口，不上传反馈或任务内容。"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react55.default.createElement(
     "input",
     {
       type: "checkbox",
@@ -20622,7 +20724,7 @@ function AdaptiveControls({ ledger, settings, onChanged, refreshing }) {
         save("feedbackLearningEnabled", event.target.checked);
       }
     }
-  ), "启用用户反馈学习"), ADAPTIVE_NUMBER_FIELDS.filter((field2) => field2.key !== "dynamicDataTtlMinutes").map((field2) => /* @__PURE__ */ import_react54.default.createElement(
+  ), "启用用户反馈学习"), ADAPTIVE_NUMBER_FIELDS.filter((field2) => field2.key !== "dynamicDataTtlMinutes").map((field2) => /* @__PURE__ */ import_react55.default.createElement(
     AdaptiveNumberControl,
     {
       key: field2.key,
@@ -20631,9 +20733,9 @@ function AdaptiveControls({ ledger, settings, onChanged, refreshing }) {
       writable: settings.writable,
       onSave: save
     }
-  ))), settings.busy && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption", role: "status" }, "正在保存设置，请稍候…"), refreshing && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption", role: "status" }, "正在读取反馈与公开数据摘要…"), refreshNotice && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, refreshNotice), learning.available ? /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption", role: "status" }, learning.enabled ? "学习已启用" : "学习已停用", " · 最近一次账本摘要：有效反馈 ", learning.feedbackCount, " · 有效权重 ", learning.effectiveWeight.toFixed(2), " · 忽略 ", learning.ignoredCount, learning.policyVersion ? ` · 策略 ${learning.policyVersion}` : "") : /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption", role: "status" }, "学习摘要尚未读取；保存后刷新执行记录查看。"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "摘要是最近一次读取的已观察证据。修改评价 / 学习设置后需刷新摘要并重新生成建议；刷新按检查间隔复用公开快照，不保证每次下载新数据。"), /* @__PURE__ */ import_react54.default.createElement(LearningEvidence, { learning: ledger?.learning }), learning.resetAt > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "学习起点：", new Date(learning.resetAt).toLocaleString(), "，此前反馈不再参与调整。"), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || resetBusy, onClick: () => {
+  ))), settings.busy && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption", role: "status" }, "正在保存设置，请稍候…"), refreshing && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption", role: "status" }, "正在读取反馈与公开数据摘要…"), refreshNotice && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, refreshNotice), learning.available ? /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption", role: "status" }, learning.enabled ? "学习已启用" : "学习已停用", " · 最近一次账本摘要：有效反馈 ", learning.feedbackCount, " · 有效权重 ", learning.effectiveWeight.toFixed(2), " · 忽略 ", learning.ignoredCount, learning.policyVersion ? ` · 策略 ${learning.policyVersion}` : "") : /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption", role: "status" }, "学习摘要尚未读取；保存后刷新执行记录查看。"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "摘要是最近一次读取的已观察证据。修改评价 / 学习设置后需刷新摘要并重新生成建议；刷新按检查间隔复用公开快照，不保证每次下载新数据。"), /* @__PURE__ */ import_react55.default.createElement(LearningEvidence, { learning: ledger?.learning }), learning.resetAt > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "学习起点：", new Date(learning.resetAt).toLocaleString(), "，此前反馈不再参与调整。"), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || resetBusy, onClick: () => {
     reset();
-  } }, resetBusy ? "正在设置…" : "从现在重新学习"), /* @__PURE__ */ import_react54.default.createElement("h3", { className: "mr-section-title" }, "动态公共数据"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "默认关闭。明确启用后，在打开 / 刷新账本及执行前按检查间隔读取公开 LiveBench 和可选价格快照；价格与能力先验保留版本，不代表真实任务收益。只有打开公共源开关才会读取远程数据，不发送任务或反馈。"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react54.default.createElement(
+  } }, resetBusy ? "正在设置…" : "从现在重新学习"), /* @__PURE__ */ import_react55.default.createElement("h3", { className: "mr-section-title" }, "动态公共数据"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "默认关闭。明确启用后，在打开 / 刷新账本及执行前按检查间隔读取公开 LiveBench 和可选价格快照；价格与能力先验保留版本，不代表真实任务收益。只有打开公共源开关才会读取远程数据，不发送任务或反馈。"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react55.default.createElement(
     "input",
     {
       type: "checkbox",
@@ -20643,7 +20745,7 @@ function AdaptiveControls({ ledger, settings, onChanged, refreshing }) {
         save("dynamicDataEnabled", event.target.checked);
       }
     }
-  ), "启用动态公共数据"), /* @__PURE__ */ import_react54.default.createElement(
+  ), "启用动态公共数据"), /* @__PURE__ */ import_react55.default.createElement(
     AdaptiveNumberControl,
     {
       field: ADAPTIVE_NUMBER_FIELDS.find((field2) => field2.key === "dynamicDataTtlMinutes"),
@@ -20651,67 +20753,67 @@ function AdaptiveControls({ ledger, settings, onChanged, refreshing }) {
       writable: settings.writable,
       onSave: save
     }
-  ), /* @__PURE__ */ import_react54.default.createElement(PublicEndpointControl, { name: "liveBenchEndpoint", label: "LiveBench 公开源", value: adaptiveSettingValue(value, "liveBenchEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react54.default.createElement(PublicEndpointControl, { name: "pricingSnapshotEndpoint", label: "价格快照公开源（可选）", value: adaptiveSettingValue(value, "pricingSnapshotEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react54.default.createElement(PublicSourceStatus, { label: "LiveBench", source: ledger?.dynamicData?.liveBench, enabled: adaptiveSettingValue(value, "dynamicDataEnabled") === !0 }), /* @__PURE__ */ import_react54.default.createElement(PublicSourceStatus, { label: "价格", source: ledger?.dynamicData?.pricing, enabled: adaptiveSettingValue(value, "dynamicDataEnabled") === !0 && !!adaptiveSettingValue(value, "pricingSnapshotEndpoint") })));
+  ), /* @__PURE__ */ import_react55.default.createElement(PublicEndpointControl, { name: "liveBenchEndpoint", label: "LiveBench 公开源", value: adaptiveSettingValue(value, "liveBenchEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react55.default.createElement(PublicEndpointControl, { name: "pricingSnapshotEndpoint", label: "价格快照公开源（可选）", value: adaptiveSettingValue(value, "pricingSnapshotEndpoint"), writable: settings.writable, onSave: save }), /* @__PURE__ */ import_react55.default.createElement(PublicSourceStatus, { label: "LiveBench", source: ledger?.dynamicData?.liveBench, enabled: adaptiveSettingValue(value, "dynamicDataEnabled") === !0 }), /* @__PURE__ */ import_react55.default.createElement(PublicSourceStatus, { label: "价格", source: ledger?.dynamicData?.pricing, enabled: adaptiveSettingValue(value, "dynamicDataEnabled") === !0 && !!adaptiveSettingValue(value, "pricingSnapshotEndpoint") })));
 }
 function CostControlCard({ ledger, settingsScope, onChanged, error, refreshing = !1 }) {
-  let settings = useSettingsWriter(settingsScope), [dailyDraft, setDailyDraft] = import_react54.default.useState(""), [monthlyDraft, setMonthlyDraft] = import_react54.default.useState(""), value = settings.value, preset = value.routingPreset ?? "balanced", daily = Number(value.dailyBudgetUsd ?? 0), monthly = Number(value.monthlyBudgetUsd ?? 0), spent = ledger?.spent ?? { today: 0, month: 0, unknownToday: 0, unknownMonth: 0 }, reserved = reservationSummary(ledger), reservations = (ledger?.reservations ?? []).filter((item) => ["active", "interrupted"].includes(item.status)), set = async (key, next) => {
+  let settings = useSettingsWriter(settingsScope), [dailyDraft, setDailyDraft] = import_react55.default.useState(""), [monthlyDraft, setMonthlyDraft] = import_react55.default.useState(""), value = settings.value, preset = value.routingPreset ?? "balanced", daily = Number(value.dailyBudgetUsd ?? 0), monthly = Number(value.monthlyBudgetUsd ?? 0), spent = ledger?.spent ?? { today: 0, month: 0, unknownToday: 0, unknownMonth: 0 }, reserved = reservationSummary(ledger), reservations = (ledger?.reservations ?? []).filter((item) => ["active", "interrupted"].includes(item.status)), set = async (key, next) => {
     await settings.write(key, next) && onChanged?.();
   }, saveLimit = async (key, draft, reset) => {
     let parsed = Number(draft);
     draft === "" || !Number.isFinite(parsed) || parsed < 0 || await settings.write(key, parsed) && (reset(""), onChanged?.());
   };
-  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-cost", "aria-label": "成本控制" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "API 费用、预算与路由方案"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "API 按实际计费计算预算（CLI 自报金额或 token 用量 × 你配置的单价）。订阅调用单独统计用量，不折算金额、不占 API 预算。API 缺少单价或完整用量时，费用保持未知；本机记录不能替代厂商账单。"))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, error), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-meters" }, /* @__PURE__ */ import_react54.default.createElement(Meter, { label: "今日 API 预算占用", meter: budgetOccupancyMeter(spent.today, daily, reserved.today) }), /* @__PURE__ */ import_react54.default.createElement(Meter, { label: "本月 API 预算占用", meter: budgetOccupancyMeter(spent.month, monthly, reserved.month) })), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "预占是尚未结算的费用估算，不是实际账单；剩余额度已扣除已发生费用与已知预占。执行中 ", reserved.activeCount, " 项 · 待核对中断 ", reserved.interruptedCount, " 项。"), (reserved.unknownToday > 0 || reserved.unknownMonth > 0) && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-warn-text" }, "预占金额未知：今日 ", reserved.unknownToday, " 项 · 本月 ", reserved.unknownMonth, " 项，未计入上方预占金额，不能视为零费用。请核对厂商账单与原任务记录。"), reserved.interruptedCount > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, "有中断任务尚未核对，预占继续保留，不能直接重跑。请先核对旧任务与厂商账单，保留原始状态文件和已保存结果；若记录损坏，从可信备份恢复完整状态。当前界面不支持手动结算或自动付费恢复。"), reservations.length > 0 && /* @__PURE__ */ import_react54.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react54.default.createElement("summary", null, "查看未结算预占（", reservations.length, " 项）"), /* @__PURE__ */ import_react54.default.createElement("ul", { className: "mr-checklist" }, reservations.map((item) => /* @__PURE__ */ import_react54.default.createElement("li", { key: item.id }, "运行 ", /* @__PURE__ */ import_react54.default.createElement("code", null, item.runId || item.id), " · ", item.billing === "subscription" ? item.status === "interrupted" ? "订阅执行中断，用量待核对" : "订阅执行中，用量待回报" : /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, item.status === "interrupted" ? "执行中断，费用待核对" : "执行中", " · 剩余预占 ", item.unknown || !Number.isFinite(item.remainingEstimateUsd) ? "金额未知" : money(item.remainingEstimateUsd)), Number.isFinite(item.updatedAt) ? ` · 最近保存 ${new Date(item.updatedAt).toLocaleString()}` : "")))), (spent.unknownToday > 0 || spent.unknownMonth > 0) && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "本月有 ", spent.unknownMonth, " 次调用缺少单价或用量，未计入金额。请在“模型价格与能力”中补齐单价。"), ledger?.budget?.exceeded && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, ledger.budget.message, " ", ledger.budget.action === "pause" ? "新的执行会先暂停并请求确认。" : "新的执行会尝试自动降级为“省钱优先”。"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-control-label" }, "路由方案"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "路由方案" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react54.default.createElement("button", { key: item.id, type: "button", title: item.description, "aria-pressed": preset === item.id, disabled: !settings.writable, onClick: () => {
+  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card mr-cost", "aria-label": "成本控制" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "API 费用、预算与路由方案"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "API 按实际计费计算预算（CLI 自报金额或 token 用量 × 你配置的单价）。订阅调用单独统计用量，不折算金额、不占 API 预算。API 缺少单价或完整用量时，费用保持未知；本机记录不能替代厂商账单。"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, error), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-meters" }, /* @__PURE__ */ import_react55.default.createElement(Meter, { label: "今日 API 预算占用", meter: budgetOccupancyMeter(spent.today, daily, reserved.today) }), /* @__PURE__ */ import_react55.default.createElement(Meter, { label: "本月 API 预算占用", meter: budgetOccupancyMeter(spent.month, monthly, reserved.month) })), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "预占是尚未结算的费用估算，不是实际账单；剩余额度已扣除已发生费用与已知预占。执行中 ", reserved.activeCount, " 项 · 待核对中断 ", reserved.interruptedCount, " 项。"), (reserved.unknownToday > 0 || reserved.unknownMonth > 0) && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-warn-text" }, "预占金额未知：今日 ", reserved.unknownToday, " 项 · 本月 ", reserved.unknownMonth, " 项，未计入上方预占金额，不能视为零费用。请核对厂商账单与原任务记录。"), reserved.interruptedCount > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, "有中断任务尚未核对，预占继续保留，不能直接重跑。请先核对旧任务与厂商账单，保留原始状态文件和已保存结果；若记录损坏，从可信备份恢复完整状态。当前界面不支持手动结算或自动付费恢复。"), reservations.length > 0 && /* @__PURE__ */ import_react55.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react55.default.createElement("summary", null, "查看未结算预占（", reservations.length, " 项）"), /* @__PURE__ */ import_react55.default.createElement("ul", { className: "mr-checklist" }, reservations.map((item) => /* @__PURE__ */ import_react55.default.createElement("li", { key: item.id }, "运行 ", /* @__PURE__ */ import_react55.default.createElement("code", null, item.runId || item.id), " · ", item.billing === "subscription" ? item.status === "interrupted" ? "订阅执行中断，用量待核对" : "订阅执行中，用量待回报" : /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, item.status === "interrupted" ? "执行中断，费用待核对" : "执行中", " · 剩余预占 ", item.unknown || !Number.isFinite(item.remainingEstimateUsd) ? "金额未知" : money(item.remainingEstimateUsd)), Number.isFinite(item.updatedAt) ? ` · 最近保存 ${new Date(item.updatedAt).toLocaleString()}` : "")))), (spent.unknownToday > 0 || spent.unknownMonth > 0) && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "本月有 ", spent.unknownMonth, " 次调用缺少单价或用量，未计入金额。请在“模型价格与能力”中补齐单价。"), ledger?.budget?.exceeded && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, ledger.budget.message, " ", ledger.budget.action === "pause" ? "新的执行会先暂停并请求确认。" : "新的执行会尝试自动降级为“省钱优先”。"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label" }, "路由方案"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "路由方案" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react55.default.createElement("button", { key: item.id, type: "button", title: item.description, "aria-pressed": preset === item.id, disabled: !settings.writable, onClick: () => {
     set("routingPreset", item.id);
-  } }, item.label))), /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, ROUTING_PRESETS[preset]?.description)), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-daily-budget" }, "每日上限（USD，0 为不限）"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input mr-budget", id: "mr-daily-budget", type: "number", min: "0", step: "0.5", placeholder: String(daily), value: dailyDraft, onChange: (event) => setDailyDraft(event.target.value) }), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || dailyDraft === "", onClick: () => {
+  } }, item.label))), /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, ROUTING_PRESETS[preset]?.description)), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-daily-budget" }, "每日上限（USD，0 为不限）"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react55.default.createElement("input", { className: "mr-input mr-budget", id: "mr-daily-budget", type: "number", min: "0", step: "0.5", placeholder: String(daily), value: dailyDraft, onChange: (event) => setDailyDraft(event.target.value) }), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || dailyDraft === "", onClick: () => {
     saveLimit("dailyBudgetUsd", dailyDraft, setDailyDraft);
-  } }, "保存"))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-monthly-budget" }, "每月上限（USD，0 为不限）"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react54.default.createElement("input", { className: "mr-input mr-budget", id: "mr-monthly-budget", type: "number", min: "0", step: "1", placeholder: String(monthly), value: monthlyDraft, onChange: (event) => setMonthlyDraft(event.target.value) }), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || monthlyDraft === "", onClick: () => {
+  } }, "保存"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-monthly-budget" }, "每月上限（USD，0 为不限）"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-inline" }, /* @__PURE__ */ import_react55.default.createElement("input", { className: "mr-input mr-budget", id: "mr-monthly-budget", type: "number", min: "0", step: "1", placeholder: String(monthly), value: monthlyDraft, onChange: (event) => setMonthlyDraft(event.target.value) }), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !settings.writable || monthlyDraft === "", onClick: () => {
     saveLimit("monthlyBudgetUsd", monthlyDraft, setMonthlyDraft);
-  } }, "保存"))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-control-label" }, "超出预算时"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "超出预算时" }, /* @__PURE__ */ import_react54.default.createElement("button", { type: "button", "aria-pressed": (value.overBudgetAction ?? "downgrade") === "downgrade", disabled: !settings.writable, onClick: () => {
+  } }, "保存"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label" }, "超出预算时"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "超出预算时" }, /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": (value.overBudgetAction ?? "downgrade") === "downgrade", disabled: !settings.writable, onClick: () => {
     set("overBudgetAction", "downgrade");
-  } }, "自动降级"), /* @__PURE__ */ import_react54.default.createElement("button", { type: "button", "aria-pressed": value.overBudgetAction === "pause", disabled: !settings.writable, onClick: () => {
+  } }, "自动降级"), /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": value.overBudgetAction === "pause", disabled: !settings.writable, onClick: () => {
     set("overBudgetAction", "pause");
-  } }, "暂停并询问"))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-control-label" }, "订阅调用失败（非额度用尽）时"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "订阅调用失败时" }, SUBSCRIPTION_FAILURE_OPTIONS.map(([id2, label]) => /* @__PURE__ */ import_react54.default.createElement("button", { key: id2, type: "button", "aria-pressed": (value.onSubscriptionFailure ?? "ask") === id2, disabled: !settings.writable, onClick: () => {
+  } }, "暂停并询问"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label" }, "订阅调用失败（非额度用尽）时"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "订阅调用失败时" }, SUBSCRIPTION_FAILURE_OPTIONS.map(([id2, label]) => /* @__PURE__ */ import_react55.default.createElement("button", { key: id2, type: "button", "aria-pressed": (value.onSubscriptionFailure ?? "ask") === id2, disabled: !settings.writable, onClick: () => {
     set("onSubscriptionFailure", id2);
-  } }, label))), /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "超时、崩溃、解析失败、非零退出、登录错误等。额度用尽或限流仍会自动切换 API Key。"))), /* @__PURE__ */ import_react54.default.createElement("h3", { className: "mr-section-title" }, "质量回路"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-control-label" }, "强模型抽查"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "强模型抽查" }, [["off", "关闭"], ["sample", "按比例抽查"], ["always", "每次审阅"]].map(([id2, label]) => /* @__PURE__ */ import_react54.default.createElement("button", { key: id2, type: "button", "aria-pressed": (value.reviewMode ?? "off") === id2, disabled: !settings.writable, onClick: () => {
+  } }, label))), /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "超时、崩溃、解析失败、非零退出、登录错误等。额度用尽或限流仍会自动切换 API Key。"))), /* @__PURE__ */ import_react55.default.createElement("h3", { className: "mr-section-title" }, "质量回路"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label" }, "强模型抽查"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "强模型抽查" }, [["off", "关闭"], ["sample", "按比例抽查"], ["always", "每次审阅"]].map(([id2, label]) => /* @__PURE__ */ import_react55.default.createElement("button", { key: id2, type: "button", "aria-pressed": (value.reviewMode ?? "off") === id2, disabled: !settings.writable, onClick: () => {
     set("reviewMode", id2);
-  } }, label))), /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "抽查由目录中质量最高的已配置模型完成，只审阅更便宜模型的结果；审阅本身也会计费。抽查比例 ", Math.round(Number(value.reviewSampleRate ?? 0.2) * 100), "%（可在插件设置中调整）。")), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react54.default.createElement("input", { type: "checkbox", checked: value.allowManualReassign !== !1, disabled: !settings.writable, onChange: (event) => {
+  } }, label))), /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "抽查由目录中质量最高的已配置模型完成，只审阅更便宜模型的结果；审阅本身也会计费。抽查比例 ", Math.round(Number(value.reviewSampleRate ?? 0.2) * 100), "%（可在插件设置中调整）。")), /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react55.default.createElement("input", { type: "checkbox", checked: value.allowManualReassign !== !1, disabled: !settings.writable, onChange: (event) => {
     set("allowManualReassign", event.target.checked);
-  } }), "允许手动改派工作包"), /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react54.default.createElement("input", { type: "checkbox", checked: value.confirmUnsandboxedCli !== !1, disabled: !settings.writable, onChange: (event) => {
+  } }), "允许手动改派工作包"), /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react55.default.createElement("input", { type: "checkbox", checked: value.confirmUnsandboxedCli !== !1, disabled: !settings.writable, onChange: (event) => {
     set("confirmUnsandboxedCli", event.target.checked);
-  } }), "直接启动无沙箱 CLI 前先确认")), /* @__PURE__ */ import_react54.default.createElement(AdaptiveControls, { ledger, settings, onChanged, refreshing }), settings.notice && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, settings.notice)));
+  } }), "直接启动无沙箱 CLI 前先确认")), /* @__PURE__ */ import_react55.default.createElement(AdaptiveControls, { ledger, settings, onChanged, refreshing }), settings.notice && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, settings.notice)));
 }
 function UsagePeriod({ label, period: period2 }) {
-  return /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, label), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, period2.calls, " 次调用"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "已报告输入 ", formatUsageTokens(period2.inputTokens), " / 输出 ", formatUsageTokens(period2.outputTokens), " tokens"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "缓存读取 ", formatUsageTokens(period2.cacheReadTokens), " / 写入 ", formatUsageTokens(period2.cacheWriteTokens), " tokens"), period2.unknownUsageCalls > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-warn-text" }, period2.unknownUsageCalls, " 次调用用量不完整或未知"));
+  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, label), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, period2.calls, " 次调用"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "已报告输入 ", formatUsageTokens(period2.inputTokens), " / 输出 ", formatUsageTokens(period2.outputTokens), " tokens"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "缓存读取 ", formatUsageTokens(period2.cacheReadTokens), " / 写入 ", formatUsageTokens(period2.cacheWriteTokens), " tokens"), period2.unknownUsageCalls > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-warn-text" }, period2.unknownUsageCalls, " 次调用用量不完整或未知"));
 }
 function SubscriptionUsageCard({ ledger }) {
   let usage = subscriptionUsageSummary(ledger);
-  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-results", "aria-label": "订阅用量" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "订阅用量"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "订阅只统计调用次数与厂商已报告的 token 用量，和 API 金额分开计算。未报告的用量保持未知，不按 API 价格折算。"))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-body" }, !usage.available && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-empty" }, "订阅用量摘要不可用。旧版 Host 或历史记录可能只保存参考金额；不能从该金额还原 token 用量，请更新 Host 后刷新。"), usage.available && /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react54.default.createElement(UsagePeriod, { label: "今日订阅用量", period: usage.today }), /* @__PURE__ */ import_react54.default.createElement(UsagePeriod, { label: "本月订阅用量", period: usage.month })), usage.byRoute.length > 0 && /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react54.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react54.default.createElement("thead", null, /* @__PURE__ */ import_react54.default.createElement("tr", null, /* @__PURE__ */ import_react54.default.createElement("th", null, "订阅供应商 / 工具"), /* @__PURE__ */ import_react54.default.createElement("th", null, "今日已观察用量"), /* @__PURE__ */ import_react54.default.createElement("th", null, "本月已观察用量"))), /* @__PURE__ */ import_react54.default.createElement("tbody", null, usage.byRoute.map((item) => /* @__PURE__ */ import_react54.default.createElement("tr", { key: `${item.provider}\0${item.toolId ?? ""}\0${item.model ?? ""}` }, /* @__PURE__ */ import_react54.default.createElement("td", null, /* @__PURE__ */ import_react54.default.createElement("strong", null, item.provider || "未记录供应商"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-caption" }, [item.toolId, item.model].filter(Boolean).join(" · ") || "未记录工具或模型")), /* @__PURE__ */ import_react54.default.createElement("td", null, subscriptionUsageText(item.today)), /* @__PURE__ */ import_react54.default.createElement("td", null, subscriptionUsageText(item.month))))))), usage.month.calls === 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "本月没有已记录的订阅调用。")), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "这些数值是本机已记录用量，不代表订阅总额度或剩余额度。不同厂商的计量方式、窗口及缓存口径可能不同；未获得厂商配额时，不显示已用百分比。")));
+  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card mr-results", "aria-label": "订阅用量" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "订阅用量"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "订阅只统计调用次数与厂商已报告的 token 用量，和 API 金额分开计算。未报告的用量保持未知，不按 API 价格折算。"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-body" }, !usage.available && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty" }, "订阅用量摘要不可用。旧版 Host 或历史记录可能只保存参考金额；不能从该金额还原 token 用量，请更新 Host 后刷新。"), usage.available && /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react55.default.createElement(UsagePeriod, { label: "今日订阅用量", period: usage.today }), /* @__PURE__ */ import_react55.default.createElement(UsagePeriod, { label: "本月订阅用量", period: usage.month })), usage.byRoute.length > 0 && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react55.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react55.default.createElement("thead", null, /* @__PURE__ */ import_react55.default.createElement("tr", null, /* @__PURE__ */ import_react55.default.createElement("th", null, "订阅供应商 / 工具"), /* @__PURE__ */ import_react55.default.createElement("th", null, "今日已观察用量"), /* @__PURE__ */ import_react55.default.createElement("th", null, "本月已观察用量"))), /* @__PURE__ */ import_react55.default.createElement("tbody", null, usage.byRoute.map((item) => /* @__PURE__ */ import_react55.default.createElement("tr", { key: `${item.provider}\0${item.toolId ?? ""}\0${item.model ?? ""}` }, /* @__PURE__ */ import_react55.default.createElement("td", null, /* @__PURE__ */ import_react55.default.createElement("strong", null, item.provider || "未记录供应商"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-caption" }, [item.toolId, item.model].filter(Boolean).join(" · ") || "未记录工具或模型")), /* @__PURE__ */ import_react55.default.createElement("td", null, subscriptionUsageText(item.today)), /* @__PURE__ */ import_react55.default.createElement("td", null, subscriptionUsageText(item.month))))))), usage.month.calls === 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "本月没有已记录的订阅调用。")), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "这些数值是本机已记录用量，不代表订阅总额度或剩余额度。不同厂商的计量方式、窗口及缓存口径可能不同；未获得厂商配额时，不显示已用百分比。")));
 }
 function DagView({ packages, renderNode, label = "子任务依赖图" }) {
   let layers = dagLayers(packages);
   if (layers.length === 0) return null;
   let names = new Map((packages ?? []).map((item) => [item.id, item.name]));
-  return /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-dag", role: "list", "aria-label": label }, layers.map((layer, index) => /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-dag-column", key: index }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-dag-step" }, "第 ", index + 1, " 步"), layer.map((item) => {
+  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-dag", role: "list", "aria-label": label }, layers.map((layer, index) => /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-dag-column", key: index }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-dag-step" }, "第 ", index + 1, " 步"), layer.map((item) => {
     let status = packageStatus(item);
-    return /* @__PURE__ */ import_react54.default.createElement("article", { className: `mr-dag-node ${status.tone}`, role: "listitem", key: item.id }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-dag-node-top" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-package-name" }, item.name), /* @__PURE__ */ import_react54.default.createElement("span", { className: `mr-pill mr-status-${status.tone}` }, status.label)), (item.dependsOn ?? []).length > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, "依赖：", item.dependsOn.map((id2) => names.get(id2) ?? id2).join("、")), renderNode?.(item));
+    return /* @__PURE__ */ import_react55.default.createElement("article", { className: `mr-dag-node ${status.tone}`, role: "listitem", key: item.id }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-dag-node-top" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-package-name" }, item.name), /* @__PURE__ */ import_react55.default.createElement("span", { className: `mr-pill mr-status-${status.tone}` }, status.label)), (item.dependsOn ?? []).length > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, "依赖：", item.dependsOn.map((id2) => names.get(id2) ?? id2).join("、")), renderNode?.(item));
   }))));
 }
 function ChannelText({ item }) {
-  return item.channel ? item.billing === "subscription" ? /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-pill mr-pill-channel-ok" }, item.channel === "official-cli" ? `订阅 · 官方 CLI · ${item.toolId ?? ""}` : "编程套餐订阅") : /* @__PURE__ */ import_react54.default.createElement("span", { className: item.channel === "official-cli" ? "mr-pill mr-pill-channel-ok" : "mr-pill" }, item.channel === "official-cli" ? `官方 CLI · ${item.toolId ?? ""}` : "模型目录 API") : /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-pill" }, item.status === "running" ? "执行中" : item.status === "interrupted" ? "执行中断" : "待执行");
+  return item.channel ? item.billing === "subscription" ? /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-pill mr-pill-channel-ok" }, item.channel === "official-cli" ? `订阅 · 官方 CLI · ${item.toolId ?? ""}` : "编程套餐订阅") : /* @__PURE__ */ import_react55.default.createElement("span", { className: item.channel === "official-cli" ? "mr-pill mr-pill-channel-ok" : "mr-pill" }, item.channel === "official-cli" ? `官方 CLI · ${item.toolId ?? ""}` : "模型目录 API") : /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-pill" }, item.status === "running" ? "执行中" : item.status === "interrupted" ? "执行中断" : "待执行");
 }
 function RunNode({ run: run2, item, routes, allowReassign, busy, onRate, onRerun, ledger }) {
-  let [target, setTarget] = import_react54.default.useState(""), rerun = rerunSupport(run2, ledger);
-  if (item.status === "paused") return /* @__PURE__ */ import_react54.default.createElement(PausedNode, { run: run2, item, busy, onRerun, rerun });
+  let [target, setTarget] = import_react55.default.useState(""), rerun = rerunSupport(run2, ledger);
+  if (item.status === "paused") return /* @__PURE__ */ import_react55.default.createElement(PausedNode, { run: run2, item, busy, onRerun, rerun });
   let cost = packageCost(item), usage = subscriptionUsageForPackage(item), canRerun = rerun.supported && !item.ok && !busy, others = routes.filter((route2) => `${route2.provider}/${route2.model}` != `${item.provider}/${item.model}`);
-  return /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "（已改派）" : ""), item.manualAssignment && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "手动分配 · ", item.manualAssignment.kind === "tool" ? `官方工具 ${item.manualAssignment.toolId}（厂商默认模型）` : `模型 API ${item.manualAssignment.provider}/${item.manualAssignment.model}`, item.algorithmRecommendation?.provider ? ` · 原推荐 ${item.algorithmRecommendation.provider}/${item.algorithmRecommendation.model}` : ""), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react54.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, item.billing === "subscription" ? "订阅用量单独统计 · 不占 API 预算" : `API 预估 ${money(item.estimatedCost)} · 实际 ${cost.budget}`, item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : "")), usage.calls > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, subscriptionUsageText(usage)), item.billing === "subscription" && usage.calls === 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, item.inFlight ? "订阅调用执行中，用量待回报。" : "尚未记录订阅调用用量。"), item.actualModel && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, "CLI 回报模型：", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, "计费：", BILLING_CHANNEL_LABEL[item.billing] ?? "—", item.subscriptionRoute ? ` · 套餐路线 ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` · ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "计费切换：", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, "回退原因：", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI 原始错误：", /* @__PURE__ */ import_react54.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), !item.ok && item.diagnostic && /* @__PURE__ */ import_react54.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react54.default.createElement("summary", null, "CLI 诊断", Number.isInteger(item.exitCode) ? `（退出码 ${item.exitCode}）` : ""), /* @__PURE__ */ import_react54.default.createElement("pre", null, item.diagnostic)), item.review && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, "强模型抽查（", item.review.provider, "/", item.review.model, "）：", item.review.score ? `${item.review.score}/5` : "未评分", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react54.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react54.default.createElement("summary", null, "查看结果"), /* @__PURE__ */ import_react54.default.createElement("pre", null, item.answer, item.answerTruncated ? `
-…（已截断）` : "")), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === 1 ? "再次点击撤回有用评价" : "评价此结果有用", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run2, item, "up")) }, "👍 有用"), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === -1 ? "再次点击撤回不好评价" : "评价此结果不好", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run2, item, "down")) }, "👎 不好")), canRerun && /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run2.id, item.id, null) }, run2.kind === "tool" ? "重新执行此调用" : rerun.writes ? "在新工作区续跑" : "重跑此步"), !rerun.supported && !item.ok && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react54.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "改派到", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react54.default.createElement("option", { value: "" }, "改派到…"), others.map((route2) => /* @__PURE__ */ import_react54.default.createElement("option", { key: `${route2.provider}/${route2.model}`, value: `${route2.provider}\0${route2.model}` }, route2.provider, "/", route2.model))), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
+  return /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model, item.reassigned ? "（已改派）" : ""), item.manualAssignment && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "手动分配 · ", item.manualAssignment.kind === "tool" ? `官方工具 ${item.manualAssignment.toolId}（厂商默认模型）` : `模型 API ${item.manualAssignment.provider}/${item.manualAssignment.model}`, item.algorithmRecommendation?.provider ? ` · 原推荐 ${item.algorithmRecommendation.provider}/${item.algorithmRecommendation.model}` : ""), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react55.default.createElement(ChannelText, { item }), /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, item.billing === "subscription" ? "订阅用量单独统计 · 不占 API 预算" : `API 预估 ${money(item.estimatedCost)} · 实际 ${cost.budget}`, item.difficulty ? ` · 难度 ${BAND[item.difficulty] ?? item.difficulty}` : "")), usage.calls > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, subscriptionUsageText(usage)), item.billing === "subscription" && usage.calls === 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, item.inFlight ? "订阅调用执行中，用量待回报。" : "尚未记录订阅调用用量。"), item.actualModel && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, "CLI 回报模型：", item.actualModel), (item.billing || item.billingMode) && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, "计费：", BILLING_CHANNEL_LABEL[item.billing] ?? "—", item.subscriptionRoute ? ` · 套餐路线 ${item.subscriptionRoute.provider}/${item.subscriptionRoute.model}` : "", item.billingMode && item.billingMode !== "subscription-first" ? ` · ${BILLING_MODE_LABEL[item.billingMode] ?? item.billingMode}` : ""), billingSwitchText(item) && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, "计费切换：", billingSwitchText(item)), item.fallback?.reason && item.fallback.reason !== billingSwitchText(item) && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, "回退原因：", item.fallback.reason), item.fallback?.error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "CLI 原始错误：", /* @__PURE__ */ import_react55.default.createElement("code", null, item.fallback.error)), !item.ok && item.error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, item.error), !item.ok && item.diagnostic && /* @__PURE__ */ import_react55.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react55.default.createElement("summary", null, "CLI 诊断", Number.isInteger(item.exitCode) ? `（退出码 ${item.exitCode}）` : ""), /* @__PURE__ */ import_react55.default.createElement("pre", null, item.diagnostic)), item.review && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, "强模型抽查（", item.review.provider, "/", item.review.model, "）：", item.review.score ? `${item.review.score}/5` : "未评分", " ", item.review.summary), item.answer && /* @__PURE__ */ import_react55.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react55.default.createElement("summary", null, "查看结果"), /* @__PURE__ */ import_react55.default.createElement("pre", null, item.answer, item.answerTruncated ? `
+…（已截断）` : "")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-node-actions" }, item.ok && /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === 1 ? "再次点击撤回有用评价" : "评价此结果有用", "aria-pressed": item.rating === 1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run2, item, "up")) }, "👍 有用"), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", title: item.rating === -1 ? "再次点击撤回不好评价" : "评价此结果不好", "aria-pressed": item.rating === -1, disabled: busy, onClick: () => onRate(...feedbackRatingArguments(run2, item, "down")) }, "👎 不好")), canRerun && /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-mini", type: "button", title: rerun.confirm || void 0, onClick: () => onRerun(run2.id, item.id, null) }, run2.kind === "tool" ? "重新执行此调用" : rerun.writes ? "在新工作区续跑" : "重跑此步"), !rerun.supported && !item.ok && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, rerun.reason), rerun.supported && rerun.reassign && !(rerun.writes && item.ok) && allowReassign && others.length > 0 && !busy && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-inline" }, /* @__PURE__ */ import_react55.default.createElement("select", { className: "mr-input mr-mini-select", "aria-label": "改派到", value: target, onChange: (event) => setTarget(event.target.value) }, /* @__PURE__ */ import_react55.default.createElement("option", { value: "" }, "改派到…"), others.map((route2) => /* @__PURE__ */ import_react55.default.createElement("option", { key: `${route2.provider}/${route2.model}`, value: `${route2.provider}\0${route2.model}` }, route2.provider, "/", route2.model))), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary mr-mini", type: "button", disabled: !target, onClick: () => {
     let [provider, model] = target.split("\0");
     onRerun(run2.id, item.id, { provider, model });
   } }, "改派并重跑"))));
 }
 function PausedNode({ run: run2, item, busy, onRerun, rerun }) {
   let pause = item.pause ?? {};
-  return /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-pill mr-pill-warn" }, "等待确认"), /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-caption" }, "订阅调用失败，未自动改用 API Key")), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, pause.reason ?? item.error), pause.detail && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "真实错误：", /* @__PURE__ */ import_react54.default.createElement("code", null, pause.detail)), pause.loginRequired && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-package-copy" }, "看起来是登录问题：请先在终端重新登录该 CLI，再点“重试订阅”。"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-node-actions" }, SUBSCRIPTION_CHOICE_BUTTONS.map(([choice, label, secondary]) => /* @__PURE__ */ import_react54.default.createElement(
+  return /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-route" }, item.provider, "/", item.model), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-pill mr-pill-warn" }, "等待确认"), /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "订阅调用失败，未自动改用 API Key")), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy mr-warn-text" }, pause.reason ?? item.error), pause.detail && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy mr-fallback-error" }, "真实错误：", /* @__PURE__ */ import_react55.default.createElement("code", null, pause.detail)), pause.loginRequired && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-package-copy" }, "看起来是登录问题：请先在终端重新登录该 CLI，再点“重试订阅”。"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-node-actions" }, SUBSCRIPTION_CHOICE_BUTTONS.map(([choice, label, secondary]) => /* @__PURE__ */ import_react55.default.createElement(
     "button",
     {
       key: choice,
@@ -20721,29 +20823,29 @@ function PausedNode({ run: run2, item, busy, onRerun, rerun }) {
       onClick: () => onRerun(run2.id, item.id, null, choice)
     },
     label
-  ))), !rerun.supported && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, rerun.reason));
+  ))), !rerun.supported && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, rerun.reason));
 }
 function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, busy, error }) {
-  let runs = ledger?.runs ?? [], [openId, setOpenId] = import_react54.default.useState(null), current = runs.find((run2) => run2.id === openId) ?? runs[0], support = rerunSupport(current, ledger), unresolved = ["running", "interrupted"].includes(current?.status) || (ledger?.reservations ?? []).some((item) => item.runId === current?.id && ["active", "interrupted"].includes(item.status)), totals = runTotals(current), subscriptionUsage = subscriptionUsageForRun(current), prior = priorAttemptTotals(current), unknownCalls = prior.unknownCalls + [...current?.packages ?? [], ...current?.reviews ?? []].filter((item) => item.ran && item.billing !== "subscription" && !Number.isFinite(item.costUsd)).length;
-  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-results", "aria-label": "执行记录" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "执行记录与子任务"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "查看模型分配、逐步结果与费用。已结束任务的失败步骤可重跑或改派；已完成的上游保持原结果。")), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: busy, onClick: onRefresh }, "刷新")), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, error), !ledger && !error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-empty", role: "status" }, "正在读取执行记录…"), ledger && runs.length === 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-empty" }, "还没有执行记录。可在上方“在工作台执行”中预览并执行，或在官方会话中调用 model_router_execute、model_router_team_execute、model_router_tool_run，这里会显示决策和结果。"), runs.length > 0 && /* @__PURE__ */ import_react54.default.createElement(import_react54.default.Fragment, null, /* @__PURE__ */ import_react54.default.createElement("label", { className: "mr-label", htmlFor: "mr-run-select" }, "选择记录"), /* @__PURE__ */ import_react54.default.createElement("select", { className: "mr-input", id: "mr-run-select", value: current?.id ?? "", onChange: (event) => setOpenId(event.target.value) }, runs.map((run2) => /* @__PURE__ */ import_react54.default.createElement("option", { key: run2.id, value: run2.id }, new Date(run2.createdAt).toLocaleString(), " · ", RUN_KIND_LABEL[run2.kind ?? "assign"] ?? run2.kind, " · ", RUN_STATUS_LABEL[run2.status] ?? run2.status, " · ", run2.task.slice(0, 40)))), current && /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-run" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "方案"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[current.preset]?.label ?? current.preset, current.budget?.downgraded ? "（超预算自动降级）" : "")), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "难度"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, BAND[current.decision?.complexity?.band] ?? "—", current.decision?.complexity?.value !== null && current.decision?.complexity?.value !== void 0 ? ` · ${current.decision.complexity.value}` : "")), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "API ", unknownCalls ? "已知实际费用" : "实际费用", "（计入预算）"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, money(totals.budgetUsd))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-label" }, "类型"), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-metric-value" }, RUN_KIND_LABEL[current.kind ?? "assign"] ?? current.kind, current.kind === "team" || current.kind === "tool" ? ` · ${current.executionMode === "workspace-write" ? "可编辑" : "只读"}` : ""))), subscriptionUsage.calls > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, subscriptionUsageText(subscriptionUsage), "。订阅不计入 API 金额。"), unknownCalls > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "另有 ", unknownCalls, " 次调用费用未知，未计入上方金额。"), (prior.budgetUsd > 0 || prior.subscriptionRuns > 0 || prior.unknownCalls > 0) && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "累计包含此前重跑尝试：API ", money(prior.budgetUsd), prior.subscriptionRuns > 0 ? ` · 订阅 ${prior.subscriptionRuns} 次调用（用量见上方累计）` : "", prior.unknownCalls > 0 ? ` · API 费用未知 ${prior.unknownCalls} 次` : "", "。下方节点显示最近一次结果。"), current.kind === "team" && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "执行环境：", current.executionEnvironment === "cli-native" ? "厂商 CLI 正常环境 · 当前用户权限 · 无 Harness 进程沙箱" : current.executionEnvironment === "harness" ? "Harness 受限环境" : "历史记录未记录执行环境"), current.isolatedWorkspace && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "独立工作区：", /* @__PURE__ */ import_react54.default.createElement("code", null, current.isolatedWorkspace)), current.rerunOf && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "重新执行自运行 ", current.rerunOf.slice(0, 8), "。"), current.decision?.reason && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "路由原因：", current.decision.reason), !support.supported && unresolved && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-warn-text" }, support.reason), /* @__PURE__ */ import_react54.default.createElement(DagView, { packages: current.packages, renderNode: (item) => /* @__PURE__ */ import_react54.default.createElement(RunNode, { run: current, item, routes, ledger, allowReassign: ledger?.settings?.allowManualReassign !== !1, busy, onRate, onRerun }) })))));
+  let runs = ledger?.runs ?? [], [openId, setOpenId] = import_react55.default.useState(null), current = runs.find((run2) => run2.id === openId) ?? runs[0], support = rerunSupport(current, ledger), unresolved = ["running", "interrupted"].includes(current?.status) || (ledger?.reservations ?? []).some((item) => item.runId === current?.id && ["active", "interrupted"].includes(item.status)), totals = runTotals(current), subscriptionUsage = subscriptionUsageForRun(current), prior = priorAttemptTotals(current), unknownCalls = prior.unknownCalls + [...current?.packages ?? [], ...current?.reviews ?? []].filter((item) => item.ran && item.billing !== "subscription" && !Number.isFinite(item.costUsd)).length;
+  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card mr-results", "aria-label": "执行记录" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "执行记录与子任务"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "查看模型分配、逐步结果与费用。已结束任务的失败步骤可重跑或改派；已完成的上游保持原结果。")), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: busy, onClick: onRefresh }, "刷新")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, error), !ledger && !error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty", role: "status" }, "正在读取执行记录…"), ledger && runs.length === 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty" }, "还没有执行记录。可在上方“在工作台执行”中预览并执行，或在官方会话中调用 model_router_execute、model_router_team_execute、model_router_tool_run，这里会显示决策和结果。"), runs.length > 0 && /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-label", htmlFor: "mr-run-select" }, "选择记录"), /* @__PURE__ */ import_react55.default.createElement("select", { className: "mr-input", id: "mr-run-select", value: current?.id ?? "", onChange: (event) => setOpenId(event.target.value) }, runs.map((run2) => /* @__PURE__ */ import_react55.default.createElement("option", { key: run2.id, value: run2.id }, new Date(run2.createdAt).toLocaleString(), " · ", RUN_KIND_LABEL[run2.kind ?? "assign"] ?? run2.kind, " · ", RUN_STATUS_LABEL[run2.status] ?? run2.status, " · ", run2.task.slice(0, 40)))), current && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-run" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "方案"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[current.preset]?.label ?? current.preset, current.budget?.downgraded ? "（超预算自动降级）" : "")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "难度"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, BAND[current.decision?.complexity?.band] ?? "—", current.decision?.complexity?.value !== null && current.decision?.complexity?.value !== void 0 ? ` · ${current.decision.complexity.value}` : "")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "API ", unknownCalls ? "已知实际费用" : "实际费用", "（计入预算）"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, money(totals.budgetUsd))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "类型"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, RUN_KIND_LABEL[current.kind ?? "assign"] ?? current.kind, current.kind === "team" || current.kind === "tool" ? ` · ${current.executionMode === "workspace-write" ? "可编辑" : "只读"}` : ""))), subscriptionUsage.calls > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, subscriptionUsageText(subscriptionUsage), "。订阅不计入 API 金额。"), unknownCalls > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "另有 ", unknownCalls, " 次调用费用未知，未计入上方金额。"), (prior.budgetUsd > 0 || prior.subscriptionRuns > 0 || prior.unknownCalls > 0) && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "累计包含此前重跑尝试：API ", money(prior.budgetUsd), prior.subscriptionRuns > 0 ? ` · 订阅 ${prior.subscriptionRuns} 次调用（用量见上方累计）` : "", prior.unknownCalls > 0 ? ` · API 费用未知 ${prior.unknownCalls} 次` : "", "。下方节点显示最近一次结果。"), current.kind === "team" && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "执行环境：", current.executionEnvironment === "cli-native" ? "厂商 CLI 正常环境 · 当前用户权限 · 无 Harness 进程沙箱" : current.executionEnvironment === "harness" ? "Harness 受限环境" : "历史记录未记录执行环境"), current.isolatedWorkspace && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "独立工作区：", /* @__PURE__ */ import_react55.default.createElement("code", null, current.isolatedWorkspace)), current.rerunOf && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "重新执行自运行 ", current.rerunOf.slice(0, 8), "。"), current.decision?.reason && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "路由原因：", current.decision.reason), !support.supported && unresolved && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-warn-text" }, support.reason), /* @__PURE__ */ import_react55.default.createElement(DagView, { packages: current.packages, renderNode: (item) => /* @__PURE__ */ import_react55.default.createElement(RunNode, { run: current, item, routes, ledger, allowReassign: ledger?.settings?.allowManualReassign !== !1, busy, onRate, onRerun }) })))));
 }
 function BillingCard({ billing, error, onRefresh, refreshing }) {
   let rows2 = billingRows(billing);
-  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-results", "aria-label": "订阅与 API Key" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "订阅与 API Key"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "默认订阅优先：有订阅（官方 CLI 账号登录或编程套餐 Key 路线）就先用订阅；订阅额度用尽或限流时，同一步骤按预算规则改用 API Key，并在执行记录中写明原因。订阅统计用量，API 统计费用，两种通道分别记账。")), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: refreshing, onClick: onRefresh }, "重新体检")), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, error), billing?.quotaPatternErrors?.length > 0 && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, "额度识别规则有误，已忽略：", billing.quotaPatternErrors.join("；")), rows2.length === 0 && !error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-empty", role: billing ? void 0 : "status" }, billing ? "模型目录中没有路线；请先在官方“模型”页添加模型，再点“刷新”。" : "正在读取计费状态…"), rows2.length > 0 && /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react54.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react54.default.createElement("thead", null, /* @__PURE__ */ import_react54.default.createElement("tr", null, /* @__PURE__ */ import_react54.default.createElement("th", null, "供应商"), /* @__PURE__ */ import_react54.default.createElement("th", null, "计费方式"), /* @__PURE__ */ import_react54.default.createElement("th", null, "订阅"), /* @__PURE__ */ import_react54.default.createElement("th", null, "订阅状态 / 恢复时间"), /* @__PURE__ */ import_react54.default.createElement("th", null, "API Key 回退"))), /* @__PURE__ */ import_react54.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react54.default.createElement("tr", { key: row.key }, /* @__PURE__ */ import_react54.default.createElement("td", null, /* @__PURE__ */ import_react54.default.createElement("strong", null, row.provider), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-caption" }, row.models)), /* @__PURE__ */ import_react54.default.createElement("td", null, row.mode), /* @__PURE__ */ import_react54.default.createElement("td", null, row.subscription), /* @__PURE__ */ import_react54.default.createElement("td", { className: row.exhausted ? "mr-warn-text" : "" }, row.state), /* @__PURE__ */ import_react54.default.createElement("td", { className: row.apiAvailable ? "" : "mr-warn-text" }, row.api)))))), billing && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "厂商没有给出恢复时间时，按设置中的冷却时间（", billing.cooldownMinutes ?? 60, " 分钟）暂停使用该订阅。团队执行和单工具调用只能通过官方 CLI 修改文件，额度用尽时会记录并提示，但不会自动改用 API Key。")));
+  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card mr-results", "aria-label": "订阅与 API Key" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "订阅与 API Key"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "默认订阅优先：有订阅（官方 CLI 账号登录或编程套餐 Key 路线）就先用订阅；订阅额度用尽或限流时，同一步骤按预算规则改用 API Key，并在执行记录中写明原因。订阅统计用量，API 统计费用，两种通道分别记账。")), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: refreshing, onClick: onRefresh }, "重新体检")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, error), billing?.quotaPatternErrors?.length > 0 && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, "额度识别规则有误，已忽略：", billing.quotaPatternErrors.join("；")), rows2.length === 0 && !error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty", role: billing ? void 0 : "status" }, billing ? "模型目录中没有路线；请先在官方“模型”页添加模型，再点“刷新”。" : "正在读取计费状态…"), rows2.length > 0 && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react55.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react55.default.createElement("thead", null, /* @__PURE__ */ import_react55.default.createElement("tr", null, /* @__PURE__ */ import_react55.default.createElement("th", null, "供应商"), /* @__PURE__ */ import_react55.default.createElement("th", null, "计费方式"), /* @__PURE__ */ import_react55.default.createElement("th", null, "订阅"), /* @__PURE__ */ import_react55.default.createElement("th", null, "订阅状态 / 恢复时间"), /* @__PURE__ */ import_react55.default.createElement("th", null, "API Key 回退"))), /* @__PURE__ */ import_react55.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react55.default.createElement("tr", { key: row.key }, /* @__PURE__ */ import_react55.default.createElement("td", null, /* @__PURE__ */ import_react55.default.createElement("strong", null, row.provider), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-caption" }, row.models)), /* @__PURE__ */ import_react55.default.createElement("td", null, row.mode), /* @__PURE__ */ import_react55.default.createElement("td", null, row.subscription), /* @__PURE__ */ import_react55.default.createElement("td", { className: row.exhausted ? "mr-warn-text" : "" }, row.state), /* @__PURE__ */ import_react55.default.createElement("td", { className: row.apiAvailable ? "" : "mr-warn-text" }, row.api)))))), billing && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "厂商没有给出恢复时间时，按设置中的冷却时间（", billing.cooldownMinutes ?? 60, " 分钟）暂停使用该订阅。团队执行和单工具调用只能通过官方 CLI 修改文件，额度用尽时会记录并提示，但不会自动改用 API Key。")));
 }
 function SecurityCard({ data, error, onRefresh }) {
   let rows2 = data?.boundaries ?? [];
-  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-results", "aria-label": "安全边界" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "安全边界"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "每条已配置路线可读、可写的范围和是否经过 Harness 进程沙箱。可编辑运行总是需要你在官方审批中确认；直接启动无沙箱 CLI 前默认也会询问。")), /* @__PURE__ */ import_react54.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: onRefresh }, "刷新")), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, error), data && !data.sandboxAvailable && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error" }, "当前 Host 没有提供 Harness 进程沙箱：可编辑运行会被拒绝，只读的无界面 CLI 将直接启动。"), rows2.length === 0 && !error && /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-empty", role: data ? void 0 : "status" }, data ? "模型目录中没有路线；请先在官方“模型”页添加模型，再点“刷新”。" : "正在读取安全边界…"), rows2.length > 0 && /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react54.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react54.default.createElement("thead", null, /* @__PURE__ */ import_react54.default.createElement("tr", null, /* @__PURE__ */ import_react54.default.createElement("th", null, "路线"), /* @__PURE__ */ import_react54.default.createElement("th", null, "只读运行可读"), /* @__PURE__ */ import_react54.default.createElement("th", null, "只读运行沙箱"), /* @__PURE__ */ import_react54.default.createElement("th", null, "可编辑运行"))), /* @__PURE__ */ import_react54.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react54.default.createElement("tr", { key: `${row.provider}/${row.model}` }, /* @__PURE__ */ import_react54.default.createElement("td", null, /* @__PURE__ */ import_react54.default.createElement("strong", null, row.provider, "/", row.model), row.toolLabel ? /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-caption" }, row.toolLabel) : /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-caption" }, "仅 API")), /* @__PURE__ */ import_react54.default.createElement("td", null, row.readOnly.readable), /* @__PURE__ */ import_react54.default.createElement("td", { className: row.readOnly.direct ? "mr-warn-text" : "" }, row.readOnly.sandbox), /* @__PURE__ */ import_react54.default.createElement("td", null, row.write ? `${row.write.writable}；需审批` : "不支持"))))))));
+  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card mr-results", "aria-label": "安全边界" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "安全边界"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "每条已配置路线可读、可写的范围和是否经过 Harness 进程沙箱。可编辑运行总是需要你在官方审批中确认；直接启动无沙箱 CLI 前默认也会询问。")), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: onRefresh }, "刷新")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-body" }, error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, error), data && !data.sandboxAvailable && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error" }, "当前 Host 没有提供 Harness 进程沙箱：可编辑运行会被拒绝，只读的无界面 CLI 将直接启动。"), rows2.length === 0 && !error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty", role: data ? void 0 : "status" }, data ? "模型目录中没有路线；请先在官方“模型”页添加模型，再点“刷新”。" : "正在读取安全边界…"), rows2.length > 0 && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react55.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react55.default.createElement("thead", null, /* @__PURE__ */ import_react55.default.createElement("tr", null, /* @__PURE__ */ import_react55.default.createElement("th", null, "路线"), /* @__PURE__ */ import_react55.default.createElement("th", null, "只读运行可读"), /* @__PURE__ */ import_react55.default.createElement("th", null, "只读运行沙箱"), /* @__PURE__ */ import_react55.default.createElement("th", null, "可编辑运行"))), /* @__PURE__ */ import_react55.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react55.default.createElement("tr", { key: `${row.provider}/${row.model}` }, /* @__PURE__ */ import_react55.default.createElement("td", null, /* @__PURE__ */ import_react55.default.createElement("strong", null, row.provider, "/", row.model), row.toolLabel ? /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-caption" }, row.toolLabel) : /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-caption" }, "仅 API")), /* @__PURE__ */ import_react55.default.createElement("td", null, row.readOnly.readable), /* @__PURE__ */ import_react55.default.createElement("td", { className: row.readOnly.direct ? "mr-warn-text" : "" }, row.readOnly.sandbox), /* @__PURE__ */ import_react55.default.createElement("td", null, row.write ? `${row.write.writable}；需审批` : "不支持"))))))));
 }
 function TwoLedgerBooks({ books }) {
   let api = books?.api, subscription = books?.subscription;
   if (!api || !subscription) return null;
   let money4 = (value) => typeof value == "number" && Number.isFinite(value) ? money(value) : "未知", calls = (value) => Number.isSafeInteger(value) ? String(value) : "0", tokens = (value) => Number.isSafeInteger(value) ? String(value) : "未知";
-  return /* @__PURE__ */ import_react54.default.createElement("section", { className: "mr-card mr-books", "aria-label": "两本账" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react54.default.createElement("div", null, /* @__PURE__ */ import_react54.default.createElement("h2", { className: "mr-card-title" }, "两本账"), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-card-copy" }, "API 记钱，订阅记额度。两本账不相加：订阅调用不产生美元费用，API 调用也不消耗订阅额度。"))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-books-grid" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-book mr-book-api" }, /* @__PURE__ */ import_react54.default.createElement("h3", { className: "mr-book-title" }, api.label, " ", /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-pill" }, "USD")), /* @__PURE__ */ import_react54.default.createElement("dl", { className: "mr-facts" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "今日已发生"), /* @__PURE__ */ import_react54.default.createElement("dd", null, money4(api.settled?.today))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "本月已发生"), /* @__PURE__ */ import_react54.default.createElement("dd", null, money4(api.settled?.month))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "今日预占"), /* @__PURE__ */ import_react54.default.createElement("dd", null, money4(api.reserved?.today))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "预算上限（今日 / 本月）"), /* @__PURE__ */ import_react54.default.createElement("dd", null, money4(api.limit?.daily), " / ", money4(api.limit?.monthly)))), api.unknown?.today > 0 || api.unknown?.month > 0 ? /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-warn-text" }, "有 ", api.unknown.today, " 次（今日）/ ", api.unknown.month, " 次（本月）调用缺少单价或用量，费用保持未知，不能视为零。") : null, api.budget?.exceeded ? /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-error", role: "alert" }, api.budget.message || "预算已超出。") : null, /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "不含：", api.excludes)), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-book mr-book-subscription" }, /* @__PURE__ */ import_react54.default.createElement("h3", { className: "mr-book-title" }, subscription.label, " ", /* @__PURE__ */ import_react54.default.createElement("span", { className: "mr-pill" }, "次")), /* @__PURE__ */ import_react54.default.createElement("dl", { className: "mr-facts" }, /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "今日调用"), /* @__PURE__ */ import_react54.default.createElement("dd", null, calls(subscription.today?.calls))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "本月调用"), /* @__PURE__ */ import_react54.default.createElement("dd", null, calls(subscription.month?.calls))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "今日 token（入 / 出）"), /* @__PURE__ */ import_react54.default.createElement("dd", null, tokens(subscription.today?.inputTokens), " / ", tokens(subscription.today?.outputTokens))), /* @__PURE__ */ import_react54.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react54.default.createElement("dt", null, "本月 token（入 / 出）"), /* @__PURE__ */ import_react54.default.createElement("dd", null, tokens(subscription.month?.inputTokens), " / ", tokens(subscription.month?.outputTokens)))), subscription.incomplete ? /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption mr-warn-text" }, subscription.note) : /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, subscription.note), /* @__PURE__ */ import_react54.default.createElement("p", { className: "mr-caption" }, "不含：", subscription.excludes))));
+  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card mr-books", "aria-label": "两本账" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "两本账"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "API 记钱，订阅记额度。两本账不相加：订阅调用不产生美元费用，API 调用也不消耗订阅额度。"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-books-grid" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-book mr-book-api" }, /* @__PURE__ */ import_react55.default.createElement("h3", { className: "mr-book-title" }, api.label, " ", /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-pill" }, "USD")), /* @__PURE__ */ import_react55.default.createElement("dl", { className: "mr-facts" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "今日已发生"), /* @__PURE__ */ import_react55.default.createElement("dd", null, money4(api.settled?.today))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "本月已发生"), /* @__PURE__ */ import_react55.default.createElement("dd", null, money4(api.settled?.month))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "今日预占"), /* @__PURE__ */ import_react55.default.createElement("dd", null, money4(api.reserved?.today))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "预算上限（今日 / 本月）"), /* @__PURE__ */ import_react55.default.createElement("dd", null, money4(api.limit?.daily), " / ", money4(api.limit?.monthly)))), api.unknown?.today > 0 || api.unknown?.month > 0 ? /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-warn-text" }, "有 ", api.unknown.today, " 次（今日）/ ", api.unknown.month, " 次（本月）调用缺少单价或用量，费用保持未知，不能视为零。") : null, api.budget?.exceeded ? /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, api.budget.message || "预算已超出。") : null, /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "不含：", api.excludes)), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-book mr-book-subscription" }, /* @__PURE__ */ import_react55.default.createElement("h3", { className: "mr-book-title" }, subscription.label, " ", /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-pill" }, "次")), /* @__PURE__ */ import_react55.default.createElement("dl", { className: "mr-facts" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "今日调用"), /* @__PURE__ */ import_react55.default.createElement("dd", null, calls(subscription.today?.calls))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "本月调用"), /* @__PURE__ */ import_react55.default.createElement("dd", null, calls(subscription.month?.calls))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "今日 token（入 / 出）"), /* @__PURE__ */ import_react55.default.createElement("dd", null, tokens(subscription.today?.inputTokens), " / ", tokens(subscription.today?.outputTokens))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-value" }, /* @__PURE__ */ import_react55.default.createElement("dt", null, "本月 token（入 / 出）"), /* @__PURE__ */ import_react55.default.createElement("dd", null, tokens(subscription.month?.inputTokens), " / ", tokens(subscription.month?.outputTokens)))), subscription.incomplete ? /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption mr-warn-text" }, subscription.note) : /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, subscription.note), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "不含：", subscription.excludes))));
 }
 
 // .dsh-plugin/client/run-launcher.jsx
-var import_react55 = __toESM(require("react"), 1);
+var import_react56 = __toESM(require("react"), 1);
 var text2 = (value) => typeof value == "string" ? value.trim() : "", STATUS_TEXT = Object.freeze({
   succeeded: "执行完成",
   completed: "执行完成",
@@ -20809,12 +20911,12 @@ function settleLaunch(identity2, value, error) {
   pendingLaunch === identity2 && (pendingLaunch = null, isJobSnapshot(value) && LIVE_STATUSES.has(value.status) && rememberJob(value.jobId), notifyLaunch({ kind: "settled", identity: identity2, value, error }));
 }
 function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = "algorithm", packageAssignments = {}, packagePlanKey: packagePlanKey2 }) {
-  let [preset, setPreset] = import_react55.default.useState(defaultPreset || "balanced"), [dryRun, setDryRun] = import_react55.default.useState(!1), [executor, setExecutor] = import_react55.default.useState("routed"), [executionMode, setExecutionMode] = import_react55.default.useState("read-only"), [executionEnvironment, setExecutionEnvironment] = import_react55.default.useState("harness"), manual = assignmentMode === "manual" && mode !== "direct", runExecutor = manual ? "routed" : executor, runMode = manual ? "read-only" : executionMode, runEnvironment = manual ? "harness" : executionEnvironment, runPreset = manual ? defaultPreset || "balanced" : preset, lastWorkspace = [...ledger?.runs ?? []].map((run2) => run2.workspace).find(Boolean) ?? "", [workspace2, setWorkspace] = import_react55.default.useState(""), [phase, setPhase] = import_react55.default.useState({ kind: "idle" }), currentPhase = import_react55.default.useRef(phase);
+  let [preset, setPreset] = import_react56.default.useState(defaultPreset || "balanced"), [dryRun, setDryRun] = import_react56.default.useState(!1), [executor, setExecutor] = import_react56.default.useState("routed"), [executionMode, setExecutionMode] = import_react56.default.useState("read-only"), [executionEnvironment, setExecutionEnvironment] = import_react56.default.useState("harness"), manual = assignmentMode === "manual" && mode !== "direct", runExecutor = manual ? "routed" : executor, runMode = manual ? "read-only" : executionMode, runEnvironment = manual ? "harness" : executionEnvironment, runPreset = manual ? defaultPreset || "balanced" : preset, lastWorkspace = [...ledger?.runs ?? []].map((run2) => run2.workspace).find(Boolean) ?? "", [workspace2, setWorkspace] = import_react56.default.useState(""), [phase, setPhase] = import_react56.default.useState({ kind: "idle" }), currentPhase = import_react56.default.useRef(phase);
   currentPhase.current = phase;
-  let [now, setNow] = import_react55.default.useState(Date.now), mounted = import_react55.default.useRef(!0), confirmRef = import_react55.default.useRef(null), pendingRequest = import_react55.default.useRef(0), activeRun = import_react55.default.useRef(null), launchSequence = import_react55.default.useRef(0), launching = import_react55.default.useRef(!1), awaitingLaunch = import_react55.default.useRef(null), pendingRemotes = import_react55.default.useRef(/* @__PURE__ */ new Set()), onFinished = import_react55.default.useRef(onStarted);
+  let [now, setNow] = import_react56.default.useState(Date.now), mounted = import_react56.default.useRef(!0), confirmRef = import_react56.default.useRef(null), pendingRequest = import_react56.default.useRef(0), activeRun = import_react56.default.useRef(null), launchSequence = import_react56.default.useRef(0), launching = import_react56.default.useRef(!1), awaitingLaunch = import_react56.default.useRef(null), pendingRemotes = import_react56.default.useRef(/* @__PURE__ */ new Set()), onFinished = import_react56.default.useRef(onStarted);
   onFinished.current = onStarted;
-  let inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace2, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]), latestSignature = import_react55.default.useRef(inputSignature);
-  latestSignature.current = inputSignature, import_react55.default.useEffect(() => {
+  let inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace2, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]), latestSignature = import_react56.default.useRef(inputSignature);
+  latestSignature.current = inputSignature, import_react56.default.useEffect(() => {
     mounted.current = !0;
     let resume = (jobId, snapshot) => {
       activeRun.current = {
@@ -20858,16 +20960,16 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       for (let controller of pendingRemotes.current) controller.abort();
       pendingRemotes.current.clear(), launchListeners.delete(receiveLaunch), pendingRequest.current += 1, activeRun.current = null;
     };
-  }, []), import_react55.default.useEffect(() => {
+  }, []), import_react56.default.useEffect(() => {
     setPreset(defaultPreset || "balanced");
-  }, [defaultPreset]), import_react55.default.useEffect(() => {
+  }, [defaultPreset]), import_react56.default.useEffect(() => {
     (mode !== "team" || manual) && (setExecutor("routed"), setExecutionMode("read-only"), setExecutionEnvironment("harness"));
-  }, [mode, manual]), import_react55.default.useEffect(() => {
+  }, [mode, manual]), import_react56.default.useEffect(() => {
     pendingRequest.current += 1, setPhase((previous) => ["previewing", "preview", "error"].includes(previous.kind) ? { kind: "idle" } : previous);
-  }, [inputSignature]), import_react55.default.useEffect(() => {
+  }, [inputSignature]), import_react56.default.useEffect(() => {
     phase.kind === "preview" && confirmRef.current?.focus();
   }, [phase.kind]);
-  let acceptSnapshot = import_react55.default.useCallback((value, token, sequence, cancelAcknowledged = !1) => {
+  let acceptSnapshot = import_react56.default.useCallback((value, token, sequence, cancelAcknowledged = !1) => {
     let active = activeRun.current;
     if (!mounted.current || !active || active.token !== token || active.terminal || value.jobId !== active.jobId) return !1;
     if (!isJobSnapshot(value)) throw new Error("暂时无法读取执行进度。");
@@ -20900,7 +21002,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       } : previous);
     return !0;
   }, []), runningJobId = phase.kind === "running" ? phase.job?.jobId : null;
-  import_react55.default.useEffect(() => {
+  import_react56.default.useEffect(() => {
     if (!runningJobId || typeof runStatus != "function") return;
     let active = activeRun.current;
     if (!active || active.jobId !== runningJobId) return;
@@ -20921,7 +21023,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     return timer = setTimeout(poll, active.restoring ? 0 : 1e3), active.restoring = !1, () => {
       disposed = !0, clearTimeout(timer);
     };
-  }, [runningJobId, runStatus, acceptSnapshot]), import_react55.default.useEffect(() => {
+  }, [runningJobId, runStatus, acceptSnapshot]), import_react56.default.useEffect(() => {
     if (!runningJobId) return;
     setNow(Date.now());
     let timer = setInterval(() => setNow(Date.now()), 1e3);
@@ -21008,15 +21110,15 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       active.cancelPending = !1;
     }
   };
-  return /* @__PURE__ */ import_react55.default.createElement("section", { className: "mr-card", "aria-label": "在工作台执行" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react55.default.createElement("div", null, /* @__PURE__ */ import_react55.default.createElement("h2", { className: "mr-card-title" }, "在工作台执行"), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-card-copy" }, "使用上方的任务描述与规划模式，先预览执行计划、权限与预估费用，确认后才会启动执行。模型路由执行只读任务；官方工具协作可选择只读检查，或在隔离工作树中使用 CLI 的正常工具编辑文件。"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label", id: "mr-launch-executor" }, "执行方式"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-executor" }, /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "routed", disabled: busy, onClick: () => {
+  return /* @__PURE__ */ import_react56.default.createElement("section", { className: "mr-card", "aria-label": "在工作台执行" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react56.default.createElement("div", null, /* @__PURE__ */ import_react56.default.createElement("h2", { className: "mr-card-title" }, "在工作台执行"), /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-card-copy" }, "使用上方的任务描述与规划模式，先预览执行计划、权限与预估费用，确认后才会启动执行。模型路由执行只读任务；官方工具协作可选择只读检查，或在隔离工作树中使用 CLI 的正常工具编辑文件。"))), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-control-label", id: "mr-launch-executor" }, "执行方式"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-executor" }, /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "routed", disabled: busy, onClick: () => {
     setExecutor("routed"), setExecutionMode("read-only"), setExecutionEnvironment("harness");
-  } }, manual ? "手动分配（只读）" : "模型路由（只读）"), /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "official-team", disabled: busy || mode !== "team" || manual, title: manual ? "手动分配按包执行只读任务" : mode !== "team" ? "先在上方选择“团队分工”" : "由官方 CLI 协作执行工作包", onClick: () => {
+  } }, manual ? "手动分配（只读）" : "模型路由（只读）"), /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "official-team", disabled: busy || mode !== "team" || manual, title: manual ? "手动分配按包执行只读任务" : mode !== "team" ? "先在上方选择“团队分工”" : "由官方 CLI 协作执行工作包", onClick: () => {
     mode === "team" && !manual && setExecutor("official-team");
-  } }, "官方工具协作"))), runExecutor === "official-team" && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label", id: "mr-launch-permission" }, "任务权限"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-permission" }, /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": executionMode === "read-only", disabled: busy, onClick: () => {
+  } }, "官方工具协作"))), runExecutor === "official-team" && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-control-label", id: "mr-launch-permission" }, "任务权限"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-permission" }, /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": executionMode === "read-only", disabled: busy, onClick: () => {
     setExecutionMode("read-only"), setExecutionEnvironment("harness");
-  } }, "只读检查"), /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": executionMode === "workspace-write", disabled: busy, onClick: () => setExecutionMode("workspace-write") }, "编辑文件"))), runExecutor === "official-team" && executionMode === "workspace-write" && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label", id: "mr-launch-environment" }, "执行环境"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-environment" }, /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "harness", disabled: busy, onClick: () => setExecutionEnvironment("harness") }, "Harness 受限环境"), /* @__PURE__ */ import_react55.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "cli-native", disabled: busy, onClick: () => setExecutionEnvironment("cli-native") }, "厂商 CLI 正常环境"))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label", id: "mr-launch-preset" }, "路由方案"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-preset" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react55.default.createElement("button", { key: item.id, type: "button", title: manual ? "手动分配沿用当前建议的方案；更改方案后请重新生成建议。" : item.description, "aria-pressed": runPreset === item.id, disabled: busy || mode === "direct" || manual, onClick: () => setPreset(item.id) }, item.label)))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group mr-launch-workspace" }, /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-launch-workspace" }, "工作区（绝对路径）"), /* @__PURE__ */ import_react55.default.createElement("input", { className: "mr-input", id: "mr-launch-workspace", value: workspace2, disabled: busy, placeholder: lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : "例如 D:\\projects\\demo 或 /home/user/demo", onChange: (event) => setWorkspace(event.target.value) })), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-control-group mr-launch-dryrun" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-control-label" }, "演练"), /* @__PURE__ */ import_react55.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react55.default.createElement("input", { type: "checkbox", checked: dryRun, disabled: busy, onChange: (event) => setDryRun(event.target.checked) }), /* @__PURE__ */ import_react55.default.createElement("span", null, "只记录，不执行")), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "演练按当前计划列出每个工作包本应使用的模型或工具和预计费用；不调用模型、不启动 CLI、不写入文件。"))), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, manual ? "手动分配按包执行只读任务，可混合模型 API 与官方工具；工具使用默认模型。所选目标、就绪状态和费用以执行预览为准。" : executor === "official-team" ? `${executionMode === "workspace-write" ? "编辑文件：各工作包在独立 Git 工作树中使用 CLI 正常工具，完成后整合回所选工作区。" : "只读检查：各工作包使用受限工具集，不修改工作区文件；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。"}失败时不会自动替换为模型目录 API。已登录不代表当前任务权限已就绪，预览会检查可用工具。` : mode === "direct" ? `指定模型：${directRoute ? `${directRoute.provider}/${directRoute.model}` : "未选择"}（跳过路由，方案不生效）` : mode === "team" ? "团队分工：按依赖执行只读工作包，每步使用可用的官方 CLI 或模型目录 API。" : "单任务：按方案选择一条路线。"), mode !== "team" && !manual && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "使用官方工具协作前，先在上方选择“团队分工”。"), runEnvironment === "cli-native" && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "厂商 CLI 使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。独立 Git 工作树用于收集改动，不是操作系统读写边界；不会自动切换到此环境。"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button", type: "button", disabled: !!blocked || busy, onClick: () => {
+  } }, "只读检查"), /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": executionMode === "workspace-write", disabled: busy, onClick: () => setExecutionMode("workspace-write") }, "编辑文件"))), runExecutor === "official-team" && executionMode === "workspace-write" && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-control-label", id: "mr-launch-environment" }, "执行环境"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-environment" }, /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "harness", disabled: busy, onClick: () => setExecutionEnvironment("harness") }, "Harness 受限环境"), /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "cli-native", disabled: busy, onClick: () => setExecutionEnvironment("cli-native") }, "厂商 CLI 正常环境"))), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-control-label", id: "mr-launch-preset" }, "路由方案"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-preset" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react56.default.createElement("button", { key: item.id, type: "button", title: manual ? "手动分配沿用当前建议的方案；更改方案后请重新生成建议。" : item.description, "aria-pressed": runPreset === item.id, disabled: busy || mode === "direct" || manual, onClick: () => setPreset(item.id) }, item.label)))), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group mr-launch-workspace" }, /* @__PURE__ */ import_react56.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-launch-workspace" }, "工作区（绝对路径）"), /* @__PURE__ */ import_react56.default.createElement("input", { className: "mr-input", id: "mr-launch-workspace", value: workspace2, disabled: busy, placeholder: lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : "例如 D:\\projects\\demo 或 /home/user/demo", onChange: (event) => setWorkspace(event.target.value) })), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group mr-launch-dryrun" }, /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-control-label" }, "演练"), /* @__PURE__ */ import_react56.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react56.default.createElement("input", { type: "checkbox", checked: dryRun, disabled: busy, onChange: (event) => setDryRun(event.target.checked) }), /* @__PURE__ */ import_react56.default.createElement("span", null, "只记录，不执行")), /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "演练按当前计划列出每个工作包本应使用的模型或工具和预计费用；不调用模型、不启动 CLI、不写入文件。"))), /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, manual ? "手动分配按包执行只读任务，可混合模型 API 与官方工具；工具使用默认模型。所选目标、就绪状态和费用以执行预览为准。" : executor === "official-team" ? `${executionMode === "workspace-write" ? "编辑文件：各工作包在独立 Git 工作树中使用 CLI 正常工具，完成后整合回所选工作区。" : "只读检查：各工作包使用受限工具集，不修改工作区文件；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。"}失败时不会自动替换为模型目录 API。已登录不代表当前任务权限已就绪，预览会检查可用工具。` : mode === "direct" ? `指定模型：${directRoute ? `${directRoute.provider}/${directRoute.model}` : "未选择"}（跳过路由，方案不生效）` : mode === "team" ? "团队分工：按依赖执行只读工作包，每步使用可用的官方 CLI 或模型目录 API。" : "单任务：按方案选择一条路线。"), mode !== "team" && !manual && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "使用官方工具协作前，先在上方选择“团队分工”。"), runEnvironment === "cli-native" && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "厂商 CLI 使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。独立 Git 工作树用于收集改动，不是操作系统读写边界；不会自动切换到此环境。"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react56.default.createElement("button", { className: "mr-button", type: "button", disabled: !!blocked || busy, onClick: () => {
     preview();
-  } }, phase.kind === "previewing" ? "正在生成预览…" : "预览执行计划"), blocked && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, blocked)), phase.kind === "previewing" && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty", role: "status" }, "正在按当前模型目录、登录状态和预算生成执行计划…"), phase.kind === "starting" && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-empty", role: "status" }, "正在等待已确认任务的启动结果，请稍候…"), phase.kind === "error" && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, phase.message), (phase.kind === "preview" && phase.signature === inputSignature || phase.kind === "running" && !phase.job) && /* @__PURE__ */ import_react55.default.createElement(
+  } }, phase.kind === "previewing" ? "正在生成预览…" : "预览执行计划"), blocked && /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-caption" }, blocked)), phase.kind === "previewing" && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-empty", role: "status" }, "正在按当前模型目录、登录状态和预算生成执行计划…"), phase.kind === "starting" && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-empty", role: "status" }, "正在等待已确认任务的启动结果，请稍候…"), phase.kind === "error" && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-error", role: "alert" }, phase.message), (phase.kind === "preview" && phase.signature === inputSignature || phase.kind === "running" && !phase.job) && /* @__PURE__ */ import_react56.default.createElement(
     LaunchPreview,
     {
       value: phase.value,
@@ -21031,7 +21133,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
         launching.current || setPhase({ kind: "idle" });
       }
     }
-  ), phase.kind === "running" && phase.job && /* @__PURE__ */ import_react55.default.createElement(
+  ), phase.kind === "running" && phase.job && /* @__PURE__ */ import_react56.default.createElement(
     RunProgress,
     {
       job: phase.job,
@@ -21045,19 +21147,19 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
         cancel();
       }
     }
-  ), phase.kind === "done" && /* @__PURE__ */ import_react55.default.createElement("div", { className: ["failed", "partial", "blocked", "incomplete"].includes(resultStatus) || resultStatus?.startsWith("paused") ? "mr-error" : "mr-empty", role: "status" }, STATUS_TEXT[resultStatus] ?? `状态：${resultStatus}`, phase.value.runId ? `；结果已记录（运行 ${phase.value.runId.slice(0, 8)}），见下方“执行记录与子任务”。` : "。", phase.value.budget?.message ? ` ${phase.value.budget.exceeded && resultStatus !== "paused-budget" ? "已按你的确认超预算执行：" : ""}${phase.value.budget.message}` : "", phase.value.dryRun === !0 && phase.value.notice ? ` ${phase.value.notice}` : "", Array.isArray(phase.value.planned) && phase.value.planned.length > 0 && /* @__PURE__ */ import_react55.default.createElement("ol", { className: "mr-planned" }, phase.value.planned.map((item) => /* @__PURE__ */ import_react55.default.createElement("li", { key: item.id ?? item.order }, item.title ?? item.id ?? `工作包 ${item.order}`, "：", item.wouldCall, Number.isFinite(item.estimatedCostUsd) ? `（预计 $${item.estimatedCostUsd.toFixed(4)}）` : ""))))));
+  ), phase.kind === "done" && /* @__PURE__ */ import_react56.default.createElement("div", { className: ["failed", "partial", "blocked", "incomplete"].includes(resultStatus) || resultStatus?.startsWith("paused") ? "mr-error" : "mr-empty", role: "status" }, STATUS_TEXT[resultStatus] ?? `状态：${resultStatus}`, phase.value.runId ? `；结果已记录（运行 ${phase.value.runId.slice(0, 8)}），见下方“执行记录与子任务”。` : "。", phase.value.budget?.message ? ` ${phase.value.budget.exceeded && resultStatus !== "paused-budget" ? "已按你的确认超预算执行：" : ""}${phase.value.budget.message}` : "", phase.value.dryRun === !0 && phase.value.notice ? ` ${phase.value.notice}` : "", Array.isArray(phase.value.planned) && phase.value.planned.length > 0 && /* @__PURE__ */ import_react56.default.createElement("ol", { className: "mr-planned" }, phase.value.planned.map((item) => /* @__PURE__ */ import_react56.default.createElement("li", { key: item.id ?? item.order }, item.title ?? item.id ?? `工作包 ${item.order}`, "：", item.wouldCall, Number.isFinite(item.estimatedCostUsd) ? `（预计 $${item.estimatedCostUsd.toFixed(4)}）` : ""))))));
 }
 var reasonText = (value) => typeof value == "string" ? text2(value) : text2(value?.zh) || text2(value?.message) || text2(value?.reason) || text2(value?.code);
 function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm, onCancel }) {
   let packages = value.decision?.packages ?? [], estimate = apiPlanEstimate(value), subscriptionEstimate = subscriptionEstimateText(value), reasons = value.reasons ?? [], officialTeam = (value.executor ?? request?.executor) === "official-team", native = (value.executionEnvironment ?? request?.executionEnvironment) === "cli-native", readOnly = value.readOnly !== !1 && (value.executionMode ?? request?.executionMode) !== "workspace-write", blocked = value.status === "blocked", manual = request?.assignmentMode === "manual" || value.assignmentMode === "manual", blocking = [...new Set([value.reason, ...Array.isArray(value.blocking) ? value.blocking : [value.blocking]].map(reasonText).filter(Boolean))];
-  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-launch-preview", role: "region", "aria-label": "执行预览" }, changed && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, "确认期间情况有变化（例如预算或登录状态），请重新核对下面的确认项。"), blocked && /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-error", role: "alert" }, /* @__PURE__ */ import_react55.default.createElement("strong", null, "当前无法启动执行。"), blocking.length ? /* @__PURE__ */ import_react55.default.createElement("ul", null, blocking.map((message) => /* @__PURE__ */ import_react55.default.createElement("li", { key: message }, message))) : /* @__PURE__ */ import_react55.default.createElement("p", null, "执行条件尚未满足，请检查所选权限、工作区和官方工具状态后重新预览。")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, officialTeam || manual ? "执行方式" : "路线"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, manual ? "手动分配 · 按包只读执行" : officialTeam ? "官方工具协作" : value.selected ? `${value.selected.provider}/${value.selected.model}` : "暂无路线", value.routingBypassed ? "（指定模型）" : "")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "API 预估费用"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, estimate === null ? "价格待配置" : money(estimate))), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "方案"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[value.decision?.preset]?.label ?? "—", value.budget?.downgraded ? "（超预算自动降级）" : "")), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-label" }, "工作区"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-metric-value mr-break" }, /* @__PURE__ */ import_react55.default.createElement("code", null, value.workspace)))), subscriptionEstimate && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, subscriptionEstimate, " 若改用 API，将重新估价并核验预算。"), officialTeam && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "任务权限：", readOnly ? "只读检查，不修改工作区文件。使用受限工具集；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。" : /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, "编辑文件。编辑范围：所选工作区 ", /* @__PURE__ */ import_react55.default.createElement("code", null, value.workspace), " 内的任务文件。官方 CLI 使用自己的正常工具，在独立 Git 工作树中完成后整合回该工作区。"), "失败时不会自动替换为模型目录 API。"), native && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "执行环境：厂商 CLI 正常环境，以当前用户权限运行，不经 Harness 进程沙箱。工作树不限制工具访问工作树外资源。"), !officialTeam && !readOnly && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "编辑范围：所选工作区 ", /* @__PURE__ */ import_react55.default.createElement("code", null, value.workspace), " 内的任务文件；在独立 Git 工作树中完成后整合回该工作区。不会自动回退模型目录 API。"), value.budget?.message && /* @__PURE__ */ import_react55.default.createElement("p", { className: value.budget.exceeded ? "mr-error" : "mr-caption" }, "预算检查：", value.budget.message), packages.length > 0 && /* @__PURE__ */ import_react55.default.createElement("ol", { className: "mr-launch-packages" }, packages.map((item) => {
+  return /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-launch-preview", role: "region", "aria-label": "执行预览" }, changed && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-error", role: "alert" }, "确认期间情况有变化（例如预算或登录状态），请重新核对下面的确认项。"), blocked && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-error", role: "alert" }, /* @__PURE__ */ import_react56.default.createElement("strong", null, "当前无法启动执行。"), blocking.length ? /* @__PURE__ */ import_react56.default.createElement("ul", null, blocking.map((message) => /* @__PURE__ */ import_react56.default.createElement("li", { key: message }, message))) : /* @__PURE__ */ import_react56.default.createElement("p", null, "执行条件尚未满足，请检查所选权限、工作区和官方工具状态后重新预览。")), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-label" }, officialTeam || manual ? "执行方式" : "路线"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-value" }, manual ? "手动分配 · 按包只读执行" : officialTeam ? "官方工具协作" : value.selected ? `${value.selected.provider}/${value.selected.model}` : "暂无路线", value.routingBypassed ? "（指定模型）" : "")), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-label" }, "API 预估费用"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-value" }, estimate === null ? "价格待配置" : money(estimate))), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-label" }, "方案"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[value.decision?.preset]?.label ?? "—", value.budget?.downgraded ? "（超预算自动降级）" : "")), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-label" }, "工作区"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-metric-value mr-break" }, /* @__PURE__ */ import_react56.default.createElement("code", null, value.workspace)))), subscriptionEstimate && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, subscriptionEstimate, " 若改用 API，将重新估价并核验预算。"), officialTeam && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "任务权限：", readOnly ? "只读检查，不修改工作区文件。使用受限工具集；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。" : /* @__PURE__ */ import_react56.default.createElement(import_react56.default.Fragment, null, "编辑文件。编辑范围：所选工作区 ", /* @__PURE__ */ import_react56.default.createElement("code", null, value.workspace), " 内的任务文件。官方 CLI 使用自己的正常工具，在独立 Git 工作树中完成后整合回该工作区。"), "失败时不会自动替换为模型目录 API。"), native && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "执行环境：厂商 CLI 正常环境，以当前用户权限运行，不经 Harness 进程沙箱。工作树不限制工具访问工作树外资源。"), !officialTeam && !readOnly && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "编辑范围：所选工作区 ", /* @__PURE__ */ import_react56.default.createElement("code", null, value.workspace), " 内的任务文件；在独立 Git 工作树中完成后整合回该工作区。不会自动回退模型目录 API。"), value.budget?.message && /* @__PURE__ */ import_react56.default.createElement("p", { className: value.budget.exceeded ? "mr-error" : "mr-caption" }, "预算检查：", value.budget.message), packages.length > 0 && /* @__PURE__ */ import_react56.default.createElement("ol", { className: "mr-launch-packages" }, packages.map((item) => {
     let tool = item.manualAssignment?.kind === "tool";
-    return /* @__PURE__ */ import_react55.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react55.default.createElement("strong", null, item.name), (manual || item.selectionSource === "manual") && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-pill" }, "手动"), " → ", tool ? `${item.toolLabel || item.toolId || item.manualAssignment.toolId} · 默认模型` : item.route || item.toolLabel || item.toolId || item.tool || "待分配路线", " ", /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "（", packageAccounting(value, item.id) ? packageEstimateText(value, item) : `预估 ${tool ? "费用未知" : item.estimatedCost === null || item.estimatedCost === void 0 ? "价格待配置" : money(item.estimatedCost)}`, item.channel === "official-cli" ? " · 官方 CLI" : item.channel ? " · 模型目录 API" : "", "）"), item.channelDetail && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, item.channelDetail));
-  })), reasons.length > 0 ? /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-confirm-box" }, /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-section-title" }, "执行前需要确认以下 ", reasons.length, " 项："), /* @__PURE__ */ import_react55.default.createElement("ol", null, reasons.map((item) => /* @__PURE__ */ import_react55.default.createElement("li", { key: item.code }, reasonText(item))))) : /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "当前没有额外确认项。", estimate === null ? "费用未知，无法确认本次费用是否在预算内。" : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? "按已提供单价估算，API 部分未超出预算；API 实际费用以执行记录和账单为准。" : "API 实际费用以执行记录和账单为准，订阅仅记录用量。"), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react55.default.createElement("button", { ref: confirmRef, className: "mr-button", type: "button", disabled: running || blocked, onClick: onConfirm }, request?.dryRun === !0 ? reasons.length ? "确认演练（不执行）" : "演练（不执行）" : running ? "正在执行…" : reasons.length ? "全部确认并执行" : "确认执行"), /* @__PURE__ */ import_react55.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: running, onClick: onCancel }, "取消"), running && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption", role: "status", "aria-live": "polite" }, "正在启动执行，请稍候…")));
+    return /* @__PURE__ */ import_react56.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react56.default.createElement("strong", null, item.name), (manual || item.selectionSource === "manual") && /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-pill" }, "手动"), " → ", tool ? `${item.toolLabel || item.toolId || item.manualAssignment.toolId} · 默认模型` : item.route || item.toolLabel || item.toolId || item.tool || "待分配路线", " ", /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-caption" }, "（", packageAccounting(value, item.id) ? packageEstimateText(value, item) : `预估 ${tool ? "费用未知" : item.estimatedCost === null || item.estimatedCost === void 0 ? "价格待配置" : money(item.estimatedCost)}`, item.channel === "official-cli" ? " · 官方 CLI" : item.channel ? " · 模型目录 API" : "", "）"), item.channelDetail && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, item.channelDetail));
+  })), reasons.length > 0 ? /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-confirm-box" }, /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-section-title" }, "执行前需要确认以下 ", reasons.length, " 项："), /* @__PURE__ */ import_react56.default.createElement("ol", null, reasons.map((item) => /* @__PURE__ */ import_react56.default.createElement("li", { key: item.code }, reasonText(item))))) : /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "当前没有额外确认项。", estimate === null ? "费用未知，无法确认本次费用是否在预算内。" : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? "按已提供单价估算，API 部分未超出预算；API 实际费用以执行记录和账单为准。" : "API 实际费用以执行记录和账单为准，订阅仅记录用量。"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react56.default.createElement("button", { ref: confirmRef, className: "mr-button", type: "button", disabled: running || blocked, onClick: onConfirm }, request?.dryRun === !0 ? reasons.length ? "确认演练（不执行）" : "演练（不执行）" : running ? "正在执行…" : reasons.length ? "全部确认并执行" : "确认执行"), /* @__PURE__ */ import_react56.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: running, onClick: onCancel }, "取消"), running && /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-caption", role: "status", "aria-live": "polite" }, "正在启动执行，请稍候…")));
 }
 function RunProgress({ job, now, restoring, pollError, cancelError, cancelPending, canCancel, onCancel }) {
   let progress = job.progress ?? {}, packages = Array.isArray(progress.packages) ? progress.packages : [], startedAt = typeof job.startedAt == "number" ? job.startedAt : Date.parse(job.startedAt), seconds = Number.isFinite(startedAt) ? Math.max(0, Math.floor((now - startedAt) / 1e3)) : 0, elapsed = Number.isFinite(startedAt) ? `${Math.floor(seconds / 60)} 分 ${String(seconds % 60).padStart(2, "0")} 秒` : "待更新", cancelling = job.cancelRequested || job.status === "cancelling";
-  return /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-launch-preview mr-run-progress", role: "region", "aria-label": "执行进度" }, /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-run-progress-head" }, /* @__PURE__ */ import_react55.default.createElement("strong", { role: "status" }, cancelling ? "正在取消…" : restoring ? "正在恢复执行进度…" : "正在执行…"), /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "已耗时 ", elapsed)), job.progress && /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption" }, "已处理 ", progress.completed ?? 0, " / ", progress.total ?? packages.length, " 个工作包"), /* @__PURE__ */ import_react55.default.createElement("progress", { className: "mr-run-meter", "aria-label": "工作包完成进度", value: progress.completed ?? 0, max: Math.max(1, progress.total ?? packages.length) })), /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-caption", "aria-live": "polite" }, progress.current ? `当前工作包：${progress.current.name || progress.current.id}` : cancelling ? "正在结束当前执行并保留已完成结果。" : STAGE_TEXT[progress.stage] ?? "正在读取执行进度…"), packages.length > 0 && /* @__PURE__ */ import_react55.default.createElement("ol", { className: "mr-run-packages" }, packages.map((item) => /* @__PURE__ */ import_react55.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react55.default.createElement("span", null, item.name || item.id), /* @__PURE__ */ import_react55.default.createElement("span", { className: `mr-pill mr-run-package-${item.status}` }, PACKAGE_STATUS_TEXT[item.status] ?? "等待更新")))), pollError && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "status" }, pollError), cancelError && /* @__PURE__ */ import_react55.default.createElement("p", { className: "mr-error", role: "alert" }, cancelError), /* @__PURE__ */ import_react55.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react55.default.createElement(
+  return /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-launch-preview mr-run-progress", role: "region", "aria-label": "执行进度" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-run-progress-head" }, /* @__PURE__ */ import_react56.default.createElement("strong", { role: "status" }, cancelling ? "正在取消…" : restoring ? "正在恢复执行进度…" : "正在执行…"), /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-caption" }, "已耗时 ", elapsed)), job.progress && /* @__PURE__ */ import_react56.default.createElement(import_react56.default.Fragment, null, /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "已处理 ", progress.completed ?? 0, " / ", progress.total ?? packages.length, " 个工作包"), /* @__PURE__ */ import_react56.default.createElement("progress", { className: "mr-run-meter", "aria-label": "工作包完成进度", value: progress.completed ?? 0, max: Math.max(1, progress.total ?? packages.length) })), /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption", "aria-live": "polite" }, progress.current ? `当前工作包：${progress.current.name || progress.current.id}` : cancelling ? "正在结束当前执行并保留已完成结果。" : STAGE_TEXT[progress.stage] ?? "正在读取执行进度…"), packages.length > 0 && /* @__PURE__ */ import_react56.default.createElement("ol", { className: "mr-run-packages" }, packages.map((item) => /* @__PURE__ */ import_react56.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react56.default.createElement("span", null, item.name || item.id), /* @__PURE__ */ import_react56.default.createElement("span", { className: `mr-pill mr-run-package-${item.status}` }, PACKAGE_STATUS_TEXT[item.status] ?? "等待更新")))), pollError && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-error", role: "status" }, pollError), cancelError && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-error", role: "alert" }, cancelError), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react56.default.createElement(
     "button",
     {
       className: "mr-button mr-button-secondary",
@@ -21066,11 +21168,11 @@ function RunProgress({ job, now, restoring, pollError, cancelError, cancelPendin
       onClick: onCancel
     },
     cancelPending ? "正在请求取消…" : cancelling ? "正在取消…" : "取消执行"
-  ), cancelling && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "取消已请求，等待执行结束；已完成结果会保留在执行记录中。"), !canCancel && /* @__PURE__ */ import_react55.default.createElement("span", { className: "mr-caption" }, "当前工作台暂不支持取消，请更新插件。")));
+  ), cancelling && /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-caption" }, "取消已请求，等待执行结束；已完成结果会保留在执行记录中。"), !canCancel && /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-caption" }, "当前工作台暂不支持取消，请更新插件。")));
 }
 
 // .dsh-plugin/client/cli-terminal.jsx
-var import_react56 = __toESM(require("react"), 1);
+var import_react57 = __toESM(require("react"), 1);
 
 // node_modules/@xterm/xterm/lib/xterm.mjs
 var zs = Object.defineProperty, Rl = Object.getOwnPropertyDescriptor, Ll = (s15, t2) => {
@@ -21152,23 +21254,23 @@ var er = class {
   decode(t2, e) {
     let i = t2.length;
     if (!i) return 0;
-    let r = 0, n, o2, l, a, u = 0, h51 = 0;
+    let r = 0, n, o2, l, a, u = 0, h52 = 0;
     if (this.interim[0]) {
       let _2 = !1, p = this.interim[0];
       p &= (p & 224) === 192 ? 31 : (p & 240) === 224 ? 15 : 7;
       let m = 0, f;
       for (; (f = this.interim[++m] & 63) && m < 4; ) p <<= 6, p |= f;
       let A = (this.interim[0] & 224) === 192 ? 2 : (this.interim[0] & 240) === 224 ? 3 : 4, R = A - m;
-      for (; h51 < R; ) {
-        if (h51 >= i) return 0;
-        if (f = t2[h51++], (f & 192) !== 128) {
-          h51--, _2 = !0;
+      for (; h52 < R; ) {
+        if (h52 >= i) return 0;
+        if (f = t2[h52++], (f & 192) !== 128) {
+          h52--, _2 = !0;
           break;
         } else this.interim[m++] = f, p <<= 6, p |= f & 63;
       }
-      _2 || (A === 2 ? p < 128 ? h51-- : e[r++] = p : A === 3 ? p < 2048 || p >= 55296 && p <= 57343 || p === 65279 || (e[r++] = p) : p < 65536 || p > 1114111 || (e[r++] = p)), this.interim.fill(0);
+      _2 || (A === 2 ? p < 128 ? h52-- : e[r++] = p : A === 3 ? p < 2048 || p >= 55296 && p <= 57343 || p === 65279 || (e[r++] = p) : p < 65536 || p > 1114111 || (e[r++] = p)), this.interim.fill(0);
     }
-    let c = i - 4, d = h51;
+    let c = i - 4, d = h52;
     for (; d < i; ) {
       for (; d < c && !((n = t2[d]) & 128) && !((o2 = t2[d + 1]) & 128) && !((l = t2[d + 2]) & 128) && !((a = t2[d + 3]) & 128); ) e[r++] = n, e[r++] = o2, e[r++] = l, e[r++] = a, d += 4;
       if (n = t2[d++], n < 128) e[r++] = n;
@@ -21449,17 +21551,17 @@ var F = ie("BufferService"), rr = ie("CoreMouseService"), ge = ie("CoreService")
       e(void 0);
       return;
     }
-    let r = [], n = this._optionsService.rawOptions.linkHandler, o2 = new q(), l = i.getTrimmedLength(), a = -1, u = -1, h51 = !1;
+    let r = [], n = this._optionsService.rawOptions.linkHandler, o2 = new q(), l = i.getTrimmedLength(), a = -1, u = -1, h52 = !1;
     for (let c = 0; c < l; c++) if (!(u === -1 && !i.hasContent(c))) {
       if (i.loadCell(c, o2), o2.hasExtendedAttrs() && o2.extended.urlId) if (u === -1) {
         u = c, a = o2.extended.urlId;
         continue;
-      } else h51 = o2.extended.urlId !== a;
-      else u !== -1 && (h51 = !0);
-      if (h51 || u !== -1 && c === l - 1) {
+      } else h52 = o2.extended.urlId !== a;
+      else u !== -1 && (h52 = !0);
+      if (h52 || u !== -1 && c === l - 1) {
         let d = this._oscLinkService.getLinkData(a)?.uri;
         if (d) {
-          let _2 = { start: { x: u + 1, y: t2 }, end: { x: c + (!h51 && c === l - 1 ? 1 : 0), y: t2 } }, p = !1;
+          let _2 = { start: { x: u + 1, y: t2 }, end: { x: c + (!h52 && c === l - 1 ? 1 : 0), y: t2 } }, p = !1;
           if (!n?.allowNonHttpProtocols) try {
             let m = new URL(d);
             ["http:", "https:"].includes(m.protocol) || (p = !0);
@@ -21468,7 +21570,7 @@ var F = ie("BufferService"), rr = ie("CoreMouseService"), ge = ie("CoreService")
           }
           p || r.push({ text: d, range: _2, activate: (m, f) => n ? n.activate(m, f, _2) : Ol(m, f), hover: (m, f) => n?.hover?.(m, f, _2), leave: (m, f) => n?.leave?.(m, f, _2) });
         }
-        h51 = !1, o2.hasExtendedAttrs() && o2.extended.urlId ? (u = c, a = o2.extended.urlId) : (u = -1, a = -1);
+        h52 = !1, o2.hasExtendedAttrs() && o2.extended.urlId ? (u = c, a = o2.extended.urlId) : (u = -1, a = -1);
       }
     }
     e(r);
@@ -21762,10 +21864,10 @@ var zn;
     return !1;
   }
   O.some = u;
-  function h51(I, k) {
+  function h52(I, k) {
     for (let P of I) if (k(P)) return P;
   }
-  O.find = h51;
+  O.find = h52;
   function* c(I, k) {
     for (let P of I) k(P) && (yield P);
   }
@@ -21853,29 +21955,29 @@ var Wl = !1, dt = null, hr = class hr2 {
     else {
       let a = /* @__PURE__ */ new Map(), u = [...this.livingDisposables.values()].filter((c) => c.source !== null && !this.getRootParent(c, a).isSingleton);
       if (u.length === 0) return;
-      let h51 = new Set(u.map((c) => c.value));
-      if (i = u.filter((c) => !(c.parent && h51.has(c.parent))), i.length === 0) throw new Error("There are cyclic diposable chains!");
+      let h52 = new Set(u.map((c) => c.value));
+      if (i = u.filter((c) => !(c.parent && h52.has(c.parent))), i.length === 0) throw new Error("There are cyclic diposable chains!");
     }
     if (!i) return;
     function r(a) {
       function u(c, d) {
         for (; c.length > 0 && d.some((_2) => typeof _2 == "string" ? _2 === c[0] : c[0].match(_2)); ) c.shift();
       }
-      let h51 = a.source.split(`
+      let h52 = a.source.split(`
 `).map((c) => c.trim().replace("at ", "")).filter((c) => c !== "");
-      return u(h51, ["Error", /^trackDisposable \(.*\)$/, /^DisposableTracker.trackDisposable \(.*\)$/]), h51.reverse();
+      return u(h52, ["Error", /^trackDisposable \(.*\)$/, /^DisposableTracker.trackDisposable \(.*\)$/]), h52.reverse();
     }
     let n = new ur();
     for (let a of i) {
       let u = r(a);
-      for (let h51 = 0; h51 <= u.length; h51++) n.add(u.slice(0, h51).join(`
+      for (let h52 = 0; h52 <= u.length; h52++) n.add(u.slice(0, h52).join(`
 `), a);
     }
     i.sort(no((a) => a.idx, so));
     let o2 = "", l = 0;
     for (let a of i.slice(0, t2)) {
       l++;
-      let u = r(a), h51 = [];
+      let u = r(a), h52 = [];
       for (let c = 0; c < u.length; c++) {
         let d = u[c];
         d = `(shared with ${n.get(u.slice(0, c + 1).join(`
@@ -21883,14 +21985,14 @@ var Wl = !1, dt = null, hr = class hr2 {
         let p = n.get(u.slice(0, c).join(`
 `)), m = co([...p].map((f) => r(f)[c]), (f) => f);
         delete m[u[c]];
-        for (let [f, A] of Object.entries(m)) h51.unshift(`    - stacktraces of ${A.length} other leaks continue with ${f}`);
-        h51.unshift(d);
+        for (let [f, A] of Object.entries(m)) h52.unshift(`    - stacktraces of ${A.length} other leaks continue with ${f}`);
+        h52.unshift(d);
       }
       o2 += `
 
 
 ==================== Leaking disposable ${l}/${i.length}: ${a.value.constructor.name} ====================
-${h51.join(`
+${h52.join(`
 `)}
 ============================================================
 
@@ -22149,17 +22251,17 @@ var G = kt, Ct = class {
   }
   Qe.once = i;
   function r(y, T, g) {
-    return h51((w, E = null, x) => y((N) => w.call(E, T(N)), null, x), g);
+    return h52((w, E = null, x) => y((N) => w.call(E, T(N)), null, x), g);
   }
   Qe.map = r;
   function n(y, T, g) {
-    return h51((w, E = null, x) => y((N) => {
+    return h52((w, E = null, x) => y((N) => {
       T(N), w.call(E, N);
     }, null, x), g);
   }
   Qe.forEach = n;
   function o2(y, T, g) {
-    return h51((w, E = null, x) => y((N) => T(N) && w.call(E, N), null, x), g);
+    return h52((w, E = null, x) => y((N) => T(N) && w.call(E, N), null, x), g);
   }
   Qe.filter = o2;
   function l(y) {
@@ -22178,7 +22280,7 @@ var G = kt, Ct = class {
     return r(y, (x) => (E = T(E, x), E), w);
   }
   Qe.reduce = u;
-  function h51(y, T) {
+  function h52(y, T) {
     let g, w = { onWillAddFirstListener() {
       g = y(E.fire, E);
     }, onDidRemoveLastListener() {
@@ -22471,8 +22573,8 @@ var v = class {
       if (this._leakageMon && this._size > this._leakageMon.threshold ** 2) {
         let a = `[${this._leakageMon.name}] REFUSES to accept new listeners because it exceeded its threshold by far (${this._size} vs ${this._leakageMon.threshold})`;
         console.warn(a);
-        let u = this._leakageMon.getMostFrequentStack() ?? ["UNKNOWN stack", -1], h51 = new Yn(`${a}. HINT: Stack shows most frequent listener (${u[1]}-times)`, u[0]);
-        return (this._options?.onListenerError || Lt)(h51), D.None;
+        let u = this._leakageMon.getMostFrequentStack() ?? ["UNKNOWN stack", -1], h52 = new Yn(`${a}. HINT: Stack shows most frequent listener (${u[1]}-times)`, u[0]);
+        return (this._options?.onListenerError || Lt)(h52), D.None;
       }
       if (this._disposed) return D.None;
       e && (t2 = t2.bind(e));
@@ -23164,8 +23266,8 @@ var Cr = class Cr2 {
     let t2 = Cr2._bigBlock32, e = this._buffDV;
     for (let c = 0; c < 64; c += 4) t2.setUint32(c, e.getUint32(c, !1), !1);
     for (let c = 64; c < 320; c += 4) t2.setUint32(c, rs(t2.getUint32(c - 12, !1) ^ t2.getUint32(c - 32, !1) ^ t2.getUint32(c - 56, !1) ^ t2.getUint32(c - 64, !1), 1), !1);
-    let i = this._h0, r = this._h1, n = this._h2, o2 = this._h3, l = this._h4, a, u, h51;
-    for (let c = 0; c < 80; c++) c < 20 ? (a = r & n | ~r & o2, u = 1518500249) : c < 40 ? (a = r ^ n ^ o2, u = 1859775393) : c < 60 ? (a = r & n | r & o2 | n & o2, u = 2400959708) : (a = r ^ n ^ o2, u = 3395469782), h51 = rs(i, 5) + a + l + u + t2.getUint32(c * 4, !1) & 4294967295, l = o2, o2 = n, n = rs(r, 30), r = i, i = h51;
+    let i = this._h0, r = this._h1, n = this._h2, o2 = this._h3, l = this._h4, a, u, h52;
+    for (let c = 0; c < 80; c++) c < 20 ? (a = r & n | ~r & o2, u = 1518500249) : c < 40 ? (a = r ^ n ^ o2, u = 1859775393) : c < 60 ? (a = r & n | r & o2 | n & o2, u = 2400959708) : (a = r ^ n ^ o2, u = 3395469782), h52 = rs(i, 5) + a + l + u + t2.getUint32(c * 4, !1) & 4294967295, l = o2, o2 = n, n = rs(r, 30), r = i, i = h52;
     this._h0 = this._h0 + i & 4294967295, this._h1 = this._h1 + r & 4294967295, this._h2 = this._h2 + n & 4294967295, this._h3 = this._h3 + o2 & 4294967295, this._h4 = this._h4 + l & 4294967295;
   }
 };
@@ -23258,13 +23360,13 @@ var os = function(t2, e, i, r) {
     i.set(n, !1);
   };
   mt = (n, o2, l = 0) => {
-    let a = Oo(n), u = new Di(o2, l), h51 = s15.get(a);
-    return h51 || (h51 = [], s15.set(a, h51)), h51.push(u), e.get(a) || (e.set(a, !0), n.requestAnimationFrame(() => r(a))), u;
+    let a = Oo(n), u = new Di(o2, l), h52 = s15.get(a);
+    return h52 || (h52 = [], s15.set(a, h52)), h52.push(u), e.get(a) || (e.set(a, !0), n.requestAnimationFrame(() => r(a))), u;
   }, wa = (n, o2, l) => {
     let a = Oo(n);
     if (i.get(a)) {
-      let u = new Di(o2, l), h51 = t2.get(a);
-      return h51 || (h51 = [], t2.set(a, h51)), h51.push(u), u;
+      let u = new Di(o2, l), h52 = t2.get(a);
+      return h52 || (h52 = [], t2.set(a, h52)), h52.push(u), u;
     } else return mt(n, o2, l);
   };
 })();
@@ -23542,11 +23644,11 @@ var Q = class Q2 extends D {
         console.warn("move of an UNKNOWN touch", a);
         continue;
       }
-      let u = this.activeTouches[a.identifier], h51 = Date.now() - u.initialTimeStamp;
-      if (h51 < Q2.HOLD_DELAY && Math.abs(u.initialPageX - Se(u.rollingPageX)) < 30 && Math.abs(u.initialPageY - Se(u.rollingPageY)) < 30) {
+      let u = this.activeTouches[a.identifier], h52 = Date.now() - u.initialTimeStamp;
+      if (h52 < Q2.HOLD_DELAY && Math.abs(u.initialPageX - Se(u.rollingPageX)) < 30 && Math.abs(u.initialPageY - Se(u.rollingPageY)) < 30) {
         let c = this.newGestureEvent(He.Tap, u.initialTarget);
         c.pageX = Se(u.rollingPageX), c.pageY = Se(u.rollingPageY), this.dispatchEvent(c);
-      } else if (h51 >= Q2.HOLD_DELAY && Math.abs(u.initialPageX - Se(u.rollingPageX)) < 30 && Math.abs(u.initialPageY - Se(u.rollingPageY)) < 30) {
+      } else if (h52 >= Q2.HOLD_DELAY && Math.abs(u.initialPageX - Se(u.rollingPageX)) < 30 && Math.abs(u.initialPageY - Se(u.rollingPageY)) < 30) {
         let c = this.newGestureEvent(He.Contextmenu, u.initialTarget);
         c.pageX = Se(u.rollingPageX), c.pageY = Se(u.rollingPageY), this.dispatchEvent(c);
       } else if (n === 1) {
@@ -23578,12 +23680,12 @@ var Q = class Q2 extends D {
       for (let [r, n] of i) n.dispatchEvent(e), this.dispatched = !0;
     }
   }
-  inertia(e, i, r, n, o2, l, a, u, h51) {
+  inertia(e, i, r, n, o2, l, a, u, h52) {
     this.handle = mt(e, () => {
       let c = Date.now(), d = c - r, _2 = 0, p = 0, m = !0;
       n += Q2.SCROLL_FRICTION * d, a += Q2.SCROLL_FRICTION * d, n > 0 && (m = !1, _2 = o2 * n * d), a > 0 && (m = !1, p = u * a * d);
       let f = this.newGestureEvent(He.Change);
-      f.translationX = _2, f.translationY = p, i.forEach((A) => A.dispatchEvent(f)), m || this.inertia(e, i, c, n, o2, l + _2, a, u, h51 + p);
+      f.translationX = _2, f.translationY = p, i.forEach((A) => A.dispatchEvent(f)), m || this.inertia(e, i, c, n, o2, l + _2, a, u, h52 + p);
     });
   }
   onTouchMove(e) {
@@ -23935,8 +24037,8 @@ var Fr = class extends D {
   static _computeValues(t2, e, i, r, n) {
     let o2 = Math.max(0, i - t2), l = Math.max(0, o2 - 2 * e), a = r > 0 && r > i;
     if (!a) return { computedAvailableSize: Math.round(o2), computedIsNeeded: a, computedSliderSize: Math.round(l), computedSliderRatio: 0, computedSliderPosition: 0 };
-    let u = Math.round(Math.max(20, Math.floor(i * l / r))), h51 = (l - u) / (r - i), c = n * h51;
-    return { computedAvailableSize: Math.round(o2), computedIsNeeded: a, computedSliderSize: Math.round(u), computedSliderRatio: h51, computedSliderPosition: Math.round(c) };
+    let u = Math.round(Math.max(20, Math.floor(i * l / r))), h52 = (l - u) / (r - i), c = n * h52;
+    return { computedAvailableSize: Math.round(o2), computedIsNeeded: a, computedSliderSize: Math.round(u), computedSliderRatio: h52, computedSliderPosition: Math.round(c) };
   }
   _refreshComputedValues() {
     let t2 = s11._computeValues(this._oppositeScrollbarSize, this._arrowSize, this._visibleSize, this._scrollSize, this._scrollPosition);
@@ -24076,8 +24178,8 @@ var Fr = class extends D {
     if (Math.abs(t2.deltaX) > 0 && Math.abs(t2.deltaY) > 0) return 1;
     let i = 0.5;
     if ((!this._isAlmostInt(t2.deltaX) || !this._isAlmostInt(t2.deltaY)) && (i += 0.25), e) {
-      let r = Math.abs(t2.deltaX), n = Math.abs(t2.deltaY), o2 = Math.abs(e.deltaX), l = Math.abs(e.deltaY), a = Math.max(Math.min(r, o2), 1), u = Math.max(Math.min(n, l), 1), h51 = Math.max(r, o2), c = Math.max(n, l);
-      h51 % a === 0 && c % u === 0 && (i -= 0.5);
+      let r = Math.abs(t2.deltaX), n = Math.abs(t2.deltaY), o2 = Math.abs(e.deltaX), l = Math.abs(e.deltaY), a = Math.max(Math.min(r, o2), 1), u = Math.max(Math.min(n, l), 1), h52 = Math.max(r, o2), c = Math.max(n, l);
+      h52 % a === 0 && c % u === 0 && (i -= 0.5);
     }
     return Math.min(Math.max(i, 0), 1);
   }
@@ -24145,16 +24247,16 @@ var hs = zr, ds = class extends lt {
       this._options.scrollPredominantAxis && (this._options.scrollYToX && l + o2 === 0 ? l = o2 = 0 : Math.abs(o2) >= Math.abs(l) ? l = 0 : o2 = 0), this._options.flipAxes && ([o2, l] = [l, o2]);
       let a = !Te && e.browserEvent && e.browserEvent.shiftKey;
       (this._options.scrollYToX || a) && !l && (l = o2, o2 = 0), e.browserEvent && e.browserEvent.altKey && (l = l * this._options.fastScrollSensitivity, o2 = o2 * this._options.fastScrollSensitivity);
-      let u = this._scrollable.getFutureScrollPosition(), h51 = {};
+      let u = this._scrollable.getFutureScrollPosition(), h52 = {};
       if (o2) {
         let c = Ko * o2, d = u.scrollTop - (c < 0 ? Math.floor(c) : Math.ceil(c));
-        this._verticalScrollbar.writeScrollPosition(h51, d);
+        this._verticalScrollbar.writeScrollPosition(h52, d);
       }
       if (l) {
         let c = Ko * l, d = u.scrollLeft - (c < 0 ? Math.floor(c) : Math.ceil(c));
-        this._horizontalScrollbar.writeScrollPosition(h51, d);
+        this._horizontalScrollbar.writeScrollPosition(h52, d);
       }
-      h51 = this._scrollable.validateScrollPosition(h51), (u.scrollLeft !== h51.scrollLeft || u.scrollTop !== h51.scrollTop) && (zo && this._options.mouseWheelSmoothScroll && i.isPhysicalMouseWheel() ? this._scrollable.setScrollPositionSmooth(h51) : this._scrollable.setScrollPositionNow(h51), r = !0);
+      h52 = this._scrollable.validateScrollPosition(h52), (u.scrollLeft !== h52.scrollLeft || u.scrollTop !== h52.scrollTop) && (zo && this._options.mouseWheelSmoothScroll && i.isPhysicalMouseWheel() ? this._scrollable.setScrollPositionSmooth(h52) : this._scrollable.setScrollPositionNow(h52), r = !0);
     }
     let n = r;
     !n && this._options.alwaysConsumeMouseWheel && (n = !0), !n && this._options.consumeMouseWheelIfScrollbarIsNeeded && (this._verticalScrollbar.isNeeded() || this._horizontalScrollbar.isNeeded()) && (n = !0), n && (e.preventDefault(), e.stopPropagation());
@@ -24211,10 +24313,10 @@ function Pa(s15) {
 var zt = class extends D {
   constructor(e, i, r, n, o2, l, a, u) {
     super(), this._bufferService = r, this._optionsService = a, this._renderService = u, this._onRequestScrollLines = this._register(new v()), this.onRequestScrollLines = this._onRequestScrollLines.event, this._isSyncing = !1, this._isHandlingScroll = !1, this._suppressOnScrollHandler = !1;
-    let h51 = this._register(new Ri({ forceIntegerValues: !1, smoothScrollDuration: this._optionsService.rawOptions.smoothScrollDuration, scheduleAtNextAnimationFrame: (c) => mt(n.window, c) }));
+    let h52 = this._register(new Ri({ forceIntegerValues: !1, smoothScrollDuration: this._optionsService.rawOptions.smoothScrollDuration, scheduleAtNextAnimationFrame: (c) => mt(n.window, c) }));
     this._register(this._optionsService.onSpecificOptionChange("smoothScrollDuration", () => {
-      h51.setSmoothScrollDuration(this._optionsService.rawOptions.smoothScrollDuration);
-    })), this._scrollableElement = this._register(new Kr(i, { vertical: 1, horizontal: 2, useShadows: !1, mouseWheelSmoothScroll: !0, ...this._getChangeOptions() }, h51)), this._register(this._optionsService.onMultipleOptionChange(["scrollSensitivity", "fastScrollSensitivity", "overviewRuler"], () => this._scrollableElement.updateOptions(this._getChangeOptions()))), this._register(o2.onProtocolChange((c) => {
+      h52.setSmoothScrollDuration(this._optionsService.rawOptions.smoothScrollDuration);
+    })), this._scrollableElement = this._register(new Kr(i, { vertical: 1, horizontal: 2, useShadows: !1, mouseWheelSmoothScroll: !0, ...this._getChangeOptions() }, h52)), this._register(this._optionsService.onMultipleOptionChange(["scrollSensitivity", "fastScrollSensitivity", "overviewRuler"], () => this._scrollableElement.updateOptions(this._getChangeOptions()))), this._register(o2.onProtocolChange((c) => {
       this._scrollableElement.updateOptions({ handleMouseWheel: !(c & 16) });
     })), this._scrollableElement.setScrollDimensions({ height: 0, scrollHeight: 0 }), this._register($.runAndSubscribe(l.onChangeColors, () => {
       this._scrollableElement.getDomNode().style.backgroundColor = l.colors.background.css;
@@ -24340,8 +24442,8 @@ var Gr = class {
 }, We = { full: 0, left: 0, center: 0, right: 0 }, at = { full: 0, left: 0, center: 0, right: 0 }, Li = { full: 0, left: 0, center: 0, right: 0 }, bt = class extends D {
   constructor(e, i, r, n, o2, l, a, u) {
     super(), this._viewportElement = e, this._screenElement = i, this._bufferService = r, this._decorationService = n, this._renderService = o2, this._optionsService = l, this._themeService = a, this._coreBrowserService = u, this._colorZoneStore = new Gr(), this._shouldUpdateDimensions = !0, this._shouldUpdateAnchor = !0, this._lastKnownBufferLength = 0, this._canvas = this._coreBrowserService.mainDocument.createElement("canvas"), this._canvas.classList.add("xterm-decoration-overview-ruler"), this._refreshCanvasDimensions(), this._viewportElement.parentElement?.insertBefore(this._canvas, this._viewportElement), this._register(C(() => this._canvas?.remove()));
-    let h51 = this._canvas.getContext("2d");
-    if (h51) this._ctx = h51;
+    let h52 = this._canvas.getContext("2d");
+    if (h52) this._ctx = h52;
     else throw new Error("Ctx cannot be null");
     this._register(this._decorationService.onDecorationRegistered(() => this._queueRefresh(void 0, !0))), this._register(this._decorationService.onDecorationRemoved(() => this._queueRefresh(void 0, !0))), this._register(this._renderService.onRenderedViewportChange(() => this._queueRefresh())), this._register(this._bufferService.buffers.onBufferActivate(() => {
       this._canvas.style.display = this._bufferService.buffer === this._bufferService.buffers.alt ? "none" : "block";
@@ -24480,8 +24582,8 @@ var U;
 ((l) => {
   function s15(a, u) {
     if (J = (u.rgba & 255) / 255, J === 1) return { css: u.css, rgba: u.rgba };
-    let h51 = u.rgba >> 24 & 255, c = u.rgba >> 16 & 255, d = u.rgba >> 8 & 255, _2 = a.rgba >> 24 & 255, p = a.rgba >> 16 & 255, m = a.rgba >> 8 & 255;
-    ue = _2 + Math.round((h51 - _2) * J), he = p + Math.round((c - p) * J), de = m + Math.round((d - m) * J);
+    let h52 = u.rgba >> 24 & 255, c = u.rgba >> 16 & 255, d = u.rgba >> 8 & 255, _2 = a.rgba >> 24 & 255, p = a.rgba >> 16 & 255, m = a.rgba >> 8 & 255;
+    ue = _2 + Math.round((h52 - _2) * J), he = p + Math.round((c - p) * J), de = m + Math.round((d - m) * J);
     let f = j.toCss(ue, he, de), A = j.toRgba(ue, he, de);
     return { css: f, rgba: A };
   }
@@ -24490,8 +24592,8 @@ var U;
     return (a.rgba & 255) === 255;
   }
   l.isOpaque = t2;
-  function e(a, u, h51) {
-    let c = $r.ensureContrastRatio(a.rgba, u.rgba, h51);
+  function e(a, u, h52) {
+    let c = $r.ensureContrastRatio(a.rgba, u.rgba, h52);
     if (c) return j.toColor(c >> 24 & 255, c >> 16 & 255, c >> 8 & 255);
   }
   l.ensureContrastRatio = e;
@@ -24550,8 +24652,8 @@ var ve;
   }
   e.relativeLuminance = s15;
   function t2(i, r, n) {
-    let o2 = i / 255, l = r / 255, a = n / 255, u = o2 <= 0.03928 ? o2 / 12.92 : Math.pow((o2 + 0.055) / 1.055, 2.4), h51 = l <= 0.03928 ? l / 12.92 : Math.pow((l + 0.055) / 1.055, 2.4), c = a <= 0.03928 ? a / 12.92 : Math.pow((a + 0.055) / 1.055, 2.4);
-    return u * 0.2126 + h51 * 0.7152 + c * 0.0722;
+    let o2 = i / 255, l = r / 255, a = n / 255, u = o2 <= 0.03928 ? o2 / 12.92 : Math.pow((o2 + 0.055) / 1.055, 2.4), h52 = l <= 0.03928 ? l / 12.92 : Math.pow((l + 0.055) / 1.055, 2.4), c = a <= 0.03928 ? a / 12.92 : Math.pow((a + 0.055) / 1.055, 2.4);
+    return u * 0.2126 + h52 * 0.7152 + c * 0.0722;
   }
   e.relativeLuminance2 = t2;
 })(ve ||= {});
@@ -24559,14 +24661,14 @@ var $r;
 ((n) => {
   function s15(o2, l) {
     if (J = (l & 255) / 255, J === 1) return l;
-    let a = l >> 24 & 255, u = l >> 16 & 255, h51 = l >> 8 & 255, c = o2 >> 24 & 255, d = o2 >> 16 & 255, _2 = o2 >> 8 & 255;
-    return ue = c + Math.round((a - c) * J), he = d + Math.round((u - d) * J), de = _2 + Math.round((h51 - _2) * J), j.toRgba(ue, he, de);
+    let a = l >> 24 & 255, u = l >> 16 & 255, h52 = l >> 8 & 255, c = o2 >> 24 & 255, d = o2 >> 16 & 255, _2 = o2 >> 8 & 255;
+    return ue = c + Math.round((a - c) * J), he = d + Math.round((u - d) * J), de = _2 + Math.round((h52 - _2) * J), j.toRgba(ue, he, de);
   }
   n.blend = s15;
   function t2(o2, l, a) {
-    let u = ve.relativeLuminance(o2 >> 8), h51 = ve.relativeLuminance(l >> 8);
-    if (Xe(u, h51) < a) {
-      if (h51 < u) {
+    let u = ve.relativeLuminance(o2 >> 8), h52 = ve.relativeLuminance(l >> 8);
+    if (Xe(u, h52) < a) {
+      if (h52 < u) {
         let p = e(o2, l, a), m = Xe(u, ve.relativeLuminance(p >> 8));
         if (m < a) {
           let f = i(o2, l, a), A = Xe(u, ve.relativeLuminance(f >> 8));
@@ -24584,14 +24686,14 @@ var $r;
   }
   n.ensureContrastRatio = t2;
   function e(o2, l, a) {
-    let u = o2 >> 24 & 255, h51 = o2 >> 16 & 255, c = o2 >> 8 & 255, d = l >> 24 & 255, _2 = l >> 16 & 255, p = l >> 8 & 255, m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h51, c));
-    for (; m < a && (d > 0 || _2 > 0 || p > 0); ) d -= Math.max(0, Math.ceil(d * 0.1)), _2 -= Math.max(0, Math.ceil(_2 * 0.1)), p -= Math.max(0, Math.ceil(p * 0.1)), m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h51, c));
+    let u = o2 >> 24 & 255, h52 = o2 >> 16 & 255, c = o2 >> 8 & 255, d = l >> 24 & 255, _2 = l >> 16 & 255, p = l >> 8 & 255, m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h52, c));
+    for (; m < a && (d > 0 || _2 > 0 || p > 0); ) d -= Math.max(0, Math.ceil(d * 0.1)), _2 -= Math.max(0, Math.ceil(_2 * 0.1)), p -= Math.max(0, Math.ceil(p * 0.1)), m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h52, c));
     return (d << 24 | _2 << 16 | p << 8 | 255) >>> 0;
   }
   n.reduceLuminance = e;
   function i(o2, l, a) {
-    let u = o2 >> 24 & 255, h51 = o2 >> 16 & 255, c = o2 >> 8 & 255, d = l >> 24 & 255, _2 = l >> 16 & 255, p = l >> 8 & 255, m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h51, c));
-    for (; m < a && (d < 255 || _2 < 255 || p < 255); ) d = Math.min(255, d + Math.ceil((255 - d) * 0.1)), _2 = Math.min(255, _2 + Math.ceil((255 - _2) * 0.1)), p = Math.min(255, p + Math.ceil((255 - p) * 0.1)), m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h51, c));
+    let u = o2 >> 24 & 255, h52 = o2 >> 16 & 255, c = o2 >> 8 & 255, d = l >> 24 & 255, _2 = l >> 16 & 255, p = l >> 8 & 255, m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h52, c));
+    for (; m < a && (d < 255 || _2 < 255 || p < 255); ) d = Math.min(255, d + Math.ceil((255 - d) * 0.1)), _2 = Math.min(255, _2 + Math.ceil((255 - _2) * 0.1)), p = Math.min(255, p + Math.ceil((255 - p) * 0.1)), m = Xe(ve.relativeLuminance2(d, _2, p), ve.relativeLuminance2(u, h52, c));
     return (d << 24 | _2 << 16 | p << 8 | 255) >>> 0;
   }
   n.increaseLuminance = i;
@@ -24646,19 +24748,19 @@ var Vr = class extends De {
     let e = this._bufferService.buffer.lines.get(t2);
     if (!e || e.length === 0) return [];
     let i = [], r = e.translateToString(!0), n = 0, o2 = 0, l = 0, a = e.getFg(0), u = e.getBg(0);
-    for (let h51 = 0; h51 < e.getTrimmedLength(); h51++) if (e.loadCell(h51, this._workCell), this._workCell.getWidth() !== 0) {
+    for (let h52 = 0; h52 < e.getTrimmedLength(); h52++) if (e.loadCell(h52, this._workCell), this._workCell.getWidth() !== 0) {
       if (this._workCell.fg !== a || this._workCell.bg !== u) {
-        if (h51 - n > 1) {
+        if (h52 - n > 1) {
           let c = this._getJoinedRanges(r, l, o2, e, n);
           for (let d = 0; d < c.length; d++) i.push(c[d]);
         }
-        n = h51, l = o2, a = this._workCell.fg, u = this._workCell.bg;
+        n = h52, l = o2, a = this._workCell.fg, u = this._workCell.bg;
       }
       o2 += this._workCell.getChars().length || we.length;
     }
     if (this._bufferService.cols - n > 1) {
-      let h51 = this._getJoinedRanges(r, l, o2, e, n);
-      for (let c = 0; c < h51.length; c++) i.push(h51[c]);
+      let h52 = this._getJoinedRanges(r, l, o2, e, n);
+      for (let c = 0; c < h52.length; c++) i.push(h52[c]);
     }
     return i;
   }
@@ -24671,7 +24773,7 @@ var Vr = class extends De {
     }
     for (let a = 1; a < this._characterJoiners.length; a++) try {
       let u = this._characterJoiners[a].handler(o2);
-      for (let h51 = 0; h51 < u.length; h51++) ct._mergeRanges(l, u[h51]);
+      for (let h52 = 0; h52 < u.length; h52++) ct._mergeRanges(l, u[h52]);
     } catch (u) {
       console.error(u);
     }
@@ -24681,13 +24783,13 @@ var Vr = class extends De {
     let r = 0, n = !1, o2 = 0, l = t2[r];
     if (l) {
       for (let a = i; a < this._bufferService.cols; a++) {
-        let u = e.getWidth(a), h51 = e.getString(a).length || we.length;
+        let u = e.getWidth(a), h52 = e.getString(a).length || we.length;
         if (u !== 0) {
           if (!n && l[0] <= o2 && (l[0] = a, n = !0), l[1] <= o2) {
             if (l[1] = a, l = t2[++r], !l) break;
             l[0] <= o2 ? (l[0] = a, n = !0) : n = !1;
           }
-          o2 += h51;
+          o2 += h52;
         }
       }
       l && (l[1] = this._bufferService.cols);
@@ -24734,10 +24836,10 @@ var Vt = class {
   handleSelectionChanged(t2, e, i) {
     this._selectionStart = t2, this._selectionEnd = e, this._columnSelectMode = i;
   }
-  createRow(t2, e, i, r, n, o2, l, a, u, h51, c) {
+  createRow(t2, e, i, r, n, o2, l, a, u, h52, c) {
     let d = [], _2 = this._characterJoinerService.getJoinedCharacters(e), p = this._themeService.colors, m = t2.getNoBgTrimmedLength();
     i && m < o2 + 1 && (m = o2 + 1);
-    let f, A = 0, R = "", O = 0, I = 0, k = 0, P = 0, oe = !1, Me = 0, Pe = !1, Ke = 0, di = 0, V = [], Qe = h51 !== -1 && c !== -1;
+    let f, A = 0, R = "", O = 0, I = 0, k = 0, P = 0, oe = !1, Me = 0, Pe = !1, Ke = 0, di = 0, V = [], Qe = h52 !== -1 && c !== -1;
     for (let y = 0; y < m; y++) {
       t2.loadCell(y, this._workCell);
       let T = this._workCell.getWidth();
@@ -24748,7 +24850,7 @@ var Vt = class {
         for (O = W[0] + 1; O < W[1]; O++) w &&= An === this._isCellInSelection(O, e);
         w &&= !i || o2 < W[0] || o2 >= W[1], w ? (g = !0, x = new Vr(this._workCell, t2.translateToString(!0, W[0], W[1]), W[1] - W[0]), E = W[1] - 1, T = x.getWidth()) : di = W[1];
       }
-      let N = this._isCellInSelection(y, e), Z = i && y === o2, te = Qe && y >= h51 && y <= c, Oe = !1;
+      let N = this._isCellInSelection(y, e), Z = i && y === o2, te = Qe && y >= h52 && y <= c, Oe = !1;
       this._decorationService.forEachDecorationAtCell(y, e, void 0, (W) => {
         Oe = !0;
       });
@@ -24915,8 +25017,8 @@ function Yo() {
   return new ms();
 }
 var _s = "xterm-dom-renderer-owner-", Le = "xterm-rows", jr = "xterm-fg-", jo = "xterm-bg-", ki = "xterm-focus", Xr = "xterm-selection", Na = 1, Yt = class extends D {
-  constructor(e, i, r, n, o2, l, a, u, h51, c, d, _2, p, m) {
-    super(), this._terminal = e, this._document = i, this._element = r, this._screenElement = n, this._viewportElement = o2, this._helperContainer = l, this._linkifier2 = a, this._charSizeService = h51, this._optionsService = c, this._bufferService = d, this._coreService = _2, this._coreBrowserService = p, this._themeService = m, this._terminalClass = Na++, this._rowElements = [], this._selectionRenderModel = Yo(), this.onRequestRedraw = this._register(new v()).event, this._rowContainer = this._document.createElement("div"), this._rowContainer.classList.add(Le), this._rowContainer.style.lineHeight = "normal", this._rowContainer.setAttribute("aria-hidden", "true"), this._refreshRowElements(this._bufferService.cols, this._bufferService.rows), this._selectionContainer = this._document.createElement("div"), this._selectionContainer.classList.add(Xr), this._selectionContainer.setAttribute("aria-hidden", "true"), this.dimensions = Vo(), this._updateDimensions(), this._register(this._optionsService.onOptionChange(() => this._handleOptionsChanged())), this._register(this._themeService.onChangeColors((f) => this._injectCss(f))), this._injectCss(this._themeService.colors), this._rowFactory = u.createInstance(Vt, document), this._element.classList.add(_s + this._terminalClass), this._screenElement.appendChild(this._rowContainer), this._screenElement.appendChild(this._selectionContainer), this._register(this._linkifier2.onShowLinkUnderline((f) => this._handleLinkHover(f))), this._register(this._linkifier2.onHideLinkUnderline((f) => this._handleLinkLeave(f))), this._register(C(() => {
+  constructor(e, i, r, n, o2, l, a, u, h52, c, d, _2, p, m) {
+    super(), this._terminal = e, this._document = i, this._element = r, this._screenElement = n, this._viewportElement = o2, this._helperContainer = l, this._linkifier2 = a, this._charSizeService = h52, this._optionsService = c, this._bufferService = d, this._coreService = _2, this._coreBrowserService = p, this._themeService = m, this._terminalClass = Na++, this._rowElements = [], this._selectionRenderModel = Yo(), this.onRequestRedraw = this._register(new v()).event, this._rowContainer = this._document.createElement("div"), this._rowContainer.classList.add(Le), this._rowContainer.style.lineHeight = "normal", this._rowContainer.setAttribute("aria-hidden", "true"), this._refreshRowElements(this._bufferService.cols, this._bufferService.rows), this._selectionContainer = this._document.createElement("div"), this._selectionContainer.classList.add(Xr), this._selectionContainer.setAttribute("aria-hidden", "true"), this.dimensions = Vo(), this._updateDimensions(), this._register(this._optionsService.onOptionChange(() => this._handleOptionsChanged())), this._register(this._themeService.onChangeColors((f) => this._injectCss(f))), this._injectCss(this._themeService.colors), this._rowFactory = u.createInstance(Vt, document), this._element.classList.add(_s + this._terminalClass), this._screenElement.appendChild(this._rowContainer), this._screenElement.appendChild(this._selectionContainer), this._register(this._linkifier2.onShowLinkUnderline((f) => this._handleLinkHover(f))), this._register(this._linkifier2.onHideLinkUnderline((f) => this._handleLinkLeave(f))), this._register(C(() => {
       this._element.classList.remove(_s + this._terminalClass), this._rowContainer.remove(), this._selectionContainer.remove(), this._widthCache.dispose(), this._themeStyleElement.remove(), this._dimensionsStyleElement.remove();
     })), this._widthCache = new Yr(this._document, this._helperContainer), this._widthCache.setFont(this._optionsService.rawOptions.fontFamily, this._optionsService.rawOptions.fontSize, this._optionsService.rawOptions.fontWeight, this._optionsService.rawOptions.fontWeightBold), this._setDefaultSpacing();
   }
@@ -24967,11 +25069,11 @@ var _s = "xterm-dom-renderer-owner-", Le = "xterm-rows", jr = "xterm-fg-", jo = 
     if (this._selectionContainer.replaceChildren(), this._rowFactory.handleSelectionChanged(e, i, r), this.renderRows(0, this._bufferService.rows - 1), !e || !i || (this._selectionRenderModel.update(this._terminal, e, i, r), !this._selectionRenderModel.hasSelection)) return;
     let n = this._selectionRenderModel.viewportStartRow, o2 = this._selectionRenderModel.viewportEndRow, l = this._selectionRenderModel.viewportCappedStartRow, a = this._selectionRenderModel.viewportCappedEndRow, u = this._document.createDocumentFragment();
     if (r) {
-      let h51 = e[0] > i[0];
-      u.appendChild(this._createSelectionElement(l, h51 ? i[0] : e[0], h51 ? e[0] : i[0], a - l + 1));
+      let h52 = e[0] > i[0];
+      u.appendChild(this._createSelectionElement(l, h52 ? i[0] : e[0], h52 ? e[0] : i[0], a - l + 1));
     } else {
-      let h51 = n === l ? e[0] : 0, c = l === o2 ? i[0] : this._bufferService.cols;
-      u.appendChild(this._createSelectionElement(l, h51, c));
+      let h52 = n === l ? e[0] : 0, c = l === o2 ? i[0] : this._bufferService.cols;
+      u.appendChild(this._createSelectionElement(l, h52, c));
       let d = a - l - 1;
       if (u.appendChild(this._createSelectionElement(l + 1, 0, this._bufferService.cols, d)), l !== a) {
         let _2 = o2 === a ? i[0] : this._bufferService.cols;
@@ -24994,8 +25096,8 @@ var _s = "xterm-dom-renderer-owner-", Le = "xterm-rows", jr = "xterm-fg-", jo = 
   }
   renderRows(e, i) {
     let r = this._bufferService.buffer, n = r.ybase + r.y, o2 = Math.min(r.x, this._bufferService.cols - 1), l = this._coreService.decPrivateModes.cursorBlink ?? this._optionsService.rawOptions.cursorBlink, a = this._coreService.decPrivateModes.cursorStyle ?? this._optionsService.rawOptions.cursorStyle, u = this._optionsService.rawOptions.cursorInactiveStyle;
-    for (let h51 = e; h51 <= i; h51++) {
-      let c = h51 + r.ydisp, d = this._rowElements[h51], _2 = r.lines.get(c);
+    for (let h52 = e; h52 <= i; h52++) {
+      let c = h52 + r.ydisp, d = this._rowElements[h52], _2 = r.lines.get(c);
       if (!d || !_2) break;
       d.replaceChildren(...this._rowFactory.createRow(_2, c, c === n, a, u, o2, l, this.dimensions.css.cell.width, this._widthCache, -1, -1));
     }
@@ -25013,11 +25115,11 @@ var _s = "xterm-dom-renderer-owner-", Le = "xterm-rows", jr = "xterm-fg-", jo = 
     r < 0 && (e = 0), n < 0 && (i = 0);
     let a = this._bufferService.rows - 1;
     r = Math.max(Math.min(r, a), 0), n = Math.max(Math.min(n, a), 0), o2 = Math.min(o2, this._bufferService.cols);
-    let u = this._bufferService.buffer, h51 = u.ybase + u.y, c = Math.min(u.x, o2 - 1), d = this._optionsService.rawOptions.cursorBlink, _2 = this._optionsService.rawOptions.cursorStyle, p = this._optionsService.rawOptions.cursorInactiveStyle;
+    let u = this._bufferService.buffer, h52 = u.ybase + u.y, c = Math.min(u.x, o2 - 1), d = this._optionsService.rawOptions.cursorBlink, _2 = this._optionsService.rawOptions.cursorStyle, p = this._optionsService.rawOptions.cursorInactiveStyle;
     for (let m = r; m <= n; ++m) {
       let f = m + u.ydisp, A = this._rowElements[m], R = u.lines.get(f);
       if (!A || !R) break;
-      A.replaceChildren(...this._rowFactory.createRow(R, f, f === h51, _2, p, c, d, this.dimensions.css.cell.width, this._widthCache, l ? m === r ? e : 0 : -1, l ? (m === n ? i : o2) - 1 : -1));
+      A.replaceChildren(...this._rowFactory.createRow(R, f, f === h52, _2, p, c, d, this.dimensions.css.cell.width, this._widthCache, l ? m === r ? e : 0 : -1, l ? (m === n ? i : o2) - 1 : -1));
     }
   }
 };
@@ -25225,10 +25327,10 @@ var Zt = ["Macintosh", "MacIntel", "MacPPC", "Mac68K"].includes(Oi), Wa = Oi ===
     this._queue.flush();
   }
 }, Qt = class extends D {
-  constructor(e, i, r, n, o2, l, a, u, h51) {
+  constructor(e, i, r, n, o2, l, a, u, h52) {
     super(), this._rowCount = e, this._optionsService = r, this._charSizeService = n, this._coreService = o2, this._coreBrowserService = u, this._renderer = this._register(new ye()), this._pausedResizeTask = new nn(), this._observerDisposable = this._register(new ye()), this._isPaused = !1, this._needsFullRefresh = !1, this._isNextRenderRedrawOnly = !0, this._needsSelectionRefresh = !1, this._canvasWidth = 0, this._canvasHeight = 0, this._selectionState = { start: void 0, end: void 0, columnSelectMode: !1 }, this._onDimensionsChange = this._register(new v()), this.onDimensionsChange = this._onDimensionsChange.event, this._onRenderedViewportChange = this._register(new v()), this.onRenderedViewportChange = this._onRenderedViewportChange.event, this._onRender = this._register(new v()), this.onRender = this._onRender.event, this._onRefreshRequest = this._register(new v()), this.onRefreshRequest = this._onRefreshRequest.event, this._renderDebouncer = new en((c, d) => this._renderRows(c, d), this._coreBrowserService), this._register(this._renderDebouncer), this._syncOutputHandler = new xs(this._coreBrowserService, this._coreService, () => this._fullRefresh()), this._register(C(() => this._syncOutputHandler.dispose())), this._register(this._coreBrowserService.onDprChange(() => this.handleDevicePixelRatioChange())), this._register(a.onResize(() => this._fullRefresh())), this._register(a.buffers.onBufferActivate(() => this._renderer.value?.clear())), this._register(this._optionsService.onOptionChange(() => this._handleOptionsChanged())), this._register(this._charSizeService.onCharSizeChange(() => this.handleCharSizeChanged())), this._register(l.onDecorationRegistered(() => this._fullRefresh())), this._register(l.onDecorationRemoved(() => this._fullRefresh())), this._register(this._optionsService.onMultipleOptionChange(["customGlyphs", "drawBoldTextInBrightColors", "letterSpacing", "lineHeight", "fontFamily", "fontSize", "fontWeight", "fontWeightBold", "minimumContrastRatio", "rescaleOverlappingGlyphs"], () => {
       this.clear(), this.handleResize(a.cols, a.rows), this._fullRefresh();
-    })), this._register(this._optionsService.onMultipleOptionChange(["cursorBlink", "cursorStyle"], () => this.refreshRows(a.buffer.y, a.buffer.y, !0))), this._register(h51.onChangeColors(() => this._fullRefresh())), this._registerIntersectionObserver(this._coreBrowserService.window, i), this._register(this._coreBrowserService.onWindowChange((c) => this._registerIntersectionObserver(c, i)));
+    })), this._register(this._optionsService.onMultipleOptionChange(["cursorBlink", "cursorStyle"], () => this.refreshRows(a.buffer.y, a.buffer.y, !0))), this._register(h52.onChangeColors(() => this._fullRefresh())), this._registerIntersectionObserver(this._coreBrowserService.window, i), this._register(this._coreBrowserService.onWindowChange((c) => this._registerIntersectionObserver(c, i)));
   }
   get dimensions() {
     return this._renderer.value.dimensions;
@@ -25431,8 +25533,8 @@ function ws(s15, t2) {
   return t2 * (s15.end.y - s15.start.y) + (s15.end.x - s15.start.x + 1);
 }
 var Ds = 50, Ya = 15, ja = 50, Xa = 500, Za = " ", Ja = new RegExp(Za, "g"), ei = class extends D {
-  constructor(e, i, r, n, o2, l, a, u, h51) {
-    super(), this._element = e, this._screenElement = i, this._linkifier = r, this._bufferService = n, this._coreService = o2, this._mouseService = l, this._optionsService = a, this._renderService = u, this._coreBrowserService = h51, this._dragScrollAmount = 0, this._enabled = !0, this._workCell = new q(), this._mouseDownTimeStamp = 0, this._oldHasSelection = !1, this._oldSelectionStart = void 0, this._oldSelectionEnd = void 0, this._onLinuxMouseSelection = this._register(new v()), this.onLinuxMouseSelection = this._onLinuxMouseSelection.event, this._onRedrawRequest = this._register(new v()), this.onRequestRedraw = this._onRedrawRequest.event, this._onSelectionChange = this._register(new v()), this.onSelectionChange = this._onSelectionChange.event, this._onRequestScrollLines = this._register(new v()), this.onRequestScrollLines = this._onRequestScrollLines.event, this._mouseMoveListener = (c) => this._handleMouseMove(c), this._mouseUpListener = (c) => this._handleMouseUp(c), this._coreService.onUserInput(() => {
+  constructor(e, i, r, n, o2, l, a, u, h52) {
+    super(), this._element = e, this._screenElement = i, this._linkifier = r, this._bufferService = n, this._coreService = o2, this._mouseService = l, this._optionsService = a, this._renderService = u, this._coreBrowserService = h52, this._dragScrollAmount = 0, this._enabled = !0, this._workCell = new q(), this._mouseDownTimeStamp = 0, this._oldHasSelection = !1, this._oldSelectionStart = void 0, this._oldSelectionEnd = void 0, this._onLinuxMouseSelection = this._register(new v()), this.onLinuxMouseSelection = this._onLinuxMouseSelection.event, this._onRedrawRequest = this._register(new v()), this.onRequestRedraw = this._onRedrawRequest.event, this._onSelectionChange = this._register(new v()), this.onSelectionChange = this._onSelectionChange.event, this._onRequestScrollLines = this._register(new v()), this.onRequestScrollLines = this._onRequestScrollLines.event, this._mouseMoveListener = (c) => this._handleMouseMove(c), this._mouseUpListener = (c) => this._handleMouseUp(c), this._coreService.onUserInput(() => {
       this.hasSelection && this.clearSelection();
     }), this._trimListener = this._bufferService.buffer.lines.onTrim((c) => this._handleTrim(c)), this._register(this._bufferService.buffers.onBufferActivate((c) => this._handleBufferActivate(c))), this.enable(), this._model = new on(this._bufferService), this._activeSelectionMode = 0, this._register(C(() => {
       this._removeMouseDownListeners();
@@ -25467,15 +25569,15 @@ var Ds = 50, Ya = 15, ja = 50, Xa = 500, Za = " ", Ja = new RegExp(Za, "g"), ei
       if (e[0] === i[0]) return "";
       let l = e[0] < i[0] ? e[0] : i[0], a = e[0] < i[0] ? i[0] : e[0];
       for (let u = e[1]; u <= i[1]; u++) {
-        let h51 = r.translateBufferLineToString(u, !0, l, a);
-        n.push(h51);
+        let h52 = r.translateBufferLineToString(u, !0, l, a);
+        n.push(h52);
       }
     } else {
       let l = e[1] === i[1] ? i[0] : void 0;
       n.push(r.translateBufferLineToString(e[1], !0, e[0], l));
       for (let a = e[1] + 1; a <= i[1] - 1; a++) {
-        let u = r.lines.get(a), h51 = r.translateBufferLineToString(a, !0);
-        u?.isWrapped ? n[n.length - 1] += h51 : n.push(h51);
+        let u = r.lines.get(a), h52 = r.translateBufferLineToString(a, !0);
+        u?.isWrapped ? n[n.length - 1] += h52 : n.push(h52);
       }
       if (e[1] !== i[1]) {
         let a = r.lines.get(i[1]), u = r.translateBufferLineToString(i[1], !0, 0, i[0]);
@@ -25632,28 +25734,28 @@ var Ds = 50, Ya = 15, ja = 50, Xa = 500, Za = " ", Ja = new RegExp(Za, "g"), ei
     if (e[0] >= this._bufferService.cols) return;
     let o2 = this._bufferService.buffer, l = o2.lines.get(e[1]);
     if (!l) return;
-    let a = o2.translateBufferLineToString(e[1], !1), u = this._convertViewportColToCharacterIndex(l, e[0]), h51 = u, c = e[0] - u, d = 0, _2 = 0, p = 0, m = 0;
+    let a = o2.translateBufferLineToString(e[1], !1), u = this._convertViewportColToCharacterIndex(l, e[0]), h52 = u, c = e[0] - u, d = 0, _2 = 0, p = 0, m = 0;
     if (a.charAt(u) === " ") {
       for (; u > 0 && a.charAt(u - 1) === " "; ) u--;
-      for (; h51 < a.length && a.charAt(h51 + 1) === " "; ) h51++;
+      for (; h52 < a.length && a.charAt(h52 + 1) === " "; ) h52++;
     } else {
       let R = e[0], O = e[0];
       l.getWidth(R) === 0 && (d++, R--), l.getWidth(O) === 2 && (_2++, O++);
       let I = l.getString(O).length;
-      for (I > 1 && (m += I - 1, h51 += I - 1); R > 0 && u > 0 && !this._isCharWordSeparator(l.loadCell(R - 1, this._workCell)); ) {
+      for (I > 1 && (m += I - 1, h52 += I - 1); R > 0 && u > 0 && !this._isCharWordSeparator(l.loadCell(R - 1, this._workCell)); ) {
         l.loadCell(R - 1, this._workCell);
         let k = this._workCell.getChars().length;
         this._workCell.getWidth() === 0 ? (d++, R--) : k > 1 && (p += k - 1, u -= k - 1), u--, R--;
       }
-      for (; O < l.length && h51 + 1 < a.length && !this._isCharWordSeparator(l.loadCell(O + 1, this._workCell)); ) {
+      for (; O < l.length && h52 + 1 < a.length && !this._isCharWordSeparator(l.loadCell(O + 1, this._workCell)); ) {
         l.loadCell(O + 1, this._workCell);
         let k = this._workCell.getChars().length;
-        this._workCell.getWidth() === 2 ? (_2++, O++) : k > 1 && (m += k - 1, h51 += k - 1), h51++, O++;
+        this._workCell.getWidth() === 2 ? (_2++, O++) : k > 1 && (m += k - 1, h52 += k - 1), h52++, O++;
       }
     }
-    h51++;
-    let f = u + c - d + p, A = Math.min(this._bufferService.cols, h51 - u + d + _2 - p - m);
-    if (!(!i && a.slice(u, h51).trim() === "")) {
+    h52++;
+    let f = u + c - d + p, A = Math.min(this._bufferService.cols, h52 - u + d + _2 - p - m);
+    if (!(!i && a.slice(u, h52).trim() === "")) {
       if (r && f === 0 && l.getCodePoint(0) !== 32) {
         let R = o2.lines.get(e[1] - 1);
         if (R && l.isWrapped && R.getCodePoint(this._bufferService.cols - 1) !== 32) {
@@ -26107,21 +26209,21 @@ function sl(s15, t2, e, i, r, n) {
   for (let l = 0; l < s15.length - 1; l++) {
     let a = l, u = s15.get(++a);
     if (!u.isWrapped) continue;
-    let h51 = [s15.get(l)];
-    for (; a < s15.length && u.isWrapped; ) h51.push(u), u = s15.get(++a);
+    let h52 = [s15.get(l)];
+    for (; a < s15.length && u.isWrapped; ) h52.push(u), u = s15.get(++a);
     if (!n && i >= l && i < a) {
-      l += h51.length - 1;
+      l += h52.length - 1;
       continue;
     }
-    let c = 0, d = ri(h51, c, t2), _2 = 1, p = 0;
-    for (; _2 < h51.length; ) {
-      let f = ri(h51, _2, t2), A = f - p, R = e - d, O = Math.min(A, R);
-      h51[c].copyCellsFrom(h51[_2], p, d, O, !1), d += O, d === e && (c++, d = 0), p += O, p === f && (_2++, p = 0), d === 0 && c !== 0 && h51[c - 1].getWidth(e - 1) === 2 && (h51[c].copyCellsFrom(h51[c - 1], e - 1, d++, 1, !1), h51[c - 1].setCell(e - 1, r));
+    let c = 0, d = ri(h52, c, t2), _2 = 1, p = 0;
+    for (; _2 < h52.length; ) {
+      let f = ri(h52, _2, t2), A = f - p, R = e - d, O = Math.min(A, R);
+      h52[c].copyCellsFrom(h52[_2], p, d, O, !1), d += O, d === e && (c++, d = 0), p += O, p === f && (_2++, p = 0), d === 0 && c !== 0 && h52[c - 1].getWidth(e - 1) === 2 && (h52[c].copyCellsFrom(h52[c - 1], e - 1, d++, 1, !1), h52[c - 1].setCell(e - 1, r));
     }
-    h51[c].replaceCells(d, e, r);
+    h52[c].replaceCells(d, e, r);
     let m = 0;
-    for (let f = h51.length - 1; f > 0 && (f > c || h51[f].getTrimmedLength() === 0); f--) m++;
-    m > 0 && (o2.push(l + h51.length - m), o2.push(m)), l += h51.length - 1;
+    for (let f = h52.length - 1; f > 0 && (f > c || h52[f].getTrimmedLength() === 0); f--) m++;
+    m > 0 && (o2.push(l + h52.length - m), o2.push(m)), l += h52.length - 1;
   }
   return o2;
 }
@@ -26151,8 +26253,8 @@ function al(s15, t2, e) {
     n > a && (n -= a, o2++);
     let u = s15[o2].getWidth(n - 1) === 2;
     u && n--;
-    let h51 = u ? e - 1 : e;
-    i.push(h51), l += h51;
+    let h52 = u ? e - 1 : e;
+    i.push(h52), l += h52;
   }
   return i;
 }
@@ -26278,7 +26380,7 @@ var cl = 4294967295, $i = class {
         let I = this.ybase + this.y;
         if (I >= l && I < l + u.length) continue;
       }
-      let h51 = u[u.length - 1].getTrimmedLength(), c = al(u, this._cols, t2), d = c.length - u.length, _2;
+      let h52 = u[u.length - 1].getTrimmedLength(), c = al(u, this._cols, t2), d = c.length - u.length, _2;
       this.ybase === 0 && this.y !== this.lines.length - 1 ? _2 = Math.max(0, this.y - this.lines.maxLength + d) : _2 = Math.max(0, this.lines.length - this.lines.maxLength + d);
       let p = [];
       for (let I = 0; I < d; I++) {
@@ -26288,7 +26390,7 @@ var cl = 4294967295, $i = class {
       p.length > 0 && (n.push({ start: l + u.length + o2, newLines: p }), o2 += p.length), u.push(...p);
       let m = c.length - 1, f = c[m];
       f === 0 && (m--, f = c[m]);
-      let A = u.length - d - 1, R = h51;
+      let A = u.length - d - 1, R = h52;
       for (; A >= 0; ) {
         let I = Math.min(R, f);
         if (u[m] === void 0) break;
@@ -26306,13 +26408,13 @@ var cl = 4294967295, $i = class {
     if (n.length > 0) {
       let l = [], a = [];
       for (let f = 0; f < this.lines.length; f++) a.push(this.lines.get(f));
-      let u = this.lines.length, h51 = u - 1, c = 0, d = n[c];
+      let u = this.lines.length, h52 = u - 1, c = 0, d = n[c];
       this.lines.length = Math.min(this.lines.maxLength, this.lines.length + o2);
       let _2 = 0;
-      for (let f = Math.min(this.lines.maxLength - 1, u + o2 - 1); f >= 0; f--) if (d && d.start > h51 + _2) {
+      for (let f = Math.min(this.lines.maxLength - 1, u + o2 - 1); f >= 0; f--) if (d && d.start > h52 + _2) {
         for (let A = d.newLines.length - 1; A >= 0; A--) this.lines.set(f--, d.newLines[A]);
-        f++, l.push({ index: h51 + 1, amount: d.newLines.length }), _2 += d.newLines.length, d = n[++c];
-      } else this.lines.set(f, a[h51--]);
+        f++, l.push({ index: h52 + 1, amount: d.newLines.length }), _2 += d.newLines.length, d = n[++c];
+      } else this.lines.set(f, a[h52--]);
       let p = 0;
       for (let f = l.length - 1; f >= 0; f--) l[f].index += p, this.lines.onInsertEmitter.fire(l[f]), p += l[f].amount;
       let m = Math.max(0, u + o2 - this.lines.maxLength);
@@ -27058,17 +27160,17 @@ var Xi = class {
     if (this._parseStack.state) if (this._parseStack.state === 2) this._parseStack.state = 0, l = this._parseStack.chunkPos + 1;
     else {
       if (r === void 0 || this._parseStack.state === 1) throw this._parseStack.state = 1, new Error("improper continuation due to previous async handler, giving up parsing");
-      let u = this._parseStack.handlers, h51 = this._parseStack.handlerPos - 1;
+      let u = this._parseStack.handlers, h52 = this._parseStack.handlerPos - 1;
       switch (this._parseStack.state) {
         case 3:
-          if (r === !1 && h51 > -1) {
-            for (; h51 >= 0 && (a = u[h51](this._params), a !== !0); h51--) if (a instanceof Promise) return this._parseStack.handlerPos = h51, a;
+          if (r === !1 && h52 > -1) {
+            for (; h52 >= 0 && (a = u[h52](this._params), a !== !0); h52--) if (a instanceof Promise) return this._parseStack.handlerPos = h52, a;
           }
           this._parseStack.handlers = [];
           break;
         case 4:
-          if (r === !1 && h51 > -1) {
-            for (; h51 >= 0 && (a = u[h51](), a !== !0); h51--) if (a instanceof Promise) return this._parseStack.handlerPos = h51, a;
+          if (r === !1 && h52 > -1) {
+            for (; h52 >= 0 && (a = u[h52](), a !== !0); h52--) if (a instanceof Promise) return this._parseStack.handlerPos = h52, a;
           }
           this._parseStack.handlers = [];
           break;
@@ -27263,8 +27365,8 @@ function bl(s15, t2) {
   return !1;
 }
 var vl = 5e3, gl = 0, vn = class extends D {
-  constructor(e, i, r, n, o2, l, a, u, h51 = new bn()) {
-    super(), this._bufferService = e, this._charsetService = i, this._coreService = r, this._logService = n, this._optionsService = o2, this._oscLinkService = l, this._coreMouseService = a, this._unicodeService = u, this._parser = h51, this._parseBuffer = new Uint32Array(4096), this._stringDecoder = new er(), this._utf8Decoder = new tr(), this._windowTitle = "", this._iconName = "", this._windowTitleStack = [], this._iconNameStack = [], this._curAttrData = X.clone(), this._eraseAttrDataInternal = X.clone(), this._onRequestBell = this._register(new v()), this.onRequestBell = this._onRequestBell.event, this._onRequestRefreshRows = this._register(new v()), this.onRequestRefreshRows = this._onRequestRefreshRows.event, this._onRequestReset = this._register(new v()), this.onRequestReset = this._onRequestReset.event, this._onRequestSendFocus = this._register(new v()), this.onRequestSendFocus = this._onRequestSendFocus.event, this._onRequestSyncScrollBar = this._register(new v()), this.onRequestSyncScrollBar = this._onRequestSyncScrollBar.event, this._onRequestWindowsOptionsReport = this._register(new v()), this.onRequestWindowsOptionsReport = this._onRequestWindowsOptionsReport.event, this._onA11yChar = this._register(new v()), this.onA11yChar = this._onA11yChar.event, this._onA11yTab = this._register(new v()), this.onA11yTab = this._onA11yTab.event, this._onCursorMove = this._register(new v()), this.onCursorMove = this._onCursorMove.event, this._onLineFeed = this._register(new v()), this.onLineFeed = this._onLineFeed.event, this._onScroll = this._register(new v()), this.onScroll = this._onScroll.event, this._onTitleChange = this._register(new v()), this.onTitleChange = this._onTitleChange.event, this._onColor = this._register(new v()), this.onColor = this._onColor.event, this._parseStack = { paused: !1, cursorStartX: 0, cursorStartY: 0, decodedLength: 0, position: 0 }, this._specialColors = [256, 257, 258], this._register(this._parser), this._dirtyRowTracker = new Zi(this._bufferService), this._activeBuffer = this._bufferService.buffer, this._register(this._bufferService.buffers.onBufferActivate((c) => this._activeBuffer = c.activeBuffer)), this._parser.setCsiHandlerFallback((c, d) => {
+  constructor(e, i, r, n, o2, l, a, u, h52 = new bn()) {
+    super(), this._bufferService = e, this._charsetService = i, this._coreService = r, this._logService = n, this._optionsService = o2, this._oscLinkService = l, this._coreMouseService = a, this._unicodeService = u, this._parser = h52, this._parseBuffer = new Uint32Array(4096), this._stringDecoder = new er(), this._utf8Decoder = new tr(), this._windowTitle = "", this._iconName = "", this._windowTitleStack = [], this._iconNameStack = [], this._curAttrData = X.clone(), this._eraseAttrDataInternal = X.clone(), this._onRequestBell = this._register(new v()), this.onRequestBell = this._onRequestBell.event, this._onRequestRefreshRows = this._register(new v()), this.onRequestRefreshRows = this._onRequestRefreshRows.event, this._onRequestReset = this._register(new v()), this.onRequestReset = this._onRequestReset.event, this._onRequestSendFocus = this._register(new v()), this.onRequestSendFocus = this._onRequestSendFocus.event, this._onRequestSyncScrollBar = this._register(new v()), this.onRequestSyncScrollBar = this._onRequestSyncScrollBar.event, this._onRequestWindowsOptionsReport = this._register(new v()), this.onRequestWindowsOptionsReport = this._onRequestWindowsOptionsReport.event, this._onA11yChar = this._register(new v()), this.onA11yChar = this._onA11yChar.event, this._onA11yTab = this._register(new v()), this.onA11yTab = this._onA11yTab.event, this._onCursorMove = this._register(new v()), this.onCursorMove = this._onCursorMove.event, this._onLineFeed = this._register(new v()), this.onLineFeed = this._onLineFeed.event, this._onScroll = this._register(new v()), this.onScroll = this._onScroll.event, this._onTitleChange = this._register(new v()), this.onTitleChange = this._onTitleChange.event, this._onColor = this._register(new v()), this.onColor = this._onColor.event, this._parseStack = { paused: !1, cursorStartX: 0, cursorStartY: 0, decodedLength: 0, position: 0 }, this._specialColors = [256, 257, 258], this._register(this._parser), this._dirtyRowTracker = new Zi(this._bufferService), this._activeBuffer = this._bufferService.buffer, this._register(this._bufferService.buffers.onBufferActivate((c) => this._activeBuffer = c.activeBuffer)), this._parser.setCsiHandlerFallback((c, d) => {
       this._logService.debug("Unknown CSI code: ", { identifier: this._parser.identToString(c), params: d.toArray() });
     }), this._parser.setEscHandlerFallback((c) => {
       this._logService.debug("Unknown ESC code: ", { identifier: this._parser.identToString(c) });
@@ -27308,11 +27410,11 @@ var vl = 5e3, gl = 0, vn = class extends D {
       if (r = this._parser.parse(this._parseBuffer, c)) return this._preserveStack(n, o2, c, 0), this._logSlowResolvingAsync(r), r;
     }
     (this._activeBuffer.x !== n || this._activeBuffer.y !== o2) && this._onCursorMove.fire();
-    let u = this._dirtyRowTracker.end + (this._bufferService.buffer.ybase - this._bufferService.buffer.ydisp), h51 = this._dirtyRowTracker.start + (this._bufferService.buffer.ybase - this._bufferService.buffer.ydisp);
-    h51 < this._bufferService.rows && this._onRequestRefreshRows.fire({ start: Math.min(h51, this._bufferService.rows - 1), end: Math.min(u, this._bufferService.rows - 1) });
+    let u = this._dirtyRowTracker.end + (this._bufferService.buffer.ybase - this._bufferService.buffer.ydisp), h52 = this._dirtyRowTracker.start + (this._bufferService.buffer.ybase - this._bufferService.buffer.ydisp);
+    h52 < this._bufferService.rows && this._onRequestRefreshRows.fire({ start: Math.min(h52, this._bufferService.rows - 1), end: Math.min(u, this._bufferService.rows - 1) });
   }
   print(e, i, r) {
-    let n, o2, l = this._charsetService.charset, a = this._optionsService.rawOptions.screenReaderMode, u = this._bufferService.cols, h51 = this._coreService.decPrivateModes.wraparound, c = this._coreService.modes.insertMode, d = this._curAttrData, _2 = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y);
+    let n, o2, l = this._charsetService.charset, a = this._optionsService.rawOptions.screenReaderMode, u = this._bufferService.cols, h52 = this._coreService.decPrivateModes.wraparound, c = this._coreService.modes.insertMode, d = this._curAttrData, _2 = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y);
     this._dirtyRowTracker.markDirty(this._activeBuffer.y), this._activeBuffer.x && r - i > 0 && _2.getWidth(this._activeBuffer.x - 1) === 2 && _2.setCellFromCodepoint(this._activeBuffer.x - 1, 0, 1, d);
     let p = this._parser.precedingJoinState;
     for (let m = i; m < r; ++m) {
@@ -27324,7 +27426,7 @@ var vl = 5e3, gl = 0, vn = class extends D {
       o2 = Ae.extractWidth(f);
       let A = Ae.extractShouldJoin(f), R = A ? Ae.extractWidth(p) : 0;
       if (p = f, a && this._onA11yChar.fire(Ce(n)), this._getCurrentLinkId() && this._oscLinkService.addLineToLink(this._getCurrentLinkId(), this._activeBuffer.ybase + this._activeBuffer.y), this._activeBuffer.x + o2 - R > u) {
-        if (h51) {
+        if (h52) {
           let O = _2, I = this._activeBuffer.x - R;
           for (this._activeBuffer.x = R, this._activeBuffer.y++, this._activeBuffer.y === this._activeBuffer.scrollBottom + 1 ? (this._activeBuffer.y--, this._bufferService.scroll(this._eraseAttrData(), !0)) : (this._activeBuffer.y >= this._bufferService.rows && (this._activeBuffer.y = this._bufferService.rows - 1), this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y).isWrapped = !0), _2 = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y), R > 0 && _2 instanceof Ze && _2.copyCellsFrom(O, I, 0, R, !1); I < u; ) O.setCellFromCodepoint(I++, 0, 1, d);
         } else if (this._activeBuffer.x = u - 1, o2 === 2) continue;
@@ -27581,13 +27683,13 @@ var vl = 5e3, gl = 0, vn = class extends D {
   repeatPrecedingCharacter(e) {
     let i = this._parser.precedingJoinState;
     if (!i) return !0;
-    let r = e.params[0] || 1, n = Ae.extractWidth(i), o2 = this._activeBuffer.x - n, a = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y).getString(o2), u = new Uint32Array(a.length * r), h51 = 0;
+    let r = e.params[0] || 1, n = Ae.extractWidth(i), o2 = this._activeBuffer.x - n, a = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y).getString(o2), u = new Uint32Array(a.length * r), h52 = 0;
     for (let d = 0; d < a.length; ) {
       let _2 = a.codePointAt(d) || 0;
-      u[h51++] = _2, d += _2 > 65535 ? 2 : 1;
+      u[h52++] = _2, d += _2 > 65535 ? 2 : 1;
     }
-    let c = h51;
-    for (let d = 1; d < r; ++d) u.copyWithin(c, 0, h51), c += h51;
+    let c = h52;
+    for (let d = 1; d < r; ++d) u.copyWithin(c, 0, h52), c += h52;
     return this.print(u, 0, c), !0;
   }
   sendDeviceAttributesPrimary(e) {
@@ -27762,8 +27864,8 @@ var vl = 5e3, gl = 0, vn = class extends D {
   requestMode(e, i) {
     let r;
     ((P) => (P[P.NOT_RECOGNIZED = 0] = "NOT_RECOGNIZED", P[P.SET = 1] = "SET", P[P.RESET = 2] = "RESET", P[P.PERMANENTLY_SET = 3] = "PERMANENTLY_SET", P[P.PERMANENTLY_RESET = 4] = "PERMANENTLY_RESET"))(r ||= {});
-    let n = this._coreService.decPrivateModes, { activeProtocol: o2, activeEncoding: l } = this._coreMouseService, a = this._coreService, { buffers: u, cols: h51 } = this._bufferService, { active: c, alt: d } = u, _2 = this._optionsService.rawOptions, p = (A, R) => (a.triggerDataEvent(`${b.ESC}[${i ? "" : "?"}${A};${R}$y`), !0), m = (A) => A ? 1 : 2, f = e.params[0];
-    return i ? f === 2 ? p(f, 4) : f === 4 ? p(f, m(a.modes.insertMode)) : f === 12 ? p(f, 3) : f === 20 ? p(f, m(_2.convertEol)) : p(f, 0) : f === 1 ? p(f, m(n.applicationCursorKeys)) : f === 3 ? p(f, _2.windowOptions.setWinLines ? h51 === 80 ? 2 : h51 === 132 ? 1 : 0 : 0) : f === 6 ? p(f, m(n.origin)) : f === 7 ? p(f, m(n.wraparound)) : f === 8 ? p(f, 3) : f === 9 ? p(f, m(o2 === "X10")) : f === 12 ? p(f, m(_2.cursorBlink)) : f === 25 ? p(f, m(!a.isCursorHidden)) : f === 45 ? p(f, m(n.reverseWraparound)) : f === 66 ? p(f, m(n.applicationKeypad)) : f === 67 ? p(f, 4) : f === 1e3 ? p(f, m(o2 === "VT200")) : f === 1002 ? p(f, m(o2 === "DRAG")) : f === 1003 ? p(f, m(o2 === "ANY")) : f === 1004 ? p(f, m(n.sendFocus)) : f === 1005 ? p(f, 4) : f === 1006 ? p(f, m(l === "SGR")) : f === 1015 ? p(f, 4) : f === 1016 ? p(f, m(l === "SGR_PIXELS")) : f === 1048 ? p(f, 1) : f === 47 || f === 1047 || f === 1049 ? p(f, m(c === d)) : f === 2004 ? p(f, m(n.bracketedPasteMode)) : f === 2026 ? p(f, m(n.synchronizedOutput)) : p(f, 0);
+    let n = this._coreService.decPrivateModes, { activeProtocol: o2, activeEncoding: l } = this._coreMouseService, a = this._coreService, { buffers: u, cols: h52 } = this._bufferService, { active: c, alt: d } = u, _2 = this._optionsService.rawOptions, p = (A, R) => (a.triggerDataEvent(`${b.ESC}[${i ? "" : "?"}${A};${R}$y`), !0), m = (A) => A ? 1 : 2, f = e.params[0];
+    return i ? f === 2 ? p(f, 4) : f === 4 ? p(f, m(a.modes.insertMode)) : f === 12 ? p(f, 3) : f === 20 ? p(f, m(_2.convertEol)) : p(f, 0) : f === 1 ? p(f, m(n.applicationCursorKeys)) : f === 3 ? p(f, _2.windowOptions.setWinLines ? h52 === 80 ? 2 : h52 === 132 ? 1 : 0 : 0) : f === 6 ? p(f, m(n.origin)) : f === 7 ? p(f, m(n.wraparound)) : f === 8 ? p(f, 3) : f === 9 ? p(f, m(o2 === "X10")) : f === 12 ? p(f, m(_2.cursorBlink)) : f === 25 ? p(f, m(!a.isCursorHidden)) : f === 45 ? p(f, m(n.reverseWraparound)) : f === 66 ? p(f, m(n.applicationKeypad)) : f === 67 ? p(f, 4) : f === 1e3 ? p(f, m(o2 === "VT200")) : f === 1002 ? p(f, m(o2 === "DRAG")) : f === 1003 ? p(f, m(o2 === "ANY")) : f === 1004 ? p(f, m(n.sendFocus)) : f === 1005 ? p(f, 4) : f === 1006 ? p(f, m(l === "SGR")) : f === 1015 ? p(f, 4) : f === 1016 ? p(f, m(l === "SGR_PIXELS")) : f === 1048 ? p(f, 1) : f === 47 || f === 1047 || f === 1049 ? p(f, m(c === d)) : f === 2004 ? p(f, m(n.bracketedPasteMode)) : f === 2026 ? p(f, m(n.synchronizedOutput)) : p(f, 0);
   }
   _updateAttrColor(e, i, r, n, o2) {
     return i === 2 ? (e |= 50331648, e &= -16777216, e |= De.fromColorRGB([r, n, o2])) : i === 5 && (e &= -50331904, e |= 33554432 | r & 255), e;
@@ -28482,8 +28584,8 @@ var ee = 0, En = class {
   _renderRows(e, i) {
     let r = this._terminal.buffer, n = r.lines.length.toString();
     for (let o2 = e; o2 <= i; o2++) {
-      let l = r.lines.get(r.ydisp + o2), a = [], u = l?.translateToString(!0, void 0, void 0, a) || "", h51 = (r.ydisp + o2 + 1).toString(), c = this._rowElements[o2];
-      c && (u.length === 0 ? (c.textContent = " ", this._rowColumns.set(c, [0, 1])) : (c.textContent = u, this._rowColumns.set(c, a)), c.setAttribute("aria-posinset", h51), c.setAttribute("aria-setsize", n), this._alignRowWidth(c));
+      let l = r.lines.get(r.ydisp + o2), a = [], u = l?.translateToString(!0, void 0, void 0, a) || "", h52 = (r.ydisp + o2 + 1).toString(), c = this._rowElements[o2];
+      c && (u.length === 0 ? (c.textContent = " ", this._rowColumns.set(c, [0, 1])) : (c.textContent = u, this._rowColumns.set(c, a)), c.setAttribute("aria-posinset", h52), c.setAttribute("aria-setsize", n), this._alignRowWidth(c));
     }
     this._announceCharacters();
   }
@@ -28495,11 +28597,11 @@ var ee = 0, En = class {
     if (o2 === l || e.relatedTarget !== n) return;
     let a, u;
     if (i === 0 ? (a = r, u = this._rowElements.pop(), this._rowContainer.removeChild(u)) : (a = this._rowElements.shift(), u = r, this._rowContainer.removeChild(a)), a.removeEventListener("focus", this._topBoundaryFocusListener), u.removeEventListener("focus", this._bottomBoundaryFocusListener), i === 0) {
-      let h51 = this._createAccessibilityTreeNode();
-      this._rowElements.unshift(h51), this._rowContainer.insertAdjacentElement("afterbegin", h51);
+      let h52 = this._createAccessibilityTreeNode();
+      this._rowElements.unshift(h52), this._rowContainer.insertAdjacentElement("afterbegin", h52);
     } else {
-      let h51 = this._createAccessibilityTreeNode();
-      this._rowElements.push(h51), this._rowContainer.appendChild(h51);
+      let h52 = this._createAccessibilityTreeNode();
+      this._rowElements.push(h52), this._rowContainer.appendChild(h52);
     }
     this._rowElements[0].addEventListener("focus", this._topBoundaryFocusListener), this._rowElements[this._rowElements.length - 1].addEventListener("focus", this._bottomBoundaryFocusListener), this._terminal.scrollLines(i === 0 ? -1 : 1), this._rowElements[i === 0 ? 1 : this._rowElements.length - 2].focus(), e.preventDefault(), e.stopImmediatePropagation();
   }
@@ -28519,12 +28621,12 @@ var ee = 0, En = class {
     if ((i.node.compareDocumentPosition(r.node) & Node.DOCUMENT_POSITION_PRECEDING || i.node === r.node && i.offset > r.offset) && ([i, r] = [r, i]), i.node.compareDocumentPosition(this._rowElements[0]) & (Node.DOCUMENT_POSITION_CONTAINED_BY | Node.DOCUMENT_POSITION_FOLLOWING) && (i = { node: this._rowElements[0].childNodes[0], offset: 0 }), !this._rowContainer.contains(i.node)) return;
     let n = this._rowElements.slice(-1)[0];
     if (r.node.compareDocumentPosition(n) & (Node.DOCUMENT_POSITION_CONTAINED_BY | Node.DOCUMENT_POSITION_PRECEDING) && (r = { node: n, offset: n.textContent?.length ?? 0 }), !this._rowContainer.contains(r.node)) return;
-    let o2 = ({ node: u, offset: h51 }) => {
+    let o2 = ({ node: u, offset: h52 }) => {
       let c = u instanceof Text ? u.parentNode : u, d = parseInt(c?.getAttribute("aria-posinset"), 10) - 1;
       if (isNaN(d)) return console.warn("row is invalid. Race condition?"), null;
       let _2 = this._rowColumns.get(c);
       if (!_2) return console.warn("columns is null. Race condition?"), null;
-      let p = h51 < _2.length ? _2[h51] : _2.slice(-1)[0] + 1;
+      let p = h52 < _2.length ? _2[h52] : _2.slice(-1)[0] + 1;
       return p >= this._terminal.cols && (++d, p = 0), { row: d, column: p };
     }, l = o2(i), a = o2(r);
     if (!(!l || !a)) {
@@ -28611,8 +28713,8 @@ var hi = class extends D {
     for (let n = 0; n < i.size; n++) {
       let o2 = i.get(n);
       if (o2) for (let l = 0; l < o2.length; l++) {
-        let a = o2[l], u = a.link.range.start.y < e ? 0 : a.link.range.start.x, h51 = a.link.range.end.y > e ? this._bufferService.cols : a.link.range.end.x;
-        for (let c = u; c <= h51; c++) {
+        let a = o2[l], u = a.link.range.start.y < e ? 0 : a.link.range.start.x, h52 = a.link.range.end.y > e ? this._bufferService.cols : a.link.range.end.x;
+        for (let c = u; c <= h52; c++) {
           if (r.has(c)) {
             o2.splice(l--, 1);
             break;
@@ -28831,27 +28933,27 @@ var yn = class extends Sn {
     function r(l) {
       let a = e._mouseService.getMouseReportCoords(l, e.screenElement);
       if (!a) return !1;
-      let u, h51;
+      let u, h52;
       switch (l.overrideType || l.type) {
         case "mousemove":
-          h51 = 32, l.buttons === void 0 ? (u = 3, l.button !== void 0 && (u = l.button < 3 ? l.button : 3)) : u = l.buttons & 1 ? 0 : l.buttons & 4 ? 1 : l.buttons & 2 ? 2 : 3;
+          h52 = 32, l.buttons === void 0 ? (u = 3, l.button !== void 0 && (u = l.button < 3 ? l.button : 3)) : u = l.buttons & 1 ? 0 : l.buttons & 4 ? 1 : l.buttons & 2 ? 2 : 3;
           break;
         case "mouseup":
-          h51 = 0, u = l.button < 3 ? l.button : 3;
+          h52 = 0, u = l.button < 3 ? l.button : 3;
           break;
         case "mousedown":
-          h51 = 1, u = l.button < 3 ? l.button : 3;
+          h52 = 1, u = l.button < 3 ? l.button : 3;
           break;
         case "wheel":
           if (e._customWheelEventHandler && e._customWheelEventHandler(l) === !1) return !1;
           let c = l.deltaY;
           if (c === 0 || e.coreMouseService.consumeWheelEvent(l, e._renderService?.dimensions?.device?.cell?.height, e._coreBrowserService?.dpr) === 0) return !1;
-          h51 = c < 0 ? 0 : 1, u = 4;
+          h52 = c < 0 ? 0 : 1, u = 4;
           break;
         default:
           return !1;
       }
-      return h51 === void 0 || u === void 0 || u > 4 ? !1 : e.coreMouseService.triggerMouseEvent({ col: a.col, row: a.row, x: a.x, y: a.y, button: u, action: h51, ctrl: l.ctrlKey, alt: l.altKey, shift: l.shiftKey });
+      return h52 === void 0 || u === void 0 || u > 4 ? !1 : e.coreMouseService.triggerMouseEvent({ col: a.col, row: a.row, x: a.x, y: a.y, button: u, action: h52, ctrl: l.ctrlKey, alt: l.altKey, shift: l.shiftKey });
     }
     let n = { mouseup: null, wheel: null, mousedrag: null, mousemove: null }, o2 = { mouseup: (l) => (r(l), l.buttons || (this._document.removeEventListener("mouseup", n.mouseup), n.mousedrag && this._document.removeEventListener("mousemove", n.mousedrag)), this.cancel(l)), wheel: (l) => (r(l), this.cancel(l, !0)), mousedrag: (l) => {
       l.buttons && r(l);
@@ -28868,8 +28970,8 @@ var yn = class extends Sn {
         if (!this.buffer.hasScrollback) {
           if (l.deltaY === 0) return !1;
           if (e.coreMouseService.consumeWheelEvent(l, e._renderService?.dimensions?.device?.cell?.height, e._coreBrowserService?.dpr) === 0) return this.cancel(l, !0);
-          let h51 = b.ESC + (this.coreService.decPrivateModes.applicationCursorKeys ? "O" : "[") + (l.deltaY < 0 ? "A" : "B");
-          return this.coreService.triggerDataEvent(h51, !0), this.cancel(l, !0);
+          let h52 = b.ESC + (this.coreService.decPrivateModes.applicationCursorKeys ? "O" : "[") + (l.deltaY < 0 ? "A" : "B");
+          return this.coreService.triggerDataEvent(h52, !0), this.cancel(l, !0);
         }
       }
     }, { passive: !1 }));
@@ -29383,7 +29485,7 @@ var xn = class {
 };
 
 // node_modules/@xterm/addon-fit/lib/addon-fit.mjs
-var h50 = 2, _ = 1, o = class {
+var h51 = 2, _ = 1, o = class {
   activate(e) {
     this._terminal = e;
   }
@@ -29400,7 +29502,7 @@ var h50 = 2, _ = 1, o = class {
     let t2 = this._terminal._core._renderService.dimensions;
     if (t2.css.cell.width === 0 || t2.css.cell.height === 0) return;
     let s15 = this._terminal.options.scrollback === 0 ? 0 : this._terminal.options.overviewRuler?.width || 14, r = window.getComputedStyle(this._terminal.element.parentElement), l = parseInt(r.getPropertyValue("height")), a = Math.max(0, parseInt(r.getPropertyValue("width"))), i = window.getComputedStyle(this._terminal.element), n = { top: parseInt(i.getPropertyValue("padding-top")), bottom: parseInt(i.getPropertyValue("padding-bottom")), right: parseInt(i.getPropertyValue("padding-right")), left: parseInt(i.getPropertyValue("padding-left")) }, m = n.top + n.bottom, d = n.right + n.left, c = l - m, p = a - d - s15;
-    return { cols: Math.max(h50, Math.floor(p / t2.css.cell.width)), rows: Math.max(_, Math.floor(c / t2.css.cell.height)) };
+    return { cols: Math.max(h51, Math.floor(p / t2.css.cell.width)), rows: Math.max(_, Math.floor(c / t2.css.cell.height)) };
   }
 };
 
@@ -29693,7 +29795,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.31.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.32.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -30026,8 +30128,8 @@ var THEME2 = Object.freeze({
   selectionBackground: "#264f78"
 });
 function TerminalPane({ api, session, active, onEnded, onStatus }) {
-  let host = import_react56.default.useRef(null), [error, setError] = import_react56.default.useState("");
-  return import_react56.default.useEffect(() => {
+  let host = import_react57.default.useRef(null), [error, setError] = import_react57.default.useState("");
+  return import_react57.default.useEffect(() => {
     let term = new Dl({
       cursorBlink: !0,
       convertEol: !1,
@@ -30067,26 +30169,26 @@ function TerminalPane({ api, session, active, onEnded, onStatus }) {
     return observer?.observe(host.current), refit(), connection.start(), term.focus(), () => {
       observer?.disconnect(), input.dispose(), resized.dispose(), connection.stop(), term.dispose();
     };
-  }, [session.sessionId]), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-term-pane", style: { display: active ? "block" : "none" } }, session.limitation && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption mr-term-warning" }, session.limitation, session.ptyError ? `（${session.ptyError}）` : ""), error && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption mr-term-warning", role: "alert" }, error), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-term-screen", ref: host }));
+  }, [session.sessionId]), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-term-pane", style: { display: active ? "block" : "none" } }, session.limitation && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-term-warning" }, session.limitation, session.ptyError ? `（${session.ptyError}）` : ""), error && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-term-warning", role: "alert" }, error), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-term-screen", ref: host }));
 }
 function CliTerminalCard({ api, health, settingsSignature = "" }) {
-  let [info, setInfo] = import_react56.default.useState({ status: "loading", value: null, error: "" }), [target, setTarget] = import_react56.default.useState("shell"), [mode, setMode] = import_react56.default.useState("interactive"), [cwd, setCwd] = import_react56.default.useState(storedCwd), [confirming, setConfirming] = import_react56.default.useState(!1), [starting, setStarting] = import_react56.default.useState(!1), [startError, setStartError] = import_react56.default.useState(""), [sessions, setSessions] = import_react56.default.useState([]), [activeId, setActiveId] = import_react56.default.useState(""), [tools, setTools] = import_react56.default.useState(health?.tools ?? []), mounted = import_react56.default.useRef(!0), refresher = import_react56.default.useRef(null);
+  let [info, setInfo] = import_react57.default.useState({ status: "loading", value: null, error: "" }), [target, setTarget] = import_react57.default.useState("shell"), [mode, setMode] = import_react57.default.useState("interactive"), [cwd, setCwd] = import_react57.default.useState(storedCwd), [confirming, setConfirming] = import_react57.default.useState(!1), [starting, setStarting] = import_react57.default.useState(!1), [startError, setStartError] = import_react57.default.useState(""), [sessions, setSessions] = import_react57.default.useState([]), [activeId, setActiveId] = import_react57.default.useState(""), [tools, setTools] = import_react57.default.useState(health?.tools ?? []), mounted = import_react57.default.useRef(!0), refresher = import_react57.default.useRef(null);
   refresher.current || (refresher.current = new TerminalInfoRefresher());
-  let healthTools = import_react56.default.useRef(health?.tools);
+  let healthTools = import_react57.default.useRef(health?.tools);
   healthTools.current = health?.tools;
-  let settingsScope = import_react56.default.useRef({ tools: health?.tools, signature: settingsSignature }), loadInfo = import_react56.default.useCallback(async () => {
+  let settingsScope = import_react57.default.useRef({ tools: health?.tools, signature: settingsSignature }), loadInfo = import_react57.default.useCallback(async () => {
     let result = await refresher.current.load(api);
     !mounted.current || !result || (setInfo(result), result.status === "ready" && setTools(terminalInfoTools(result.value, healthTools.current)));
   }, [api]);
-  import_react56.default.useEffect(() => (mounted.current = !0, loadInfo(), () => {
+  import_react57.default.useEffect(() => (mounted.current = !0, loadInfo(), () => {
     mounted.current = !1, refresher.current.invalidate();
-  }), [loadInfo]), import_react56.default.useEffect(() => {
+  }), [loadInfo]), import_react57.default.useEffect(() => {
     settingsScope.current.tools === health?.tools && settingsScope.current.signature === settingsSignature || (settingsScope.current = { tools: health?.tools, signature: settingsSignature }, loadInfo());
   }, [health?.tools, settingsSignature, loadInfo]);
   let platform = info.value?.platform ?? clientPlatform(), targets = terminalTargets(tools, platform), selected = targets.find((item) => item.id === target) ?? targets[0];
-  import_react56.default.useEffect(() => {
+  import_react57.default.useEffect(() => {
     targets.some((item) => item.id === target) || setTarget("shell");
-  }, [tools, target]), import_react56.default.useEffect(() => {
+  }, [tools, target]), import_react57.default.useEffect(() => {
     !selected?.canLogin && mode === "login" && setMode("interactive");
   }, [selected?.id]);
   let problem = startProblem({ target: selected?.id, cwd, targets }), details = confirmationDetails({ target: selected?.id, mode, cwd, platform }), live = sessions.filter((item) => !item.ended).length, maxSessions = info.value?.limits?.maxSessions ?? 4, start = async () => {
@@ -30103,9 +30205,9 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
     } finally {
       mounted.current && setStarting(!1);
     }
-  }, onEnded = import_react56.default.useCallback((sessionId, event) => {
+  }, onEnded = import_react57.default.useCallback((sessionId, event) => {
     mounted.current && (setSessions((previous) => previous.map((item) => item.sessionId === sessionId ? { ...item, ...event, ended: event } : item)), loadInfo());
-  }, [loadInfo]), onStatus = import_react56.default.useCallback((sessionId, status) => {
+  }, [loadInfo]), onStatus = import_react57.default.useCallback((sessionId, status) => {
     mounted.current && setSessions((previous) => previous.map((item) => item.sessionId === sessionId ? { ...item, ...status } : item));
   }, []), closeTab = (sessionId) => {
     setSessions((previous) => {
@@ -30119,15 +30221,15 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
     } catch {
     }
   }, active = sessions.find((item) => item.sessionId === activeId), history = info.value?.history ?? [];
-  return /* @__PURE__ */ import_react56.default.createElement("section", { className: "mr-card", "aria-label": "官方工具终端" }, /* @__PURE__ */ import_react56.default.createElement("style", null, xterm_default), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react56.default.createElement("div", null, /* @__PURE__ */ import_react56.default.createElement("h2", { className: "mr-card-title" }, "官方工具终端"), /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-card-copy" }, "在工作台里交互式运行 PowerShell、已安装的 CLI（包括独立 ZCode CLI TUI）（多轮对话、实时输出，可用于 ", /* @__PURE__ */ import_react56.default.createElement("code", null, "codex login"), " 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。")), /* @__PURE__ */ import_react56.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
+  return /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card", "aria-label": "官方工具终端" }, /* @__PURE__ */ import_react57.default.createElement("style", null, xterm_default), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "官方工具终端"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "在工作台里交互式运行 PowerShell、已安装的 CLI（包括独立 ZCode CLI TUI）（多轮对话、实时输出，可用于 ", /* @__PURE__ */ import_react57.default.createElement("code", null, "codex login"), " 等登录）。启动入口与官方工具的安装方式和目录同步。终端不经过 Harness 沙箱，使用你自己的登录和环境变量。")), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     loadInfo();
-  } }, "刷新")), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-card-body" }, info.status === "error" && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-error", role: "alert" }, info.error), info.value && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, info.value.backend === "pty" ? "终端组件：伪终端（PTY），支持全屏界面、颜色和窗口大小同步。" : `终端组件：管道模式。${info.value.limitation ?? ""}${info.value.ptyError ? `（PTY 加载失败：${info.value.ptyError}）` : ""}`), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react56.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-term-target" }, "启动"), /* @__PURE__ */ import_react56.default.createElement("select", { className: "mr-input", id: "mr-term-target", value: selected?.id ?? "shell", onChange: (event) => {
+  } }, "刷新")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, info.status === "error" && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-error", role: "alert" }, info.error), info.value && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, info.value.backend === "pty" ? "终端组件：伪终端（PTY），支持全屏界面、颜色和窗口大小同步。" : `终端组件：管道模式。${info.value.limitation ?? ""}${info.value.ptyError ? `（PTY 加载失败：${info.value.ptyError}）` : ""}`), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-term-target" }, "启动"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", id: "mr-term-target", value: selected?.id ?? "shell", onChange: (event) => {
     setTarget(event.target.value), setConfirming(!1);
-  } }, targets.map((item) => /* @__PURE__ */ import_react56.default.createElement("option", { key: item.id, value: item.id }, item.label)))), selected?.canLogin && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-control-label" }, "方式"), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "启动方式" }, /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": mode === "interactive", onClick: () => {
+  } }, targets.map((item) => /* @__PURE__ */ import_react57.default.createElement("option", { key: item.id, value: item.id }, item.label)))), selected?.canLogin && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-control-label" }, "方式"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "启动方式" }, /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": mode === "interactive", onClick: () => {
     setMode("interactive"), setConfirming(!1);
-  } }, "交互会话"), /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", "aria-pressed": mode === "login", onClick: () => {
+  } }, "交互会话"), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": mode === "login", onClick: () => {
     setMode("login"), setConfirming(!1);
-  } }, "登录"))), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-control-group mr-term-cwd" }, /* @__PURE__ */ import_react56.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-term-cwd" }, "工作目录（绝对路径）"), /* @__PURE__ */ import_react56.default.createElement(
+  } }, "登录"))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-control-group mr-term-cwd" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-term-cwd" }, "工作目录（绝对路径）"), /* @__PURE__ */ import_react57.default.createElement(
     "input",
     {
       className: "mr-input",
@@ -30139,13 +30241,13 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
         setCwd(event.target.value), setConfirming(!1);
       }
     }
-  ))), targets.length === 1 && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "尚未发现已安装的官方 CLI；安装或配置目录后点本卡片“刷新”或“官方工具 · 体检”的“重新体检”，这里会出现对应选项。"), !confirming && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react56.default.createElement("button", { className: "mr-button", type: "button", disabled: !!problem || live >= maxSessions || info.status !== "ready", onClick: () => {
+  ))), targets.length === 1 && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "尚未发现已安装的官方 CLI；安装或配置目录后点本卡片“刷新”或“官方工具 · 体检”的“重新体检”，这里会出现对应选项。"), !confirming && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button", type: "button", disabled: !!problem || live >= maxSessions || info.status !== "ready", onClick: () => {
     setStartError(""), setConfirming(!0);
-  } }, "开始"), /* @__PURE__ */ import_react56.default.createElement("span", { className: "mr-caption" }, problem || (live >= maxSessions ? `最多同时运行 ${maxSessions} 个会话。` : `将运行：${details.command}`))), confirming && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-term-confirm", role: "dialog", "aria-label": "确认启动终端" }, /* @__PURE__ */ import_react56.default.createElement("strong", null, details.title), /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, "命令：", /* @__PURE__ */ import_react56.default.createElement("code", null, details.command), /* @__PURE__ */ import_react56.default.createElement("br", null), "工作目录：", /* @__PURE__ */ import_react56.default.createElement("code", null, details.cwd)), /* @__PURE__ */ import_react56.default.createElement("ul", null, details.points.map((point) => /* @__PURE__ */ import_react56.default.createElement("li", { key: point }, point))), /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react56.default.createElement("button", { className: "mr-button", type: "button", disabled: starting, onClick: () => {
+  } }, "开始"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, problem || (live >= maxSessions ? `最多同时运行 ${maxSessions} 个会话。` : `将运行：${details.command}`))), confirming && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-term-confirm", role: "dialog", "aria-label": "确认启动终端" }, /* @__PURE__ */ import_react57.default.createElement("strong", null, details.title), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "命令：", /* @__PURE__ */ import_react57.default.createElement("code", null, details.command), /* @__PURE__ */ import_react57.default.createElement("br", null), "工作目录：", /* @__PURE__ */ import_react57.default.createElement("code", null, details.cwd)), /* @__PURE__ */ import_react57.default.createElement("ul", null, details.points.map((point) => /* @__PURE__ */ import_react57.default.createElement("li", { key: point }, point))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button", type: "button", disabled: starting, onClick: () => {
     start();
-  } }, starting ? "正在启动…" : "确认启动"), /* @__PURE__ */ import_react56.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: starting, onClick: () => setConfirming(!1) }, "取消"))), startError && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-error", role: "alert" }, startError), sessions.length > 0 && /* @__PURE__ */ import_react56.default.createElement("div", { className: "mr-term-tabs", role: "tablist", "aria-label": "终端会话" }, sessions.map((item) => /* @__PURE__ */ import_react56.default.createElement("div", { key: item.sessionId, className: "mr-term-tab", role: "tab", "aria-selected": item.sessionId === activeId }, /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", className: "mr-term-tab-label", onClick: () => setActiveId(item.sessionId), title: `${item.display} · ${item.cwd}` }, item.label, item.mode === "login" ? " · 登录" : "", item.ended ? item.stopRequested && !item.stopConfirmed ? " · 已退出（派生进程未确认）" : " · 已结束" : item.stopRequested ? item.exited ? " · 宿主已退出（停止未确认）" : " · 停止中" : item.exited && item.treeTracking ? " · 宿主已退出（后代待确认）" : ""), item.ended ? /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": "关闭标签", onClick: () => closeTab(item.sessionId) }, "×") : /* @__PURE__ */ import_react56.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": item.stopRequested ? "停止未确认" : "结束会话", title: item.stopRequested ? "停止已请求，等待实际退出" : "结束会话", disabled: item.stopRequested, onClick: () => {
+  } }, starting ? "正在启动…" : "确认启动"), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: starting, onClick: () => setConfirming(!1) }, "取消"))), startError && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, startError), sessions.length > 0 && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-term-tabs", role: "tablist", "aria-label": "终端会话" }, sessions.map((item) => /* @__PURE__ */ import_react57.default.createElement("div", { key: item.sessionId, className: "mr-term-tab", role: "tab", "aria-selected": item.sessionId === activeId }, /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-term-tab-label", onClick: () => setActiveId(item.sessionId), title: `${item.display} · ${item.cwd}` }, item.label, item.mode === "login" ? " · 登录" : "", item.ended ? item.stopRequested && !item.stopConfirmed ? " · 已退出（派生进程未确认）" : " · 已结束" : item.stopRequested ? item.exited ? " · 宿主已退出（停止未确认）" : " · 停止中" : item.exited && item.treeTracking ? " · 宿主已退出（后代待确认）" : ""), item.ended ? /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": "关闭标签", onClick: () => closeTab(item.sessionId) }, "×") : /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-term-tab-close", "aria-label": item.stopRequested ? "停止未确认" : "结束会话", title: item.stopRequested ? "停止已请求，等待实际退出" : "结束会话", disabled: item.stopRequested, onClick: () => {
     stopSession(item.sessionId);
-  } }, "■")))), sessions.map((item) => /* @__PURE__ */ import_react56.default.createElement(TerminalPane, { key: item.sessionId, api, session: item, active: item.sessionId === activeId, onEnded, onStatus })), active && /* @__PURE__ */ import_react56.default.createElement("p", { className: "mr-caption" }, active.ended ? endDescription(active.ended) : active.stopRequested || active.exited && active.treeTracking ? endDescription(active) : `${active.display} · ${active.cwd} · 选中文字后 Ctrl+C 复制，Ctrl+Shift+V 粘贴；拖动右下角可调整高度。`), history.length > 0 && /* @__PURE__ */ import_react56.default.createElement("details", { className: "mr-term-history" }, /* @__PURE__ */ import_react56.default.createElement("summary", null, "最近的终端会话（不记录输入、输出或环境变量）"), /* @__PURE__ */ import_react56.default.createElement("table", { className: "mr-term-table" }, /* @__PURE__ */ import_react56.default.createElement("thead", null, /* @__PURE__ */ import_react56.default.createElement("tr", null, /* @__PURE__ */ import_react56.default.createElement("th", null, "开始"), /* @__PURE__ */ import_react56.default.createElement("th", null, "工具"), /* @__PURE__ */ import_react56.default.createElement("th", null, "工作目录"), /* @__PURE__ */ import_react56.default.createElement("th", null, "时长"), /* @__PURE__ */ import_react56.default.createElement("th", null, "结果"))), /* @__PURE__ */ import_react56.default.createElement("tbody", null, history.map((item) => /* @__PURE__ */ import_react56.default.createElement("tr", { key: item.id }, /* @__PURE__ */ import_react56.default.createElement("td", null, item.startedAt ? new Date(item.startedAt).toLocaleString() : "—"), /* @__PURE__ */ import_react56.default.createElement("td", null, item.label, item.mode === "login" ? " · 登录" : "", item.backend === "pipe" ? " · 管道" : ""), /* @__PURE__ */ import_react56.default.createElement("td", { title: item.cwd }, item.cwd), /* @__PURE__ */ import_react56.default.createElement("td", null, formatDuration(item.durationMs)), /* @__PURE__ */ import_react56.default.createElement("td", null, endDescription(item)))))))));
+  } }, "■")))), sessions.map((item) => /* @__PURE__ */ import_react57.default.createElement(TerminalPane, { key: item.sessionId, api, session: item, active: item.sessionId === activeId, onEnded, onStatus })), active && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, active.ended ? endDescription(active.ended) : active.stopRequested || active.exited && active.treeTracking ? endDescription(active) : `${active.display} · ${active.cwd} · 选中文字后 Ctrl+C 复制，Ctrl+Shift+V 粘贴；拖动右下角可调整高度。`), history.length > 0 && /* @__PURE__ */ import_react57.default.createElement("details", { className: "mr-term-history" }, /* @__PURE__ */ import_react57.default.createElement("summary", null, "最近的终端会话（不记录输入、输出或环境变量）"), /* @__PURE__ */ import_react57.default.createElement("table", { className: "mr-term-table" }, /* @__PURE__ */ import_react57.default.createElement("thead", null, /* @__PURE__ */ import_react57.default.createElement("tr", null, /* @__PURE__ */ import_react57.default.createElement("th", null, "开始"), /* @__PURE__ */ import_react57.default.createElement("th", null, "工具"), /* @__PURE__ */ import_react57.default.createElement("th", null, "工作目录"), /* @__PURE__ */ import_react57.default.createElement("th", null, "时长"), /* @__PURE__ */ import_react57.default.createElement("th", null, "结果"))), /* @__PURE__ */ import_react57.default.createElement("tbody", null, history.map((item) => /* @__PURE__ */ import_react57.default.createElement("tr", { key: item.id }, /* @__PURE__ */ import_react57.default.createElement("td", null, item.startedAt ? new Date(item.startedAt).toLocaleString() : "—"), /* @__PURE__ */ import_react57.default.createElement("td", null, item.label, item.mode === "login" ? " · 登录" : "", item.backend === "pipe" ? " · 管道" : ""), /* @__PURE__ */ import_react57.default.createElement("td", { title: item.cwd }, item.cwd), /* @__PURE__ */ import_react57.default.createElement("td", null, formatDuration(item.durationMs)), /* @__PURE__ */ import_react57.default.createElement("td", null, endDescription(item)))))))));
 }
 
 // .dsh-plugin/client/router-main.css
@@ -30490,20 +30592,20 @@ var money2 = (value) => value == null ? "价格待配置" : `$${Number(value).to
   ...Object.keys(ADAPTIVE_DEFAULTS).map((key) => value[key] ?? ADAPTIVE_DEFAULTS[key])
 ]);
 function RouterPanelIcon({ size = 20, active = !1 }) {
-  return /* @__PURE__ */ import_react57.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react57.default.createElement("path", { d: "M7 6.5h7M7 17.5h7M15 6.5v11", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }), /* @__PURE__ */ import_react57.default.createElement("circle", { cx: "5", cy: "6.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react57.default.createElement("circle", { cx: "5", cy: "17.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react57.default.createElement("circle", { cx: "17", cy: "12", r: "3", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7" }));
+  return /* @__PURE__ */ import_react58.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react58.default.createElement("path", { d: "M7 6.5h7M7 17.5h7M15 6.5v11", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }), /* @__PURE__ */ import_react58.default.createElement("circle", { cx: "5", cy: "6.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react58.default.createElement("circle", { cx: "5", cy: "17.5", r: "2", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6" }), /* @__PURE__ */ import_react58.default.createElement("circle", { cx: "17", cy: "12", r: "3", fill: active ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7" }));
 }
 function RouteList({ routes, query }) {
   let filtered = routes.filter((route2) => `${route2.providerName} ${route2.provider} ${route2.name} ${route2.model}`.toLowerCase().includes(query.toLowerCase()));
-  return filtered.length === 0 ? /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-empty" }, routes.length === 0 ? "官方模型目录尚无可规划的路线。请先在“模型”页完成配置。" : "没有匹配的模型。") : /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-list", role: "list", "aria-label": "官方已登记模型路线" }, filtered.map((route2) => /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route", role: "listitem", key: `${route2.provider}/${route2.model}` }, /* @__PURE__ */ import_react57.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-name", title: route2.name }, route2.name), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-provider", title: `${route2.provider}/${route2.model}` }, route2.provider, "/", route2.model)), route2.reasoningKnown && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-pill" }, "推理等级"))));
+  return filtered.length === 0 ? /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-empty" }, routes.length === 0 ? "官方模型目录尚无可规划的路线。请先在“模型”页完成配置。" : "没有匹配的模型。") : /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-list", role: "list", "aria-label": "官方已登记模型路线" }, filtered.map((route2) => /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-route", role: "listitem", key: `${route2.provider}/${route2.model}` }, /* @__PURE__ */ import_react58.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-route-name", title: route2.name }, route2.name), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-route-provider", title: `${route2.provider}/${route2.model}` }, route2.provider, "/", route2.model)), route2.reasoningKnown && /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-pill" }, "推理等级"))));
 }
 function ChannelBadge({ item }) {
   if (!item?.executionChannel) return null;
   let official = item.executionChannel === "official-cli";
-  return /* @__PURE__ */ import_react57.default.createElement("span", { className: official ? "mr-pill mr-pill-channel-ok" : "mr-pill", title: item.channelDetail ?? "" }, official ? `官方 CLI · ${item.channelLabel ?? item.channelTool}` : "模型目录 API");
+  return /* @__PURE__ */ import_react58.default.createElement("span", { className: official ? "mr-pill mr-pill-channel-ok" : "mr-pill", title: item.channelDetail ?? "" }, official ? `官方 CLI · ${item.channelLabel ?? item.channelTool}` : "模型目录 API");
 }
 function PlanResults({ plan, ledger, headingRef, assignmentMode = "algorithm", packageAssignments = {}, assignmentOptions = [], manualAllowed = !0, onAssignmentModeChange, onPackageAssignmentChange, onRestoreAssignments }) {
   let selected = plan.selected, estimate = apiPlanEstimate(plan), budget = plan.accounting ? planBudget(ledger, estimate) : null, subscriptionEstimate = subscriptionEstimateText(plan), packageNames = new Map((plan.team?.workPackages ?? []).map((item) => [item.id, item.name])), purposeLabel = { analysis: "任务分析", execution: "任务实施", verification: "独立验证", synthesis: "结果整合" };
-  return /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card mr-results", "aria-label": "路由建议" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title", ref: headingRef, tabIndex: -1 }, "路由建议"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "本地计算完成，未向模型发送任务内容。"))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-label" }, assignmentMode === "manual" ? "算法原推荐路线" : "推荐路线"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "暂无路线")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-label" }, "任务复杂度 · 分值（0–1）"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-value" }, { simple: "简单", balanced: "中等", complex: "复杂" }[plan.complexity.band] || plan.complexity.band, " · ", plan.complexity.value)), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-label" }, assignmentMode === "manual" ? "调整前 API 估算" : "API 预估费用"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-value" }, plan.accounting ? money2(estimate) : "以执行预览为准")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-label" }, "路由方案"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[plan.preset]?.label ?? "均衡"))), budget?.exceeded && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, assignmentMode === "manual" ? "算法原方案预算提示：" : "执行前预算检查：", budget.message, " ", assignmentMode === "manual" ? "手动方案将重新预览费用，超预算时暂停确认，不自动替换目标。" : "实际执行时将按设置自动降级或暂停询问。"), budget?.limited && !budget.exceeded && budget.estimateKnown && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, assignmentMode === "manual" ? "算法原方案：" : "执行前 API 预算检查：本次预估 ", money2(estimate), "，剩余额度 ", money2(budget.remainingUsd), "。"), subscriptionEstimate && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, subscriptionEstimate, " 这是工作包本地估算，不是厂商已使用或剩余额度。"), !plan.accounting && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "本地规划尚未核验实际计费渠道；API 费用与订阅预估用量以执行预览为准。"), plan.loginRequired && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "推荐模型的官方 CLI 未登录，执行时按计费设置暂停或使用模型目录 API；可在“官方工具”卡片点“去登录”。"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-control-label" }, assignmentMode === "manual" ? "算法原推荐渠道" : "执行渠道"), /* @__PURE__ */ import_react57.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react57.default.createElement("details", { className: "mr-plan-explanation" }, /* @__PURE__ */ import_react57.default.createElement("summary", null, "查看规划依据与估算说明"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, plan.reason), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, plan.pricingNotice, " ", plan.qualityNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")), plan.accounting && Number.isFinite(estimate) && Number(plan.optimization.budgetUsd) > 0 && estimate > Number(plan.optimization.budgetUsd) && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error" }, "按已提供单价估算，API 部分可能超过本次预算。预算只影响建议，不会阻止实际扣费。"), !plan.routingBypassed && plan.team && /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("h3", { className: "mr-section-title" }, plan.mode === "team" ? "团队工作包" : "任务工作包"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-assignment-controls" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "工作包分配方式" }, /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": assignmentMode === "algorithm", onClick: () => onAssignmentModeChange?.("algorithm") }, "按算法推荐分配"), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": assignmentMode === "manual", disabled: !manualAllowed || !plan.team.workPackages.length, title: manualAllowed ? "为每个工作包选择模型 API 或官方工具" : "设置中已关闭手动改派", onClick: () => onAssignmentModeChange?.("manual") }, "手动调整分配")), assignmentMode === "manual" && /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: onRestoreAssignments }, "恢复推荐分配")), !manualAllowed && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "设置中已关闭手动改派。"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, assignmentMode === "manual" ? "手动分配可混合模型 API 与官方工具，按依赖执行只读任务；工具使用默认模型。上方费用仍是算法建议估算，手动目标与费用以执行预览为准，预览会核验套餐计费与工具就绪状态。" : "下方模型是工作包的规划建议。模型路由按只读方式执行，每步可使用官方 CLI 或模型目录 API；如需编辑文件，可在下方执行区选择“官方工具协作”和“编辑文件”权限。CLI 请求模型名需符合厂商规则，实际模型以运行记录为准。"), plan.team.workPackages.length > 1 && /* @__PURE__ */ import_react57.default.createElement(DagView, { packages: plan.team.workPackages, label: "工作包依赖图", renderNode: (item) => /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-package-route" }, "算法推荐：", item.recommendedProvider, "/", item.recommendedModel) }), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-empty" }, "当前目录没有可分配的模型路线。") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react57.default.createElement("details", { className: "mr-package mr-package-details", key: item.id, open: assignmentMode === "manual" ? !0 : void 0 }, /* @__PURE__ */ import_react57.default.createElement("summary", null, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-package-route" }, "算法推荐：", item.recommendedProvider, "/", item.recommendedModel)), assignmentMode === "manual" && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-assignment-target" }, /* @__PURE__ */ import_react57.default.createElement("label", { htmlFor: `mr-assignment-${item.id}` }, item.name, " 执行目标"), /* @__PURE__ */ import_react57.default.createElement(
+  return /* @__PURE__ */ import_react58.default.createElement("section", { className: "mr-card mr-results", "aria-label": "路由建议" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("h2", { className: "mr-card-title", ref: headingRef, tabIndex: -1 }, "路由建议"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-card-copy" }, "本地计算完成，未向模型发送任务内容。"))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-label" }, assignmentMode === "manual" ? "算法原推荐路线" : "推荐路线"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-value" }, selected ? `${selected.provider}/${selected.model}` : "暂无路线")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-label" }, "任务复杂度 · 分值（0–1）"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-value" }, { simple: "简单", balanced: "中等", complex: "复杂" }[plan.complexity.band] || plan.complexity.band, " · ", plan.complexity.value)), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-label" }, assignmentMode === "manual" ? "调整前 API 估算" : "API 预估费用"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-value" }, plan.accounting ? money2(estimate) : "以执行预览为准")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-label" }, "路由方案"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-metric-value" }, ROUTING_PRESETS[plan.preset]?.label ?? "均衡"))), budget?.exceeded && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error", role: "alert" }, assignmentMode === "manual" ? "算法原方案预算提示：" : "执行前预算检查：", budget.message, " ", assignmentMode === "manual" ? "手动方案将重新预览费用，超预算时暂停确认，不自动替换目标。" : "实际执行时将按设置自动降级或暂停询问。"), budget?.limited && !budget.exceeded && budget.estimateKnown && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, assignmentMode === "manual" ? "算法原方案：" : "执行前 API 预算检查：本次预估 ", money2(estimate), "，剩余额度 ", money2(budget.remainingUsd), "。"), subscriptionEstimate && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, subscriptionEstimate, " 这是工作包本地估算，不是厂商已使用或剩余额度。"), !plan.accounting && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "本地规划尚未核验实际计费渠道；API 费用与订阅预估用量以执行预览为准。"), plan.loginRequired && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "推荐模型的官方 CLI 未登录，执行时按计费设置暂停或使用模型目录 API；可在“官方工具”卡片点“去登录”。"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-channel-line" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label" }, assignmentMode === "manual" ? "算法原推荐渠道" : "执行渠道"), /* @__PURE__ */ import_react58.default.createElement(ChannelBadge, { item: plan })), /* @__PURE__ */ import_react58.default.createElement("details", { className: "mr-plan-explanation" }, /* @__PURE__ */ import_react58.default.createElement("summary", null, "查看规划依据与估算说明"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, plan.reason), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, plan.pricingNotice, " ", plan.qualityNotice, " ", plan.availabilityNotice, " ", plan.modalityNotice || "")), plan.accounting && Number.isFinite(estimate) && Number(plan.optimization.budgetUsd) > 0 && estimate > Number(plan.optimization.budgetUsd) && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error" }, "按已提供单价估算，API 部分可能超过本次预算。预算只影响建议，不会阻止实际扣费。"), !plan.routingBypassed && plan.team && /* @__PURE__ */ import_react58.default.createElement(import_react58.default.Fragment, null, /* @__PURE__ */ import_react58.default.createElement("h3", { className: "mr-section-title" }, plan.mode === "team" ? "团队工作包" : "任务工作包"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-assignment-controls" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "工作包分配方式" }, /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": assignmentMode === "algorithm", onClick: () => onAssignmentModeChange?.("algorithm") }, "按算法推荐分配"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": assignmentMode === "manual", disabled: !manualAllowed || !plan.team.workPackages.length, title: manualAllowed ? "为每个工作包选择模型 API 或官方工具" : "设置中已关闭手动改派", onClick: () => onAssignmentModeChange?.("manual") }, "手动调整分配")), assignmentMode === "manual" && /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: onRestoreAssignments }, "恢复推荐分配")), !manualAllowed && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "设置中已关闭手动改派。"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, assignmentMode === "manual" ? "手动分配可混合模型 API 与官方工具，按依赖执行只读任务；工具使用默认模型。上方费用仍是算法建议估算，手动目标与费用以执行预览为准，预览会核验套餐计费与工具就绪状态。" : "下方模型是工作包的规划建议。模型路由按只读方式执行，每步可使用官方 CLI 或模型目录 API；如需编辑文件，可在下方执行区选择“官方工具协作”和“编辑文件”权限。CLI 请求模型名需符合厂商规则，实际模型以运行记录为准。"), plan.team.workPackages.length > 1 && /* @__PURE__ */ import_react58.default.createElement(DagView, { packages: plan.team.workPackages, label: "工作包依赖图", renderNode: (item) => /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-package-route" }, "算法推荐：", item.recommendedProvider, "/", item.recommendedModel) }), plan.team.workPackages.length === 0 ? /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-empty" }, "当前目录没有可分配的模型路线。") : plan.team.workPackages.map((item, index) => /* @__PURE__ */ import_react58.default.createElement("details", { className: "mr-package mr-package-details", key: item.id, open: assignmentMode === "manual" ? !0 : void 0 }, /* @__PURE__ */ import_react58.default.createElement("summary", null, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-package-name" }, index + 1, ". ", item.name), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-package-route" }, "算法推荐：", item.recommendedProvider, "/", item.recommendedModel)), assignmentMode === "manual" && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-assignment-target" }, /* @__PURE__ */ import_react58.default.createElement("label", { htmlFor: `mr-assignment-${item.id}` }, item.name, " 执行目标"), /* @__PURE__ */ import_react58.default.createElement(
     "select",
     {
       className: "mr-input",
@@ -30514,9 +30616,9 @@ function PlanResults({ plan, ledger, headingRef, assignmentMode = "algorithm", p
         option && onPackageAssignmentChange?.(item.id, { ...option.binding });
       }
     },
-    /* @__PURE__ */ import_react57.default.createElement("optgroup", { label: "模型目录 API" }, assignmentOptions.filter((option) => option.binding.kind === "api").map((option) => /* @__PURE__ */ import_react57.default.createElement("option", { key: option.value, value: option.value, disabled: option.disabled }, option.label))),
-    /* @__PURE__ */ import_react57.default.createElement("optgroup", { label: "官方工具（默认模型）" }, assignmentOptions.filter((option) => option.binding.kind === "tool").map((option) => /* @__PURE__ */ import_react57.default.createElement("option", { key: option.value, value: option.value, disabled: option.disabled }, option.label)))
-  )), item.objective && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-package-copy" }, "具体目标：", item.objective), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-package-copy" }, purposeLabel[item.purpose] ?? item.purpose, item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.map((id2) => packageNames.get(id2) ?? id2).join("、")}` : ""), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-package-copy" }, "难度：", { simple: "简单", balanced: "中等", complex: "困难" }[item.difficulty] || item.difficulty || "待评估", " · ", plan.accounting ? packageEstimateText(plan, item) : "费用与订阅用量待执行预览核验"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-package-copy" }, "验收：", item.verificationChecklist.join("；")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-channel-line" }, assignmentMode === "manual" && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, "原推荐渠道："), /* @__PURE__ */ import_react57.default.createElement(ChannelBadge, { item }), item.loginRequired && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-pill" }, "CLI 未登录")), item.channelDetail && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-package-copy" }, "渠道说明：", item.channelDetail)))), plan.routingBypassed && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "已指定单一模型，未与其他路线比较。在官方会话中调用 ", /* @__PURE__ */ import_react57.default.createElement("code", null, "model_router_execute"), " 并传入该 provider 与 model 即可直接执行；若该模型允许官方工具，会优先使用对应 CLI。"), plan.mode === "team" && assignmentMode !== "manual" && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, plan.team.handoff)));
+    /* @__PURE__ */ import_react58.default.createElement("optgroup", { label: "模型目录 API" }, assignmentOptions.filter((option) => option.binding.kind === "api").map((option) => /* @__PURE__ */ import_react58.default.createElement("option", { key: option.value, value: option.value, disabled: option.disabled }, option.label))),
+    /* @__PURE__ */ import_react58.default.createElement("optgroup", { label: "官方工具（默认模型）" }, assignmentOptions.filter((option) => option.binding.kind === "tool").map((option) => /* @__PURE__ */ import_react58.default.createElement("option", { key: option.value, value: option.value, disabled: option.disabled }, option.label)))
+  )), item.objective && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-package-copy" }, "具体目标：", item.objective), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-package-copy" }, purposeLabel[item.purpose] ?? item.purpose, item.dependsOn.length > 0 ? ` · 依赖：${item.dependsOn.map((id2) => packageNames.get(id2) ?? id2).join("、")}` : ""), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-package-copy" }, "难度：", { simple: "简单", balanced: "中等", complex: "困难" }[item.difficulty] || item.difficulty || "待评估", " · ", plan.accounting ? packageEstimateText(plan, item) : "费用与订阅用量待执行预览核验"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-package-copy" }, "验收：", item.verificationChecklist.join("；")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-channel-line" }, assignmentMode === "manual" && /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-caption" }, "原推荐渠道："), /* @__PURE__ */ import_react58.default.createElement(ChannelBadge, { item }), item.loginRequired && /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-pill" }, "CLI 未登录")), item.channelDetail && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-package-copy" }, "渠道说明：", item.channelDetail)))), plan.routingBypassed && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "已指定单一模型，未与其他路线比较。在官方会话中调用 ", /* @__PURE__ */ import_react58.default.createElement("code", null, "model_router_execute"), " 并传入该 provider 与 model 即可直接执行；若该模型允许官方工具，会优先使用对应 CLI。"), plan.mode === "team" && assignmentMode !== "manual" && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, plan.team.handoff)));
 }
 var remoteError = (response, fallback) => remoteErrorText(
   text5(response?.error?.message) || text5(response?.value?.error) || (typeof response?.error == "string" ? response.error : ""),
@@ -30549,8 +30651,8 @@ var INSTALL_SETTING_FIELDS = [
   }
 ];
 function InstallSettings({ settingsScope, install, onPendingChange, onMutationStart }) {
-  let [snapshot, setSnapshot] = import_react57.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [drafts, setDrafts] = import_react57.default.useState({}), [saving, setSaving] = import_react57.default.useState(!1), [notice, setNotice] = import_react57.default.useState("");
-  import_react57.default.useEffect(() => {
+  let [snapshot, setSnapshot] = import_react58.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [drafts, setDrafts] = import_react58.default.useState({}), [saving, setSaving] = import_react58.default.useState(!1), [notice, setNotice] = import_react58.default.useState("");
+  import_react58.default.useEffect(() => {
     if (typeof settingsScope?.subscribe != "function") return;
     let unsubscribe = settingsScope.subscribe(() => {
       let next = settingsScope.getSnapshot();
@@ -30559,7 +30661,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
     return setSnapshot(settingsScope.getSnapshot()), unsubscribe;
   }, [settingsScope]);
   let dirty = Object.keys(drafts).length > 0;
-  if (import_react57.default.useEffect(() => {
+  if (import_react58.default.useEffect(() => {
     onPendingChange?.(saving || dirty);
   }, [saving, dirty, onPendingChange]), !settingsScope) return null;
   let writable = snapshot.writable === !0 && !saving, shown = (field2) => drafts[field2.key] ?? String(snapshot.value?.[field2.key] ?? field2.fallback), fields = INSTALL_SETTING_FIELDS, errors = Object.fromEntries(fields.map((field2) => [field2.key, validateToolInstallSetting(field2.key, shown(field2))])), invalid = Object.values(errors).some(Boolean), edit = (key, value) => {
@@ -30582,7 +30684,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
       }
     }
   };
-  return /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-install-settings", "aria-label": "统一安装设置" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-install-settings-head" }, /* @__PURE__ */ import_react57.default.createElement("strong", null, "统一安装设置"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, "保存后用于后续安装与更新。每个工具下方显示实际方式和目录，插件设置页里也能修改。")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-install-grid" }, fields.map((field2) => /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-install-field", key: field2.key }, /* @__PURE__ */ import_react57.default.createElement("span", null, field2.label), /* @__PURE__ */ import_react57.default.createElement(
+  return /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-install-settings", "aria-label": "统一安装设置" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-install-settings-head" }, /* @__PURE__ */ import_react58.default.createElement("strong", null, "统一安装设置"), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-caption" }, "保存后用于后续安装与更新。每个工具下方显示实际方式和目录，插件设置页里也能修改。")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-install-grid" }, fields.map((field2) => /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-install-field", key: field2.key }, /* @__PURE__ */ import_react58.default.createElement("span", null, field2.label), /* @__PURE__ */ import_react58.default.createElement(
     "input",
     {
       className: "mr-input",
@@ -30592,7 +30694,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
       "aria-invalid": !!errors[field2.key],
       onChange: (event) => edit(field2.key, event.target.value)
     }
-  ), errors[field2.key] ? /* @__PURE__ */ import_react57.default.createElement("small", { className: "mr-install-error", role: "alert" }, errors[field2.key]) : /* @__PURE__ */ import_react57.default.createElement("small", null, field2.hint))), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-install-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "安装脚本方式"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-install-toggle-row" }, /* @__PURE__ */ import_react57.default.createElement(
+  ), errors[field2.key] ? /* @__PURE__ */ import_react58.default.createElement("small", { className: "mr-install-error", role: "alert" }, errors[field2.key]) : /* @__PURE__ */ import_react58.default.createElement("small", null, field2.hint))), /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-install-field" }, /* @__PURE__ */ import_react58.default.createElement("span", null, "安装脚本方式"), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-install-toggle-row" }, /* @__PURE__ */ import_react58.default.createElement(
     "input",
     {
       type: "checkbox",
@@ -30602,22 +30704,22 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
         edit("toolAllowScriptInstall", event.target.checked);
       }
     }
-  ), /* @__PURE__ */ import_react57.default.createElement("span", null, "允许 curl / irm 安装脚本")), /* @__PURE__ */ import_react57.default.createElement("small", null, "关闭后仍可使用 npm / pnpm 和 GitHub Release 发行包；脚本方式需先下载并核对厂商标记。"))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-install-save-row" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || !dirty || invalid, onClick: () => {
+  ), /* @__PURE__ */ import_react58.default.createElement("span", null, "允许 curl / irm 安装脚本")), /* @__PURE__ */ import_react58.default.createElement("small", null, "关闭后仍可使用 npm / pnpm 和 GitHub Release 发行包；脚本方式需先下载并核对厂商标记。"))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-install-save-row" }, /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: !writable || !dirty || invalid, onClick: () => {
     apply4();
-  } }, saving ? "保存中…" : "保存安装设置"), dirty && /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: saving, onClick: () => {
+  } }, saving ? "保存中…" : "保存安装设置"), dirty && /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: saving, onClick: () => {
     setDrafts({}), setNotice(""), onPendingChange?.(!1);
-  } }, "放弃更改"), dirty && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, invalid ? "请修正输入后保存。" : "更改尚未保存，安装与更新暂不可用。")), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, `当前生效：安装目录 ${install?.installDir || "（各厂商默认）"} · npm 源 ${install?.registry || "（默认）"}`, notice ? ` · ${notice}` : ""));
+  } }, "放弃更改"), dirty && /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-caption" }, invalid ? "请修正输入后保存。" : "更改尚未保存，安装与更新暂不可用。")), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, `当前生效：安装目录 ${install?.installDir || "（各厂商默认）"} · npm 源 ${install?.registry || "（默认）"}`, notice ? ` · ${notice}` : ""));
 }
 function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope, tuiPrompt }) {
-  let healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item])), [probeState, setProbeState] = import_react57.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" }), [jobs, setJobs] = import_react57.default.useState({}), [rowErrors, setRowErrors] = import_react57.default.useState({}), [settingsPending, setSettingsPending] = import_react57.default.useState(!1), [methodSaving, setMethodSaving] = import_react57.default.useState(null), [previewPending, setPreviewPending] = import_react57.default.useState(!1), [settingsSnapshot, setSettingsSnapshot] = import_react57.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [previewError, setPreviewError] = import_react57.default.useState(""), [probeSettingsStale, setProbeSettingsStale] = import_react57.default.useState(!1);
-  import_react57.default.useEffect(() => {
+  let healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item])), [probeState, setProbeState] = import_react58.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" }), [jobs, setJobs] = import_react58.default.useState({}), [rowErrors, setRowErrors] = import_react58.default.useState({}), [settingsPending, setSettingsPending] = import_react58.default.useState(!1), [methodSaving, setMethodSaving] = import_react58.default.useState(null), [previewPending, setPreviewPending] = import_react58.default.useState(!1), [settingsSnapshot, setSettingsSnapshot] = import_react58.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [previewError, setPreviewError] = import_react58.default.useState(""), [probeSettingsStale, setProbeSettingsStale] = import_react58.default.useState(!1);
+  import_react58.default.useEffect(() => {
     if (probeState.status !== "loading" && probeState.status !== "refreshing") return;
     let timer = setTimeout(() => {
       setProbeState((previous) => previous.status === "loading" || previous.status === "refreshing" ? previous.probes.length > 0 ? { ...previous, status: "ready", error: "体检超时：部分工具的结果没有返回，已显示已有结果。可点“重新体检”。" } : { ...previous, status: "error", error: "体检超时：Host 45 秒内没有返回检测结果，请点“重新体检”。" } : previous);
     }, 45e3);
     return () => clearTimeout(timer);
   }, [probeState.status]);
-  let settingsPendingRef = import_react57.default.useRef(!1), methodSavingRef = import_react57.default.useRef(null), previewPendingRef = import_react57.default.useRef(!1), mounted = import_react57.default.useRef(!1), request = import_react57.default.useRef(0), previewRequest = import_react57.default.useRef(0), mutationGeneration = import_react57.default.useRef(0), mutationPendingRef = import_react57.default.useRef(null), submitting = import_react57.default.useRef(/* @__PURE__ */ new Set()), polling = import_react57.default.useRef(/* @__PURE__ */ new Set()), jobsRef = import_react57.default.useRef({}), handleSettingsPending = import_react57.default.useCallback((value) => {
+  let settingsPendingRef = import_react58.default.useRef(!1), methodSavingRef = import_react58.default.useRef(null), previewPendingRef = import_react58.default.useRef(!1), mounted = import_react58.default.useRef(!1), request = import_react58.default.useRef(0), previewRequest = import_react58.default.useRef(0), mutationGeneration = import_react58.default.useRef(0), mutationPendingRef = import_react58.default.useRef(null), submitting = import_react58.default.useRef(/* @__PURE__ */ new Set()), polling = import_react58.default.useRef(/* @__PURE__ */ new Set()), jobsRef = import_react58.default.useRef({}), handleSettingsPending = import_react58.default.useCallback((value) => {
     settingsPendingRef.current = value, setSettingsPending(value);
   }, []), rememberJobs = (updater) => {
     setJobs((previous) => {
@@ -30670,7 +30772,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       mounted.current && current === previewRequest.current && setPreviewError(text5(error?.message) || "安装命令刷新失败。");
     }
   };
-  import_react57.default.useEffect(() => (mounted.current = !0, refresh(), refreshInstallSettings(), typeof officialToolInstallStatus == "function" && Promise.all(OFFICIAL_TOOLS.map(async (tool) => {
+  import_react58.default.useEffect(() => (mounted.current = !0, refresh(), refreshInstallSettings(), typeof officialToolInstallStatus == "function" && Promise.all(OFFICIAL_TOOLS.map(async (tool) => {
     try {
       let response = await officialToolInstallStatus(tool.id);
       return response?.ok && response.value?.job ? [tool.id, response.value.job] : null;
@@ -30690,13 +30792,13 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
   }), () => {
     mounted.current = !1, request.current += 1, previewRequest.current += 1;
   }), []);
-  let refreshInstallSettingsRef = import_react57.default.useRef(refreshInstallSettings);
+  let refreshInstallSettingsRef = import_react58.default.useRef(refreshInstallSettings);
   refreshInstallSettingsRef.current = refreshInstallSettings;
-  let beginSettingsMutation = import_react57.default.useCallback((operations) => {
+  let beginSettingsMutation = import_react58.default.useCallback((operations) => {
     let generation = ++mutationGeneration.current;
     return mutationPendingRef.current = { generation, operations }, previewPendingRef.current = !0, setPreviewPending(!0), () => !mounted.current || mutationPendingRef.current?.generation !== generation ? !1 : (mutationPendingRef.current = null, refreshInstallSettingsRef.current(), !0);
   }, []);
-  import_react57.default.useEffect(() => {
+  import_react58.default.useEffect(() => {
     if (typeof settingsScope?.subscribe != "function") return;
     let signature2 = (snapshot) => toolInstallSettingsSignature(snapshot?.value), previous = signature2(settingsScope.getSnapshot());
     return settingsScope.subscribe(() => {
@@ -30705,7 +30807,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       let next = signature2(snapshot);
       next !== previous && (previous = next, request.current += 1, setProbeSettingsStale(!0), setProbeState((previous2) => ({ ...previous2, status: "ready", probes: [], readiness: [], error: "" })), onProbes({ probes: [], capabilities: [], readiness: [] }), previewPendingRef.current = !0, setPreviewPending(!0), refreshInstallSettingsRef.current());
     });
-  }, [settingsScope]), import_react57.default.useEffect(() => {
+  }, [settingsScope]), import_react58.default.useEffect(() => {
     let active = Object.values(jobs).filter((job) => job?.status === "running").map((job) => job.tool);
     if (active.length === 0 || typeof officialToolInstallStatus != "function") return;
     let listening = !0, poll = async (id2) => {
@@ -30739,7 +30841,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
     };
   }, [jobs, officialToolInstallStatus]);
   let run2 = async (id2, operation) => {
-    let tool = OFFICIAL_TOOLS.find((item) => item.id === id2), summary = (probeState.install?.tools ?? []).find((item) => item.id === id2), bridge = { install: installOfficialTool, repair: repairOfficialTool, uninstall: uninstallOfficialTool }[operation], refusal = installClickRefusal({
+    let tool = OFFICIAL_TOOLS.find((item) => item.id === id2), summary = (probeState.install?.tools ?? []).find((item) => item.id === id2), bridge2 = { install: installOfficialTool, repair: repairOfficialTool, uninstall: uninstallOfficialTool }[operation], refusal = installClickRefusal({
       tool,
       submitting: submitting.current.has(id2),
       running: jobsRef.current[id2]?.status === "running",
@@ -30751,7 +30853,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       setRowErrors((previous) => ({ ...previous, [id2]: refusal }));
       return;
     }
-    if (typeof bridge != "function") {
+    if (typeof bridge2 != "function") {
       setRowErrors((previous) => ({ ...previous, [id2]: "官方工具安装桥尚未加载。" }));
       return;
     }
@@ -30762,7 +30864,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       [id2]: { tool: id2, operation, status: "running", outputTail: [], startedAt, error: null }
     }));
     try {
-      let response = await bridge({ tool: id2 });
+      let response = await bridge2({ tool: id2 });
       if (!mounted.current) return;
       let accepted = acceptedInstallJob(response);
       if (!accepted.job) throw new Error(remoteErrorText(accepted.error, "任务未被接受。"));
@@ -30818,13 +30920,13 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       }
     }
   }, byId = Object.fromEntries(probeState.probes.map((probe) => [probe.id, probe])), capabilitiesById = Object.fromEntries(probeState.capabilities.map((item) => [item.id, item])), readinessById = Object.fromEntries(probeState.readiness.map((item) => [item.id, item])), installById = Object.fromEntries((probeState.install?.tools ?? []).map((item) => [item.id, item])), savedMethods = savedToolInstallMethods(settingsSnapshot.value);
-  return /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card", "aria-label": "官方工具" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "官方工具 · 体检"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm、厂商安装脚本或经过校验的发行包，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode CLI 可选择 npm 社区包或 GitHub Release 发行包，按所选方式使用安装目录设置。")), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
+  return /* @__PURE__ */ import_react58.default.createElement("section", { className: "mr-card", "aria-label": "官方工具" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("h2", { className: "mr-card-title" }, "官方工具 · 体检"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-card-copy" }, "检测本机官方工具的安装、版本和登录状态，并从固定注册表一键安装或更新到各厂商最新版（新版本未经插件测试）。可按工具选择 npm、pnpm、厂商安装脚本或经过校验的发行包，并统一设置安装目录与下载源；卸载只删除程序，配置与登录保留。未登录的工具点“去登录”查看登录命令。ZCode CLI 可选择 npm 社区包或 GitHub Release 发行包，按所选方式使用安装目录设置。")), /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: probeState.status === "loading", onClick: () => {
     refresh();
-  } }, "重新体检")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react57.default.createElement(InstallSettings, { settingsScope, install: probeState.install, onPendingChange: handleSettingsPending, onMutationStart: beginSettingsMutation }), previewPending && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", role: "status" }, "安装设置已变更，正在刷新实际安装命令；仍可切换方式，刷新完成后可安装与更新。", !previewError && /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
+  } }, "重新体检")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react58.default.createElement(InstallSettings, { settingsScope, install: probeState.install, onPendingChange: handleSettingsPending, onMutationStart: beginSettingsMutation }), previewPending && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption", role: "status" }, "安装设置已变更，正在刷新实际安装命令；仍可切换方式，刷新完成后可安装与更新。", !previewError && /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     refreshInstallSettings();
-  } }, "刷新安装命令")), previewError && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, previewError, " ", /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
+  } }, "刷新安装命令")), previewError && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error", role: "alert" }, previewError, " ", /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => {
     refreshInstallSettings();
-  } }, "刷新安装命令")), probeSettingsStale && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", role: "status" }, "安装设置已更改，旧目标的版本与安装状态已过期。可安装所选目标；卸载前请重新体检。"), probeState.status === "loading" && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-empty", role: "status" }, "正在检测本机官方工具…"), probeState.error && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "官方工具注册表" }, OFFICIAL_TOOLS.map((tool) => {
+  } }, "刷新安装命令")), probeSettingsStale && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption", role: "status" }, "安装设置已更改，旧目标的版本与安装状态已过期。可安装所选目标；卸载前请重新体检。"), probeState.status === "loading" && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-empty", role: "status" }, "正在检测本机官方工具…"), probeState.error && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error", role: "alert" }, probeState.error), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tools", role: "list", "aria-label": "官方工具注册表" }, OFFICIAL_TOOLS.map((tool) => {
     let summary = installById[tool.id], command = summary ? summary.command : installCommandLine(tool), updateCommand = summary?.updateCommand ?? command, methods = summary?.methods ?? installMethodsFor(tool).map((method) => ({ id: method.id, label: method.label })), settingsBusy = settingsPending || !!methodSaving || previewPending, probe = byId[tool.id], capability = capabilitiesById[tool.id], readiness = readinessById[tool.id], readyModes = readiness?.readyModes ?? readiness?.modes ?? capability?.modes ?? [], job = jobs[tool.id], running = job?.status === "running", action = toolInstallAction({ tool, probe, readiness, job, probeStatus: probeState.status, latestVersion: healthById[tool.id]?.latestVersion ?? null }), maintenance = toolMaintenanceActions({
       tool,
       probe,
@@ -30835,8 +30937,8 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
         removable: !(summary?.uninstallError ?? (summary?.uninstallCommand ? "" : summary?.error))
       }
     }), verified = !!probe && job?.status === "succeeded" && (job.operation === "uninstall" ? job.postInstallProbe?.installed === !1 : job.postInstallProbe?.installed === !0), operation = job?.operation === "uninstall" ? "卸载" : job?.operation === "repair" ? "修复" : "安装", status = running ? job.cancelRequested ? `正在取消${operation}…` : `${operation}中…` : job?.status === "cancelled" ? `${operation}已取消，请重新检测` : verified ? `${operation}成功并验证` : probe ? probeLabel(probe) : "所选安装目标尚未体检";
-    return /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " · ", tool.id), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` · ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react57.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.taskBackend === !0 ? "可登记为子任务：Bot 派发的 CLI 步骤会进入统一任务系统（依赖、取消、重试、收据），收据分别记录请求模型与实际模型。" : tool.headlessAdapter ? "只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。" : readiness?.ready ? `执行入口已核验：${readyModes.includes("read-only") ? "支持只读任务" : "不支持只读任务"}；${readyModes.includes("workspace-write") ? "支持可编辑隔离工作区任务（需审批）" : "不支持可编辑任务"}。实际调用还需当前会话权限、账号与模型可用。` : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || "执行入口尚未核验。"}`), command ? /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "安装方式：", methods.find((method) => method.id === summary?.methodId)?.label ?? tool.manager, " · 实际安装目录：", probe?.installDir || summary?.installDir || "各厂商默认目录"), /* @__PURE__ */ import_react57.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 安装命令` }, command), updateCommand !== command && /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "更新沿用原安装位置：", summary?.updateInstallDir || "各厂商默认目录"), /* @__PURE__ */ import_react57.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 更新命令` }, updateCommand))) : /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), tool.tuiPrompt === !0 && tuiPrompt ? /* @__PURE__ */ import_react57.default.createElement(TuiPromptBox, { tool, tuiPrompt }) : null, (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react57.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react57.default.createElement("summary", null, "安装日志"), /* @__PURE__ */ import_react57.default.createElement("pre", null, job.outputTail.slice(-6).join(`
-`)))), (command || methods.length > 0) && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-actions" }, methods.length > 0 && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-methods" }, /* @__PURE__ */ import_react57.default.createElement("label", null, /* @__PURE__ */ import_react57.default.createElement("span", null, "安装方式"), /* @__PURE__ */ import_react57.default.createElement(
+    return /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " · ", tool.id), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` · ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react58.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.taskBackend === !0 ? "可登记为子任务：Bot 派发的 CLI 步骤会进入统一任务系统（依赖、取消、重试、收据），收据分别记录请求模型与实际模型。" : tool.headlessAdapter ? "只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。" : readiness?.ready ? `执行入口已核验：${readyModes.includes("read-only") ? "支持只读任务" : "不支持只读任务"}；${readyModes.includes("workspace-write") ? "支持可编辑隔离工作区任务（需审批）" : "不支持可编辑任务"}。实际调用还需当前会话权限、账号与模型可用。` : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || "执行入口尚未核验。"}`), command ? /* @__PURE__ */ import_react58.default.createElement(import_react58.default.Fragment, null, /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "安装方式：", methods.find((method) => method.id === summary?.methodId)?.label ?? tool.manager, " · 实际安装目录：", probe?.installDir || summary?.installDir || "各厂商默认目录"), /* @__PURE__ */ import_react58.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 安装命令` }, command), updateCommand !== command && /* @__PURE__ */ import_react58.default.createElement(import_react58.default.Fragment, null, /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "更新沿用原安装位置：", summary?.updateInstallDir || "各厂商默认目录"), /* @__PURE__ */ import_react58.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 更新命令` }, updateCommand))) : /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), tool.tuiPrompt === !0 && tuiPrompt ? /* @__PURE__ */ import_react58.default.createElement(TuiPromptBox, { tool, tuiPrompt }) : null, (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react58.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react58.default.createElement("summary", null, "安装日志"), /* @__PURE__ */ import_react58.default.createElement("pre", null, job.outputTail.slice(-6).join(`
+`)))), (command || methods.length > 0) && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tool-actions" }, methods.length > 0 && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tool-methods" }, /* @__PURE__ */ import_react58.default.createElement("label", null, /* @__PURE__ */ import_react58.default.createElement("span", null, "安装方式"), /* @__PURE__ */ import_react58.default.createElement(
       "select",
       {
         className: "mr-mini-select",
@@ -30846,18 +30948,18 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
           setInstallMethod(tool.id, event.target.value);
         }
       },
-      /* @__PURE__ */ import_react57.default.createElement("option", { value: "" }, "自动选择"),
-      methods.map((method) => /* @__PURE__ */ import_react57.default.createElement("option", { key: method.id, value: method.id, disabled: !!method.blocked }, method.label, method.blocked ? `（${method.blocked}）` : ""))
-    ))), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: action.disabled || settingsBusy || !command || !!summary?.error, title: summary?.error || (settingsBusy ? "请先保存或放弃安装设置更改，并等待命令刷新。" : void 0), onClick: () => {
+      /* @__PURE__ */ import_react58.default.createElement("option", { value: "" }, "自动选择"),
+      methods.map((method) => /* @__PURE__ */ import_react58.default.createElement("option", { key: method.id, value: method.id, disabled: !!method.blocked }, method.label, method.blocked ? `（${method.blocked}）` : ""))
+    ))), /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: action.disabled || settingsBusy || !command || !!summary?.error, title: summary?.error || (settingsBusy ? "请先保存或放弃安装设置更改，并等待命令刷新。" : void 0), onClick: () => {
       install(tool.id);
-    } }, methodSaving === tool.id ? "保存方式中…" : action.label), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.repair.disabled || settingsBusy, title: maintenance.repair.title, onClick: () => {
+    } }, methodSaving === tool.id ? "保存方式中…" : action.label), /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.repair.disabled || settingsBusy, title: maintenance.repair.title, onClick: () => {
       repair(tool.id);
-    } }, maintenance.repair.label), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.uninstall.disabled || settingsBusy, title: maintenance.uninstall.title, onClick: () => {
+    } }, maintenance.repair.label), /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: maintenance.uninstall.disabled || settingsBusy, title: maintenance.uninstall.title, onClick: () => {
       uninstall(tool.id);
-    } }, maintenance.uninstall.label), running && /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
+    } }, maintenance.uninstall.label), running && /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary mr-tool-button", type: "button", disabled: job.cancelRequested, onClick: () => {
       cancel(tool.id);
     } }, job.cancelRequested ? "正在取消…" : `取消${operation}`)));
-  })), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode CLI 可从已保存的 npm 源安装完整运行包，或下载固定 GitHub Release 并校验 SHA-256。会话与 Agent 也可使用 ", /* @__PURE__ */ import_react57.default.createElement("code", null, "/tools"), "、", /* @__PURE__ */ import_react57.default.createElement("code", null, "model_router_tool_install"), "、", /* @__PURE__ */ import_react57.default.createElement("code", null, "model_router_tool_repair"), " 和 ", /* @__PURE__ */ import_react57.default.createElement("code", null, "model_router_tool_uninstall"), "。")));
+  })), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption", style: { marginTop: 12 } }, "安装目录与下载源使用已保存设置，命令上方显示实际执行方式。可点“取消”终止下载任务，随后重新检测版本。卸载保留配置、登录信息和历史记录；脚本方式只移除登记的命令入口，可能保留厂商版本目录。不支持安全卸载的方式会说明原因。ZCode CLI 可从已保存的 npm 源安装完整运行包，或下载固定 GitHub Release 并校验 SHA-256。会话与 Agent 也可使用 ", /* @__PURE__ */ import_react58.default.createElement("code", null, "/tools"), "、", /* @__PURE__ */ import_react58.default.createElement("code", null, "model_router_tool_install"), "、", /* @__PURE__ */ import_react58.default.createElement("code", null, "model_router_tool_repair"), " 和 ", /* @__PURE__ */ import_react58.default.createElement("code", null, "model_router_tool_uninstall"), "。")));
 }
 var HEADLESS_TOOLS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]), WORKSPACE_VIEWS = [
   { id: "plan", label: "任务与执行", number: "01" },
@@ -30866,8 +30968,8 @@ var HEADLESS_TOOLS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"])
   { id: "controls", label: "预算与安全", number: "04" }
 ];
 function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
-  let [health, setHealth] = import_react57.default.useState({ report: null, error: "", refreshing: !1 }), [ledger, setLedger] = import_react57.default.useState({ value: null, error: "", refreshing: !1 }), [boundaries, setBoundaries] = import_react57.default.useState({ value: null, error: "" }), [busy, setBusy] = import_react57.default.useState(!1), mounted = import_react57.default.useRef(!0), ledgerRequest = import_react57.default.useRef(0), mutationBusy = import_react57.default.useRef(!1);
-  import_react57.default.useEffect(() => (mounted.current = !0, () => {
+  let [health, setHealth] = import_react58.default.useState({ report: null, error: "", refreshing: !1 }), [ledger, setLedger] = import_react58.default.useState({ value: null, error: "", refreshing: !1 }), [boundaries, setBoundaries] = import_react58.default.useState({ value: null, error: "" }), [busy, setBusy] = import_react58.default.useState(!1), mounted = import_react58.default.useRef(!0), ledgerRequest = import_react58.default.useRef(0), mutationBusy = import_react58.default.useRef(!1);
+  import_react58.default.useEffect(() => (mounted.current = !0, () => {
     mounted.current = !1, ledgerRequest.current += 1;
   }), []);
   let call2 = async (operation, fallback) => {
@@ -30958,12 +31060,12 @@ ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join(`
       }
     }
   };
-  return import_react57.default.useEffect(() => {
+  return import_react58.default.useEffect(() => {
     refreshHealth(!1), refreshLedger(), refreshBoundaries();
   }, []), { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun };
 }
 function TuiPromptBox({ tool, tuiPrompt }) {
-  let [prompt, setPrompt] = import_react57.default.useState(""), [reply, setReply] = import_react57.default.useState(null), [busy, setBusy] = import_react57.default.useState(!1), send = async () => {
+  let [prompt, setPrompt] = import_react58.default.useState(""), [reply, setReply] = import_react58.default.useState(null), [busy, setBusy] = import_react58.default.useState(!1), send = async () => {
     if (!(busy || prompt.trim() === "")) {
       setBusy(!0), setReply(null);
       try {
@@ -30976,7 +31078,7 @@ function TuiPromptBox({ tool, tuiPrompt }) {
       }
     }
   };
-  return /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tui-prompt" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-caption", htmlFor: `mr-tui-${tool.id}` }, "向 ", tool.label, " 输入提示词（经受管终端执行，回复为终端文本）"), /* @__PURE__ */ import_react57.default.createElement(
+  return /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tui-prompt" }, /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-caption", htmlFor: `mr-tui-${tool.id}` }, "向 ", tool.label, " 输入提示词（经受管终端执行，回复为终端文本）"), /* @__PURE__ */ import_react58.default.createElement(
     "textarea",
     {
       id: `mr-tui-${tool.id}`,
@@ -30987,16 +31089,16 @@ function TuiPromptBox({ tool, tuiPrompt }) {
       placeholder: "例如：用一句话说明你当前使用的模型与会话",
       onChange: (event) => setPrompt(event.target.value)
     }
-  ), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tui-actions" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: busy || prompt.trim() === "", onClick: () => {
+  ), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-tui-actions" }, /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: busy || prompt.trim() === "", onClick: () => {
     send();
-  } }, busy ? "运行中…" : "发送"), reply?.durationMs != null && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, "耗时 ", Math.round(reply.durationMs / 1e3), " 秒")), reply?.error && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, reply.error), reply?.text && /* @__PURE__ */ import_react57.default.createElement("pre", { className: "mr-tui-reply", "aria-label": `${tool.label} 回复` }, reply.text));
+  } }, busy ? "运行中…" : "发送"), reply?.durationMs != null && /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-caption" }, "耗时 ", Math.round(reply.durationMs / 1e3), " 秒")), reply?.error && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error", role: "alert" }, reply.error), reply?.text && /* @__PURE__ */ import_react58.default.createElement("pre", { className: "mr-tui-reply", "aria-label": `${tool.label} 回复` }, reply.text));
 }
 function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt }) {
-  let workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }), [catalogState, setCatalogState] = import_react57.default.useState({ status: "loading", catalog: null, error: "" }), [task, setTask] = import_react57.default.useState(""), [mode, setMode] = import_react57.default.useState("single"), [directKey, setDirectKey] = import_react57.default.useState(""), [budget, setBudget] = import_react57.default.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)), [query, setQuery] = import_react57.default.useState(""), [plan, setPlan] = import_react57.default.useState(null), [assignmentMode, setAssignmentMode] = import_react57.default.useState("algorithm"), [packageAssignments, setPackageAssignments] = import_react57.default.useState({}), [planError, setPlanError] = import_react57.default.useState(""), [toolProbes, setToolProbes] = import_react57.default.useState(null), [routingSettings, setRoutingSettings] = import_react57.default.useState(() => {
+  let workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }), [catalogState, setCatalogState] = import_react58.default.useState({ status: "loading", catalog: null, error: "" }), [task, setTask] = import_react58.default.useState(""), [mode, setMode] = import_react58.default.useState("single"), [directKey, setDirectKey] = import_react58.default.useState(""), [budget, setBudget] = import_react58.default.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)), [query, setQuery] = import_react58.default.useState(""), [plan, setPlan] = import_react58.default.useState(null), [assignmentMode, setAssignmentMode] = import_react58.default.useState("algorithm"), [packageAssignments, setPackageAssignments] = import_react58.default.useState({}), [planError, setPlanError] = import_react58.default.useState(""), [toolProbes, setToolProbes] = import_react58.default.useState(null), [routingSettings, setRoutingSettings] = import_react58.default.useState(() => {
     let value = settingsScope.getSnapshot().value ?? {};
     return routingSettingsSignature(value);
-  }), [view, setView] = import_react57.default.useState("plan"), tabRefs = import_react57.default.useRef({}), resultHeading = import_react57.default.useRef(null), budgetEdited = import_react57.default.useRef(!1), budgetValue = import_react57.default.useRef(budget), mounted = import_react57.default.useRef(!1), catalogRequest = import_react57.default.useRef(0), generationRequest = import_react57.default.useRef(0), generationInputs = import_react57.default.useRef("");
-  generationInputs.current = JSON.stringify([task, budget, mode, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools]), import_react57.default.useEffect(() => {
+  }), [view, setView] = import_react58.default.useState("plan"), tabRefs = import_react58.default.useRef({}), resultHeading = import_react58.default.useRef(null), budgetEdited = import_react58.default.useRef(!1), budgetValue = import_react58.default.useRef(budget), mounted = import_react58.default.useRef(!1), catalogRequest = import_react58.default.useRef(0), generationRequest = import_react58.default.useRef(0), generationInputs = import_react58.default.useRef("");
+  generationInputs.current = JSON.stringify([task, budget, mode, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools]), import_react58.default.useEffect(() => {
     plan && resultHeading.current?.focus({ preventScroll: !0 });
   }, [plan]);
   let selectView = (id2) => {
@@ -31005,7 +31107,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
     let next = event.key === "ArrowRight" ? (index + 1) % WORKSPACE_VIEWS.length : event.key === "ArrowLeft" ? (index + WORKSPACE_VIEWS.length - 1) % WORKSPACE_VIEWS.length : event.key === "Home" ? 0 : event.key === "End" ? WORKSPACE_VIEWS.length - 1 : null;
     next !== null && (event.preventDefault(), selectView(WORKSPACE_VIEWS[next].id));
   };
-  import_react57.default.useEffect(() => {
+  import_react58.default.useEffect(() => {
     let syncBudget = () => {
       let value = settingsScope.getSnapshot().value ?? {}, signature2 = routingSettingsSignature(value);
       if (setRoutingSettings((previous) => previous === signature2 ? previous : signature2), budgetEdited.current) return;
@@ -31013,15 +31115,15 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       next !== budgetValue.current && (budgetValue.current = next, setBudget(next), setPlan(null), setPlanError(""));
     };
     return syncBudget(), settingsScope.subscribe(syncBudget);
-  }, [settingsScope]), import_react57.default.useEffect(() => {
+  }, [settingsScope]), import_react58.default.useEffect(() => {
     setPlan(null), setPlanError("");
   }, [routingSettings]);
   let dataRevision = workbench.ledger.value?.dynamicData?.revision ?? "", feedbackRevision = workbench.ledger.value?.learning?.revision ?? "", evidenceRevision = workbench.ledger.value?.routingEvidence?.revision ?? "", manualAllowed = workbench.ledger.value?.settings?.allowManualReassign !== !1 && settingsScope.getSnapshot().value?.allowManualReassign !== !1;
-  import_react57.default.useEffect(() => {
+  import_react58.default.useEffect(() => {
     setAssignmentMode("algorithm"), setPackageAssignments({});
-  }, [plan, task, mode, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools, manualAllowed]), import_react57.default.useEffect(() => {
+  }, [plan, task, mode, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools, manualAllowed]), import_react58.default.useEffect(() => {
     plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}/${evidenceRevision}` && (setPlan(null), setPlanError(""));
-  }, [dataRevision, feedbackRevision, evidenceRevision, plan]), import_react57.default.useEffect(() => {
+  }, [dataRevision, feedbackRevision, evidenceRevision, plan]), import_react58.default.useEffect(() => {
     mounted.current = !0;
     let request = ++catalogRequest.current;
     return Promise.resolve().then(loadCatalog).then((response) => {
@@ -31032,7 +31134,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       mounted.current = !1, catalogRequest.current += 1;
     };
   }, []);
-  let routes = routesFromModelCatalog(catalogState.catalog), assignmentOptions = manualAssignmentOptions(routes, toolProbes, workbench.health.report), attention = import_react57.default.useMemo(() => deriveAttention({
+  let routes = routesFromModelCatalog(catalogState.catalog), assignmentOptions = manualAssignmentOptions(routes, toolProbes, workbench.health.report), attention = import_react58.default.useMemo(() => deriveAttention({
     budget: workbench.ledger.value?.budget ?? null,
     reserved: workbench.ledger.value?.reserved ?? null,
     probes: toolProbes?.probes ?? [],
@@ -31058,7 +31160,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
     }
   }, invalidatePlan = () => {
     generationRequest.current += 1, setPlan(null), setPlanError("");
-  }, handleToolProbes = import_react57.default.useCallback((snapshot) => {
+  }, handleToolProbes = import_react58.default.useCallback((snapshot) => {
     generationRequest.current += 1, setToolProbes(snapshot), setPlan(null), setPlanError("");
   }, []), generate = async () => {
     let request = ++generationRequest.current, inputs = generationInputs.current;
@@ -31095,21 +31197,21 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       setPlan(null), setPlanError(text5(error?.message) || "无法生成路由建议。");
     }
   }, summary = healthSummary(workbench.health.report?.tools);
-  return /* @__PURE__ */ import_react57.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react57.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react57.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-eyebrow" }, "Model Router · DeepSeek Harness"), /* @__PURE__ */ import_react57.default.createElement("h1", { className: "mr-title" }, "模型路由工作台"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-subtitle" }, "把任务交给合适的模型。从本地规划，到可确认的执行。")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === "loading" ? "正在读取模型目录" : "模型目录读取失败")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-overview", "aria-label": "工作台概览" }, /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("models") }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-label" }, "模型路线"), /* @__PURE__ */ import_react57.default.createElement("strong", null, catalogState.status === "ready" ? routes.length : "—"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-detail" }, catalogState.status === "ready" ? `${providerCount} 个供应商 · 配置价格与能力 →` : "等待目录加载")), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("tools") }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-label" }, "官方工具"), /* @__PURE__ */ import_react57.default.createElement("strong", null, workbench.health.report ? summary.installed : "—", /* @__PURE__ */ import_react57.default.createElement("small", null, " / ", OFFICIAL_TOOLS.length)), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-detail" }, workbench.health.report ? `${summary.ready} 个已登录 · 查看体检 →` : "查看安装与登录状态 →")), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("controls") }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-label" }, "今日已发生 API 费用"), /* @__PURE__ */ import_react57.default.createElement("strong", null, workbench.ledger.value ? money2(workbench.ledger.value.spent?.today ?? 0) : "—"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-detail" }, "预占 ", money2(reservationSummary(workbench.ledger.value).today), " · 查看预算 →"))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-workspace-tabs", role: "tablist", "aria-label": "工作台功能" }, WORKSPACE_VIEWS.map((item, index) => /* @__PURE__ */ import_react57.default.createElement("button", { key: item.id, ref: (element) => {
+  return /* @__PURE__ */ import_react58.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react58.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react58.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-eyebrow" }, "Model Router · DeepSeek Harness"), /* @__PURE__ */ import_react58.default.createElement("h1", { className: "mr-title" }, "模型路由工作台"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-subtitle" }, "把任务交给合适的模型。从本地规划，到可确认的执行。")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === "loading" ? "正在读取模型目录" : "模型目录读取失败")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-overview", "aria-label": "工作台概览" }, /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("models") }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-overview-label" }, "模型路线"), /* @__PURE__ */ import_react58.default.createElement("strong", null, catalogState.status === "ready" ? routes.length : "—"), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-overview-detail" }, catalogState.status === "ready" ? `${providerCount} 个供应商 · 配置价格与能力 →` : "等待目录加载")), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("tools") }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-overview-label" }, "官方工具"), /* @__PURE__ */ import_react58.default.createElement("strong", null, workbench.health.report ? summary.installed : "—", /* @__PURE__ */ import_react58.default.createElement("small", null, " / ", OFFICIAL_TOOLS.length)), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-overview-detail" }, workbench.health.report ? `${summary.ready} 个已登录 · 查看体检 →` : "查看安装与登录状态 →")), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("controls") }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-overview-label" }, "今日已发生 API 费用"), /* @__PURE__ */ import_react58.default.createElement("strong", null, workbench.ledger.value ? money2(workbench.ledger.value.spent?.today ?? 0) : "—"), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-overview-detail" }, "预占 ", money2(reservationSummary(workbench.ledger.value).today), " · 查看预算 →"))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-workspace-tabs", role: "tablist", "aria-label": "工作台功能" }, WORKSPACE_VIEWS.map((item, index) => /* @__PURE__ */ import_react58.default.createElement("button", { key: item.id, ref: (element) => {
     tabRefs.current[item.id] = element;
-  }, type: "button", role: "tab", id: `mr-tab-${item.id}`, "aria-selected": view === item.id, "aria-controls": `mr-panel-${item.id}`, tabIndex: view === item.id ? 0 : -1, onKeyDown: (event) => navigateTabs(event, index), onClick: () => setView(item.id) }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-tab-number", "aria-hidden": "true" }, item.number), item.label))), staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: !!toolProbes?.probes?.length }) && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-error", role: "alert" }, staleHostNotice({ hostVersion: toolProbes?.hostVersion })), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react57.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), attention.length > 0 && /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card mr-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "需要你处理"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, attentionSummary(attention)))), /* @__PURE__ */ import_react57.default.createElement("ul", { className: "mr-attention-list" }, attention.map((row) => /* @__PURE__ */ import_react57.default.createElement("li", { key: row.key, className: `mr-attention-row mr-attention-${row.stage}` }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, row.detail)), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView(row.target) }, row.target === "tools" ? "查看官方工具" : "查看费用与用量"))))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-plan", "aria-labelledby": "mr-tab-plan", hidden: view !== "plan" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-grid mr-planning-grid" }, /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card", "aria-label": "任务规划" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "任务规划"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "写清目标与验收标准，先生成本地建议，再预览执行。")), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-pill" }, "本地规划 · 不消耗 token")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-label", htmlFor: "mr-task" }, "任务描述"), /* @__PURE__ */ import_react57.default.createElement("textarea", { className: "mr-textarea", id: "mr-task", value: task, onChange: (event) => {
+  }, type: "button", role: "tab", id: `mr-tab-${item.id}`, "aria-selected": view === item.id, "aria-controls": `mr-panel-${item.id}`, tabIndex: view === item.id ? 0 : -1, onKeyDown: (event) => navigateTabs(event, index), onClick: () => setView(item.id) }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-tab-number", "aria-hidden": "true" }, item.number), item.label))), staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: !!toolProbes?.probes?.length }) && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-error", role: "alert" }, staleHostNotice({ hostVersion: toolProbes?.hostVersion })), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react58.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), attention.length > 0 && /* @__PURE__ */ import_react58.default.createElement("section", { className: "mr-card mr-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("h2", { className: "mr-card-title" }, "需要你处理"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-card-copy" }, attentionSummary(attention)))), /* @__PURE__ */ import_react58.default.createElement("ul", { className: "mr-attention-list" }, attention.map((row) => /* @__PURE__ */ import_react58.default.createElement("li", { key: row.key, className: `mr-attention-row mr-attention-${row.stage}` }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, row.detail)), /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView(row.target) }, row.target === "tools" ? "查看官方工具" : "查看费用与用量"))))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-plan", "aria-labelledby": "mr-tab-plan", hidden: view !== "plan" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-grid mr-planning-grid" }, /* @__PURE__ */ import_react58.default.createElement("section", { className: "mr-card", "aria-label": "任务规划" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("h2", { className: "mr-card-title" }, "任务规划"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-card-copy" }, "写清目标与验收标准，先生成本地建议，再预览执行。")), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-pill" }, "本地规划 · 不消耗 token")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-label", htmlFor: "mr-task" }, "任务描述"), /* @__PURE__ */ import_react58.default.createElement("textarea", { className: "mr-textarea", id: "mr-task", value: task, onChange: (event) => {
     setTask(event.target.value), invalidatePlan();
-  }, placeholder: "例如：分析项目架构，分工修复关键问题，并给出验收清单", "aria-describedby": "mr-task-hint" }), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-task-hint", id: "mr-task-hint" }, "团队任务可按编号写出步骤、交付物和依赖；规划不会更改主会话模型。"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-control-label" }, "规划模式"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "规划模式" }, /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": mode === "single", onClick: () => {
+  }, placeholder: "例如：分析项目架构，分工修复关键问题，并给出验收清单", "aria-describedby": "mr-task-hint" }), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption mr-task-hint", id: "mr-task-hint" }, "团队任务可按编号写出步骤、交付物和依赖；规划不会更改主会话模型。"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label" }, "规划模式"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "规划模式" }, /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": mode === "single", onClick: () => {
     setMode("single"), invalidatePlan();
-  } }, "单任务"), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": mode === "team", onClick: () => {
+  } }, "单任务"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": mode === "team", onClick: () => {
     setMode("team"), invalidatePlan();
-  } }, "团队分工"), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": mode === "direct", onClick: () => {
+  } }, "团队分工"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": mode === "direct", onClick: () => {
     setMode("direct"), invalidatePlan();
-  } }, "指定模型"))), mode === "direct" && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-control-group mr-direct" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-direct-model" }, "直接使用"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", id: "mr-direct-model", value: directKey || (routes[0] ? `${routes[0].provider}/${routes[0].model}` : ""), onChange: (event) => {
+  } }, "指定模型"))), mode === "direct" && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group mr-direct" }, /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-direct-model" }, "直接使用"), /* @__PURE__ */ import_react58.default.createElement("select", { className: "mr-input", id: "mr-direct-model", value: directKey || (routes[0] ? `${routes[0].provider}/${routes[0].model}` : ""), onChange: (event) => {
     setDirectKey(event.target.value), invalidatePlan();
-  } }, routes.map((route2) => /* @__PURE__ */ import_react57.default.createElement("option", { key: `${route2.provider}/${route2.model}`, value: `${route2.provider}/${route2.model}` }, route2.provider, "/", route2.model)))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-control-group mr-budget" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-budget" }, "本次估算预算（USD）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", id: "mr-budget", type: "number", min: "0", step: "0.01", value: budget, onChange: (event) => {
+  } }, routes.map((route2) => /* @__PURE__ */ import_react58.default.createElement("option", { key: `${route2.provider}/${route2.model}`, value: `${route2.provider}/${route2.model}` }, route2.provider, "/", route2.model)))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group mr-budget" }, /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-budget" }, "本次估算预算（USD）"), /* @__PURE__ */ import_react58.default.createElement("input", { className: "mr-input", id: "mr-budget", type: "number", min: "0", step: "0.01", value: budget, onChange: (event) => {
     budgetEdited.current = !0, budgetValue.current = event.target.value, setBudget(event.target.value), invalidatePlan();
-  } }))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "生成路由建议"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, catalogState.status === "loading" ? "正在读取模型目录…" : catalogState.status === "error" ? "目录读取失败，请在“模型配置”中刷新。" : routes.length === 0 ? "请先在 Harness 的“模型”页添加模型。" : toolProbes === null ? "正在检测官方工具…" : "预算 0 为不限；费用为估算。")), planError && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react57.default.createElement("aside", { className: "mr-planning-guide", "aria-label": "规划使用提示" }, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-eyebrow" }, "工作流程"), /* @__PURE__ */ import_react57.default.createElement("ol", { className: "mr-workflow" }, /* @__PURE__ */ import_react57.default.createElement("li", null, /* @__PURE__ */ import_react57.default.createElement("span", null, "01"), /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("strong", null, "描述任务"), /* @__PURE__ */ import_react57.default.createElement("p", null, "选择单任务、团队分工或指定模型。"))), /* @__PURE__ */ import_react57.default.createElement("li", null, /* @__PURE__ */ import_react57.default.createElement("span", null, "02"), /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("strong", null, "核对路由建议"), /* @__PURE__ */ import_react57.default.createElement("p", null, "检查模型、工作包依赖和估算费用。"))), /* @__PURE__ */ import_react57.default.createElement("li", null, /* @__PURE__ */ import_react57.default.createElement("span", null, "03"), /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("strong", null, "预览并确认执行"), /* @__PURE__ */ import_react57.default.createElement("p", null, "确认后调用模型，结果写入执行记录。")))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-guide-links" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("models") }, "配置模型价格与能力 →"), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("tools") }, "检查官方工具与登录 →")), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "缺少价格时会提示“价格待配置”。只读检查可直接预览；修改文件时，先选“团队分工”，再在执行区选择“官方工具协作”和“编辑文件”权限，核对预览后确认执行。"))), plan && /* @__PURE__ */ import_react57.default.createElement(
+  } }))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button", type: "button", disabled: catalogState.status !== "ready" || routes.length === 0 || toolProbes === null, onClick: generate }, "生成路由建议"), /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-caption" }, catalogState.status === "loading" ? "正在读取模型目录…" : catalogState.status === "error" ? "目录读取失败，请在“模型配置”中刷新。" : routes.length === 0 ? "请先在 Harness 的“模型”页添加模型。" : toolProbes === null ? "正在检测官方工具…" : "预算 0 为不限；费用为估算。")), planError && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error", role: "alert" }, planError))), /* @__PURE__ */ import_react58.default.createElement("aside", { className: "mr-planning-guide", "aria-label": "规划使用提示" }, /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-eyebrow" }, "工作流程"), /* @__PURE__ */ import_react58.default.createElement("ol", { className: "mr-workflow" }, /* @__PURE__ */ import_react58.default.createElement("li", null, /* @__PURE__ */ import_react58.default.createElement("span", null, "01"), /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("strong", null, "描述任务"), /* @__PURE__ */ import_react58.default.createElement("p", null, "选择单任务、团队分工或指定模型。"))), /* @__PURE__ */ import_react58.default.createElement("li", null, /* @__PURE__ */ import_react58.default.createElement("span", null, "02"), /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("strong", null, "核对路由建议"), /* @__PURE__ */ import_react58.default.createElement("p", null, "检查模型、工作包依赖和估算费用。"))), /* @__PURE__ */ import_react58.default.createElement("li", null, /* @__PURE__ */ import_react58.default.createElement("span", null, "03"), /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("strong", null, "预览并确认执行"), /* @__PURE__ */ import_react58.default.createElement("p", null, "确认后调用模型，结果写入执行记录。")))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-guide-links" }, /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("models") }, "配置模型价格与能力 →"), /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView("tools") }, "检查官方工具与登录 →")), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "缺少价格时会提示“价格待配置”。只读检查可直接预览；修改文件时，先选“团队分工”，再在执行区选择“官方工具协作”和“编辑文件”权限，核对预览后确认执行。"))), plan && /* @__PURE__ */ import_react58.default.createElement(
     PlanResults,
     {
       plan,
@@ -31125,7 +31227,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         manualAllowed && currentPackagePlanKey && setPackageAssignments(initialPackageAssignments(plan));
       }
     }
-  ), /* @__PURE__ */ import_react57.default.createElement(
+  ), /* @__PURE__ */ import_react58.default.createElement(
     RunLauncher,
     {
       task,
@@ -31147,7 +31249,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         workbench.refreshLedger();
       }
     }
-  ), /* @__PURE__ */ import_react57.default.createElement(
+  ), /* @__PURE__ */ import_react58.default.createElement(
     RunHistoryCard,
     {
       ledger: workbench.ledger.value,
@@ -31164,14 +31266,14 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         workbench.rerun(runId, packageId, override, choice);
       }
     }
-  )), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view", role: "tabpanel", id: "mr-panel-models", "aria-labelledby": "mr-tab-models", hidden: view !== "models" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react57.default.createElement("h2", null, "模型配置"), /* @__PURE__ */ import_react57.default.createElement("p", null, "从官方目录选择路线，补齐比较所需的价格、能力与执行方式。")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-grid mr-model-grid" }, /* @__PURE__ */ import_react57.default.createElement(ModelProfileEditor, { routes, settingsScope, onSaved: invalidatePlan }), /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card", "aria-label": "模型目录" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "模型目录"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, routes.length, " 条路线 · 只读取官方目录，不读取 API Key。")), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: catalogState.status === "loading", onClick: refresh }, "刷新")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-empty" }, "正在加载官方模型目录…"), catalogState.status === "ready" && /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "搜索路线"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "模型或供应商" }), /* @__PURE__ */ import_react57.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " 个供应商的目录读取失败，请在官方模型页检查配置。")), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "目录登记不代表凭据或网络当前可用；图像能力需要在实际使用前核对。"))))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-tools", "aria-labelledby": "mr-tab-tools", hidden: view !== "tools" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react57.default.createElement("h2", null, "官方工具"), /* @__PURE__ */ import_react57.default.createElement("p", null, "管理本机 CLI、检查登录状态，或打开交互式终端。")), terminalApi && /* @__PURE__ */ import_react57.default.createElement(
+  )), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-view", role: "tabpanel", id: "mr-panel-models", "aria-labelledby": "mr-tab-models", hidden: view !== "models" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react58.default.createElement("h2", null, "模型配置"), /* @__PURE__ */ import_react58.default.createElement("p", null, "从官方目录选择路线，补齐比较所需的价格、能力与执行方式。")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-grid mr-model-grid" }, /* @__PURE__ */ import_react58.default.createElement(ModelProfileEditor, { routes, settingsScope, onSaved: invalidatePlan }), /* @__PURE__ */ import_react58.default.createElement("section", { className: "mr-card", "aria-label": "模型目录" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("h2", { className: "mr-card-title" }, "模型目录"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-card-copy" }, routes.length, " 条路线 · 只读取官方目录，不读取 API Key。")), /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", disabled: catalogState.status === "loading", onClick: refresh }, "刷新")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-body" }, catalogState.status === "error" && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-error", role: "alert" }, catalogState.error), catalogState.status === "loading" && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-empty" }, "正在加载官方模型目录…"), catalogState.status === "ready" && /* @__PURE__ */ import_react58.default.createElement(import_react58.default.Fragment, null, /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-label", htmlFor: "mr-model-search" }, "搜索路线"), /* @__PURE__ */ import_react58.default.createElement("input", { className: "mr-input mr-search", id: "mr-model-search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: "模型或供应商" }), /* @__PURE__ */ import_react58.default.createElement(RouteList, { routes, query }), catalogState.catalog?.failures?.length > 0 && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, catalogState.catalog.failures.length, " 个供应商的目录读取失败，请在官方模型页检查配置。")), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption", style: { marginTop: 13 } }, "目录登记不代表凭据或网络当前可用；图像能力需要在实际使用前核对。"))))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-tools", "aria-labelledby": "mr-tab-tools", hidden: view !== "tools" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react58.default.createElement("h2", null, "官方工具"), /* @__PURE__ */ import_react58.default.createElement("p", null, "管理本机 CLI、检查登录状态，或打开交互式终端。")), terminalApi && /* @__PURE__ */ import_react58.default.createElement(
     CliTerminalCard,
     {
       api: terminalApi,
       health: workbench.health.report,
       settingsSignature: toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)
     }
-  ), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react57.default.createElement(
+  ), workbench.health.report && !workbench.health.report.onboarding?.completedAt && /* @__PURE__ */ import_react58.default.createElement(
     OnboardingBanner,
     {
       health: workbench.health.report,
@@ -31184,7 +31286,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         workbench.finishOnboarding();
       }
     }
-  ), /* @__PURE__ */ import_react57.default.createElement(
+  ), /* @__PURE__ */ import_react58.default.createElement(
     OfficialToolsCard,
     {
       tuiPrompt,
@@ -31202,7 +31304,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         workbench.refreshHealth(!0);
       }
     }
-  )), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-controls", "aria-labelledby": "mr-tab-controls", hidden: view !== "controls" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react57.default.createElement("h2", null, "预算与安全"), /* @__PURE__ */ import_react57.default.createElement("p", null, "API 按金额管理预算，订阅单独核对用量与执行边界。")), /* @__PURE__ */ import_react57.default.createElement(TwoLedgerBooks, { books: workbench.ledger.value?.books }), /* @__PURE__ */ import_react57.default.createElement(
+  )), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-controls", "aria-labelledby": "mr-tab-controls", hidden: view !== "controls" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-view-heading" }, /* @__PURE__ */ import_react58.default.createElement("h2", null, "预算与安全"), /* @__PURE__ */ import_react58.default.createElement("p", null, "API 按金额管理预算，订阅单独核对用量与执行边界。")), /* @__PURE__ */ import_react58.default.createElement(TwoLedgerBooks, { books: workbench.ledger.value?.books }), /* @__PURE__ */ import_react58.default.createElement(
     CostControlCard,
     {
       ledger: workbench.ledger.value,
@@ -31211,7 +31313,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       settingsScope,
       onChanged: () => (invalidatePlan(), workbench.refreshLedger())
     }
-  ), /* @__PURE__ */ import_react57.default.createElement(SubscriptionUsageCard, { ledger: workbench.ledger.value }), /* @__PURE__ */ import_react57.default.createElement(
+  ), /* @__PURE__ */ import_react58.default.createElement(SubscriptionUsageCard, { ledger: workbench.ledger.value }), /* @__PURE__ */ import_react58.default.createElement(
     BillingCard,
     {
       billing: workbench.health.report?.billing ?? null,
@@ -31221,9 +31323,9 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         workbench.refreshHealth(!0);
       }
     }
-  ), /* @__PURE__ */ import_react57.default.createElement(SecurityCard, { data: workbench.boundaries.value, error: workbench.boundaries.error, onRefresh: () => {
+  ), /* @__PURE__ */ import_react58.default.createElement(SecurityCard, { data: workbench.boundaries.value, error: workbench.boundaries.error, onRefresh: () => {
     workbench.refreshBoundaries();
-  } })), /* @__PURE__ */ import_react57.default.createElement("footer", { className: "mr-footer" }, "主会话模型由 Harness 管理。更多设置：插件 → 已安装 → ", /* @__PURE__ */ import_react57.default.createElement("code", null, "@ljwei-stak/dsh-model-router"), "。")));
+  } })), /* @__PURE__ */ import_react58.default.createElement("footer", { className: "mr-footer" }, "主会话模型由 Harness 管理。更多设置：插件 → 已安装 → ", /* @__PURE__ */ import_react58.default.createElement("code", null, "@ljwei-stak/dsh-model-router"), "。")));
 }
 
 // .dsh-plugin/shared/official-tools-remote.mjs
@@ -31624,7 +31726,7 @@ function RouterSettingsCard(props) {
   if (props.view === "summary")
     return "为官方已配置的模型生成路由计划，并提供跨模型咨询工具。";
   let disabled = !state.writable || state.saving;
-  return /* @__PURE__ */ import_react58.default.createElement(import_dsh_client_ui_primitives2.SettingsForm, { labels: FORM_LABELS, state, onSave: props.save, onDiscard: props.discard }, /* @__PURE__ */ import_react58.default.createElement(
+  return /* @__PURE__ */ import_react59.default.createElement(import_dsh_client_ui_primitives2.SettingsForm, { labels: FORM_LABELS, state, onSave: props.save, onDiscard: props.discard }, /* @__PURE__ */ import_react59.default.createElement(
     import_dsh_client_ui_primitives2.SettingsValueField,
     {
       id: "model-router-budget-usd",
@@ -31646,7 +31748,7 @@ function RouterSettingsCard(props) {
         props.resetField("budgetUsd");
       }
     }
-  ), /* @__PURE__ */ import_react58.default.createElement(
+  ), /* @__PURE__ */ import_react59.default.createElement(
     import_dsh_client_ui_primitives2.SettingsValueField,
     {
       id: "model-router-consult-output",
@@ -31670,7 +31772,7 @@ function RouterSettingsCard(props) {
     ["monthlyBudgetUsd", "model-router-monthly-budget", "每月执行预算（USD）", "0 表示不限。按本地时区的自然月累计。"],
     ["reviewSampleRate", "model-router-review-rate", "强模型抽检比例（0–1）", "质量回路设为“抽检”时，按此比例让更强的模型复核便宜模型的结果。"],
     ["subscriptionCooldownMinutes", "model-router-subscription-cooldown", "订阅额度冷却时间（分钟）", "订阅额度用尽或限流、但厂商没有给出恢复时间时，暂停使用该订阅的时长；期间同一路线直接使用 API Key。"]
-  ].map(([key, id2, label, hint]) => /* @__PURE__ */ import_react58.default.createElement(
+  ].map(([key, id2, label, hint]) => /* @__PURE__ */ import_react59.default.createElement(
     import_dsh_client_ui_primitives2.SettingsValueField,
     {
       key,
@@ -31689,10 +31791,10 @@ function RouterSettingsCard(props) {
         props.resetField(key);
       }
     }
-  )), /* @__PURE__ */ import_react58.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react58.default.createElement("span", { style: styles.profileLabel }, "官方 CLI 读写边界"), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "只读执行不写任何文件；修改文件的执行在独立 Git 工作树中进行，需要你确认后才会把补丁应用回当前工作区。工作台“安全边界”卡片按已配置模型逐条列出。"), /* @__PURE__ */ import_react58.default.createElement("table", { style: styles.boundaryTable }, /* @__PURE__ */ import_react58.default.createElement("thead", null, /* @__PURE__ */ import_react58.default.createElement("tr", null, /* @__PURE__ */ import_react58.default.createElement("th", { style: styles.boundaryCell }, "工具"), /* @__PURE__ */ import_react58.default.createElement("th", { style: styles.boundaryCell }, "只读执行可读"), /* @__PURE__ */ import_react58.default.createElement("th", { style: styles.boundaryCell }, "修改执行可写"))), /* @__PURE__ */ import_react58.default.createElement("tbody", null, [["claude-code", "Claude Code"], ["codex", "Codex"], ["gemini", "Gemini CLI"]].map(([toolId, label]) => {
+  )), /* @__PURE__ */ import_react59.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react59.default.createElement("span", { style: styles.profileLabel }, "官方 CLI 读写边界"), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "只读执行不写任何文件；修改文件的执行在独立 Git 工作树中进行，需要你确认后才会把补丁应用回当前工作区。工作台“安全边界”卡片按已配置模型逐条列出。"), /* @__PURE__ */ import_react59.default.createElement("table", { style: styles.boundaryTable }, /* @__PURE__ */ import_react59.default.createElement("thead", null, /* @__PURE__ */ import_react59.default.createElement("tr", null, /* @__PURE__ */ import_react59.default.createElement("th", { style: styles.boundaryCell }, "工具"), /* @__PURE__ */ import_react59.default.createElement("th", { style: styles.boundaryCell }, "只读执行可读"), /* @__PURE__ */ import_react59.default.createElement("th", { style: styles.boundaryCell }, "修改执行可写"))), /* @__PURE__ */ import_react59.default.createElement("tbody", null, [["claude-code", "Claude Code"], ["codex", "Codex"], ["gemini", "Gemini CLI"]].map(([toolId, label]) => {
     let boundary = toolBoundary(toolId);
-    return /* @__PURE__ */ import_react58.default.createElement("tr", { key: toolId }, /* @__PURE__ */ import_react58.default.createElement("td", { style: styles.boundaryCell }, label), /* @__PURE__ */ import_react58.default.createElement("td", { style: styles.boundaryCell }, boundary.readOnly.readable), /* @__PURE__ */ import_react58.default.createElement("td", { style: styles.boundaryCell }, boundary.write?.writable ?? "不支持修改执行"));
-  })))), /* @__PURE__ */ import_react58.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react58.default.createElement("label", { htmlFor: "model-router-profiles-json", style: styles.profileLabel }, "模型价格与能力配置（JSON）"), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "按“模型目录”中的准确 provider/model 填写。quality 为自定的 0–100 分；input/output 是美元每百万 token。缺少价格时只给路线建议，不显示虚构费用。"), /* @__PURE__ */ import_react58.default.createElement(
+    return /* @__PURE__ */ import_react59.default.createElement("tr", { key: toolId }, /* @__PURE__ */ import_react59.default.createElement("td", { style: styles.boundaryCell }, label), /* @__PURE__ */ import_react59.default.createElement("td", { style: styles.boundaryCell }, boundary.readOnly.readable), /* @__PURE__ */ import_react59.default.createElement("td", { style: styles.boundaryCell }, boundary.write?.writable ?? "不支持修改执行"));
+  })))), /* @__PURE__ */ import_react59.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react59.default.createElement("label", { htmlFor: "model-router-profiles-json", style: styles.profileLabel }, "模型价格与能力配置（JSON）"), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "按“模型目录”中的准确 provider/model 填写。quality 为自定的 0–100 分；input/output 是美元每百万 token。缺少价格时只给路线建议，不显示虚构费用。"), /* @__PURE__ */ import_react59.default.createElement(
     "textarea",
     {
       id: "model-router-profiles-json",
@@ -31703,7 +31805,7 @@ function RouterSettingsCard(props) {
       spellCheck: !1,
       style: styles.profileTextarea
     }
-  ), state.modelProfilesJson.invalid && /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.profileError, role: "alert" }, "JSON 格式或某项配置无效。每项需提供准确的 provider/model，单价为非负 USD 数字，质量为 0–100。"), /* @__PURE__ */ import_react58.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react58.default.createElement("summary", null, "查看配置格式"), /* @__PURE__ */ import_react58.default.createElement("pre", null, `[
+  ), state.modelProfilesJson.invalid && /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.profileError, role: "alert" }, "JSON 格式或某项配置无效。每项需提供准确的 provider/model，单价为非负 USD 数字，质量为 0–100。"), /* @__PURE__ */ import_react59.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react59.default.createElement("summary", null, "查看配置格式"), /* @__PURE__ */ import_react59.default.createElement("pre", null, `[
   {
     "provider": "模型目录中的供应商 ID",
     "model": "模型目录中的模型 ID",
@@ -31716,7 +31818,7 @@ function RouterSettingsCard(props) {
     "subscription": "plan-key",
     "apiRoute": { "provider": "按量付费供应商 ID", "model": "模型 ID" }
   }
-]`), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "execution 可省略。auto 或 official 表示优先官方无界面工具，失败后回退 API；api 表示始终走模型目录。billing 默认 subscription-first（订阅优先，额度用尽或限流时切换 API Key），也可设为 api-only 或 subscription-only。subscription 为 plan-key 表示该路线本身是编程套餐端点（如 GLM Coding Plan、Kimi Code、MiniMax Token Plan），apiRoute 指定额度用尽时回退的按量付费路线。")), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("modelProfilesJson") }, "恢复默认配置")), /* @__PURE__ */ import_react58.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react58.default.createElement("label", { htmlFor: "model-router-quota-patterns", style: styles.profileLabel }, "订阅额度识别规则（JSON，可选）"), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "内置规则已覆盖 Claude、Codex、Gemini、Kimi、MiniMax、GLM 的文档化报错。厂商改了报错文案时，可按工具 ID、供应商 ID 或 * 追加正则：quota 表示额度用尽，rateLimit 表示限流。"), /* @__PURE__ */ import_react58.default.createElement(
+]`), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "execution 可省略。auto 或 official 表示优先官方无界面工具，失败后回退 API；api 表示始终走模型目录。billing 默认 subscription-first（订阅优先，额度用尽或限流时切换 API Key），也可设为 api-only 或 subscription-only。subscription 为 plan-key 表示该路线本身是编程套餐端点（如 GLM Coding Plan、Kimi Code、MiniMax Token Plan），apiRoute 指定额度用尽时回退的按量付费路线。")), /* @__PURE__ */ import_react59.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("modelProfilesJson") }, "恢复默认配置")), /* @__PURE__ */ import_react59.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react59.default.createElement("label", { htmlFor: "model-router-quota-patterns", style: styles.profileLabel }, "订阅额度识别规则（JSON，可选）"), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "内置规则已覆盖 Claude、Codex、Gemini、Kimi、MiniMax、GLM 的文档化报错。厂商改了报错文案时，可按工具 ID、供应商 ID 或 * 追加正则：quota 表示额度用尽，rateLimit 表示限流。"), /* @__PURE__ */ import_react59.default.createElement(
     "textarea",
     {
       id: "model-router-quota-patterns",
@@ -31727,10 +31829,10 @@ function RouterSettingsCard(props) {
       spellCheck: !1,
       style: styles.profileTextarea
     }
-  ), state.quotaPatternsJson.invalid && /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.profileError, role: "alert" }, "需要 JSON 对象，且每条规则都是有效的正则表达式。"), /* @__PURE__ */ import_react58.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react58.default.createElement("summary", null, "查看规则格式"), /* @__PURE__ */ import_react58.default.createElement("pre", null, `{
+  ), state.quotaPatternsJson.invalid && /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.profileError, role: "alert" }, "需要 JSON 对象，且每条规则都是有效的正则表达式。"), /* @__PURE__ */ import_react59.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react59.default.createElement("summary", null, "查看规则格式"), /* @__PURE__ */ import_react59.default.createElement("pre", null, `{
   "kimi-code": { "quota": ["额度已用完"], "rateLimit": ["请求过于频繁"] },
   "my-glm-plan": { "quota": ["Usage limit reached for", "1308"] }
-}`)), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("quotaPatternsJson") }, "恢复默认规则")), /* @__PURE__ */ import_react58.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react58.default.createElement("span", { style: styles.profileLabel }, "官方工具统一安装设置"), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "用于官方工具的安装与更新。工作台的“官方工具”页也能保存同样的字段，并会显示每个工具的实际安装方式、目录与执行命令。 安装命令始终来自固定注册表，这里只决定目录与下载源，不接受自定义包名或任意地址。"), /* @__PURE__ */ import_react58.default.createElement(
+}`)), /* @__PURE__ */ import_react59.default.createElement("button", { type: "button", disabled, onClick: () => props.resetField("quotaPatternsJson") }, "恢复默认规则")), /* @__PURE__ */ import_react59.default.createElement("div", { style: styles.profileEditor }, /* @__PURE__ */ import_react59.default.createElement("span", { style: styles.profileLabel }, "官方工具统一安装设置"), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "用于官方工具的安装与更新。工作台的“官方工具”页也能保存同样的字段，并会显示每个工具的实际安装方式、目录与执行命令。 安装命令始终来自固定注册表，这里只决定目录与下载源，不接受自定义包名或任意地址。"), /* @__PURE__ */ import_react59.default.createElement(
     import_dsh_client_ui_primitives2.SettingsValueField,
     {
       id: "model-router-tool-install-dir",
@@ -31748,7 +31850,7 @@ function RouterSettingsCard(props) {
         props.resetField("toolInstallDir");
       }
     }
-  ), /* @__PURE__ */ import_react58.default.createElement(
+  ), /* @__PURE__ */ import_react59.default.createElement(
     import_dsh_client_ui_primitives2.SettingsValueField,
     {
       id: "model-router-tool-npm-registry",
@@ -31766,7 +31868,7 @@ function RouterSettingsCard(props) {
         props.resetField("toolNpmRegistry");
       }
     }
-  ), /* @__PURE__ */ import_react58.default.createElement(
+  ), /* @__PURE__ */ import_react59.default.createElement(
     import_dsh_client_ui_primitives2.SettingsValueField,
     {
       id: "model-router-tool-install-methods",
@@ -31784,7 +31886,7 @@ function RouterSettingsCard(props) {
         props.resetField("toolInstallMethodsJson");
       }
     }
-  ), /* @__PURE__ */ import_react58.default.createElement(
+  ), /* @__PURE__ */ import_react59.default.createElement(
     import_dsh_client_ui_primitives2.SettingsValueField,
     {
       id: "model-router-tool-script-urls",
@@ -31802,13 +31904,13 @@ function RouterSettingsCard(props) {
         props.resetField("toolScriptUrlsJson");
       }
     }
-  ), /* @__PURE__ */ import_react58.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react58.default.createElement("summary", null, "查看格式"), /* @__PURE__ */ import_react58.default.createElement("pre", null, `{
+  ), /* @__PURE__ */ import_react59.default.createElement("details", { style: styles.profileExample }, /* @__PURE__ */ import_react59.default.createElement("summary", null, "查看格式"), /* @__PURE__ */ import_react59.default.createElement("pre", null, `{
   "stepcode": "https://mirror.example.com/stepcode/install.ps1",
   "opencode": "https://mirror.example.com/opencode/install"
-}`), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "安装脚本方式（curl / irm）可以在工作台的“官方工具”页关闭；关闭后所有工具只能通过 npm 或 pnpm 安装。"))), /* @__PURE__ */ import_react58.default.createElement("aside", { style: styles.notice, "aria-label": "模型路由使用说明" }, /* @__PURE__ */ import_react58.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react58.default.createElement(import_dsh_client_ui_primitives2.Tag, { tone: "info" }, "官方模型配置")), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "请在 DeepSeek Harness 的“模型”页面配置 DeepSeek、OpenAI 兼容或 Anthropic 兼容服务。此插件读取官方模型目录，不保存 API Key；目录中的路线仍需通过实际调用验证账号和网络可用性。"), /* @__PURE__ */ import_react58.default.createElement("p", { style: styles.noticeText }, "使用 ", /* @__PURE__ */ import_react58.default.createElement("code", null, "model_router_plan"), " 获取可审阅的路由建议，使用 ", /* @__PURE__ */ import_react58.default.createElement("code", null, "model_router_consult"), " 咨询一个已配置模型。建议不会改写主会话模型；多人分工由官方 Agent Teams 工具执行。")));
+}`), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "安装脚本方式（curl / irm）可以在工作台的“官方工具”页关闭；关闭后所有工具只能通过 npm 或 pnpm 安装。"))), /* @__PURE__ */ import_react59.default.createElement("aside", { style: styles.notice, "aria-label": "模型路由使用说明" }, /* @__PURE__ */ import_react59.default.createElement("div", { style: styles.titleLine }, /* @__PURE__ */ import_react59.default.createElement(import_dsh_client_ui_primitives2.Tag, { tone: "info" }, "官方模型配置")), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "请在 DeepSeek Harness 的“模型”页面配置 DeepSeek、OpenAI 兼容或 Anthropic 兼容服务。此插件读取官方模型目录，不保存 API Key；目录中的路线仍需通过实际调用验证账号和网络可用性。"), /* @__PURE__ */ import_react59.default.createElement("p", { style: styles.noticeText }, "使用 ", /* @__PURE__ */ import_react59.default.createElement("code", null, "model_router_plan"), " 获取可审阅的路由建议，使用 ", /* @__PURE__ */ import_react59.default.createElement("code", null, "model_router_consult"), " 咨询一个已配置模型。建议不会改写主会话模型；多人分工由官方 Agent Teams 工具执行。")));
 }
 function OpenRouterWorkspace({ subject, openPanel }) {
-  return subject?.kind !== "bundle" || subject.pkg?.name !== ROUTER_PACKAGE ? null : /* @__PURE__ */ import_react58.default.createElement(import_dsh_client_ui_primitives2.Button, { variant: "outline", size: "sm", type: "button", onClick: openPanel }, "打开工作台");
+  return subject?.kind !== "bundle" || subject.pkg?.name !== ROUTER_PACKAGE ? null : /* @__PURE__ */ import_react59.default.createElement(import_dsh_client_ui_primitives2.Button, { variant: "outline", size: "sm", type: "button", onClick: openPanel }, "打开工作台");
 }
 function registerUi(ctx) {
   let officialToolsRemote = ctx.remote[OFFICIAL_TOOLS_REMOTE_NAMESPACE], settingsScope = ctx.configForms.get(ROUTER_NAMESPACE), card = new RouterSettingsCardController(settingsScope);
@@ -31935,7 +32037,7 @@ var TASK_STATES = Object.freeze({
 }), money3 = (value) => typeof value == "number" && Number.isFinite(value) ? `USD ${value.toFixed(6)}` : "未知（待收据核对）", modelName = (model) => typeof model == "string" ? model : model?.provider && (model?.model ?? model?.id) ? `${model.provider}/${model.model ?? model.id}` : "尚未选择准确模型";
 
 // apps/integration-client/panels.jsx
-var import_react60 = __toESM(require("react"), 1);
+var import_react61 = __toESM(require("react"), 1);
 
 // apps/integration-client/bot-attention.mjs
 var BOT_ATTENTION_STAGES = Object.freeze(["reconcile", "approve", "remote-unknown", "budget", "failed", "blocked"]), STAGE_ORDER2 = new Map(BOT_ATTENTION_STAGES.map((stage, index) => [stage, index])), TERMINAL = /* @__PURE__ */ new Set(["cancelled", "succeeded", "failed", "skipped"]), short2 = (value, limit = 80) => {
@@ -32088,11 +32190,11 @@ function framePoint({ clientX, clientY, rect, frame }) {
 }
 
 // apps/integration-client/binding-editor.jsx
-var import_react59 = __toESM(require("react"), 1);
+var import_react60 = __toESM(require("react"), 1);
 var route = (model) => model ? `${model.provider}/${model.model}` : "", workspace = (ref) => ref ? `${ref.machineId}/${ref.rootId}` : "";
 function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy }) {
-  let [form, setForm] = (0, import_react59.useState)(null);
-  (0, import_react59.useEffect)(() => {
+  let [form, setForm] = (0, import_react60.useState)(null);
+  (0, import_react60.useEffect)(() => {
     if (!record3) {
       setForm(null);
       return;
@@ -32119,8 +32221,8 @@ function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy }) {
       maxConcurrentTasks: value.maxConcurrentTasks
     });
   }, [bot.id, record3?.revision]);
-  let model = (0, import_react59.useMemo)(() => record3?.catalog.models.find((item) => route(item) === form?.model) ?? null, [record3, form?.model]), account = accounts.items.find((item) => item.provider === model?.provider);
-  if (!record3 || !form) return /* @__PURE__ */ import_react59.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得绑定目录。" } });
+  let model = (0, import_react60.useMemo)(() => record3?.catalog.models.find((item) => route(item) === form?.model) ?? null, [record3, form?.model]), account = accounts.items.find((item) => item.provider === model?.provider);
+  if (!record3 || !form) return /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得绑定目录。" } });
   let change = (key, value) => setForm((current) => ({ ...current, [key]: value })), selectedMachine = form.workspace.split("/")[0], selectedRoot = form.workspace.split("/").slice(1).join("/"), enableAccount = () => dispatch("funding.account.save", {
     scopeId: account.id,
     expectedRevision: account.revision,
@@ -32150,30 +32252,30 @@ function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy }) {
     };
     return dispatch("binding.save", { botId: bot.id, expectedRevision: record3.revision, settings });
   }, cliMappings = (model?.cliModels ?? []).filter((item, index, items) => items.findIndex((other) => other.toolId === item.toolId && other.model === item.model) === index);
-  return /* @__PURE__ */ import_react59.default.createElement("details", { className: "bp-card", open: record3.status !== "available" }, /* @__PURE__ */ import_react59.default.createElement("summary", null, "配置并启用此 Bot"), /* @__PURE__ */ import_react59.default.createElement("form", { className: "bp-form", onSubmit: save }, /* @__PURE__ */ import_react59.default.createElement("label", null, "准确模型", /* @__PURE__ */ import_react59.default.createElement("select", { "aria-label": `${bot.name} 的绑定模型`, value: form.model, onChange: (event) => {
+  return /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-card", open: record3.status !== "available" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "配置并启用此 Bot"), /* @__PURE__ */ import_react60.default.createElement("form", { className: "bp-form", onSubmit: save }, /* @__PURE__ */ import_react60.default.createElement("label", null, "准确模型", /* @__PURE__ */ import_react60.default.createElement("select", { "aria-label": `${bot.name} 的绑定模型`, value: form.model, onChange: (event) => {
     change("model", event.target.value), change("officialTools", []);
-  }, required: !0 }, /* @__PURE__ */ import_react59.default.createElement("option", { value: "", disabled: !0 }, "请选择"), record3.catalog.models.map((item) => /* @__PURE__ */ import_react59.default.createElement("option", { key: route(item), value: route(item) }, route(item))))), model && account && !account.enabled && /* @__PURE__ */ import_react59.default.createElement("aside", { className: "bp-blocked" }, /* @__PURE__ */ import_react59.default.createElement("strong", null, "资金范围尚未启用"), /* @__PURE__ */ import_react59.default.createElement("p", null, account.provider, " 需要本地预算上限；它不是厂商余额。"), /* @__PURE__ */ import_react59.default.createElement("label", null, "账户每日上限（USD）", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountDaily, onChange: (event) => change("accountDaily", event.target.value) })), /* @__PURE__ */ import_react59.default.createElement("label", null, "账户每月上限（USD）", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountMonthly, onChange: (event) => change("accountMonthly", event.target.value) })), /* @__PURE__ */ import_react59.default.createElement("button", { type: "button", disabled: busy, onClick: enableAccount }, "启用 ", account.provider, " 资金范围")), /* @__PURE__ */ import_react59.default.createElement("label", null, "工作区", /* @__PURE__ */ import_react59.default.createElement("select", { "aria-label": `${bot.name} 的绑定工作区`, value: form.workspace, onChange: (event) => change("workspace", event.target.value), required: !0 }, /* @__PURE__ */ import_react59.default.createElement("option", { value: "", disabled: !0 }, "请选择"), record3.catalog.machines.flatMap((machine) => machine.roots.map((root) => /* @__PURE__ */ import_react59.default.createElement("option", { key: `${machine.machineId}/${root.rootId}`, value: `${machine.machineId}/${root.rootId}` }, machine.label, " / ", root.label))))), /* @__PURE__ */ import_react59.default.createElement("label", null, "工作区权限", /* @__PURE__ */ import_react59.default.createElement("select", { value: form.workspaceMode, onChange: (event) => change("workspaceMode", event.target.value) }, /* @__PURE__ */ import_react59.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react59.default.createElement("option", { value: "workspace-write" }, "允许写入"))), /* @__PURE__ */ import_react59.default.createElement("fieldset", null, /* @__PURE__ */ import_react59.default.createElement("legend", null, "路由与任务能力"), record3.catalog.capabilities.map((capability) => /* @__PURE__ */ import_react59.default.createElement("label", { key: capability.id }, /* @__PURE__ */ import_react59.default.createElement("input", { type: "checkbox", checked: form.capabilities.includes(capability.id), onChange: (event) => change("capabilities", event.target.checked ? [...form.capabilities, capability.id] : form.capabilities.filter((id2) => id2 !== capability.id)) }), capability.label))), cliMappings.length > 0 && /* @__PURE__ */ import_react59.default.createElement("fieldset", null, /* @__PURE__ */ import_react59.default.createElement("legend", null, "已核验官方 CLI"), cliMappings.map((mapping) => {
+  }, required: !0 }, /* @__PURE__ */ import_react60.default.createElement("option", { value: "", disabled: !0 }, "请选择"), record3.catalog.models.map((item) => /* @__PURE__ */ import_react60.default.createElement("option", { key: route(item), value: route(item) }, route(item))))), model && account && !account.enabled && /* @__PURE__ */ import_react60.default.createElement("aside", { className: "bp-blocked" }, /* @__PURE__ */ import_react60.default.createElement("strong", null, "资金范围尚未启用"), /* @__PURE__ */ import_react60.default.createElement("p", null, account.provider, " 需要本地预算上限；它不是厂商余额。"), /* @__PURE__ */ import_react60.default.createElement("label", null, "账户每日上限（USD）", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountDaily, onChange: (event) => change("accountDaily", event.target.value) })), /* @__PURE__ */ import_react60.default.createElement("label", null, "账户每月上限（USD）", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountMonthly, onChange: (event) => change("accountMonthly", event.target.value) })), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy, onClick: enableAccount }, "启用 ", account.provider, " 资金范围")), /* @__PURE__ */ import_react60.default.createElement("label", null, "工作区", /* @__PURE__ */ import_react60.default.createElement("select", { "aria-label": `${bot.name} 的绑定工作区`, value: form.workspace, onChange: (event) => change("workspace", event.target.value), required: !0 }, /* @__PURE__ */ import_react60.default.createElement("option", { value: "", disabled: !0 }, "请选择"), record3.catalog.machines.flatMap((machine) => machine.roots.map((root) => /* @__PURE__ */ import_react60.default.createElement("option", { key: `${machine.machineId}/${root.rootId}`, value: `${machine.machineId}/${root.rootId}` }, machine.label, " / ", root.label))))), /* @__PURE__ */ import_react60.default.createElement("label", null, "工作区权限", /* @__PURE__ */ import_react60.default.createElement("select", { value: form.workspaceMode, onChange: (event) => change("workspaceMode", event.target.value) }, /* @__PURE__ */ import_react60.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react60.default.createElement("option", { value: "workspace-write" }, "允许写入"))), /* @__PURE__ */ import_react60.default.createElement("fieldset", null, /* @__PURE__ */ import_react60.default.createElement("legend", null, "路由与任务能力"), record3.catalog.capabilities.map((capability) => /* @__PURE__ */ import_react60.default.createElement("label", { key: capability.id }, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: form.capabilities.includes(capability.id), onChange: (event) => change("capabilities", event.target.checked ? [...form.capabilities, capability.id] : form.capabilities.filter((id2) => id2 !== capability.id)) }), capability.label))), cliMappings.length > 0 && /* @__PURE__ */ import_react60.default.createElement("fieldset", null, /* @__PURE__ */ import_react60.default.createElement("legend", null, "已核验官方 CLI"), cliMappings.map((mapping) => {
     let selected = form.officialTools.some((tool) => tool.toolId === mapping.toolId && tool.cliModel === mapping.model);
-    return /* @__PURE__ */ import_react59.default.createElement("label", { key: `${mapping.toolId}/${mapping.model}` }, /* @__PURE__ */ import_react59.default.createElement("input", { type: "checkbox", checked: selected, onChange: (event) => change("officialTools", event.target.checked ? [...form.officialTools, { toolId: mapping.toolId, cliModel: mapping.model, mode: "read-only" }] : form.officialTools.filter((tool) => !(tool.toolId === mapping.toolId && tool.cliModel === mapping.model))) }), mapping.toolId, " / ", mapping.model, "（只读）");
-  })), /* @__PURE__ */ import_react59.default.createElement("label", null, "资金渠道", /* @__PURE__ */ import_react59.default.createElement("select", { value: form.fundingMode, onChange: (event) => change("fundingMode", event.target.value) }, /* @__PURE__ */ import_react59.default.createElement("option", { value: "api" }, "API（金额）"), /* @__PURE__ */ import_react59.default.createElement("option", { value: "subscription" }, "订阅（调用次数）"))), form.fundingMode === "api" ? /* @__PURE__ */ import_react59.default.createElement(import_react59.default.Fragment, null, /* @__PURE__ */ import_react59.default.createElement("label", null, "输入价格（USD / 百万 Token）", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.input, onChange: (event) => change("input", event.target.value), required: !0 })), /* @__PURE__ */ import_react59.default.createElement("label", null, "输出价格（USD / 百万 Token）", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.output, onChange: (event) => change("output", event.target.value), required: !0 })), /* @__PURE__ */ import_react59.default.createElement("label", null, "最大输入 Token", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxInputTokens, onChange: (event) => change("maxInputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react59.default.createElement("label", null, "最大输出 Token", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxOutputTokens, onChange: (event) => change("maxOutputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react59.default.createElement("label", null, "Bot 每日预算（USD）", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.daily, onChange: (event) => change("daily", event.target.value), required: !0 })), /* @__PURE__ */ import_react59.default.createElement("label", null, "Bot 每月预算（USD）", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.monthly, onChange: (event) => change("monthly", event.target.value), required: !0 }))) : /* @__PURE__ */ import_react59.default.createElement(import_react59.default.Fragment, null, /* @__PURE__ */ import_react59.default.createElement("label", null, "每日订阅调用次数", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "1", value: form.dailyCalls, onChange: (event) => change("dailyCalls", event.target.value), required: !0 })), /* @__PURE__ */ import_react59.default.createElement("label", null, "每月订阅调用次数", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "0", step: "1", value: form.monthlyCalls, onChange: (event) => change("monthlyCalls", event.target.value), required: !0 }))), /* @__PURE__ */ import_react59.default.createElement("label", null, "最大并发任务", /* @__PURE__ */ import_react59.default.createElement("input", { type: "number", min: "1", max: "32", step: "1", value: form.maxConcurrentTasks, onChange: (event) => change("maxConcurrentTasks", event.target.value), required: !0 })), /* @__PURE__ */ import_react59.default.createElement("label", null, /* @__PURE__ */ import_react59.default.createElement("input", { type: "checkbox", checked: form.enabled, onChange: (event) => change("enabled", event.target.checked) }), "启用此绑定（模型、工作区和资金范围必须完整）"), /* @__PURE__ */ import_react59.default.createElement("button", { type: "submit", disabled: busy || form.enabled && (!model || !account?.enabled || !selectedMachine || !selectedRoot) }, "保存绑定"), record3.blockedReason && /* @__PURE__ */ import_react59.default.createElement(Blocked, { value: record3 })));
+    return /* @__PURE__ */ import_react60.default.createElement("label", { key: `${mapping.toolId}/${mapping.model}` }, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: selected, onChange: (event) => change("officialTools", event.target.checked ? [...form.officialTools, { toolId: mapping.toolId, cliModel: mapping.model, mode: "read-only" }] : form.officialTools.filter((tool) => !(tool.toolId === mapping.toolId && tool.cliModel === mapping.model))) }), mapping.toolId, " / ", mapping.model, "（只读）");
+  })), /* @__PURE__ */ import_react60.default.createElement("label", null, "资金渠道", /* @__PURE__ */ import_react60.default.createElement("select", { value: form.fundingMode, onChange: (event) => change("fundingMode", event.target.value) }, /* @__PURE__ */ import_react60.default.createElement("option", { value: "api" }, "API（金额）"), /* @__PURE__ */ import_react60.default.createElement("option", { value: "subscription" }, "订阅（调用次数）"))), form.fundingMode === "api" ? /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("label", null, "输入价格（USD / 百万 Token）", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.input, onChange: (event) => change("input", event.target.value), required: !0 })), /* @__PURE__ */ import_react60.default.createElement("label", null, "输出价格（USD / 百万 Token）", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.output, onChange: (event) => change("output", event.target.value), required: !0 })), /* @__PURE__ */ import_react60.default.createElement("label", null, "最大输入 Token", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxInputTokens, onChange: (event) => change("maxInputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react60.default.createElement("label", null, "最大输出 Token", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxOutputTokens, onChange: (event) => change("maxOutputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react60.default.createElement("label", null, "Bot 每日预算（USD）", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.daily, onChange: (event) => change("daily", event.target.value), required: !0 })), /* @__PURE__ */ import_react60.default.createElement("label", null, "Bot 每月预算（USD）", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.monthly, onChange: (event) => change("monthly", event.target.value), required: !0 }))) : /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("label", null, "每日订阅调用次数", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "1", value: form.dailyCalls, onChange: (event) => change("dailyCalls", event.target.value), required: !0 })), /* @__PURE__ */ import_react60.default.createElement("label", null, "每月订阅调用次数", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "0", step: "1", value: form.monthlyCalls, onChange: (event) => change("monthlyCalls", event.target.value), required: !0 }))), /* @__PURE__ */ import_react60.default.createElement("label", null, "最大并发任务", /* @__PURE__ */ import_react60.default.createElement("input", { type: "number", min: "1", max: "32", step: "1", value: form.maxConcurrentTasks, onChange: (event) => change("maxConcurrentTasks", event.target.value), required: !0 })), /* @__PURE__ */ import_react60.default.createElement("label", null, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: form.enabled, onChange: (event) => change("enabled", event.target.checked) }), "启用此绑定（模型、工作区和资金范围必须完整）"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "submit", disabled: busy || form.enabled && (!model || !account?.enabled || !selectedMachine || !selectedRoot) }, "保存绑定"), record3.blockedReason && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: record3 })));
 }
 
 // apps/integration-client/panels.jsx
 function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
-  return /* @__PURE__ */ import_react60.default.createElement("nav", { className: `bp-nav${compact2 ? " bp-nav-compact" : ""}`, "aria-label": "Bot 工作系统" }, [
+  return /* @__PURE__ */ import_react61.default.createElement("nav", { className: `bp-nav${compact2 ? " bp-nav-compact" : ""}`, "aria-label": "Bot 工作系统" }, [
     [panels.bindings, "Bot 绑定", "◈", "绑定"],
     [panels.tasks, "任务", "☑", "任务"],
     [panels.machines, "远程电脑", "▣", "电脑"],
     [panels.usage, "费用与用量", "◷", "费用"],
     ["model-router-galgame", "高级工作台", "⚙", "工作台"]
-  ].map(([id2, label, icon2, caption]) => /* @__PURE__ */ import_react60.default.createElement("button", { key: id2, type: "button", onClick: () => openPanel(id2), title: label, "aria-label": label }, /* @__PURE__ */ import_react60.default.createElement("span", { "aria-hidden": "true" }, icon2), compact2 ? /* @__PURE__ */ import_react60.default.createElement("span", { className: "bp-nav-caption" }, caption) : /* @__PURE__ */ import_react60.default.createElement("span", null, label))));
+  ].map(([id2, label, icon2, caption]) => /* @__PURE__ */ import_react61.default.createElement("button", { key: id2, type: "button", onClick: () => openPanel(id2), title: label, "aria-label": label }, /* @__PURE__ */ import_react61.default.createElement("span", { "aria-hidden": "true" }, icon2), compact2 ? /* @__PURE__ */ import_react61.default.createElement("span", { className: "bp-nav-caption" }, caption) : /* @__PURE__ */ import_react61.default.createElement("span", null, label))));
 }
 function Blocked({ value }) {
-  return /* @__PURE__ */ import_react60.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react60.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react60.default.createElement("p", null, value?.reason ?? "尚未取得宿主状态。"), value?.nextAction && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "下一步：", value.nextAction));
+  return /* @__PURE__ */ import_react61.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react61.default.createElement("p", null, value?.reason ?? "尚未取得宿主状态。"), value?.nextAction && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "下一步：", value.nextAction));
 }
-var Value = ({ label, children }) => /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react60.default.createElement("dt", null, label), /* @__PURE__ */ import_react60.default.createElement("dd", null, children ?? "未配置")), Tag2 = ({ children }) => /* @__PURE__ */ import_react60.default.createElement("span", { className: "bp-tag" }, children), subscriptionText = (value) => value && typeof value == "object" ? `今日 ${value.callsToday ?? "未知"} 次 · 本月 ${value.callsMonth ?? "未知"} 次` : value ?? "见逐来源收据";
+var Value = ({ label, children }) => /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react61.default.createElement("dt", null, label), /* @__PURE__ */ import_react61.default.createElement("dd", null, children ?? "未配置")), Tag2 = ({ children }) => /* @__PURE__ */ import_react61.default.createElement("span", { className: "bp-tag" }, children), subscriptionText = (value) => value && typeof value == "object" ? `今日 ${value.callsToday ?? "未知"} 次 · 本月 ${value.callsMonth ?? "未知"} 次` : value ?? "见逐来源收据";
 function BotRuntimeRow({ botId, dispatch, busy }) {
-  let [state, setState] = import_react60.default.useState(null), [error, setError] = import_react60.default.useState(""), [working, setWorking] = import_react60.default.useState(!1), load = import_react60.default.useCallback(async () => {
+  let [state, setState] = import_react61.default.useState(null), [error, setError] = import_react61.default.useState(""), [working, setWorking] = import_react61.default.useState(!1), load = import_react61.default.useCallback(async () => {
     if (typeof dispatch == "function")
       try {
         let rows2 = await dispatch("botRuntimeStatus", {}), row = Array.isArray(rows2) ? rows2.find((item) => item.botId === botId) : null;
@@ -32187,7 +32289,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       } catch (failure) {
         setState(null), setError(String(failure?.message ?? failure));
       }
-  }, [botId, dispatch]), [history, setHistory] = import_react60.default.useState([]), [historyError, setHistoryError] = import_react60.default.useState(""), loadHistory = import_react60.default.useCallback(async () => {
+  }, [botId, dispatch]), [history, setHistory] = import_react61.default.useState([]), [historyError, setHistoryError] = import_react61.default.useState(""), loadHistory = import_react61.default.useCallback(async () => {
     if (typeof dispatch == "function")
       try {
         let rows2 = await dispatch("botRuntimeHistory", { botId, limit: 20 });
@@ -32195,7 +32297,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       } catch (failure) {
         setHistory([]), setHistoryError(String(failure?.message ?? failure));
       }
-  }, [botId, dispatch]), [full2, setFull] = import_react60.default.useState(null), openFull = import_react60.default.useCallback(async (index) => {
+  }, [botId, dispatch]), [full2, setFull] = import_react61.default.useState(null), openFull = import_react61.default.useCallback(async (index) => {
     try {
       let message = await dispatch("botRuntimeMessage", { botId, index });
       setFull({ index, ...message }), setHistoryError("");
@@ -32203,7 +32305,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       setHistoryError(String(failure?.message ?? failure)), setFull(null);
     }
   }, [botId, dispatch]);
-  if (import_react60.default.useEffect(() => {
+  if (import_react61.default.useEffect(() => {
     load();
   }, [load]), !state && !error) return null;
   let target = state?.runtime === "independent" ? "integration" : "independent", move = async () => {
@@ -32216,17 +32318,17 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       setWorking(!1);
     }
   };
-  return /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || working, onClick: () => {
+  return /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy || working, onClick: () => {
     move();
-  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error), state ? /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-log" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "最近会话（仅预览）"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: working, onClick: () => {
+  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, error), state ? /* @__PURE__ */ import_react61.default.createElement("details", { className: "bp-log" }, /* @__PURE__ */ import_react61.default.createElement("summary", null, "最近会话（仅预览）"), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: working, onClick: () => {
     loadHistory();
-  } }, "读取预览"), historyError && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, historyError), history.length === 0 ? /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "点“读取预览”加载最近 20 条。") : /* @__PURE__ */ import_react60.default.createElement("ul", { className: "bp-checklist" }, history.map((row, index) => /* @__PURE__ */ import_react60.default.createElement("li", { key: index }, /* @__PURE__ */ import_react60.default.createElement("strong", null, row.role), row.name ? ` · ${row.name}` : "", " · ", row.chars, " 字", row.at ? ` · ${new Date(row.at).toLocaleTimeString("zh-CN")}` : "", /* @__PURE__ */ import_react60.default.createElement("small", null, row.preview, String(row.preview ?? "").length < row.chars ? "…" : ""), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", onClick: () => {
+  } }, "读取预览"), historyError && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, historyError), history.length === 0 ? /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "点“读取预览”加载最近 20 条。") : /* @__PURE__ */ import_react61.default.createElement("ul", { className: "bp-checklist" }, history.map((row, index) => /* @__PURE__ */ import_react61.default.createElement("li", { key: index }, /* @__PURE__ */ import_react61.default.createElement("strong", null, row.role), row.name ? ` · ${row.name}` : "", " · ", row.chars, " 字", row.at ? ` · ${new Date(row.at).toLocaleTimeString("zh-CN")}` : "", /* @__PURE__ */ import_react61.default.createElement("small", null, row.preview, String(row.preview ?? "").length < row.chars ? "…" : ""), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", onClick: () => {
     openFull(index);
-  } }, "查看全文")))), full2 ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-fulltext" }, /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "第 ", full2.index + 1, " 条（从最新往前数）· ", full2.role, " · ", full2.chars, " 字"), /* @__PURE__ */ import_react60.default.createElement("pre", null, full2.content)) : null) : null);
+  } }, "查看全文")))), full2 ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-fulltext" }, /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "第 ", full2.index + 1, " 条（从最新往前数）· ", full2.role, " · ", full2.chars, " 字"), /* @__PURE__ */ import_react61.default.createElement("pre", null, full2.content)) : null) : null);
 }
 function BotBindings({ snapshot, openSession, dispatch, busy }) {
-  let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react60.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id);
-  return bots.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => /* @__PURE__ */ import_react60.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react60.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react60.default.createElement(Tag2, null, "Main"), /* @__PURE__ */ import_react60.default.createElement("small", null, item.role || item.id)))), /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: () => openSession(bot.sessionId) }, "打开私聊")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? "尚未取得宿主绑定"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "预算范围" }, binding?.budgetScope), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("h3", null, "官方工具"), binding.officialTools?.length ? /* @__PURE__ */ import_react60.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react60.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知"))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "此 Bot 没有官方工具绑定。"), /* @__PURE__ */ import_react60.default.createElement("h3", null, "有效权限"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-code" }, (binding.tools ?? binding.capabilities ?? []).join("、") || "无额外能力"), binding.blockedReason && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。"), /* @__PURE__ */ import_react60.default.createElement(BotRuntimeRow, { botId: bot.id, dispatch, busy }), dispatch && /* @__PURE__ */ import_react60.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy }))) : /* @__PURE__ */ import_react60.default.createElement("p", null, "还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。");
+  let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react61.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id);
+  return bots.length ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => /* @__PURE__ */ import_react61.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react61.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react61.default.createElement(Tag2, null, "Main"), /* @__PURE__ */ import_react61.default.createElement("small", null, item.role || item.id)))), /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react61.default.createElement("button", { onClick: () => openSession(bot.sessionId) }, "打开私聊")), /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? "尚未取得宿主绑定"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "预算范围" }, binding?.budgetScope), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement("h3", null, "官方工具"), binding.officialTools?.length ? /* @__PURE__ */ import_react61.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react61.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知"))) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "此 Bot 没有官方工具绑定。"), /* @__PURE__ */ import_react61.default.createElement("h3", null, "有效权限"), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-code" }, (binding.tools ?? binding.capabilities ?? []).join("、") || "无额外能力"), binding.blockedReason && /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。"), /* @__PURE__ */ import_react61.default.createElement(BotRuntimeRow, { botId: bot.id, dispatch, busy }), dispatch && /* @__PURE__ */ import_react61.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy }))) : /* @__PURE__ */ import_react61.default.createElement("p", null, "还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。");
 }
 function BotAttention({ snapshot, dispatch, busy, openTask }) {
   let rows2 = deriveBotAttention(snapshot);
@@ -32234,28 +32336,28 @@ function BotAttention({ snapshot, dispatch, busy, openTask }) {
   let actions = snapshot?.availableActions ?? [], run2 = (row, action, payload) => {
     !dispatch || busy || !actions.includes(action) || dispatch(action, { botId: row.botId, taskId: row.taskId, requestKey: crypto.randomUUID(), ...payload });
   };
-  return /* @__PURE__ */ import_react60.default.createElement("section", { className: "bp-card bp-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "需要你处理"), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, botAttentionSummary(rows2))), /* @__PURE__ */ import_react60.default.createElement("ul", { className: "bp-attention-list" }, rows2.map((row) => /* @__PURE__ */ import_react60.default.createElement("li", { key: row.key, className: `bp-attention-row bp-attention-${row.stage}` }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, row.detail)), row.action === "reconcile" && actions.includes("task.reconcile") && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => run2(row, "task.reconcile") }, "核对原收据"), row.action === "retry" && actions.includes("task.retry") && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => run2(row, "task.retry") }, "重试"), row.action !== "reconcile" && row.action !== "retry" && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => openTask(row.taskId) }, "打开任务")))));
+  return /* @__PURE__ */ import_react61.default.createElement("section", { className: "bp-card bp-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "需要你处理"), /* @__PURE__ */ import_react61.default.createElement(Tag2, null, botAttentionSummary(rows2))), /* @__PURE__ */ import_react61.default.createElement("ul", { className: "bp-attention-list" }, rows2.map((row) => /* @__PURE__ */ import_react61.default.createElement("li", { key: row.key, className: `bp-attention-row bp-attention-${row.stage}` }, /* @__PURE__ */ import_react61.default.createElement("div", null, /* @__PURE__ */ import_react61.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, row.detail)), row.action === "reconcile" && actions.includes("task.reconcile") && /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => run2(row, "task.reconcile") }, "核对原收据"), row.action === "retry" && actions.includes("task.retry") && /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => run2(row, "task.retry") }, "重试"), row.action !== "reconcile" && row.action !== "retry" && /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => openTask(row.taskId) }, "打开任务")))));
 }
 function Tasks({ snapshot, dispatch, busy }) {
-  let section = snapshot.tasks, [selected, setSelected] = (0, import_react60.useState)(null);
-  if (section?.status !== "available") return /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section });
+  let section = snapshot.tasks, [selected, setSelected] = (0, import_react61.useState)(null);
+  if (section?.status !== "available") return /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: section });
   let rows2 = section.items, task = rows2.find((row) => (row.taskId ?? row.id) === selected), actions = snapshot.availableActions ?? [];
-  return /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(BotAttention, { snapshot, dispatch, busy, openTask: setSelected }), section.plans?.map((plan) => /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card", key: plan.planId }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "计划 ", plan.planId), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, TASK_STATES[plan.state] ?? plan.state), actions.includes("task.plan.cancel") && !["succeeded", "cancelled"].includes(plan.state) && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.plan.cancel", { botId: plan.ownerBotId, planId: plan.planId }) }, "停止整个计划")), plan.needsReconciliation && /* @__PURE__ */ import_react60.default.createElement("p", { role: "status" }, "有工作包停止尚未确认，请核对原收据；计划尚未完成停止。"), /* @__PURE__ */ import_react60.default.createElement("ul", null, plan.packages.map((item) => /* @__PURE__ */ import_react60.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react60.default.createElement("strong", null, item.id), " · ", snapshot.bots?.find((bot) => bot.id === item.targetBotId)?.name ?? item.targetBotId, " · ", TASK_STATES[item.state] ?? item.state, item.dependsOn.length > 0 && /* @__PURE__ */ import_react60.default.createElement("small", null, " 前置：", item.dependsOn.join("、")), item.result?.code === "DEPENDENCY_FAILED" && /* @__PURE__ */ import_react60.default.createElement("small", null, " 前置包失败，尚未执行")))))), rows2.length === 0 ? /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, "尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。") : /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react60.default.createElement("table", null, /* @__PURE__ */ import_react60.default.createElement("thead", null, /* @__PURE__ */ import_react60.default.createElement("tr", null, /* @__PURE__ */ import_react60.default.createElement("th", null, "任务"), /* @__PURE__ */ import_react60.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react60.default.createElement("th", null, "状态"), /* @__PURE__ */ import_react60.default.createElement("th", null, "执行尝试"), /* @__PURE__ */ import_react60.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react60.default.createElement("tbody", null, rows2.map((row) => {
+  return /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement(BotAttention, { snapshot, dispatch, busy, openTask: setSelected }), section.plans?.map((plan) => /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card", key: plan.planId }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "计划 ", plan.planId), /* @__PURE__ */ import_react61.default.createElement(Tag2, null, TASK_STATES[plan.state] ?? plan.state), actions.includes("task.plan.cancel") && !["succeeded", "cancelled"].includes(plan.state) && /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.plan.cancel", { botId: plan.ownerBotId, planId: plan.planId }) }, "停止整个计划")), plan.needsReconciliation && /* @__PURE__ */ import_react61.default.createElement("p", { role: "status" }, "有工作包停止尚未确认，请核对原收据；计划尚未完成停止。"), /* @__PURE__ */ import_react61.default.createElement("ul", null, plan.packages.map((item) => /* @__PURE__ */ import_react61.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react61.default.createElement("strong", null, item.id), " · ", snapshot.bots?.find((bot) => bot.id === item.targetBotId)?.name ?? item.targetBotId, " · ", TASK_STATES[item.state] ?? item.state, item.dependsOn.length > 0 && /* @__PURE__ */ import_react61.default.createElement("small", null, " 前置：", item.dependsOn.join("、")), item.result?.code === "DEPENDENCY_FAILED" && /* @__PURE__ */ import_react61.default.createElement("small", null, " 前置包失败，尚未执行")))))), rows2.length === 0 ? /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-empty" }, "尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。") : /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react61.default.createElement("table", null, /* @__PURE__ */ import_react61.default.createElement("thead", null, /* @__PURE__ */ import_react61.default.createElement("tr", null, /* @__PURE__ */ import_react61.default.createElement("th", null, "任务"), /* @__PURE__ */ import_react61.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react61.default.createElement("th", null, "状态"), /* @__PURE__ */ import_react61.default.createElement("th", null, "执行尝试"), /* @__PURE__ */ import_react61.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react61.default.createElement("tbody", null, rows2.map((row) => {
     let id2 = row.taskId ?? row.id, canCancel = !["cancelled", "succeeded", "failed", "skipped"].includes(row.state), remote = row.result?.remote, stopKnown = !remote || remote.stopConfirmed === !0;
-    return /* @__PURE__ */ import_react60.default.createElement("tr", { key: id2 }, /* @__PURE__ */ import_react60.default.createElement("td", null, /* @__PURE__ */ import_react60.default.createElement("button", { className: "bp-text-button", onClick: () => setSelected(id2) }, row.title ?? row.input?.task ?? id2), /* @__PURE__ */ import_react60.default.createElement("small", null, id2)), /* @__PURE__ */ import_react60.default.createElement("td", null, snapshot.bots?.find((bot) => bot.id === row.botId)?.name ?? row.botId ?? "未取得归属"), /* @__PURE__ */ import_react60.default.createElement("td", null, /* @__PURE__ */ import_react60.default.createElement(Tag2, null, TASK_STATES[row.state] ?? row.state), row.blockedReason && /* @__PURE__ */ import_react60.default.createElement("small", null, row.blockedReason), remote && (stopKnown ? remote.notStarted === !0 && remote.possiblyApplied !== !0 ? /* @__PURE__ */ import_react60.default.createElement("small", null, "原操作未启动。") : remote.status === "succeeded" ? /* @__PURE__ */ import_react60.default.createElement("small", null, "写入已确认。", row.state === "cancelled" ? "取消未撤销文件变更。" : "") : remote.possiblyApplied === !0 && /* @__PURE__ */ import_react60.default.createElement("small", null, "操作已停止，文件可能已改变；重试不会撤销已有变更，请先核对产物。") : /* @__PURE__ */ import_react60.default.createElement("small", { role: "status" }, "写入或停止尚未确认，请核对原操作；不会自动重发，也暂不能重试。"))), /* @__PURE__ */ import_react60.default.createElement("td", null, Number.isSafeInteger(row.attempts) ? row.attempts : row.attempts?.length ?? row.attemptCount ?? "未知"), /* @__PURE__ */ import_react60.default.createElement("td", { className: "bp-actions" }, actions.includes("task.cancel") && canCancel && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.cancel", { botId: row.botId, taskId: id2 }) }, "停止"), actions.includes("task.retry") && ["failed", "cancelled", "waiting-budget"].includes(row.state) && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || !stopKnown, onClick: () => {
+    return /* @__PURE__ */ import_react61.default.createElement("tr", { key: id2 }, /* @__PURE__ */ import_react61.default.createElement("td", null, /* @__PURE__ */ import_react61.default.createElement("button", { className: "bp-text-button", onClick: () => setSelected(id2) }, row.title ?? row.input?.task ?? id2), /* @__PURE__ */ import_react61.default.createElement("small", null, id2)), /* @__PURE__ */ import_react61.default.createElement("td", null, snapshot.bots?.find((bot) => bot.id === row.botId)?.name ?? row.botId ?? "未取得归属"), /* @__PURE__ */ import_react61.default.createElement("td", null, /* @__PURE__ */ import_react61.default.createElement(Tag2, null, TASK_STATES[row.state] ?? row.state), row.blockedReason && /* @__PURE__ */ import_react61.default.createElement("small", null, row.blockedReason), remote && (stopKnown ? remote.notStarted === !0 && remote.possiblyApplied !== !0 ? /* @__PURE__ */ import_react61.default.createElement("small", null, "原操作未启动。") : remote.status === "succeeded" ? /* @__PURE__ */ import_react61.default.createElement("small", null, "写入已确认。", row.state === "cancelled" ? "取消未撤销文件变更。" : "") : remote.possiblyApplied === !0 && /* @__PURE__ */ import_react61.default.createElement("small", null, "操作已停止，文件可能已改变；重试不会撤销已有变更，请先核对产物。") : /* @__PURE__ */ import_react61.default.createElement("small", { role: "status" }, "写入或停止尚未确认，请核对原操作；不会自动重发，也暂不能重试。"))), /* @__PURE__ */ import_react61.default.createElement("td", null, Number.isSafeInteger(row.attempts) ? row.attempts : row.attempts?.length ?? row.attemptCount ?? "未知"), /* @__PURE__ */ import_react61.default.createElement("td", { className: "bp-actions" }, actions.includes("task.cancel") && canCancel && /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.cancel", { botId: row.botId, taskId: id2 }) }, "停止"), actions.includes("task.retry") && ["failed", "cancelled", "waiting-budget"].includes(row.state) && /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy || !stopKnown, onClick: () => {
       stopKnown && dispatch("task.retry", { botId: row.botId, taskId: id2, requestKey: crypto.randomUUID() });
-    } }, "重试"), actions.includes("task.reconcile") && row.state === "needs-reconciliation" && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.reconcile", { botId: row.botId, taskId: id2, requestKey: crypto.randomUUID() }) }, "核对原收据")));
-  })))), task && /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "任务详情"), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: () => setSelected(null) }, "关闭")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Task" }, task.taskId ?? task.id), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Package" }, task.packageId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Attempt" }, task.attemptId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Operation" }, task.operationId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "期限" }, task.deadlineAt ? new Date(task.deadlineAt).toLocaleString("zh-CN") : "未取得"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "MR 运行" }, task.legacyRunIds?.join("、"))), /* @__PURE__ */ import_react60.default.createElement("h3", null, "执行与收据依据"), /* @__PURE__ */ import_react60.default.createElement("pre", null, JSON.stringify({ attempts: task.attempts, executionRef: task.executionRef, remoteReceipt: task.result?.remote, reconciliation: task.reconciliation, packages: task.packages }, null, 2))));
+    } }, "重试"), actions.includes("task.reconcile") && row.state === "needs-reconciliation" && /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.reconcile", { botId: row.botId, taskId: id2, requestKey: crypto.randomUUID() }) }, "核对原收据")));
+  })))), task && /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "任务详情"), /* @__PURE__ */ import_react61.default.createElement("button", { onClick: () => setSelected(null) }, "关闭")), /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Task" }, task.taskId ?? task.id), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Package" }, task.packageId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Attempt" }, task.attemptId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Operation" }, task.operationId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "期限" }, task.deadlineAt ? new Date(task.deadlineAt).toLocaleString("zh-CN") : "未取得"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "MR 运行" }, task.legacyRunIds?.join("、"))), /* @__PURE__ */ import_react61.default.createElement("h3", null, "执行与收据依据"), /* @__PURE__ */ import_react61.default.createElement("pre", null, JSON.stringify({ attempts: task.attempts, executionRef: task.executionRef, remoteReceipt: task.result?.remote, reconciliation: task.reconciliation, packages: task.packages }, null, 2))));
 }
 function DesktopControl({ snapshot, dispatch, busy }) {
-  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react60.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react60.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react60.default.useState(null), [status, setStatus] = import_react60.default.useState("idle"), [error, setError] = import_react60.default.useState(""), [live, setLive] = import_react60.default.useState(!1), [text7, setText] = import_react60.default.useState(""), imageRef = import_react60.default.useRef(null), rootId = machines.find((item) => item.id === machineId)?.roots?.[0]?.id ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
+  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react61.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react61.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react61.default.useState(null), [status, setStatus] = import_react61.default.useState("idle"), [error, setError] = import_react61.default.useState(""), [live, setLive] = import_react61.default.useState(!1), [text7, setText] = import_react61.default.useState(""), imageRef = import_react61.default.useRef(null), rootId = machines.find((item) => item.id === machineId)?.roots?.[0]?.id ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
     setError("");
     try {
       return await dispatch(action, payload);
     } catch (failure) {
       return setError(String(failure?.message ?? failure)), null;
     }
-  }, capture = import_react60.default.useCallback(async () => {
+  }, capture = import_react61.default.useCallback(async () => {
     if (!canView) return;
     setStatus("capturing");
     let value = await call2("machine.desktop.view", { botId, machineId, rootId });
@@ -32269,7 +32371,7 @@ function DesktopControl({ snapshot, dispatch, busy }) {
     }
     setFrame({ ...value, takenAtMs: Date.now() }), setStatus("ready");
   }, [botId, machineId, rootId, canView]);
-  import_react60.default.useEffect(() => {
+  import_react61.default.useEffect(() => {
     if (!live || !canView) return;
     capture();
     let timer = setInterval(() => {
@@ -32294,22 +32396,22 @@ function DesktopControl({ snapshot, dispatch, busy }) {
       setError(String(failure?.message ?? failure));
     }
   }, keys = ["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
-  return /* @__PURE__ */ import_react60.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react60.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react60.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react60.default.createElement("select", { value: machineId, onChange: (event) => {
+  return /* @__PURE__ */ import_react61.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react61.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react61.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react61.default.createElement("select", { value: machineId, onChange: (event) => {
     setMachineId(event.target.value), setFrame(null);
-  } }, machines.map((item) => /* @__PURE__ */ import_react60.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react60.default.createElement("label", null, "以哪个 Bot 执行", /* @__PURE__ */ import_react60.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((item) => /* @__PURE__ */ import_react60.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || !canView || status === "capturing", onClick: () => {
+  } }, machines.map((item) => /* @__PURE__ */ import_react61.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react61.default.createElement("label", null, "以哪个 Bot 执行", /* @__PURE__ */ import_react61.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((item) => /* @__PURE__ */ import_react61.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy || !canView || status === "capturing", onClick: () => {
     capture();
-  } }, status === "capturing" ? "截取中…" : "截取当前画面"), /* @__PURE__ */ import_react60.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: live, disabled: !canView, onChange: (event) => setLive(event.target.checked) }), "实时（1.5 秒）"))), error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error), frame?.base64 ? /* @__PURE__ */ import_react60.default.createElement("img", { ref: imageRef, className: "bp-desktop-frame", alt: "远程桌面画面", src: `data:${frame.mediaType};base64,${frame.base64}`, onClick: clickImage }) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, canView ? "还没有画面。点“截取当前画面”。" : "先配对一台电脑，并选择一个 Bot。"), frame?.base64 && /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions bp-desktop-keys" }, keys.map((key) => /* @__PURE__ */ import_react60.default.createElement("button", { key, disabled: busy, onClick: () => {
+  } }, status === "capturing" ? "截取中…" : "截取当前画面"), /* @__PURE__ */ import_react61.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react61.default.createElement("input", { type: "checkbox", checked: live, disabled: !canView, onChange: (event) => setLive(event.target.checked) }), "实时（1.5 秒）"))), error && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, error), frame?.base64 ? /* @__PURE__ */ import_react61.default.createElement("img", { ref: imageRef, className: "bp-desktop-frame", alt: "远程桌面画面", src: `data:${frame.mediaType};base64,${frame.base64}`, onClick: clickImage }) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-empty" }, canView ? "还没有画面。点“截取当前画面”。" : "先配对一台电脑，并选择一个 Bot。"), frame?.base64 && /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-actions bp-desktop-keys" }, keys.map((key) => /* @__PURE__ */ import_react61.default.createElement("button", { key, disabled: busy, onClick: () => {
     act({ tool: "key", key });
-  } }, key)), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => {
+  } }, key)), /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => {
     act({ tool: "scroll", delta: 120 });
-  } }, "滚轮上"), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => {
+  } }, "滚轮上"), /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => {
     act({ tool: "scroll", delta: -120 });
-  } }, "滚轮下")), frame?.base64 && /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("input", { className: "bp-desktop-text", "aria-label": "要输入的文本", value: text7, placeholder: "输入文字后发送（发送的是按键，不是剪贴板）", onChange: (event) => setText(event.target.value) }), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || !text7, onClick: () => {
+  } }, "滚轮下")), frame?.base64 && /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react61.default.createElement("input", { className: "bp-desktop-text", "aria-label": "要输入的文本", value: text7, placeholder: "输入文字后发送（发送的是按键，不是剪贴板）", onChange: (event) => setText(event.target.value) }), /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy || !text7, onClick: () => {
     act({ type: "type", tool: "type", text: text7 });
   } }, "发送文本")));
 }
 function MachineSetup({ snapshot, dispatch, busy }) {
-  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react60.default.useState(""), [address, setAddress] = import_react60.default.useState(""), [tunnel, setTunnel] = import_react60.default.useState(!0), [status, setStatus] = import_react60.default.useState(""), [error, setError] = import_react60.default.useState(""), [working, setWorking] = import_react60.default.useState(!1), parsed = import_react60.default.useMemo(() => parsePairingPaste(paste), [paste]), endpoint = import_react60.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react60.default.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed]), importFile = async (event) => {
+  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react61.default.useState(""), [address, setAddress] = import_react61.default.useState(""), [tunnel, setTunnel] = import_react61.default.useState(!0), [status, setStatus] = import_react61.default.useState(""), [error, setError] = import_react61.default.useState(""), [working, setWorking] = import_react61.default.useState(!1), parsed = import_react61.default.useMemo(() => parsePairingPaste(paste), [paste]), endpoint = import_react61.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react61.default.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed]), importFile = async (event) => {
     let file = event.target.files?.[0];
     if (file)
       try {
@@ -32345,11 +32447,11 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       }
     }
   };
-  return /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "添加电脑（导入配对文件）"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "在目标电脑上运行 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "node dist/cli.mjs pair config.json 名称 ceiling.json > pair.json"), "，把生成的 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "pair.json"), " 导入即可；文件里已有 token、machineId 与 secretRef，不用手抄。"), available.includes("machine.secret") && available.includes("machine.pair") ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react60.default.createElement("label", null, "配对文件", /* @__PURE__ */ import_react60.default.createElement("input", { type: "file", accept: ".json,application/json", onChange: (event) => {
+  return /* @__PURE__ */ import_react61.default.createElement("details", { className: "bp-card" }, /* @__PURE__ */ import_react61.default.createElement("summary", null, "添加电脑（导入配对文件）"), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "在目标电脑上运行 ", /* @__PURE__ */ import_react61.default.createElement("code", null, "node dist/cli.mjs pair config.json 名称 ceiling.json > pair.json"), "，把生成的 ", /* @__PURE__ */ import_react61.default.createElement("code", null, "pair.json"), " 导入即可；文件里已有 token、machineId 与 secretRef，不用手抄。"), available.includes("machine.secret") && available.includes("machine.pair") ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react61.default.createElement("label", null, "配对文件", /* @__PURE__ */ import_react61.default.createElement("input", { type: "file", accept: ".json,application/json", onChange: (event) => {
     importFile(event);
-  } })), /* @__PURE__ */ import_react60.default.createElement("label", null, "或粘贴文件内容", /* @__PURE__ */ import_react60.default.createElement("textarea", { rows: 3, value: paste, onChange: (event) => setPaste(event.target.value), placeholder: '{"clientId":"host-office","token":"...","machineId":"machine-..."}' })), /* @__PURE__ */ import_react60.default.createElement("label", null, "Agent 地址", /* @__PURE__ */ import_react60.default.createElement("input", { value: address, onChange: (event) => setAddress(event.target.value), placeholder: "10.0.0.2 或 http://10.0.0.2:9701", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react60.default.createElement("label", null, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: tunnel, onChange: (event) => setTunnel(event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), paste !== "" && parsed.problems.length > 0 && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, parsed.problems.join(" ")), address !== "" && endpoint.problem !== "" && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, endpoint.problem), ready && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "将保存凭据 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "ds-secret/", secretName), " 并配对 ", parsed.machineId, "。"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: !ready || busy || working, onClick: () => {
+  } })), /* @__PURE__ */ import_react61.default.createElement("label", null, "或粘贴文件内容", /* @__PURE__ */ import_react61.default.createElement("textarea", { rows: 3, value: paste, onChange: (event) => setPaste(event.target.value), placeholder: '{"clientId":"host-office","token":"...","machineId":"machine-..."}' })), /* @__PURE__ */ import_react61.default.createElement("label", null, "Agent 地址", /* @__PURE__ */ import_react61.default.createElement("input", { value: address, onChange: (event) => setAddress(event.target.value), placeholder: "10.0.0.2 或 http://10.0.0.2:9701", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react61.default.createElement("label", null, /* @__PURE__ */ import_react61.default.createElement("input", { type: "checkbox", checked: tunnel, onChange: (event) => setTunnel(event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), paste !== "" && parsed.problems.length > 0 && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, parsed.problems.join(" ")), address !== "" && endpoint.problem !== "" && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, endpoint.problem), ready && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "将保存凭据 ", /* @__PURE__ */ import_react61.default.createElement("code", null, "ds-secret/", secretName), " 并配对 ", parsed.machineId, "。"), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: !ready || busy || working, onClick: () => {
     submit();
-  } }, working ? "添加中…" : "导入并添加"), status !== "" && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted", role: "status" }, status), error !== "" && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供配对操作。"));
+  } }, working ? "添加中…" : "导入并添加"), status !== "" && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted", role: "status" }, status), error !== "" && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供配对操作。"));
 }
 function MachineControls({ machine, snapshot, dispatch, busy }) {
   let groups = [
@@ -32359,8 +32461,8 @@ function MachineControls({ machine, snapshot, dispatch, busy }) {
     ["browser", "远程浏览器", ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_script", "browser_upload", "browser_download", "browser_close"]],
     ["desktop", "Windows 桌面", ["desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"]],
     ["cli", "远程 Codex", ["cli_probe_v1", "cli_task_v1"]]
-  ], [botId, setBotId] = (0, import_react60.useState)(snapshot.bots?.[0]?.id ?? ""), [rootId, setRootId] = (0, import_react60.useState)(machine.roots?.[0] ?? ""), [relativePath, setRelativePath] = (0, import_react60.useState)(""), [mode, setMode] = (0, import_react60.useState)("read-only"), [selected, setSelected] = (0, import_react60.useState)(["read"]), available = snapshot.availableActions ?? [], savedBinding = machine.bindings?.find((item) => item.botId === botId), binding = savedBinding && !savedBinding.revoked ? savedBinding : null;
-  (0, import_react60.useEffect)(() => {
+  ], [botId, setBotId] = (0, import_react61.useState)(snapshot.bots?.[0]?.id ?? ""), [rootId, setRootId] = (0, import_react61.useState)(machine.roots?.[0] ?? ""), [relativePath, setRelativePath] = (0, import_react61.useState)(""), [mode, setMode] = (0, import_react61.useState)("read-only"), [selected, setSelected] = (0, import_react61.useState)(["read"]), available = snapshot.availableActions ?? [], savedBinding = machine.bindings?.find((item) => item.botId === botId), binding = savedBinding && !savedBinding.revoked ? savedBinding : null;
+  (0, import_react61.useEffect)(() => {
     let tools = savedBinding?.tools ?? [];
     setMode(savedBinding?.mode ?? "read-only"), setSelected(groups.filter(([, , names]) => names.some((name) => tools.includes(name))).map(([id2]) => id2));
   }, [botId, savedBinding?.revision]);
@@ -32369,28 +32471,45 @@ function MachineControls({ machine, snapshot, dispatch, busy }) {
     for (let [id2, , names] of groups) if (selected.includes(id2)) for (let name of names) tools.add(name);
     run2("machine.bind", { botId, roots: [rootId], tools: [...tools].filter((tool) => machine.tools.includes(tool)), mode, expectedRevision: savedBinding?.revision ?? 0 });
   };
-  return /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react60.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react60.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 Bot`, value: botId, onChange: (event) => setBotId(event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react60.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react60.default.createElement("label", null, "根目录", /* @__PURE__ */ import_react60.default.createElement("select", { "aria-label": `机器 ${machine.id} 的根目录`, value: rootId, onChange: (event) => setRootId(event.target.value) }, (machine.roots ?? []).map((id2) => /* @__PURE__ */ import_react60.default.createElement("option", { key: id2 }, id2)))), /* @__PURE__ */ import_react60.default.createElement("fieldset", null, /* @__PURE__ */ import_react60.default.createElement("legend", null, "授予此 Bot 的能力"), groups.map(([id2, label, names]) => /* @__PURE__ */ import_react60.default.createElement("label", { key: id2 }, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", disabled: !names.some((name) => machine.tools.includes(name)), checked: selected.includes(id2), onChange: (event) => {
+  return /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react61.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react61.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 Bot`, value: botId, onChange: (event) => setBotId(event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react61.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react61.default.createElement("label", null, "根目录", /* @__PURE__ */ import_react61.default.createElement("select", { "aria-label": `机器 ${machine.id} 的根目录`, value: rootId, onChange: (event) => setRootId(event.target.value) }, (machine.roots ?? []).map((id2) => /* @__PURE__ */ import_react61.default.createElement("option", { key: id2 }, id2)))), /* @__PURE__ */ import_react61.default.createElement("fieldset", null, /* @__PURE__ */ import_react61.default.createElement("legend", null, "授予此 Bot 的能力"), groups.map(([id2, label, names]) => /* @__PURE__ */ import_react61.default.createElement("label", { key: id2 }, /* @__PURE__ */ import_react61.default.createElement("input", { type: "checkbox", disabled: !names.some((name) => machine.tools.includes(name)), checked: selected.includes(id2), onChange: (event) => {
     let next = event.target.checked ? [...selected, id2] : selected.filter((value) => value !== id2);
     setSelected(next), id2 !== "read" && event.target.checked && setMode("workspace-write");
-  } }), label, /* @__PURE__ */ import_react60.default.createElement("small", null, names.filter((name) => machine.tools.includes(name)).join("、") || "此 Agent 未提供")))), /* @__PURE__ */ import_react60.default.createElement("label", null, "权限模式", /* @__PURE__ */ import_react60.default.createElement("select", { value: mode, onChange: (event) => setMode(event.target.value) }, /* @__PURE__ */ import_react60.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react60.default.createElement("option", { value: "workspace-write" }, "允许写入及已勾选的控制操作"))), available.includes("machine.bind") && /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy || !botId || !rootId || selected.length === 0, onClick: save }, "保存此 Bot 的机器授权"), available.includes("machine.probe") && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.probe", { botId, rootId }) }, "检查 Agent 在线状态"), /* @__PURE__ */ import_react60.default.createElement("label", null, "受控读测试的相对路径", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": `机器 ${machine.id} 的测试路径`, value: relativePath, onChange: (event) => setRelativePath(event.target.value), placeholder: "README.md" })), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy || !binding || !relativePath, onClick: () => run2("machine.probe", { botId, rootId, relativePath }) }, "验证可读（不显示文件内容）")), available.includes("machine.revoke") && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.revoke", { botId, expectedRevision: binding.revision }) }, "撤销此 Bot 的机器访问"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy, onClick: () => run2("machine.revoke", { expectedRevision: machine.revision }) }, "撤销电脑配对")), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "每次保存都会先撤销旧票据再按新范围授权。桌面截图也需要 artifact 权限；撤销离线时会保留“停止未确认”。"));
+  } }), label, /* @__PURE__ */ import_react61.default.createElement("small", null, names.filter((name) => machine.tools.includes(name)).join("、") || "此 Agent 未提供")))), /* @__PURE__ */ import_react61.default.createElement("label", null, "权限模式", /* @__PURE__ */ import_react61.default.createElement("select", { value: mode, onChange: (event) => setMode(event.target.value) }, /* @__PURE__ */ import_react61.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react61.default.createElement("option", { value: "workspace-write" }, "允许写入及已勾选的控制操作"))), available.includes("machine.bind") && /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy || !botId || !rootId || selected.length === 0, onClick: save }, "保存此 Bot 的机器授权"), available.includes("machine.probe") && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.probe", { botId, rootId }) }, "检查 Agent 在线状态"), /* @__PURE__ */ import_react61.default.createElement("label", null, "受控读测试的相对路径", /* @__PURE__ */ import_react61.default.createElement("input", { "aria-label": `机器 ${machine.id} 的测试路径`, value: relativePath, onChange: (event) => setRelativePath(event.target.value), placeholder: "README.md" })), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy || !binding || !relativePath, onClick: () => run2("machine.probe", { botId, rootId, relativePath }) }, "验证可读（不显示文件内容）")), available.includes("machine.revoke") && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.revoke", { botId, expectedRevision: binding.revision }) }, "撤销此 Bot 的机器访问"), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => run2("machine.revoke", { expectedRevision: machine.revision }) }, "撤销电脑配对")), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "每次保存都会先撤销旧票据再按新范围授权。桌面截图也需要 artifact 权限；撤销离线时会保留“停止未确认”。"));
 }
 function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
-  let [form, setForm] = (0, import_react60.useState)({ botId: snapshot.bots?.[0]?.id ?? "", taskId: "", attemptId: "", operationId: "", artifactId: "" }), [result, setResult] = (0, import_react60.useState)(null), [error, setError] = (0, import_react60.useState)(null), change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  return /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-form" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "下载 artifact"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "仅下载原任务已授权的 artifact；先核对元数据，再校验完整字节和 SHA-256。内容不会显示在页面中。"), /* @__PURE__ */ import_react60.default.createElement("form", { onSubmit: async (event) => {
+  let [form, setForm] = (0, import_react61.useState)({ botId: snapshot.bots?.[0]?.id ?? "", taskId: "", attemptId: "", operationId: "", artifactId: "" }), [result, setResult] = (0, import_react61.useState)(null), [error, setError] = (0, import_react61.useState)(null), change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  return /* @__PURE__ */ import_react61.default.createElement("details", { className: "bp-form" }, /* @__PURE__ */ import_react61.default.createElement("summary", null, "下载 artifact"), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "仅下载原任务已授权的 artifact；先核对元数据，再校验完整字节和 SHA-256。内容不会显示在页面中。"), /* @__PURE__ */ import_react61.default.createElement("form", { onSubmit: async (event) => {
     event.preventDefault(), setError(null), setResult(null);
     try {
       setResult(await dispatch("machine.artifact", { machineId: machine.id, ...form }));
     } catch (error2) {
       setError(error2);
     }
-  } }, /* @__PURE__ */ import_react60.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react60.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 artifact Bot`, value: form.botId, onChange: (event) => change("botId", event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react60.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), [["taskId", "Task"], ["attemptId", "Attempt"], ["operationId", "Operation"], ["artifactId", "Artifact"]].map(([key, label]) => /* @__PURE__ */ import_react60.default.createElement("label", { key }, label, /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": `机器 ${machine.id} 的 artifact ${label}`, value: form[key], onInput: (event) => change(key, event.target.value), required: !0, autoComplete: "off" }))), /* @__PURE__ */ import_react60.default.createElement("button", { type: "submit", disabled: busy || Object.values(form).some((value) => !value) }, "核验并下载")), error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-blocked", role: "status" }, "下载失败：", error.code ?? "ARTIFACT_DOWNLOAD_FAILED", "。artifact 不存在、已过期或未获授权。"), result && /* @__PURE__ */ import_react60.default.createElement("a", { download: `${form.artifactId}.bin`, href: `data:${result.mediaType ?? "application/octet-stream"};base64,${result.content}` }, "下载已核验 artifact（", result.size, " 字节，SHA-256 已匹配）"));
+  } }, /* @__PURE__ */ import_react61.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react61.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 artifact Bot`, value: form.botId, onChange: (event) => change("botId", event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react61.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), [["taskId", "Task"], ["attemptId", "Attempt"], ["operationId", "Operation"], ["artifactId", "Artifact"]].map(([key, label]) => /* @__PURE__ */ import_react61.default.createElement("label", { key }, label, /* @__PURE__ */ import_react61.default.createElement("input", { "aria-label": `机器 ${machine.id} 的 artifact ${label}`, value: form[key], onInput: (event) => change(key, event.target.value), required: !0, autoComplete: "off" }))), /* @__PURE__ */ import_react61.default.createElement("button", { type: "submit", disabled: busy || Object.values(form).some((value) => !value) }, "核验并下载")), error && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-blocked", role: "status" }, "下载失败：", error.code ?? "ARTIFACT_DOWNLOAD_FAILED", "。artifact 不存在、已过期或未获授权。"), result && /* @__PURE__ */ import_react61.default.createElement("a", { download: `${form.artifactId}.bin`, href: `data:${result.mediaType ?? "application/octet-stream"};base64,${result.content}` }, "下载已核验 artifact（", result.size, " 字节，SHA-256 已匹配）"));
 }
 function Machines({ snapshot, dispatch, busy }) {
+  import_react61.default.useEffect(() => {
+    if (typeof dispatch != "function") return;
+    let rows2 = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked");
+    return globalThis.__dshDesktop = Object.freeze({
+      machines: () => rows2.map((item) => ({ machineId: item.id, rootId: item.roots?.[0]?.id ?? "", label: item.name ?? item.id })),
+      view: (botId, machineId) => {
+        let machine = rows2.find((item) => item.id === machineId);
+        return dispatch("machine.desktop.view", { botId, machineId, rootId: machine?.roots?.[0]?.id ?? "" });
+      },
+      act: (botId, machineId, screenshotId, action) => {
+        let machine = rows2.find((item) => item.id === machineId);
+        return dispatch("machine.desktop.act", { botId, machineId, rootId: machine?.roots?.[0]?.id ?? "", screenshotId, action });
+      }
+    }), () => {
+      delete globalThis.__dshDesktop;
+    };
+  }, [dispatch, snapshot.machines]);
   let section = snapshot.machines;
-  return section?.status !== "available" ? /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, dispatch && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(DesktopControl, { snapshot, dispatch, busy }), /* @__PURE__ */ import_react60.default.createElement(MachineSetup, { snapshot, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, machine.status ?? "未知")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react60.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react60.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react60.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react60.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装同版本 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
+  return section?.status !== "available" ? /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, dispatch && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement(DesktopControl, { snapshot, dispatch, busy }), /* @__PURE__ */ import_react61.default.createElement(MachineSetup, { snapshot, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react61.default.createElement(Tag2, null, machine.status ?? "未知")), /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react61.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react61.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react61.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装同版本 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
 }
 function UnknownReview({ item, dispatch, busy }) {
-  let [note, setNote] = (0, import_react60.useState)(""), [amount, setAmount] = (0, import_react60.useState)(""), attestable = note.trim().length > 0 && amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0, submit = (kind) => dispatch("usage.resolve", {
+  let [note, setNote] = (0, import_react61.useState)(""), [amount, setAmount] = (0, import_react61.useState)(""), attestable = note.trim().length > 0 && amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0, submit = (kind) => dispatch("usage.resolve", {
     botId: item.botId,
     runId: item.runId,
     packageId: item.packageId,
@@ -32398,16 +32517,16 @@ function UnknownReview({ item, dispatch, busy }) {
     ...kind === "attest" ? { costUsd: Number(amount) } : {},
     note: note.trim()
   });
-  return /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, item.botId), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, item.billing === "subscription" ? "订阅" : "API")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "运行" }, item.runId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "工作包" }, item.packageId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "模型" }, modelName(item.model ?? (item.provider ? { provider: item.provider, model: item.model } : null))), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "用量" }, item.usage ? `${item.usage.inputTokens ?? "未报告"} / ${item.usage.outputTokens ?? "未报告"}` : "未报告"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "结束于" }, item.finishedAt ? new Date(item.finishedAt).toLocaleString("zh-CN") : "未取得")), /* @__PURE__ */ import_react60.default.createElement("label", null, "核对说明（必填，留痕于运行记录）", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": `核对说明 ${item.runId}`, value: note, onChange: (event) => setNote(event.target.value), maxLength: 2e3, required: !0, autoComplete: "off" })), /* @__PURE__ */ import_react60.default.createElement("label", null, "厂商确认金额（美元；留空并按零费用放行）", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": `核对金额 ${item.runId}`, value: amount, onChange: (event) => setAmount(event.target.value), inputMode: "decimal", placeholder: "0.00", autoComplete: "off" })), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy || !attestable, onClick: () => submit("attest") }, "按厂商账单确认"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy || !note.trim(), onClick: () => submit("waive") }, "按零费用放行")));
+  return /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, item.botId), /* @__PURE__ */ import_react61.default.createElement(Tag2, null, item.billing === "subscription" ? "订阅" : "API")), /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "运行" }, item.runId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "工作包" }, item.packageId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "模型" }, modelName(item.model ?? (item.provider ? { provider: item.provider, model: item.model } : null))), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "用量" }, item.usage ? `${item.usage.inputTokens ?? "未报告"} / ${item.usage.outputTokens ?? "未报告"}` : "未报告"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "结束于" }, item.finishedAt ? new Date(item.finishedAt).toLocaleString("zh-CN") : "未取得")), /* @__PURE__ */ import_react61.default.createElement("label", null, "核对说明（必填，留痕于运行记录）", /* @__PURE__ */ import_react61.default.createElement("input", { "aria-label": `核对说明 ${item.runId}`, value: note, onChange: (event) => setNote(event.target.value), maxLength: 2e3, required: !0, autoComplete: "off" })), /* @__PURE__ */ import_react61.default.createElement("label", null, "厂商确认金额（美元；留空并按零费用放行）", /* @__PURE__ */ import_react61.default.createElement("input", { "aria-label": `核对金额 ${item.runId}`, value: amount, onChange: (event) => setAmount(event.target.value), inputMode: "decimal", placeholder: "0.00", autoComplete: "off" })), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy || !attestable, onClick: () => submit("attest") }, "按厂商账单确认"), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy || !note.trim(), onClick: () => submit("waive") }, "按零费用放行")));
 }
 function Usage({ snapshot, dispatch, busy, openAdvanced }) {
   let section = snapshot.usage;
-  if (section?.status !== "available") return /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: openAdvanced }, "打开已有 MR 费用与订阅面板"));
+  if (section?.status !== "available") return /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: section }), /* @__PURE__ */ import_react61.default.createElement("button", { onClick: openAdvanced }, "打开已有 MR 费用与订阅面板"));
   let unresolved = section.unresolved ?? [];
-  return /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。"), section.summary && /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts bp-card" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "已知 API 费用" }, money3(section.summary.apiUsd)), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "当前预占" }, money3(section.summary.reservedUsd)), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "未知费用记录" }, section.summary.unknownCount ?? "未报告"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "订阅用量" }, subscriptionText(section.summary.subscriptionSummary))), unresolved.length ? /* @__PURE__ */ import_react60.default.createElement("section", { className: "bp-card", "aria-label": "待人工核对的未确认费用" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "待人工核对的未确认费用"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-grid" }, unresolved.map((item) => /* @__PURE__ */ import_react60.default.createElement(UnknownReview, { key: `${item.runId}/${item.packageId}`, item, dispatch, busy })))) : null, section.items.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react60.default.createElement("table", null, /* @__PURE__ */ import_react60.default.createElement("thead", null, /* @__PURE__ */ import_react60.default.createElement("tr", null, /* @__PURE__ */ import_react60.default.createElement("th", null, "Bot / 任务"), /* @__PURE__ */ import_react60.default.createElement("th", null, "来源"), /* @__PURE__ */ import_react60.default.createElement("th", null, "准确模型"), /* @__PURE__ */ import_react60.default.createElement("th", null, "金额"), /* @__PURE__ */ import_react60.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react60.default.createElement("tbody", null, section.items.map((row, i) => /* @__PURE__ */ import_react60.default.createElement("tr", { key: row.id ?? row.receiptId ?? i }, /* @__PURE__ */ import_react60.default.createElement("td", null, row.botName ?? row.botId ?? "未归属", /* @__PURE__ */ import_react60.default.createElement("small", null, row.taskId ?? row.runId)), /* @__PURE__ */ import_react60.default.createElement("td", null, { bot: "Bot 对话", aux: "Bot 辅助调用", "mr-api": "MR API", cli: "官方 CLI", review: "评审" }[row.source] ?? row.source ?? "未报告"), /* @__PURE__ */ import_react60.default.createElement("td", null, modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))), /* @__PURE__ */ import_react60.default.createElement("td", null, row.billing === "subscription" ? "订阅" : money3(row.amountUsd ?? row.costUsd)), /* @__PURE__ */ import_react60.default.createElement("td", null, row.status ?? "未知", row.resolution && /* @__PURE__ */ import_react60.default.createElement(Tag2, null, row.resolution.kind === "waive" ? "已按零费用放行" : `已确认 ${money3(row.resolution.costUsd)}`))))))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, "尚无费用收据。"), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: openAdvanced }, "打开高级费用、订阅与历史能力"));
+  return /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。"), section.summary && /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts bp-card" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "已知 API 费用" }, money3(section.summary.apiUsd)), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "当前预占" }, money3(section.summary.reservedUsd)), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "未知费用记录" }, section.summary.unknownCount ?? "未报告"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "订阅用量" }, subscriptionText(section.summary.subscriptionSummary))), unresolved.length ? /* @__PURE__ */ import_react61.default.createElement("section", { className: "bp-card", "aria-label": "待人工核对的未确认费用" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "待人工核对的未确认费用"), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。"), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-grid" }, unresolved.map((item) => /* @__PURE__ */ import_react61.default.createElement(UnknownReview, { key: `${item.runId}/${item.packageId}`, item, dispatch, busy })))) : null, section.items.length ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react61.default.createElement("table", null, /* @__PURE__ */ import_react61.default.createElement("thead", null, /* @__PURE__ */ import_react61.default.createElement("tr", null, /* @__PURE__ */ import_react61.default.createElement("th", null, "Bot / 任务"), /* @__PURE__ */ import_react61.default.createElement("th", null, "来源"), /* @__PURE__ */ import_react61.default.createElement("th", null, "准确模型"), /* @__PURE__ */ import_react61.default.createElement("th", null, "金额"), /* @__PURE__ */ import_react61.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react61.default.createElement("tbody", null, section.items.map((row, i) => /* @__PURE__ */ import_react61.default.createElement("tr", { key: row.id ?? row.receiptId ?? i }, /* @__PURE__ */ import_react61.default.createElement("td", null, row.botName ?? row.botId ?? "未归属", /* @__PURE__ */ import_react61.default.createElement("small", null, row.taskId ?? row.runId)), /* @__PURE__ */ import_react61.default.createElement("td", null, { bot: "Bot 对话", aux: "Bot 辅助调用", "mr-api": "MR API", cli: "官方 CLI", review: "评审" }[row.source] ?? row.source ?? "未报告"), /* @__PURE__ */ import_react61.default.createElement("td", null, modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))), /* @__PURE__ */ import_react61.default.createElement("td", null, row.billing === "subscription" ? "订阅" : money3(row.amountUsd ?? row.costUsd)), /* @__PURE__ */ import_react61.default.createElement("td", null, row.status ?? "未知", row.resolution && /* @__PURE__ */ import_react61.default.createElement(Tag2, null, row.resolution.kind === "waive" ? "已按零费用放行" : `已确认 ${money3(row.resolution.costUsd)}`))))))) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-empty" }, "尚无费用收据。"), /* @__PURE__ */ import_react61.default.createElement("button", { onClick: openAdvanced }, "打开高级费用、订阅与历史能力"));
 }
 function ProductPage({ section, productApi, openSession, openPanel }) {
-  let [snapshot, setSnapshot] = (0, import_react60.useState)(null), [error, setError] = (0, import_react60.useState)(""), [busy, setBusy] = (0, import_react60.useState)(!1), [snapshotStale, setSnapshotStale] = (0, import_react60.useState)(!1), lifecycle = (0, import_react60.useRef)({ live: !1, epoch: 0, request: 0 }), snapshotApi = (0, import_react60.useRef)(null), refresh = (0, import_react60.useCallback)(async (signal) => {
+  let [snapshot, setSnapshot] = (0, import_react61.useState)(null), [error, setError] = (0, import_react61.useState)(""), [busy, setBusy] = (0, import_react61.useState)(!1), [snapshotStale, setSnapshotStale] = (0, import_react61.useState)(!1), lifecycle = (0, import_react61.useRef)({ live: !1, epoch: 0, request: 0 }), snapshotApi = (0, import_react61.useRef)(null), refresh = (0, import_react61.useCallback)(async (signal) => {
     let state = lifecycle.current;
     if (!state.live) return;
     let epoch = state.epoch, request = ++state.request, current = () => state.live && state.epoch === epoch && state.request === request && !signal?.aborted;
@@ -32420,7 +32539,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
       current() && (setSnapshotStale(!0), setError(cause.message));
     }
   }, [productApi]);
-  (0, import_react60.useEffect)(() => {
+  (0, import_react61.useEffect)(() => {
     let controller = new AbortController(), state = lifecycle.current;
     state.live = !0, state.epoch++, setSnapshotStale(!0), setBusy(!1);
     let timer, stopped = !1, loop = async () => {
@@ -32443,7 +32562,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
       current() && setBusy(!1);
     }
   }, disabled = busy || snapshotStale || snapshotApi.current !== productApi || !!snapshot?.readOnly, title = { bindings: "Bot 绑定与权限", tasks: "任务", machines: "远程电脑", usage: "费用与用量" }[section];
-  return /* @__PURE__ */ import_react60.default.createElement("main", { className: "bp-page" }, /* @__PURE__ */ import_react60.default.createElement("header", null, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-eyebrow" }, "BOT 工作系统"), /* @__PURE__ */ import_react60.default.createElement("h1", null, title)), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => refresh() }, "刷新")), error && /* @__PURE__ */ import_react60.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react60.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react60.default.createElement("p", null, error), snapshot && /* @__PURE__ */ import_react60.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot?.readOnly && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: snapshot.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot && !error && /* @__PURE__ */ import_react60.default.createElement("p", { role: "status" }, "正在读取宿主状态…"), snapshot && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, section === "bindings" && /* @__PURE__ */ import_react60.default.createElement(BotBindings, { snapshot, openSession, dispatch, busy: disabled }), section === "tasks" && /* @__PURE__ */ import_react60.default.createElement(Tasks, { snapshot, dispatch, busy: disabled }), section === "machines" && /* @__PURE__ */ import_react60.default.createElement(Machines, { snapshot, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react60.default.createElement(Usage, { snapshot, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react60.default.createElement("footer", { className: "bp-muted" }, "宿主读取时间：", new Date(snapshot.observedAt).toLocaleString("zh-CN"))));
+  return /* @__PURE__ */ import_react61.default.createElement("main", { className: "bp-page" }, /* @__PURE__ */ import_react61.default.createElement("header", null, /* @__PURE__ */ import_react61.default.createElement("div", null, /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-eyebrow" }, "BOT 工作系统"), /* @__PURE__ */ import_react61.default.createElement("h1", null, title)), /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => refresh() }, "刷新")), error && /* @__PURE__ */ import_react61.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react61.default.createElement("p", null, error), snapshot && /* @__PURE__ */ import_react61.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot?.readOnly && /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: { reason: snapshot.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot && !error && /* @__PURE__ */ import_react61.default.createElement("p", { role: "status" }, "正在读取宿主状态…"), snapshot && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, section === "bindings" && /* @__PURE__ */ import_react61.default.createElement(BotBindings, { snapshot, openSession, dispatch, busy: disabled }), section === "tasks" && /* @__PURE__ */ import_react61.default.createElement(Tasks, { snapshot, dispatch, busy: disabled }), section === "machines" && /* @__PURE__ */ import_react61.default.createElement(Machines, { snapshot, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react61.default.createElement(Usage, { snapshot, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react61.default.createElement("footer", { className: "bp-muted" }, "宿主读取时间：", new Date(snapshot.observedAt).toLocaleString("zh-CN"))));
 }
 
 // apps/integration-client/product.css
@@ -32478,8 +32597,8 @@ function productSlots(slots, openPanel) {
     if (key === "register") return (options, component) => {
       if (component !== TeamSidebar) return target.register(options, component);
       let Sidebar = (props) => {
-        let sidebarAddon = () => /* @__PURE__ */ import_react61.default.createElement(ProductNavigation, { panels: PRODUCT_PANELS, openPanel, compact: !props.wide });
-        return /* @__PURE__ */ import_react61.default.createElement(TeamSidebar, { ...props, actions: { ...props.actions, sidebarAddon } });
+        let sidebarAddon = () => /* @__PURE__ */ import_react62.default.createElement(ProductNavigation, { panels: PRODUCT_PANELS, openPanel, compact: !props.wide });
+        return /* @__PURE__ */ import_react62.default.createElement(TeamSidebar, { ...props, actions: { ...props.actions, sidebarAddon } });
       };
       return Sidebar.dsBotTeamSidebar = TeamSidebar, target.register(options, Sidebar);
     };
