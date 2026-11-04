@@ -2393,6 +2393,7 @@ export function apply(ctx, config = {}) {
     } catch (error) {
       ctx.logger?.('model-router: independent runtime unavailable: %s', error?.message ?? error)
     }
+    try { ctx.provide('botRuntimeAdapter', botRuntime) } catch { /* provided only once */ }
     registerOfficialToolsRemote(ctx, {
       ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences, botRuntime, botRouting }),
       requireBotPolicy: () => policyRequired(config),
