@@ -4,6 +4,7 @@ import { ModelProfileEditor } from './model-profile-editor.jsx'
 import { acceptedInstallJob, installClickRefusal, installSummaryMatchesSettings, mutateToolInstallSettings, retainToolInstallDrafts, savedToolInstallMethods, shouldApplyInstallStatus, toolInstallAction, toolInstallSettingsSignature, toolMaintenanceActions, validateToolInstallSetting } from './tool-install-state.mjs'
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
+import { attentionSummary, deriveAttention } from '../shared/attention.mjs'
 import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, SubscriptionUsageCard, ToolLoginLine } from './router-insights.jsx'
 import { apiPlanEstimate, healthSummary, initialPackageAssignments, manualAssignmentOptions, packageEstimateText, planBudget, rerunConfirmations, rerunSupport, reservationSummary, subscriptionEstimateText, unwrapRemote } from './insights-state.mjs'
 import { packagePlanKey } from '../shared/package-assignments.mjs'
@@ -991,6 +992,14 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
   const routes = routesFromModelCatalog(catalogState.catalog)
   const assignmentOptions = manualAssignmentOptions(routes, toolProbes, workbench.health.report)
+  // \u201c\u6709\u4ec0\u4e48\u9700\u8981\u6211\u5904\u7406\u201d\u5148\u4e8e\u5176\u4ed6\u4e00\u5207\uff1a\u53ea\u5217\u771f\u6b63\u7b49\u4eba\u7684\u4e8b\uff0c\u5065\u5eb7\u65f6\u4e0d\u5360\u4f4d\u7f6e\u3002
+  const attention = React.useMemo(() => deriveAttention({
+    budget: workbench.ledger.value?.budget ?? null,
+    reserved: workbench.ledger.value?.reserved ?? null,
+    probes: toolProbes?.probes ?? [],
+    health: (workbench.health.report?.tools ?? []).map(item => ({ ...item, label: OFFICIAL_TOOLS.find(tool => tool.id === item.id)?.label ?? item.id })),
+    runs: workbench.ledger.value?.runs ?? [],
+  }), [workbench.ledger.value, workbench.health.report, toolProbes])
   const currentPackagePlanKey = packagePlanKey(plan, task)
   const effectiveAssignmentMode = assignmentMode === 'manual' && currentPackagePlanKey && manualAllowed && mode !== 'direct' ? 'manual' : 'algorithm'
   const changeAssignmentMode = next => {
@@ -1101,6 +1110,15 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         {(workbench.health.report?.notices ?? []).map(notice => (
           <div key={`${notice.kind}-${notice.at}`} className="mr-error" role="alert">{notice.message}</div>
         ))}
+        {attention.length > 0 && <section className="mr-card mr-attention" aria-label="需要你处理">
+          <div className="mr-card-head"><div><h2 className="mr-card-title">需要你处理</h2><p className="mr-card-copy">{attentionSummary(attention)}</p></div></div>
+          <ul className="mr-attention-list">
+            {attention.map(row => <li key={row.key} className={`mr-attention-row mr-attention-${row.stage}`}>
+              <div><strong>{row.title}</strong><p className="mr-caption">{row.detail}</p></div>
+              <button className="mr-button mr-button-secondary" type="button" onClick={() => selectView(row.target)}>{row.target === 'tools' ? '查看官方工具' : '查看费用与用量'}</button>
+            </li>)}
+          </ul>
+        </section>}
         <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-plan" aria-labelledby="mr-tab-plan" hidden={view !== 'plan'}>
         <div className="mr-grid mr-planning-grid">
           <section className="mr-card" aria-label="任务规划">

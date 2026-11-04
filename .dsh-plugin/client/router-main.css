@@ -306,3 +306,14 @@
 .mr-tui-input{width:100%;box-sizing:border-box;border:1px solid var(--mr-line,#d8ded6);border-radius:8px;padding:8px 10px;font:inherit;color:inherit;background:var(--mr-bg,#fff);resize:vertical}
 .mr-tui-actions{display:flex;align-items:center;gap:10px}
 .mr-tui-reply{margin:0;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--mr-soft,#f4f6f2);border-radius:8px;padding:10px;font:12px/1.6 ui-monospace,monospace}
+
+.mr-attention{border-color:#c9a22766;background:linear-gradient(180deg,#fdf7e6,#fffef9)}
+.mr-attention-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.mr-attention-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid var(--mr-line,#e4e0d2);border-radius:10px;background:#fff}
+.mr-attention-row>div{min-width:0}
+.mr-attention-row strong{display:block;font-size:13px;line-height:1.4}
+.mr-attention-row .mr-caption{margin:2px 0 0}
+.mr-attention-blocked{border-left:3px solid #b3261e}
+.mr-attention-failed{border-left:3px solid #b26a00}
+.mr-attention-login{border-left:3px solid #4a8069}
+.mr-attention-answer{border-left:3px solid #2f6f9f}
