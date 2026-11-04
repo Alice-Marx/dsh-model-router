@@ -29618,7 +29618,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.26.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -30510,7 +30510,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
     setDrafts({}), setNotice(""), onPendingChange?.(!1);
   } }, "放弃更改"), dirty && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, invalid ? "请修正输入后保存。" : "更改尚未保存，安装与更新暂不可用。")), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, `当前生效：安装目录 ${install?.installDir || "（各厂商默认）"} · npm 源 ${install?.registry || "（默认）"}`, notice ? ` · ${notice}` : ""));
 }
-function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
+function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope, tuiPrompt }) {
   let healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item])), [probeState, setProbeState] = import_react57.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" }), [jobs, setJobs] = import_react57.default.useState({}), [rowErrors, setRowErrors] = import_react57.default.useState({}), [settingsPending, setSettingsPending] = import_react57.default.useState(!1), [methodSaving, setMethodSaving] = import_react57.default.useState(null), [previewPending, setPreviewPending] = import_react57.default.useState(!1), [settingsSnapshot, setSettingsSnapshot] = import_react57.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [previewError, setPreviewError] = import_react57.default.useState(""), [probeSettingsStale, setProbeSettingsStale] = import_react57.default.useState(!1), settingsPendingRef = import_react57.default.useRef(!1), methodSavingRef = import_react57.default.useRef(null), previewPendingRef = import_react57.default.useRef(!1), mounted = import_react57.default.useRef(!1), request = import_react57.default.useRef(0), previewRequest = import_react57.default.useRef(0), mutationGeneration = import_react57.default.useRef(0), mutationPendingRef = import_react57.default.useRef(null), submitting = import_react57.default.useRef(/* @__PURE__ */ new Set()), polling = import_react57.default.useRef(/* @__PURE__ */ new Set()), jobsRef = import_react57.default.useRef({}), handleSettingsPending = import_react57.default.useCallback((value) => {
     settingsPendingRef.current = value, setSettingsPending(value);
   }, []), rememberJobs = (updater) => {
@@ -30857,12 +30857,12 @@ ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join(`
     refreshHealth(!1), refreshLedger(), refreshBoundaries();
   }, []), { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun };
 }
-function TuiPromptBox({ tool, tuiPrompt: tuiPrompt2 }) {
+function TuiPromptBox({ tool, tuiPrompt }) {
   let [prompt, setPrompt] = import_react57.default.useState(""), [reply, setReply] = import_react57.default.useState(null), [busy, setBusy] = import_react57.default.useState(!1), send = async () => {
     if (!(busy || prompt.trim() === "")) {
       setBusy(!0), setReply(null);
       try {
-        let result = await tuiPrompt2({ tool: tool.id, prompt });
+        let result = await tuiPrompt({ tool: tool.id, prompt });
         result?.ok === !1 ? setReply({ error: result.error ?? "运行失败" }) : setReply({ text: result?.value?.text ?? "", durationMs: result?.value?.durationMs ?? null });
       } catch (error) {
         setReply({ error: String(error?.message ?? error) });
@@ -30886,7 +30886,7 @@ function TuiPromptBox({ tool, tuiPrompt: tuiPrompt2 }) {
     send();
   } }, busy ? "运行中…" : "发送"), reply?.durationMs != null && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, "耗时 ", Math.round(reply.durationMs / 1e3), " 秒")), reply?.error && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, reply.error), reply?.text && /* @__PURE__ */ import_react57.default.createElement("pre", { className: "mr-tui-reply", "aria-label": `${tool.label} 回复` }, reply.text));
 }
-function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt: tuiPrompt2 }) {
+function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt }) {
   let workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }), [catalogState, setCatalogState] = import_react57.default.useState({ status: "loading", catalog: null, error: "" }), [task, setTask] = import_react57.default.useState(""), [mode, setMode] = import_react57.default.useState("single"), [directKey, setDirectKey] = import_react57.default.useState(""), [budget, setBudget] = import_react57.default.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)), [query, setQuery] = import_react57.default.useState(""), [plan, setPlan] = import_react57.default.useState(null), [assignmentMode, setAssignmentMode] = import_react57.default.useState("algorithm"), [packageAssignments, setPackageAssignments] = import_react57.default.useState({}), [planError, setPlanError] = import_react57.default.useState(""), [toolProbes, setToolProbes] = import_react57.default.useState(null), [routingSettings, setRoutingSettings] = import_react57.default.useState(() => {
     let value = settingsScope.getSnapshot().value ?? {};
     return routingSettingsSignature(value);
@@ -31076,6 +31076,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
   ), /* @__PURE__ */ import_react57.default.createElement(
     OfficialToolsCard,
     {
+      tuiPrompt,
       listOfficialTools,
       loadOfficialInstallSettings,
       installOfficialTool,

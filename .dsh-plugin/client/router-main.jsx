@@ -280,7 +280,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
   )
 }
 
-export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope }) {
+export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope, tuiPrompt }) {
   const healthById = Object.fromEntries((health?.tools ?? []).map(item => [item.id, item]))
   const [probeState, setProbeState] = React.useState({ status: 'loading', probes: [], capabilities: [], readiness: [], install: null, error: '' })
   const [jobs, setJobs] = React.useState({})
@@ -1157,7 +1157,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           <OnboardingBanner health={workbench.health.report} error={workbench.health.error} refreshing={workbench.health.refreshing}
             onRefresh={() => { void workbench.refreshHealth(true) }} onDone={() => { void workbench.finishOnboarding() }} />
         )}
-        <OfficialToolsCard listOfficialTools={listOfficialTools} loadOfficialInstallSettings={loadOfficialInstallSettings} installOfficialTool={installOfficialTool} uninstallOfficialTool={uninstallOfficialTool} repairOfficialTool={repairOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} settingsScope={settingsScope}
+        <OfficialToolsCard tuiPrompt={tuiPrompt} listOfficialTools={listOfficialTools} loadOfficialInstallSettings={loadOfficialInstallSettings} installOfficialTool={installOfficialTool} uninstallOfficialTool={uninstallOfficialTool} repairOfficialTool={repairOfficialTool} cancelOfficialToolInstall={cancelOfficialToolInstall} officialToolInstallStatus={officialToolInstallStatus} onProbes={handleToolProbes} settingsScope={settingsScope}
           health={workbench.health.report} onRefreshHealth={() => { void workbench.refreshHealth(true) }} />
         </div>
 
