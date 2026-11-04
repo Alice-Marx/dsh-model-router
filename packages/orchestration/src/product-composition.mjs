@@ -569,6 +569,24 @@ export function startBotProduct(ctx, options = {}) {
         releaseTaskTools = registerTaskTools(ctx, defineTool, { service: taskService, directory })
       }
       const machineActions=Object.fromEntries(['pair','bind','probe','revoke','reconcile'].map(name=>[`machine.${name}`,(payload,context)=>machines[name](payload,context)]))
+      // A newly paired machine is usable by the Main Bot at once: pairing already binds the probe
+      // bot, and the Main Bot is the operator's own assistant, so it gets the same full ceiling
+      // instead of needing a second trip through the binding form.
+      machineActions['machine.pair'] = async (payload, context) => {
+        const paired = await machines.pair(payload, context)
+        try {
+          const mainId = (product?.rt.state?.mainBotIds ?? [])[0]
+          if (mainId && mainId !== payload?.probeBotId) {
+            const record = machines.readModel().items.find(item => item.id === (paired?.machineId ?? payload?.machineId))
+            const config = record?.config ?? record ?? {}
+            const binding = (record?.bindings ?? []).find(item => item.botId === payload?.probeBotId)
+            const roots = Array.isArray(config.roots) ? config.roots : (Array.isArray(binding?.roots) ? binding.roots : [])
+            const tools = Array.isArray(config.tools) ? config.tools : (Array.isArray(binding?.tools) ? binding.tools : [])
+            if (roots.length && tools.length) await machines.bind({ machineId: record?.id ?? payload?.machineId, botId: mainId, roots, tools, mode: 'workspace-write', expectedRevision: record?.revision ?? 0 }, context)
+          }
+        } catch { /* the Main Bot binding is a convenience; pairing itself already succeeded */ }
+        return paired
+      }
       machineActions['machine.artifact']=(payload,context)=>machines.download(taskOwner(payload),payload,context)
       // Desktop control: a person watches one frame and acts on it. Both calls run as that
       // person's Bot, so the Bot grant and the machine ceiling decide, and the operations land
