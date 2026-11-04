@@ -1,6 +1,6 @@
 # Unified model-router product
 
-- This package is the desktop app's only Bot runtime. Do not mount `ds-bot` beside it or create another agent loop.
+- This package is the desktop app's Bot runtime. Integration mode reuses Harness Sessions; independent mode uses `packages/orchestration/src/bot-loop.mjs` with `bot-session-store.mjs`. Never let both serve the same Bot: a Bot is moved atomically and the old path goes read-only first.
 - `modules/bot-runtime/vendor/ds-bot/` is synchronized from `../ds-bot/`; do not edit it directly. Run `node scripts/sync-ds-bot.mjs`, or `npm run build:client` to synchronize it and rebuild `.dsh-plugin/client.js`.
 - `.dsh-plugin/client.js` is generated. Check it with `npm run check:client`; never edit it by hand.
 - Model, tool, machine and funding authority comes from committed Host state. Do not accept authority, executable paths, endpoints, credentials or operation identity from model arguments.
