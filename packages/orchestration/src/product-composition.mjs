@@ -328,7 +328,12 @@ export function startBotProduct(ctx, options = {}) {
     // bot-settings' botExists honest during that same synchronous compilation.
     committedBots.set(bot.id, bot)
     scheduleRefresh()
-    const grant = botSettings ? botSettings.grantFor(bot) : compileProductGrant(bot, { routes, hydrated })
+    let grant = botSettings ? botSettings.grantFor(bot) : compileProductGrant(bot, { routes, hydrated })
+    // The Main Bot is the operator's own assistant: it may switch model in its panel at any time,
+    // so its grant carries every hydrated route instead of only the one saved at that moment.
+    if ((product?.rt.state?.mainBotIds ?? []).includes(bot.id) && hydrated && routes.size > 0) {
+      grant = { ...grant, modelRoutes: [...routes.keys()].map(key => { const at = key.indexOf('/'); return { provider: key.slice(0, at), model: key.slice(at + 1) } }) }
+    }
     const names = {machine_ping:'remote_computer_ping',fs_list:'remote_computer_list',fs_read:'remote_computer_read',fs_write:'remote_computer_write'}
     // Grant compilation is synchronous and runs on every DS save/load: an
     // unavailable machine directory (not yet opened, or closed after a failed
