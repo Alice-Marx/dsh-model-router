@@ -33,7 +33,7 @@ function operationOutcome(record, tool) {
   return { value: { ...(record.result ?? {}), operationStatus: record.status, ...(record.error ? { error: record.error } : {}) }, status: record.status }
 }
 
-export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null }) {
+export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null, botRouting = null }) {
   // A session that is not a Bot (the operator's own agent) is otherwise refused as
   // UNKNOWN_SUBJECT. When passthrough is enabled the Host supplies the Main Bot's subject, so the
   // call carries that Bot's grants and audit trail instead of a second permission set.
@@ -53,6 +53,25 @@ export function registerRemoteComputerTools(ctx, { runtime, directory, machines,
   const target = {
     machineId: { type: 'string', required: true },
     rootId: { type: 'string', required: true },
+  }
+
+  // The Main Bot consults routing before it hands work out. This reads the same decision the
+  // workbench shows: it dispatches nothing, binds nothing and spends nothing, so a Bot cannot
+  // widen its own reach by asking who should do something.
+  if (botRouting && typeof botRouting.decide === 'function') {
+    register('bot_route_task', 'Decide which Bot should take a task, and why. A preview only: it dispatches nothing and grants nothing.', {
+      text: { type: 'string', required: true },
+      pinnedBotId: { type: 'string' },
+      requiresMachine: { type: 'boolean' },
+      machineId: { type: 'string' },
+      requiredTools: { type: 'array', items: { type: 'string' } },
+    }, async args => json(botRouting.decide({
+      text: args.text,
+      pinnedBotId: args.pinnedBotId ?? '',
+      requiresMachine: args.requiresMachine === true,
+      machineId: args.machineId ?? '',
+      requiredTools: Array.isArray(args.requiredTools) ? args.requiredTools : [],
+    })))
   }
 
   register('remote_computer_ping', 'Check an explicitly paired remote computer and its desktop/browser capabilities.', target,

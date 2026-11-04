@@ -775,7 +775,7 @@ export function startBotProduct(ctx, options = {}) {
         authorizeRequest })
       releaseMachineSecrets=guardMachineSecrets(ctx,product.rt,machines)
       ctx.provide('botRemoteMachines', machines)
-      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject})
+      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject,botRouting})
       // The MR execution paths project their routes through the same Bot
       // binding, so a consult run carries the binding price instead of an
       // unknown-cost package.
