@@ -16,11 +16,9 @@
 | 任务、执行尝试、预算与收据进事务账本 | ✅ `model-receipt.mjs` 有不可变身份字段与 `state/usage/actualModel/reportedCostUsd/outcome`；`sqlite-router-state.mjs` 提供事务存储 | `packages/orchestration/src/model-receipt.mjs` |
 | 防重复执行、重复计费 | ✅ 幂等键 `taskHash` + 原子准入 `atomicAdmission`；预占 `budgetReservations` | `task-contract.mjs`、`funded-router-state.mjs` |
 | 工作台执行接入同一任务服务 | ✅ 工作台 `startRun` → `executePreparedWorkbenchRun` → 同一批执行器；演练模式在同一阻塞点短路 | `.dsh-plugin/index.mjs` |
-| 官方 CLI 作为**明确子任务**登记 | ⬜ 目前 CLI 调用有收据（`createCliExecution`），但没有以 Task 形式进入 `task-service`，所以依赖/取消/改派不覆盖它 | `packages/orchestration/src/cli-execution.mjs` |
+| 官方 CLI 作为**明确子任务**登记 | ✅ `codex-read` 已是注册后端（`effect: read`，按 Bot 绑定解析入口/模型/资费）；收据与结果都带 `requestedModel`/`actualModel`。⬜ 适配器目前只覆盖 Codex 只读 | `product-composition.mjs` `createTaskBackends`、`cli-execution.mjs` |
 
-**下一步（1）**：新增 `cli` 后端注册到 `createTaskService({ backends })`，`effect: workspace-write`、`location: local`，
-入参只带 `{ toolId, model, prompt }`，命令由 Host 从注册表解析；收据写 `requestedModel` 与 `actualModel` 两列。
-验收：同一任务里 CLI 步骤可被取消/重试，且收据能证明"请求模型 ≠ 实际模型"。
+**下一步（1）**：CLI 后端已存在，缺口是**适配器覆盖面**——现在只有 Codex 只读。把 `createCliReadBackend` 的入口解析与输出解析抽成适配器接口，按 `official-tools` 注册表声明 `headlessAdapter` 的工具逐个接入；收据的 `requestedModel`/`actualModel` 字段与结果包已就位（本轮修复：结果此前不带 package，导致任务详情看不到模型对照）。
 
 ---
 

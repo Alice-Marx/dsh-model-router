@@ -63,7 +63,10 @@ test('CLI execution/native: Task admission, pre-turn fence, source receipt and a
   assert.equal(f.stats.dispatched,1);assert.equal(f.stats.stopped,1)
   const bank=await f.store.read(),receipt=(await f.store.modelCalls()).items[0]
   assert.equal(bank.runs.length,1);assert.deepEqual(bank.budgetReservations,{});assert.equal(spending(bank.runs).today,0)
-  assert.equal(receipt.source,'cli');assert.equal(receipt.operationId,task.operationId);assert.equal(receipt.state,'settled');assert.equal(receipt.actualModel,null)
+  assert.equal(receipt.source,'cli');assert.equal(receipt.operationId,task.operationId);assert.equal(receipt.state,'settled')
+  // The receipt records what the CLI reported, not the catalog model.
+  assert.equal(receipt.actualModel,'gpt-exact')
+  assert.equal(done.result.packages[0].actualModel,'gpt-exact');assert.equal(done.result.packages[0].requestedModel,'gpt-exact')
   assert.deepEqual(receipt.usage,{cacheReadTokens:3,inputTokens:8,outputTokens:5})
   assert.equal((await f.backend.facade.collect(f.subject,done.legacyRunIds[0])).outcome,'succeeded')
   assert.equal(f.stats.dispatched,1);assert.equal((await f.store.modelCalls()).items.length,1)
@@ -111,6 +114,8 @@ test('CLI execution/native: unconfirmed tree stop or configured model mismatch s
     assert.equal((await f.store.modelCalls()).items[0].state,'unknown')
     assert.equal(Object.keys((await f.store.read()).budgetReservations).length,1)
     assert.throws(()=>f.service.retry(f.subject,{taskId:task.taskId,requestKey:'unsafe'}),/TASK_RECONCILIATION_REQUIRED/)
+    const receipts=(await f.store.modelCalls()).items
+    assert.equal(receipts[0].actualModel,options.mismatch?'gpt-other':'gpt-exact','a reported model is recorded even when it differs')
     const observed=await f.service.reconcile(f.subject,{taskId:task.taskId,requestKey:'observe'})
     assert.equal(observed.state,'needs-reconciliation');assert.equal(f.stats.dispatched,1)
   }

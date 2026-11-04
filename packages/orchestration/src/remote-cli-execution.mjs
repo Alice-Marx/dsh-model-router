@@ -144,9 +144,11 @@ export function createRemoteCliReadBackend({machines,directory,store,authority,p
   const outcome=snapshot.terminal==='completed'?'succeeded':snapshot.terminal==='failed'?'failed':snapshot.terminal==='interrupted'?'cancelled':'unknown'
   const observed=usageOf(snapshot.usage),inference=snapshot.cliTurnRequestsDispatched>0
   if(!terminal.has(outcome)||billing==='api'&&inference)return null
-  const finishedAt=now(),item={id:'cli',provider:model.provider,model:model.model,toolId:'codex',channel:'official-cli',billing,ran:inference,ok:outcome==='succeeded',status:outcome,usage:observed.usage,usageIncomplete:!observed.complete,finishedAt,pricingSnapshot:pricing,
-   costUsd:billing==='subscription'&&inference?0:null,costSource:!inference?'not-run':'subscription',actualModel:null}
-  return {outcome,stopConfirmed:true,receipt:{finishedAt,usage:observed.usage,usageComplete:observed.complete,finishKind:snapshot.terminal,actualModel:null,reportedCostUsd:null},
+  const finishedAt=now()
+  const reportedModel=typeof snapshot?.identity?.reportedCliModel==='string'&&snapshot.identity.reportedCliModel?snapshot.identity.reportedCliModel:null
+  const item={id:'cli',provider:model.provider,model:model.model,toolId:'codex',channel:'official-cli',billing,ran:inference,ok:outcome==='succeeded',status:outcome,usage:observed.usage,usageIncomplete:!observed.complete,finishedAt,pricingSnapshot:pricing,
+   costUsd:billing==='subscription'&&inference?0:null,costSource:!inference?'not-run':'subscription',requestedModel,actualModel:reportedModel}
+  return {outcome,stopConfirmed:true,receipt:{finishedAt,usage:observed.usage,usageComplete:observed.complete,finishKind:snapshot.terminal,actualModel:reportedModel,reportedCostUsd:null},
    run:{status:outcome==='succeeded'?'completed':outcome,finishedAt,packages:[item]},cliExecution:{modelIdentity:snapshot.identity,cliTurnRequestsDispatched:snapshot.cliTurnRequestsDispatched,actualProviderRequestCount:snapshot.actualProviderRequestCount??null}}
  }
  function innerFor(subject,input,target){

@@ -114,17 +114,20 @@ export function createCliExecution({store,authority,directory,entry,runtimeRoot,
         let snapshotAccepted=Boolean(snapshot)
         try{if(snapshotValid)snapshotAccepted=snapshotValid(snapshot)===true}catch{snapshotAccepted=false}
         const observed=usageOf(snapshot?.usage),inference=location==='remote'?snapshotAccepted&&snapshot?.cliTurnRequestsDispatched>0:dispatched||(snapshot?.cliTurnRequestsDispatched??0)>0
-        const identity=snapshot?.identity,identityValid=snapshotAccepted&&identity?.requestedCliModel===requestedModel&&identity?.reportedCliModel===requestedModel&&identity?.reportedProvider==='openai'&&identity?.verification!=='mismatch'&&!(identity.reroutes??[]).some(row=>row.toModel!==requestedModel)
+        const identity=snapshot?.identity
+        // What the CLI says it used. Never the catalog model, never a substitute.
+        const reportedModel=typeof identity?.reportedCliModel==='string'&&identity.reportedCliModel?identity.reportedCliModel:null
+        const identityValid=snapshotAccepted&&identity?.requestedCliModel===requestedModel&&identity?.reportedCliModel===requestedModel&&identity?.reportedProvider==='openai'&&identity?.verification!=='mismatch'&&!(identity.reroutes??[]).some(row=>row.toModel!==requestedModel)
         // Factory rejection can occur after spawning a supervisor; only the
         // Host transport's dispatch-not-sent marker proves remote non-dispatch.
         const stopConfirmed=stopped?.treeStopped===true
         let outcome=!stopConfirmed?'unknown':!inference?signal.aborted?'cancelled':'failed':!identityValid||!terminal.has(snapshot?.terminal==='completed'?'succeeded':snapshot?.terminal==='failed'?'failed':snapshot?.terminal==='interrupted'?'cancelled':'unknown')?'unknown':snapshot.terminal==='completed'?'succeeded':signal.aborted?'cancelled':'failed'
         if(error&&outcome==='succeeded')outcome=signal.aborted?'cancelled':'unknown'
         const item={id:'cli',provider:model.provider,model:model.model,toolId:'codex',channel:'official-cli',billing,ran:inference,ok:outcome==='succeeded',status:outcome==='unknown'?'interrupted':outcome,usage:observed.usage,usageIncomplete:!observed.complete,finishedAt:now(),pricingSnapshot:pricing,
-          costUsd:billing==='subscription'&&inference?0:null,costSource:!inference?'not-run':billing==='subscription'?'subscription':'cli-actual-price-unreported',actualModel:null}
+          costUsd:billing==='subscription'&&inference?0:null,costSource:!inference?'not-run':billing==='subscription'?'subscription':'cli-actual-price-unreported',requestedModel,actualModel:reportedModel}
         // Configured model proof cannot manufacture an API bill or actual response identity.
         if(inference&&billing==='api'){outcome='unknown';item.ok=false;item.status='interrupted'}
-        receipt.finishedAt=item.finishedAt;receipt.usage=observed.usage;receipt.usageComplete=observed.complete
+        receipt.finishedAt=item.finishedAt;receipt.usage=observed.usage;receipt.usageComplete=observed.complete;receipt.actualModel=reportedModel
         if(location==='remote'&&outcome==='unknown'){receipt.finishKind=null;receipt.outcome=null;receipt.state='running'}
         else{receipt.finishKind=snapshot?.terminal??null;receipt.outcome=outcome;receipt.state=outcome==='unknown'?'unknown':'settled'}
         const evidenceSource=notStarted?'remote-dispatch-not-sent':stopSource,stopProof=stopConfirmed?proofFor(evidenceSource,reference,receipt):null
@@ -132,14 +135,14 @@ export function createCliExecution({store,authority,directory,entry,runtimeRoot,
         if(outcome==='unknown')await manager.interruptExecution({reservationId:id,ownerToken:admitted.ownerToken,run:final})
         else await manager.finishExecution({reservationId:id,ownerToken:admitted.ownerToken,run:final})
         const failureCode=[error?.code,error?.message].find(value=>typeof value==='string'&&/^[A-Z][A-Z0-9_:]{0,95}$/.test(value))
-        return {outcome,legacyRunId:id,summary:{code:outcome==='unknown'?'CLI_OUTCOME_UNCONFIRMED':outcome==='succeeded'?'CLI_COMPLETED':'CLI_STOPPED',...(failureCode?{failureCode}:{}),stopConfirmed,...(stopConfirmed?{stopEvidence:evidenceSource,stopProof}:{}),...(notStarted?{notStarted:true}:{}),configuredModel:identity?.reportedCliModel??null,actualResponseModelVerified:false,usage:observed.usage,...(Number.isSafeInteger(snapshot?.stopEvidence?.exitCode)?{exitCode:snapshot.stopEvidence.exitCode}:{}),finalText:outcome==='succeeded'?String(snapshot?.finalText??'').slice(0,8000):null}}
+        return {outcome,legacyRunId:id,packages:[item],summary:{code:outcome==='unknown'?'CLI_OUTCOME_UNCONFIRMED':outcome==='succeeded'?'CLI_COMPLETED':'CLI_STOPPED',...(failureCode?{failureCode}:{}),stopConfirmed,...(stopConfirmed?{stopEvidence:evidenceSource,stopProof}:{}),...(notStarted?{notStarted:true}:{}),configuredModel:identity?.reportedCliModel??null,actualResponseModelVerified:false,usage:observed.usage,...(Number.isSafeInteger(snapshot?.stopEvidence?.exitCode)?{exitCode:snapshot.stopEvidence.exitCode}:{}),finalText:outcome==='succeeded'?String(snapshot?.finalText??'').slice(0,8000):null}}
       })()
       record.promise.then(result=>{finished.set(id,{botId,result});while(finished.size>128)finished.delete(finished.keys().next().value)},()=>{}).finally(()=>active.delete(id))
       return {executionId:id,replayed:false}
     },
     async observe(subject,executionId){const {run}=await ownerRun(subject,executionId);return {executionId:run.id,status:run.status,source:'cli',configuredModel:run.cliExecution.requestedModel,actualResponseModelVerified:false,stopConfirmed:run.cliExecution.stopConfirmed??false,receipt:await store.modelCall(run.cliExecution.botId,run.cliExecution.receiptId)}},
     async cancel(subject,executionId){const botId=assert(subject,'cli/cancel'),record=active.get(executionId);if(!record||record.botId!==botId)fail('CLI_EXECUTION_NOT_FOUND');record.controller.abort(new Error('CLI_TASK_CANCELLED'));await record.promise;return facade.observe(subject,executionId)},
-    async collect(subject,executionId){const {run}=await ownerRun(subject,executionId),record=active.get(executionId);if(record)return record.promise;if(finished.has(executionId))return finished.get(executionId).result;const receipt=await store.modelCall(run.cliExecution.botId,run.cliExecution.receiptId),reference={kind:'cli-run',runId:run.id,...(run.cliExecution.remote?{remote:run.cliExecution.remote}:{}),marker:run.managedExecution},proven=verifiedStop(run,receipt,reference);return {outcome:proven?receipt.outcome:'unknown',legacyRunId:run.id,summary:{code:'CLI_STORED_RESULT',stopConfirmed:proven,...(proven?{stopEvidence:run.cliExecution.stopEvidence,stopProof:run.cliExecution.stopProof}:{})}}},
+    async collect(subject,executionId){const {run}=await ownerRun(subject,executionId),record=active.get(executionId);if(record)return record.promise;if(finished.has(executionId))return finished.get(executionId).result;const receipt=await store.modelCall(run.cliExecution.botId,run.cliExecution.receiptId),reference={kind:'cli-run',runId:run.id,...(run.cliExecution.remote?{remote:run.cliExecution.remote}:{}),marker:run.managedExecution},proven=verifiedStop(run,receipt,reference);const storedPackage=Array.isArray(run.packages)&&run.packages[0]?run.packages[0]:null;return {outcome:proven?receipt.outcome:'unknown',legacyRunId:run.id,...(storedPackage?{packages:[storedPackage]}:{}),summary:{code:'CLI_STORED_RESULT',stopConfirmed:proven,...(proven?{stopEvidence:run.cliExecution.stopEvidence,stopProof:run.cliExecution.stopProof}:{})}}},
     async reconcile(subject,{task,reference,signal}){
       let {run}=await ownerRun(subject,reference?.runId)
       const expected=refFor({binding:{taskId:task.taskId,attemptId:task.attemptId},operationId:task.operationId,targetHash:task.input.targetHash})
