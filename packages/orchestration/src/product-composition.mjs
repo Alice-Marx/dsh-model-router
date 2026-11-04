@@ -295,6 +295,8 @@ export function startBotProduct(ctx, options = {}) {
   ctx.provide('botIntegrationPolicy', policy)
   // Bot routing reads the same committed state everything else obeys: the Bot list, each Bot's
   // saved settings, and machine reachability from health. It never invents a candidate.
+  // Routines live beside the router state; the plugin owns that directory and provides the store.
+  const routineStore = (() => { try { return ctx.get?.('routineStore') ?? null } catch { return null } })()
   const botRouting = createBotRoutingService({
     bots: () => product?.rt?.state?.bots ?? [],
     settingsFor: botId => { try { return botSettings?.get(botId, { publishChange: false })?.settings ?? null } catch { return null } },
@@ -797,7 +799,7 @@ export function startBotProduct(ctx, options = {}) {
         authorizeRequest })
       releaseMachineSecrets=guardMachineSecrets(ctx,product.rt,machines)
       ctx.provide('botRemoteMachines', machines)
-      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject,botRouting})
+      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject,botRouting,routineStore})
       // The MR execution paths project their routes through the same Bot
       // binding, so a consult run carries the binding price instead of an
       // unknown-cost package.

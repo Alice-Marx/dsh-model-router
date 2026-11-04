@@ -7,6 +7,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createBotLibrary } from '../packages/orchestration/src/bot-library.mjs'
 import { libraryRoot, registerLibraryTools } from './shared/library-tools.mjs'
+import { createBotRoutineStore, routineStoreDir } from '../packages/orchestration/src/bot-routine-store.mjs'
 import { legacyPolicy, policyRequired, registerPolicyTool, registerPolicyCommand, guardLegacyTools } from './shared/legacy-policy.mjs'
 import { DEFAULT_ROUTER_SETTINGS, estimateAssignedPackage, modelMetadata } from './shared/router.mjs'
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
@@ -2450,6 +2451,7 @@ export function apply(ctx, config = {}) {
     const libraryRootDir = libraryRoot(dirname(routerStateStore().file))
     const library = createBotLibrary({ root: libraryRootDir, fs })
     registerLibraryTools({ ctx, config, defineTool, registerPolicyTool, library, jsonOutput: JSON_OUTPUT, jsonValue, stateDir: libraryRootDir })
+    ctx.provide('routineStore', createBotRoutineStore({ dir: routineStoreDir(dirname(routerStateStore().file)) }))
   } catch (error) {
     ctx.logger?.('model-router: bot library unavailable: %s', error?.message ?? error)
   }
