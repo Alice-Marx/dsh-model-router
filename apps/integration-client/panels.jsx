@@ -187,7 +187,8 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
       setError(String(failure?.message ?? failure))
     }
   }, [dispatch])
-  React.useEffect(() => { void load() }, [load])
+  // Candidates are read when asked: mounting this card must not make every Tasks panel wait on a
+  // Host read it does not need.
 
   const [dispatched, setDispatched] = React.useState(null)
   const submitRouted = async () => {
@@ -232,7 +233,7 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
   }
   const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
   return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2><Tag>{view.enabled ? `已开启 · ${view.preset}` : '未开启'}</Tag>
-    <button type="button" disabled={busy} onClick={() => { void load() }}>刷新候选</button></div>
+    <button type="button" disabled={busy} onClick={() => { void load() }}>{view ? '刷新候选' : '读取候选'}</button></div>
     {view.enabled ? null : <p className="bp-muted">在插件配置里加 <code>botRouting: &#123; "enabled": true, "preset": "balanced" &#125;</code> 后，主 Bot 才会按候选分配任务。</p>}
     {view.enabled ? <div className="bp-table-wrap"><table>
       <thead><tr><th>Bot</th><th>模型</th><th>机器</th><th>价格/百万</th><th>质量</th><th>状态</th></tr></thead>
@@ -276,7 +277,7 @@ export function Tasks({ snapshot, dispatch, busy }) {
   const rows = section.items
   const task = rows.find(row => (row.taskId ?? row.id) === selected)
   const actions = snapshot.availableActions ?? []
-  return <><BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} /><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map(plan=><article className="bp-card" key={plan.planId}>
+  return <><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map(plan=><article className="bp-card" key={plan.planId}>
     <div className="bp-card-title"><h2>计划 {plan.planId}</h2><Tag>{TASK_STATES[plan.state]??plan.state}</Tag>
       {actions.includes('task.plan.cancel')&&!['succeeded','cancelled'].includes(plan.state)&&<button disabled={busy} onClick={()=>dispatch('task.plan.cancel',{botId:plan.ownerBotId,planId:plan.planId})}>停止整个计划</button>}</div>
     {plan.needsReconciliation&&<p role="status">有工作包停止尚未确认，请核对原收据；计划尚未完成停止。</p>}
@@ -305,6 +306,7 @@ export function Tasks({ snapshot, dispatch, busy }) {
         <Value label="期限">{task.deadlineAt ? new Date(task.deadlineAt).toLocaleString('zh-CN') : '未取得'}</Value><Value label="MR 运行">{task.legacyRunIds?.join('、')}</Value></dl>
       <h3>执行与收据依据</h3><pre>{JSON.stringify({ attempts: task.attempts, executionRef: task.executionRef, remoteReceipt:task.result?.remote,reconciliation: task.reconciliation, packages: task.packages }, null, 2)}</pre>
     </article>}
+    <BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} />
   </>
 }
 
