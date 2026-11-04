@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto'
+import * as fs from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { createBotLibrary } from '../packages/orchestration/src/bot-library.mjs'
+import { libraryRoot, registerLibraryTools } from './shared/library-tools.mjs'
 import { legacyPolicy, policyRequired, registerPolicyTool, registerPolicyCommand, guardLegacyTools } from './shared/legacy-policy.mjs'
 import { DEFAULT_ROUTER_SETTINGS, estimateAssignedPackage, modelMetadata } from './shared/router.mjs'
 import { DEFAULT_ROUTING_PRESET, normalizeRoutingPreset, routingPreset } from './shared/routing-presets.mjs'
@@ -2442,6 +2445,14 @@ export function apply(ctx, config = {}) {
     if (reasons.length) return combinedAsk(reasons)
     return decision
   })
+  // A Bot's own library: same policy gate as every other owner tool, its own directory per Bot.
+  try {
+    const libraryRootDir = libraryRoot(dirname(routerStateStore().file))
+    const library = createBotLibrary({ root: libraryRootDir, fs })
+    registerLibraryTools({ ctx, config, defineTool, registerPolicyTool, library, jsonOutput: JSON_OUTPUT, jsonValue, stateDir: libraryRootDir })
+  } catch (error) {
+    ctx.logger?.('model-router: bot library unavailable: %s', error?.message ?? error)
+  }
   registerOfficialToolModels(ctx, config, assertInstallPreferences)
   registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_routes',
