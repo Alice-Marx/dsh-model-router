@@ -2368,7 +2368,11 @@ export function apply(ctx, config = {}) {
         settings: { ...(valueOf(config, 'independentRuntime', {}) ?? {}), ...(ctx.get?.('botRemoteToolInvoker') ? { remoteInvoke: (botId, tool, args) => ctx.get('botRemoteToolInvoker').invoke(botId, tool, args) } : {}) },
         stateDir: dirname(routerStateStore().file),
       })
-      if (runtime) botRuntime = { list: () => runtime.list(), move: (botId, mode) => runtime.move(botId, mode) }
+      if (runtime) botRuntime = {
+        // One row per moved Bot: the runtime it is on plus its transcript size, never message bodies.
+        list: async () => runtime.inventory(runtime.list().map(row => row.botId)).map(row => ({ botId: row.botId, mode: row.runtime, changedAt: row.updatedAt ?? null, turns: row.turns, messages: row.messages })),
+        move: (botId, mode) => runtime.move(botId, mode),
+      }
     } catch (error) {
       ctx.logger?.('model-router: independent runtime unavailable: %s', error?.message ?? error)
     }
