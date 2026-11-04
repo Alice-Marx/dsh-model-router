@@ -17736,6 +17736,23 @@ var OFFICIAL_TOOLS = Object.freeze([
       installArgs: Object.freeze([]),
       uninstallArgs: Object.freeze([])
     }), packageManagerMethod("npm", "npm", "npm", "@ljwei-stak/zcode-cli@latest")])
+  }),
+  Object.freeze({
+    id: "dsh-tui",
+    label: "dsh-TUI · DeepSeek",
+    vendor: "ccch1mneyyy",
+    purpose: "DeepSeek Harness 的终端 TUI：像素鲸鱼、实时状态、时间回退、会话管理，直接复用 DSH 的模型、工具与会话。",
+    package: "@deepseek-harness-tui/dsh-tui",
+    manager: "npm",
+    installArgs: ["install", "-g", "@deepseek-harness-tui/dsh-tui@latest", "--registry=https://registry.npmjs.org/"],
+    uninstallArgs: ["uninstall", "-g", "@deepseek-harness-tui/dsh-tui"],
+    probeExecutables: ["dsh-tui", "dst"],
+    probeNote: "包同时提供 dsh-tui 与 dst 两个命令，二者指向同一入口；需要 Node 22.19 或 24 以上。",
+    providerHints: [],
+    installMethods: Object.freeze([
+      packageManagerMethod("npm", "npm", "npm", "@deepseek-harness-tui/dsh-tui@latest"),
+      packageManagerMethod("pnpm", "pnpm", "pnpm", "@deepseek-harness-tui/dsh-tui@latest")
+    ])
   })
 ]), TOOL_BY_ID = new Map(OFFICIAL_TOOLS.map((tool) => [tool.id, tool]));
 function getOfficialTool(id2) {
@@ -29599,7 +29616,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.0-preview.7", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.26.0-preview.8", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);

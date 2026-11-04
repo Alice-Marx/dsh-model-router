@@ -63,8 +63,8 @@ You can also paste the package spec into **Harness Desktop → Plugins → Add p
 | Routing presets | Economy, balanced and quality-first presets; quality floors, estimated token costs and bounded assignment search. Missing prices stay unknown. |
 | Read-only execution | Preview and confirm a routed run from the workbench, or invoke it in an official Harness session. Supported headless CLIs and model-directory API calls return recorded results. |
 | Editable CLI execution | A sequential CLI team from the workbench, or one supported CLI from a session, using approved isolated Git worktrees and conditional patch integration. |
-| Official tools | Detect, install/update, check launch readiness and inspect login status for twelve registry tools; installation jobs have logs and cancellation. |
-| Interactive terminal | PowerShell/system shell and all twelve registry CLI targets (including standalone ZCode CLI TUI), including fixed login commands, live output and multiple sessions. |
+| Official tools | Detect, install/update, check launch readiness and inspect login status for thirteen registry tools; installation jobs have logs and cancellation. |
+| Interactive terminal | PowerShell/system shell and all thirteen registry CLI targets (including standalone ZCode CLI TUI), including fixed login commands, live output and multiple sessions. |
 | Costs and subscriptions | API money and concurrent budget reservations are separate from subscription calls/tokens. Unknown subscription usage stays unknown; API fallback is re-estimated and admitted before the paid call. |
 | History and quality | Per-package results, dependency views, failure details, rerun/reassignment, ratings and optional stronger-model review. |
 | Execution boundaries | Shows what each route can read/write and whether its process uses the Harness sandbox. |
@@ -267,6 +267,7 @@ The CLI team runner is the plugin's own sequential dependency executor. It does 
 | `hermes` | Hermes Agent | Official Windows/POSIX installer, version checks and interactive terminal; authenticate with `hermes auth`; no verified managed runner |
 | `pi` | Pi | Official npm/pnpm package and interactive terminal; enter `/login` inside Pi; no verified managed runner |
 | `zcode` | ZCode CLI | Standalone TUI and approved `workspace-write` when its runtime entry is ready |
+| `dsh-tui` | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | DeepSeek Harness terminal UI (pixel whale, live state, session manager); npm/pnpm install, probe and terminal; the interactive app is not a managed single-tool/team runner |
 
 Hermes uses its [official source installer](https://hermes-agent.nousresearch.com/docs/getting-started/installation) in non-interactive mode, then you run `hermes auth`. A configured shared root places its source in `<root>/hermes-agent`; the plugin binds that checkout's `.hermes/bin` launcher and refuses a different old global copy. Existing configuration, login and history stay in their original Hermes home. Without a shared root, vendor defaults remain in use. The installer may refresh its global convenience command to the selected checkout. Uninstall source installs through `hermes uninstall`. Pi uses [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) through npm/pnpm with `--ignore-scripts` and requires Node.js 22.19 or later. Start `pi`, then enter `/login`. Both tools keep login status unknown until confirmed in their own interface; the plugin does not read their credentials.
 
