@@ -291,6 +291,19 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
   const [settingsSnapshot, setSettingsSnapshot] = React.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: false })
   const [previewError, setPreviewError] = React.useState('')
   const [probeSettingsStale, setProbeSettingsStale] = React.useState(false)
+  // A probe that never settles must say so instead of spinning: the Host can be busy, and
+  // "正在检测" forever looks exactly like a broken check.
+  React.useEffect(() => {
+    if (probeState.status !== 'loading' && probeState.status !== 'refreshing') return
+    const timer = setTimeout(() => {
+      setProbeState(previous => (previous.status === 'loading' || previous.status === 'refreshing')
+        ? previous.probes.length > 0
+          ? { ...previous, status: 'ready', error: '体检超时：部分工具的结果没有返回，已显示已有结果。可点“重新体检”。' }
+          : { ...previous, status: 'error', error: '体检超时：Host 45 秒内没有返回检测结果，请点“重新体检”。' }
+        : previous)
+    }, 45_000)
+    return () => clearTimeout(timer)
+  }, [probeState.status])
   const settingsPendingRef = React.useRef(false)
   const methodSavingRef = React.useRef(null)
   const previewPendingRef = React.useRef(false)
@@ -327,20 +340,19 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
       if (typeof listOfficialTools !== 'function') throw new Error('官方工具安装桥尚未加载。')
       const response = await listOfficialTools()
       if (!mounted.current || current !== request.current) return
-      if (settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return
       if (!response?.ok) throw new Error(remoteError(response, '无法检测官方工具。'))
       const probes = Array.isArray(response.value?.tools) ? response.value.tools : []
       const capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : []
       const readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : []
-      // Full probes can finish after a settings write or a quicker command
-      // preview. They must not replace a newer saved method with an old one.
+      // A settings write can finish while the probes run. The probes still describe the
+      // Host's own saved settings, so they are accepted; only the command preview — which
+      // is what a stale settings signature would misrepresent — is held back.
       const install = response.value?.install
       const matches = settingsSignature === toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)
         && installSummaryMatchesSettings(install, settingsScope?.getSnapshot?.()?.value)
-      if (!matches) return
       setProbeState(previous => ({ status: 'ready', probes, capabilities, readiness,
         install: matches ? install : previous.install, error: '' }))
-      setProbeSettingsStale(false)
+      setProbeSettingsStale(!matches)
       if (matches && !mutationPendingRef.current) {
         previewPendingRef.current = false
         setPreviewPending(false)
@@ -349,7 +361,6 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
       onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion === 'string' ? response.value.hostVersion : null })
     } catch (error) {
       if (!mounted.current || current !== request.current) return
-      if (settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return
       const message = remoteErrorText(text(error?.message), '无法检测官方工具。')
       let kept = false
       setProbeState(previous => {
