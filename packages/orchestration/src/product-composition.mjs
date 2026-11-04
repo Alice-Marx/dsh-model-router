@@ -1,5 +1,6 @@
 import { createBotRoutingService } from './bot-routing-service.mjs'
 import { buildRoutedPlan } from './bot-routing-dispatch.mjs'
+import { assertHandoffAllowed, buildHandoff, createHandoffLedger } from './bot-handoff.mjs'
 import { hostname } from 'node:os'
 import { join, dirname, isAbsolute } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -296,6 +297,17 @@ export function startBotProduct(ctx, options = {}) {
   // Bot routing reads the same committed state everything else obeys: the Bot list, each Bot's
   // saved settings, and machine reachability from health. It never invents a candidate.
   // Routines live beside the router state; the plugin owns that directory and provides the store.
+  // Handing work between Bots: the ledger makes loops impossible, the plan carries the sender.
+  const handoffLedger = createHandoffLedger()
+  const handoffTask = async (args, context) => {
+    assertHandoffAllowed({ taskId: args.taskId, fromBotId: args.fromBotId, toBotId: args.toBotId, ledger: handoffLedger })
+    const { plan } = buildHandoff({ taskId: args.taskId, fromBotId: args.fromBotId, toBotId: args.toBotId, objective: args.objective })
+    if (!taskService) throw new Error('TASK_SERVICE_UNAVAILABLE')
+    const submitted = await taskService.submitPlan(taskOwner({ botId: args.toBotId }), { requestKey: `handoff-${args.taskId}-${args.toBotId}`, plan }, { owner: true })
+    handoffLedger.held(args.taskId, args.fromBotId)
+    handoffLedger.held(args.taskId, args.toBotId)
+    return { plan, submitted }
+  }
   const routineStore = (() => { try { return ctx.get?.('routineStore') ?? null } catch { return null } })()
   const botRouting = createBotRoutingService({
     bots: () => product?.rt?.state?.bots ?? [],
@@ -799,7 +811,7 @@ export function startBotProduct(ctx, options = {}) {
         authorizeRequest })
       releaseMachineSecrets=guardMachineSecrets(ctx,product.rt,machines)
       ctx.provide('botRemoteMachines', machines)
-      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject,botRouting,routineStore})
+      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject,botRouting,routineStore,handoffTask})
       // The MR execution paths project their routes through the same Bot
       // binding, so a consult run carries the binding price instead of an
       // unknown-cost package.

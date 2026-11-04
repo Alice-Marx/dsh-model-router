@@ -52,7 +52,7 @@ export function routineStepToTool(step) {
   }
 }
 
-export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null, botRouting = null, routineStore = null, botIdFor = null }) {
+export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null, botRouting = null, routineStore = null, botIdFor = null, handoffTask = null }) {
   // A session that is not a Bot (the operator's own agent) is otherwise refused as
   // UNKNOWN_SUBJECT. When passthrough is enabled the Host supplies the Main Bot's subject, so the
   // call carries that Bot's grants and audit trail instead of a second permission set.
@@ -72,6 +72,17 @@ export function registerRemoteComputerTools(ctx, { runtime, directory, machines,
   const target = {
     machineId: { type: 'string', required: true },
     rootId: { type: 'string', required: true },
+  }
+
+  // Passing work to another Bot: the rules live in bot-handoff, the Host applies them, and this
+  // surface only asks. A refusal names why instead of quietly doing nothing.
+  if (typeof handoffTask === 'function') {
+    register('bot_handoff_task', 'Hand a task to another Bot. Refused on a self-handoff, a cycle, or a chain that is too deep.', {
+      taskId: { type: 'string', required: true },
+      fromBotId: { type: 'string', required: true },
+      toBotId: { type: 'string', required: true },
+      objective: { type: 'string', required: true },
+    }, async (args, exec) => json(await handoffTask(args, exec)))
   }
 
   // The Main Bot consults routing before it hands work out. This reads the same decision the
