@@ -149,7 +149,10 @@ test('billing plan pairs plan-key routes, CLI logins and API routes', () => {
   const claude = billingPlan(routes[2], routes)
   assert.deepEqual([claude.subscription.kind, claude.subscription.toolId], ['cli-login', 'claude-code'])
   const deepseek = billingPlan(routes[3], routes)
-  assert.equal(deepseek.subscription, null)
+  // DeepSeek has an official CLI login now (dsh-tui), so its route pairs with that instead of
+  // falling back to api-only. The pairing still names the tool, never an executable path.
+  assert.deepEqual([deepseek.subscription.kind, deepseek.subscription.toolId], ['cli-login', 'dsh-tui'])
+  // The CLI pairing is recorded, but this route still bills through the API key first.
   assert.equal(deepseek.mode, 'api-only')
   const kimi = billingPlan(routes[4], routes)
   assert.equal(kimi.subscription.kind, 'plan-key', 'provider id hint marks a coding-plan endpoint')
@@ -498,7 +501,9 @@ test('health billing overview shows subscription state and API availability per 
   assert.equal(byProvider.openai.subscription.exhaustedUntil, NOW + 3_600_000)
   assert.equal(byProvider.openai.api.cliKeyEnv, true)
   assert.equal(byProvider['kimi-code'].api.available, false)
-  assert.equal(byProvider.deepseek.subscription.state, 'none')
+  // DeepSeek's CLI (dsh-tui) has no probe yet, so its login state is unknown rather than absent:
+  // "unknown" must not be reported as "not logged in".
+  assert.equal(byProvider.deepseek.subscription.state, 'unknown')
   assert.equal(byProvider.deepseek.api.available, true)
   const rows = billingRows(overview)
   const openai = rows.find(row => row.provider === 'openai')

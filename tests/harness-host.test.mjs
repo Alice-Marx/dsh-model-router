@@ -171,6 +171,11 @@ test('registers router tools and manual command without intercepting the main ag
   apply(ctx, routerConfig())
 
   assert.deepEqual(tools.map(tool => tool.name).sort(), [
+    // The Bot's own library tools are registered by the same product mount, so they belong in the
+    // full surface this test pins.
+    'bot_library_list',
+    'bot_library_read',
+    'bot_library_write',
     'model_router_consult',
     'model_router_execute',
     'model_router_health',

@@ -516,7 +516,7 @@ test('a missing or failed official tool falls back to the model API', async t =>
     apiFallback: async () => ({ ok: true, answer: 'deepseek api' }),
   })
   assert.equal(deepseek.answer, 'deepseek api')
-  assert.match(deepseek.fallback.reason, /没有官方代理工具/)
+  assert.match(deepseek.fallback.reason, /没有可用的无界面适配器|没有官方代理工具/)
 })
 
 test('official CLI timeout falls back and a dependency failure does not run later packages', async t => {

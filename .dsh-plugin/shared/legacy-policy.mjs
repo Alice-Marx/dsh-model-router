@@ -39,7 +39,10 @@ export function guardLegacyTools(ctx, config) {
     return
   }
   ctx.tools.guard(exec => {
-    if (!exec.name.startsWith('model_router_')) return
+    // Every tool this plugin registers is guarded, not just the router's own prefix: the Bot library
+    // and routine tools are registered through the same wrapper, so a strict profile must refuse
+    // them before their body runs rather than relying on the body to notice.
+    if (!exec.name.startsWith('model_router_') && !exec.name.startsWith('bot_')) return
     try { legacyPolicy(ctx, policyRequired(config))?.check({ kind: 'tool', name: exec.name, agent: exec.agent }) }
     catch (error) { return error.message }
   })

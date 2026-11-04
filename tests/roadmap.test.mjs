@@ -302,8 +302,10 @@ test('boundaries name what each channel can read and write', () => {
   assert.equal(rows[0].readOnly.direct, true)
   assert.match(rows[0].readOnly.readable, /全部文件/)
   assert.equal(rows[0].write.requiresApproval, true)
-  assert.equal(rows[1].toolId, null)
-  assert.match(rows[1].readOnly.readable, /无本机文件访问/)
+  // DeepSeek pairs with the dsh-tui CLI; the boundary row names the tool, never a path.
+  assert.equal(rows[1].toolId, 'dsh-tui')
+  // A CLI route reads the session workspace, which is narrower than the owner's whole tree.
+  assert.match(rows[1].readOnly.readable, /当前会话工作区/)
   assert.equal(rows[2].write, null)
   assert.equal(routeBoundaries([{ provider: 'openai', model: 'gpt-5' }], { sandboxedToolIds: ['codex'], platform: 'win32' })[0].readOnly.direct, false)
 })

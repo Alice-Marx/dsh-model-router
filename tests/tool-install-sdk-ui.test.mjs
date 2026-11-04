@@ -560,7 +560,10 @@ test('official tool rows keep login state separate from the modes their executio
   t.after(() => ui.unmount())
   await tick(); ui.render()
   const rowText = id => ui.row(id).flatMap(node => typeof node.props.children === 'string' ? [node.props.children] : []).join(' ')
-  assert.match(rowText('codex'), /支持只读任务；不支持可编辑任务/, 'dynamic readyModes override broader advertised modes')
+  // The Codex row now describes the unified task system rather than a mode sentence; what matters
+  // is that it advertises sub-task execution and does not claim editable execution it lacks.
+  assert.match(rowText('codex'), /可登记为子任务/, 'dynamic readyModes override broader advertised modes')
+  assert.doesNotMatch(rowText('codex'), /支持可编辑/)
   assert.match(rowText('minimax-code'), /不支持只读任务；支持可编辑隔离工作区任务（需审批）/)
   assert.match(rowText('mimo-code'), /支持只读任务；不支持可编辑任务/, 'readiness modes override broader static capability')
   assert.match(rowText('stepcode'), /当前不可托管执行：尚未核验执行入口/)

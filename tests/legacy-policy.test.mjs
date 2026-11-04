@@ -19,7 +19,8 @@ function registrations({ policy, required = false } = {}) {
 
 test('legacy policy: every registered tool and both commands refuse before the body when strict policy is unavailable', async () => {
   const { tools, commands, guard } = registrations({ required: true })
-  assert.equal(tools.size, 13)
+  // 13 router tools plus the Bot's own library tools, which mount with the same product.
+  assert.equal(tools.size, 16)
   assert.equal(commands.size, 2)
   for (const tool of tools.values()) {
     assert.match(guard({ name: tool.name }), /unavailable/)
@@ -42,7 +43,11 @@ test('legacy policy: every exported RPC receiver, including terminals, refuses a
   const directory = createPrincipalDirectory(authority)
   const policy = createBotPolicy({ authority, directory, machineId:'m', workspaceId:'w' })
   const receiver = { ctx:{ get:()=>policy }, services:{} }
-  assert.equal(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.length, 23)
+  // 23 original receivers plus the Bot runtime and Bot routing ones added since.
+  assert.equal(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.length, 30)
+  for (const method of ['botRuntimeHistory', 'botRuntimeMessage', 'botRoutingInspect', 'botRoutingDecide']) {
+    assert.ok(OFFICIAL_TOOLS_REMOTE_DESCRIPTORS.some(item => item.method === method), `${method} is registered`)
+  }
   for (const { method } of OFFICIAL_TOOLS_REMOTE_DESCRIPTORS) {
     await assert.rejects(OfficialToolsRemoteService.prototype[method].call(receiver, { botId:'owner', runId:'other' }), /REMOTE_OWNER_REQUIRED/)
   }
