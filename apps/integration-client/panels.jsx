@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { TASK_STATES, modelName, money } from './api.mjs'
+import { botAttentionSummary, deriveBotAttention } from './bot-attention.mjs'
 import { BotBindingEditor } from './binding-editor.jsx'
 
 export function ProductNavigation({ openPanel, panels, compact = false }) {
@@ -51,6 +52,30 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
   </div>
 }
 
+
+/**
+ * What the team needs from a person, above the task table. Healthy state renders nothing,
+ * and each row offers the action it names instead of a link into a report.
+ */
+function BotAttention({ snapshot, dispatch, busy, openTask }) {
+  const rows = deriveBotAttention(snapshot)
+  if (rows.length === 0) return null
+  const actions = snapshot?.availableActions ?? []
+  const run = (row, action, payload) => {
+    if (!dispatch || busy || !actions.includes(action)) return
+    void dispatch(action, { botId: row.botId, taskId: row.taskId, requestKey: crypto.randomUUID(), ...payload })
+  }
+  return <section className="bp-card bp-attention" aria-label="需要你处理">
+    <div className="bp-card-title"><h2>需要你处理</h2><Tag>{botAttentionSummary(rows)}</Tag></div>
+    <ul className="bp-attention-list">{rows.map(row => <li key={row.key} className={`bp-attention-row bp-attention-${row.stage}`}>
+      <div><strong>{row.title}</strong><p className="bp-muted">{row.detail}</p></div>
+      {row.action === 'reconcile' && actions.includes('task.reconcile') && <button disabled={busy} onClick={() => run(row, 'task.reconcile')}>核对原收据</button>}
+      {row.action === 'retry' && actions.includes('task.retry') && <button disabled={busy} onClick={() => run(row, 'task.retry')}>重试</button>}
+      {row.action !== 'reconcile' && row.action !== 'retry' && <button disabled={busy} onClick={() => openTask(row.taskId)}>打开任务</button>}
+    </li>)}</ul>
+  </section>
+}
+
 export function Tasks({ snapshot, dispatch, busy }) {
   const section = snapshot.tasks
   const [selected, setSelected] = useState(null)
@@ -58,7 +83,7 @@ export function Tasks({ snapshot, dispatch, busy }) {
   const rows = section.items
   const task = rows.find(row => (row.taskId ?? row.id) === selected)
   const actions = snapshot.availableActions ?? []
-  return <>{section.plans?.map(plan=><article className="bp-card" key={plan.planId}>
+  return <><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map(plan=><article className="bp-card" key={plan.planId}>
     <div className="bp-card-title"><h2>计划 {plan.planId}</h2><Tag>{TASK_STATES[plan.state]??plan.state}</Tag>
       {actions.includes('task.plan.cancel')&&!['succeeded','cancelled'].includes(plan.state)&&<button disabled={busy} onClick={()=>dispatch('task.plan.cancel',{botId:plan.ownerBotId,planId:plan.planId})}>停止整个计划</button>}</div>
     {plan.needsReconciliation&&<p role="status">有工作包停止尚未确认，请核对原收据；计划尚未完成停止。</p>}
