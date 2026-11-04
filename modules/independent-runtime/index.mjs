@@ -11,6 +11,7 @@
  */
 
 import { join } from 'node:path'
+import { createWorkspaceTools } from './workspace-tools.mjs'
 import { createIndependentRuntime } from '../../packages/orchestration/src/bot-runtime-assembly.mjs'
 
 const fail = code => { const error = new Error(code); error.code = code; throw error }
@@ -45,10 +46,13 @@ export function createPluginRuntime({ ctx, settings = {}, stateDir, integration,
   if (typeof provider !== 'string' || !provider || typeof model !== 'string' || !model) fail('PLUGIN_RUNTIME_REQUIRES_MODEL')
 
   const providerFor = () => async ({ messages }) => collectAnswer(llm.stream({ provider, model, messages }))
+  // Tools are opt-in too: without a workspace root the loop answers and calls nothing.
+  const tools = typeof settings.workspaceRoot === 'string' && settings.workspaceRoot ? createWorkspaceTools({ root: settings.workspaceRoot }) : null
   return createIndependentRuntime({
     dir: settings.dir ? String(settings.dir) : join(stateDir, 'independent-runtime'),
     integration: typeof integration === 'function' ? integration : async () => fail('INDEPENDENT_RUNTIME_NO_INTEGRATION'),
     providerFor,
+    toolsFor: () => tools,
     now,
     ...(Number.isSafeInteger(settings.maxSteps) ? { maxSteps: settings.maxSteps } : {}),
   })
