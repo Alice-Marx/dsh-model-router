@@ -737,6 +737,49 @@ export function Routines({ snapshot, dispatch, busy }) {
   </article>
 }
 
+
+/**
+ * The role catalog: eight briefs a person can start a Bot from.
+ *
+ * Creating a Bot belongs to the Bot runtime's own flow, so this card does not pretend to create one.
+ * It shows what each role is for and copies its brief, which is the part a person would otherwise
+ * have to reinvent in the new-Bot form.
+ */
+export function RoleCatalog({ dispatch, busy }) {
+  const [roles, setRoles] = React.useState(null)
+  const [copied, setCopied] = React.useState('')
+  const [error, setError] = React.useState('')
+  React.useEffect(() => {
+    let live = true
+    if (typeof dispatch !== 'function') return undefined
+    dispatch('roles.list', {})
+      .then(value => { if (live && value && value.ok !== false) setRoles(Array.isArray(value) ? value : value?.roles ?? []) })
+      .catch(failure => { if (live) setError(String(failure?.message ?? failure)) })
+    return () => { live = false }
+  }, [dispatch])
+  const copy = async role => {
+    try {
+      await navigator.clipboard?.writeText(`${role.name}: ${role.brief}`)
+      setCopied(role.id)
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+  }
+  if (error) return <article className="bp-card"><div className="bp-card-title"><h2>岗位</h2></div><p className="bp-error" role="alert">{error}</p></article>
+  if (!roles) return null
+  return <article className="bp-card"><div className="bp-card-title"><h2>岗位</h2><Tag>{roles.length}</Tag></div>
+    <p className="bp-muted">这些是给 Bot 的岗位简述。新建 Bot 时把简述粘进描述即可；岗位文本不会授予任何工具或机器权限。</p>
+    <div className="bp-table-wrap"><table>
+      <thead><tr><th>岗位</th><th>简述</th><th>需要的能力</th><th>操作</th></tr></thead>
+      <tbody>{roles.map(role => <tr key={role.id}>
+        <td>{role.name}<small>{role.id}</small></td>
+        <td>{role.brief}</td>
+        <td className="bp-code">{role.tools.join('、')}</td>
+        <td><button type="button" disabled={busy} onClick={() => { void copy(role) }}>{copied === role.id ? '已复制' : '复制简述'}</button></td>
+      </tr>)}</tbody></table></div>
+  </article>
+}
+
 export function ProductPage({ section, productApi, openSession, openPanel }) {
   const [snapshot, setSnapshot] = useState(null)
   const [error, setError] = useState('')
@@ -789,7 +832,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <p role="status">正在读取宿主状态…</p>}
-    {snapshot && <>{section === 'bindings' && <BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />}
+    {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} /><RoleCatalog dispatch={dispatch} busy={disabled} /></>}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'routine' && <Routines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
