@@ -40,11 +40,25 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
     try {
       const rows = await dispatch('botRuntimeStatus', {})
       const row = Array.isArray(rows) ? rows.find(item => item.botId === botId) : null
-      setState({ runtime: row?.mode ?? 'integration', changedAt: row?.changedAt ?? null })
+      setState({ runtime: row?.mode ?? 'integration', changedAt: row?.changedAt ?? null,
+        turns: row?.turns ?? null, messages: row?.messages ?? null, snapshot: row?.snapshot ?? null })
       setError('')
     } catch (failure) {
       setState(null)
       setError(String(failure?.message ?? failure))
+    }
+  }, [botId, dispatch])
+  const [history, setHistory] = React.useState([])
+  const [historyError, setHistoryError] = React.useState('')
+  const loadHistory = React.useCallback(async () => {
+    if (typeof dispatch !== 'function') return
+    try {
+      const rows = await dispatch('botRuntimeHistory', { botId, limit: 20 })
+      setHistory(Array.isArray(rows) ? rows : [])
+      setHistoryError('')
+    } catch (failure) {
+      setHistory([])
+      setHistoryError(String(failure?.message ?? failure))
     }
   }, [botId, dispatch])
   React.useEffect(() => { void load() }, [load])

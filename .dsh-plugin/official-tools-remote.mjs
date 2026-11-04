@@ -1,0 +1,316 @@
+/**
+ * Narrow Typert Remote contract for the official desktop tool installer.
+ *
+ * The official Client Gateway mounts this contribution with remote.$mount;
+ * the Host Typert registry owns the matching strict descriptors. No endpoint
+ * accepts a command, package name, URL, argument vector, or executable path.
+ */
+import { getOfficialTool, installMethodsFor } from './official-tool-registry.mjs'
+import { parsePackageAssignments } from './package-assignments.mjs'
+import {
+  parseTerminalRead,
+  parseTerminalResize,
+  parseTerminalStart,
+  parseTerminalStop,
+  parseTerminalWrite,
+} from './cli-terminal-protocol.mjs'
+
+export const OFFICIAL_TOOLS_REMOTE_PACKAGE = '@ljwei-stak/dsh-model-router'
+export const OFFICIAL_TOOLS_REMOTE_NAMESPACE = 'modelRouterOfficialTools'
+
+function strictCodec(typeSymbol, parse) {
+  return Object.freeze({ mode: 'strict', typeSymbol, create: () => ({ parse }) })
+}
+
+function plainObject(value, subject) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${subject} must be an object`)
+  }
+  return value
+}
+
+const toolIdCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolId`, value => {
+  if (typeof value !== 'string' || !getOfficialTool(value)) {
+    throw new TypeError('toolId must name a fixed official tool')
+  }
+  return value
+})
+
+const MAX_METHOD_ID_CHARS = 40
+
+const text = value => (typeof value === 'string' ? value.trim() : '')
+
+/**
+ * One install/uninstall request: a registry id plus, optionally, which of that
+ * tool's declared install methods to use. The install directory, the npm source
+ * and the installer-script source are Host settings and never travel on this
+ * call, so a compromised client cannot redirect an install at a package or URL
+ * of its choosing.
+ */
+/**
+ * One prompt typed into a TUI registry tool. The tool must declare `tuiPrompt`; the Host owns
+ * the executable, the terminal, the timeout and the capture, so only the words travel here.
+ */
+const tuiPromptCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TuiPrompt`, value => {
+  const request = plainObject(value, 'tui prompt request')
+  for (const key of Object.keys(request)) {
+    if (key !== 'tool' && key !== 'prompt') throw new TypeError(`unknown field ${key} in tui prompt request`)
+  }
+  const tool = request.tool === undefined ? 'dsh-tui' : text(request.tool)
+  const entry = getOfficialTool(tool)
+  if (!entry || entry.tuiPrompt !== true) throw new TypeError('tool must name a registry tool that runs in a terminal')
+  const prompt = typeof request.prompt === 'string' ? request.prompt : ''
+  if (prompt.trim() === '' || prompt.length > 8000) throw new TypeError('prompt must be 1..8000 characters')
+  return { tool: entry.id, prompt }
+})
+
+const toolActionCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolAction`, value => {
+  const request = plainObject(value, 'tool action request')
+  // Closed shape: an unknown key is refused rather than ignored, so a client
+  // cannot smuggle a command, URL or argument list past the codec.
+  for (const key of Object.keys(request)) {
+    if (key !== 'tool' && key !== 'method') throw new TypeError(`unknown field ${key} in tool action request`)
+  }
+  const tool = getOfficialTool(text(request.tool))
+  if (!tool) throw new TypeError('tool must name a fixed official tool')
+  const method = request.method === undefined || request.method === null || request.method === ''
+    ? null
+    : text(request.method)
+  if (method !== null) {
+    if (method.length > MAX_METHOD_ID_CHARS || !/^[A-Za-z0-9-]+$/.test(method)) {
+      throw new TypeError('method must be one of the tool\'s declared install methods')
+    }
+    if (!installMethodsFor(tool).some(item => item.id === method)) {
+      throw new TypeError(`${tool.label} does not offer the install method ${method}`)
+    }
+  }
+  return method === null ? { tool: tool.id } : { tool: tool.id, method }
+})
+
+const listResultCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolList`, value => {
+  const result = plainObject(value, 'tool list result')
+  if (!Array.isArray(result.tools)) throw new TypeError('tool list result needs a tools array')
+  return result
+})
+
+const installResultCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolInstall`, value => {
+  const result = plainObject(value, 'install result')
+  if (typeof result.accepted !== 'boolean') throw new TypeError('install result needs accepted')
+  if (result.accepted && !result.job) throw new TypeError('accepted install needs a job')
+  if (!result.accepted && typeof result.error !== 'string') throw new TypeError('refused install needs an error')
+  return result
+})
+
+const statusResultCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolStatus`, value => {
+  const result = plainObject(value, 'install status result')
+  if (result.job !== null && (typeof result.job !== 'object' || Array.isArray(result.job))) {
+    throw new TypeError('install status result needs a job or null')
+  }
+  return result
+})
+
+const anyObjectCodec = name => strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${name}`, value => plainObject(value, name))
+
+const freshCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#HealthFresh`, value => {
+  if (typeof value !== 'boolean') throw new TypeError('fresh must be a boolean')
+  return value
+})
+
+const idText = (value, subject) => {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,80}$/.test(value)) throw new TypeError(`${subject} must be a short id`)
+  return value
+}
+
+/** A status/cancel request can only address an existing Host-owned run. */
+export function parseRunJobRequest(value) {
+  const request = plainObject(value, 'run job request')
+  if (Object.keys(request).some(key => key !== 'jobId')) throw new TypeError('run job request only accepts jobId')
+  return { jobId: idText(request.jobId, 'jobId') }
+}
+
+const runJobRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunJobRequest`, parseRunJobRequest)
+
+const optionalRouteText = (value, subject) => {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value !== 'string' || value.length > 240 || value.includes('\0')) throw new TypeError(`${subject} is invalid`)
+  return value
+}
+
+const rateRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RateRequest`, value => {
+  const request = plainObject(value, 'rate request')
+  if (!['up', 'down', 'clear'].includes(request.rating)) throw new TypeError('rating must be up, down or clear')
+  if (request.expectedFinishedAt !== undefined && (!Number.isFinite(request.expectedFinishedAt) || request.expectedFinishedAt < 0)) throw new TypeError('expectedFinishedAt must be a non-negative timestamp')
+  return { runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'), rating: request.rating,
+    ...(request.expectedFinishedAt === undefined ? {} : { expectedFinishedAt: request.expectedFinishedAt }) }
+})
+
+const rerunRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RerunRequest`, value => {
+  const request = plainObject(value, 'rerun request')
+  const provider = optionalRouteText(request.provider, 'provider')
+  const model = optionalRouteText(request.model, 'model')
+  if (Boolean(provider) !== Boolean(model)) throw new TypeError('provider and model must be supplied together')
+  return {
+    runId: idText(request.runId, 'runId'), packageId: idText(request.packageId, 'packageId'),
+    ...(provider ? { provider, model } : {}),
+    confirmOverBudget: request.confirmOverBudget === true,
+    confirmWrite: request.confirmWrite === true,
+    ...(request.confirmUnsandboxed === undefined ? {} : { confirmUnsandboxed: request.confirmUnsandboxed === true }),
+    ...(['api', 'subscription', 'cancel'].includes(request.subscriptionChoice) ? { subscriptionChoice: request.subscriptionChoice } : {}),
+  }
+})
+
+export const RUN_CONFIRMATION_CODES = Object.freeze(['workspace-write', 'rerun-write', 'subscription-api', 'over-budget', 'unsandboxed'])
+const MAX_RUN_TASK_CHARS = 200_000
+
+/**
+ * Workbench "start a run" request. The workspace is a user-typed absolute
+ * directory (validated again on the Host); the run itself is read-only.
+ */
+export function parseRunRequest(value) {
+  const request = plainObject(value, 'run request')
+  if (typeof request.task !== 'string' || !request.task.trim() || request.task.length > MAX_RUN_TASK_CHARS) {
+    throw new TypeError('task must be a non-empty string')
+  }
+  const provider = optionalRouteText(request.provider, 'provider')
+  const model = optionalRouteText(request.model, 'model')
+  if (Boolean(provider) !== Boolean(model)) throw new TypeError('provider and model must be supplied together')
+  const workspace = request.workspace === undefined || request.workspace === null || request.workspace === '' ? undefined : request.workspace
+  if (workspace !== undefined && (typeof workspace !== 'string' || workspace.length > 4_096 || workspace.includes('\0'))) throw new TypeError('workspace is invalid')
+  if (request.budgetUsd !== undefined && (typeof request.budgetUsd !== 'number' || !Number.isFinite(request.budgetUsd) || request.budgetUsd < 0)) {
+    throw new TypeError('budgetUsd must be a non-negative number')
+  }
+  if (request.dryRun !== undefined && typeof request.dryRun !== 'boolean') throw new TypeError('dryRun must be a boolean')
+  const confirmed = Array.isArray(request.confirmedReasons) ? request.confirmedReasons : []
+  if (request.executor !== undefined && !['routed', 'official-team'].includes(request.executor)) throw new TypeError('executor is invalid')
+  if (request.executionMode !== undefined && !['read-only', 'workspace-write'].includes(request.executionMode)) throw new TypeError('executionMode is invalid')
+  if (request.executionEnvironment !== undefined && !['harness', 'cli-native'].includes(request.executionEnvironment)) throw new TypeError('executionEnvironment is invalid')
+  const officialTeam = request.executor === 'official-team'
+  if (request.assignmentMode !== undefined && !['algorithm', 'manual'].includes(request.assignmentMode)) throw new TypeError('assignmentMode is invalid')
+  const manual = request.assignmentMode === 'manual'
+  if (manual && (officialTeam || provider || model)) throw new TypeError('manual assignments require routed work packages without an explicit global route')
+  if (!manual && (request.packageAssignments !== undefined || request.packagePlanKey !== undefined)) throw new TypeError('package assignments require manual assignmentMode')
+  const packageAssignments = manual ? parsePackageAssignments(request.packageAssignments) : undefined
+  if (manual && (!packageAssignments || typeof request.packagePlanKey !== 'string' || request.packagePlanKey.length > 200 || !request.packagePlanKey)) {
+    throw new TypeError('manual assignments require packageAssignments and a current packagePlanKey')
+  }
+  if (officialTeam && (request.planMode !== 'team' || provider || model)) throw new TypeError('official-team requires a team plan without an explicit route')
+  if (!officialTeam && request.executionMode === 'workspace-write') throw new TypeError('workspace-write requires official-team')
+  if (request.executionEnvironment === 'cli-native' && (!officialTeam || request.executionMode !== 'workspace-write')) {
+    throw new TypeError('cli-native requires official-team with workspace-write')
+  }
+  if (confirmed.length > RUN_CONFIRMATION_CODES.length || confirmed.some(code => !RUN_CONFIRMATION_CODES.includes(code))) {
+    throw new TypeError('confirmedReasons contains an unknown reason')
+  }
+  return {
+    task: request.task,
+    ...(officialTeam ? { executor: 'official-team', executionMode: request.executionMode ?? 'read-only',
+      ...(request.executionEnvironment === undefined ? {} : { executionEnvironment: request.executionEnvironment }) } : {}),
+    ...(provider ? { provider, model } : {}),
+    ...(manual ? { assignmentMode: 'manual', packageAssignments, packagePlanKey: request.packagePlanKey } : {}),
+    ...(['single', 'team'].includes(request.planMode) ? { planMode: request.planMode } : {}),
+    ...(['economy', 'balanced', 'quality'].includes(request.preset) ? { preset: request.preset } : {}),
+    ...(request.budgetUsd !== undefined ? { budgetUsd: request.budgetUsd } : {}),
+    ...(workspace ? { workspace } : {}),
+    // A rehearsal records what would run; it never reaches a model or a tool.
+    ...(request.dryRun === true ? { dryRun: true } : {}),
+    confirmedReasons: [...new Set(confirmed)],
+  }
+}
+
+const terminalStartCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStart`, parseTerminalStart)
+const terminalReadCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalRead`, parseTerminalRead)
+const terminalWriteCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalWrite`, parseTerminalWrite)
+const terminalResizeCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalResize`, parseTerminalResize)
+const terminalStopCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStop`, parseTerminalStop)
+
+const botRuntimeMoveCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeMove`, value => {
+  const request = plainObject(value, 'bot runtime move')
+  for (const key of Object.keys(request)) {
+    if (key !== 'botId' && key !== 'mode') throw new TypeError(`unknown field ${key} in bot runtime move`)
+  }
+  const botId = text(request.botId)
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError('botId is invalid')
+  if (!['integration', 'independent'].includes(request.mode)) throw new TypeError('mode must be integration or independent')
+  return { botId, mode: request.mode }
+})
+
+const botRuntimeHistoryCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeHistory`, value => {
+  const request = plainObject(value, 'bot runtime history')
+  for (const key of Object.keys(request)) {
+    if (key !== 'botId' && key !== 'limit') throw new TypeError(`unknown field ${key} in bot runtime history`)
+  }
+  const botId = text(request.botId)
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError('botId is invalid')
+  const limit = request.limit === undefined ? 20 : request.limit
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new TypeError('limit must be 1..100')
+  return { botId, limit }
+})
+
+const runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest)
+
+function descriptor(method, parameters, result, cancellable = false) {
+  return Object.freeze({
+    id: `${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${OFFICIAL_TOOLS_REMOTE_NAMESPACE}/${method}`,
+    service: OFFICIAL_TOOLS_REMOTE_NAMESPACE,
+    namespace: OFFICIAL_TOOLS_REMOTE_NAMESPACE,
+    method,
+    invocation: { kind: 'direct' },
+    parameters,
+    result,
+    ...(cancellable ? { cancellation: { parameter: 'signal' } } : {}),
+  })
+}
+
+const toolIdParameter = Object.freeze({
+  name: 'toolId', wire: 'toolId', source: 'json', codec: toolIdCodec,
+})
+const jsonParameter = (name, codec) => Object.freeze({ name, wire: name, source: 'json', codec })
+
+export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
+  descriptor('list', [], listResultCodec),
+  descriptor('installSettings', [], anyObjectCodec('OfficialInstallSettings')),
+  descriptor('installTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
+  descriptor('uninstallTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
+  descriptor('repairTool', [jsonParameter('request', toolActionCodec)], installResultCodec),
+  descriptor('cancel', [toolIdParameter], installResultCodec),
+  descriptor('status', [toolIdParameter], statusResultCodec),
+  // Workbench: onboarding health check, run ledger, ratings, step retry, security boundaries.
+  descriptor('health', [jsonParameter('fresh', freshCodec)], anyObjectCodec('HealthReport')),
+  descriptor('completeOnboarding', [], anyObjectCodec('OnboardingState')),
+  descriptor('ledger', [], anyObjectCodec('RunLedger')),
+  descriptor('rateResult', [jsonParameter('request', rateRequestCodec)], anyObjectCodec('RateResult')),
+  descriptor('rerunStep', [jsonParameter('request', rerunRequestCodec)], anyObjectCodec('RerunResult')),
+  // Terminal tools (dsh-TUI): one prompt through the managed PTY, reply is rendered text.
+  descriptor('tuiPrompt', [jsonParameter('request', tuiPromptCodec)], anyObjectCodec('TuiReply')),
+  descriptor('boundaries', [], anyObjectCodec('SecurityBoundaries')),
+  // Bot runtime: which path serves each Bot, and moving one between them.
+  descriptor('botRuntimeStatus', [], anyObjectCodec('BotRuntimeStatus')),
+  descriptor('botRuntimeMove', [jsonParameter('request', botRuntimeMoveCodec)], anyObjectCodec('BotRuntimeMoved')),
+  descriptor('botRuntimeHistory', [jsonParameter('request', botRuntimeHistoryCodec)], anyObjectCodec('BotRuntimeHistory')),
+  // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
+  descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview'), true),
+  descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),
+  descriptor('runStatus', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus'), true),
+  descriptor('cancelRun', [jsonParameter('request', runJobRequestCodec)], anyObjectCodec('RunJobStatus'), true),
+  // Workbench "官方工具终端": interactive shell / fixed official CLI sessions.
+  // Output streams through long-poll reads; input and resize are unary calls.
+  descriptor('terminalInfo', [], anyObjectCodec('TerminalInfo')),
+  descriptor('terminalStart', [jsonParameter('request', terminalStartCodec)], anyObjectCodec('TerminalStarted')),
+  descriptor('terminalRead', [jsonParameter('request', terminalReadCodec)], anyObjectCodec('TerminalOutput')),
+  descriptor('terminalWrite', [jsonParameter('request', terminalWriteCodec)], anyObjectCodec('TerminalWritten')),
+  descriptor('terminalResize', [jsonParameter('request', terminalResizeCodec)], anyObjectCodec('TerminalResized')),
+  descriptor('terminalStop', [jsonParameter('request', terminalStopCodec)], anyObjectCodec('TerminalStopped')),
+])
+
+export const OFFICIAL_TOOLS_CLIENT_REMOTE = Object.freeze({
+  package: OFFICIAL_TOOLS_REMOTE_PACKAGE,
+  descriptors: OFFICIAL_TOOLS_REMOTE_DESCRIPTORS,
+})
+
+export const OFFICIAL_TOOLS_HOST_TYPERT = Object.freeze({
+  package: OFFICIAL_TOOLS_REMOTE_PACKAGE,
+  face: 'host',
+  schemas: [],
+  invocations: OFFICIAL_TOOLS_REMOTE_DESCRIPTORS,
+  model: { services: [], events: [], objects: [] },
+})

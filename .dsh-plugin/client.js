@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.30.5", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.30.6", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -31373,6 +31373,15 @@ var terminalStartCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalS
   if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError("botId is invalid");
   if (!["integration", "independent"].includes(request.mode)) throw new TypeError("mode must be integration or independent");
   return { botId, mode: request.mode };
+}), botRuntimeHistoryCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeHistory`, (value) => {
+  let request = plainObject2(value, "bot runtime history");
+  for (let key of Object.keys(request))
+    if (key !== "botId" && key !== "limit") throw new TypeError(`unknown field ${key} in bot runtime history`);
+  let botId = text6(request.botId);
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError("botId is invalid");
+  let limit = request.limit === void 0 ? 20 : request.limit;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new TypeError("limit must be 1..100");
+  return { botId, limit };
 }), runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest);
 function descriptor(method, parameters, result, cancellable = !1) {
   return Object.freeze({
@@ -31411,6 +31420,7 @@ var toolIdParameter = Object.freeze({
   // Bot runtime: which path serves each Bot, and moving one between them.
   descriptor("botRuntimeStatus", [], anyObjectCodec("BotRuntimeStatus")),
   descriptor("botRuntimeMove", [jsonParameter("request", botRuntimeMoveCodec)], anyObjectCodec("BotRuntimeMoved")),
+  descriptor("botRuntimeHistory", [jsonParameter("request", botRuntimeHistoryCodec)], anyObjectCodec("BotRuntimeHistory")),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview"), !0),
   descriptor("startRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunStarted")),
@@ -32116,9 +32126,23 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
     if (typeof dispatch == "function")
       try {
         let rows2 = await dispatch("botRuntimeStatus", {}), row = Array.isArray(rows2) ? rows2.find((item) => item.botId === botId) : null;
-        setState({ runtime: row?.mode ?? "integration", changedAt: row?.changedAt ?? null }), setError("");
+        setState({
+          runtime: row?.mode ?? "integration",
+          changedAt: row?.changedAt ?? null,
+          turns: row?.turns ?? null,
+          messages: row?.messages ?? null,
+          snapshot: row?.snapshot ?? null
+        }), setError("");
       } catch (failure) {
         setState(null), setError(String(failure?.message ?? failure));
+      }
+  }, [botId, dispatch]), [history, setHistory] = import_react60.default.useState([]), [historyError, setHistoryError] = import_react60.default.useState(""), loadHistory = import_react60.default.useCallback(async () => {
+    if (typeof dispatch == "function")
+      try {
+        let rows2 = await dispatch("botRuntimeHistory", { botId, limit: 20 });
+        setHistory(Array.isArray(rows2) ? rows2 : []), setHistoryError("");
+      } catch (failure) {
+        setHistory([]), setHistoryError(String(failure?.message ?? failure));
       }
   }, [botId, dispatch]);
   if (import_react60.default.useEffect(() => {

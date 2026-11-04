@@ -127,6 +127,9 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** Which runtime serves each Bot (empty when the independent runtime is off). */
   botRuntimeStatus() { return settled(() => (this.services.botRuntimeStatus ?? (async () => []))()) }
 
+  /** A bounded, redacted view of one Bot transcript (previews only). */
+  botRuntimeHistory(request) { return settled(() => (this.services.botRuntimeHistory ?? unavailable)(request)) }
+
   /** Move one Bot between the integration path and the independent runtime. */
   botRuntimeMove(request) { return settled(() => (this.services.botRuntimeMove ?? unavailable)(request)) }
 
