@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.43.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.44.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32423,7 +32423,22 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
   import_react61.default.useEffect(() => {
     load();
   }, [load]);
-  let decide = async () => {
+  let [dispatched, setDispatched] = import_react61.default.useState(null), submitRouted = async () => {
+    if (!(!decision?.chosen || working)) {
+      setWorking(!0), setError("");
+      try {
+        let request = { text: text7.trim(), requestKey: crypto.randomUUID(), requiresMachine: machine !== "" };
+        pin && (request.pinnedBotId = pin), machine && (request.machineId = machine);
+        let next = await dispatch("botRouting.dispatch", request);
+        if (next && next.ok === !1) throw new Error(next.error?.message ?? next.error);
+        setDispatched(next);
+      } catch (failure) {
+        setError(String(failure?.message ?? failure));
+      } finally {
+        setWorking(!1);
+      }
+    }
+  }, decide = async () => {
     if (!(!text7.trim() || working)) {
       setWorking(!0), setError("");
       try {
@@ -32446,7 +32461,9 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
     load();
   } }, "刷新候选")), view.enabled ? null : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "在插件配置里加 ", /* @__PURE__ */ import_react61.default.createElement("code", null, 'botRouting: { "enabled": true, "preset": "balanced" }'), " 后，主 Bot 才会按候选分配任务。"), view.enabled ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react61.default.createElement("table", null, /* @__PURE__ */ import_react61.default.createElement("thead", null, /* @__PURE__ */ import_react61.default.createElement("tr", null, /* @__PURE__ */ import_react61.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react61.default.createElement("th", null, "模型"), /* @__PURE__ */ import_react61.default.createElement("th", null, "机器"), /* @__PURE__ */ import_react61.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react61.default.createElement("th", null, "质量"), /* @__PURE__ */ import_react61.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react61.default.createElement("tbody", null, view.candidates.map((row) => /* @__PURE__ */ import_react61.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react61.default.createElement("td", null, row.name, row.main ? /* @__PURE__ */ import_react61.default.createElement(Tag2, null, "Main") : null, /* @__PURE__ */ import_react61.default.createElement("small", null, row.botId)), /* @__PURE__ */ import_react61.default.createElement("td", null, row.model ? `${row.model.provider}/${row.model.model}` : /* @__PURE__ */ import_react61.default.createElement("em", null, "未绑定")), /* @__PURE__ */ import_react61.default.createElement("td", null, row.machineId ? row.machineOnline ? "在线" : "未在线" : "无"), /* @__PURE__ */ import_react61.default.createElement("td", null, row.pricePerMTokUsd === null ? "未知" : `$${row.pricePerMTokUsd}`), /* @__PURE__ */ import_react61.default.createElement("td", null, row.quality === null ? "未知" : row.quality), /* @__PURE__ */ import_react61.default.createElement("td", null, row.busy ? "正忙" : "空闲")))))) : null, view.enabled ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react61.default.createElement("label", null, "任务描述", /* @__PURE__ */ import_react61.default.createElement("textarea", { rows: 2, value: text7, onChange: (event) => setText(event.target.value), placeholder: "例如：整理上周的发布记录" })), /* @__PURE__ */ import_react61.default.createElement("label", null, "路由方式", /* @__PURE__ */ import_react61.default.createElement("select", { value: pin, onChange: (event) => setPin(event.target.value) }, /* @__PURE__ */ import_react61.default.createElement("option", { value: "" }, "自动路由（按预设打分）"), view.candidates.map((row) => /* @__PURE__ */ import_react61.default.createElement("option", { key: row.botId, value: row.botId }, "指定：", row.name)))), /* @__PURE__ */ import_react61.default.createElement("label", null, "需要远程电脑", /* @__PURE__ */ import_react61.default.createElement("select", { value: machine, onChange: (event) => setMachine(event.target.value) }, /* @__PURE__ */ import_react61.default.createElement("option", { value: "" }, "不需要"), machines.map((item) => /* @__PURE__ */ import_react61.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy || working || !text7.trim(), onClick: () => {
     decide();
-  } }, working ? "计算中…" : "预览路由"), error && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : null, decision ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-blocked" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "选中：", decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? "（手动指定）" : ""}` : "没有可用的 Bot"), decision.binding ? /* @__PURE__ */ import_react61.default.createElement("p", null, "将授予该 Bot：", decision.binding.mode, " · ", decision.binding.tools.length, " 项工具（", decision.binding.tools.join("、"), "）") : null, decision.rejected?.length ? /* @__PURE__ */ import_react61.default.createElement("p", null, "落选：", decision.rejected.map((row) => `${row.botId}（${row.reason}）`).join("；")) : null) : null);
+  } }, working ? "计算中…" : "预览路由"), error && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : null, decision ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-blocked" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "选中：", decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? "（手动指定）" : ""}` : "没有可用的 Bot"), decision.binding ? /* @__PURE__ */ import_react61.default.createElement("p", null, "将授予该 Bot：", decision.binding.mode, " · ", decision.binding.tools.length, " 项工具（", decision.binding.tools.join("、"), "）") : null, decision.rejected?.length ? /* @__PURE__ */ import_react61.default.createElement("p", null, "落选：", decision.rejected.map((row) => `${row.botId}（${row.reason}）`).join("；")) : null, decision.chosen ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
+    submitRouted();
+  } }, "按此路由创建任务"), dispatched ? /* @__PURE__ */ import_react61.default.createElement("small", { role: "status" }, "已提交：", dispatched.plan?.taskId ?? dispatched.submitted?.taskId ?? "已受理") : null) : null) : null);
 }
 function Tasks({ snapshot, dispatch, busy }) {
   let section = snapshot.tasks, [selected, setSelected] = (0, import_react61.useState)(null);
