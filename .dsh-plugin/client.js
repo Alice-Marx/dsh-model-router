@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.27.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.27.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32183,15 +32183,15 @@ function DesktopControl({ snapshot, dispatch, busy }) {
   } }, "发送文本")));
 }
 function MachineSetup({ snapshot, dispatch, busy }) {
-  let [secretName, setSecretName] = (0, import_react60.useState)("REMOTE_AGENT_DESKTOP"), [secretValue, setSecretValue] = (0, import_react60.useState)(""), [pair, setPair] = (0, import_react60.useState)({ name: "", machineId: "", endpoint: "", secretRef: "ds-secret/REMOTE_AGENT_DESKTOP", roots: "project", probeBotId: snapshot.bots?.[0]?.id ?? "", protectedTunnel: !1 }), available = snapshot.availableActions ?? [], change = (key, value) => setPair((current) => ({ ...current, [key]: value }));
+  let [secretName, setSecretName] = (0, import_react60.useState)("REMOTE_AGENT_DESKTOP"), [secretValue, setSecretValue] = (0, import_react60.useState)(""), [pair, setPair] = (0, import_react60.useState)({ name: "", machineId: "", endpoint: "", secretRef: "ds-secret/REMOTE_AGENT_DESKTOP", roots: "project", probeBotId: snapshot.bots?.[0]?.id ?? "", protectedTunnel: !1 }), available = snapshot.availableActions ?? [], change = (key, value) => setPair((current) => ({ ...current, [key]: value })), nameProblem2 = /^REMOTE_AGENT_[A-Z0-9_]{1,50}$/.test(secretName) ? "" : "只能是大写字母、数字与下划线，并以 REMOTE_AGENT_ 开头（例如 REMOTE_AGENT_CAD2）。", tokenProblem = secretValue === "" || /^[A-Za-z0-9_-]{43}$/.test(secretValue) ? "" : `配对凭据应为 43 位，当前 ${secretValue.length} 位。`, canSaveSecret = !busy && secretName !== "" && secretValue !== "" && !nameProblem2 && !tokenProblem;
   return /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "添加或重新配对电脑"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "先在目标电脑的 Agent 本地创建配对，核对 machineId。控制凭据只填下面的秘密输入框，保存到现有秘密库；此凭据不给任何 Bot 使用。"), available.includes("machine.secret") && /* @__PURE__ */ import_react60.default.createElement("form", { className: "bp-form", onSubmit: async (event) => {
-    event.preventDefault();
-    try {
-      await dispatch("machine.secret", { name: secretName, value: secretValue });
-    } finally {
-      setSecretValue("");
-    }
-  } }, /* @__PURE__ */ import_react60.default.createElement("label", null, "秘密名称", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": "远程凭据名称", value: secretName, onChange: (event) => setSecretName(event.target.value.toUpperCase()), pattern: "REMOTE_AGENT_[A-Z0-9_]{1,50}", required: !0, autoComplete: "off" })), /* @__PURE__ */ import_react60.default.createElement("label", null, "配对凭据", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": "远程配对凭据", type: "password", value: secretValue, onChange: (event) => setSecretValue(event.target.value), required: !0, autoComplete: "new-password", spellCheck: !1 })), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || !secretValue, type: "submit" }, "保存宿主专用凭据"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "secretRef：ds-secret/", secretName, "。替换已有凭据会撤销使用它的机器授权，需要重新配对。")), available.includes("machine.pair") && /* @__PURE__ */ import_react60.default.createElement("form", { className: "bp-form", onSubmit: (event) => {
+    if (event.preventDefault(), !!canSaveSecret)
+      try {
+        await dispatch("machine.secret", { name: secretName, value: secretValue });
+      } finally {
+        setSecretValue("");
+      }
+  } }, /* @__PURE__ */ import_react60.default.createElement("label", null, "秘密名称", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": "远程凭据名称", value: secretName, onChange: (event) => setSecretName(event.target.value.toUpperCase()), "aria-invalid": !!nameProblem2, "aria-describedby": "bp-secret-name-hint", required: !0, autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react60.default.createElement("p", { className: nameProblem2 ? "bp-error" : "bp-muted", id: "bp-secret-name-hint" }, nameProblem2 || "大写字母、数字与下划线；保存后 secretRef 为 ds-secret/该名称。"), /* @__PURE__ */ import_react60.default.createElement("label", null, "配对凭据", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": "远程配对凭据", type: "password", value: secretValue, onChange: (event) => setSecretValue(event.target.value), "aria-invalid": !!tokenProblem, "aria-describedby": "bp-secret-value-hint", required: !0, autoComplete: "new-password", spellCheck: !1 })), /* @__PURE__ */ import_react60.default.createElement("p", { className: tokenProblem ? "bp-error" : "bp-muted", id: "bp-secret-value-hint" }, tokenProblem || `Agent 的 pair 命令只显示一次的配对凭据（43 位）。当前 ${secretValue.length} 位。`), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: !canSaveSecret, type: "submit" }, "保存宿主专用凭据"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "secretRef：ds-secret/", secretName, "。替换已有凭据会撤销使用它的机器授权，需要重新配对。")), available.includes("machine.pair") && /* @__PURE__ */ import_react60.default.createElement("form", { className: "bp-form", onSubmit: (event) => {
     event.preventDefault();
     let existing = snapshot.machines.items.find((item) => item.id === pair.machineId);
     dispatch("machine.pair", { ...pair, roots: pair.roots.split(",").map((v2) => v2.trim()).filter(Boolean), tools: ["machine_ping", "fs_list", "fs_read", "fs_write", "shell_exec", "container_command_v1", "cli_probe_v1", "cli_task_v1", "operation_status", "operation_cancel", "artifact_stat", "artifact_read", "worktree_create", "worktree_diff", "worktree_integrate", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_script", "browser_upload", "browser_download", "browser_close", "desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"], expectedRevision: existing?.revision ?? 0 });

@@ -212,12 +212,20 @@ function MachineSetup({ snapshot, dispatch, busy }) {
   const [pair,setPair]=useState({name:'',machineId:'',endpoint:'',secretRef:'ds-secret/REMOTE_AGENT_DESKTOP',roots:'project',probeBotId:snapshot.bots?.[0]?.id??'',protectedTunnel:false})
   const available=snapshot.availableActions??[]
   const change=(key,value)=>setPair(current=>({...current,[key]:value}))
+  // The hints are the contract, spelled out here so a browser's generic "pattern mismatch" never
+  // replaces them. The Host re-validates both shapes; this only keeps the button honest.
+  const nameProblem = /^REMOTE_AGENT_[A-Z0-9_]{1,50}$/.test(secretName) ? ''
+    : '只能是大写字母、数字与下划线，并以 REMOTE_AGENT_ 开头（例如 REMOTE_AGENT_CAD2）。'
+  const tokenProblem = secretValue === '' ? '' : /^[A-Za-z0-9_-]{43}$/.test(secretValue) ? '' : `配对凭据应为 43 位，当前 ${secretValue.length} 位。`
+  const canSaveSecret = !busy && secretName !== '' && secretValue !== '' && !nameProblem && !tokenProblem
   return <details className="bp-card"><summary>添加或重新配对电脑</summary>
     <p className="bp-muted">先在目标电脑的 Agent 本地创建配对，核对 machineId。控制凭据只填下面的秘密输入框，保存到现有秘密库；此凭据不给任何 Bot 使用。</p>
-    {available.includes('machine.secret')&&<form className="bp-form" onSubmit={async event=>{event.preventDefault();try{await dispatch('machine.secret',{name:secretName,value:secretValue})}finally{setSecretValue('')}}}>
-      <label>秘密名称<input aria-label="远程凭据名称" value={secretName} onChange={event=>setSecretName(event.target.value.toUpperCase())} pattern="REMOTE_AGENT_[A-Z0-9_]{1,50}" required autoComplete="off" /></label>
-      <label>配对凭据<input aria-label="远程配对凭据" type="password" value={secretValue} onChange={event=>setSecretValue(event.target.value)} required autoComplete="new-password" spellCheck={false} /></label>
-      <button disabled={busy||!secretValue} type="submit">保存宿主专用凭据</button>
+    {available.includes('machine.secret')&&<form className="bp-form" onSubmit={async event=>{event.preventDefault();if(!canSaveSecret)return;try{await dispatch('machine.secret',{name:secretName,value:secretValue})}finally{setSecretValue('')}}}>
+      <label>秘密名称<input aria-label="远程凭据名称" value={secretName} onChange={event=>setSecretName(event.target.value.toUpperCase())} aria-invalid={Boolean(nameProblem)} aria-describedby="bp-secret-name-hint" required autoComplete="off" spellCheck={false} /></label>
+      <p className={nameProblem ? 'bp-error' : 'bp-muted'} id="bp-secret-name-hint">{nameProblem || '大写字母、数字与下划线；保存后 secretRef 为 ds-secret/该名称。'}</p>
+      <label>配对凭据<input aria-label="远程配对凭据" type="password" value={secretValue} onChange={event=>setSecretValue(event.target.value)} aria-invalid={Boolean(tokenProblem)} aria-describedby="bp-secret-value-hint" required autoComplete="new-password" spellCheck={false} /></label>
+      <p className={tokenProblem ? 'bp-error' : 'bp-muted'} id="bp-secret-value-hint">{tokenProblem || `Agent 的 pair 命令只显示一次的配对凭据（43 位）。当前 ${secretValue.length} 位。`}</p>
+      <button disabled={!canSaveSecret} type="submit">保存宿主专用凭据</button>
       <p className="bp-muted">secretRef：ds-secret/{secretName}。替换已有凭据会撤销使用它的机器授权，需要重新配对。</p>
     </form>}
     {available.includes('machine.pair')&&<form className="bp-form" onSubmit={event=>{event.preventDefault();const existing=snapshot.machines.items.find(item=>item.id===pair.machineId);void dispatch('machine.pair',{...pair,roots:pair.roots.split(',').map(v=>v.trim()).filter(Boolean),tools:['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1','cli_probe_v1','cli_task_v1','operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate','browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close','desktop_screenshot','desktop_click','desktop_type','desktop_key','desktop_scroll'],expectedRevision:existing?.revision??0})}}>
@@ -229,7 +237,6 @@ function MachineSetup({ snapshot, dispatch, busy }) {
     </form>}
   </details>
 }
-
 function MachineControls({ machine, snapshot, dispatch, busy }) {
   const groups = [
     ['read','文件读取',['machine_ping','fs_list','fs_read']],
