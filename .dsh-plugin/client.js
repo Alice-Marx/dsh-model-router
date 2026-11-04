@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.58.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.59.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -29892,7 +29892,9 @@ var TERMINAL_TOOL_IDS = Object.freeze(OFFICIAL_TOOLS.filter((tool) => !tool.unsu
   stepcode: Object.freeze(["login"]),
   hermes: Object.freeze(["auth"]),
   pi: Object.freeze([]),
-  zcode: Object.freeze(["login"])
+  zcode: Object.freeze(["login"]),
+  // dsh-tui signs in from its own TUI, so there is no separate login argument to run.
+  "dsh-tui": Object.freeze([])
 });
 function terminalCanLogin(target) {
   return !!TERMINAL_LOGIN_ARGS[target]?.length;

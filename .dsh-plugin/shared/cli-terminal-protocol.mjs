@@ -53,6 +53,8 @@ export const TERMINAL_LOGIN_ARGS = Object.freeze({
   hermes: Object.freeze(['auth']),
   pi: Object.freeze([]),
   zcode: Object.freeze(['login']),
+  // dsh-tui signs in from its own TUI, so there is no separate login argument to run.
+  'dsh-tui': Object.freeze([]),
 })
 
 /** Tools without a separate login command authenticate from their TUI. */
