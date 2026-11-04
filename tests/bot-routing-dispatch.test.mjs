@@ -59,3 +59,17 @@ test('dispatch: no eligible Bot names the refusals instead of picking one', asyn
   await assert.rejects(routeTaskToBot({ routing: on, task: { text: 'x' }, candidatesFor: () => [worker({ enabled: false })] }), /BOT_ROUTING_NO_ELIGIBLE:BOT_DISABLED/)
   await assert.rejects(routeTaskToBot({ routing: on, task: { text: '  ' }, candidatesFor: () => [worker()] }), /ROUTING_REQUIRES_TASK/)
 })
+
+test('dispatch: a decision becomes one plan package aimed at the chosen Bot', async () => {
+  const { buildRoutedPlan } = await import('../packages/orchestration/src/bot-routing-dispatch.mjs')
+  const plan = buildRoutedPlan({ decision: { chosen: { botId: 'worker' } }, text: '  整理日志  ', taskId: 'task-1', requesterBotId: 'main' })
+  assert.equal(plan.taskId, 'task-1')
+  assert.equal(plan.origin.botId, 'main')
+  assert.equal(plan.packages.length, 1)
+  assert.equal(plan.packages[0].targetBotId, 'worker')
+  assert.equal(plan.packages[0].objective, '整理日志')
+  assert.deepEqual(plan.packages[0].acceptance, [])
+  assert.equal(plan.packages[0].effectClass, 'read')
+  assert.throws(() => buildRoutedPlan({ decision: null, text: 'x', taskId: 't' }), /ROUTING_DECISION_REQUIRED/)
+  assert.throws(() => buildRoutedPlan({ decision: { chosen: { botId: 'w' } }, text: 'x', taskId: 't', effectClass: 'danger' }), /ROUTING_INVALID_EFFECT_CLASS/)
+})

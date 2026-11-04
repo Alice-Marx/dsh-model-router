@@ -1,4 +1,5 @@
 import { createBotRoutingService } from './bot-routing-service.mjs'
+import { buildRoutedPlan } from './bot-routing-dispatch.mjs'
 import { hostname } from 'node:os'
 import { join, dirname, isAbsolute } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -757,6 +758,27 @@ export function startBotProduct(ctx, options = {}) {
           // N09: owner task management runs on the owning Bot's own subject, so
           // the Bot's committed grant authorizes every cancel/retry/reconcile.
           ...(taskService ? {
+            // Bot routing turns a preview into a real package: the decision names the Bot, the
+            // worker binding is committed first, and only then is the plan submitted. A failure in
+            // either step leaves no half-dispatched task behind.
+            'botRouting.dispatch': async (payload, context) => {
+              if (!taskService) throw new Error('TASK_SERVICE_UNAVAILABLE')
+              const requesterBotId = typeof payload?.requesterBotId === 'string' ? payload.requesterBotId : ''
+              const decision = botRouting.decide({
+                text: payload?.text, pinnedBotId: payload?.pinnedBotId ?? '',
+                requiresMachine: payload?.requiresMachine === true, machineId: payload?.machineId ?? '',
+                requesterBotId,
+              })
+              if (!decision.chosen) throw new Error('BOT_ROUTING_NO_ELIGIBLE')
+              if (decision.binding) {
+                const roots = (() => { try { const row = machines.readModel().items.find(item => item.id === decision.binding.machineId); return row?.roots?.map(root => root.id ?? root) ?? ['project'] } catch { return ['project'] } })()
+                await machineActions['machine.bind']({ ...decision.binding, roots, expectedRevision: undefined }, context)
+              }
+              const taskId = `task-${randomUUID()}`
+              const plan = buildRoutedPlan({ decision, text: payload.text, taskId, requesterBotId, acceptance: Array.isArray(payload?.acceptance) ? payload.acceptance : [], effectClass: decision.binding ? 'workspace-write' : 'read' })
+              const submitted = await taskService.submitPlan(taskOwner({ botId: decision.chosen.botId }), { requestKey: payload?.requestKey ?? `route-${taskId}`, plan }, { owner: true })
+              return { decision, plan, submitted }
+            },
             'task.plan.submit': payload => taskService.submitPlan(taskOwner(payload),{requestKey:payload?.requestKey,plan:payload?.plan},{owner:true}),
             'task.plan.cancel': payload => taskService.cancelPlan(taskOwner(payload),{planId:payload?.planId}),
             'task.cancel': payload => taskService.cancel(taskOwner(payload), { taskId: payload?.taskId }),
