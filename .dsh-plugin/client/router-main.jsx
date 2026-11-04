@@ -666,7 +666,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
                   <div className="mr-route-provider">{tool.vendor} · {tool.id}</div>
                   <div className="mr-tool-status" role="status"><span className={`mr-tool-dot ${running ? 'running' : probe?.installed ? 'installed' : 'missing'}`} />{status}{probe?.installed && probe.version ? ` · ${probe.version}` : ''}{healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ''}</div>
                   <ToolLoginLine entry={healthById[tool.id]} />
-                  {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.headlessAdapter
+                  {probe?.installed && <p className="mr-caption mr-tool-detail">{tool.taskBackend === true ? '可登记为子任务：Bot 派发的 CLI 步骤会进入统一任务系统（依赖、取消、重试、收据），收据分别记录请求模型与实际模型。' : tool.headlessAdapter
                     ? '只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。'
                     : readiness?.ready
                     ? `执行入口已核验：${readyModes.includes('read-only') ? '支持只读任务' : '不支持只读任务'}；${readyModes.includes('workspace-write') ? '支持可编辑隔离工作区任务（需审批）' : '不支持可编辑任务'}。实际调用还需当前会话权限、账号与模型可用。`

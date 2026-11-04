@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { access, readFile } from 'node:fs/promises'
 import { CAPABILITY_UNION } from '../.dsh-plugin/shared/capability-union.mjs'
 
-const REQUIRED = ['groups', 'memory', 'capabilities', 'voice', 'side', 'schedules', 'views', 'tools', 'terminal', 'routing']
+const REQUIRED = ['cli-task', 'groups', 'memory', 'capabilities', 'voice', 'side', 'schedules', 'views', 'tools', 'terminal', 'routing']
 
 test('capability union: every promised capability still has its evidence on disk', async () => {
   const missing = []

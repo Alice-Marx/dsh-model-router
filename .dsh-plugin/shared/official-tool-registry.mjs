@@ -164,6 +164,8 @@ export const OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ['uninstall', '-g', '@openai/codex'],
     probeExecutables: ['codex'],
     probeNote: 'Codex 版本横幅由适配层宽匹配；安装时取 npm 最新版。',
+    // The unified task service registers this CLI as an explicit task backend (cli/codex).
+    taskBackend: true,
     providerHints: ['openai', 'gpt', 'codex'],
     scriptBinaryNames: Object.freeze(['codex', 'codex.exe']),
     defaultScriptInstallDir: '.local/bin',
