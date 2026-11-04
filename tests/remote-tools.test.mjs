@@ -43,3 +43,12 @@ test('remote tools: a named machine must be on the Bot whitelist', async () => {
   await assert.rejects(tools.call('fs_read', { path: 'a', machineId: 'machine-b' }), /MACHINE_NOT_ALLOWED/)
   assert.equal(seen.length, 1)
 })
+
+test('remote tools: read-only names are marked, mutating ones are not', async () => {
+  const tools = createRemoteTools({ invoke: async () => ({ ok: true }), names: ['fs_read', 'fs_write', 'machine_ping'], machines: [] })
+  assert.equal(tools.isReadonly('fs_read'), true)
+  assert.equal(tools.isReadonly('machine_ping'), true)
+  assert.equal(tools.isReadonly('fs_write'), false)
+  assert.equal(tools.isReadonly('shell_exec'), false)
+  assert.equal(tools.isReadonly('not_granted'), false)
+})

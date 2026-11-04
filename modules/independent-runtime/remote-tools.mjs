@@ -17,6 +17,9 @@ export const REMOTE_TOOL_NAMES = Object.freeze([
 
 const fail = (code, message) => { const error = new Error(message ?? code); error.code = code; throw error }
 
+/** Tools that only read. Everything else mutates and stays sequential. */
+export const READ_ONLY_TOOLS = Object.freeze(['machine_ping', 'fs_list', 'fs_read', 'operation_status', 'artifact_stat', 'artifact_read'])
+
 /**
  * @param {{ invoke: (tool: string, args: object) => Promise<unknown>, names?: string[], origin?: string }} options
  */
@@ -31,6 +34,8 @@ export function createRemoteTools({ invoke, names = REMOTE_TOOL_NAMES, machines 
   return Object.freeze({
     names: [...allowed].sort(),
     machines: [...machinesAllowed].sort(),
+    /** Whether a name may run beside another call in the same step. */
+    isReadonly: name => allowed.includes(name) && READ_ONLY_TOOLS.includes(name),
     origin,
     async call(name, args = {}) {
       if (typeof name !== 'string' || !allowed.includes(name)) fail('TOOL_NOT_GRANTED')

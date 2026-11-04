@@ -108,3 +108,36 @@ test('bot sessions: parseSession keeps only known fields', () => {
   assert.equal(parsed.messages[0].extra, undefined)
   assert.equal('secret' in parsed, false)
 })
+
+test('bot loop: a read-only batch runs together, a mutating batch stays sequential', async (t) => {
+  const store = openBotSessionStore({ dir: tempDir(t) })
+  const order = []
+  const tools = {
+    isReadonly: name => name === 'fs_read',
+    async call(name, args) {
+      order.push(`start:${args.path}`)
+      await new Promise(resolve => setTimeout(resolve, 10))
+      order.push(`end:${args.path}`)
+      return { content: args.path }
+    },
+  }
+  let step = 0
+  const provider = async () => {
+    step += 1
+    if (step === 1) return { toolCalls: [{ id: 'a', name: 'fs_read', args: { path: 'a' } }, { id: 'b', name: 'fs_read', args: { path: 'b' } }] }
+    if (step === 2) return { toolCalls: [{ id: 'c', name: 'fs_write', args: { path: 'c' } }, { id: 'd', name: 'fs_write', args: { path: 'd' } }] }
+    return { text: 'done' }
+  }
+  const loop = createBotLoop({ store, provider, tools })
+  const result = await loop.run({ botId: 'b1', input: 'x' })
+  assert.equal(result.answer, 'done')
+  const firstStart = order.indexOf('start:a')
+  const secondStart = order.indexOf('start:b')
+  const firstEnd = order.indexOf('end:a')
+  assert.equal(secondStart < firstEnd, true, 'read-only calls overlap')
+  const cStart = order.indexOf('start:c')
+  const cEnd = order.indexOf('end:c')
+  const dStart = order.indexOf('start:d')
+  assert.equal(dStart > cEnd, true, 'a mutating batch does not overlap')
+  assert.equal(cStart < cEnd, true)
+})
