@@ -47,15 +47,15 @@ export function createPluginRuntime({ ctx, settings = {}, stateDir, integration,
   if (typeof provider !== 'string' || !provider || typeof model !== 'string' || !model) fail('PLUGIN_RUNTIME_REQUIRES_MODEL')
 
   const providerFor = () => async ({ messages }) => collectAnswer(llm.stream({ provider, model, messages }))
-  // Tools are opt-in too: without a workspace root the loop answers and calls nothing.
-  const tools = typeof settings.remoteInvoke === 'function'
-    ? createRemoteTools({ invoke: settings.remoteInvoke, ...(Array.isArray(settings.remoteTools) ? { names: settings.remoteTools } : {}) })
+  // Tools are per Bot: the Host invoker is bound to this Bot, so one Bot cannot borrow another grant.
+  const toolsFor = botId => typeof settings.remoteInvoke === 'function'
+    ? createRemoteTools({ invoke: (tool, args) => settings.remoteInvoke(botId, tool, args), ...(Array.isArray(settings.remoteTools) ? { names: settings.remoteTools } : {}) })
     : typeof settings.workspaceRoot === 'string' && settings.workspaceRoot ? createWorkspaceTools({ root: settings.workspaceRoot }) : null
   return createIndependentRuntime({
     dir: settings.dir ? String(settings.dir) : join(stateDir, 'independent-runtime'),
     integration: typeof integration === 'function' ? integration : async () => fail('INDEPENDENT_RUNTIME_NO_INTEGRATION'),
     providerFor,
-    toolsFor: () => tools,
+    toolsFor,
     now,
     ...(Number.isSafeInteger(settings.maxSteps) ? { maxSteps: settings.maxSteps } : {}),
   })

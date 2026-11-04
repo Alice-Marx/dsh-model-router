@@ -2364,7 +2364,9 @@ export function apply(ctx, config = {}) {
     let botRuntime = null
     try {
       const runtime = createPluginRuntime({
-        ctx, settings: valueOf(config, 'independentRuntime', {}) ?? {}, stateDir: dirname(routerStateStore().file),
+        ctx,
+        settings: { ...(valueOf(config, 'independentRuntime', {}) ?? {}), ...(ctx.get?.('botRemoteToolInvoker') ? { remoteInvoke: (botId, tool, args) => ctx.get('botRemoteToolInvoker').invoke(botId, tool, args) } : {}) },
+        stateDir: dirname(routerStateStore().file),
       })
       if (runtime) botRuntime = { list: () => runtime.list(), move: (botId, mode) => runtime.move(botId, mode) }
     } catch (error) {

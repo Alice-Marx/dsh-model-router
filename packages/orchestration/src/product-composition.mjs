@@ -446,6 +446,29 @@ export function startBotProduct(ctx, options = {}) {
         assertMigrationStartupAllowed({home:resolveStateHome()})
         funding=await openProductFunding({Database,file:storageFile,legacyFile,policy,authority,pricingFor:bindingFunding,now})
       }
+
+      // The independent Bot runtime may call a remote tool, but only through this: the Bot's own
+      // subject, its first live machine binding, and a fresh task/attempt per call. Nothing here
+      // accepts a machine, root, endpoint or operation id from the caller's arguments.
+      ctx.provide?.('botRemoteToolInvoker', Object.freeze({
+        async invoke(botId, tool, args = {}) {
+          const subject = directory.forBot(botId)
+          if (!subject) throw new Error('UNKNOWN_BOT')
+          const model = machines.readModel()
+          const candidates = (model?.items ?? []).filter(item => item.status !== 'revoked'
+            && Array.isArray(item.bindings) && item.bindings.some(binding => binding.botId === botId && !binding.revoked))
+          const machine = candidates[0]
+          if (!machine) throw new Error('MACHINE_NOT_BOUND')
+          const binding = machine.bindings.find(item => item.botId === botId && !item.revoked)
+          const rootId = (binding.roots ?? [])[0]
+          if (typeof rootId !== 'string' || !rootId) throw new Error('MACHINE_ROOT_NOT_BOUND')
+          if (Array.isArray(binding.tools) && !binding.tools.includes(tool)) throw new Error('MACHINE_BOT_DENIED')
+          const stamp = String(Date.now()) + Math.random().toString(16).slice(2, 8)
+          return machines.call(subject, {
+            machineId: machine.id, rootId, taskId: 'bot-' + stamp, attemptId: 'bot-a-' + stamp, tool, args,
+          })
+        },
+      }))
       machines = openRemoteMachines({ Database, file:storageFile, authority, cliProfiles:cliConfig?.remote??[],
         botExists:id=>Boolean(product&&Object.hasOwn(product.rt.state?.bots??{},id)), now,
         resolveSecret:async secretRef=>{
