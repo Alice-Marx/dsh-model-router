@@ -317,9 +317,15 @@ function MachineSetup({ snapshot, dispatch, busy }) {
     setWorking(true)
     setError('')
     try {
-      await dispatch('machine.secret', { name: secretName, value: parsed.token })
+      // The channel reports failures as {ok:false}; silence here is how a pairing looks successful
+      // while nothing was stored, so every step is checked.
+      const unwrap = response => {
+        if (response && response.ok === false) throw new Error(response.error?.message ?? response.error ?? '宿主拒绝了这一步。')
+        return response
+      }
+      await unwrap(await dispatch('machine.secret', { name: secretName, value: parsed.token }))
       const existing = (snapshot.machines?.items ?? []).find(item => item.id === parsed.machineId)
-      await dispatch('machine.pair', {
+      await unwrap(await dispatch('machine.pair', {
         name: parsed.clientId || parsed.machineId,
         machineId: parsed.machineId,
         endpoint: endpoint.endpoint,
@@ -329,7 +335,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
         protectedTunnel: tunnel,
         tools: ['machine_ping', 'fs_list', 'fs_read', 'fs_write', 'shell_exec', 'operation_status', 'operation_cancel', 'artifact_stat', 'artifact_read', 'desktop_screenshot', 'desktop_click', 'desktop_type', 'desktop_key', 'desktop_scroll'],
         expectedRevision: existing?.revision ?? 0,
-      })
+      }))
       setStatus('已添加 ' + (parsed.clientId || parsed.machineId) + '，几秒后体检会刷新状态。')
       setPaste('')
     } catch (failure) {
