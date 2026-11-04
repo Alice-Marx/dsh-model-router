@@ -68,13 +68,37 @@ export function createIndependentRuntime({
     describe: botId => dispatch.describe(botId),
     /** Move a Bot between runtimes; refused while it is busy. */
     move: async (botId, mode) => {
-      const result = await switchApi.move(botId, mode, { isBusy })
+      const before = store.list([botId])[0] ?? null
+      const result = await switchApi.move(botId, mode, {
+        isBusy,
+        snapshot: before ? { turns: before.turns, messages: before.messages, at: now() } : null,
+      })
       // A moved Bot must not keep a loop remembering an older provider or grant.
       loops.delete(botId)
       return result
     },
     /** Which Bots were moved, in the switch's own words. */
     list: () => switchApi.list(),
+
+    /**
+     * A bounded, redacted view of one Bot transcript: role, time, size and a short preview.
+     * Bodies never leave this module; a caller shows previews instead of the full text.
+     */
+    history(botId, { limit = 20, previewChars = 120 } = {}) {
+      const messages = store.get(botId).messages
+      const take = Math.min(Math.max(1, limit), 100)
+      const chars = Math.min(Math.max(0, previewChars), 400)
+      return messages.slice(-take).map(message => {
+        const body = String(message.content ?? '')
+        return {
+          role: message.role,
+          at: message.at ?? null,
+          chars: body.length,
+          preview: chars === 0 ? '' : body.slice(0, chars),
+          ...(message.name ? { name: message.name } : {}),
+        }
+      })
+    },
 
     /** Inventory for a panel: runtime plus transcript size, never message bodies. */
     inventory: botIds => {
