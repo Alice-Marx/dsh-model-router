@@ -374,7 +374,7 @@ export function manualAssignmentOptions(routes = [], toolSnapshot = null, health
 }
 
 /** Workbench request: algorithm callers keep their original request shape. */
-export function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, executor = 'routed', executionMode = 'read-only', executionEnvironment = 'harness', assignmentMode = 'algorithm', packageAssignments, packagePlanKey } = {}) {
+export function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace, executor = 'routed', executionMode = 'read-only', executionEnvironment = 'harness', assignmentMode = 'algorithm', packageAssignments, packagePlanKey, dryRun = false } = {}) {
   if (!['algorithm', 'manual'].includes(assignmentMode)) throw new Error('不支持的分配方式。')
   let manual = null
   if (assignmentMode === 'manual') {
@@ -398,6 +398,7 @@ export function launchRequest({ task, mode, directRoute, budgetUsd, preset, work
     task: typeof task === 'string' ? task : '',
     ...(executor === 'official-team' ? { executor, executionMode } : {}),
     ...(executionEnvironment === 'cli-native' ? { executionEnvironment } : {}),
+    ...(dryRun === true ? { dryRun: true } : {}),
     ...(mode === 'direct' && directRoute ? { provider: directRoute.provider, model: directRoute.model } : { planMode: mode === 'team' ? 'team' : 'single', preset }),
     ...(Number.isFinite(budget) && budget >= 0 ? { budgetUsd: budget } : {}),
     ...(typeof workspace === 'string' && workspace.trim() ? { workspace: workspace.trim() } : {}),

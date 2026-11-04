@@ -7,6 +7,7 @@ const STATUS_TEXT = Object.freeze({
   succeeded: '执行完成', completed: '执行完成', partial: '部分步骤失败', failed: '执行失败', cancelled: '已取消',
   'cli-completed': '执行完成', blocked: '执行被阻止', incomplete: '执行未完成', paused: '有步骤等待确认',
   'integration-pending': '执行完成，改动等待整合', pending: '等待执行',
+  planned: '演练完成：没有执行任何步骤', dryRun: '演练完成：没有执行任何步骤',
   'paused-budget': '已因预算暂停，未启动模型', 'paused-subscription-failure': '有步骤因订阅调用失败而暂停，请在下方执行记录中选择如何继续',
 })
 const LIVE_STATUSES = new Set(['running', 'cancelling'])
@@ -69,6 +70,8 @@ function settleLaunch(identity, value, error) {
  */
 export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = 'algorithm', packageAssignments = {}, packagePlanKey }) {
   const [preset, setPreset] = React.useState(defaultPreset || 'balanced')
+  // Rehearsal: plan and report the same work, call nothing, cost nothing.
+  const [dryRun, setDryRun] = React.useState(false)
   const [executor, setExecutor] = React.useState('routed')
   const [executionMode, setExecutionMode] = React.useState('read-only')
   const [executionEnvironment, setExecutionEnvironment] = React.useState('harness')
@@ -240,7 +243,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
 
   const request = () => launchRequest({ task, mode, directRoute, budgetUsd, preset: runPreset, workspace: text(workspace) || lastWorkspace,
     executor: runExecutor, executionMode: runMode, executionEnvironment: runEnvironment,
-    assignmentMode: manual ? 'manual' : 'algorithm', packageAssignments, packagePlanKey })
+    assignmentMode: manual ? 'manual' : 'algorithm', packageAssignments, packagePlanKey, dryRun })
   const unavailable = typeof previewRun !== 'function' || typeof startRun !== 'function'
   const blocked = disabledReason || (unavailable ? '工作台执行服务尚未加载，请更新插件后重试。' : !text(task) ? '先在上方“任务规划”中描述任务。' : manual && !packagePlanKey ? '请重新生成工作包后再手动分配。' : runExecutor === 'official-team' && mode !== 'team' ? '官方工具协作需要先在上方选择“团队分工”。' : '')
   const busy = phase.kind === 'previewing' || phase.kind === 'running' || phase.kind === 'starting'
@@ -357,6 +360,14 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
           <div className="mr-control-group mr-launch-workspace"><label className="mr-control-label" htmlFor="mr-launch-workspace">工作区（绝对路径）</label>
             <input className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '例如 D:\\projects\\demo 或 /home/user/demo'} onChange={event => setWorkspace(event.target.value)} />
           </div>
+          <div className="mr-control-group mr-launch-dryrun">
+            <span className="mr-control-label">演练</span>
+            <label className="mr-check">
+              <input type="checkbox" checked={dryRun} disabled={busy} onChange={event => setDryRun(event.target.checked)} />
+              <span>只记录，不执行</span>
+            </label>
+            <p className="mr-caption">演练按当前计划列出每个工作包本应使用的模型或工具和预计费用；不调用模型、不启动 CLI、不写入文件。</p>
+          </div>
         </div>
         <p className="mr-caption">{manual ? '手动分配按包执行只读任务，可混合模型 API 与官方工具；工具使用默认模型。所选目标、就绪状态和费用以执行预览为准。' : executor === 'official-team'
           ? `${executionMode === 'workspace-write' ? '编辑文件：各工作包在独立 Git 工作树中使用 CLI 正常工具，完成后整合回所选工作区。' : '只读检查：各工作包使用受限工具集，不修改工作区文件；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。'}失败时不会自动替换为模型目录 API。已登录不代表当前任务权限已就绪，预览会检查可用工具。`
@@ -379,6 +390,12 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
           <div className={['failed', 'partial', 'blocked', 'incomplete'].includes(resultStatus) || resultStatus?.startsWith('paused') ? 'mr-error' : 'mr-empty'} role="status">
             {STATUS_TEXT[resultStatus] ?? `状态：${resultStatus}`}{phase.value.runId ? `；结果已记录（运行 ${phase.value.runId.slice(0, 8)}），见下方“执行记录与子任务”。` : '。'}
             {phase.value.budget?.message ? ` ${phase.value.budget.exceeded && resultStatus !== 'paused-budget' ? '已按你的确认超预算执行：' : ''}${phase.value.budget.message}` : ''}
+            {phase.value.dryRun === true && phase.value.notice ? ` ${phase.value.notice}` : ''}
+            {Array.isArray(phase.value.planned) && phase.value.planned.length > 0 && <ol className="mr-planned">
+              {phase.value.planned.map(item => <li key={item.id ?? item.order}>
+                {item.title ?? item.id ?? `工作包 ${item.order}`}：{item.wouldCall}{Number.isFinite(item.estimatedCostUsd) ? `（预计 $${item.estimatedCostUsd.toFixed(4)}）` : ''}
+              </li>)}
+            </ol>}
           </div>
         )}
       </div>
@@ -426,7 +443,7 @@ function LaunchPreview({ value, request, changed, running, confirmRef, onConfirm
         ? <div className="mr-confirm-box"><p className="mr-section-title">执行前需要确认以下 {reasons.length} 项：</p><ol>{reasons.map(item => <li key={item.code}>{reasonText(item)}</li>)}</ol></div>
         : <p className="mr-caption">当前没有额外确认项。{estimate === null ? '费用未知，无法确认本次费用是否在预算内。' : value.budget?.limited && value.budget?.estimateKnown && !value.budget?.exceeded ? '按已提供单价估算，API 部分未超出预算；API 实际费用以执行记录和账单为准。' : 'API 实际费用以执行记录和账单为准，订阅仅记录用量。'}</p>}
       <div className="mr-actions">
-        <button ref={confirmRef} className="mr-button" type="button" disabled={running || blocked} onClick={onConfirm}>{running ? '正在执行…' : reasons.length ? '全部确认并执行' : '确认执行'}</button>
+        <button ref={confirmRef} className="mr-button" type="button" disabled={running || blocked} onClick={onConfirm}>{(request?.dryRun === true ? (reasons.length ? '确认演练（不执行）' : '演练（不执行）') : running ? '正在执行…' : reasons.length ? '全部确认并执行' : '确认执行')}</button>
         <button className="mr-button mr-button-secondary" type="button" disabled={running} onClick={onCancel}>取消</button>
         {running && <span className="mr-caption" role="status" aria-live="polite">正在启动执行，请稍候…</span>}
       </div>

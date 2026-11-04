@@ -179,6 +179,7 @@ export function parseRunRequest(value) {
   if (request.budgetUsd !== undefined && (typeof request.budgetUsd !== 'number' || !Number.isFinite(request.budgetUsd) || request.budgetUsd < 0)) {
     throw new TypeError('budgetUsd must be a non-negative number')
   }
+  if (request.dryRun !== undefined && typeof request.dryRun !== 'boolean') throw new TypeError('dryRun must be a boolean')
   const confirmed = Array.isArray(request.confirmedReasons) ? request.confirmedReasons : []
   if (request.executor !== undefined && !['routed', 'official-team'].includes(request.executor)) throw new TypeError('executor is invalid')
   if (request.executionMode !== undefined && !['read-only', 'workspace-write'].includes(request.executionMode)) throw new TypeError('executionMode is invalid')
@@ -210,6 +211,8 @@ export function parseRunRequest(value) {
     ...(['economy', 'balanced', 'quality'].includes(request.preset) ? { preset: request.preset } : {}),
     ...(request.budgetUsd !== undefined ? { budgetUsd: request.budgetUsd } : {}),
     ...(workspace ? { workspace } : {}),
+    // A rehearsal records what would run; it never reaches a model or a tool.
+    ...(request.dryRun === true ? { dryRun: true } : {}),
     confirmedReasons: [...new Set(confirmed)],
   }
 }
