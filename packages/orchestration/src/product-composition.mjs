@@ -308,6 +308,7 @@ export function startBotProduct(ctx, options = {}) {
     handoffLedger.held(args.taskId, args.toBotId)
     return { plan, submitted }
   }
+  const botLibrary = (() => { try { return ctx.get?.('botLibrary') ?? null } catch { return null } })()
   const botRuntimeAdapter = (() => { try { return ctx.get?.('botRuntimeAdapter') ?? null } catch { return null } })()
   const routineStore = (() => { try { return ctx.get?.('routineStore') ?? null } catch { return null } })()
   const botRouting = createBotRoutingService({
@@ -751,6 +752,13 @@ export function startBotProduct(ctx, options = {}) {
                 subscriptionSummary: { callsToday: subscription.today.calls, callsMonth: subscription.month.calls, usdToday: totals.subscriptionToday, usdMonth: totals.subscriptionMonth } } }
           } } : {}) },
         actions: { ...actions, ...machineActions,
+          // The library panel reads and writes one Bot's files. The directory is chosen by the
+          // library itself (the caller's Bot, or the operator's choice), never by the panel.
+          ...(botLibrary ? {
+            'library.list': async payload => botLibrary.list(payload?.botId, payload?.relativePath ?? ''),
+            'library.read': async payload => ({ content: botLibrary.read(payload?.botId, payload?.relativePath ?? '') }),
+            'library.write': async payload => botLibrary.write(payload?.botId, payload?.relativePath ?? '', payload?.content ?? ''),
+          } : {}),
           // The Bot runtime card is a panel: its buttons dispatch on this channel, so the same four
           // operations the owner RPC exposes must exist here as well.
           ...(botRuntimeAdapter ? {
