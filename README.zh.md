@@ -2,7 +2,11 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![npm 版本](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![已收录于 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![npm version](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![Listed in the DSH plugin directory](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+
+[![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
+
+只想看发布说明？点 **Watch → Custom → Releases**（不必 Watching 全部动态）。
 
 一个插件，把 DeepSeek Harness 变成一支 Bot 团队：路由、预算、官方 CLI、远程电脑与监管工作台，
 全部挂在你已经运行的 Harness 里，只挂载一次。
@@ -13,7 +17,6 @@
 - **包名**：`@ljwei-stak/dsh-model-router`
 - **版本**：0.27.1
 - **宿主**：DeepSeek Harness Desktop 0.2.1-rc.4 / 0.2.1-rc.5
-- **文档、验证报告与完整历史**：[GitLab 归档仓](https://gitlab.com/Alice_marx/dsh-model-router)
 
 ## 安装
 
@@ -94,7 +97,7 @@ Codex 以一等子任务（`cli/codex`）进入任务系统。Claude 的只读�
 ```
 你的机器（DSH 宿主）                目标机器（Agent）                  某个 Bot
 ┌──────────────────────┐   授权票   ┌─────────────────────────┐   工具   ┌──────────────┐
-│ 机器目录 / ceiling    │ ────────► │ 10.0.0.2:9701 /mcp      │ ◄─────── │ session-…    │
+│ 机器目录 / ceiling    │ ────────► │ <agent-host>:9701 /mcp      │ ◄─────── │ session-…    │
 │ 宿主专用凭据 secretRef│           │ 根目录、ceiling、操作账本 │  调用    │ 授权 grant   │
 └──────────────────────┘           └─────────────────────────┘          └──────────────┘
 ```
@@ -111,7 +114,7 @@ Codex 以一等子任务（`cli/codex`）进入任务系统。Claude 的只读�
 | Node.js | **22.19 或更高**（推荐 24.x）。用 `node -v` 确认。 |
 | 账号 | 普通账号即可，但建议用专用低权账号。想用桌面控制就不要把它装成 Session 0 的服务。 |
 | 网络 | 宿主能访问：WireGuard/Tailscale 内网地址，或 HTTPS。内网 IP 本身不代表可信，需要你显式声明隧道。 |
-| 磁盘 | 为每个要暴露的根目录准备一个工作目录，例如 `D:\dsh-workspaces\project`。 |
+| 磁盘 | 为每个要暴露的根目录准备一个工作目录，例如 `D:\workspaces\project`。 |
 
 ### 3. 安装 Agent
 
@@ -119,13 +122,13 @@ Codex 以一等子任务（`cli/codex`）进入任务系统。Claude 的只读�
 
 ```powershell
 powershell -File deploy/remote-agent/install-windows.ps1 `
-  -SourceRoot . -Prefix D:\dsh-agent -AuthorizedRoot D:\dsh-workspaces\project
+  -SourceRoot . -Prefix D:\dsh-agent -AuthorizedRoot D:\workspaces\project
 ```
 
 **Linux**
 
 ```sh
-sh deploy/remote-agent/install-linux.sh ./source ./dsh-agent /srv/dsh-workspaces/project
+sh deploy/remote-agent/install-linux.sh ./source ./dsh-agent /srv/workspaces/project
 ```
 
 安装器会把 Agent 复制到带版本号的目录，执行 `npm ci` 与构建，然后初始化 `config.json`。
@@ -140,19 +143,19 @@ sh deploy/remote-agent/install-linux.sh ./source ./dsh-agent /srv/dsh-workspaces
 ```json
 {
   "dataDir": "D:\\dsh-agent\\data",
-  "roots": { "project": "D:\\dsh-workspaces\\project" },
+  "roots": { "project": "D:\\workspaces\\project" },
   "isolation": "application",
   "network": {
     "mode": "wireguard",
-    "host": "10.0.0.2",
+    "host": "<agent-host>",
     "port": 9701,
     "protectedTunnel": true,
-    "allowedHosts": ["10.0.0.2:9701"]
+    "allowedHosts": ["<agent-host>:9701"]
   },
   "executables": { "node": "D:\\Program Files\\nodejs\\node.exe" },
   "windowsJobRunner": "D:\\dsh-agent\\native\\dsh-process-job.exe",
   "desktop": {
-    "pipeName": "dsh-desktop-10-0-0-2",
+    "pipeName": "dsh-desktop-<host>",
     "secretFile": "D:\\dsh-agent\\desktop.secret"
   },
   "browserOrigins": []
@@ -175,7 +178,7 @@ sh deploy/remote-agent/install-linux.sh ./source ./dsh-agent /srv/dsh-workspaces
 
 ```json
 {
-  "botIds": ["session-a57565e5-64a8-473b-b529-3da6e98fd359"],
+  "botIds": ["<bot-session-id>"],
   "roots": ["project"],
   "tools": ["machine_ping", "fs_list", "fs_read", "fs_write", "shell_exec",
             "operation_status", "operation_cancel", "artifact_stat", "artifact_read",
@@ -219,7 +222,7 @@ netsh advfirewall firewall add rule name=dsh-remote-agent dir=in action=allow ^
 
 **Linux** —— 用 `deploy/remote-agent/remote-agent.service.example` 作模板。
 
-从宿主侧验证：`curl -i http://10.0.0.2:9701/mcp` 必须是 **401**（活着且要鉴权），
+从宿主侧验证：`curl -i http://<agent-host>:9701/mcp` 必须是 **401**（活着且要鉴权），
 既不是 200，也不是连接被拒。
 
 ### 7. 在工作台登记这台机器
@@ -231,7 +234,7 @@ netsh advfirewall firewall add rule name=dsh-remote-agent dir=in action=allow ^
 2. **配对表单**：
    - 电脑名称：随便起一个好认的，例如 `office-pc · Win11`
    - Agent machineId：`pair` 打印的那个 `machineId`
-   - Agent 地址：`http://10.0.0.2:9701`
+   - Agent 地址：`http://<agent-host>:9701`
    - 凭据 secretRef：`ds-secret/REMOTE_AGENT_OFFICE_PC`
    - 已配对根目录 ID：`project`
    - 用于核验的 Bot：这台机器归属的 Bot
@@ -325,7 +328,6 @@ remote-computer-agent/     机器侧 Agent（MCP 传输、操作账本）
 native/                    Windows 桌面与进程 Job 助手
 ```
 
-开发、测试与打包说明见 [GitLab 归档仓](https://gitlab.com/Alice_marx/dsh-model-router)，各版本的
 验证报告也在那里。
 
 ## 许可

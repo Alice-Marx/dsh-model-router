@@ -2,7 +2,11 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![npm version](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![Listed in the DSH plugin directory](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![npm version](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![Listed in the DSH plugin directory](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+
+[![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
+
+Want release notes only? Click **Watch → Custom → Releases** (you do not need Watching all activity).
 
 One plugin that turns DeepSeek Harness into a Bot team: routing, budgets, official CLIs, remote
 computers and a supervision workbench, mounted once inside the Harness you already run.
@@ -14,7 +18,6 @@ authority, accounting and control around them.
 - **Package**: `@ljwei-stak/dsh-model-router`
 - **Version**: 0.27.1
 - **Harness**: DeepSeek Harness Desktop 0.2.1-rc.4 / 0.2.1-rc.5
-- **Docs, validation reports and full history**: [GitLab archive](https://gitlab.com/Alice_marx/dsh-model-router)
 
 ## Install
 
@@ -105,7 +108,7 @@ exactly what the Bot may do, then use it from chat or from the workbench.
 ```
 your machine (DSH Host)            the target machine (Agent)          the Bot
 ┌──────────────────────┐   grant   ┌─────────────────────────┐   tools  ┌──────────────┐
-│ machine catalog      │ ────────► │ 10.0.0.2:9701 /mcp      │ ◄─────── │ session-…    │
+│ machine catalog      │ ────────► │ <agent-host>:9701 /mcp      │ ◄─────── │ session-…    │
 │ ceiling, secretRef   │  ticket   │ roots, ceiling, ledger  │  call    │ grant        │
 └──────────────────────┘           └─────────────────────────┘          └──────────────┘
 ```
@@ -125,7 +128,7 @@ your machine (DSH Host)            the target machine (Agent)          the Bot
 | Node.js | **22.19 or newer** (24.x recommended). Check with `node -v`. |
 | Account | A normal account is enough; a dedicated low-privilege account is better. Do not run it as a Session 0 service if you want desktop control. |
 | Network | Reachable from your Harness: a WireGuard/Tailscale private address, or HTTPS. A private IP is not trusted by itself — you attest the tunnel. |
-| Disk | A workspace directory for each root you expose, e.g. `D:\dsh-workspaces\project`. |
+| Disk | A workspace directory for each root you expose, e.g. `D:\workspaces\project`. |
 
 ### 3. Install the agent
 
@@ -133,13 +136,13 @@ your machine (DSH Host)            the target machine (Agent)          the Bot
 
 ```powershell
 powershell -File deploy/remote-agent/install-windows.ps1 `
-  -SourceRoot . -Prefix D:\dsh-agent -AuthorizedRoot D:\dsh-workspaces\project
+  -SourceRoot . -Prefix D:\dsh-agent -AuthorizedRoot D:\workspaces\project
 ```
 
 **Linux**
 
 ```sh
-sh deploy/remote-agent/install-linux.sh ./source ./dsh-agent /srv/dsh-workspaces/project
+sh deploy/remote-agent/install-linux.sh ./source ./dsh-agent /srv/workspaces/project
 ```
 
 The installer copies the agent into a versioned directory, runs `npm ci` and the build, then
@@ -154,19 +157,19 @@ No checkout on the target? Copy the agent folder (`package.json`, `package-lock.
 ```json
 {
   "dataDir": "D:\\dsh-agent\\data",
-  "roots": { "project": "D:\\dsh-workspaces\\project" },
+  "roots": { "project": "D:\\workspaces\\project" },
   "isolation": "application",
   "network": {
     "mode": "wireguard",
-    "host": "10.0.0.2",
+    "host": "<agent-host>",
     "port": 9701,
     "protectedTunnel": true,
-    "allowedHosts": ["10.0.0.2:9701"]
+    "allowedHosts": ["<agent-host>:9701"]
   },
   "executables": { "node": "D:\\Program Files\\nodejs\\node.exe" },
   "windowsJobRunner": "D:\\dsh-agent\\native\\dsh-process-job.exe",
   "desktop": {
-    "pipeName": "dsh-desktop-10-0-0-2",
+    "pipeName": "dsh-desktop-<host>",
     "secretFile": "D:\\dsh-agent\\desktop.secret"
   },
   "browserOrigins": []
@@ -189,7 +192,7 @@ Write a ceiling — the most any client may ever ask for:
 
 ```json
 {
-  "botIds": ["session-a57565e5-64a8-473b-b529-3da6e98fd359"],
+  "botIds": ["<bot-session-id>"],
   "roots": ["project"],
   "tools": ["machine_ping", "fs_list", "fs_read", "fs_write", "shell_exec",
             "operation_status", "operation_cancel", "artifact_stat", "artifact_read",
@@ -235,7 +238,7 @@ netsh advfirewall firewall add rule name=dsh-remote-agent dir=in action=allow ^
 
 **Linux** — use `deploy/remote-agent/remote-agent.service.example` as the template.
 
-Check from the Host side: `curl -i http://10.0.0.2:9701/mcp` must answer **401** (alive and
+Check from the Host side: `curl -i http://<agent-host>:9701/mcp` must answer **401** (alive and
 authenticated), never 200 and never a connection refusal.
 
 ### 7. Register the machine in the workbench
@@ -247,7 +250,7 @@ authenticated), never 200 and never a connection refusal.
 2. **Pairing form**:
    - 电脑名称: anything readable, e.g. `office-pc · Win11`
    - Agent machineId: the `machineId` printed by `pair`
-   - Agent 地址: `http://10.0.0.2:9701`
+   - Agent 地址: `http://<agent-host>:9701`
    - 凭据 secretRef: `ds-secret/REMOTE_AGENT_OFFICE_PC`
    - 已配对根目录 ID: `project`
    - 用于核验的 Bot: the Bot that will own this machine
@@ -352,7 +355,6 @@ remote-computer-agent/     machine-side agent (MCP transport, operation ledger)
 native/                    Windows desktop and process-job helpers
 ```
 
-Development, tests and packaging instructions live in the [GitLab archive](https://gitlab.com/Alice_marx/dsh-model-router),
 together with each release's validation report.
 
 ## License
