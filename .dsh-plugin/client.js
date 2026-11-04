@@ -29618,7 +29618,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.26.2", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -30511,7 +30511,15 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
   } }, "放弃更改"), dirty && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, invalid ? "请修正输入后保存。" : "更改尚未保存，安装与更新暂不可用。")), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { marginTop: 8 }, role: notice ? "status" : void 0 }, `当前生效：安装目录 ${install?.installDir || "（各厂商默认）"} · npm 源 ${install?.registry || "（默认）"}`, notice ? ` · ${notice}` : ""));
 }
 function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, onProbes, health, onRefreshHealth, settingsScope, tuiPrompt }) {
-  let healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item])), [probeState, setProbeState] = import_react57.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" }), [jobs, setJobs] = import_react57.default.useState({}), [rowErrors, setRowErrors] = import_react57.default.useState({}), [settingsPending, setSettingsPending] = import_react57.default.useState(!1), [methodSaving, setMethodSaving] = import_react57.default.useState(null), [previewPending, setPreviewPending] = import_react57.default.useState(!1), [settingsSnapshot, setSettingsSnapshot] = import_react57.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [previewError, setPreviewError] = import_react57.default.useState(""), [probeSettingsStale, setProbeSettingsStale] = import_react57.default.useState(!1), settingsPendingRef = import_react57.default.useRef(!1), methodSavingRef = import_react57.default.useRef(null), previewPendingRef = import_react57.default.useRef(!1), mounted = import_react57.default.useRef(!1), request = import_react57.default.useRef(0), previewRequest = import_react57.default.useRef(0), mutationGeneration = import_react57.default.useRef(0), mutationPendingRef = import_react57.default.useRef(null), submitting = import_react57.default.useRef(/* @__PURE__ */ new Set()), polling = import_react57.default.useRef(/* @__PURE__ */ new Set()), jobsRef = import_react57.default.useRef({}), handleSettingsPending = import_react57.default.useCallback((value) => {
+  let healthById = Object.fromEntries((health?.tools ?? []).map((item) => [item.id, item])), [probeState, setProbeState] = import_react57.default.useState({ status: "loading", probes: [], capabilities: [], readiness: [], install: null, error: "" }), [jobs, setJobs] = import_react57.default.useState({}), [rowErrors, setRowErrors] = import_react57.default.useState({}), [settingsPending, setSettingsPending] = import_react57.default.useState(!1), [methodSaving, setMethodSaving] = import_react57.default.useState(null), [previewPending, setPreviewPending] = import_react57.default.useState(!1), [settingsSnapshot, setSettingsSnapshot] = import_react57.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [previewError, setPreviewError] = import_react57.default.useState(""), [probeSettingsStale, setProbeSettingsStale] = import_react57.default.useState(!1);
+  import_react57.default.useEffect(() => {
+    if (probeState.status !== "loading" && probeState.status !== "refreshing") return;
+    let timer = setTimeout(() => {
+      setProbeState((previous) => previous.status === "loading" || previous.status === "refreshing" ? previous.probes.length > 0 ? { ...previous, status: "ready", error: "体检超时：部分工具的结果没有返回，已显示已有结果。可点“重新体检”。" } : { ...previous, status: "error", error: "体检超时：Host 45 秒内没有返回检测结果，请点“重新体检”。" } : previous);
+    }, 45e3);
+    return () => clearTimeout(timer);
+  }, [probeState.status]);
+  let settingsPendingRef = import_react57.default.useRef(!1), methodSavingRef = import_react57.default.useRef(null), previewPendingRef = import_react57.default.useRef(!1), mounted = import_react57.default.useRef(!1), request = import_react57.default.useRef(0), previewRequest = import_react57.default.useRef(0), mutationGeneration = import_react57.default.useRef(0), mutationPendingRef = import_react57.default.useRef(null), submitting = import_react57.default.useRef(/* @__PURE__ */ new Set()), polling = import_react57.default.useRef(/* @__PURE__ */ new Set()), jobsRef = import_react57.default.useRef({}), handleSettingsPending = import_react57.default.useCallback((value) => {
     settingsPendingRef.current = value, setSettingsPending(value);
   }, []), rememberJobs = (updater) => {
     setJobs((previous) => {
@@ -30529,10 +30537,9 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
     try {
       if (typeof listOfficialTools != "function") throw new Error("官方工具安装桥尚未加载。");
       let response = await listOfficialTools();
-      if (!mounted.current || current !== request.current || settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return;
+      if (!mounted.current || current !== request.current) return;
       if (!response?.ok) throw new Error(remoteError(response, "无法检测官方工具。"));
       let probes = Array.isArray(response.value?.tools) ? response.value.tools : [], capabilities = Array.isArray(response.value?.executionCapabilities) ? response.value.executionCapabilities : [], readiness = Array.isArray(response.value?.executionReadiness) ? response.value.executionReadiness : [], install2 = response.value?.install, matches = settingsSignature === toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value) && installSummaryMatchesSettings(install2, settingsScope?.getSnapshot?.()?.value);
-      if (!matches) return;
       setProbeState((previous) => ({
         status: "ready",
         probes,
@@ -30540,9 +30547,9 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
         readiness,
         install: matches ? install2 : previous.install,
         error: ""
-      })), setProbeSettingsStale(!1), matches && !mutationPendingRef.current && (previewPendingRef.current = !1, setPreviewPending(!1), setPreviewError("")), onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion == "string" ? response.value.hostVersion : null });
+      })), setProbeSettingsStale(!matches), matches && !mutationPendingRef.current && (previewPendingRef.current = !1, setPreviewPending(!1), setPreviewError("")), onProbes({ probes, capabilities, readiness, hostVersion: typeof response.value?.hostVersion == "string" ? response.value.hostVersion : null });
     } catch (error) {
-      if (!mounted.current || current !== request.current || settingsSignature !== toolInstallSettingsSignature(settingsScope?.getSnapshot?.()?.value)) return;
+      if (!mounted.current || current !== request.current) return;
       let message = remoteErrorText(text5(error?.message), "无法检测官方工具。"), kept = !1;
       setProbeState((previous) => previous.probes.length > 0 || previous.install ? (kept = !0, { ...previous, status: "ready", error: message }) : { status: "error", probes: [], capabilities: [], readiness: [], install: null, error: message }), kept || onProbes({ probes: [], capabilities: [], readiness: [] });
     }
