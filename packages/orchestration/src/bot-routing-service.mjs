@@ -53,24 +53,29 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
      * Decide for one task. A pinned Bot is honoured but still checked, and the whole decision is
      * returned so the workbench can show the losers and their reasons.
      */
-    decide({ text, requiredTools = [], requiresMachine = false, machineId = '', needs = {}, pinnedBotId = '' } = {}) {
+    decide({ text, requiredTools = [], requiresMachine = false, machineId = '', needs = {}, pinnedBotId = '', requesterBotId = '' } = {}) {
       if (typeof text !== 'string' || text.trim() === '') fail('BOT_ROUTING_REQUIRES_TASK')
       const settings = readSettings()
       if (settings.enabled !== true) fail('BOT_ROUTING_DISABLED')
+      // A Bot's own policy wins for the work it hands out; the global preset is the fallback.
+      let preset = settings.preset
+      if (typeof requesterBotId === 'string' && requesterBotId !== '') {
+        try { preset = settingsFor(requesterBotId)?.routing?.preset ?? preset } catch { /* keep the global preset */ }
+      }
       const all = candidates()
       const task = { requiredTools, requiresMachine }
       if (typeof pinnedBotId === 'string' && pinnedBotId !== '') {
         const pinned = all.find(candidate => candidate.botId === pinnedBotId)
         if (!pinned) fail(`BOT_ROUTING_PINNED_UNKNOWN:${pinnedBotId}`)
-        const probe = routeBot({ task, candidates: [pinned], preset: settings.preset })
+        const probe = routeBot({ task, candidates: [pinned], preset })
         if (!probe.chosen) fail(`BOT_ROUTING_PINNED_INELIGIBLE:${pinnedBotId}:${probe.rejected[0]?.reason ?? 'UNKNOWN'}`)
-        return { chosen: { botId: pinned.botId, name: pinned.name }, preset: settings.preset, pinned: true, binding: bindingFor(pinned, task, machineId, needs, settings), ranked: [], rejected: [] }
+        return { chosen: { botId: pinned.botId, name: pinned.name }, preset, pinned: true, binding: bindingFor(pinned, task, machineId, needs, settings), ranked: [], rejected: [] }
       }
-      const decision = routeBot({ task, candidates: all, preset: settings.preset })
+      const decision = routeBot({ task, candidates: all, preset })
       const chosen = decision.chosen ? all.find(candidate => candidate.botId === decision.chosen.botId) : null
       return {
         chosen: decision.chosen ? { botId: decision.chosen.botId, name: chosen?.name ?? decision.chosen.botId, score: decision.chosen.score } : null,
-        preset: settings.preset,
+        preset,
         pinned: false,
         ranked: decision.ranked,
         rejected: decision.rejected,

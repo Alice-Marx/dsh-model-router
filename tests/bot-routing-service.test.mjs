@@ -47,3 +47,15 @@ test('service: inspect lists the candidates the switch would score', () => {
   assert.deepEqual(view.candidates.map(row => row.botId).sort(), ['main', 'worker'])
   assert.equal(view.candidates.find(row => row.botId === 'worker').machineId, 'm1')
 })
+
+test('service: a Bot carries its own routing preset for the work it hands out', () => {
+  const withPolicy = createBotRoutingService({
+    bots, machineHealth: () => ({ online: true }),
+    settingsFor: id => ({ ...settings[id], routing: id === 'main' ? { preset: 'quality' } : null }),
+    priceFor: model => (model.model === 'v4' ? 0.3 : 1.2), qualityFor: id => (id === 'main' ? 0.8 : 0.6),
+    routing: { enabled: true, preset: 'economy' },
+  })
+  assert.equal(withPolicy.decide({ text: 'x' }).preset, 'economy')
+  assert.equal(withPolicy.decide({ text: 'x', requesterBotId: 'main' }).preset, 'quality')
+  assert.equal(withPolicy.decide({ text: 'x', requesterBotId: 'worker' }).preset, 'economy')
+})
