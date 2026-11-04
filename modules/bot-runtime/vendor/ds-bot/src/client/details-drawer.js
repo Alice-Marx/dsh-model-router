@@ -30,7 +30,7 @@ function transcriptOf(list, id, name, hiddenTurns = []) {
   return lines.join('\n\n')
 }
 
-const TAB_LABELS = { details: 'Details', browser: 'Browser', desktop: 'Computer' }
+const TAB_LABELS = { details: 'Details', browser: 'Browser', desktop: '电脑操作' }
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
 const shortUrl = url => String(url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
@@ -251,7 +251,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, ro
   }
   const subtitle = bot ? bot.role : roomSubtitle(room, roster)
   // Tab sets: a 1:1 Bot has Details and Browser; a group has only Details, so no tab row.
-  const tabs = bot ? (globalThis.__dshDesktop ? ['details', 'browser', 'desktop'] : ['details', 'browser']) : ['details']
+  const tabs = bot ? ['details', 'browser', 'desktop'] : ['details']
   return [h(Fragment, { key: 'top' }, top),
     h('div', { key: 'id', className: 'bt-drawer-id', 'data-move': side },
       bot ? h(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })

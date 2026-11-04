@@ -441,7 +441,8 @@ export function Machines({ snapshot, dispatch, busy }) {
         return dispatch('machine.desktop.act', { botId, machineId, rootId: machine?.roots?.[0]?.id ?? '', screenshotId, action })
       },
     })
-    return () => { delete globalThis.__dshDesktop }
+    // The bridge stays for this window: a Bot drawer opened later still needs it, and the panel
+    // that owns the authority has already rendered.
   }, [dispatch, snapshot.machines])
 
   const section = snapshot.machines

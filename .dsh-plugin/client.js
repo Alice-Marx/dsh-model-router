@@ -14429,7 +14429,7 @@ function transcriptOf(list, id2, name, hiddenTurns = []) {
 
 `);
 }
-var TAB_LABELS = { details: "Details", browser: "Browser", desktop: "Computer" }, hostOf2 = (url) => {
+var TAB_LABELS = { details: "Details", browser: "Browser", desktop: "电脑操作" }, hostOf2 = (url) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
@@ -14666,7 +14666,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, a
     setEditing(!1);
     let next = draftName.trim();
     next === current || room2 && !room2.named && next === "" || (bot && next && await run2(actions.updateBot(bot.id, { name: next })), room2 && await run2(actions.updateRoom(room2.id, { name: next })));
-  }, subtitle = bot ? bot.role : roomSubtitle(room2, roster), tabs = bot ? globalThis.__dshDesktop ? ["details", "browser", "desktop"] : ["details", "browser"] : ["details"];
+  }, subtitle = bot ? bot.role : roomSubtitle(room2, roster), tabs = bot ? ["details", "browser", "desktop"] : ["details"];
   return [
     (0, import_react49.createElement)(import_react49.Fragment, { key: "top" }, top),
     (0, import_react49.createElement)(
@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.32.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.33.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32545,7 +32545,7 @@ function Machines({ snapshot, dispatch, busy }) {
   import_react61.default.useEffect(() => {
     if (typeof dispatch != "function") return;
     let rows2 = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked");
-    return globalThis.__dshDesktop = Object.freeze({
+    globalThis.__dshDesktop = Object.freeze({
       machines: () => rows2.map((item) => ({ machineId: item.id, rootId: item.roots?.[0]?.id ?? "", label: item.name ?? item.id })),
       view: (botId, machineId) => {
         let machine = rows2.find((item) => item.id === machineId);
@@ -32555,9 +32555,7 @@ function Machines({ snapshot, dispatch, busy }) {
         let machine = rows2.find((item) => item.id === machineId);
         return dispatch("machine.desktop.act", { botId, machineId, rootId: machine?.roots?.[0]?.id ?? "", screenshotId, action });
       }
-    }), () => {
-      delete globalThis.__dshDesktop;
-    };
+    });
   }, [dispatch, snapshot.machines]);
   let section = snapshot.machines;
   return section?.status !== "available" ? /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, dispatch && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement(DesktopControl, { snapshot, dispatch, busy }), /* @__PURE__ */ import_react61.default.createElement(MachineSetup, { snapshot, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react61.default.createElement(Tag2, null, machine.status ?? "未知")), /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react61.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react61.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react61.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装同版本 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));

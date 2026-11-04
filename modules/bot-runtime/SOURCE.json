@@ -463,8 +463,8 @@
     {
       "path": "vendor/ds-bot/src/client/details-drawer.js",
       "sourcePath": "ds-bot/src/client/details-drawer.js",
-      "sha256": "00e992020c46901c99f07e688e5ad252928e5b79ab2f9e61b447eb239572ac6d",
-      "gitBlob": "c5a3a7160cb1930b00a7f3d52c7ca88053cd9e8d"
+      "sha256": "80cacf9d614086bb343029ea1d9ef4c1a9fff658579d1ca8b926252221ba2456",
+      "gitBlob": "4a68624281deff137f0b8a8258cecbbd1d416e33"
     },
     {
       "path": "vendor/ds-bot/src/client/diagnostics.js",
