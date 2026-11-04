@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.30.9", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.30.10", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32321,9 +32321,13 @@ function MachineSetup({ snapshot, dispatch, busy }) {
     if (!(!ready || working)) {
       setWorking(!0), setError("");
       try {
-        await dispatch("machine.secret", { name: secretName, value: parsed.token });
+        let unwrap2 = (response) => {
+          if (response && response.ok === !1) throw new Error(response.error?.message ?? response.error ?? "宿主拒绝了这一步。");
+          return response;
+        };
+        await unwrap2(await dispatch("machine.secret", { name: secretName, value: parsed.token }));
         let existing = (snapshot.machines?.items ?? []).find((item) => item.id === parsed.machineId);
-        await dispatch("machine.pair", {
+        await unwrap2(await dispatch("machine.pair", {
           name: parsed.clientId || parsed.machineId,
           machineId: parsed.machineId,
           endpoint: endpoint.endpoint,
@@ -32333,7 +32337,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
           protectedTunnel: tunnel,
           tools: ["machine_ping", "fs_list", "fs_read", "fs_write", "shell_exec", "operation_status", "operation_cancel", "artifact_stat", "artifact_read", "desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"],
           expectedRevision: existing?.revision ?? 0
-        }), setStatus("已添加 " + (parsed.clientId || parsed.machineId) + "，几秒后体检会刷新状态。"), setPaste("");
+        })), setStatus("已添加 " + (parsed.clientId || parsed.machineId) + "，几秒后体检会刷新状态。"), setPaste("");
       } catch (failure) {
         setError(String(failure?.message ?? failure));
       } finally {
