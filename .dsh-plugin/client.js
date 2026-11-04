@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.30.10", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.30.11", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32309,7 +32309,7 @@ function DesktopControl({ snapshot, dispatch, busy }) {
   } }, "发送文本")));
 }
 function MachineSetup({ snapshot, dispatch, busy }) {
-  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react60.default.useState(""), [address, setAddress] = import_react60.default.useState(""), [tunnel, setTunnel] = import_react60.default.useState(!0), [status, setStatus] = import_react60.default.useState(""), [error, setError] = import_react60.default.useState(""), [working, setWorking] = import_react60.default.useState(!1), parsed = import_react60.default.useMemo(() => parsePairingPaste(paste), [paste]), endpoint = import_react60.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react60.default.useMemo(() => (parsed.secretRef || "").replace(/^ds-secret\//u, "") || secretNameFor(parsed), [parsed]), importFile = async (event) => {
+  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react60.default.useState(""), [address, setAddress] = import_react60.default.useState(""), [tunnel, setTunnel] = import_react60.default.useState(!0), [status, setStatus] = import_react60.default.useState(""), [error, setError] = import_react60.default.useState(""), [working, setWorking] = import_react60.default.useState(!1), parsed = import_react60.default.useMemo(() => parsePairingPaste(paste), [paste]), endpoint = import_react60.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react60.default.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed]), importFile = async (event) => {
     let file = event.target.files?.[0];
     if (file)
       try {
@@ -32331,7 +32331,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
           name: parsed.clientId || parsed.machineId,
           machineId: parsed.machineId,
           endpoint: endpoint.endpoint,
-          secretRef: parsed.secretRef || "ds-secret/" + secretName,
+          secretRef: "ds-secret/" + secretName,
           roots: ["project"],
           probeBotId: snapshot.bots?.[0]?.id ?? "",
           protectedTunnel: tunnel,
