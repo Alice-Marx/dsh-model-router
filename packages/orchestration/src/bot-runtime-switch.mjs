@@ -48,7 +48,7 @@ export function openRuntimeSwitch({ file, now = Date.now } = {}) {
     },
     /** Record the mode of every switched Bot without message bodies or credentials. */
     list() {
-      return Object.entries(read().bots).map(([botId, entry]) => ({ botId, mode: entry.mode, changedAt: entry.changedAt }))
+      return Object.entries(read().bots).map(([botId, entry]) => ({ botId, mode: entry.mode, changedAt: entry.changedAt, ...(entry.snapshot ? { snapshot: entry.snapshot } : {}) }))
     },
     /**
      * Move one Bot to a runtime, atomically.
@@ -56,7 +56,7 @@ export function openRuntimeSwitch({ file, now = Date.now } = {}) {
      * @param {'integration'|'independent'} mode
      * @param {{ isBusy?: (botId: string) => boolean | Promise<boolean> }} [options]
      */
-    async move(botId, mode, { isBusy } = {}) {
+    async move(botId, mode, { isBusy, snapshot = null } = {}) {
       if (!idOk(botId)) fail('INVALID_BOT_ID')
       if (!RUNTIME_MODES.includes(mode)) fail('INVALID_RUNTIME_MODE')
       const busy = typeof isBusy === 'function' ? await isBusy(botId) : false
@@ -65,7 +65,8 @@ export function openRuntimeSwitch({ file, now = Date.now } = {}) {
       const state = read()
       const current = state.bots[botId]?.mode ?? 'integration'
       if (current === mode) return { botId, mode, changed: false }
-      state.bots[botId] = { mode, changedAt: now() }
+      // A snapshot makes a move auditable afterwards: counts only, never message bodies.
+      state.bots[botId] = { mode, changedAt: now(), ...(snapshot ? { snapshot } : {}) }
       write(state)
       return { botId, mode, previous: current, changed: true }
     },
