@@ -33,8 +33,11 @@ function operationOutcome(record, tool) {
   return { value: { ...(record.result ?? {}), operationStatus: record.status, ...(record.error ? { error: record.error } : {}) }, status: record.status }
 }
 
-export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null }) {
-  const subject = exec => directory.forAgent(exec.agent)
+export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null }) {
+  // A session that is not a Bot (the operator's own agent) is otherwise refused as
+  // UNKNOWN_SUBJECT. When passthrough is enabled the Host supplies the Main Bot's subject, so the
+  // call carries that Bot's grants and audit trail instead of a second permission set.
+  const subject = exec => directory.forAgent(exec.agent) ?? (typeof operatorSubject === 'function' ? operatorSubject() : null)
   const register = (name, description, parameters, execute, output = JSON_OUTPUT) => ctx.tools.register(defineTool({ name, description, parameters, output, execute }))
   const call = async (exec, args, tool, business, identity = {}) => {
     await runtime.load()

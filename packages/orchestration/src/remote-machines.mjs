@@ -288,6 +288,21 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
       }
     },
     scopes(botId) { alive(); return db.prepare('SELECT machine_id,revision,scope FROM remote_machine_bindings WHERE bot_id=? AND revoked=0').all(botId).flatMap(r=>{try{machine(r.machine_id);return [{machineId:r.machine_id,revision:r.revision,...JSON.parse(r.scope)}]}catch{return []}}) },
+    /**
+     * A Bot's grants, straight from committed state.
+     *
+     * Grant compilation runs on every DS save, long before a machine directory is opened, so it
+     * must not depend on `scopes()` (which needs the directory alive). This reads the same rows
+     * without the availability check: what was authorised stays authorised across a restart.
+     */
+    bindingsFor(botId) {
+      alive()
+      if (typeof botId !== 'string' || !botId) return []
+      return db.prepare('SELECT machine_id, revision, scope FROM remote_machine_bindings WHERE bot_id=? AND revoked=0').all(botId).flatMap(row => {
+        try { const scope = JSON.parse(row.scope); return [{ machineId: row.machine_id, revision: row.revision, roots: scope.roots ?? [], tools: scope.tools ?? [], mode: scope.mode ?? 'read-only' }] } catch { return [] }
+      })
+    },
+
     readModel() { alive(); return {status:'available',items:db.prepare('SELECT * FROM remote_machines ORDER BY id').all().map(row=>publicMachine({...row,config:JSON.parse(row.config),health:row.health?JSON.parse(row.health):null}))} },
     close() { if(!closed){for(const call of active)call.controller.abort(new Error('MACHINE_DIRECTORY_CLOSED'));closed=true;db.close()} },
   }

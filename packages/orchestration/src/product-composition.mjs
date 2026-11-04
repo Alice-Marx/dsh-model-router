@@ -292,6 +292,20 @@ export function startBotProduct(ctx, options = {}) {
   const policy = createBotPolicy({ authority, directory, machineId, workspaceId,ownerGrant:{tools:ownerTools} })
   ctx.provide('botIntegrationPolicy', policy)
   const describeBot = subject => { try { return authority.describe(subject).botId } catch { return null } }
+  // Operator passthrough: a session that is not a Bot (the operator's own agent session) would
+  // otherwise be refused as UNKNOWN_SUBJECT by every Bot-shaped tool. When the operator turns this
+  // on, such a session acts with the Main Bot's authority — the same grants, the same audit trail
+  // — instead of being handed a second, parallel set of permissions.
+  const operatorSubject = () => {
+    const settings = config?.operatorPassthrough
+    // On by default: the operator's own session is the person who owns the machines.
+    if (settings && settings.enabled === false) return null
+    const mainId = (product?.rt.state?.mainBotIds ?? [])[0]
+    if (!mainId) return null
+    try { return directory.forBot(mainId) ?? null } catch { return null }
+  }
+  const subjectOrOperator = subject => subject ?? operatorSubject()
+  ctx.provide('operatorSubject', operatorSubject)
   // Owner task management acts on the owning Bot's own subject: the Bot's
   // committed grant authorizes the operation, never the browser session.
   const taskOwner = payload => {
@@ -339,7 +353,11 @@ export function startBotProduct(ctx, options = {}) {
     // unavailable machine directory (not yet opened, or closed after a failed
     // boot) grants no machine access instead of suspending the lifecycle.
     let scopes = [],cliOfficial=false
-    try { scopes = machines?.scopes(bot.id) ?? [] } catch { /* no machine access */ }
+    // Authorisation comes from committed state; `scopes()` only adds capabilities that are live
+    // right now. Relying on scopes() alone meant a restart granted the Main Bot no remote tools
+    // at all, because the directory is not open yet when grants compile.
+    try { scopes = machines?.bindingsFor(bot.id) ?? [] } catch { scopes = [] }
+    if (scopes.length === 0) { try { scopes = machines?.scopes(bot.id) ?? [] } catch { /* no machine access */ } }
     try { cliOfficial=botSettings?.get(bot.id,{publishChange:false}).settings?.officialTools?.some(item=>item.toolId==='codex'&&item.mode==='read-only')===true } catch {}
     for (const scope of scopes) for (const tool of scope.tools) {
       if(['operation_status','operation_cancel'].includes(tool)){grant.tools.push(`remote/${tool}`,'tool/remote_computer_operation');continue}
@@ -745,7 +763,7 @@ export function startBotProduct(ctx, options = {}) {
         authorizeRequest })
       releaseMachineSecrets=guardMachineSecrets(ctx,product.rt,machines)
       ctx.provide('botRemoteMachines', machines)
-      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend})
+      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject})
       // The MR execution paths project their routes through the same Bot
       // binding, so a consult run carries the binding price instead of an
       // unknown-cost package.
