@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { legacyPolicy, policyRequired, registerPolicyTool, registerPolicyCommand, guardLegacyTools } from './shared/legacy-policy.mjs'
@@ -38,6 +38,7 @@ import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs
 import { parseRunRequest, parseRunJobRequest } from './shared/official-tools-remote.mjs'
 import { createTerminalManager, defaultLocate } from './shared/cli-terminal.mjs'
 import { createTuiPromptRunner } from './shared/tui-executor.mjs'
+import { createPluginRuntime } from '../modules/independent-runtime/index.mjs'
 import {
   parseTerminalRead,
   parseTerminalResize,
@@ -2261,13 +2262,18 @@ function terminalServices(terminals, assertPreferences = () => {}) {
   }
 }
 
-export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences, runJobs = createRunJobs(), runOptions = {} } = {}) {
+export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences, runJobs = createRunJobs(), runOptions = {}, botRuntime = null } = {}) {
   // Terminal tools (dsh-TUI) have no headless mode: the Host types into the managed PTY and
   // returns what it rendered. Built once, reused by every call of this Host fiber.
   const tuiRunner = terminals ? createTuiPromptRunner({ terminals, locate: (name, options) => defaultLocate(name, options) }) : null
   return {
     ...terminalServices(terminals, assertPreferences),
     ...(tuiRunner ? { tuiPrompt: request => tuiRunner.run({ tool: getOfficialTool(request.tool), prompt: request.prompt }) } : {}),
+    // The independent Bot runtime is opt-in; without it these stay empty instead of pretending.
+    ...(botRuntime ? {
+      botRuntimeStatus: async () => botRuntime.list(),
+      botRuntimeMove: async request => botRuntime.move(request.botId, request.mode),
+    } : {}),
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })
       const saved = await savedState()
@@ -2353,8 +2359,19 @@ export function apply(ctx, config = {}) {
       process.once('exit', onExit)
       return () => { process.off('exit', onExit); terminals.disposeAll('dispose'); runJobs.dispose() }
     }, 'model-router-galgame: interactive terminals')
+    // Opt-in independent Bot runtime. A failure here leaves the product on the integration path
+    // instead of taking the plugin down.
+    let botRuntime = null
+    try {
+      const runtime = createPluginRuntime({
+        ctx, settings: valueOf(config, 'independentRuntime', {}) ?? {}, stateDir: dirname(routerStateStore().file),
+      })
+      if (runtime) botRuntime = { list: () => runtime.list(), move: (botId, mode) => runtime.move(botId, mode) }
+    } catch (error) {
+      ctx.logger?.('model-router: independent runtime unavailable: %s', error?.message ?? error)
+    }
     registerOfficialToolsRemote(ctx, {
-      ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences }),
+      ...routerRemoteServices(ctx, config, { terminals, runJobs, assertPreferences: assertInstallPreferences, botRuntime }),
       requireBotPolicy: () => policyRequired(config),
       installSettingsError: () => installPreferenceError,
       installRequestedDirectory: () => valueOf(config, 'toolInstallDir', ''),

@@ -18,3 +18,5 @@
 .bp-desktop-text{flex:1;min-width:200px}
 .bp-check{display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .bp-error{color:#b3261e;font-size:12px}
+
+.bp-runtime{margin:10px 0;padding:10px 12px;border:1px dashed var(--dsw-alias-border-l1,#d8dfd8);border-radius:10px}

@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.29.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.29.3", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -31365,7 +31365,15 @@ function parseRunRequest(value) {
     confirmedReasons: [...new Set(confirmed)]
   };
 }
-var terminalStartCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStart`, parseTerminalStart), terminalReadCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalRead`, parseTerminalRead), terminalWriteCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalWrite`, parseTerminalWrite), terminalResizeCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalResize`, parseTerminalResize), terminalStopCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStop`, parseTerminalStop), runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest);
+var terminalStartCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStart`, parseTerminalStart), terminalReadCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalRead`, parseTerminalRead), terminalWriteCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalWrite`, parseTerminalWrite), terminalResizeCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalResize`, parseTerminalResize), terminalStopCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStop`, parseTerminalStop), botRuntimeMoveCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeMove`, (value) => {
+  let request = plainObject2(value, "bot runtime move");
+  for (let key of Object.keys(request))
+    if (key !== "botId" && key !== "mode") throw new TypeError(`unknown field ${key} in bot runtime move`);
+  let botId = text6(request.botId);
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError("botId is invalid");
+  if (!["integration", "independent"].includes(request.mode)) throw new TypeError("mode must be integration or independent");
+  return { botId, mode: request.mode };
+}), runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest);
 function descriptor(method, parameters, result, cancellable = !1) {
   return Object.freeze({
     id: `${OFFICIAL_TOOLS_REMOTE_PACKAGE}#${OFFICIAL_TOOLS_REMOTE_NAMESPACE}/${method}`,
@@ -31400,6 +31408,9 @@ var toolIdParameter = Object.freeze({
   // Terminal tools (dsh-TUI): one prompt through the managed PTY, reply is rendered text.
   descriptor("tuiPrompt", [jsonParameter("request", tuiPromptCodec)], anyObjectCodec("TuiReply")),
   descriptor("boundaries", [], anyObjectCodec("SecurityBoundaries")),
+  // Bot runtime: which path serves each Bot, and moving one between them.
+  descriptor("botRuntimeStatus", [], anyObjectCodec("BotRuntimeStatus")),
+  descriptor("botRuntimeMove", [jsonParameter("request", botRuntimeMoveCodec)], anyObjectCodec("BotRuntimeMoved")),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview"), !0),
   descriptor("startRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunStarted")),
@@ -31811,6 +31822,8 @@ function registerUi(ctx) {
       runStatus: (request, signal) => officialToolsRemote.runStatus(request, signal),
       cancelRun: (request, signal) => officialToolsRemote.cancelRun(request, signal),
       tuiPrompt: (request) => officialToolsRemote.tuiPrompt(request),
+      botRuntimeStatus: () => officialToolsRemote.botRuntimeStatus(),
+      botRuntimeMove: (request) => officialToolsRemote.botRuntimeMove(request),
       terminalApi: Object.freeze({
         terminalInfo: () => officialToolsRemote.terminalInfo(),
         terminalStart: (request) => officialToolsRemote.terminalStart(request),
@@ -32098,9 +32111,36 @@ function Blocked({ value }) {
   return /* @__PURE__ */ import_react60.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react60.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react60.default.createElement("p", null, value?.reason ?? "尚未取得宿主状态。"), value?.nextAction && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "下一步：", value.nextAction));
 }
 var Value = ({ label, children }) => /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react60.default.createElement("dt", null, label), /* @__PURE__ */ import_react60.default.createElement("dd", null, children ?? "未配置")), Tag2 = ({ children }) => /* @__PURE__ */ import_react60.default.createElement("span", { className: "bp-tag" }, children), subscriptionText = (value) => value && typeof value == "object" ? `今日 ${value.callsToday ?? "未知"} 次 · 本月 ${value.callsMonth ?? "未知"} 次` : value ?? "见逐来源收据";
+function BotRuntimeRow({ botId, dispatch, busy }) {
+  let [state, setState] = import_react60.default.useState(null), [error, setError] = import_react60.default.useState(""), [working, setWorking] = import_react60.default.useState(!1), load = import_react60.default.useCallback(async () => {
+    if (typeof dispatch == "function")
+      try {
+        let rows2 = await dispatch("botRuntimeStatus", {}), row = Array.isArray(rows2) ? rows2.find((item) => item.botId === botId) : null;
+        setState({ runtime: row?.mode ?? "integration", changedAt: row?.changedAt ?? null }), setError("");
+      } catch (failure) {
+        setState(null), setError(String(failure?.message ?? failure));
+      }
+  }, [botId, dispatch]);
+  if (import_react60.default.useEffect(() => {
+    load();
+  }, [load]), !state && !error) return null;
+  let target = state?.runtime === "independent" ? "integration" : "independent", move = async () => {
+    setWorking(!0);
+    try {
+      await dispatch("botRuntimeMove", { botId, mode: target }), await load();
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    } finally {
+      setWorking(!1);
+    }
+  };
+  return /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || working, onClick: () => {
+    move();
+  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error));
+}
 function BotBindings({ snapshot, openSession, dispatch, busy }) {
   let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react60.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id);
-  return bots.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => /* @__PURE__ */ import_react60.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react60.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react60.default.createElement(Tag2, null, "Main"), /* @__PURE__ */ import_react60.default.createElement("small", null, item.role || item.id)))), /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: () => openSession(bot.sessionId) }, "打开私聊")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? "尚未取得宿主绑定"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "预算范围" }, binding?.budgetScope), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("h3", null, "官方工具"), binding.officialTools?.length ? /* @__PURE__ */ import_react60.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react60.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知"))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "此 Bot 没有官方工具绑定。"), /* @__PURE__ */ import_react60.default.createElement("h3", null, "有效权限"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-code" }, (binding.tools ?? binding.capabilities ?? []).join("、") || "无额外能力"), binding.blockedReason && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。"), dispatch && /* @__PURE__ */ import_react60.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy }))) : /* @__PURE__ */ import_react60.default.createElement("p", null, "还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。");
+  return bots.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => /* @__PURE__ */ import_react60.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react60.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react60.default.createElement(Tag2, null, "Main"), /* @__PURE__ */ import_react60.default.createElement("small", null, item.role || item.id)))), /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: () => openSession(bot.sessionId) }, "打开私聊")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? "尚未取得宿主绑定"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "预算范围" }, binding?.budgetScope), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("h3", null, "官方工具"), binding.officialTools?.length ? /* @__PURE__ */ import_react60.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react60.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知"))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "此 Bot 没有官方工具绑定。"), /* @__PURE__ */ import_react60.default.createElement("h3", null, "有效权限"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-code" }, (binding.tools ?? binding.capabilities ?? []).join("、") || "无额外能力"), binding.blockedReason && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。"), /* @__PURE__ */ import_react60.default.createElement(BotRuntimeRow, { botId: bot.id, dispatch, busy }), dispatch && /* @__PURE__ */ import_react60.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy }))) : /* @__PURE__ */ import_react60.default.createElement("p", null, "还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。");
 }
 function BotAttention({ snapshot, dispatch, busy, openTask }) {
   let rows2 = deriveBotAttention(snapshot);
@@ -32313,6 +32353,8 @@ var product_default = `.bp-page{height:100%;overflow:auto;box-sizing:border-box;
 .bp-desktop-text{flex:1;min-width:200px}
 .bp-check{display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .bp-error{color:#b3261e;font-size:12px}
+
+.bp-runtime{margin:10px 0;padding:10px 12px;border:1px dashed var(--dsw-alias-border-l1,#d8dfd8);border-radius:10px}
 `;
 
 // apps/integration-client/index.jsx
