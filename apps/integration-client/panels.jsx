@@ -160,6 +160,93 @@ function BotAttention({ snapshot, dispatch, busy, openTask }) {
   </section>
 }
 
+
+/**
+ * Bot routing: who should take this task, and why.
+ *
+ * The card only previews. It reads the candidate table the Host builds from committed state and
+ * asks for one decision; nothing is dispatched, no machine is bound and no money moves until a
+ * person acts on it elsewhere.
+ */
+function BotRoutingCard({ snapshot, dispatch, busy }) {
+  const [view, setView] = React.useState(null)
+  const [error, setError] = React.useState('')
+  const [text, setText] = React.useState('')
+  const [pin, setPin] = React.useState('')
+  const [machine, setMachine] = React.useState('')
+  const [decision, setDecision] = React.useState(null)
+  const [working, setWorking] = React.useState(false)
+
+  const load = React.useCallback(async () => {
+    if (typeof dispatch !== 'function') return
+    try {
+      const next = await dispatch('botRoutingInspect', {})
+      setView(next && next.ok === false ? null : next)
+      setError(next && next.ok === false ? String(next.error?.message ?? next.error) : '')
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+  }, [dispatch])
+  React.useEffect(() => { void load() }, [load])
+
+  const decide = async () => {
+    if (!text.trim() || working) return
+    setWorking(true)
+    setError('')
+    try {
+      const request = { text: text.trim(), requiresMachine: machine !== '' }
+      if (pin) request.pinnedBotId = pin
+      if (machine) request.machineId = machine
+      const next = await dispatch('botRoutingDecide', request)
+      if (next && next.ok === false) throw new Error(next.error?.message ?? next.error)
+      setDecision(next)
+    } catch (failure) {
+      setDecision(null)
+      setError(String(failure?.message ?? failure))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  if (!view) {
+    return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2></div>
+      <p className="bp-muted">{error || '正在读取候选…'}</p></article>
+  }
+  const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
+  return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2><Tag>{view.enabled ? `已开启 · ${view.preset}` : '未开启'}</Tag>
+    <button type="button" disabled={busy} onClick={() => { void load() }}>刷新候选</button></div>
+    {view.enabled ? null : <p className="bp-muted">在插件配置里加 <code>botRouting: &#123; "enabled": true, "preset": "balanced" &#125;</code> 后，主 Bot 才会按候选分配任务。</p>}
+    {view.enabled ? <div className="bp-table-wrap"><table>
+      <thead><tr><th>Bot</th><th>模型</th><th>机器</th><th>价格/百万</th><th>质量</th><th>状态</th></tr></thead>
+      <tbody>{view.candidates.map(row => <tr key={row.botId}>
+        <td>{row.name}{row.main ? <Tag>Main</Tag> : null}<small>{row.botId}</small></td>
+        <td>{row.model ? `${row.model.provider}/${row.model.model}` : <em>未绑定</em>}</td>
+        <td>{row.machineId ? (row.machineOnline ? '在线' : '未在线') : '无'}</td>
+        <td>{row.pricePerMTokUsd === null ? '未知' : `$${row.pricePerMTokUsd}`}</td>
+        <td>{row.quality === null ? '未知' : row.quality}</td>
+        <td>{row.busy ? '正忙' : '空闲'}</td>
+      </tr>)}</tbody></table></div> : null}
+    {view.enabled ? <div className="bp-form">
+      <label>任务描述<textarea rows={2} value={text} onChange={event => setText(event.target.value)} placeholder="例如：整理上周的发布记录" /></label>
+      <label>路由方式<select value={pin} onChange={event => setPin(event.target.value)}>
+        <option value="">自动路由（按预设打分）</option>
+        {view.candidates.map(row => <option key={row.botId} value={row.botId}>指定：{row.name}</option>)}
+      </select></label>
+      <label>需要远程电脑<select value={machine} onChange={event => setMachine(event.target.value)}>
+        <option value="">不需要</option>
+        {machines.map(item => <option key={item.id} value={item.id}>{item.name ?? item.id}</option>)}
+      </select></label>
+      <button type="button" disabled={busy || working || !text.trim()} onClick={() => { void decide() }}>{working ? '计算中…' : '预览路由'}</button>
+      {error && <p className="bp-error" role="alert">{error}</p>}
+    </div> : null}
+    {decision ? <div className="bp-blocked">
+      <strong>选中：{decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? '（手动指定）' : ''}` : '没有可用的 Bot'}</strong>
+      {decision.binding ? <p>将授予该 Bot：{decision.binding.mode} · {decision.binding.tools.length} 项工具（{decision.binding.tools.join('、')}）</p> : null}
+      {decision.rejected?.length ? <p>落选：{decision.rejected.map(row => `${row.botId}（${row.reason}）`).join('；')}</p> : null}
+    </div> : null}
+  </article>
+}
+
 export function Tasks({ snapshot, dispatch, busy }) {
   const section = snapshot.tasks
   const [selected, setSelected] = useState(null)
@@ -167,7 +254,7 @@ export function Tasks({ snapshot, dispatch, busy }) {
   const rows = section.items
   const task = rows.find(row => (row.taskId ?? row.id) === selected)
   const actions = snapshot.availableActions ?? []
-  return <><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map(plan=><article className="bp-card" key={plan.planId}>
+  return <><BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} /><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map(plan=><article className="bp-card" key={plan.planId}>
     <div className="bp-card-title"><h2>计划 {plan.planId}</h2><Tag>{TASK_STATES[plan.state]??plan.state}</Tag>
       {actions.includes('task.plan.cancel')&&!['succeeded','cancelled'].includes(plan.state)&&<button disabled={busy} onClick={()=>dispatch('task.plan.cancel',{botId:plan.ownerBotId,planId:plan.planId})}>停止整个计划</button>}</div>
     {plan.needsReconciliation&&<p role="status">有工作包停止尚未确认，请核对原收据；计划尚未完成停止。</p>}
