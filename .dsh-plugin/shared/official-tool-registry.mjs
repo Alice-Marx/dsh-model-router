@@ -481,7 +481,7 @@ export const OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ['uninstall', '-g', '@deepseek-harness-tui/dsh-tui'],
     probeExecutables: ['dsh-tui', 'dst'],
     probeNote: '包同时提供 dsh-tui 与 dst 两个命令，二者指向同一入口；需要 Node 22.19 或 24 以上。',
-    providerHints: [],
+    providerHints: ['deepseek'],
     installMethods: Object.freeze([
       packageManagerMethod('npm', 'npm', 'npm', '@deepseek-harness-tui/dsh-tui@latest'),
       packageManagerMethod('pnpm', 'pnpm', 'pnpm', '@deepseek-harness-tui/dsh-tui@latest'),
