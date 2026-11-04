@@ -1,3 +1,4 @@
+import { createRemoteTools } from './remote-tools.mjs'
 /**
  * Mount the independent Bot runtime as this plugin's own path.
  *
@@ -47,7 +48,9 @@ export function createPluginRuntime({ ctx, settings = {}, stateDir, integration,
 
   const providerFor = () => async ({ messages }) => collectAnswer(llm.stream({ provider, model, messages }))
   // Tools are opt-in too: without a workspace root the loop answers and calls nothing.
-  const tools = typeof settings.workspaceRoot === 'string' && settings.workspaceRoot ? createWorkspaceTools({ root: settings.workspaceRoot }) : null
+  const tools = typeof settings.remoteInvoke === 'function'
+    ? createRemoteTools({ invoke: settings.remoteInvoke, ...(Array.isArray(settings.remoteTools) ? { names: settings.remoteTools } : {}) })
+    : typeof settings.workspaceRoot === 'string' && settings.workspaceRoot ? createWorkspaceTools({ root: settings.workspaceRoot }) : null
   return createIndependentRuntime({
     dir: settings.dir ? String(settings.dir) : join(stateDir, 'independent-runtime'),
     integration: typeof integration === 'function' ? integration : async () => fail('INDEPENDENT_RUNTIME_NO_INTEGRATION'),
