@@ -18,6 +18,7 @@ import { createBudgetReservations, reservationSpending } from './shared/budget-r
 import { beginExecutionLifecycle } from './shared/execution-lifecycle.mjs'
 import { attachPlanAccounting, accountingEstimates, initialFunding, planningFundingPrices } from './shared/execution-accounting.mjs'
 import { subscriptionUsage } from './shared/subscription-usage.mjs'
+import { twoLedgers } from './shared/ledgers.mjs'
 import { applyFeedbackProfile, buildFeedbackProfile } from './shared/adaptive-feedback.mjs'
 import { buildRoutingEvidence, parseRoutingEvidenceJson } from './shared/routing-evidence.mjs'
 import { apiReasoningRequest } from './shared/reasoning-execution.mjs'
@@ -1673,6 +1674,8 @@ export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
   const saved = await routingSavedState(config)
   const spent = spending(saved.runs, undefined, saved.archivedSpending)
   const settings = budgetSettings(config)
+  const budgetValue = { ...budgetFor(config, saved, null, { checkEstimate: false }), historyVerified: saved.historyVerified !== false }
+  const subscriptionValue = { ...subscriptionUsage(saved.runs, Date.now(), saved.archivedSubscriptionUsage), historyIncomplete: saved.subscriptionUsageIncomplete === true }
   const entries = Object.values(saved.budgetReservations ?? {})
   const reserved = { ...reservationSpending(saved), activeCount: entries.filter(item => item.status === 'active').length,
     interruptedCount: entries.filter(item => item.status === 'interrupted').length }
@@ -1684,14 +1687,18 @@ export async function ledgerSummary(config = {}, { limit = 30 } = {}) {
         .map(item => ({ ...item, answer: text(item.answer).slice(0, 1_500) })),
     })),
     spent,
-    subscriptionUsage: { ...subscriptionUsage(saved.runs, Date.now(), saved.archivedSubscriptionUsage), historyIncomplete: saved.subscriptionUsageIncomplete === true },
+    subscriptionUsage: subscriptionValue,
+    // Two books: API money and subscription quota never share a total.
+    books: twoLedgers({ spending: spent, subscription: subscriptionValue, budget: budgetValue,
+      reserved: { today: reserved.today, activeCount: reserved.activeCount, interruptedCount: reserved.interruptedCount },
+      subscriptionIncomplete: saved.subscriptionUsageIncomplete === true }),
     reserved,
     reservations: entries.map(entry => ({ id: entry.id, runId: entry.runId, status: entry.status, updatedAt: entry.updatedAt,
       billing: entry.packages.every(item => item.billing === 'subscription') ? 'subscription' : entry.packages.some(item => item.billing === 'subscription') ? 'mixed' : 'api',
       unknown: entry.packages.some(item => item.billing !== 'subscription' && (item.estimatedCostUsd === null || entry.status === 'interrupted' && item.started)),
       remainingEstimateUsd: entry.packages.every(item => Number.isFinite(item.estimatedCostUsd))
         ? entry.packages.reduce((sum, item) => sum + item.estimatedCostUsd, 0) : null })),
-    budget: { ...budgetFor(config, saved, null, { checkEstimate: false }), historyVerified: saved.historyVerified !== false },
+    budget: budgetValue,
     storageAvailable: saved.storageAvailable !== false,
     storageNotice: saved.storageAvailable === false ? '执行记录存储暂不可用；下方费用与学习摘要尚未核验，不能当作零花费或没有反馈。'
       : saved.historyVerified === false ? '此前执行记录已损坏或不完整，当前摘要只包含可读记录；不能视为完整费用历史，请从备份恢复后再核验预算。' : '',

@@ -607,3 +607,48 @@ export function SecurityCard({ data, error, onRefresh }) {
     </section>
   )
 }
+
+/**
+ * The two books, side by side. They are never added: one is money, the other is quota.
+ * A quantity the Host could not learn stays "未知" here as well.
+ */
+export function TwoLedgerBooks({ books }) {
+  const api = books?.api, subscription = books?.subscription
+  if (!api || !subscription) return null
+  const money = value => (typeof value === 'number' && Number.isFinite(value) ? formatUsd(value) : '未知')
+  const calls = value => (Number.isSafeInteger(value) ? String(value) : '0')
+  const tokens = value => (Number.isSafeInteger(value) ? String(value) : '未知')
+  return <section className="mr-card mr-books" aria-label="两本账">
+    <div className="mr-card-head"><div>
+      <h2 className="mr-card-title">两本账</h2>
+      <p className="mr-card-copy">API 记钱，订阅记额度。两本账不相加：订阅调用不产生美元费用，API 调用也不消耗订阅额度。</p>
+    </div></div>
+    <div className="mr-books-grid">
+      <div className="mr-book mr-book-api">
+        <h3 className="mr-book-title">{api.label} <span className="mr-pill">USD</span></h3>
+        <dl className="mr-facts">
+          <div className="mr-value"><dt>今日已发生</dt><dd>{money(api.settled?.today)}</dd></div>
+          <div className="mr-value"><dt>本月已发生</dt><dd>{money(api.settled?.month)}</dd></div>
+          <div className="mr-value"><dt>今日预占</dt><dd>{money(api.reserved?.today)}</dd></div>
+          <div className="mr-value"><dt>预算上限（今日 / 本月）</dt><dd>{money(api.limit?.daily)} / {money(api.limit?.monthly)}</dd></div>
+        </dl>
+        {api.unknown?.today > 0 || api.unknown?.month > 0
+          ? <p className="mr-caption mr-warn-text">有 {api.unknown.today} 次（今日）/ {api.unknown.month} 次（本月）调用缺少单价或用量，费用保持未知，不能视为零。</p>
+          : null}
+        {api.budget?.exceeded ? <p className="mr-error" role="alert">{api.budget.message || '预算已超出。'}</p> : null}
+        <p className="mr-caption">不含：{api.excludes}</p>
+      </div>
+      <div className="mr-book mr-book-subscription">
+        <h3 className="mr-book-title">{subscription.label} <span className="mr-pill">次</span></h3>
+        <dl className="mr-facts">
+          <div className="mr-value"><dt>今日调用</dt><dd>{calls(subscription.today?.calls)}</dd></div>
+          <div className="mr-value"><dt>本月调用</dt><dd>{calls(subscription.month?.calls)}</dd></div>
+          <div className="mr-value"><dt>今日 token（入 / 出）</dt><dd>{tokens(subscription.today?.inputTokens)} / {tokens(subscription.today?.outputTokens)}</dd></div>
+          <div className="mr-value"><dt>本月 token（入 / 出）</dt><dd>{tokens(subscription.month?.inputTokens)} / {tokens(subscription.month?.outputTokens)}</dd></div>
+        </dl>
+        {subscription.incomplete ? <p className="mr-caption mr-warn-text">{subscription.note}</p> : <p className="mr-caption">{subscription.note}</p>}
+        <p className="mr-caption">不含：{subscription.excludes}</p>
+      </div>
+    </div>
+  </section>
+}
