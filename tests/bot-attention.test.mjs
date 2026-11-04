@@ -75,3 +75,21 @@ test('bot attention: a missing snapshot is quiet instead of throwing', () => {
   assert.deepEqual(deriveBotAttention({}), [])
   assert.deepEqual(deriveBotAttention({ tasks: { status: 'blocked' } }), [])
 })
+
+test('attention: contradictory stop evidence is a reconciliation, not a retry', () => {
+  const snapshot = {
+    bots: [{ id: 'bot-1', name: 'Chief', main: true, sessionId: 'session-1' }],
+    tasks: { status: 'available', items: [
+      // Says it never started and also that it may have applied: the only safe reading is "not proven".
+      { taskId: 't1', botId: 'bot-1', state: 'failed', title: '写文件', result: { remote: { status: 'failed', notStarted: true, possiblyApplied: true } } },
+      // Genuinely never started: nothing to reconcile.
+      { taskId: 't2', botId: 'bot-1', state: 'failed', title: '读文件', result: { remote: { status: 'failed', notStarted: true } } },
+    ] },
+  }
+  const rows = deriveBotAttention(snapshot)
+  const first = rows.find(row => row.taskId === 't1')
+  assert.equal(first.stage, 'remote-unknown')
+  assert.equal(first.action, 'reconcile')
+  const second = rows.find(row => row.taskId === 't2')
+  assert.equal(second.action, 'retry')
+})

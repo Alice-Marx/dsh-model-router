@@ -108,7 +108,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
   </div>
 }
 
-function BotBindings({ snapshot, openSession, dispatch, busy }) {
+export function BotBindings({ snapshot, openSession, dispatch, busy }) {
   const bots = snapshot.bots ?? []
   const [selected, setSelected] = useState(bots[0]?.id ?? '')
   const bot = bots.find(row => row.id === selected) ?? bots[0]

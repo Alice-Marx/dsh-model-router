@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.51.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.52.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32118,7 +32118,7 @@ var BOT_ATTENTION_STAGES = Object.freeze(["reconcile", "approve", "remote-unknow
 };
 function remoteUncertain(row) {
   let remote = row?.result?.remote;
-  return !remote || typeof remote != "object" || remote.notStarted === !0 ? !1 : remote.stopConfirmed !== !0 && TERMINAL.has(row.state);
+  return !remote || typeof remote != "object" || remote.notStarted === !0 && remote.possiblyApplied !== !0 || remote.stopConfirmed === !0 ? !1 : TERMINAL.has(row.state);
 }
 function deriveBotAttention(snapshot, { limit = 6 } = {}) {
   let tasks = Array.isArray(snapshot?.tasks?.items) ? snapshot.tasks.items : [], bots = Array.isArray(snapshot?.bots) ? snapshot.bots : [], nameOf = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId ?? "未取得归属", rows2 = [], add = (stage, key, title, detail, action, extra = {}) => {

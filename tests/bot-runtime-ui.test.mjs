@@ -205,8 +205,11 @@ test('bot product UI: machine grants, controlled read and revoke use the selecte
     snapshot.availableActions=['machine.secret','machine.pair','machine.bind','machine.probe','machine.revoke']
     snapshot.machines={status:'available',items:[{id:'machine-fixture',revision:4,name:'Machine fixture',status:'online',roots:['project'],tools:['machine_ping','fs_list','fs_read'],bindings:[{botId:'bot-main',revision:3,revoked:false,roots:['project'],tools:['machine_ping','fs_read']}]}]}
     await act(async()=>root.render(React.createElement(Machines,{snapshot,busy:false,dispatch:async(action,payload)=>{calls.push({action,payload})}})))
-    const secret=container.querySelector('input[aria-label="远程配对凭据"]')
-    assert.equal(secret.type,'password');assert.equal(secret.autocomplete,'new-password');assert.equal(secret.value,'')
+    // Pairing moved to an imported file: there is no secret input in the panel any more, and the
+    // values that used to be typed by hand now come from the file the Agent printed.
+    const pairingFile=container.querySelector('input[type=file]')
+    assert.ok(pairingFile,'the pairing form imports a file')
+    assert.equal(container.querySelector('input[aria-label="远程配对凭据"]'),null,'no hand-typed credential remains')
     await click([...container.querySelectorAll('button')].find(button=>button.textContent==='保存此 Bot 的机器授权'))
     assert.deepEqual(calls[0],{action:'machine.bind',payload:{machineId:'machine-fixture',botId:'bot-main',roots:['project'],tools:['machine_ping','fs_list','fs_read'],mode:'read-only',expectedRevision:3}})
     await click([...container.querySelectorAll('button')].find(button=>button.textContent==='检查 Agent 在线状态'))
