@@ -121,6 +121,9 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
 
   completeOnboarding() { return settled(() => (this.services.completeOnboarding ?? unavailable)()) }
 
+  /** Type one prompt into a terminal tool (dsh-TUI) and return its rendered reply. */
+  tuiPrompt(request) { return settled(() => (this.services.tuiPrompt ?? unavailable)(request)) }
+
   /** Recent runs, spending, budget status and learned route biases. */
   ledger() { return settled(() => (this.services.ledger ?? unavailable)()) }
 

@@ -35,7 +35,8 @@ import { parsePackageAssignments, packagePlanKey } from './shared/package-assign
 import { applyModelProfiles, parseModelProfilesJson } from './shared/model-profiles.mjs'
 import { registerOfficialToolsRemote } from './official-tools-remote-service.mjs'
 import { parseRunRequest, parseRunJobRequest } from './shared/official-tools-remote.mjs'
-import { createTerminalManager } from './shared/cli-terminal.mjs'
+import { createTerminalManager, defaultLocate } from './shared/cli-terminal.mjs'
+import { createTuiPromptRunner } from './shared/tui-executor.mjs'
 import {
   parseTerminalRead,
   parseTerminalResize,
@@ -2223,8 +2224,12 @@ function terminalServices(terminals, assertPreferences = () => {}) {
 }
 
 export function routerRemoteServices(ctx, config, { terminals = null, assertPreferences, runJobs = createRunJobs(), runOptions = {} } = {}) {
+  // Terminal tools (dsh-TUI) have no headless mode: the Host types into the managed PTY and
+  // returns what it rendered. Built once, reused by every call of this Host fiber.
+  const tuiRunner = terminals ? createTuiPromptRunner({ terminals, locate: (name, options) => defaultLocate(name, options) }) : null
   return {
     ...terminalServices(terminals, assertPreferences),
+    ...(tuiRunner ? { tuiPrompt: request => tuiRunner.run({ tool: getOfficialTool(request.tool), prompt: request.prompt }) } : {}),
     health: async fresh => {
       const report = await toolHealthReport({ fresh: fresh === true })
       const saved = await savedState()

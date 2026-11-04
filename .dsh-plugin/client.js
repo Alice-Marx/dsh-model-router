@@ -17748,6 +17748,8 @@ var OFFICIAL_TOOLS = Object.freeze([
     uninstallArgs: ["uninstall", "-g", "@deepseek-harness-tui/dsh-tui"],
     probeExecutables: ["dsh-tui", "dst"],
     probeNote: "包同时提供 dsh-tui 与 dst 两个命令，二者指向同一入口；需要 Node 22.19 或 24 以上。",
+    // No headless mode: the Host drives it through the managed terminal instead.
+    tuiPrompt: !0,
     providerHints: ["deepseek"],
     installMethods: Object.freeze([
       packageManagerMethod("npm", "npm", "npm", "@deepseek-harness-tui/dsh-tui@latest"),
@@ -19271,7 +19273,7 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
 }
 
 // .dsh-plugin/shared/harness-plan.mjs
-var clean2 = (value) => typeof value == "string" ? value.trim() : "", HEADLESS_TOOL_IDS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]);
+var clean2 = (value) => typeof value == "string" ? value.trim() : "", HEADLESS_TOOL_IDS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini"]), TUI_TOOL_IDS = /* @__PURE__ */ new Set(["dsh-tui"]);
 function channelForProvider(provider, installedToolIds = [], runnableToolIds = [], route2 = null, loggedOutToolIds = []) {
   let preference = normalizeExecutionPreference(route2?.execution), tool = toolForProvider(provider);
   if (preference === "api")
@@ -19293,13 +19295,13 @@ function channelForProvider(provider, installedToolIds = [], runnableToolIds = [
       loginRequired: !0,
       detail: `${tool.label} 已安装但未登录（开箱体检结果）；实际调用直接使用模型目录 API，不等待 CLI 失败。`
     };
-  let runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id), headless = installed && HEADLESS_TOOL_IDS.has(tool.id);
-  return runnable || headless ? {
+  let runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id), headless = installed && HEADLESS_TOOL_IDS.has(tool.id), tui = installed && TUI_TOOL_IDS.has(tool.id);
+  return runnable || headless || tui ? {
     kind: "official-cli",
     preference,
     tool: tool.id,
     label: tool.label,
-    detail: tool.id === "zcode" ? "独立 ZCode CLI 已安装，插件可调用其编程代理；其 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。" : headless && !runnable ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。` : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。`
+    detail: tui ? `${tool.label} 已安装：工作台通过受管终端（PTY）把提示词输入它并取回终端文本，不是无头协议输出。` : tool.id === "zcode" ? "独立 ZCode CLI 已安装，插件可调用其编程代理；其 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。" : headless && !runnable ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。` : `${tool.label} 已安装，插件可托管调用其官方 CLI；Harness 模型目录与厂商 CLI 名称可能不同，团队无法确认映射时使用 CLI 默认模型，实际模型仍须核对运行记录。`
   } : {
     kind: "harness-llm",
     preference,
@@ -29616,7 +29618,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.0-preview.9", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.26.0-preview.10", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -30375,6 +30377,11 @@ var router_main_default = `.mr-workspace {
   .mr-meters { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .mr-workspace { scroll-behavior: auto; } }
+
+.mr-tui-prompt{display:grid;gap:6px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--mr-line,#d8ded6)}
+.mr-tui-input{width:100%;box-sizing:border-box;border:1px solid var(--mr-line,#d8ded6);border-radius:8px;padding:8px 10px;font:inherit;color:inherit;background:var(--mr-bg,#fff);resize:vertical}
+.mr-tui-actions{display:flex;align-items:center;gap:10px}
+.mr-tui-reply{margin:0;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--mr-soft,#f4f6f2);border-radius:8px;padding:10px;font:12px/1.6 ui-monospace,monospace}
 `;
 
 // .dsh-plugin/client/router-main.jsx
@@ -30723,7 +30730,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
         removable: !(summary?.uninstallError ?? (summary?.uninstallCommand ? "" : summary?.error))
       }
     }), verified = !!probe && job?.status === "succeeded" && (job.operation === "uninstall" ? job.postInstallProbe?.installed === !1 : job.postInstallProbe?.installed === !0), operation = job?.operation === "uninstall" ? "卸载" : job?.operation === "repair" ? "修复" : "安装", status = running ? job.cancelRequested ? `正在取消${operation}…` : `${operation}中…` : job?.status === "cancelled" ? `${operation}已取消，请重新检测` : verified ? `${operation}成功并验证` : probe ? probeLabel(probe) : "所选安装目标尚未体检";
-    return /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " · ", tool.id), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` · ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react57.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.headlessAdapter ? "只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。" : readiness?.ready ? `执行入口已核验：${readyModes.includes("read-only") ? "支持只读任务" : "不支持只读任务"}；${readyModes.includes("workspace-write") ? "支持可编辑隔离工作区任务（需审批）" : "不支持可编辑任务"}。实际调用还需当前会话权限、账号与模型可用。` : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || "执行入口尚未核验。"}`), command ? /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "安装方式：", methods.find((method) => method.id === summary?.methodId)?.label ?? tool.manager, " · 实际安装目录：", probe?.installDir || summary?.installDir || "各厂商默认目录"), /* @__PURE__ */ import_react57.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 安装命令` }, command), updateCommand !== command && /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "更新沿用原安装位置：", summary?.updateInstallDir || "各厂商默认目录"), /* @__PURE__ */ import_react57.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 更新命令` }, updateCommand))) : /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react57.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react57.default.createElement("summary", null, "安装日志"), /* @__PURE__ */ import_react57.default.createElement("pre", null, job.outputTail.slice(-6).join(`
+    return /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool", role: "listitem", key: tool.id }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-info" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-name", title: tool.purpose }, tool.label), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-route-provider" }, tool.vendor, " · ", tool.id), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-status", role: "status" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: `mr-tool-dot ${running ? "running" : probe?.installed ? "installed" : "missing"}` }), status, probe?.installed && probe.version ? ` · ${probe.version}` : "", healthById[tool.id]?.latestVersion ? ` · 最新 ${healthById[tool.id].latestVersion}` : ""), /* @__PURE__ */ import_react57.default.createElement(ToolLoginLine, { entry: healthById[tool.id] }), probe?.installed && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, tool.headlessAdapter ? "只读路由任务可尝试官方无界面 CLI；API 回退按计费与失败处理设置执行。此工具未支持官方隔离工作区团队入口。" : readiness?.ready ? `执行入口已核验：${readyModes.includes("read-only") ? "支持只读任务" : "不支持只读任务"}；${readyModes.includes("workspace-write") ? "支持可编辑隔离工作区任务（需审批）" : "不支持可编辑任务"}。实际调用还需当前会话权限、账号与模型可用。` : `已安装，但当前不可托管执行：${readiness?.reason || capability?.reason || "执行入口尚未核验。"}`), command ? /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "安装方式：", methods.find((method) => method.id === summary?.methodId)?.label ?? tool.manager, " · 实际安装目录：", probe?.installDir || summary?.installDir || "各厂商默认目录"), /* @__PURE__ */ import_react57.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 安装命令` }, command), updateCommand !== command && /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, "更新沿用原安装位置：", summary?.updateInstallDir || "各厂商默认目录"), /* @__PURE__ */ import_react57.default.createElement("code", { className: "mr-tool-command", "aria-label": `${tool.label} 更新命令` }, updateCommand))) : /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption", style: { margin: "6px 0 0" } }, summary?.error ?? tool.unsupportedReason), (summary?.notices ?? []).map((notice) => /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail", key: notice }, notice)), probe?.detail && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-tool-detail" }, probe.detail), tool.tuiPrompt === !0 && tuiPrompt ? /* @__PURE__ */ import_react57.default.createElement(TuiPromptBox, { tool, tuiPrompt }) : null, (rowErrors[tool.id] || job?.error) && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error mr-tool-error", role: "alert" }, rowErrors[tool.id] || job.error), Array.isArray(job?.outputTail) && job.outputTail.length > 0 && /* @__PURE__ */ import_react57.default.createElement("details", { className: "mr-tool-log" }, /* @__PURE__ */ import_react57.default.createElement("summary", null, "安装日志"), /* @__PURE__ */ import_react57.default.createElement("pre", null, job.outputTail.slice(-6).join(`
 `)))), (command || methods.length > 0) && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-actions" }, methods.length > 0 && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tool-methods" }, /* @__PURE__ */ import_react57.default.createElement("label", null, /* @__PURE__ */ import_react57.default.createElement("span", null, "安装方式"), /* @__PURE__ */ import_react57.default.createElement(
       "select",
       {
@@ -30850,7 +30857,36 @@ ${reasons.map((entry, index) => `${index + 1}. ${entry.text}`).join(`
     refreshHealth(!1), refreshLedger(), refreshBoundaries();
   }, []), { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun };
 }
-function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi }) {
+function TuiPromptBox({ tool, tuiPrompt: tuiPrompt2 }) {
+  let [prompt, setPrompt] = import_react57.default.useState(""), [reply, setReply] = import_react57.default.useState(null), [busy, setBusy] = import_react57.default.useState(!1), send = async () => {
+    if (!(busy || prompt.trim() === "")) {
+      setBusy(!0), setReply(null);
+      try {
+        let result = await tuiPrompt2({ tool: tool.id, prompt });
+        result?.ok === !1 ? setReply({ error: result.error ?? "运行失败" }) : setReply({ text: result?.value?.text ?? "", durationMs: result?.value?.durationMs ?? null });
+      } catch (error) {
+        setReply({ error: String(error?.message ?? error) });
+      } finally {
+        setBusy(!1);
+      }
+    }
+  };
+  return /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tui-prompt" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-caption", htmlFor: `mr-tui-${tool.id}` }, "向 ", tool.label, " 输入提示词（经受管终端执行，回复为终端文本）"), /* @__PURE__ */ import_react57.default.createElement(
+    "textarea",
+    {
+      id: `mr-tui-${tool.id}`,
+      className: "mr-tui-input",
+      rows: 3,
+      value: prompt,
+      disabled: busy,
+      placeholder: "例如：用一句话说明你当前使用的模型与会话",
+      onChange: (event) => setPrompt(event.target.value)
+    }
+  ), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-tui-actions" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-tool-button", type: "button", disabled: busy || prompt.trim() === "", onClick: () => {
+    send();
+  } }, busy ? "运行中…" : "发送"), reply?.durationMs != null && /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-caption" }, "耗时 ", Math.round(reply.durationMs / 1e3), " 秒")), reply?.error && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, reply.error), reply?.text && /* @__PURE__ */ import_react57.default.createElement("pre", { className: "mr-tui-reply", "aria-label": `${tool.label} 回复` }, reply.text));
+}
+function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt: tuiPrompt2 }) {
   let workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }), [catalogState, setCatalogState] = import_react57.default.useState({ status: "loading", catalog: null, error: "" }), [task, setTask] = import_react57.default.useState(""), [mode, setMode] = import_react57.default.useState("single"), [directKey, setDirectKey] = import_react57.default.useState(""), [budget, setBudget] = import_react57.default.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)), [query, setQuery] = import_react57.default.useState(""), [plan, setPlan] = import_react57.default.useState(null), [assignmentMode, setAssignmentMode] = import_react57.default.useState("algorithm"), [packageAssignments, setPackageAssignments] = import_react57.default.useState({}), [planError, setPlanError] = import_react57.default.useState(""), [toolProbes, setToolProbes] = import_react57.default.useState(null), [routingSettings, setRoutingSettings] = import_react57.default.useState(() => {
     let value = settingsScope.getSnapshot().value ?? {};
     return routingSettingsSignature(value);
@@ -31092,7 +31128,16 @@ var toolIdCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolId`,
   if (typeof value != "string" || !getOfficialTool(value))
     throw new TypeError("toolId must name a fixed official tool");
   return value;
-}), MAX_METHOD_ID_CHARS = 40, text6 = (value) => typeof value == "string" ? value.trim() : "", toolActionCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolAction`, (value) => {
+}), MAX_METHOD_ID_CHARS = 40, text6 = (value) => typeof value == "string" ? value.trim() : "", tuiPromptCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TuiPrompt`, (value) => {
+  let request = plainObject2(value, "tui prompt request");
+  for (let key of Object.keys(request))
+    if (key !== "tool" && key !== "prompt") throw new TypeError(`unknown field ${key} in tui prompt request`);
+  let tool = request.tool === void 0 ? "dsh-tui" : text6(request.tool), entry = getOfficialTool(tool);
+  if (!entry || entry.tuiPrompt !== !0) throw new TypeError("tool must name a registry tool that runs in a terminal");
+  let prompt = typeof request.prompt == "string" ? request.prompt : "";
+  if (prompt.trim() === "" || prompt.length > 8e3) throw new TypeError("prompt must be 1..8000 characters");
+  return { tool: entry.id, prompt };
+}), toolActionCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolAction`, (value) => {
   let request = plainObject2(value, "tool action request");
   for (let key of Object.keys(request))
     if (key !== "tool" && key !== "method") throw new TypeError(`unknown field ${key} in tool action request`);
@@ -31237,6 +31282,8 @@ var toolIdParameter = Object.freeze({
   descriptor("ledger", [], anyObjectCodec("RunLedger")),
   descriptor("rateResult", [jsonParameter("request", rateRequestCodec)], anyObjectCodec("RateResult")),
   descriptor("rerunStep", [jsonParameter("request", rerunRequestCodec)], anyObjectCodec("RerunResult")),
+  // Terminal tools (dsh-TUI): one prompt through the managed PTY, reply is rendered text.
+  descriptor("tuiPrompt", [jsonParameter("request", tuiPromptCodec)], anyObjectCodec("TuiReply")),
   descriptor("boundaries", [], anyObjectCodec("SecurityBoundaries")),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor("previewRun", [jsonParameter("request", runRequestCodec)], anyObjectCodec("RunPreview"), !0),
@@ -31648,6 +31695,7 @@ function registerUi(ctx) {
       startRun: (request) => officialToolsRemote.startRun(request),
       runStatus: (request, signal) => officialToolsRemote.runStatus(request, signal),
       cancelRun: (request, signal) => officialToolsRemote.cancelRun(request, signal),
+      tuiPrompt: (request) => officialToolsRemote.tuiPrompt(request),
       terminalApi: Object.freeze({
         terminalInfo: () => officialToolsRemote.terminalInfo(),
         terminalStart: (request) => officialToolsRemote.terminalStart(request),

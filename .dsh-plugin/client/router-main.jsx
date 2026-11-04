@@ -671,6 +671,7 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
                     : <p className="mr-caption" style={{ margin: '6px 0 0' }}>{summary?.error ?? tool.unsupportedReason}</p>}
                   {(summary?.notices ?? []).map(notice => <p className="mr-caption mr-tool-detail" key={notice}>{notice}</p>)}
                   {probe?.detail && <p className="mr-caption mr-tool-detail">{probe.detail}</p>}
+                  {tool.tuiPrompt === true && tuiPrompt ? <TuiPromptBox tool={tool} tuiPrompt={tuiPrompt} /> : null}
                   {(rowErrors[tool.id] || job?.error) && <p className="mr-error mr-tool-error" role="alert">{rowErrors[tool.id] || job.error}</p>}
                   {Array.isArray(job?.outputTail) && job.outputTail.length > 0 && (
                     <details className="mr-tool-log"><summary>安装日志</summary><pre>{job.outputTail.slice(-6).join('\n')}</pre></details>
@@ -839,7 +840,52 @@ function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResu
   return { health, ledger, boundaries, busy, refreshHealth, refreshLedger, refreshBoundaries, finishOnboarding, rate, rerun }
 }
 
-export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi }) {
+/**
+ * Send one prompt to a terminal tool (dsh-TUI) and show what it rendered.
+ * The Host types into a managed PTY, so the reply is terminal text, not a model answer with a
+ * protocol shape; failures are reported as they are instead of being rephrased as model output.
+ */
+function TuiPromptBox({ tool, tuiPrompt }) {
+  const [prompt, setPrompt] = React.useState('')
+  const [reply, setReply] = React.useState(null)
+  const [busy, setBusy] = React.useState(false)
+  const send = async () => {
+    if (busy || prompt.trim() === '') return
+    setBusy(true)
+    setReply(null)
+    try {
+      const result = await tuiPrompt({ tool: tool.id, prompt })
+      if (result?.ok === false) setReply({ error: result.error ?? '运行失败' })
+      else setReply({ text: result?.value?.text ?? '', durationMs: result?.value?.durationMs ?? null })
+    } catch (error) {
+      setReply({ error: String(error?.message ?? error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+  return <div className="mr-tui-prompt">
+    <label className="mr-caption" htmlFor={`mr-tui-${tool.id}`}>向 {tool.label} 输入提示词（经受管终端执行，回复为终端文本）</label>
+    <textarea
+      id={`mr-tui-${tool.id}`}
+      className="mr-tui-input"
+      rows={3}
+      value={prompt}
+      disabled={busy}
+      placeholder="例如：用一句话说明你当前使用的模型与会话"
+      onChange={event => setPrompt(event.target.value)}
+    />
+    <div className="mr-tui-actions">
+      <button className="mr-button mr-tool-button" type="button" disabled={busy || prompt.trim() === ''} onClick={() => { void send() }}>
+        {busy ? '运行中…' : '发送'}
+      </button>
+      {reply?.durationMs != null && <span className="mr-caption">耗时 {Math.round(reply.durationMs / 1000)} 秒</span>}
+    </div>
+    {reply?.error && <p className="mr-error" role="alert">{reply.error}</p>}
+    {reply?.text && <pre className="mr-tui-reply" aria-label={`${tool.label} 回复`}>{reply.text}</pre>}
+  </div>
+}
+
+export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
   const [task, setTask] = React.useState('')

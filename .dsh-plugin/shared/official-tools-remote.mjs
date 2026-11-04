@@ -47,6 +47,23 @@ const text = value => (typeof value === 'string' ? value.trim() : '')
  * call, so a compromised client cannot redirect an install at a package or URL
  * of its choosing.
  */
+/**
+ * One prompt typed into a TUI registry tool. The tool must declare `tuiPrompt`; the Host owns
+ * the executable, the terminal, the timeout and the capture, so only the words travel here.
+ */
+const tuiPromptCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TuiPrompt`, value => {
+  const request = plainObject(value, 'tui prompt request')
+  for (const key of Object.keys(request)) {
+    if (key !== 'tool' && key !== 'prompt') throw new TypeError(`unknown field ${key} in tui prompt request`)
+  }
+  const tool = request.tool === undefined ? 'dsh-tui' : text(request.tool)
+  const entry = getOfficialTool(tool)
+  if (!entry || entry.tuiPrompt !== true) throw new TypeError('tool must name a registry tool that runs in a terminal')
+  const prompt = typeof request.prompt === 'string' ? request.prompt : ''
+  if (prompt.trim() === '' || prompt.length > 8000) throw new TypeError('prompt must be 1..8000 characters')
+  return { tool: entry.id, prompt }
+})
+
 const toolActionCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#OfficialToolAction`, value => {
   const request = plainObject(value, 'tool action request')
   // Closed shape: an unknown key is refused rather than ignored, so a client
@@ -237,6 +254,8 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('ledger', [], anyObjectCodec('RunLedger')),
   descriptor('rateResult', [jsonParameter('request', rateRequestCodec)], anyObjectCodec('RateResult')),
   descriptor('rerunStep', [jsonParameter('request', rerunRequestCodec)], anyObjectCodec('RerunResult')),
+  // Terminal tools (dsh-TUI): one prompt through the managed PTY, reply is rendered text.
+  descriptor('tuiPrompt', [jsonParameter('request', tuiPromptCodec)], anyObjectCodec('TuiReply')),
   descriptor('boundaries', [], anyObjectCodec('SecurityBoundaries')),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview'), true),
