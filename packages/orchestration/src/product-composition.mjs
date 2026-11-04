@@ -750,6 +750,18 @@ export function startBotProduct(ctx, options = {}) {
                 subscriptionSummary: { callsToday: subscription.today.calls, callsMonth: subscription.month.calls, usdToday: totals.subscriptionToday, usdMonth: totals.subscriptionMonth } } }
           } } : {}) },
         actions: { ...actions, ...machineActions,
+          // The workbench reads Bot routing through the same product channel as every other panel
+          // action. Registering it here is what makes the routing card work at runtime; the owner
+          // RPC methods are a second door onto the same service.
+          'botRoutingInspect': async () => botRouting.inspect(),
+          'botRoutingDecide': async payload => botRouting.decide({
+            text: payload?.text,
+            pinnedBotId: payload?.pinnedBotId ?? '',
+            requiresMachine: payload?.requiresMachine === true,
+            machineId: payload?.machineId ?? '',
+            requiredTools: Array.isArray(payload?.requiredTools) ? payload.requiredTools : [],
+            requesterBotId: typeof payload?.requesterBotId === 'string' ? payload.requesterBotId : '',
+          }),
           ...(botSettings ? { 'binding.save': async (payload, context) => {
             // A Bot holds its greeting until its model is picked, and the model change releases it
             // immediately. Saving a binding changes both the model and its authority, so hold the
