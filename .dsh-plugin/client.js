@@ -29691,7 +29691,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.5", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.26.6", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -31902,6 +31902,96 @@ var TASK_STATES = Object.freeze({
 // apps/integration-client/panels.jsx
 var import_react60 = __toESM(require("react"), 1);
 
+// apps/integration-client/bot-attention.mjs
+var BOT_ATTENTION_STAGES = Object.freeze(["reconcile", "approve", "remote-unknown", "budget", "failed", "blocked"]), STAGE_ORDER2 = new Map(BOT_ATTENTION_STAGES.map((stage, index) => [stage, index])), TERMINAL = /* @__PURE__ */ new Set(["cancelled", "succeeded", "failed", "skipped"]), short2 = (value, limit = 80) => {
+  let text7 = String(value ?? "").replace(/\s+/g, " ").trim();
+  return text7.length > limit ? `${text7.slice(0, limit - 1)}…` : text7;
+};
+function remoteUncertain(row) {
+  let remote = row?.result?.remote;
+  return !remote || typeof remote != "object" || remote.notStarted === !0 ? !1 : remote.stopConfirmed !== !0 && TERMINAL.has(row.state);
+}
+function deriveBotAttention(snapshot, { limit = 6 } = {}) {
+  let tasks = Array.isArray(snapshot?.tasks?.items) ? snapshot.tasks.items : [], bots = Array.isArray(snapshot?.bots) ? snapshot.bots : [], nameOf = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId ?? "未取得归属", rows2 = [], add = (stage, key, title, detail, action, extra = {}) => {
+    rows2.push({ key, stage, title, detail: short2(detail, 160), action, ...extra });
+  };
+  for (let task of tasks) {
+    let id2 = task?.taskId ?? task?.id;
+    if (!id2) continue;
+    let bot = nameOf(task.botId), title = short2(task.title ?? task.input?.task ?? id2, 50);
+    if (task.state === "needs-reconciliation") {
+      add(
+        "reconcile",
+        `reconcile:${id2}`,
+        `${bot} 的执行需要核对收据：${title}`,
+        "原操作结果未知。核对厂商与远端记录后再决定是否重试；不会自动重发。",
+        "reconcile",
+        { botId: task.botId, taskId: id2 }
+      );
+      continue;
+    }
+    if (task.state === "waiting-approval") {
+      add(
+        "approve",
+        `approve:${id2}`,
+        `${bot} 等待审批：${title}`,
+        task.blockedReason || "此任务需要你批准后才能继续。",
+        "approve",
+        { botId: task.botId, taskId: id2 }
+      );
+      continue;
+    }
+    if (task.state === "waiting-budget" || task.state === "admitting") {
+      add(
+        "budget",
+        `budget:${id2}`,
+        `${bot} 等待预算：${title}`,
+        task.blockedReason || "预算或资金准入未通过，任务已停在启动前。",
+        "budget",
+        { botId: task.botId, taskId: id2 }
+      );
+      continue;
+    }
+    if (remoteUncertain(task)) {
+      add(
+        "remote-unknown",
+        `remote:${id2}`,
+        `${bot} 的远程操作结果未确认：${title}`,
+        "停止或写入没有确认回执，文件可能已经改变。先核对原操作，再决定是否重试。",
+        "reconcile",
+        { botId: task.botId, taskId: id2 }
+      );
+      continue;
+    }
+    if (task.state === "failed") {
+      add(
+        "failed",
+        `failed:${id2}`,
+        `${bot} 的任务失败：${title}`,
+        task.blockedReason || task.error || "打开任务详情查看每一步的结果，确认后再重试。",
+        "retry",
+        { botId: task.botId, taskId: id2 }
+      );
+      continue;
+    }
+    task.state === "blocked" && add(
+      "blocked",
+      `blocked:${id2}`,
+      `${bot} 的任务受阻：${title}`,
+      task.blockedReason || "依赖未满足，任务停在这里等人处理。",
+      "open",
+      { botId: task.botId, taskId: id2 }
+    );
+  }
+  return rows2.sort((left, right) => (STAGE_ORDER2.get(left.stage) ?? BOT_ATTENTION_STAGES.length) - (STAGE_ORDER2.get(right.stage) ?? BOT_ATTENTION_STAGES.length)).slice(0, Math.max(1, limit));
+}
+function botAttentionSummary(rows2 = []) {
+  let count = Array.isArray(rows2) ? rows2.length : 0;
+  if (count === 0) return "";
+  let urgent = rows2.filter((row) => row.stage === "reconcile" || row.stage === "approve").length;
+  return urgent > 0 ? `${count} 项需要你处理（${urgent} 项卡在确认上）` : `${count} 项需要你处理`;
+}
+
 // apps/integration-client/binding-editor.jsx
 var import_react59 = __toESM(require("react"), 1);
 var route = (model) => model ? `${model.provider}/${model.model}` : "", workspace = (ref) => ref ? `${ref.machineId}/${ref.rootId}` : "";
@@ -31991,11 +32081,19 @@ function BotBindings({ snapshot, openSession, dispatch, busy }) {
   let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react60.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id);
   return bots.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => /* @__PURE__ */ import_react60.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react60.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react60.default.createElement(Tag2, null, "Main"), /* @__PURE__ */ import_react60.default.createElement("small", null, item.role || item.id)))), /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: () => openSession(bot.sessionId) }, "打开私聊")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? "尚未取得宿主绑定"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "预算范围" }, binding?.budgetScope), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement("h3", null, "官方工具"), binding.officialTools?.length ? /* @__PURE__ */ import_react60.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react60.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知"))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "此 Bot 没有官方工具绑定。"), /* @__PURE__ */ import_react60.default.createElement("h3", null, "有效权限"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-code" }, (binding.tools ?? binding.capabilities ?? []).join("、") || "无额外能力"), binding.blockedReason && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。"), dispatch && /* @__PURE__ */ import_react60.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy }))) : /* @__PURE__ */ import_react60.default.createElement("p", null, "还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。");
 }
+function BotAttention({ snapshot, dispatch, busy, openTask }) {
+  let rows2 = deriveBotAttention(snapshot);
+  if (rows2.length === 0) return null;
+  let actions = snapshot?.availableActions ?? [], run2 = (row, action, payload) => {
+    !dispatch || busy || !actions.includes(action) || dispatch(action, { botId: row.botId, taskId: row.taskId, requestKey: crypto.randomUUID(), ...payload });
+  };
+  return /* @__PURE__ */ import_react60.default.createElement("section", { className: "bp-card bp-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "需要你处理"), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, botAttentionSummary(rows2))), /* @__PURE__ */ import_react60.default.createElement("ul", { className: "bp-attention-list" }, rows2.map((row) => /* @__PURE__ */ import_react60.default.createElement("li", { key: row.key, className: `bp-attention-row bp-attention-${row.stage}` }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, row.detail)), row.action === "reconcile" && actions.includes("task.reconcile") && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => run2(row, "task.reconcile") }, "核对原收据"), row.action === "retry" && actions.includes("task.retry") && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => run2(row, "task.retry") }, "重试"), row.action !== "reconcile" && row.action !== "retry" && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => openTask(row.taskId) }, "打开任务")))));
+}
 function Tasks({ snapshot, dispatch, busy }) {
   let section = snapshot.tasks, [selected, setSelected] = (0, import_react60.useState)(null);
   if (section?.status !== "available") return /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section });
   let rows2 = section.items, task = rows2.find((row) => (row.taskId ?? row.id) === selected), actions = snapshot.availableActions ?? [];
-  return /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, section.plans?.map((plan) => /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card", key: plan.planId }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "计划 ", plan.planId), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, TASK_STATES[plan.state] ?? plan.state), actions.includes("task.plan.cancel") && !["succeeded", "cancelled"].includes(plan.state) && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.plan.cancel", { botId: plan.ownerBotId, planId: plan.planId }) }, "停止整个计划")), plan.needsReconciliation && /* @__PURE__ */ import_react60.default.createElement("p", { role: "status" }, "有工作包停止尚未确认，请核对原收据；计划尚未完成停止。"), /* @__PURE__ */ import_react60.default.createElement("ul", null, plan.packages.map((item) => /* @__PURE__ */ import_react60.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react60.default.createElement("strong", null, item.id), " · ", snapshot.bots?.find((bot) => bot.id === item.targetBotId)?.name ?? item.targetBotId, " · ", TASK_STATES[item.state] ?? item.state, item.dependsOn.length > 0 && /* @__PURE__ */ import_react60.default.createElement("small", null, " 前置：", item.dependsOn.join("、")), item.result?.code === "DEPENDENCY_FAILED" && /* @__PURE__ */ import_react60.default.createElement("small", null, " 前置包失败，尚未执行")))))), rows2.length === 0 ? /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, "尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。") : /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react60.default.createElement("table", null, /* @__PURE__ */ import_react60.default.createElement("thead", null, /* @__PURE__ */ import_react60.default.createElement("tr", null, /* @__PURE__ */ import_react60.default.createElement("th", null, "任务"), /* @__PURE__ */ import_react60.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react60.default.createElement("th", null, "状态"), /* @__PURE__ */ import_react60.default.createElement("th", null, "执行尝试"), /* @__PURE__ */ import_react60.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react60.default.createElement("tbody", null, rows2.map((row) => {
+  return /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(BotAttention, { snapshot, dispatch, busy, openTask: setSelected }), section.plans?.map((plan) => /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card", key: plan.planId }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "计划 ", plan.planId), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, TASK_STATES[plan.state] ?? plan.state), actions.includes("task.plan.cancel") && !["succeeded", "cancelled"].includes(plan.state) && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.plan.cancel", { botId: plan.ownerBotId, planId: plan.planId }) }, "停止整个计划")), plan.needsReconciliation && /* @__PURE__ */ import_react60.default.createElement("p", { role: "status" }, "有工作包停止尚未确认，请核对原收据；计划尚未完成停止。"), /* @__PURE__ */ import_react60.default.createElement("ul", null, plan.packages.map((item) => /* @__PURE__ */ import_react60.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react60.default.createElement("strong", null, item.id), " · ", snapshot.bots?.find((bot) => bot.id === item.targetBotId)?.name ?? item.targetBotId, " · ", TASK_STATES[item.state] ?? item.state, item.dependsOn.length > 0 && /* @__PURE__ */ import_react60.default.createElement("small", null, " 前置：", item.dependsOn.join("、")), item.result?.code === "DEPENDENCY_FAILED" && /* @__PURE__ */ import_react60.default.createElement("small", null, " 前置包失败，尚未执行")))))), rows2.length === 0 ? /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, "尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。") : /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react60.default.createElement("table", null, /* @__PURE__ */ import_react60.default.createElement("thead", null, /* @__PURE__ */ import_react60.default.createElement("tr", null, /* @__PURE__ */ import_react60.default.createElement("th", null, "任务"), /* @__PURE__ */ import_react60.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react60.default.createElement("th", null, "状态"), /* @__PURE__ */ import_react60.default.createElement("th", null, "执行尝试"), /* @__PURE__ */ import_react60.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react60.default.createElement("tbody", null, rows2.map((row) => {
     let id2 = row.taskId ?? row.id, canCancel = !["cancelled", "succeeded", "failed", "skipped"].includes(row.state), remote = row.result?.remote, stopKnown = !remote || remote.stopConfirmed === !0;
     return /* @__PURE__ */ import_react60.default.createElement("tr", { key: id2 }, /* @__PURE__ */ import_react60.default.createElement("td", null, /* @__PURE__ */ import_react60.default.createElement("button", { className: "bp-text-button", onClick: () => setSelected(id2) }, row.title ?? row.input?.task ?? id2), /* @__PURE__ */ import_react60.default.createElement("small", null, id2)), /* @__PURE__ */ import_react60.default.createElement("td", null, snapshot.bots?.find((bot) => bot.id === row.botId)?.name ?? row.botId ?? "未取得归属"), /* @__PURE__ */ import_react60.default.createElement("td", null, /* @__PURE__ */ import_react60.default.createElement(Tag2, null, TASK_STATES[row.state] ?? row.state), row.blockedReason && /* @__PURE__ */ import_react60.default.createElement("small", null, row.blockedReason), remote && (stopKnown ? remote.notStarted === !0 && remote.possiblyApplied !== !0 ? /* @__PURE__ */ import_react60.default.createElement("small", null, "原操作未启动。") : remote.status === "succeeded" ? /* @__PURE__ */ import_react60.default.createElement("small", null, "写入已确认。", row.state === "cancelled" ? "取消未撤销文件变更。" : "") : remote.possiblyApplied === !0 && /* @__PURE__ */ import_react60.default.createElement("small", null, "操作已停止，文件可能已改变；重试不会撤销已有变更，请先核对产物。") : /* @__PURE__ */ import_react60.default.createElement("small", { role: "status" }, "写入或停止尚未确认，请核对原操作；不会自动重发，也暂不能重试。"))), /* @__PURE__ */ import_react60.default.createElement("td", null, Number.isSafeInteger(row.attempts) ? row.attempts : row.attempts?.length ?? row.attemptCount ?? "未知"), /* @__PURE__ */ import_react60.default.createElement("td", { className: "bp-actions" }, actions.includes("task.cancel") && canCancel && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.cancel", { botId: row.botId, taskId: id2 }) }, "停止"), actions.includes("task.retry") && ["failed", "cancelled", "waiting-budget"].includes(row.state) && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || !stopKnown, onClick: () => {
       stopKnown && dispatch("task.retry", { botId: row.botId, taskId: id2, requestKey: crypto.randomUUID() });
@@ -32115,6 +32213,18 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
 // apps/integration-client/product.css
 var product_default = `.bp-page{height:100%;overflow:auto;box-sizing:border-box;padding:28px 32px;color:var(--dsw-alias-label-primary,#25312f);background:var(--dsw-alias-bg-base,#fafbf9);font:14px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif}.bp-page *{box-sizing:border-box}.bp-page header,.bp-card-title{display:flex;align-items:center;justify-content:space-between;gap:16px}.bp-page h1{font-size:28px;line-height:1.25;margin:4px 0 26px}.bp-page h2{font-size:18px;margin:0}.bp-page h3{font-size:14px;margin:20px 0 8px}.bp-eyebrow{font-size:10px;letter-spacing:.14em;margin:0;color:var(--dsw-alias-label-secondary,#64716a)}.bp-muted,.bp-page small{color:var(--dsw-alias-label-secondary,#64716a)}.bp-page small{display:block;font-size:11px;margin-top:4px;overflow-wrap:anywhere}.bp-page button,.bp-nav button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:8px;padding:7px 11px;background:var(--dsw-alias-bg-l1,#fff)}.bp-page button:hover,.bp-nav button:hover{background:var(--dsw-alias-bg-hover,#eef3ed)}.bp-page button:focus-visible,.bp-nav button:focus-visible{outline:2px solid #4a8069;outline-offset:2px}.bp-page button:disabled{cursor:wait;opacity:.5}.bp-columns{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr);gap:24px}.bp-bot-list{display:grid;gap:8px;align-content:start}.bp-bot-list button{text-align:left;padding:14px}.bp-bot-list button[aria-current=true]{border-color:#4a8069;background:#4a806912}.bp-card{border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:14px;padding:22px;background:var(--dsw-alias-bg-l1,#fff);min-width:0;margin-bottom:20px}.bp-tag{display:inline-flex;padding:2px 7px;border-radius:5px;background:#71826e13;color:var(--dsw-alias-label-secondary,#4a6653);font-size:11px;margin-left:6px}.bp-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:17px 22px;margin:20px 0}.bp-value dt{font-size:11px;color:var(--dsw-alias-label-secondary,#64716a)}.bp-value dd{margin:4px 0 0;overflow-wrap:anywhere}.bp-blocked{border:1px solid #b18c4d66;background:#bd8c2510;border-radius:10px;padding:15px 18px;margin:14px 0;overflow-wrap:anywhere}.bp-blocked strong{font-size:13px}.bp-blocked p{margin:5px 0}.bp-table-wrap{overflow:auto;border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:12px;margin-bottom:20px}.bp-page table{width:100%;border-collapse:collapse;text-align:left;font-size:12px}.bp-page th{font-size:11px;font-weight:500;background:#71826e0b;white-space:nowrap}.bp-page td,.bp-page th{padding:14px 16px;border-bottom:1px solid var(--dsw-alias-border-l1,#d8dfd8);vertical-align:top}.bp-page tr:last-child td{border-bottom:0}.bp-page td:first-child{max-width:380px;overflow-wrap:anywhere}.bp-page .bp-text-button{border:0;background:none;padding:0;text-align:left}.bp-actions{display:flex;gap:6px;flex-wrap:wrap}.bp-page pre{overflow:auto;font:11px/1.6 ui-monospace,monospace;max-height:420px;background:#71826e09;padding:14px;border-radius:8px}.bp-code{overflow-wrap:anywhere;font:12px/1.7 ui-monospace,monospace}.bp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}.bp-empty{padding:28px;border:1px dashed var(--dsw-alias-border-l1,#d8dfd8);border-radius:12px}.bp-page footer{font-size:11px;margin-top:26px}.bp-sidebar{display:flex;flex-direction:column;height:100%;min-height:0}.bp-sidebar>.bt-side{flex:1;min-height:0}.bp-nav{display:grid;gap:3px;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1,#d8dfd8);flex-shrink:0}.bp-nav button{display:flex;align-items:center;gap:10px;border:0;background:none;text-align:left;padding:7px 9px;font-size:12px}.bp-nav button>span:first-child{width:17px;text-align:center;opacity:.7}.bp-nav-compact{padding:7px 3px}.bp-nav-compact button{justify-content:center;padding:7px 3px;flex-direction:column;gap:1px;font-size:10px;line-height:1.2}.bp-nav-compact button>span:first-child{width:auto;font-size:15px;line-height:1}.bp-nav-caption{font-size:10px;white-space:nowrap;opacity:.85}@media(max-width:760px){.bp-page{padding:20px 16px}.bp-columns{grid-template-columns:1fr}.bp-bot-list{display:flex;overflow:auto;gap:7px}.bp-bot-list button{min-width:145px}.bp-page h1{font-size:23px}.bp-card{padding:16px}.bp-facts{grid-template-columns:1fr}.bp-grid{grid-template-columns:1fr}}
 .bp-form{display:grid;gap:10px;margin-top:16px;min-width:0}.bp-form label{display:grid;gap:5px;font-size:12px}.bp-form input:not([type=checkbox]),.bp-form select{width:100%;min-width:0;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:7px;padding:8px 10px;color:inherit;background:var(--dsw-alias-bg-base,#fafbf9);font:inherit}.bp-form label:has(input[type=checkbox]){display:flex;align-items:flex-start;gap:8px}.bp-form input[type=checkbox]{flex:none;margin-top:4px}.bp-form button{justify-self:start;max-width:100%}.bp-page details>summary{cursor:pointer;font-weight:600}
+
+.bp-attention{border-color:#c9a22766;background:linear-gradient(180deg,#fdf7e6,#fffef9)}
+.bp-attention-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.bp-attention-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1,#e4e0d2);border-radius:10px;background:#fff}
+.bp-attention-row strong{display:block;font-size:13px}
+.bp-attention-row .bp-muted{margin:2px 0 0}
+.bp-attention-reconcile{border-left:3px solid #b3261e}
+.bp-attention-remote-unknown{border-left:3px solid #b3261e}
+.bp-attention-approve{border-left:3px solid #2f6f9f}
+.bp-attention-budget{border-left:3px solid #b26a00}
+.bp-attention-failed{border-left:3px solid #b26a00}
+.bp-attention-blocked{border-left:3px solid #7a7f78}
 `;
 
 // apps/integration-client/index.jsx
