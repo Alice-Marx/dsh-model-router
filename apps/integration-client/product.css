@@ -20,3 +20,16 @@
 .bp-error{color:#b3261e;font-size:12px}
 
 .bp-runtime{margin:10px 0;padding:10px 12px;border:1px dashed var(--dsw-alias-border-l1,#d8dfd8);border-radius:10px}
+
+.bt-desktop-pane{display:flex;flex-direction:column;gap:8px;padding:4px 2px}
+.bt-desktop-head{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.bt-desktop-select{max-width:56%}
+.bt-desktop-modes{display:flex;align-items:center;gap:6px}
+.bt-desktop-frame{width:100%;max-height:220px;object-fit:contain;border-radius:10px;border:1px solid rgba(127,127,127,.35);display:block;background:#111}
+.bt-desktop-frame-big{max-width:92vw;max-height:82vh;object-fit:contain;border-radius:8px;display:block;background:#111}
+.bt-desktop-open{padding:0;border:0;background:none}
+.bt-desktop-empty{padding:28px;border:1px dashed rgba(127,127,127,.4);border-radius:10px;text-align:center}
+.bt-desktop-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bt-desktop-modal{position:fixed;inset:0;z-index:9999;background:rgba(10,12,14,.92);display:flex;align-items:center;justify-content:center}
+.bt-desktop-modal-body{display:flex;flex-direction:column;gap:10px;align-items:center}
+.bt-desktop-modal-bar{display:flex;align-items:center;gap:8px;color:#e8ecef}

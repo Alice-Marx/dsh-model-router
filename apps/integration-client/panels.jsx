@@ -425,6 +425,25 @@ function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
 }
 
 export function Machines({ snapshot, dispatch, busy }) {
+  // The Bot drawer's desktop tab reads this bridge: it lives in the vendored client, which owns no
+  // remote authority, so every call still runs through this panel's owner channel.
+  React.useEffect(() => {
+    if (typeof dispatch !== 'function') return undefined
+    const rows = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
+    globalThis.__dshDesktop = Object.freeze({
+      machines: () => rows.map(item => ({ machineId: item.id, rootId: item.roots?.[0]?.id ?? '', label: item.name ?? item.id })),
+      view: (botId, machineId) => {
+        const machine = rows.find(item => item.id === machineId)
+        return dispatch('machine.desktop.view', { botId, machineId, rootId: machine?.roots?.[0]?.id ?? '' })
+      },
+      act: (botId, machineId, screenshotId, action) => {
+        const machine = rows.find(item => item.id === machineId)
+        return dispatch('machine.desktop.act', { botId, machineId, rootId: machine?.roots?.[0]?.id ?? '', screenshotId, action })
+      },
+    })
+    return () => { delete globalThis.__dshDesktop }
+  }, [dispatch, snapshot.machines])
+
   const section = snapshot.machines
   if (section?.status !== 'available') return <Blocked value={section} />
   return <>{dispatch&&<><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} />
