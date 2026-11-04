@@ -246,6 +246,18 @@ const botRuntimeHistoryCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#Bot
   return { botId, limit }
 })
 
+const botRuntimeMessageCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeMessage`, value => {
+  const request = plainObject(value, 'bot runtime message')
+  for (const key of Object.keys(request)) {
+    if (key !== 'botId' && key !== 'index') throw new TypeError(`unknown field ${key} in bot runtime message`)
+  }
+  const botId = text(request.botId)
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError('botId is invalid')
+  const index = request.index === undefined ? 0 : request.index
+  if (!Number.isSafeInteger(index) || index < 0 || index > 2_000) throw new TypeError('index must be 0..2000')
+  return { botId, index }
+})
+
 const runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest)
 
 function descriptor(method, parameters, result, cancellable = false) {
@@ -287,6 +299,7 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   descriptor('botRuntimeStatus', [], anyObjectCodec('BotRuntimeStatus')),
   descriptor('botRuntimeMove', [jsonParameter('request', botRuntimeMoveCodec)], anyObjectCodec('BotRuntimeMoved')),
   descriptor('botRuntimeHistory', [jsonParameter('request', botRuntimeHistoryCodec)], anyObjectCodec('BotRuntimeHistory')),
+  descriptor('botRuntimeMessage', [jsonParameter('request', botRuntimeMessageCodec)], anyObjectCodec('BotRuntimeMessage')),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview'), true),
   descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),

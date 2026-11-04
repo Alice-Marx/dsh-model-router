@@ -88,3 +88,15 @@ test('assembly: a move records counts only, and history is previewed and bounded
   assert.equal('content' in history[0], false)
   assert.equal(instance.history('b1', { limit: 1 }).length, 1)
 })
+
+test('assembly: full text is available by position, and out-of-range is refused', async (t) => {
+  const { instance } = runtime(t)
+  await instance.move('b1', 'independent')
+  await instance.turn({ botId: 'b1', input: '记住这件事' })
+  const newest = instance.readMessage('b1', 0)
+  assert.equal(newest.content, '独立循环')
+  assert.equal(newest.role, 'assistant')
+  const oldest = instance.readMessage('b1', 1)
+  assert.equal(oldest.content, '记住这件事')
+  assert.throws(() => instance.readMessage('b1', 99), /MESSAGE_NOT_FOUND/)
+})
