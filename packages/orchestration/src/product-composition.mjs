@@ -1,6 +1,7 @@
 import { createBotRoutingService } from './bot-routing-service.mjs'
 import { buildRoutedPlan } from './bot-routing-dispatch.mjs'
 import { assertHandoffAllowed, buildHandoff, createHandoffLedger } from './bot-handoff.mjs'
+import { routineStepToTool } from './remote-computer-tools.mjs'
 import { hostname } from 'node:os'
 import { join, dirname, isAbsolute } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -754,6 +755,25 @@ export function startBotProduct(ctx, options = {}) {
         actions: { ...actions, ...machineActions,
           // The library panel reads and writes one Bot's files. The directory is chosen by the
           // library itself (the caller's Bot, or the operator's choice), never by the panel.
+          // Saved routines: list what a Bot has, and run one on a machine the caller may use.
+          ...(routineStore ? {
+            'routine.list': async payload => routineStore.inspect(payload?.botId),
+            'routine.run': async (payload, context) => {
+              const routine = routineStore.get(payload?.botId, payload?.routineId)
+              const subject = operatorSubject() ?? (typeof context?.subject === 'string' ? context.subject : null)
+              if (!subject) throw new Error('UNKNOWN_SUBJECT')
+              const steps = []
+              for (const [index, step] of routine.steps.entries()) {
+                const mapped = routineStepToTool(step)
+                if (!mapped) { await new Promise(resolve => setTimeout(resolve, step.ms)); steps.push(index); continue }
+                const identity = { taskId: `routine-${randomUUID()}`, attemptId: `attempt-${randomUUID()}`, operationId: `operation-${randomUUID()}` }
+                const record = await machines.call(subject, { machineId: payload?.machineId, rootId: payload?.rootId || 'project', ...identity, tool: mapped.tool, args: mapped.args })
+                if (record?.status && record.status !== 'succeeded') return { status: 'failed', steps, stoppedAt: index, error: record.error?.message ?? record.status }
+                steps.push(index)
+              }
+              return { status: 'succeeded', steps, stoppedAt: null }
+            },
+          } : {}),
           ...(botLibrary ? {
             'library.list': async payload => botLibrary.list(payload?.botId, payload?.relativePath ?? ''),
             'library.read': async payload => ({ content: botLibrary.read(payload?.botId, payload?.relativePath ?? '') }),
