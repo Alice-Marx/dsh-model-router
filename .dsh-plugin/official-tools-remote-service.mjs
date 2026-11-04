@@ -124,6 +124,12 @@ export class OfficialToolsRemoteService extends TypertRemoteService {
   /** Type one prompt into a terminal tool (dsh-TUI) and return its rendered reply. */
   tuiPrompt(request) { return settled(() => (this.services.tuiPrompt ?? unavailable)(request)) }
 
+  /** Which runtime serves each Bot (empty when the independent runtime is off). */
+  botRuntimeStatus() { return settled(() => (this.services.botRuntimeStatus ?? (async () => []))()) }
+
+  /** Move one Bot between the integration path and the independent runtime. */
+  botRuntimeMove(request) { return settled(() => (this.services.botRuntimeMove ?? unavailable)(request)) }
+
   /** Recent runs, spending, budget status and learned route biases. */
   ledger() { return settled(() => (this.services.ledger ?? unavailable)()) }
 

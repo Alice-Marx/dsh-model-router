@@ -223,6 +223,17 @@ const terminalWriteCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#Termina
 const terminalResizeCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalResize`, parseTerminalResize)
 const terminalStopCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#TerminalStop`, parseTerminalStop)
 
+const botRuntimeMoveCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#BotRuntimeMove`, value => {
+  const request = plainObject(value, 'bot runtime move')
+  for (const key of Object.keys(request)) {
+    if (key !== 'botId' && key !== 'mode') throw new TypeError(`unknown field ${key} in bot runtime move`)
+  }
+  const botId = text(request.botId)
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(botId)) throw new TypeError('botId is invalid')
+  if (!['integration', 'independent'].includes(request.mode)) throw new TypeError('mode must be integration or independent')
+  return { botId, mode: request.mode }
+})
+
 const runRequestCodec = strictCodec(`${OFFICIAL_TOOLS_REMOTE_PACKAGE}#RunRequest`, parseRunRequest)
 
 function descriptor(method, parameters, result, cancellable = false) {
@@ -260,6 +271,9 @@ export const OFFICIAL_TOOLS_REMOTE_DESCRIPTORS = Object.freeze([
   // Terminal tools (dsh-TUI): one prompt through the managed PTY, reply is rendered text.
   descriptor('tuiPrompt', [jsonParameter('request', tuiPromptCodec)], anyObjectCodec('TuiReply')),
   descriptor('boundaries', [], anyObjectCodec('SecurityBoundaries')),
+  // Bot runtime: which path serves each Bot, and moving one between them.
+  descriptor('botRuntimeStatus', [], anyObjectCodec('BotRuntimeStatus')),
+  descriptor('botRuntimeMove', [jsonParameter('request', botRuntimeMoveCodec)], anyObjectCodec('BotRuntimeMoved')),
   // Workbench "start a run": plan preview with cost estimate and confirmation reasons, then execute.
   descriptor('previewRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunPreview'), true),
   descriptor('startRun', [jsonParameter('request', runRequestCodec)], anyObjectCodec('RunStarted')),

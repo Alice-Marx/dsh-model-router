@@ -73,6 +73,9 @@ export function createIndependentRuntime({
       loops.delete(botId)
       return result
     },
+    /** Which Bots were moved, in the switch's own words. */
+    list: () => switchApi.list(),
+
     /** Inventory for a panel: runtime plus transcript size, never message bodies. */
     inventory: botIds => {
       const rows = store.list(Array.isArray(botIds) ? botIds : [])

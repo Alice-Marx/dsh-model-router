@@ -446,6 +446,8 @@ function registerUi(ctx) {
       runStatus: (request, signal) => officialToolsRemote.runStatus(request, signal),
       cancelRun: (request, signal) => officialToolsRemote.cancelRun(request, signal),
       tuiPrompt: request => officialToolsRemote.tuiPrompt(request),
+      botRuntimeStatus: () => officialToolsRemote.botRuntimeStatus(),
+      botRuntimeMove: request => officialToolsRemote.botRuntimeMove(request),
       terminalApi: Object.freeze({
         terminalInfo: () => officialToolsRemote.terminalInfo(),
         terminalStart: request => officialToolsRemote.terminalStart(request),

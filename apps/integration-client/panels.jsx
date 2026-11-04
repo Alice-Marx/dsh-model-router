@@ -26,7 +26,51 @@ const subscriptionText = value => value && typeof value === 'object'
   ? `今日 ${value.callsToday ?? '未知'} 次 · 本月 ${value.callsMonth ?? '未知'} 次`
   : value ?? '见逐来源收据'
 
-export function BotBindings({ snapshot, openSession, dispatch, busy }) {
+export 
+/**
+ * 运行时: which path serves this Bot. Only rendered when the Host exposes the switch, so an older
+ * Host shows nothing instead of a dead control.
+ */
+function BotRuntimeRow({ botId, dispatch, busy }) {
+  const [state, setState] = React.useState(null)
+  const [error, setError] = React.useState('')
+  const [working, setWorking] = React.useState(false)
+  const load = React.useCallback(async () => {
+    if (typeof dispatch !== 'function') return
+    try {
+      const rows = await dispatch('botRuntimeStatus', {})
+      const row = Array.isArray(rows) ? rows.find(item => item.botId === botId) : null
+      setState({ runtime: row?.mode ?? 'integration', changedAt: row?.changedAt ?? null })
+      setError('')
+    } catch (failure) {
+      setState(null)
+      setError(String(failure?.message ?? failure))
+    }
+  }, [botId, dispatch])
+  React.useEffect(() => { void load() }, [load])
+  if (!state && !error) return null
+  const target = state?.runtime === 'independent' ? 'integration' : 'independent'
+  const move = async () => {
+    setWorking(true)
+    try {
+      await dispatch('botRuntimeMove', { botId, mode: target })
+      await load()
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    } finally {
+      setWorking(false)
+    }
+  }
+  return <div className="bp-runtime">
+    <dl className="bp-facts"><Value label="运行时">{state?.runtime === 'independent' ? '独立循环 + 独立会话库' : 'Harness 会话集成'}</Value>
+      <Value label="切换时间">{state?.changedAt ? new Date(state.changedAt).toLocaleString('zh-CN') : '从未切换'}</Value></dl>
+    <div className="bp-actions"><button disabled={busy || working} onClick={() => { void move() }}>{working ? '切换中…' : target === 'independent' ? '迁移到独立运行时' : '迁回 Harness 会话'}</button></div>
+    <p className="bp-muted">迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。</p>
+    {error && <p className="bp-error" role="alert">{error}</p>}
+  </div>
+}
+
+function BotBindings({ snapshot, openSession, dispatch, busy }) {
   const bots = snapshot.bots ?? []
   const [selected, setSelected] = useState(bots[0]?.id ?? '')
   const bot = bots.find(row => row.id === selected) ?? bots[0]
@@ -48,6 +92,7 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
         {binding.blockedReason && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
       </> : <Blocked value={{ reason: '此 Bot 尚未取得有效绑定。', nextAction: '在宿主 Bot 绑定配置中授予明确工具、机器与工作区。' }} />}
       <p className="bp-muted">角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。</p>
+      <BotRuntimeRow botId={bot.id} dispatch={dispatch} busy={busy} />
       {dispatch && <BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} />}
     </article>
   </div>
