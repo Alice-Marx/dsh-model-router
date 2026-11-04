@@ -5,7 +5,7 @@ import { acceptedInstallJob, installClickRefusal, installSummaryMatchesSettings,
 import { OFFICIAL_TOOLS, installCommandLine, installMethodsFor, toolForProvider } from '../shared/official-tool-registry.mjs'
 import { ROUTING_PRESETS } from '../shared/routing-presets.mjs'
 import { attentionSummary, deriveAttention } from '../shared/attention.mjs'
-import { BillingCard, CostControlCard, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, SubscriptionUsageCard, ToolLoginLine } from './router-insights.jsx'
+import { BillingCard, CostControlCard, TwoLedgerBooks, DagView, OnboardingBanner, RunHistoryCard, SecurityCard, SubscriptionUsageCard, ToolLoginLine } from './router-insights.jsx'
 import { apiPlanEstimate, healthSummary, initialPackageAssignments, manualAssignmentOptions, packageEstimateText, planBudget, rerunConfirmations, rerunSupport, reservationSummary, subscriptionEstimateText, unwrapRemote } from './insights-state.mjs'
 import { packagePlanKey } from '../shared/package-assignments.mjs'
 import { RunLauncher } from './run-launcher.jsx'
@@ -1192,6 +1192,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
         <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-controls" aria-labelledby="mr-tab-controls" hidden={view !== 'controls'}>
         <div className="mr-view-heading"><h2>预算与安全</h2><p>API 按金额管理预算，订阅单独核对用量与执行边界。</p></div>
+        <TwoLedgerBooks books={workbench.ledger.value?.books} />
         <CostControlCard ledger={workbench.ledger.value} error={workbench.ledger.error || workbench.ledger.value?.storageNotice || ''} refreshing={workbench.ledger.refreshing} settingsScope={settingsScope}
           onChanged={() => { invalidatePlan(); return workbench.refreshLedger() }} />
         <SubscriptionUsageCard ledger={workbench.ledger.value} />
