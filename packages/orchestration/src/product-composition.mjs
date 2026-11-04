@@ -2,6 +2,7 @@ import { createBotRoutingService } from './bot-routing-service.mjs'
 import { buildRoutedPlan } from './bot-routing-dispatch.mjs'
 import { assertHandoffAllowed, buildHandoff, createHandoffLedger } from './bot-handoff.mjs'
 import { routineStepToTool } from './remote-computer-tools.mjs'
+import { listRoles } from './bot-roles.mjs'
 import { hostname } from 'node:os'
 import { join, dirname, isAbsolute } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -756,6 +757,8 @@ export function startBotProduct(ctx, options = {}) {
           // The library panel reads and writes one Bot's files. The directory is chosen by the
           // library itself (the caller's Bot, or the operator's choice), never by the panel.
           // Saved routines: list what a Bot has, and run one on a machine the caller may use.
+          // The role catalog is a read-only convenience: it describes jobs, it grants nothing.
+          'roles.list': async () => listRoles(),
           ...(routineStore ? {
             'routine.list': async payload => routineStore.inspect(payload?.botId),
             'routine.run': async (payload, context) => {
