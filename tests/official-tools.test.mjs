@@ -347,7 +347,10 @@ test('provider keywords map conservatively to registry tools', () => {
   assert.equal(toolForProvider('xai').id, 'grok-build')
   assert.equal(toolForProvider('gemini').id, 'gemini')
   assert.equal(toolForProvider('google-ai').id, 'gemini')
-  assert.equal(toolForProvider('deepseek-account'), null, 'DeepSeek is the host itself')
+  // The user chose dsh-TUI as the DeepSeek tool: providers map to it, and an installed copy
+  // without a verified headless adapter still calls through the model directory API.
+  assert.equal(toolForProvider('deepseek-account').id, 'dsh-tui')
+  assert.equal(toolForProvider('deepseek-official').id, 'dsh-tui')
   assert.equal(toolForProvider('unknown-vendor'), null)
   assert.equal(toolForProvider(''), null)
 })
@@ -374,7 +377,11 @@ test('channel annotation reflects probe truth and never invents tools', () => {
   assert.equal(grok.tool, 'grok-build')
   const deepseek = channelForProvider('deepseek-account', [])
   assert.equal(deepseek.kind, 'harness-llm')
-  assert.equal(deepseek.tool, undefined)
+  assert.equal(deepseek.tool, 'dsh-tui', 'the user chose dsh-TUI as the DeepSeek tool')
+  const deepseekInstalled = channelForProvider('deepseek-account', ['dsh-tui'])
+  assert.equal(deepseekInstalled.kind, 'harness-llm')
+  assert.equal(deepseekInstalled.tool, 'dsh-tui')
+  assert.match(deepseekInstalled.detail, /缺少经核验的托管执行适配器/)
 })
 
 test('plan annotates selected route and work packages with channels', () => {

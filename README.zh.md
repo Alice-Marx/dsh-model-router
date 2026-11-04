@@ -267,7 +267,7 @@ CLI 团队运行器是插件自身的顺序依赖执行器，不控制 Harness �
 | `hermes` | Hermes Agent | Windows/POSIX 官方安装脚本、版本检测、交互终端；使用 `hermes auth` 登录；尚无经过验证的托管执行器 |
 | `pi` | Pi | 官方 npm/pnpm 安装、版本检测、交互终端；启动后输入 `/login`；尚无经过验证的托管执行器 |
 | `zcode` | ZCode CLI | 独立 TUI；运行入口就绪后支持获批的 `workspace-write` |
-| `dsh-tui` | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | DeepSeek Harness 终端 TUI（像素鲸鱼、实时状态、会话管理）；npm/pnpm 安装、探测与交互终端；该交互应用不属于托管单工具/团队执行器 |
+| `dsh-tui` | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | DeepSeek 的工具：Harness 终端 TUI（像素鲸鱼、实时状态、会话管理）。npm/pnpm 安装、探测与交互终端；DeepSeek 的路线把它标为通道，实际调用仍走模型目录 API，直到出现经核验的无头适配器 |
 
 Hermes 使用[官方源码安装器](https://hermes-agent.nousresearch.com/docs/getting-started/installation)的非交互模式，安装后运行 `hermes auth`。设置统一根目录后，源码安装到 `<根目录>/hermes-agent`，插件绑定该源码的 `.hermes/bin` 入口，不会改用其他旧的全局副本。配置、登录和历史仍保留在原 Hermes 数据目录；未设置统一根时沿用厂商默认位置。官方安装器可能将全局便利命令更新为指向所选源码。源码安装请通过 `hermes uninstall` 卸载。Pi 使用 [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)，npm/pnpm 安装带 `--ignore-scripts`，要求 Node.js 22.19 及以上。启动 `pi` 后输入 `/login`。这两种工具的登录状态显示为未知，以各自界面为准；插件不会读取它们的凭据。
 
