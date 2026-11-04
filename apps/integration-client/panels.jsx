@@ -300,7 +300,9 @@ function MachineSetup({ snapshot, dispatch, busy }) {
   const parsed = React.useMemo(() => parsePairingPaste(paste), [paste])
   const endpoint = React.useMemo(() => normalizeEndpoint(address, {}), [address])
   const ready = parsed.problems.length === 0 && endpoint.problem === ''
-  const secretName = React.useMemo(() => (parsed.secretRef || '').replace(/^ds-secret\//u, '') || secretNameFor(parsed), [parsed])
+  // The Agent prints its own ref (`remote-agent/<machine>/<client>`); the Host requires
+  // `ds-secret/<NAME>`. Keep the Host shape and derive the name from the client id only.
+  const secretName = React.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed])
   const importFile = async event => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -329,7 +331,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
         name: parsed.clientId || parsed.machineId,
         machineId: parsed.machineId,
         endpoint: endpoint.endpoint,
-        secretRef: parsed.secretRef || ('ds-secret/' + secretName),
+        secretRef: 'ds-secret/' + secretName,
         roots: ['project'],
         probeBotId: snapshot.bots?.[0]?.id ?? '',
         protectedTunnel: tunnel,
