@@ -20,6 +20,12 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
       accountDaily: 10, accountMonthly: 100,
       dailyCalls: value.funding.subscription?.dailyCalls ?? 20, monthlyCalls: value.funding.subscription?.monthlyCalls ?? 200,
       maxConcurrentTasks: value.maxConcurrentTasks,
+      // Loaded from committed settings so the form shows what is actually stored, not a default.
+      routing: {
+        preset: value.routing?.preset ?? '',
+        dailyBudgetUsd: value.routing?.dailyBudgetUsd ?? '',
+        monthlyBudgetUsd: value.routing?.monthlyBudgetUsd ?? '',
+      },
     })
   }, [bot.id, record?.revision])
   const model = useMemo(() => record?.catalog.models.find(item => route(item) === form?.model) ?? null, [record, form?.model])
@@ -28,6 +34,8 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
   const change = (key, value) => setForm(current => ({ ...current, [key]: value }))
   const selectedMachine = form.workspace.split('/')[0]
   const selectedRoot = form.workspace.split('/').slice(1).join('/')
+  // This Bot's own routing policy: empty means it inherits the global preset.
+  const routing = form.routing ?? { preset: '', dailyBudgetUsd: '', monthlyBudgetUsd: '' }
   const enableAccount = () => dispatch('funding.account.save', { scopeId: account.id, expectedRevision: account.revision, enabled: true,
     dailyLimitUsd: Number(form.accountDaily), monthlyLimitUsd: Number(form.accountMonthly) })
   const save = event => {
@@ -48,6 +56,14 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
         subscription: form.fundingMode === 'subscription' ? { dailyCalls: Number(form.dailyCalls), monthlyCalls: Number(form.monthlyCalls) } : null,
       },
       maxConcurrentTasks: Number(form.maxConcurrentTasks),
+      // An empty preset inherits; a budget left blank means "no separate ceiling for this Bot".
+      routing: routing.preset === '' && routing.dailyBudgetUsd === '' && routing.monthlyBudgetUsd === ''
+        ? null
+        : {
+          preset: routing.preset === '' ? null : routing.preset,
+          dailyBudgetUsd: routing.dailyBudgetUsd === '' ? null : Number(routing.dailyBudgetUsd),
+          monthlyBudgetUsd: routing.monthlyBudgetUsd === '' ? null : Number(routing.monthlyBudgetUsd),
+        },
     }
     return dispatch('binding.save', { botId: bot.id, expectedRevision: record.revision, settings })
   }
@@ -66,6 +82,14 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
         <option value="" disabled>请选择</option>{record.catalog.machines.flatMap(machine => machine.roots.map(root => <option key={`${machine.machineId}/${root.rootId}`} value={`${machine.machineId}/${root.rootId}`}>{machine.label} / {root.label}</option>))}
       </select></label>
       <label>工作区权限<select value={form.workspaceMode} onChange={event => change('workspaceMode', event.target.value)}><option value="read-only">只读</option><option value="workspace-write">允许写入</option></select></label>
+      <fieldset><legend>Bot 路由策略</legend>
+        <p className="bp-muted">这个 Bot 派活给别人时用哪套取舍；留空表示沿用全局预设。</p>
+        <label>预设<select aria-label={`${bot.name} 的路由预设`} value={routing.preset} onChange={event => change('routing', { ...routing, preset: event.target.value })}>
+          <option value="">沿用全局</option><option value="economy">省钱优先</option><option value="balanced">均衡</option><option value="quality">效果优先</option>
+        </select></label>
+        <label>每日预算（USD）<input type="number" min="0" step="0.01" value={routing.dailyBudgetUsd} onChange={event => change('routing', { ...routing, dailyBudgetUsd: event.target.value })} placeholder="留空表示不单独限制" /></label>
+        <label>每月预算（USD）<input type="number" min="0" step="0.01" value={routing.monthlyBudgetUsd} onChange={event => change('routing', { ...routing, monthlyBudgetUsd: event.target.value })} placeholder="留空表示不单独限制" /></label>
+      </fieldset>
       <fieldset><legend>路由与任务能力</legend>{record.catalog.capabilities.map(capability => <label key={capability.id}><input type="checkbox" checked={form.capabilities.includes(capability.id)} onChange={event => change('capabilities', event.target.checked ? [...form.capabilities, capability.id] : form.capabilities.filter(id => id !== capability.id))} />{capability.label}</label>)}</fieldset>
       {cliMappings.length > 0 && <fieldset><legend>已核验官方 CLI</legend>{cliMappings.map(mapping => {
         const selected = form.officialTools.some(tool => tool.toolId === mapping.toolId && tool.cliModel === mapping.model)
