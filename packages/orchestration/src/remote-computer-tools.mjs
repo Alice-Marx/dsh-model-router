@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { replayRoutine } from './bot-routine.mjs'
 
 const JSON_OUTPUT = {
   schema: { type: 'json' },
@@ -33,7 +34,25 @@ function operationOutcome(record, tool) {
   return { value: { ...(record.result ?? {}), operationStatus: record.status, ...(record.error ? { error: record.error } : {}) }, status: record.status }
 }
 
-export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null, botRouting = null }) {
+/**
+ * A recorded routine step as the desktop tool that performs it.
+ *
+ * `wait` has no tool: it is a pause, and pretending it is a machine action would put it in the
+ * operation log where nothing happened.
+ */
+export function routineStepToTool(step) {
+  if (!step || typeof step !== 'object') throw Object.assign(new Error('ROUTINE_STEP_INVALID'), { code: 'ROUTINE_STEP_INVALID' })
+  switch (step.action) {
+    case 'click': return { tool: 'desktop_click', args: { x: step.x, y: step.y, ...(step.button === 'right' ? { button: 'right' } : {}) } }
+    case 'type': return { tool: 'desktop_type', args: { text: step.text } }
+    case 'key': return { tool: 'desktop_key', args: { key: step.key, ...(step.modifiers?.length ? { modifiers: step.modifiers } : {}) } }
+    case 'scroll': return { tool: 'desktop_scroll', args: { delta: step.delta } }
+    case 'wait': return null
+    default: throw Object.assign(new Error(`ROUTINE_ACTION_UNKNOWN:${String(step.action)}`), { code: 'ROUTINE_ACTION_UNKNOWN' })
+  }
+}
+
+export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null, botRouting = null, routineStore = null, botIdFor = null }) {
   // A session that is not a Bot (the operator's own agent) is otherwise refused as
   // UNKNOWN_SUBJECT. When passthrough is enabled the Host supplies the Main Bot's subject, so the
   // call carries that Bot's grants and audit trail instead of a second permission set.
@@ -98,6 +117,42 @@ export function registerRemoteComputerTools(ctx, { runtime, directory, machines,
       const { value, status, taskId, attemptId, operationId } = await call(exec, args, args.tool, args.args)
       return { ...json(value), taskId, attemptId, operationId, ...(status && status !== 'succeeded' ? { operationStatus: status } : {}) }
     })
+
+  // Routines a Bot can keep and run again. The store owns ids and validation; this surface only
+  // moves a saved routine onto one machine, stopping at the first failed step.
+  if (routineStore) {
+    const botFor = args => {
+      const asked = typeof args?.botId === 'string' && args.botId !== '' ? args.botId : null
+      return asked ?? (typeof botIdFor === 'function' ? botIdFor(exec => exec) : null)
+    }
+    register('bot_routine_list', 'List the routines saved for one Bot. Steps are not returned — use run or inspect.', {
+      botId: { type: 'string', required: true },
+    }, async args => json(routineStore.inspect(args.botId)))
+
+    register('bot_routine_save', 'Save a recorded routine for one Bot. Steps are validated before they are stored.', {
+      botId: { type: 'string', required: true },
+      name: { type: 'string', required: true },
+      steps: { type: 'array', required: true, items: { type: 'object' } },
+    }, async args => json(routineStore.save(args.botId, { name: args.name, steps: args.steps })))
+
+    register('bot_routine_run', 'Run one saved routine against a machine. Stops at the first failed step and reports where.', {
+      botId: { type: 'string', required: true },
+      routineId: { type: 'string', required: true },
+      machineId: { type: 'string', required: true },
+      rootId: { type: 'string', required: true },
+    }, async (args, exec) => {
+      const routine = routineStore.get(args.botId, args.routineId)
+      const result = await replayRoutine(routine, {
+        signal: exec.signal,
+        act: async step => {
+          const mapped = routineStepToTool(step)
+          if (!mapped) { await new Promise(resolve => setTimeout(resolve, step.ms)); return }
+          await call(exec, { machineId: args.machineId, rootId: args.rootId }, mapped.tool, mapped.args)
+        },
+      })
+      return json(result)
+    })
+  }
 
   register('remote_computer_desktop', [
     'See and operate the explicitly granted logged-in Windows desktop.',
