@@ -308,6 +308,7 @@ export function startBotProduct(ctx, options = {}) {
     handoffLedger.held(args.taskId, args.toBotId)
     return { plan, submitted }
   }
+  const botRuntimeAdapter = (() => { try { return ctx.get?.('botRuntimeAdapter') ?? null } catch { return null } })()
   const routineStore = (() => { try { return ctx.get?.('routineStore') ?? null } catch { return null } })()
   const botRouting = createBotRoutingService({
     bots: () => product?.rt?.state?.bots ?? [],
@@ -750,6 +751,17 @@ export function startBotProduct(ctx, options = {}) {
                 subscriptionSummary: { callsToday: subscription.today.calls, callsMonth: subscription.month.calls, usdToday: totals.subscriptionToday, usdMonth: totals.subscriptionMonth } } }
           } } : {}) },
         actions: { ...actions, ...machineActions,
+          // The Bot runtime card is a panel: its buttons dispatch on this channel, so the same four
+          // operations the owner RPC exposes must exist here as well.
+          ...(botRuntimeAdapter ? {
+            'botRuntimeStatus': async () => botRuntimeAdapter.list(),
+            'botRuntimeMove': async payload => botRuntimeAdapter.move(payload?.botId, payload?.mode),
+            'botRuntimeHistory': async payload => botRuntimeAdapter.history(payload?.botId, { limit: payload?.limit }),
+            'botRuntimeMessage': async payload => {
+              if (valueOf(config, 'independentRuntime.fullTextHistory', false) !== true) throw new Error('HISTORY_FULLTEXT_DISABLED')
+              return botRuntimeAdapter.readMessage(payload?.botId, payload?.index)
+            },
+          } : {}),
           // The workbench reads Bot routing through the same product channel as every other panel
           // action. Registering it here is what makes the routing card work at runtime; the owner
           // RPC methods are a second door onto the same service.
