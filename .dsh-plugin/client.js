@@ -19976,6 +19976,69 @@ function shouldApplyInstallStatus(localJob, remoteJob) {
   return !localStarted || !remoteStarted ? !0 : remoteStarted >= localStarted;
 }
 
+// .dsh-plugin/shared/attention.mjs
+var ATTENTION_STAGES = Object.freeze(["blocked", "failed", "answer", "login"]), STAGE_ORDER = new Map(ATTENTION_STAGES.map((stage, index) => [stage, index])), short = (value, limit = 90) => {
+  let text7 = String(value ?? "").replace(/\s+/g, " ").trim();
+  return text7.length > limit ? `${text7.slice(0, limit - 1)}…` : text7;
+};
+function deriveAttention({ budget = null, reserved = null, probes = [], health = [], runs = [], limit = 5 } = {}) {
+  let rows2 = [], add = (stage, key, title, detail, target) => {
+    rows2.push({ key, stage, title, detail: short(detail, 160), target });
+  };
+  budget?.exceeded === !0 && budget?.action === "pause" && add(
+    "blocked",
+    "budget",
+    "预算已用完，新的执行会先暂停",
+    budget.message || "调高预算，或把超预算动作改为“自动降级”。",
+    "usage"
+  );
+  let interrupted = Number(reserved?.interruptedCount);
+  Number.isFinite(interrupted) && interrupted > 0 && add(
+    "blocked",
+    "interrupted",
+    `${interrupted} 次执行中断，费用尚未核验`,
+    "这些执行在中断前已经开始，费用按预估计入。核对后再继续。",
+    "usage"
+  );
+  for (let probe of probes) {
+    if (probe?.status !== "probe-failed" && probe?.status !== "probe-timeout") continue;
+    let name = short(probe.label ?? probe.id, 40);
+    add(
+      "failed",
+      `probe:${probe.id ?? name}`,
+      `${name} 版本检测${probe.status === "probe-timeout" ? "超时" : "失败"}`,
+      probe.detail || "无法确认这个工具的版本；可重新体检，或在终端里手动运行一次 --version。",
+      "tools"
+    );
+  }
+  for (let run2 of runs) {
+    if (run2?.status !== "failed") continue;
+    let task = short(run2.task, 60) || "未命名任务";
+    add(
+      "failed",
+      `run:${run2.id ?? task}`,
+      `上次执行失败：${task}`,
+      run2.error ? short(run2.error) : "打开执行记录查看每一步的结果，确认后再重试。",
+      "usage"
+    );
+  }
+  for (let tool of health)
+    !tool?.installed || tool?.login?.state !== "logged-out" || add(
+      "login",
+      `login:${tool.id}`,
+      `${short(tool.label ?? tool.id, 40)} 需要登录`,
+      tool.login.detail || "已安装但未登录；订阅通道不可用，API 通道不受影响。",
+      "tools"
+    );
+  return rows2.sort((left, right) => (STAGE_ORDER.get(left.stage) ?? ATTENTION_STAGES.length) - (STAGE_ORDER.get(right.stage) ?? ATTENTION_STAGES.length)).slice(0, Math.max(1, limit));
+}
+function attentionSummary(rows2 = []) {
+  let count = Array.isArray(rows2) ? rows2.length : 0;
+  if (count === 0) return "";
+  let blocked = rows2.filter((row) => row.stage === "blocked").length;
+  return blocked > 0 ? `${count} 项需要你处理（${blocked} 项会阻止执行）` : `${count} 项需要你处理`;
+}
+
 // .dsh-plugin/client/router-insights.jsx
 var import_react54 = __toESM(require("react"), 1);
 
@@ -29618,7 +29681,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.2", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.26.3", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -30382,6 +30445,17 @@ var router_main_default = `.mr-workspace {
 .mr-tui-input{width:100%;box-sizing:border-box;border:1px solid var(--mr-line,#d8ded6);border-radius:8px;padding:8px 10px;font:inherit;color:inherit;background:var(--mr-bg,#fff);resize:vertical}
 .mr-tui-actions{display:flex;align-items:center;gap:10px}
 .mr-tui-reply{margin:0;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--mr-soft,#f4f6f2);border-radius:8px;padding:10px;font:12px/1.6 ui-monospace,monospace}
+
+.mr-attention{border-color:#c9a22766;background:linear-gradient(180deg,#fdf7e6,#fffef9)}
+.mr-attention-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.mr-attention-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid var(--mr-line,#e4e0d2);border-radius:10px;background:#fff}
+.mr-attention-row>div{min-width:0}
+.mr-attention-row strong{display:block;font-size:13px;line-height:1.4}
+.mr-attention-row .mr-caption{margin:2px 0 0}
+.mr-attention-blocked{border-left:3px solid #b3261e}
+.mr-attention-failed{border-left:3px solid #b26a00}
+.mr-attention-login{border-left:3px solid #4a8069}
+.mr-attention-answer{border-left:3px solid #2f6f9f}
 `;
 
 // .dsh-plugin/client/router-main.jsx
@@ -30934,7 +31008,13 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       mounted.current = !1, catalogRequest.current += 1;
     };
   }, []);
-  let routes = routesFromModelCatalog(catalogState.catalog), assignmentOptions = manualAssignmentOptions(routes, toolProbes, workbench.health.report), currentPackagePlanKey = packagePlanKey(plan, task), effectiveAssignmentMode = assignmentMode === "manual" && currentPackagePlanKey && manualAllowed && mode !== "direct" ? "manual" : "algorithm", changeAssignmentMode = (next) => {
+  let routes = routesFromModelCatalog(catalogState.catalog), assignmentOptions = manualAssignmentOptions(routes, toolProbes, workbench.health.report), attention = import_react57.default.useMemo(() => deriveAttention({
+    budget: workbench.ledger.value?.budget ?? null,
+    reserved: workbench.ledger.value?.reserved ?? null,
+    probes: toolProbes?.probes ?? [],
+    health: (workbench.health.report?.tools ?? []).map((item) => ({ ...item, label: OFFICIAL_TOOLS.find((tool) => tool.id === item.id)?.label ?? item.id })),
+    runs: workbench.ledger.value?.runs ?? []
+  }), [workbench.ledger.value, workbench.health.report, toolProbes]), currentPackagePlanKey = packagePlanKey(plan, task), effectiveAssignmentMode = assignmentMode === "manual" && currentPackagePlanKey && manualAllowed && mode !== "direct" ? "manual" : "algorithm", changeAssignmentMode = (next) => {
     if (next === "manual") {
       if (!manualAllowed || !currentPackagePlanKey) return;
       setPackageAssignments(initialPackageAssignments(plan)), setAssignmentMode("manual");
@@ -30993,7 +31073,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
   }, summary = healthSummary(workbench.health.report?.tools);
   return /* @__PURE__ */ import_react57.default.createElement("main", { className: "mr-workspace" }, /* @__PURE__ */ import_react57.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react57.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-eyebrow" }, "Model Router · DeepSeek Harness"), /* @__PURE__ */ import_react57.default.createElement("h1", { className: "mr-title" }, "模型路由工作台"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-subtitle" }, "把任务交给合适的模型。从本地规划，到可确认的执行。")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === "loading" ? "正在读取模型目录" : "模型目录读取失败")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-overview", "aria-label": "工作台概览" }, /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("models") }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-label" }, "模型路线"), /* @__PURE__ */ import_react57.default.createElement("strong", null, catalogState.status === "ready" ? routes.length : "—"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-detail" }, catalogState.status === "ready" ? `${providerCount} 个供应商 · 配置价格与能力 →` : "等待目录加载")), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("tools") }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-label" }, "官方工具"), /* @__PURE__ */ import_react57.default.createElement("strong", null, workbench.health.report ? summary.installed : "—", /* @__PURE__ */ import_react57.default.createElement("small", null, " / ", OFFICIAL_TOOLS.length)), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-detail" }, workbench.health.report ? `${summary.ready} 个已登录 · 查看体检 →` : "查看安装与登录状态 →")), /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("controls") }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-label" }, "今日已发生 API 费用"), /* @__PURE__ */ import_react57.default.createElement("strong", null, workbench.ledger.value ? money2(workbench.ledger.value.spent?.today ?? 0) : "—"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-overview-detail" }, "预占 ", money2(reservationSummary(workbench.ledger.value).today), " · 查看预算 →"))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-workspace-tabs", role: "tablist", "aria-label": "工作台功能" }, WORKSPACE_VIEWS.map((item, index) => /* @__PURE__ */ import_react57.default.createElement("button", { key: item.id, ref: (element) => {
     tabRefs.current[item.id] = element;
-  }, type: "button", role: "tab", id: `mr-tab-${item.id}`, "aria-selected": view === item.id, "aria-controls": `mr-panel-${item.id}`, tabIndex: view === item.id ? 0 : -1, onKeyDown: (event) => navigateTabs(event, index), onClick: () => setView(item.id) }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-tab-number", "aria-hidden": "true" }, item.number), item.label))), staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: !!toolProbes?.probes?.length }) && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-error", role: "alert" }, staleHostNotice({ hostVersion: toolProbes?.hostVersion })), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react57.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-plan", "aria-labelledby": "mr-tab-plan", hidden: view !== "plan" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-grid mr-planning-grid" }, /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card", "aria-label": "任务规划" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "任务规划"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "写清目标与验收标准，先生成本地建议，再预览执行。")), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-pill" }, "本地规划 · 不消耗 token")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-label", htmlFor: "mr-task" }, "任务描述"), /* @__PURE__ */ import_react57.default.createElement("textarea", { className: "mr-textarea", id: "mr-task", value: task, onChange: (event) => {
+  }, type: "button", role: "tab", id: `mr-tab-${item.id}`, "aria-selected": view === item.id, "aria-controls": `mr-panel-${item.id}`, tabIndex: view === item.id ? 0 : -1, onKeyDown: (event) => navigateTabs(event, index), onClick: () => setView(item.id) }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-tab-number", "aria-hidden": "true" }, item.number), item.label))), staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: !!toolProbes?.probes?.length }) && /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-error", role: "alert" }, staleHostNotice({ hostVersion: toolProbes?.hostVersion })), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react57.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), attention.length > 0 && /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card mr-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "需要你处理"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, attentionSummary(attention)))), /* @__PURE__ */ import_react57.default.createElement("ul", { className: "mr-attention-list" }, attention.map((row) => /* @__PURE__ */ import_react57.default.createElement("li", { key: row.key, className: `mr-attention-row mr-attention-${row.stage}` }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, row.detail)), /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => selectView(row.target) }, row.target === "tools" ? "查看官方工具" : "查看费用与用量"))))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-plan", "aria-labelledby": "mr-tab-plan", hidden: view !== "plan" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-grid mr-planning-grid" }, /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card", "aria-label": "任务规划" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "任务规划"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "写清目标与验收标准，先生成本地建议，再预览执行。")), /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-pill" }, "本地规划 · 不消耗 token")), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-label", htmlFor: "mr-task" }, "任务描述"), /* @__PURE__ */ import_react57.default.createElement("textarea", { className: "mr-textarea", id: "mr-task", value: task, onChange: (event) => {
     setTask(event.target.value), invalidatePlan();
   }, placeholder: "例如：分析项目架构，分工修复关键问题，并给出验收清单", "aria-describedby": "mr-task-hint" }), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-task-hint", id: "mr-task-hint" }, "团队任务可按编号写出步骤、交付物和依赖；规划不会更改主会话模型。"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "mr-control-label" }, "规划模式"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "规划模式" }, /* @__PURE__ */ import_react57.default.createElement("button", { type: "button", "aria-pressed": mode === "single", onClick: () => {
     setMode("single"), invalidatePlan();
