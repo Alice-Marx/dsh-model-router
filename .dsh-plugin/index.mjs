@@ -2137,8 +2137,37 @@ function refusedWorkbenchStart({ preview, request }) {
     missing: missing.map(item => item.code) } : null
 }
 
+/**
+ * A rehearsal reports the work it would have handed out, without calling a model or a tool.
+ * Every field comes from the already-computed preview, so nothing new is decided here.
+ */
+export function dryRunOutcome(prepared = {}) {
+  const packages = Array.isArray(prepared?.preview?.decision?.packages) ? prepared.preview.decision.packages : []
+  const planned = packages.map((item, index) => ({
+    ...item,
+    dryRun: true,
+    wouldCall: item?.provider && item?.model ? `${item.provider}/${item.model}` : item?.toolId ?? '未分配',
+    order: index + 1,
+  }))
+  return {
+    status: 'planned',
+    dryRun: true,
+    runId: null,
+    workspace: prepared?.preview?.workspace ?? null,
+    decision: prepared?.preview?.decision ?? null,
+    budget: prepared?.preview?.budget ?? null,
+    planned,
+    notice: `演练：本应执行 ${planned.length} 个工作包，没有调用任何模型或工具，也没有产生费用。每个工作包的预计费用见计划。`,
+  }
+}
+
 async function executePreparedWorkbenchRun(ctx, config, prepared, options = {}) {
   const { preview, request } = prepared
+  // A rehearsal short-circuits every execution path, including official-team CLI runs.
+  if (request?.dryRun === true) {
+    await reportRunProgress(options, { type: 'stage', stage: 'dry-run' })
+    return dryRunOutcome(prepared)
+  }
   const confirmed = new Set(Array.isArray(request.confirmedReasons) ? request.confirmedReasons : [])
   throwIfAborted(options.signal)
   await reportRunProgress(options, { type: 'stage', stage: 'executing' })
@@ -2172,7 +2201,9 @@ async function executePreparedWorkbenchRun(ctx, config, prepared, options = {}) 
 export async function launchWorkbenchRun(ctx, config, supplied = {}, { runJobs, ...options } = {}) {
   if (!runJobs) throw new Error('工作台任务服务不可用，请重启 Harness 后重试。')
   const prepared = await prepareWorkbenchPreview(ctx, config, supplied, options)
-  const refused = refusedWorkbenchStart(prepared)
+  // A rehearsal changes nothing, so it needs no confirmation: the preview already lists
+  // which reasons an actual run would ask for.
+  const refused = prepared?.request?.dryRun === true ? null : refusedWorkbenchStart(prepared)
   if (refused) return refused
   return runJobs.start({
     packages: prepared.preview.decision?.packages ?? [],

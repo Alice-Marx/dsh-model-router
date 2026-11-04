@@ -317,3 +317,8 @@
 .mr-attention-failed{border-left:3px solid #b26a00}
 .mr-attention-login{border-left:3px solid #4a8069}
 .mr-attention-answer{border-left:3px solid #2f6f9f}
+
+.mr-launch-dryrun{min-width:auto}
+.mr-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;margin:4px 0}
+.mr-planned{margin:8px 0 0;padding-left:20px;font-size:12px;line-height:1.7;color:var(--mr-text,#37433c)}
+.mr-planned li{margin:2px 0}
