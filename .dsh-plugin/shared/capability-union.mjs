@@ -27,5 +27,6 @@ export const CAPABILITY_UNION = Object.freeze([
   Object.freeze({ id: 'remote', label: '远程能力授权入口', evidence: 'packages/orchestration/src/remote-computer-tools.mjs' }),
   Object.freeze({ id: 'attention', label: '需要你处理（工作台）', evidence: '.dsh-plugin/shared/attention.mjs' }),
   Object.freeze({ id: 'bot-attention', label: '需要你处理（Bot 任务）', evidence: 'apps/integration-client/bot-attention.mjs' }),
+  Object.freeze({ id: 'cli-task', label: '官方 CLI 作为子任务', evidence: 'packages/orchestration/src/cli-execution.mjs', note: 'Codex 已登记为 cli/codex 任务后端；其余 CLI 尚未登记' }),
   Object.freeze({ id: 'ledgers', label: '两本账', evidence: '.dsh-plugin/shared/ledgers.mjs' }),
 ])
