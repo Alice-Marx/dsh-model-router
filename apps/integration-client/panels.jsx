@@ -9,7 +9,7 @@ export function ProductNavigation({ openPanel, panels, compact = false }) {
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
     {[
       [panels.bindings, 'Bot 绑定', '◈', '绑定'], [panels.tasks, '任务', '☑', '任务'], [panels.machines, '远程电脑', '▣', '电脑'],
-      [panels.usage, '费用与用量', '◷', '费用'], ['model-router-galgame', '高级工作台', '⚙', '工作台'],
+      [panels.library, '资料库', '▤', '资料'], [panels.usage, '费用与用量', '◷', '费用'], ['model-router-galgame', '高级工作台', '⚙', '工作台'],
     ].map(([id, label, icon, caption]) => <button key={id} type="button" onClick={() => openPanel(id)} title={label} aria-label={label}>
       {/* A narrow column still says what each icon opens, so the row is readable without hovering. */}
       <span aria-hidden="true">{icon}</span>{compact ? <span className="bp-nav-caption">{caption}</span> : <span>{label}</span>}
@@ -614,6 +614,74 @@ export function Usage({ snapshot, dispatch, busy, openAdvanced }) {
   </>
 }
 
+
+/**
+ * One Bot's library: its own files, never another Bot's.
+ *
+ * The Host decides which Bot's directory this is (the caller's own Bot, or the operator's choice), so
+ * the panel only names the Bot it is asking about. Paths stay relative; the Host refuses escapes.
+ */
+export function Library({ snapshot, dispatch, busy }) {
+  const bots = snapshot.bots ?? []
+  const [botId, setBotId] = React.useState(bots[0]?.id ?? '')
+  const [path, setPath] = React.useState('')
+  const [entries, setEntries] = React.useState(null)
+  const [content, setContent] = React.useState(null)
+  const [draft, setDraft] = React.useState('')
+  const [error, setError] = React.useState('')
+  const [status, setStatus] = React.useState('')
+  const call = async (action, payload) => {
+    if (typeof dispatch !== 'function') return null
+    const value = await dispatch(action, payload)
+    if (value && value.ok === false) throw new Error(value.error?.message ?? value.error ?? '宿主拒绝了这一步。')
+    return value
+  }
+  const list = async () => {
+    setError(''); setStatus('')
+    try { setEntries(await call('library.list', { botId, relativePath: path })) } catch (failure) { setError(String(failure?.message ?? failure)) }
+  }
+  const read = async name => {
+    setError(''); setStatus(''); setContent(null)
+    try {
+      const value = await call('library.read', { botId, relativePath: path ? `${path}/${name}` : name })
+      setContent({ name, text: value?.content ?? '' }); setDraft(value?.content ?? '')
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+  }
+  const save = async () => {
+    if (!content) return
+    setError('')
+    try {
+      await call('library.write', { botId, relativePath: path ? `${path}/${content.name}` : content.name, content: draft })
+      setStatus(`已保存 ${content.name}`)
+      await list()
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+  }
+  if (!bots.length) return <p className="bp-empty">还没有 Bot。</p>
+  return <article className="bp-card"><div className="bp-card-title"><h2>资料库</h2><Tag>{botId || '未选择'}</Tag></div>
+    <p className="bp-muted">每个 Bot 有自己的目录；这里看不到别的 Bot 的文件，路径只能是相对的。</p>
+    <div className="bp-form">
+      <label>Bot<select value={botId} onChange={event => { setBotId(event.target.value); setEntries(null); setContent(null) }}>
+        {bots.map(bot => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>
+      <label>相对路径<input value={path} onChange={event => setPath(event.target.value)} placeholder="留空表示根目录，例如 notes" autoComplete="off" spellCheck={false} /></label>
+      <button type="button" disabled={busy} onClick={() => { void list() }}>列出目录</button>
+      {error && <p className="bp-error" role="alert">{error}</p>}
+      {status && <p className="bp-muted" role="status">{status}</p>}
+    </div>
+    {entries ? (entries.length === 0 ? <p className="bp-muted">这个目录是空的。</p> : <div className="bp-table-wrap"><table>
+      <thead><tr><th>名称</th><th>类型</th><th>大小</th><th>操作</th></tr></thead>
+      <tbody>{entries.map(entry => <tr key={entry.name}>
+        <td>{entry.name}</td><td>{entry.kind === 'directory' ? '目录' : '文件'}</td>
+        <td>{Number.isFinite(entry.size) ? `${entry.size} 字节` : '—'}</td>
+        <td>{entry.kind === 'file' && <button type="button" disabled={busy} onClick={() => { void read(entry.name) }}>查看</button>}</td>
+      </tr>)}</tbody></table></div>) : null}
+    {content ? <div className="bp-blocked"><strong>{content.name}</strong>
+      <label className="bp-form">内容<textarea rows={10} value={draft} onChange={event => setDraft(event.target.value)} /></label>
+      <div className="bp-actions"><button type="button" disabled={busy} onClick={() => { void save() }}>保存</button>
+        <button type="button" disabled={busy} onClick={() => setContent(null)}>关闭</button></div>
+    </div> : null}
+  </article>
+}
+
 export function ProductPage({ section, productApi, openSession, openPanel }) {
   const [snapshot, setSnapshot] = useState(null)
   const [error, setError] = useState('')
@@ -661,7 +729,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     } catch (cause) { if (current()) { state.request++; setSnapshotStale(true); setError(cause.message) } } finally { if (current()) setBusy(false) }
   }
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
-  const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', usage: '费用与用量' }[section]
+  const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', usage: '费用与用量' }[section]
   return <main className="bp-page"><header><div><p className="bp-eyebrow">BOT 工作系统</p><h1>{title}</h1></div><button disabled={busy} onClick={() => refresh()}>刷新</button></header>
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
@@ -669,6 +737,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {snapshot && <>{section === 'bindings' && <BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
+      {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} openAdvanced={() => openPanel('model-router-galgame')} />}
       <footer className="bp-muted">宿主读取时间：{new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
   </main>

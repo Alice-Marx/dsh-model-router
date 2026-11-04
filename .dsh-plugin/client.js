@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.54.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.55.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32075,7 +32075,7 @@ var styles = Object.freeze({
 });
 
 // apps/integration-client/api.mjs
-var PRODUCT_PANELS = Object.freeze({ bindings: "bot-product-bindings", tasks: "bot-product-tasks", machines: "bot-product-machines", usage: "bot-product-usage" });
+var PRODUCT_PANELS = Object.freeze({ bindings: "bot-product-bindings", tasks: "bot-product-tasks", machines: "bot-product-machines", library: "bot-product-library", usage: "bot-product-usage" });
 function createProductApi(fetcher = globalThis.fetch) {
   let call2 = async (action, payload, signal) => {
     let response = await fetcher("api/bot-product", {
@@ -32338,6 +32338,7 @@ function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
     [panels.bindings, "Bot 绑定", "◈", "绑定"],
     [panels.tasks, "任务", "☑", "任务"],
     [panels.machines, "远程电脑", "▣", "电脑"],
+    [panels.library, "资料库", "▤", "资料"],
     [panels.usage, "费用与用量", "◷", "费用"],
     ["model-router-galgame", "高级工作台", "⚙", "工作台"]
   ].map(([id2, label, icon2, caption]) => /* @__PURE__ */ import_react61.default.createElement("button", { key: id2, type: "button", onClick: () => openPanel(id2), title: label, "aria-label": label }, /* @__PURE__ */ import_react61.default.createElement("span", { "aria-hidden": "true" }, icon2), compact2 ? /* @__PURE__ */ import_react61.default.createElement("span", { className: "bp-nav-caption" }, caption) : /* @__PURE__ */ import_react61.default.createElement("span", null, label))));
@@ -32646,6 +32647,47 @@ function Usage({ snapshot, dispatch, busy, openAdvanced }) {
   let unresolved = section.unresolved ?? [];
   return /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。"), section.summary && /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts bp-card" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "已知 API 费用" }, money3(section.summary.apiUsd)), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "当前预占" }, money3(section.summary.reservedUsd)), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "未知费用记录" }, section.summary.unknownCount ?? "未报告"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "订阅用量" }, subscriptionText(section.summary.subscriptionSummary))), unresolved.length ? /* @__PURE__ */ import_react61.default.createElement("section", { className: "bp-card", "aria-label": "待人工核对的未确认费用" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "待人工核对的未确认费用"), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。"), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-grid" }, unresolved.map((item) => /* @__PURE__ */ import_react61.default.createElement(UnknownReview, { key: `${item.runId}/${item.packageId}`, item, dispatch, busy })))) : null, section.items.length ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react61.default.createElement("table", null, /* @__PURE__ */ import_react61.default.createElement("thead", null, /* @__PURE__ */ import_react61.default.createElement("tr", null, /* @__PURE__ */ import_react61.default.createElement("th", null, "Bot / 任务"), /* @__PURE__ */ import_react61.default.createElement("th", null, "来源"), /* @__PURE__ */ import_react61.default.createElement("th", null, "准确模型"), /* @__PURE__ */ import_react61.default.createElement("th", null, "金额"), /* @__PURE__ */ import_react61.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react61.default.createElement("tbody", null, section.items.map((row, i) => /* @__PURE__ */ import_react61.default.createElement("tr", { key: row.id ?? row.receiptId ?? i }, /* @__PURE__ */ import_react61.default.createElement("td", null, row.botName ?? row.botId ?? "未归属", /* @__PURE__ */ import_react61.default.createElement("small", null, row.taskId ?? row.runId)), /* @__PURE__ */ import_react61.default.createElement("td", null, { bot: "Bot 对话", aux: "Bot 辅助调用", "mr-api": "MR API", cli: "官方 CLI", review: "评审" }[row.source] ?? row.source ?? "未报告"), /* @__PURE__ */ import_react61.default.createElement("td", null, modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))), /* @__PURE__ */ import_react61.default.createElement("td", null, row.billing === "subscription" ? "订阅" : money3(row.amountUsd ?? row.costUsd)), /* @__PURE__ */ import_react61.default.createElement("td", null, row.status ?? "未知", row.resolution && /* @__PURE__ */ import_react61.default.createElement(Tag2, null, row.resolution.kind === "waive" ? "已按零费用放行" : `已确认 ${money3(row.resolution.costUsd)}`))))))) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-empty" }, "尚无费用收据。"), /* @__PURE__ */ import_react61.default.createElement("button", { onClick: openAdvanced }, "打开高级费用、订阅与历史能力"));
 }
+function Library({ snapshot, dispatch, busy }) {
+  let bots = snapshot.bots ?? [], [botId, setBotId] = import_react61.default.useState(bots[0]?.id ?? ""), [path, setPath] = import_react61.default.useState(""), [entries2, setEntries] = import_react61.default.useState(null), [content, setContent] = import_react61.default.useState(null), [draft, setDraft] = import_react61.default.useState(""), [error, setError] = import_react61.default.useState(""), [status, setStatus] = import_react61.default.useState(""), call2 = async (action, payload) => {
+    if (typeof dispatch != "function") return null;
+    let value = await dispatch(action, payload);
+    if (value && value.ok === !1) throw new Error(value.error?.message ?? value.error ?? "宿主拒绝了这一步。");
+    return value;
+  }, list = async () => {
+    setError(""), setStatus("");
+    try {
+      setEntries(await call2("library.list", { botId, relativePath: path }));
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+  }, read = async (name) => {
+    setError(""), setStatus(""), setContent(null);
+    try {
+      let value = await call2("library.read", { botId, relativePath: path ? `${path}/${name}` : name });
+      setContent({ name, text: value?.content ?? "" }), setDraft(value?.content ?? "");
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+  }, save = async () => {
+    if (content) {
+      setError("");
+      try {
+        await call2("library.write", { botId, relativePath: path ? `${path}/${content.name}` : content.name, content: draft }), setStatus(`已保存 ${content.name}`), await list();
+      } catch (failure) {
+        setError(String(failure?.message ?? failure));
+      }
+    }
+  };
+  return bots.length ? /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "资料库"), /* @__PURE__ */ import_react61.default.createElement(Tag2, null, botId || "未选择")), /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "每个 Bot 有自己的目录；这里看不到别的 Bot 的文件，路径只能是相对的。"), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react61.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react61.default.createElement("select", { value: botId, onChange: (event) => {
+    setBotId(event.target.value), setEntries(null), setContent(null);
+  } }, bots.map((bot) => /* @__PURE__ */ import_react61.default.createElement("option", { key: bot.id, value: bot.id }, bot.name)))), /* @__PURE__ */ import_react61.default.createElement("label", null, "相对路径", /* @__PURE__ */ import_react61.default.createElement("input", { value: path, onChange: (event) => setPath(event.target.value), placeholder: "留空表示根目录，例如 notes", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
+    list();
+  } }, "列出目录"), error && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-error", role: "alert" }, error), status && /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted", role: "status" }, status)), entries2 ? entries2.length === 0 ? /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-muted" }, "这个目录是空的。") : /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react61.default.createElement("table", null, /* @__PURE__ */ import_react61.default.createElement("thead", null, /* @__PURE__ */ import_react61.default.createElement("tr", null, /* @__PURE__ */ import_react61.default.createElement("th", null, "名称"), /* @__PURE__ */ import_react61.default.createElement("th", null, "类型"), /* @__PURE__ */ import_react61.default.createElement("th", null, "大小"), /* @__PURE__ */ import_react61.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react61.default.createElement("tbody", null, entries2.map((entry) => /* @__PURE__ */ import_react61.default.createElement("tr", { key: entry.name }, /* @__PURE__ */ import_react61.default.createElement("td", null, entry.name), /* @__PURE__ */ import_react61.default.createElement("td", null, entry.kind === "directory" ? "目录" : "文件"), /* @__PURE__ */ import_react61.default.createElement("td", null, Number.isFinite(entry.size) ? `${entry.size} 字节` : "—"), /* @__PURE__ */ import_react61.default.createElement("td", null, entry.kind === "file" && /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
+    read(entry.name);
+  } }, "查看"))))))) : null, content ? /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-blocked" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, content.name), /* @__PURE__ */ import_react61.default.createElement("label", { className: "bp-form" }, "内容", /* @__PURE__ */ import_react61.default.createElement("textarea", { rows: 10, value: draft, onChange: (event) => setDraft(event.target.value) })), /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
+    save();
+  } }, "保存"), /* @__PURE__ */ import_react61.default.createElement("button", { type: "button", disabled: busy, onClick: () => setContent(null) }, "关闭"))) : null) : /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-empty" }, "还没有 Bot。");
+}
 function ProductPage({ section, productApi, openSession, openPanel }) {
   let [snapshot, setSnapshot] = (0, import_react61.useState)(null), [error, setError] = (0, import_react61.useState)(""), [busy, setBusy] = (0, import_react61.useState)(!1), [snapshotStale, setSnapshotStale] = (0, import_react61.useState)(!1), lifecycle = (0, import_react61.useRef)({ live: !1, epoch: 0, request: 0 }), snapshotApi = (0, import_react61.useRef)(null), refresh = (0, import_react61.useCallback)(async (signal) => {
     let state = lifecycle.current;
@@ -32682,8 +32724,8 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
     } finally {
       current() && setBusy(!1);
     }
-  }, disabled = busy || snapshotStale || snapshotApi.current !== productApi || !!snapshot?.readOnly, title = { bindings: "Bot 绑定与权限", tasks: "任务", machines: "远程电脑", usage: "费用与用量" }[section];
-  return /* @__PURE__ */ import_react61.default.createElement("main", { className: "bp-page" }, /* @__PURE__ */ import_react61.default.createElement("header", null, /* @__PURE__ */ import_react61.default.createElement("div", null, /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-eyebrow" }, "BOT 工作系统"), /* @__PURE__ */ import_react61.default.createElement("h1", null, title)), /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => refresh() }, "刷新")), error && /* @__PURE__ */ import_react61.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react61.default.createElement("p", null, error), snapshot && /* @__PURE__ */ import_react61.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot?.readOnly && /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: { reason: snapshot.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot && !error && /* @__PURE__ */ import_react61.default.createElement("p", { role: "status" }, "正在读取宿主状态…"), snapshot && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, section === "bindings" && /* @__PURE__ */ import_react61.default.createElement(BotBindings, { snapshot, openSession, dispatch, busy: disabled }), section === "tasks" && /* @__PURE__ */ import_react61.default.createElement(Tasks, { snapshot, dispatch, busy: disabled }), section === "machines" && /* @__PURE__ */ import_react61.default.createElement(Machines, { snapshot, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react61.default.createElement(Usage, { snapshot, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react61.default.createElement("footer", { className: "bp-muted" }, "宿主读取时间：", new Date(snapshot.observedAt).toLocaleString("zh-CN"))));
+  }, disabled = busy || snapshotStale || snapshotApi.current !== productApi || !!snapshot?.readOnly, title = { bindings: "Bot 绑定与权限", tasks: "任务", machines: "远程电脑", library: "资料库", usage: "费用与用量" }[section];
+  return /* @__PURE__ */ import_react61.default.createElement("main", { className: "bp-page" }, /* @__PURE__ */ import_react61.default.createElement("header", null, /* @__PURE__ */ import_react61.default.createElement("div", null, /* @__PURE__ */ import_react61.default.createElement("p", { className: "bp-eyebrow" }, "BOT 工作系统"), /* @__PURE__ */ import_react61.default.createElement("h1", null, title)), /* @__PURE__ */ import_react61.default.createElement("button", { disabled: busy, onClick: () => refresh() }, "刷新")), error && /* @__PURE__ */ import_react61.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react61.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react61.default.createElement("p", null, error), snapshot && /* @__PURE__ */ import_react61.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot?.readOnly && /* @__PURE__ */ import_react61.default.createElement(Blocked, { value: { reason: snapshot.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot && !error && /* @__PURE__ */ import_react61.default.createElement("p", { role: "status" }, "正在读取宿主状态…"), snapshot && /* @__PURE__ */ import_react61.default.createElement(import_react61.default.Fragment, null, section === "bindings" && /* @__PURE__ */ import_react61.default.createElement(BotBindings, { snapshot, openSession, dispatch, busy: disabled }), section === "tasks" && /* @__PURE__ */ import_react61.default.createElement(Tasks, { snapshot, dispatch, busy: disabled }), section === "machines" && /* @__PURE__ */ import_react61.default.createElement(Machines, { snapshot, dispatch, busy: disabled }), section === "library" && /* @__PURE__ */ import_react61.default.createElement(Library, { snapshot, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react61.default.createElement(Usage, { snapshot, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react61.default.createElement("footer", { className: "bp-muted" }, "宿主读取时间：", new Date(snapshot.observedAt).toLocaleString("zh-CN"))));
 }
 
 // apps/integration-client/product.css

@@ -2452,6 +2452,7 @@ export function apply(ctx, config = {}) {
     const libraryRootDir = libraryRoot(dirname(routerStateStore().file))
     const library = createBotLibrary({ root: libraryRootDir, fs })
     registerLibraryTools({ ctx, config, defineTool, registerPolicyTool, library, jsonOutput: JSON_OUTPUT, jsonValue, stateDir: libraryRootDir })
+    try { ctx.provide('botLibrary', library) } catch { /* provided once */ }
     ctx.provide('routineStore', createBotRoutineStore({ dir: routineStoreDir(dirname(routerStateStore().file)) }))
   } catch (error) {
     ctx.logger?.('model-router: bot library unavailable: %s', error?.message ?? error)
