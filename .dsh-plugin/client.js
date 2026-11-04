@@ -1737,7 +1737,7 @@ function registerShape(id2, shape) {
   if (typeof shape?.body != "function" || typeof shape.body("#000") != "string") throw new Error("A shape needs body(paint) returning SVG markup");
   let at2 = shape.eyes?.at;
   if (!Array.isArray(at2) || at2.length !== 2 || !at2.every(isPoint)) throw new Error("A shape needs eyes.at: two [x, y] points");
-  let size = Number.isFinite(shape.size) && shape.size > 0 ? shape.size : 100, pick2 = (key, fallback) => Number.isFinite(shape.eyes[key]) ? shape.eyes[key] : fallback, eyes = at2.map(([x, y]) => [x, y, pick2("w", size * 0.1), pick2("h", size * 0.23), pick2("tilt", -27)]), previous = SHAPES[id2];
+  let size = Number.isFinite(shape.size) && shape.size > 0 ? shape.size : 100, pick3 = (key, fallback) => Number.isFinite(shape.eyes[key]) ? shape.eyes[key] : fallback, eyes = at2.map(([x, y]) => [x, y, pick3("w", size * 0.1), pick3("h", size * 0.23), pick3("tilt", -27)]), previous = SHAPES[id2];
   SHAPES[id2] = {
     label: String(shape.label ?? id2),
     size,
@@ -3630,8 +3630,8 @@ function useDockHold(sessionId, kind, requestId, actions, inline) {
 // modules/bot-runtime/vendor/ds-bot/src/client/questions.js
 var keyLetter = (index) => String.fromCharCode(65 + index), optionsOf = (question) => (question?.options ?? []).map((option) => typeof option == "string" ? { label: option } : option), isTypingTarget = (node) => node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement || node instanceof HTMLElement && node.isContentEditable, optionKeyCards = createSource(0);
 function useOptionKeys(count, onPick, ownRef) {
-  let pick2 = (0, import_react6.useRef)(onPick);
-  pick2.current = onPick;
+  let pick3 = (0, import_react6.useRef)(onPick);
+  pick3.current = onPick;
   let listening = (0, import_react6.useSyncExternalStore)(optionKeyCards.subscribe, optionKeyCards.getSnapshot);
   return (0, import_react6.useEffect)(() => {
     if (count === 0) return;
@@ -3639,7 +3639,7 @@ function useOptionKeys(count, onPick, ownRef) {
     let onKey = (event) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.length !== 1 || isTypingTarget(event.target) || isTypingTarget(document.activeElement) || document.querySelector('[role="dialog"], [aria-modal="true"]') !== null || optionKeyCards.getSnapshot() !== 1) return;
       let index = event.key.toUpperCase().charCodeAt(0) - 65;
-      index >= 0 && index < count ? (event.preventDefault(), pick2.current(index)) : index === count && ownRef.current && (event.preventDefault(), ownRef.current.focus());
+      index >= 0 && index < count ? (event.preventDefault(), pick3.current(index)) : index === count && ownRef.current && (event.preventDefault(), ownRef.current.focus());
     };
     return document.addEventListener("keydown", onKey, !0), () => {
       document.removeEventListener("keydown", onKey, !0), optionKeyCards.set((value) => value - 1);
@@ -3957,8 +3957,8 @@ var keyLetter2 = (index) => String.fromCharCode(65 + index), isTypingTarget2 = (
   };
 })();
 function useOptionKeys2(count, onPick, ownRef) {
-  let pick2 = (0, import_react8.useRef)(onPick);
-  pick2.current = onPick;
+  let pick3 = (0, import_react8.useRef)(onPick);
+  pick3.current = onPick;
   let listening = (0, import_react8.useSyncExternalStore)(keyCards.subscribe, keyCards.getSnapshot);
   return (0, import_react8.useEffect)(() => {
     if (count === 0) return;
@@ -3966,7 +3966,7 @@ function useOptionKeys2(count, onPick, ownRef) {
     let onKey = (event) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.length !== 1 || isTypingTarget2(event.target) || isTypingTarget2(document.activeElement) || document.querySelector('[role="dialog"], [aria-modal="true"]') !== null || keyCards.getSnapshot() !== 1) return;
       let index = event.key.toUpperCase().charCodeAt(0) - 65;
-      index >= 0 && index < count ? (event.preventDefault(), pick2.current(index)) : index === count && ownRef.current && (event.preventDefault(), ownRef.current.focus());
+      index >= 0 && index < count ? (event.preventDefault(), pick3.current(index)) : index === count && ownRef.current && (event.preventDefault(), ownRef.current.focus());
     };
     return document.addEventListener("keydown", onKey, !0), () => {
       document.removeEventListener("keydown", onKey, !0), keyCards.set((value) => value - 1);
@@ -5235,7 +5235,7 @@ function NumberInput({ node, ctx }) {
   );
 }
 function ChoiceInput({ node, ctx }) {
-  let labelId = (0, import_react11.useId)(), options = optionsOf2(node), current = ctx.values[node.id], side = options.length <= 4 && options.every((option) => [...option.label].length <= 14), pick2 = (option) => () => {
+  let labelId = (0, import_react11.useId)(), options = optionsOf2(node), current = ctx.values[node.id], side = options.length <= 4 && options.every((option) => [...option.label].length <= 14), pick3 = (option) => () => {
     ctx.locked || ctx.setInput(node.id, choiceValue(option));
   };
   return (0, import_react11.createElement)(
@@ -5245,7 +5245,7 @@ function ChoiceInput({ node, ctx }) {
     side ? (0, import_react11.createElement)(
       Segmented2,
       { label: node.label, value: options.findIndex((option) => choiceValue(option) === current), className: "dv-view-seg" },
-      options.map((option) => (0, import_react11.createElement)("button", { key: option.label, type: "button", "aria-pressed": choiceValue(option) === current, disabled: ctx.locked, onClick: pick2(option) }, option.label))
+      options.map((option) => (0, import_react11.createElement)("button", { key: option.label, type: "button", "aria-pressed": choiceValue(option) === current, disabled: ctx.locked, onClick: pick3(option) }, option.label))
     ) : (0, import_react11.createElement)(
       "div",
       { className: "dv-view-radios", role: "radiogroup", "aria-labelledby": labelId },
@@ -5256,7 +5256,7 @@ function ChoiceInput({ node, ctx }) {
         className: "dv-view-radio",
         "aria-checked": choiceValue(option) === current,
         disabled: ctx.locked,
-        onClick: pick2(option)
+        onClick: pick3(option)
       }, (0, import_react11.createElement)("span", { className: "dv-view-radio-dot", "aria-hidden": !0 }), option.label))
     )
   );
@@ -5355,7 +5355,7 @@ function useChartHandles() {
   }
   return { charts: [...charts.current.values()], ...fns.current };
 }
-function ViewMenuList({ charts, pick: pick2 }) {
+function ViewMenuList({ charts, pick: pick3 }) {
   let ui3 = useViewUi();
   return (0, import_react11.createElement)(
     "div",
@@ -5369,9 +5369,9 @@ function ViewMenuList({ charts, pick: pick2 }) {
         index > 0 ? (0, import_react11.createElement)("div", { className: "dv-menu-sep", role: "separator" }) : null,
         (0, import_react11.createElement)("div", { className: "dv-view-menu-label" }, chart.label ?? ui3.t("Chart {n}", { n: index + 1 }))
       ) : null,
-      (0, import_react11.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.toggleTable) }, (0, import_react11.createElement)(TableIcon), chart.asTable ? ui3.t("View as chart") : ui3.t("View as table")),
-      (0, import_react11.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.copy) }, (0, import_react11.createElement)(CopyIcon2), ui3.t("Copy data")),
-      (0, import_react11.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.save) }, (0, import_react11.createElement)(DownloadIcon2), ui3.t("Download image"))
+      (0, import_react11.createElement)("button", { type: "button", role: "menuitem", onClick: pick3(chart.toggleTable) }, (0, import_react11.createElement)(TableIcon), chart.asTable ? ui3.t("View as chart") : ui3.t("View as table")),
+      (0, import_react11.createElement)("button", { type: "button", role: "menuitem", onClick: pick3(chart.copy) }, (0, import_react11.createElement)(CopyIcon2), ui3.t("Copy data")),
+      (0, import_react11.createElement)("button", { type: "button", role: "menuitem", onClick: pick3(chart.save) }, (0, import_react11.createElement)(DownloadIcon2), ui3.t("Download image"))
     ))
   );
 }
@@ -5388,14 +5388,14 @@ function ViewMenu({ charts }) {
       document.removeEventListener("pointerdown", away, !0), document.removeEventListener("keydown", key);
     };
   }, [open]);
-  let pick2 = (run2) => () => {
+  let pick3 = (run2) => () => {
     setOpen(!1), run2();
   };
   return (0, import_react11.createElement)(
     "div",
     { ref: root, className: "dv-view-tools", "data-open": open ? "" : void 0 },
     (0, import_react11.createElement)("button", { type: "button", className: "dv-view-more", "aria-label": ui3.t("Chart options"), "aria-haspopup": "menu", "aria-expanded": open, onClick: () => setOpen((value) => !value) }, (0, import_react11.createElement)(DotsIcon2)),
-    open ? (0, import_react11.createElement)(ViewMenuList, { charts, pick: pick2 }) : null
+    open ? (0, import_react11.createElement)(ViewMenuList, { charts, pick: pick3 }) : null
   );
 }
 function WidgetCard({ title, view, onSubmit, onDismiss, busy = !1, raised = !1, settled = !1, answer = null }) {
@@ -7611,7 +7611,7 @@ function useMarkedUnread(id2, active, marked, actions) {
 var PinMark = () => (0, import_react19.createElement)("span", { className: "bt-pin", "aria-hidden": !0 }, (0, import_react19.createElement)(PinMarkIcon)), nameIfCut = (event) => {
   let row = event.currentTarget, name = row.querySelector(".bt-row-title");
   name && name.scrollWidth > name.clientWidth ? row.title = name.textContent : row.removeAttribute("title");
-}, useApproval = (useWork, match) => useWork ? useWork((work) => (work.approvals ?? []).some(match)) : !1, useGroupWork = (useWork, pick2) => useWork ? useWork((work) => JSON.stringify(pick2(work.rooms ?? {}))) : "[]", workKeys = (text7) => JSON.parse(text7), doingOf = ({ tool, said, note, target, switching }) => ({ tool, said, note, target, switching }), workLine = (lead, doing, more) => (0, import_react19.createElement)(Shimmer, null, `${lead} · ${workPhrase(doing)}…${more > 0 ? ` +${more}` : ""}`), doingLine = (doing) => (0, import_react19.createElement)(Shimmer, null, `${workPhrase(doing)}…`), waitingFor = (roster, waits) => {
+}, useApproval = (useWork, match) => useWork ? useWork((work) => (work.approvals ?? []).some(match)) : !1, useGroupWork = (useWork, pick3) => useWork ? useWork((work) => JSON.stringify(pick3(work.rooms ?? {}))) : "[]", workKeys = (text7) => JSON.parse(text7), doingOf = ({ tool, said, note, target, switching }) => ({ tool, said, note, target, switching }), workLine = (lead, doing, more) => (0, import_react19.createElement)(Shimmer, null, `${lead} · ${workPhrase(doing)}…${more > 0 ? ` +${more}` : ""}`), doingLine = (doing) => (0, import_react19.createElement)(Shimmer, null, `${workPhrase(doing)}…`), waitingFor = (roster, waits) => {
   let names = [...(waits?.bots ?? []).map((id2) => roster.byId[id2]?.name), ...(waits?.rooms ?? []).map((id2) => roster.roomsById[id2]?.name)].filter(Boolean);
   return names.length === 0 ? "" : t("Waiting for {names}", { names: names.join(t(" and ")) });
 };
@@ -8956,9 +8956,9 @@ function sideSource({ roster, actions }) {
     async candidates(session, req) {
       return req?.position === "inline" ? [] : sideSurface(roster.getSnapshot(), session.sessionId) !== "bot" ? [] : sideQueryMatches(req?.query) ? [{ name: "side", description: t("Ask without interrupting"), value: "side" }] : [];
     },
-    onPick(pick2) {
-      if (pick2?.action !== "drill" && sideSurface(roster.getSnapshot(), pick2.session.sessionId) === "bot")
-        return { claim: claimFor(pick2.session.sessionId) };
+    onPick(pick3) {
+      if (pick3?.action !== "drill" && sideSurface(roster.getSnapshot(), pick3.session.sessionId) === "bot")
+        return { claim: claimFor(pick3.session.sessionId) };
     },
     matchSpace(session, token) {
       return matchSideSpace(roster.getSnapshot(), session.sessionId, token) === void 0 ? void 0 : { claim: claimFor(session.sessionId) };
@@ -9509,7 +9509,7 @@ function ModelMenu({ bot, roster, actions, run: run2, wide = !1, onPick, onPickE
       return;
     }
     actions?.refreshModels?.(), open();
-  }, pick2 = (ref) => {
+  }, pick3 = (ref) => {
     close(), onPick ? onPick(ref) : (ref !== current || !bot.model) && run2(actions.updateBot(bot.id, { model: ref }));
   }, pickEffort = (effort) => {
     close(), onPickEffort ? onPickEffort(effort) : effort !== bot.effort && run2(actions.updateBot(bot.id, { effort: effort ?? null }));
@@ -9541,7 +9541,7 @@ function ModelMenu({ bot, roster, actions, run: run2, wide = !1, onPick, onPickE
     shownPlace ? (0, import_react_dom6.createPortal)((0, import_react25.createElement)(
       "div",
       { ref: menu, className: `bt-menu bt-model-menu${shownPlace.bottom !== void 0 ? " bt-menu-up" : ""}`, role: "menu", "aria-label": t("Model for {name}", { name: bot.name }), style: shownPlace, "data-leaving": leaving || void 0 },
-      models.length > 0 ? (0, import_react25.createElement)(ModelRows, { roster, current, onPick: pick2 }) : (0, import_react25.createElement)("div", { className: "bt-model-none" }, t("No models are set up in DeepSeek Harness yet.")),
+      models.length > 0 ? (0, import_react25.createElement)(ModelRows, { roster, current, onPick: pick3 }) : (0, import_react25.createElement)("div", { className: "bt-model-none" }, t("No models are set up in DeepSeek Harness yet.")),
       effortRows(reasoning).length > 0 ? (0, import_react25.createElement)(EffortRows, { reasoning, current: picked, onPick: pickEffort }) : null,
       manage ? (0, import_react25.createElement)("div", { className: "bt-menu-sep", role: "separator" }) : null,
       manage ? (0, import_react25.createElement)("button", { type: "button", role: "menuitem", onClick: () => {
@@ -9557,7 +9557,7 @@ function ModelChoiceDock({ sessionId, useRoster, actions }) {
   }, [shown, sessionId]), !bot || currentPart(bot) !== sessionId || !roster.ready) return null;
   let models = roster.models ?? [], usable = models.filter((model) => !model.needsKey), lost = bot.model ? !models.some((model) => model.ref === bot.model) : !1;
   if (bot.model && (!lost || models.length === 0)) return null;
-  let keyFor = usable.length === 0 && actions.setProviderKey ? models.find((model) => model.needsKey) : void 0, manage = manageModels(actions), pick2 = (ref) => {
+  let keyFor = usable.length === 0 && actions.setProviderKey ? models.find((model) => model.needsKey) : void 0, manage = manageModels(actions), pick3 = (ref) => {
     setBusy(ref), setError(""), Promise.resolve(actions.updateBot(bot.id, { model: ref })).catch((failure) => {
       setError(failure?.message ?? String(failure)), actions.refreshModels?.();
     }).finally(() => setBusy(""));
@@ -9574,7 +9574,7 @@ function ModelChoiceDock({ sessionId, useRoster, actions }) {
         "aria-busy": busy === model.ref || void 0,
         "aria-label": `${model.name} · ${provider}`,
         title: model.ref === roster.defaultModel ? `${model.ref} · ${t("Harness default")}` : model.ref,
-        onClick: () => pick2(model.ref)
+        onClick: () => pick3(model.ref)
       }, model.name, busy === model.ref ? (0, import_react25.createElement)("span", { className: "bt-model-spin", "aria-label": t("Saving…") }) : null)))
     )),
     manage ? (0, import_react25.createElement)("button", { key: "manage", type: "button", className: "bt-model-chip bt-model-chip-quiet", onClick: manage }, (0, import_react25.createElement)(SlidersIcon), t("Manage models")) : null
@@ -11263,7 +11263,7 @@ function NewChat({ mode, roster, actions }) {
         setBusy(!1);
       }
     }
-  }, pick2 = (bot) => {
+  }, pick3 = (bot) => {
     setPicked((current) => [...current, bot.id]), setQuery(""), setCursor(0), inputRef.current?.focus();
   }, chooseAdmin = (bot) => {
     setAdmin(bot.id), setQuery(""), setCursor(0), inputRef.current?.focus();
@@ -11273,7 +11273,7 @@ function NewChat({ mode, roster, actions }) {
       return;
     }
     if (group || picked.length > 0) {
-      pick2(bot);
+      pick3(bot);
       return;
     }
     bot.hidden && await actions.setFlags(bot.id, { hidden: !1 }), message.trim() && await actions.send(bot.id, message.trim()), actions.openSession(bot.id), close();
@@ -11755,7 +11755,7 @@ function PermissionPicker({ catalog, saved, onPick, repick = !1 }) {
       }
       flight.current.value = void 0, ok || setPending(null);
     });
-  }, current = pending ?? saved, pick2 = (value) => {
+  }, current = pending ?? saved, pick3 = (value) => {
     if (!(value === current && !repick)) {
       if (setPending(value), flight.current.value !== void 0) {
         flight.current.latest = value;
@@ -11772,7 +11772,7 @@ function PermissionPicker({ catalog, saved, onPick, repick = !1 }) {
       type: "button",
       "aria-pressed": option.value === current,
       title: option.description,
-      onClick: () => pick2(option.value),
+      onClick: () => pick3(option.value),
       className: presetDanger(option.value) ? "bt-perm-danger" : void 0
     }, presetName(option.value, catalog)))
   );
@@ -12607,7 +12607,7 @@ function UsagePage({ roster, actions, focusId }) {
         (0, import_react39.createElement)("span", null, t("Token usage shows up here after a model is called."))
       )
     );
-  let { faces, models, ownerAt, face, keep, all, part, series, tipSeries, fillOf, columns: columns2, ranked, isBot, activeDays, oldest } = shaped, pick2 = (next) => actions.openSettings("usage", `${next.kind}:${next.key}`), chooseRange = (id2) => {
+  let { faces, models, ownerAt, face, keep, all, part, series, tipSeries, fillOf, columns: columns2, ranked, isBot, activeDays, oldest } = shaped, pick3 = (next) => actions.openSettings("usage", `${next.kind}:${next.key}`), chooseRange = (id2) => {
     if (id2 !== "custom") {
       setRangeId(id2), setPicking(!1);
       return;
@@ -12628,7 +12628,7 @@ function UsagePage({ roster, actions, focusId }) {
     whole: total,
     index,
     fill: face ? soften(face.paint, 0.8) : fillOf.get(`o${at2}`) ?? soften(faces[at2].paint),
-    onClick: () => pick2({ kind: "owner", key: view.owners[at2].key })
+    onClick: () => pick3({ kind: "owner", key: view.owners[at2].key })
   }), modelRow = ([at2, sum], index) => (0, import_react39.createElement)(Row2, {
     key: `m${at2}`,
     kind: "model",
@@ -12639,7 +12639,7 @@ function UsagePage({ roster, actions, focusId }) {
     whole,
     index,
     fill: face ? soften(face.paint, 0.8) : fillOf.get(`m${at2}`) ?? soften(models[at2].paint),
-    onClick: () => pick2({ kind: "model", key: view.models[at2].key })
+    onClick: () => pick3({ kind: "model", key: view.models[at2].key })
   }), nothing = (0, import_react39.createElement)("div", { className: "bt-us-none" }, t("Nothing in this range.")), body;
   if (face) {
     let kinds = ranked(part.kinds), usedModels = ranked(part.models), owners = ranked(part.owners);
@@ -12649,7 +12649,7 @@ function UsagePage({ roster, actions, focusId }) {
         "div",
         { key: "sheet", className: "bt-us-sheet" },
         (0, import_react39.createElement)(Stats, { key: "stats", range, total: part.total, previous: part.previous }),
-        (0, import_react39.createElement)(Chart, { key: "chart", range, columns: columns2, series, tipSeries, onPick: pick2 }),
+        (0, import_react39.createElement)(Chart, { key: "chart", range, columns: columns2, series, tipSeries, onPick: pick3 }),
         (0, import_react39.createElement)(
           "div",
           { key: "pair", className: "bt-us-pair" },
@@ -12670,7 +12670,7 @@ function UsagePage({ roster, actions, focusId }) {
         "div",
         { key: "sheet", className: "bt-us-sheet" },
         (0, import_react39.createElement)(Stats, { key: "stats", range, total: all.total, previous: all.previous }),
-        (0, import_react39.createElement)(Chart, { key: "chart", range, columns: columns2, series, tipSeries, by, onBy: setBy, onPick: pick2 }),
+        (0, import_react39.createElement)(Chart, { key: "chart", range, columns: columns2, series, tipSeries, by, onBy: setBy, onPick: pick3 }),
         (0, import_react39.createElement)(
           "div",
           { key: "pair", className: "bt-us-pair" },
@@ -13637,13 +13637,13 @@ function SetRow({ label, hint, children, className = "" }) {
   );
 }
 var LAYOUTS = [["bubble", "Bubble"], ["flat", "Flat"]];
-function Choice({ label, value, options, pick: pick2 }) {
+function Choice({ label, value, options, pick: pick3 }) {
   return (0, import_react45.createElement)(Segmented, { label, value, className: "bt-look-seg" }, options.map(([id2, text7]) => (0, import_react45.createElement)("button", {
     key: id2,
     type: "button",
     "aria-pressed": value === id2,
     onClick: () => {
-      value !== id2 && pick2(id2);
+      value !== id2 && pick3(id2);
     }
   }, t(text7))));
 }
@@ -13659,13 +13659,13 @@ function WidthSlider({ label, value, save }) {
   (0, import_react45.useEffect)(() => () => {
     clearTimeout(timer.current), flush();
   }, []);
-  let pick2 = (next) => {
+  let pick3 = (next) => {
     setWidth(next), pending.current = next, clearTimeout(timer.current), timer.current = setTimeout(flush, 350);
   }, { min, max, step } = MESSAGE_WIDTH;
   return (0, import_react45.createElement)(
     "div",
     { className: "bt-range", style: { "--bt-fill": `${(width - min) / (max - min) * 100}%` } },
-    (0, import_react45.createElement)("input", { type: "range", min, max, step, value: width, "aria-label": label, "aria-valuetext": `${width}%`, onChange: (event) => pick2(Number(event.target.value)) }),
+    (0, import_react45.createElement)("input", { type: "range", min, max, step, value: width, "aria-label": label, "aria-valuetext": `${width}%`, onChange: (event) => pick3(Number(event.target.value)) }),
     (0, import_react45.createElement)("output", null, `${width}%`)
   );
 }
@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.30.8", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.30.9", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32027,6 +32027,47 @@ function botAttentionSummary(rows2 = []) {
   return urgent > 0 ? `${count} 项需要你处理（${urgent} 项卡在确认上）` : `${count} 项需要你处理`;
 }
 
+// apps/integration-client/pairing.mjs
+var TOKEN = /^[A-Za-z0-9_-]{43}$/, ID = /^[A-Za-z0-9_.-]{1,128}$/, pick2 = (value, key) => {
+  let raw = value?.[key];
+  return typeof raw == "string" && raw.trim() ? raw.trim() : "";
+};
+function secretNameFor({ clientId = "", machineId = "" } = {}) {
+  return `REMOTE_AGENT_${String(clientId || machineId || "agent").toUpperCase().replace(/[^A-Z0-9_]/gu, "_").replace(/_+/gu, "_").replace(/^_|_$/gu, "").slice(0, 40) || "AGENT"}`;
+}
+function parsePairingPaste(text7) {
+  let raw = String(text7 ?? "").trim(), problems = [], result = { token: "", machineId: "", clientId: "", secretRef: "" };
+  if (!raw) return { ...result, problems: ["请先粘贴 Agent 的 pair 输出。"] };
+  if (raw.startsWith("{"))
+    try {
+      let value = JSON.parse(raw);
+      result.token = pick2(value, "token"), result.machineId = pick2(value, "machineId"), result.clientId = pick2(value, "clientId"), result.secretRef = pick2(value, "secretRef");
+    } catch {
+      problems.push("这段看起来是 JSON，但没法解析。请整段复制 pair 的输出。");
+    }
+  else {
+    for (let line of raw.split(/\r?\n/u)) {
+      let match = line.match(/^\s*(token|machineId|machine_id|clientId|client_id|secretRef|secret_ref)\s*[:=]\s*(.+?)\s*$/iu);
+      if (!match) continue;
+      let key = match[1].toLowerCase().replace(/_/gu, ""), value = match[2].replace(/^["']|["']$/gu, "");
+      key === "token" && (result.token = value), key === "machineid" && (result.machineId = value), key === "clientid" && (result.clientId = value), key === "secretref" && (result.secretRef = value);
+    }
+    !result.token && TOKEN.test(raw) && (result.token = raw);
+  }
+  return result.token ? TOKEN.test(result.token) || problems.push(`token 应为 43 位，当前 ${result.token.length} 位。`) : problems.push("没有读到 token（43 位）。"), result.machineId ? ID.test(result.machineId) || problems.push("machineId 含非法字符。") : problems.push("没有读到 machineId。"), result.clientId && !ID.test(result.clientId) && problems.push("clientId 含非法字符。"), result.secretRef || (result.secretRef = `ds-secret/${secretNameFor(result)}`), { ...result, problems };
+}
+function normalizeEndpoint(input, { port = 9701 } = {}) {
+  let raw = String(input ?? "").trim();
+  if (!raw) return { endpoint: "", problem: "请填写 Agent 地址。" };
+  let withScheme = /^https?:\/\//iu.test(raw) ? raw : `http://${raw}`, url;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return { endpoint: "", problem: "地址格式不对，例如 10.0.0.2 或 http://10.0.0.2:9701。" };
+  }
+  return url.port || (url.port = String(port)), url.pathname !== "/" || url.search || url.hash ? { endpoint: "", problem: "只填主机与端口，不要带路径或参数。" } : { endpoint: `${url.protocol}//${url.host}`, problem: "" };
+}
+
 // packages/orchestration/src/desktop-contract.mjs
 var fail2 = (code) => {
   let error = new Error(code);
@@ -32268,19 +32309,43 @@ function DesktopControl({ snapshot, dispatch, busy }) {
   } }, "发送文本")));
 }
 function MachineSetup({ snapshot, dispatch, busy }) {
-  let [secretName, setSecretName] = (0, import_react60.useState)("REMOTE_AGENT_DESKTOP"), [secretValue, setSecretValue] = (0, import_react60.useState)(""), [pair, setPair] = (0, import_react60.useState)({ name: "", machineId: "", endpoint: "", secretRef: "ds-secret/REMOTE_AGENT_DESKTOP", roots: "project", probeBotId: snapshot.bots?.[0]?.id ?? "", protectedTunnel: !1 }), available = snapshot.availableActions ?? [], change = (key, value) => setPair((current) => ({ ...current, [key]: value })), nameProblem2 = /^REMOTE_AGENT_[A-Z0-9_]{1,50}$/.test(secretName) ? "" : "只能是大写字母、数字与下划线，并以 REMOTE_AGENT_ 开头（例如 REMOTE_AGENT_CAD2）。", tokenProblem = secretValue === "" || /^[A-Za-z0-9_-]{43}$/.test(secretValue) ? "" : `配对凭据应为 43 位，当前 ${secretValue.length} 位。`, canSaveSecret = !busy && secretName !== "" && secretValue !== "" && !nameProblem2 && !tokenProblem;
-  return /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "添加或重新配对电脑"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "先在目标电脑的 Agent 本地创建配对，核对 machineId。控制凭据只填下面的秘密输入框，保存到现有秘密库；此凭据不给任何 Bot 使用。"), available.includes("machine.secret") && /* @__PURE__ */ import_react60.default.createElement("form", { className: "bp-form", onSubmit: async (event) => {
-    if (event.preventDefault(), !!canSaveSecret)
+  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react60.default.useState(""), [address, setAddress] = import_react60.default.useState(""), [tunnel, setTunnel] = import_react60.default.useState(!0), [status, setStatus] = import_react60.default.useState(""), [error, setError] = import_react60.default.useState(""), [working, setWorking] = import_react60.default.useState(!1), parsed = import_react60.default.useMemo(() => parsePairingPaste(paste), [paste]), endpoint = import_react60.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react60.default.useMemo(() => (parsed.secretRef || "").replace(/^ds-secret\//u, "") || secretNameFor(parsed), [parsed]), importFile = async (event) => {
+    let file = event.target.files?.[0];
+    if (file)
       try {
-        await dispatch("machine.secret", { name: secretName, value: secretValue });
-      } finally {
-        setSecretValue("");
+        setPaste(await file.text()), setStatus("已读取 " + file.name), setError("");
+      } catch (failure) {
+        setError(String(failure?.message ?? failure));
       }
-  } }, /* @__PURE__ */ import_react60.default.createElement("label", null, "秘密名称", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": "远程凭据名称", value: secretName, onChange: (event) => setSecretName(event.target.value.toUpperCase()), "aria-invalid": !!nameProblem2, "aria-describedby": "bp-secret-name-hint", required: !0, autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react60.default.createElement("p", { className: nameProblem2 ? "bp-error" : "bp-muted", id: "bp-secret-name-hint" }, nameProblem2 || "大写字母、数字与下划线；保存后 secretRef 为 ds-secret/该名称。"), /* @__PURE__ */ import_react60.default.createElement("label", null, "配对凭据", /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": "远程配对凭据", type: "password", value: secretValue, onChange: (event) => setSecretValue(event.target.value), "aria-invalid": !!tokenProblem, "aria-describedby": "bp-secret-value-hint", required: !0, autoComplete: "new-password", spellCheck: !1 })), /* @__PURE__ */ import_react60.default.createElement("p", { className: tokenProblem ? "bp-error" : "bp-muted", id: "bp-secret-value-hint" }, tokenProblem || `Agent 的 pair 命令只显示一次的配对凭据（43 位）。当前 ${secretValue.length} 位。`), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: !canSaveSecret, type: "submit" }, "保存宿主专用凭据"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "secretRef：ds-secret/", secretName, "。替换已有凭据会撤销使用它的机器授权，需要重新配对。")), available.includes("machine.pair") && /* @__PURE__ */ import_react60.default.createElement("form", { className: "bp-form", onSubmit: (event) => {
-    event.preventDefault();
-    let existing = snapshot.machines.items.find((item) => item.id === pair.machineId);
-    dispatch("machine.pair", { ...pair, roots: pair.roots.split(",").map((v2) => v2.trim()).filter(Boolean), tools: ["machine_ping", "fs_list", "fs_read", "fs_write", "shell_exec", "container_command_v1", "cli_probe_v1", "cli_task_v1", "operation_status", "operation_cancel", "artifact_stat", "artifact_read", "worktree_create", "worktree_diff", "worktree_integrate", "browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_script", "browser_upload", "browser_download", "browser_close", "desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"], expectedRevision: existing?.revision ?? 0 });
-  } }, [["name", "电脑名称"], ["machineId", "Agent machineId"], ["endpoint", "Agent 地址"], ["secretRef", "凭据 secretRef"], ["roots", "已配对根目录 ID（逗号分隔）"]].map(([key, label]) => /* @__PURE__ */ import_react60.default.createElement("label", { key }, label, /* @__PURE__ */ import_react60.default.createElement("input", { "aria-label": label, value: pair[key], onChange: (event) => change(key, event.target.value), required: !0, autoComplete: "off", spellCheck: !1 }))), /* @__PURE__ */ import_react60.default.createElement("label", null, "用于核验的 Bot", /* @__PURE__ */ import_react60.default.createElement("select", { "aria-label": "配对核验 Bot", value: pair.probeBotId, onChange: (event) => change("probeBotId", event.target.value), required: !0 }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react60.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react60.default.createElement("label", null, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: pair.protectedTunnel, onChange: (event) => change("protectedTunnel", event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "HTTPS 或本机回环地址可直接连接。远程 HTTP 需要已实际配置的受保护隧道；此选项不会创建 VPN。配对后，请在下方按 Bot 明确授予读取、写入、命令、浏览器或桌面能力。"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "submit", disabled: busy }, "核验并配对")));
+  }, submit = async () => {
+    if (!(!ready || working)) {
+      setWorking(!0), setError("");
+      try {
+        await dispatch("machine.secret", { name: secretName, value: parsed.token });
+        let existing = (snapshot.machines?.items ?? []).find((item) => item.id === parsed.machineId);
+        await dispatch("machine.pair", {
+          name: parsed.clientId || parsed.machineId,
+          machineId: parsed.machineId,
+          endpoint: endpoint.endpoint,
+          secretRef: parsed.secretRef || "ds-secret/" + secretName,
+          roots: ["project"],
+          probeBotId: snapshot.bots?.[0]?.id ?? "",
+          protectedTunnel: tunnel,
+          tools: ["machine_ping", "fs_list", "fs_read", "fs_write", "shell_exec", "operation_status", "operation_cancel", "artifact_stat", "artifact_read", "desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"],
+          expectedRevision: existing?.revision ?? 0
+        }), setStatus("已添加 " + (parsed.clientId || parsed.machineId) + "，几秒后体检会刷新状态。"), setPaste("");
+      } catch (failure) {
+        setError(String(failure?.message ?? failure));
+      } finally {
+        setWorking(!1);
+      }
+    }
+  };
+  return /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "添加电脑（导入配对文件）"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "在目标电脑上运行 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "node dist/cli.mjs pair config.json 名称 ceiling.json > pair.json"), "，把生成的 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "pair.json"), " 导入即可；文件里已有 token、machineId 与 secretRef，不用手抄。"), available.includes("machine.secret") && available.includes("machine.pair") ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react60.default.createElement("label", null, "配对文件", /* @__PURE__ */ import_react60.default.createElement("input", { type: "file", accept: ".json,application/json", onChange: (event) => {
+    importFile(event);
+  } })), /* @__PURE__ */ import_react60.default.createElement("label", null, "或粘贴文件内容", /* @__PURE__ */ import_react60.default.createElement("textarea", { rows: 3, value: paste, onChange: (event) => setPaste(event.target.value), placeholder: '{"clientId":"host-office","token":"...","machineId":"machine-..."}' })), /* @__PURE__ */ import_react60.default.createElement("label", null, "Agent 地址", /* @__PURE__ */ import_react60.default.createElement("input", { value: address, onChange: (event) => setAddress(event.target.value), placeholder: "10.0.0.2 或 http://10.0.0.2:9701", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react60.default.createElement("label", null, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: tunnel, onChange: (event) => setTunnel(event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), paste !== "" && parsed.problems.length > 0 && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, parsed.problems.join(" ")), address !== "" && endpoint.problem !== "" && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, endpoint.problem), ready && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "将保存凭据 ", /* @__PURE__ */ import_react60.default.createElement("code", null, "ds-secret/", secretName), " 并配对 ", parsed.machineId, "。"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: !ready || busy || working, onClick: () => {
+    submit();
+  } }, working ? "添加中…" : "导入并添加"), status !== "" && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted", role: "status" }, status), error !== "" && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供配对操作。"));
 }
 function MachineControls({ machine, snapshot, dispatch, busy }) {
   let groups = [

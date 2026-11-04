@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { TASK_STATES, modelName, money } from './api.mjs'
 import { botAttentionSummary, deriveBotAttention } from './bot-attention.mjs'
+import { normalizeEndpoint, parsePairingPaste, secretNameFor } from './pairing.mjs'
 import { framePoint } from '../../packages/orchestration/src/desktop-contract.mjs'
 import { BotBindingEditor } from './binding-editor.jsx'
 
@@ -289,36 +290,71 @@ function DesktopControl({ snapshot, dispatch, busy }) {
 }
 
 function MachineSetup({ snapshot, dispatch, busy }) {
-  const [secretName,setSecretName]=useState('REMOTE_AGENT_DESKTOP')
-  const [secretValue,setSecretValue]=useState('')
-  const [pair,setPair]=useState({name:'',machineId:'',endpoint:'',secretRef:'ds-secret/REMOTE_AGENT_DESKTOP',roots:'project',probeBotId:snapshot.bots?.[0]?.id??'',protectedTunnel:false})
-  const available=snapshot.availableActions??[]
-  const change=(key,value)=>setPair(current=>({...current,[key]:value}))
-  // The hints are the contract, spelled out here so a browser's generic "pattern mismatch" never
-  // replaces them. The Host re-validates both shapes; this only keeps the button honest.
-  const nameProblem = /^REMOTE_AGENT_[A-Z0-9_]{1,50}$/.test(secretName) ? ''
-    : '只能是大写字母、数字与下划线，并以 REMOTE_AGENT_ 开头（例如 REMOTE_AGENT_CAD2）。'
-  const tokenProblem = secretValue === '' ? '' : /^[A-Za-z0-9_-]{43}$/.test(secretValue) ? '' : `配对凭据应为 43 位，当前 ${secretValue.length} 位。`
-  const canSaveSecret = !busy && secretName !== '' && secretValue !== '' && !nameProblem && !tokenProblem
-  return <details className="bp-card"><summary>添加或重新配对电脑</summary>
-    <p className="bp-muted">先在目标电脑的 Agent 本地创建配对，核对 machineId。控制凭据只填下面的秘密输入框，保存到现有秘密库；此凭据不给任何 Bot 使用。</p>
-    {available.includes('machine.secret')&&<form className="bp-form" onSubmit={async event=>{event.preventDefault();if(!canSaveSecret)return;try{await dispatch('machine.secret',{name:secretName,value:secretValue})}finally{setSecretValue('')}}}>
-      <label>秘密名称<input aria-label="远程凭据名称" value={secretName} onChange={event=>setSecretName(event.target.value.toUpperCase())} aria-invalid={Boolean(nameProblem)} aria-describedby="bp-secret-name-hint" required autoComplete="off" spellCheck={false} /></label>
-      <p className={nameProblem ? 'bp-error' : 'bp-muted'} id="bp-secret-name-hint">{nameProblem || '大写字母、数字与下划线；保存后 secretRef 为 ds-secret/该名称。'}</p>
-      <label>配对凭据<input aria-label="远程配对凭据" type="password" value={secretValue} onChange={event=>setSecretValue(event.target.value)} aria-invalid={Boolean(tokenProblem)} aria-describedby="bp-secret-value-hint" required autoComplete="new-password" spellCheck={false} /></label>
-      <p className={tokenProblem ? 'bp-error' : 'bp-muted'} id="bp-secret-value-hint">{tokenProblem || `Agent 的 pair 命令只显示一次的配对凭据（43 位）。当前 ${secretValue.length} 位。`}</p>
-      <button disabled={!canSaveSecret} type="submit">保存宿主专用凭据</button>
-      <p className="bp-muted">secretRef：ds-secret/{secretName}。替换已有凭据会撤销使用它的机器授权，需要重新配对。</p>
-    </form>}
-    {available.includes('machine.pair')&&<form className="bp-form" onSubmit={event=>{event.preventDefault();const existing=snapshot.machines.items.find(item=>item.id===pair.machineId);void dispatch('machine.pair',{...pair,roots:pair.roots.split(',').map(v=>v.trim()).filter(Boolean),tools:['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1','cli_probe_v1','cli_task_v1','operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate','browser_open','browser_snapshot','browser_click','browser_type','browser_script','browser_upload','browser_download','browser_close','desktop_screenshot','desktop_click','desktop_type','desktop_key','desktop_scroll'],expectedRevision:existing?.revision??0})}}>
-      {[['name','电脑名称'],['machineId','Agent machineId'],['endpoint','Agent 地址'],['secretRef','凭据 secretRef'],['roots','已配对根目录 ID（逗号分隔）']].map(([key,label])=><label key={key}>{label}<input aria-label={label} value={pair[key]} onChange={event=>change(key,event.target.value)} required autoComplete="off" spellCheck={false} /></label>)}
-      <label>用于核验的 Bot<select aria-label="配对核验 Bot" value={pair.probeBotId} onChange={event=>change('probeBotId',event.target.value)} required>{snapshot.bots.map(bot=><option key={bot.id} value={bot.id}>{bot.name??bot.id}</option>)}</select></label>
-      <label><input type="checkbox" checked={pair.protectedTunnel} onChange={event=>change('protectedTunnel',event.target.checked)} />地址位于已配置的 WireGuard / Tailscale 受保护隧道</label>
-      <p className="bp-muted">HTTPS 或本机回环地址可直接连接。远程 HTTP 需要已实际配置的受保护隧道；此选项不会创建 VPN。配对后，请在下方按 Bot 明确授予读取、写入、命令、浏览器或桌面能力。</p>
-      <button type="submit" disabled={busy}>核验并配对</button>
-    </form>}
+  const available = snapshot.availableActions ?? []
+  const [paste, setPaste] = React.useState('')
+  const [address, setAddress] = React.useState('')
+  const [tunnel, setTunnel] = React.useState(true)
+  const [status, setStatus] = React.useState('')
+  const [error, setError] = React.useState('')
+  const [working, setWorking] = React.useState(false)
+  const parsed = React.useMemo(() => parsePairingPaste(paste), [paste])
+  const endpoint = React.useMemo(() => normalizeEndpoint(address, {}), [address])
+  const ready = parsed.problems.length === 0 && endpoint.problem === ''
+  const secretName = React.useMemo(() => (parsed.secretRef || '').replace(/^ds-secret\//u, '') || secretNameFor(parsed), [parsed])
+  const importFile = async event => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try {
+      setPaste(await file.text())
+      setStatus('已读取 ' + file.name)
+      setError('')
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+  }
+  const submit = async () => {
+    if (!ready || working) return
+    setWorking(true)
+    setError('')
+    try {
+      await dispatch('machine.secret', { name: secretName, value: parsed.token })
+      const existing = (snapshot.machines?.items ?? []).find(item => item.id === parsed.machineId)
+      await dispatch('machine.pair', {
+        name: parsed.clientId || parsed.machineId,
+        machineId: parsed.machineId,
+        endpoint: endpoint.endpoint,
+        secretRef: parsed.secretRef || ('ds-secret/' + secretName),
+        roots: ['project'],
+        probeBotId: snapshot.bots?.[0]?.id ?? '',
+        protectedTunnel: tunnel,
+        tools: ['machine_ping', 'fs_list', 'fs_read', 'fs_write', 'shell_exec', 'operation_status', 'operation_cancel', 'artifact_stat', 'artifact_read', 'desktop_screenshot', 'desktop_click', 'desktop_type', 'desktop_key', 'desktop_scroll'],
+        expectedRevision: existing?.revision ?? 0,
+      })
+      setStatus('已添加 ' + (parsed.clientId || parsed.machineId) + '，几秒后体检会刷新状态。')
+      setPaste('')
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    } finally {
+      setWorking(false)
+    }
+  }
+  return <details className="bp-card"><summary>添加电脑（导入配对文件）</summary>
+    <p className="bp-muted">在目标电脑上运行 <code>node dist/cli.mjs pair config.json 名称 ceiling.json &gt; pair.json</code>，把生成的 <code>pair.json</code> 导入即可；文件里已有 token、machineId 与 secretRef，不用手抄。</p>
+    {available.includes('machine.secret') && available.includes('machine.pair') ? <div className="bp-form">
+      <label>配对文件<input type="file" accept=".json,application/json" onChange={event => { void importFile(event) }} /></label>
+      <label>或粘贴文件内容<textarea rows={3} value={paste} onChange={event => setPaste(event.target.value)} placeholder='{"clientId":"host-office","token":"...","machineId":"machine-..."}' /></label>
+      <label>Agent 地址<input value={address} onChange={event => setAddress(event.target.value)} placeholder="10.0.0.2 或 http://10.0.0.2:9701" autoComplete="off" spellCheck={false} /></label>
+      <label><input type="checkbox" checked={tunnel} onChange={event => setTunnel(event.target.checked)} />地址位于已配置的 WireGuard / Tailscale 受保护隧道</label>
+      {paste !== '' && parsed.problems.length > 0 && <p className="bp-error" role="alert">{parsed.problems.join(' ')}</p>}
+      {address !== '' && endpoint.problem !== '' && <p className="bp-error" role="alert">{endpoint.problem}</p>}
+      {ready && <p className="bp-muted">将保存凭据 <code>ds-secret/{secretName}</code> 并配对 {parsed.machineId}。</p>}
+      <button type="button" disabled={!ready || busy || working} onClick={() => { void submit() }}>{working ? '添加中…' : '导入并添加'}</button>
+      {status !== '' && <p className="bp-muted" role="status">{status}</p>}
+      {error !== '' && <p className="bp-error" role="alert">{error}</p>}
+    </div> : <p className="bp-muted">宿主尚未提供配对操作。</p>}
   </details>
 }
+
 function MachineControls({ machine, snapshot, dispatch, busy }) {
   const groups = [
     ['read','文件读取',['machine_ping','fs_list','fs_read']],
