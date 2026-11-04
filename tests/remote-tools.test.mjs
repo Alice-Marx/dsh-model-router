@@ -14,7 +14,7 @@ test('remote tools: only granted names are offered, and the rest never reach the
 
 test('remote tools: identity never travels in the arguments', async () => {
   const tools = createRemoteTools({ invoke: async () => ({ ok: true }), names: ['fs_read'] })
-  for (const key of ['machineId', 'rootId', 'botId', 'taskId', 'attemptId', 'operationId', 'endpoint', 'secretRef']) {
+  for (const key of ['rootId', 'botId', 'taskId', 'attemptId', 'operationId', 'endpoint', 'secretRef']) {
     await assert.rejects(tools.call('fs_read', { path: 'a', [key]: 'x' }), /TOOL_ARG_FORBIDDEN/)
   }
 })
@@ -32,4 +32,14 @@ test('remote tools: the Host error surfaces unchanged', async () => {
     names: ['fs_read'],
   })
   await assert.rejects(tools.call('fs_read', { path: 'a' }), /MACHINE_BOT_DENIED/)
+})
+
+test('remote tools: a named machine must be on the Bot whitelist', async () => {
+  const seen = []
+  const tools = createRemoteTools({ invoke: async (name, args) => { seen.push(args); return { ok: true } }, names: ['fs_read'], machines: ['machine-a'] })
+  assert.deepEqual(tools.machines, ['machine-a'])
+  await tools.call('fs_read', { path: 'a', machineId: 'machine-a' })
+  assert.equal(seen[0].machineId, 'machine-a')
+  await assert.rejects(tools.call('fs_read', { path: 'a', machineId: 'machine-b' }), /MACHINE_NOT_ALLOWED/)
+  assert.equal(seen.length, 1)
 })

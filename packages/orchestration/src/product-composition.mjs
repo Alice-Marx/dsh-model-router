@@ -457,15 +457,19 @@ export function startBotProduct(ctx, options = {}) {
           const model = machines.readModel()
           const candidates = (model?.items ?? []).filter(item => item.status !== 'revoked'
             && Array.isArray(item.bindings) && item.bindings.some(binding => binding.botId === botId && !binding.revoked))
-          const machine = candidates[0]
+          // A caller may name one machine; it must be one of this Bot's own live bindings.
+          const wanted = typeof args?.machineId === 'string' ? args.machineId : null
+          const machine = wanted ? candidates.find(item => item.id === wanted) : candidates[0]
           if (!machine) throw new Error('MACHINE_NOT_BOUND')
           const binding = machine.bindings.find(item => item.botId === botId && !item.revoked)
           const rootId = (binding.roots ?? [])[0]
           if (typeof rootId !== 'string' || !rootId) throw new Error('MACHINE_ROOT_NOT_BOUND')
           if (Array.isArray(binding.tools) && !binding.tools.includes(tool)) throw new Error('MACHINE_BOT_DENIED')
+          const calls = { ...args }
+          delete calls.machineId
           const stamp = String(Date.now()) + Math.random().toString(16).slice(2, 8)
           return machines.call(subject, {
-            machineId: machine.id, rootId, taskId: 'bot-' + stamp, attemptId: 'bot-a-' + stamp, tool, args,
+            machineId: machine.id, rootId, taskId: 'bot-' + stamp, attemptId: 'bot-a-' + stamp, tool, args: calls,
           })
         },
       }))
