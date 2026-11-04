@@ -33,3 +33,10 @@
 .bt-desktop-modal{position:fixed;inset:0;z-index:9999;background:rgba(10,12,14,.92);display:flex;align-items:center;justify-content:center}
 .bt-desktop-modal-body{display:flex;flex-direction:column;gap:10px;align-items:center}
 .bt-desktop-modal-bar{display:flex;align-items:center;gap:8px;color:#e8ecef}
+
+/* The DS Bot thread is mounted inside this harness, whose theme does not define the bt-* bubble
+   colours; without these two rules a person's own message inherits a light colour on a light
+   background and is invisible until selected. */
+.bt-urow,.bt-bubble,.bt-ububble{color:var(--dsw-alias-label-primary,#1f2421)}
+.bt-ububble{background:var(--dsw-alias-bg-l1,#fff);border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:12px;padding:8px 12px}
+.bt-ububble a{color:inherit}

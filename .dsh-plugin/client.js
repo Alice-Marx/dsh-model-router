@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.35.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.35.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32653,6 +32653,13 @@ var product_default = `.bp-page{height:100%;overflow:auto;box-sizing:border-box;
 .bt-desktop-modal{position:fixed;inset:0;z-index:9999;background:rgba(10,12,14,.92);display:flex;align-items:center;justify-content:center}
 .bt-desktop-modal-body{display:flex;flex-direction:column;gap:10px;align-items:center}
 .bt-desktop-modal-bar{display:flex;align-items:center;gap:8px;color:#e8ecef}
+
+/* The DS Bot thread is mounted inside this harness, whose theme does not define the bt-* bubble
+   colours; without these two rules a person's own message inherits a light colour on a light
+   background and is invisible until selected. */
+.bt-urow,.bt-bubble,.bt-ububble{color:var(--dsw-alias-label-primary,#1f2421)}
+.bt-ububble{background:var(--dsw-alias-bg-l1,#fff);border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:12px;padding:8px 12px}
+.bt-ububble a{color:inherit}
 `;
 
 // apps/integration-client/index.jsx
