@@ -8893,7 +8893,7 @@ function SideEntry({ chatId, entry, actions }) {
   );
 }
 function SideChatView({ subject, chat, actions }) {
-  let scroll = (0, import_react22.useRef)(null), [draft, setDraft] = (0, import_react22.useState)(""), [fail2, setFail] = (0, import_react22.useState)(null), entries2 = Array.isArray(chat?.entries) ? chat.entries : [], busy = entries2.some((entry) => entry?.status === "answering"), last = entries2.at(-1);
+  let scroll = (0, import_react22.useRef)(null), [draft, setDraft] = (0, import_react22.useState)(""), [fail3, setFail] = (0, import_react22.useState)(null), entries2 = Array.isArray(chat?.entries) ? chat.entries : [], busy = entries2.some((entry) => entry?.status === "answering"), last = entries2.at(-1);
   if ((0, import_react22.useEffect)(() => {
     let node = scroll.current;
     node && (node.scrollTop = node.scrollHeight);
@@ -8924,13 +8924,13 @@ function SideChatView({ subject, chat, actions }) {
         placeholder: t("Ask about the work so far"),
         "aria-label": t("Ask about the work so far"),
         onChange: (event) => {
-          setDraft(event.target.value), fail2 !== null && setFail(null);
+          setDraft(event.target.value), fail3 !== null && setFail(null);
         },
         onKeyDown: (event) => {
           event.key !== "Enter" || event.shiftKey || event.nativeEvent?.isComposing || (event.preventDefault(), ask());
         }
       }),
-      fail2 !== null ? (0, import_react22.createElement)("p", { className: "bt-side-fail" }, fail2) : null
+      fail3 !== null ? (0, import_react22.createElement)("p", { className: "bt-side-fail" }, fail3) : null
     )
   );
 }
@@ -29693,7 +29693,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.26.12", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.27.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -31994,6 +31994,25 @@ function botAttentionSummary(rows2 = []) {
   return urgent > 0 ? `${count} 项需要你处理（${urgent} 项卡在确认上）` : `${count} 项需要你处理`;
 }
 
+// packages/orchestration/src/desktop-contract.mjs
+var fail2 = (code) => {
+  let error = new Error(code);
+  throw error.code = code, error;
+};
+var ACTIONS2 = Object.freeze({
+  click: ["screenshotId", "x", "y", "button", "clickCount"],
+  type: ["screenshotId", "text"],
+  key: ["screenshotId", "key", "modifiers"],
+  scroll: ["screenshotId", "delta", "x", "y"]
+});
+function framePoint({ clientX, clientY, rect, frame }) {
+  (!rect || !frame || !Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) && fail2("INVALID_FRAME_GEOMETRY"), (!Number.isSafeInteger(frame.width) || !Number.isSafeInteger(frame.height) || frame.width <= 0 || frame.height <= 0) && fail2("INVALID_FRAME_GEOMETRY");
+  let ratio = Math.min(rect.width / frame.width, rect.height / frame.height);
+  (!Number.isFinite(ratio) || ratio <= 0) && fail2("INVALID_FRAME_GEOMETRY");
+  let offsetX = (rect.width - frame.width * ratio) / 2, offsetY = (rect.height - frame.height * ratio) / 2, x = Math.floor((clientX - offsetX) / ratio), y = Math.floor((clientY - offsetY) / ratio);
+  return (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= frame.width || y >= frame.height) && fail2("POINT_OUTSIDE_FRAME"), { x, y };
+}
+
 // apps/integration-client/binding-editor.jsx
 var import_react59 = __toESM(require("react"), 1);
 var route = (model) => model ? `${model.provider}/${model.model}` : "", workspace = (ref) => ref ? `${ref.machineId}/${ref.rootId}` : "";
@@ -32102,6 +32121,67 @@ function Tasks({ snapshot, dispatch, busy }) {
     } }, "重试"), actions.includes("task.reconcile") && row.state === "needs-reconciliation" && /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.reconcile", { botId: row.botId, taskId: id2, requestKey: crypto.randomUUID() }) }, "核对原收据")));
   })))), task && /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "任务详情"), /* @__PURE__ */ import_react60.default.createElement("button", { onClick: () => setSelected(null) }, "关闭")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Task" }, task.taskId ?? task.id), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Package" }, task.packageId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Attempt" }, task.attemptId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Operation" }, task.operationId), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "期限" }, task.deadlineAt ? new Date(task.deadlineAt).toLocaleString("zh-CN") : "未取得"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "MR 运行" }, task.legacyRunIds?.join("、"))), /* @__PURE__ */ import_react60.default.createElement("h3", null, "执行与收据依据"), /* @__PURE__ */ import_react60.default.createElement("pre", null, JSON.stringify({ attempts: task.attempts, executionRef: task.executionRef, remoteReceipt: task.result?.remote, reconciliation: task.reconciliation, packages: task.packages }, null, 2))));
 }
+function DesktopControl({ snapshot, dispatch, busy }) {
+  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react60.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react60.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react60.default.useState(null), [status, setStatus] = import_react60.default.useState("idle"), [error, setError] = import_react60.default.useState(""), [live, setLive] = import_react60.default.useState(!1), [text7, setText] = import_react60.default.useState(""), imageRef = import_react60.default.useRef(null), rootId = machines.find((item) => item.id === machineId)?.roots?.[0]?.id ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
+    setError("");
+    try {
+      return await dispatch(action, payload);
+    } catch (failure) {
+      return setError(String(failure?.message ?? failure)), null;
+    }
+  }, capture = import_react60.default.useCallback(async () => {
+    if (!canView) return;
+    setStatus("capturing");
+    let value = await call2("machine.desktop.view", { botId, machineId, rootId });
+    if (!value) {
+      setStatus("error");
+      return;
+    }
+    if (value.unavailable) {
+      setStatus("unavailable"), setError(value.reason ?? "桌面帧不可用。");
+      return;
+    }
+    setFrame({ ...value, takenAtMs: Date.now() }), setStatus("ready");
+  }, [botId, machineId, rootId, canView]);
+  import_react60.default.useEffect(() => {
+    if (!live || !canView) return;
+    capture();
+    let timer = setInterval(() => {
+      capture();
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [live, canView, capture]);
+  let act = async (action) => {
+    if (!frame?.screenshotId) {
+      setError("先取一帧，再操作。");
+      return;
+    }
+    let value = await call2("machine.desktop.act", { botId, machineId, rootId, screenshotId: frame.screenshotId, action });
+    value && (setStatus(value.status === "succeeded" ? "ready" : "error"), value.status !== "succeeded" && setError(`操作未成功：${value.status}`), live || capture());
+  }, clickImage = (event) => {
+    if (!frame?.width || !frame?.height || !imageRef.current) return;
+    let rect = imageRef.current.getBoundingClientRect();
+    try {
+      let point = framePoint({ clientX: event.clientX, clientY: event.clientY, rect: { width: rect.width, height: rect.height }, frame: { width: frame.width, height: frame.height } });
+      act({ tool: "click", x: point.x, y: point.y });
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    }
+  }, keys = ["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+  return /* @__PURE__ */ import_react60.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react60.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react60.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react60.default.createElement("select", { value: machineId, onChange: (event) => {
+    setMachineId(event.target.value), setFrame(null);
+  } }, machines.map((item) => /* @__PURE__ */ import_react60.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react60.default.createElement("label", null, "以哪个 Bot 执行", /* @__PURE__ */ import_react60.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((item) => /* @__PURE__ */ import_react60.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || !canView || status === "capturing", onClick: () => {
+    capture();
+  } }, status === "capturing" ? "截取中…" : "截取当前画面"), /* @__PURE__ */ import_react60.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react60.default.createElement("input", { type: "checkbox", checked: live, disabled: !canView, onChange: (event) => setLive(event.target.checked) }), "实时（1.5 秒）"))), error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-error", role: "alert" }, error), frame?.base64 ? /* @__PURE__ */ import_react60.default.createElement("img", { ref: imageRef, className: "bp-desktop-frame", alt: "远程桌面画面", src: `data:${frame.mediaType};base64,${frame.base64}`, onClick: clickImage }) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, canView ? "还没有画面。点“截取当前画面”。" : "先配对一台电脑，并选择一个 Bot。"), frame?.base64 && /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions bp-desktop-keys" }, keys.map((key) => /* @__PURE__ */ import_react60.default.createElement("button", { key, disabled: busy, onClick: () => {
+    act({ tool: "key", key });
+  } }, key)), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => {
+    act({ tool: "scroll", delta: 120 });
+  } }, "滚轮上"), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy, onClick: () => {
+    act({ tool: "scroll", delta: -120 });
+  } }, "滚轮下")), frame?.base64 && /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react60.default.createElement("input", { className: "bp-desktop-text", "aria-label": "要输入的文本", value: text7, placeholder: "输入文字后发送（发送的是按键，不是剪贴板）", onChange: (event) => setText(event.target.value) }), /* @__PURE__ */ import_react60.default.createElement("button", { disabled: busy || !text7, onClick: () => {
+    act({ type: "type", tool: "type", text: text7 });
+  } }, "发送文本")));
+}
 function MachineSetup({ snapshot, dispatch, busy }) {
   let [secretName, setSecretName] = (0, import_react60.useState)("REMOTE_AGENT_DESKTOP"), [secretValue, setSecretValue] = (0, import_react60.useState)(""), [pair, setPair] = (0, import_react60.useState)({ name: "", machineId: "", endpoint: "", secretRef: "ds-secret/REMOTE_AGENT_DESKTOP", roots: "project", probeBotId: snapshot.bots?.[0]?.id ?? "", protectedTunnel: !1 }), available = snapshot.availableActions ?? [], change = (key, value) => setPair((current) => ({ ...current, [key]: value }));
   return /* @__PURE__ */ import_react60.default.createElement("details", { className: "bp-card" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "添加或重新配对电脑"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-muted" }, "先在目标电脑的 Agent 本地创建配对，核对 machineId。控制凭据只填下面的秘密输入框，保存到现有秘密库；此凭据不给任何 Bot 使用。"), available.includes("machine.secret") && /* @__PURE__ */ import_react60.default.createElement("form", { className: "bp-form", onSubmit: async (event) => {
@@ -32153,7 +32233,7 @@ function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
 }
 function Machines({ snapshot, dispatch, busy }) {
   let section = snapshot.machines;
-  return section?.status !== "available" ? /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, dispatch && /* @__PURE__ */ import_react60.default.createElement(MachineSetup, { snapshot, dispatch, busy }), section.items.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, machine.status ?? "未知")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react60.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react60.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react60.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react60.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装同版本 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
+  return section?.status !== "available" ? /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, dispatch && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(DesktopControl, { snapshot, dispatch, busy }), /* @__PURE__ */ import_react60.default.createElement(MachineSetup, { snapshot, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react60.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react60.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react60.default.createElement(Tag2, null, machine.status ?? "未知")), /* @__PURE__ */ import_react60.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react60.default.createElement(Value, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react60.default.createElement(Value, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react60.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react60.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react60.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react60.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react60.default.createElement(import_react60.default.Fragment, null, /* @__PURE__ */ import_react60.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react60.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : /* @__PURE__ */ import_react60.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装同版本 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
 }
 function UnknownReview({ item, dispatch, busy }) {
   let [note, setNote] = (0, import_react60.useState)(""), [amount, setAmount] = (0, import_react60.useState)(""), attestable = note.trim().length > 0 && amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0, submit = (kind) => dispatch("usage.resolve", {
@@ -32227,6 +32307,12 @@ var product_default = `.bp-page{height:100%;overflow:auto;box-sizing:border-box;
 .bp-attention-budget{border-left:3px solid #b26a00}
 .bp-attention-failed{border-left:3px solid #b26a00}
 .bp-attention-blocked{border-left:3px solid #7a7f78}
+
+.bp-desktop-frame{display:block;max-width:100%;max-height:520px;margin:12px 0;border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:10px;cursor:crosshair;background:#111}
+.bp-desktop-keys{flex-wrap:wrap;gap:6px;margin:8px 0}
+.bp-desktop-text{flex:1;min-width:200px}
+.bp-check{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.bp-error{color:#b3261e;font-size:12px}
 `;
 
 // apps/integration-client/index.jsx

@@ -12,3 +12,9 @@
 .bp-attention-budget{border-left:3px solid #b26a00}
 .bp-attention-failed{border-left:3px solid #b26a00}
 .bp-attention-blocked{border-left:3px solid #7a7f78}
+
+.bp-desktop-frame{display:block;max-width:100%;max-height:520px;margin:12px 0;border:1px solid var(--dsw-alias-border-l1,#d8dfd8);border-radius:10px;cursor:crosshair;background:#111}
+.bp-desktop-keys{flex-wrap:wrap;gap:6px;margin:8px 0}
+.bp-desktop-text{flex:1;min-width:200px}
+.bp-check{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.bp-error{color:#b3261e;font-size:12px}

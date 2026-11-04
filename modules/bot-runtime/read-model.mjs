@@ -10,7 +10,7 @@ const missing = {
   machines: blocked('尚未接入远程电脑目录。', '安装并配对同版本 remote-computer-agent，然后在机器目录中登记。'),
   usage: blocked('宿主尚未提供统一费用与预占投影。', '接入唯一 MR 资金库的只读投影；已有 Token 用量仍可在 DS 用量页查看。'),
 }
-const ACTIONS = new Set(['task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve', 'binding.save', 'funding.account.save', 'machine.secret', 'machine.pair', 'machine.bind', 'machine.probe', 'machine.revoke', 'machine.reconcile'])
+const ACTIONS = new Set(['task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve', 'binding.save', 'funding.account.save', 'machine.secret', 'machine.pair', 'machine.bind', 'machine.probe', 'machine.revoke', 'machine.reconcile', 'machine.desktop.view', 'machine.desktop.act'])
 const plain = value => value && typeof value === 'object' && !Array.isArray(value)
 const error = (code, message) => Object.assign(new Error(message), { code })
 
