@@ -22,9 +22,12 @@ const short = (value, limit = 80) => {
 function remoteUncertain(row) {
   const remote = row?.result?.remote
   if (!remote || typeof remote !== 'object') return false
-  // An operation that never started has nothing to confirm.
-  if (remote.notStarted === true) return false
-  return remote.stopConfirmed !== true && TERMINAL.has(row.state)
+  // An operation that never started has nothing to confirm — but a receipt that also claims its
+  // effects may have applied is telling two different stories, and the safe reading of that is
+  // "not proven": it stays a reconciliation instead of becoming a retry.
+  if (remote.notStarted === true && remote.possiblyApplied !== true) return false
+  if (remote.stopConfirmed === true) return false
+  return TERMINAL.has(row.state)
 }
 
 /**
