@@ -518,11 +518,8 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
       file: found.entry,
       args: [
         '--no-session-persistence',
-        ...(mode === 'read-only' ? [
-          '--restricted', '--disable-slash-commands', '--strict-mcp-config',
-          '--tools', 'Read,Glob,Grep', '--disallowedTools', 'mcp__*',
-        ] : []),
-        '--permission-mode', mode === 'workspace-write' ? 'bypassPermissions' : 'dontAsk',
+        // The mode fragment lives in cli-profiles.mjs, so a limit is a reviewed row, not a literal.
+        ...(cliProfile('claude-code', mode)?.args ?? []),
         ...(modelId ? ['--model', modelId] : []),
         '-p', '--output-format', 'json',
         mode === 'workspace-write'
@@ -552,7 +549,7 @@ async function launchSpec(toolId, workspace, mode, modelId, task = 'Check readin
     if (!found) return { unsupported: '未找到具有 OpenAI 有效签名的 codex.exe。' }
     return {
       file: found.entry,
-      args: codexExecArgs(mode, modelId),
+      args: codexExecArgs(mode, modelId, { cwd: workspace }),
       format: 'codex-jsonl',
       source: found.source,
     }
@@ -675,9 +672,11 @@ export async function resolveZCodeLaunch(workspace, mode, task, {
  * `--sandbox read-only` and the Harness process sandbox; write runs use an
  * isolated Git worktree, so the flag changes nothing there.
  */
-export function codexExecArgs(mode, modelId = null) {
+export function codexExecArgs(mode, modelId = null, { cwd = null } = {}) {
   return [
     '--ask-for-approval', 'never', 'exec', '--skip-git-repo-check',
+    // Codex reads anything the user can read; pin its working root to the run workspace.
+    ...(cwd ? ['-C', cwd] : []),
     ...(modelId ? ['--model', modelId] : []),
     '--sandbox', mode, '--json', '-',
   ]
