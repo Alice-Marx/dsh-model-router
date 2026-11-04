@@ -18,6 +18,7 @@ import { openBotSettings } from './bot-settings.mjs'
 import { openFundingAccounts } from './funding-accounts.mjs'
 import { createModelAccounting } from './model-accounting.mjs'
 import { createTaskService } from './task-service.mjs'
+import { createDesktopActions } from './desktop-actions.mjs'
 import { registerTaskTools } from './task-tools.mjs'
 import { createMrReadBackend } from './mr-read-backend.mjs'
 import { createCliReadBackend } from './cli-execution.mjs'
@@ -542,6 +543,18 @@ export function startBotProduct(ctx, options = {}) {
       }
       const machineActions=Object.fromEntries(['pair','bind','probe','revoke','reconcile'].map(name=>[`machine.${name}`,(payload,context)=>machines[name](payload,context)]))
       machineActions['machine.artifact']=(payload,context)=>machines.download(taskOwner(payload),payload,context)
+      // Desktop control: a person watches one frame and acts on it. Both calls run as that
+      // person's Bot, so the Bot grant and the machine ceiling decide, and the operations land
+      // under that Bot instead of an anonymous console.
+      const desktopActions = createDesktopActions({ machines, directory })
+      machineActions['machine.desktop.view'] = (payload, context) => {
+        if (context?.kind !== 'owner') throw new Error('REMOTE_OWNER_REQUIRED')
+        return desktopActions.view(payload)
+      }
+      machineActions['machine.desktop.act'] = (payload, context) => {
+        if (context?.kind !== 'owner') throw new Error('REMOTE_OWNER_REQUIRED')
+        return desktopActions.act(payload)
+      }
       machineActions['machine.secret']=async(payload,context)=>{
         if(context?.kind!=='owner')throw new Error('REMOTE_OWNER_REQUIRED')
         if(!payload||Object.keys(payload).some(key=>!['name','value'].includes(key))||!/^REMOTE_AGENT_[A-Z0-9_]{1,50}$/.test(payload.name)||typeof payload.value!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(payload.value))throw new Error('INVALID_MACHINE_SECRET')

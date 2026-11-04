@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { TASK_STATES, modelName, money } from './api.mjs'
 import { botAttentionSummary, deriveBotAttention } from './bot-attention.mjs'
+import { framePoint } from '../../packages/orchestration/src/desktop-contract.mjs'
 import { BotBindingEditor } from './binding-editor.jsx'
 
 export function ProductNavigation({ openPanel, panels, compact = false }) {
@@ -115,6 +116,96 @@ export function Tasks({ snapshot, dispatch, busy }) {
   </>
 }
 
+
+/**
+ * 电脑操作: watch one frame, then act on it. Every action carries the id of the frame the person
+ * actually saw, so a stale picture cannot be clicked; the state line reports what really happened.
+ */
+function DesktopControl({ snapshot, dispatch, busy }) {
+  const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
+  const bots = snapshot.bots ?? []
+  const [machineId, setMachineId] = React.useState(machines[0]?.id ?? '')
+  const [botId, setBotId] = React.useState(bots[0]?.id ?? '')
+  const [frame, setFrame] = React.useState(null)
+  const [status, setStatus] = React.useState('idle')
+  const [error, setError] = React.useState('')
+  const [live, setLive] = React.useState(false)
+  const [text, setText] = React.useState('')
+  const imageRef = React.useRef(null)
+  const machine = machines.find(item => item.id === machineId)
+  const rootId = machine?.roots?.[0]?.id ?? ''
+  const canView = typeof dispatch === 'function' && Boolean(machineId && rootId && botId)
+  const call = async (action, payload) => {
+    setError('')
+    try {
+      const value = await dispatch(action, payload)
+      return value
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+      return null
+    }
+  }
+  const capture = React.useCallback(async () => {
+    if (!canView) return
+    setStatus('capturing')
+    const value = await call('machine.desktop.view', { botId, machineId, rootId })
+    if (!value) { setStatus('error'); return }
+    if (value.unavailable) { setStatus('unavailable'); setError(value.reason ?? '桌面帧不可用。'); return }
+    setFrame({ ...value, takenAtMs: Date.now() })
+    setStatus('ready')
+  }, [botId, machineId, rootId, canView])
+  React.useEffect(() => {
+    if (!live || !canView) return undefined
+    void capture()
+    const timer = setInterval(() => { void capture() }, 1500)
+    return () => clearInterval(timer)
+  }, [live, canView, capture])
+  const act = async action => {
+    if (!frame?.screenshotId) { setError('先取一帧，再操作。'); return }
+    const value = await call('machine.desktop.act', { botId, machineId, rootId, screenshotId: frame.screenshotId, action })
+    if (!value) return
+    setStatus(value.status === 'succeeded' ? 'ready' : 'error')
+    if (value.status !== 'succeeded') setError(`操作未成功：${value.status}`)
+    if (!live) void capture()
+  }
+  const clickImage = event => {
+    if (!frame?.width || !frame?.height || !imageRef.current) return
+    const rect = imageRef.current.getBoundingClientRect()
+    try {
+      const point = framePoint({ clientX: event.clientX, clientY: event.clientY, rect: { width: rect.width, height: rect.height }, frame: { width: frame.width, height: frame.height } })
+      void act({ tool: 'click', x: point.x, y: point.y })
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    }
+  }
+  const keys = ['Enter', 'Tab', 'Escape', 'Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
+  return <section className="bp-card" aria-label="电脑操作">
+    <div className="bp-card-title"><h2>电脑操作</h2><span className="bp-tag">{`${status}${frame?.screenshotId ? ' · 帧 ' + frame.screenshotId.slice(-6) : ''}`}</span></div>
+    <p className="bp-muted">画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。</p>
+    <div className="bp-form">
+      <label>电脑<select value={machineId} onChange={event => { setMachineId(event.target.value); setFrame(null) }}>{machines.map(item => <option key={item.id} value={item.id}>{item.name ?? item.id}</option>)}</select></label>
+      <label>以哪个 Bot 执行<select value={botId} onChange={event => setBotId(event.target.value)}>{bots.map(item => <option key={item.id} value={item.id}>{item.name ?? item.id}</option>)}</select></label>
+      <div className="bp-actions">
+        <button disabled={busy || !canView || status === 'capturing'} onClick={() => { void capture() }}>{status === 'capturing' ? '截取中…' : '截取当前画面'}</button>
+        <label className="bp-check"><input type="checkbox" checked={live} disabled={!canView} onChange={event => setLive(event.target.checked)} />实时（1.5 秒）</label>
+      </div>
+    </div>
+    {error && <p className="bp-error" role="alert">{error}</p>}
+    {frame?.base64
+      ? <img ref={imageRef} className="bp-desktop-frame" alt="远程桌面画面" src={`data:${frame.mediaType};base64,${frame.base64}`} onClick={clickImage} />
+      : <p className="bp-empty">{canView ? '还没有画面。点“截取当前画面”。' : '先配对一台电脑，并选择一个 Bot。'}</p>}
+    {frame?.base64 && <div className="bp-actions bp-desktop-keys">
+      {keys.map(key => <button key={key} disabled={busy} onClick={() => { void act({ tool: 'key', key }) }}>{key}</button>)}
+      <button disabled={busy} onClick={() => { void act({ tool: 'scroll', delta: 120 }) }}>滚轮上</button>
+      <button disabled={busy} onClick={() => { void act({ tool: 'scroll', delta: -120 }) }}>滚轮下</button>
+    </div>}
+    {frame?.base64 && <div className="bp-actions">
+      <input className="bp-desktop-text" aria-label="要输入的文本" value={text} placeholder="输入文字后发送（发送的是按键，不是剪贴板）" onChange={event => setText(event.target.value)} />
+      <button disabled={busy || !text} onClick={() => { void act({ type: 'type', tool: 'type', text }) }}>发送文本</button>
+    </div>}
+  </section>
+}
+
 function MachineSetup({ snapshot, dispatch, busy }) {
   const [secretName,setSecretName]=useState('REMOTE_AGENT_DESKTOP')
   const [secretValue,setSecretValue]=useState('')
@@ -203,7 +294,8 @@ function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
 export function Machines({ snapshot, dispatch, busy }) {
   const section = snapshot.machines
   if (section?.status !== 'available') return <Blocked value={section} />
-  return <>{dispatch&&<MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} />}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className="bp-card" key={machine.id ?? machine.machineId}>
+  return <>{dispatch&&<><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} />
+    <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className="bp-card" key={machine.id ?? machine.machineId}>
     <div className="bp-card-title"><h2>{machine.name ?? machine.id ?? machine.machineId}</h2><Tag>{machine.status ?? '未知'}</Tag></div>
     <dl className="bp-facts"><Value label="平台">{machine.platform}</Value><Value label="Agent 版本">{machine.version}</Value><Value label="最后在线">{machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString('zh-CN') : '从未取得心跳'}</Value>
       <Value label="能力">{machine.capabilities?.join('、')}</Value><Value label="桌面会话">{machine.desktop?.status ?? '未报告'}</Value></dl>
