@@ -379,9 +379,10 @@ test('channel annotation reflects probe truth and never invents tools', () => {
   assert.equal(deepseek.kind, 'harness-llm')
   assert.equal(deepseek.tool, 'dsh-tui', 'the user chose dsh-TUI as the DeepSeek tool')
   const deepseekInstalled = channelForProvider('deepseek-account', ['dsh-tui'])
-  assert.equal(deepseekInstalled.kind, 'harness-llm')
+  // An installed dsh-TUI is an official channel: the Host drives it through the managed PTY.
+  assert.equal(deepseekInstalled.kind, 'official-cli')
   assert.equal(deepseekInstalled.tool, 'dsh-tui')
-  assert.match(deepseekInstalled.detail, /缺少经核验的托管执行适配器/)
+  assert.match(deepseekInstalled.detail, /受管终端（PTY）/)
 })
 
 test('plan annotates selected route and work packages with channels', () => {

@@ -301,3 +301,8 @@
   .mr-meters { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .mr-workspace { scroll-behavior: auto; } }
+
+.mr-tui-prompt{display:grid;gap:6px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--mr-line,#d8ded6)}
+.mr-tui-input{width:100%;box-sizing:border-box;border:1px solid var(--mr-line,#d8ded6);border-radius:8px;padding:8px 10px;font:inherit;color:inherit;background:var(--mr-bg,#fff);resize:vertical}
+.mr-tui-actions{display:flex;align-items:center;gap:10px}
+.mr-tui-reply{margin:0;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--mr-soft,#f4f6f2);border-radius:8px;padding:10px;font:12px/1.6 ui-monospace,monospace}

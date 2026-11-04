@@ -5,6 +5,8 @@ import { normalizeExecutionPreference } from './model-profiles.mjs'
 const clean = value => typeof value === 'string' ? value.trim() : ''
 
 const HEADLESS_TOOL_IDS = new Set(['claude-code', 'codex', 'gemini'])
+/** Interactive terminal tools: run through the managed PTY, never a headless command. */
+const TUI_TOOL_IDS = new Set(['dsh-tui'])
 
 /**
  * Resolve the intended execution channel for one provider without touching
@@ -34,10 +36,13 @@ export function channelForProvider(provider, installedToolIds = [], runnableTool
   }
   const runnable = installed && Array.isArray(runnableToolIds) && runnableToolIds.includes(tool.id)
   const headless = installed && HEADLESS_TOOL_IDS.has(tool.id)
-  if (runnable || headless) {
+  const tui = installed && TUI_TOOL_IDS.has(tool.id)
+  if (runnable || headless || tui) {
     return {
       kind: 'official-cli', preference, tool: tool.id, label: tool.label,
-      detail: tool.id === 'zcode'
+      detail: tui
+        ? `${tool.label} 已安装：工作台通过受管终端（PTY）把提示词输入它并取回终端文本，不是无头协议输出。`
+        : tool.id === 'zcode'
         ? '独立 ZCode CLI 已安装，插件可调用其编程代理；其 CLI 使用自身配置的默认模型，不能保证与 Harness 建议模型一致。'
         : headless && !runnable
           ? `${tool.label} 已安装。分配到该模型的任务会先走官方无界面命令；命令缺失或失败时回退模型目录 API。`
