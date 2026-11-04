@@ -14068,8 +14068,15 @@ var import_react47 = require("react"), bridge = () => {
   let value = globalThis.__dshDesktop;
   return value && typeof value.view == "function" ? value : null;
 };
+function pointOf(event, element, frame) {
+  if (!element || !frame?.width || !frame?.height) return null;
+  let rect = element.getBoundingClientRect(), ratio = Math.min(rect.width / frame.width, rect.height / frame.height);
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  let x = Math.floor((event.clientX - rect.left - (rect.width - frame.width * ratio) / 2) / ratio), y = Math.floor((event.clientY - rect.top - (rect.height - frame.height * ratio) / 2) / ratio);
+  return x < 0 || y < 0 || x >= frame.width || y >= frame.height ? null : { x, y };
+}
 function DesktopPane({ bot }) {
-  let [machines, setMachines] = (0, import_react47.useState)([]), [machineId, setMachineId] = (0, import_react47.useState)(""), [frame, setFrame] = (0, import_react47.useState)(null), [status, setStatus] = (0, import_react47.useState)("idle"), [error, setError] = (0, import_react47.useState)(""), [live, setLive] = (0, import_react47.useState)(!1), imageRef = (0, import_react47.useRef)(null), api = bridge();
+  let [machines, setMachines] = (0, import_react47.useState)([]), [machineId, setMachineId] = (0, import_react47.useState)(""), [frame, setFrame] = (0, import_react47.useState)(null), [status, setStatus] = (0, import_react47.useState)("idle"), [error, setError] = (0, import_react47.useState)(""), [live, setLive] = (0, import_react47.useState)(!1), [control, setControl] = (0, import_react47.useState)(!1), [expanded, setExpanded] = (0, import_react47.useState)(!1), smallRef = (0, import_react47.useRef)(null), bigRef = (0, import_react47.useRef)(null), api = bridge();
   (0, import_react47.useEffect)(() => {
     if (!api) return;
     let current = !0;
@@ -14099,69 +14106,116 @@ function DesktopPane({ bot }) {
     }
   }, [api, bot.id, machineId]);
   (0, import_react47.useEffect)(() => {
+    !api || !machineId || frame || capture();
+  }, [api, machineId, frame, capture]), (0, import_react47.useEffect)(() => {
     if (!live || !api || !machineId) return;
-    capture();
     let timer = setInterval(() => {
       capture();
     }, 1500);
     return () => clearInterval(timer);
   }, [live, api, machineId, capture]);
   let act = async (action) => {
-    if (!api || !frame?.screenshotId) {
-      setError("先取一帧，再操作。");
-      return;
+    if (!(!api || !frame?.screenshotId)) {
+      if (!control) {
+        setError("当前是仅观看模式，点「取得控制权」后才会真正操作这台电脑。");
+        return;
+      }
+      setError("");
+      try {
+        let result = await api.act(bot.id, machineId, frame.screenshotId, action);
+        result?.status && result.status !== "succeeded" && setError(`操作未成功：${result.status}`), live || await capture();
+      } catch (failure) {
+        setError(String(failure?.message ?? failure));
+      }
     }
-    try {
-      let result = await api.act(bot.id, machineId, frame.screenshotId, action);
-      result?.status && result.status !== "succeeded" && setError(`操作未成功：${result.status}`), live || await capture();
-    } catch (failure) {
-      setError(String(failure?.message ?? failure));
-    }
-  }, click = (event) => {
-    if (!frame?.base64 || !frame?.width || !imageRef.current) return;
-    let rect = imageRef.current.getBoundingClientRect(), ratio = Math.min(rect.width / frame.width, rect.height / frame.height), x = Math.floor((event.clientX - rect.left - (rect.width - frame.width * ratio) / 2) / ratio), y = Math.floor((event.clientY - rect.top - (rect.height - frame.height * ratio) / 2) / ratio);
-    x < 0 || y < 0 || x >= frame.width || y >= frame.height || act({ tool: "click", x, y });
+  }, clickOn = (event, element) => {
+    let point = pointOf(event, element, frame);
+    point && act({ tool: "click", x: point.x, y: point.y });
   };
-  return api ? (0, import_react47.createElement)(
+  if (!api)
+    return (0, import_react47.createElement)("div", { className: "bt-muted" }, "远程桌面需要工作台已加载：打开一次「电脑」页，再回到这里。");
+  let screen = (elementRef, big) => frame?.base64 ? (0, import_react47.createElement)("img", {
+    ref: elementRef,
+    className: big ? "bt-desktop-frame-big" : "bt-desktop-frame",
+    alt: "远程桌面画面",
+    src: `data:${frame.mediaType ?? "image/png"};base64,${frame.base64}`,
+    onClick: (event) => clickOn(event, elementRef.current),
+    style: { cursor: control ? "crosshair" : "zoom-in" }
+  }) : (0, import_react47.createElement)("div", { className: "bt-muted bt-desktop-empty" }, machineId ? status === "capturing" ? "正在取画面…" : "还没有画面，点「刷新画面」。" : "先配对一台电脑。");
+  return (0, import_react47.createElement)(
     "div",
     { className: "bt-desktop-pane" },
-    (0, import_react47.createElement)("div", { className: "bt-section-title" }, "远程桌面"),
     (0, import_react47.createElement)(
       "div",
-      { className: "bt-desktop-row" },
+      { className: "bt-desktop-head" },
+      (0, import_react47.createElement)("span", { className: "bt-section-title" }, "远程桌面"),
       (0, import_react47.createElement)("select", {
-        className: "bt-input",
+        className: "bt-input bt-desktop-select",
         value: machineId,
         "aria-label": "电脑",
         onChange: (event) => {
           setMachineId(event.target.value), setFrame(null);
         }
-      }, machines.length === 0 ? (0, import_react47.createElement)("option", { value: "" }, "还没有配对的电脑") : machines.map((item) => (0, import_react47.createElement)("option", { key: item.machineId, value: item.machineId }, item.label ?? item.machineId))),
-      (0, import_react47.createElement)(
-        "button",
-        { type: "button", className: "bt-btn", disabled: status === "capturing" || !machineId, onClick: () => {
-          capture();
-        } },
-        status === "capturing" ? "截取中…" : "截取画面"
-      ),
+      }, machines.length === 0 ? (0, import_react47.createElement)("option", { value: "" }, "还没有配对的电脑") : machines.map((item) => (0, import_react47.createElement)("option", { key: item.machineId, value: item.machineId }, item.label ?? item.machineId)))
+    ),
+    (0, import_react47.createElement)(
+      "div",
+      { className: "bt-desktop-modes", role: "group", "aria-label": "桌面模式" },
+      (0, import_react47.createElement)("button", { type: "button", className: control ? "bt-tab" : "bt-tab is-active", "aria-pressed": !control, onClick: () => setControl(!1) }, "仅观看"),
+      (0, import_react47.createElement)("button", { type: "button", className: control ? "bt-tab is-active" : "bt-tab", "aria-pressed": control, onClick: () => setControl(!0) }, "取得控制权"),
+      (0, import_react47.createElement)("span", { className: "bt-muted bt-desktop-frame-id" }, frame?.screenshotId ? `帧 ${String(frame.screenshotId).slice(-6)}` : "")
+    ),
+    error ? (0, import_react47.createElement)("div", { className: "bt-error" }, error) : null,
+    (0, import_react47.createElement)("button", {
+      type: "button",
+      className: "bt-desktop-open",
+      title: "放大",
+      disabled: !frame?.base64,
+      onClick: () => setExpanded(!0)
+    }, screen(smallRef, !1)),
+    (0, import_react47.createElement)(
+      "div",
+      { className: "bt-desktop-actions" },
+      (0, import_react47.createElement)("button", { type: "button", className: "bt-btn", disabled: status === "capturing" || !machineId, onClick: () => {
+        capture();
+      } }, status === "capturing" ? "取画面中…" : "刷新画面"),
       (0, import_react47.createElement)(
         "label",
         { className: "bt-muted bt-desktop-live" },
         (0, import_react47.createElement)("input", { type: "checkbox", checked: live, onChange: (event) => setLive(event.target.checked) }),
         " 实时"
       ),
-      (0, import_react47.createElement)("span", { className: "bt-muted" }, frame?.screenshotId ? `帧 ${String(frame.screenshotId).slice(-6)}` : "")
+      (0, import_react47.createElement)("button", { type: "button", className: "bt-btn", disabled: !frame?.base64, onClick: () => setExpanded(!0) }, "放大")
     ),
-    error ? (0, import_react47.createElement)("div", { className: "bt-error" }, error) : null,
-    frame?.base64 ? (0, import_react47.createElement)("img", {
-      ref: imageRef,
-      className: "bt-desktop-frame",
-      alt: "远程桌面画面",
-      src: `data:${frame.mediaType ?? "image/png"};base64,${frame.base64}`,
-      onClick: click,
-      style: { cursor: "crosshair" }
-    }) : (0, import_react47.createElement)("div", { className: "bt-muted bt-desktop-empty" }, machineId ? "点「截取画面」查看桌面，点画面即点击。" : "先配对一台电脑。")
-  ) : (0, import_react47.createElement)("div", { className: "bt-muted" }, "远程桌面需要工作台已加载：打开一次「电脑」页，再回到这里。");
+    expanded ? (0, import_react47.createElement)(
+      "div",
+      {
+        className: "bt-desktop-modal",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": "远程桌面",
+        onClick: (event) => {
+          event.target === event.currentTarget && setExpanded(!1);
+        }
+      },
+      (0, import_react47.createElement)(
+        "div",
+        { className: "bt-desktop-modal-body" },
+        (0, import_react47.createElement)(
+          "div",
+          { className: "bt-desktop-modal-bar" },
+          (0, import_react47.createElement)("strong", null, `${machines.find((item) => item.machineId === machineId)?.label ?? machineId}`),
+          (0, import_react47.createElement)("button", { type: "button", className: control ? "bt-tab" : "bt-tab is-active", onClick: () => setControl(!1) }, "仅观看"),
+          (0, import_react47.createElement)("button", { type: "button", className: control ? "bt-tab is-active" : "bt-tab", onClick: () => setControl(!0) }, "取得控制权"),
+          (0, import_react47.createElement)("button", { type: "button", className: "bt-btn", onClick: () => {
+            capture();
+          } }, "刷新"),
+          (0, import_react47.createElement)("button", { type: "button", className: "bt-btn", onClick: () => setExpanded(!1) }, "关闭")
+        ),
+        screen(bigRef, !0)
+      )
+    ) : null
+  );
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/member-status.js
@@ -29795,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.32.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.32.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32588,6 +32642,19 @@ var product_default = `.bp-page{height:100%;overflow:auto;box-sizing:border-box;
 .bp-error{color:#b3261e;font-size:12px}
 
 .bp-runtime{margin:10px 0;padding:10px 12px;border:1px dashed var(--dsw-alias-border-l1,#d8dfd8);border-radius:10px}
+
+.bt-desktop-pane{display:flex;flex-direction:column;gap:8px;padding:4px 2px}
+.bt-desktop-head{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.bt-desktop-select{max-width:56%}
+.bt-desktop-modes{display:flex;align-items:center;gap:6px}
+.bt-desktop-frame{width:100%;max-height:220px;object-fit:contain;border-radius:10px;border:1px solid rgba(127,127,127,.35);display:block;background:#111}
+.bt-desktop-frame-big{max-width:92vw;max-height:82vh;object-fit:contain;border-radius:8px;display:block;background:#111}
+.bt-desktop-open{padding:0;border:0;background:none}
+.bt-desktop-empty{padding:28px;border:1px dashed rgba(127,127,127,.4);border-radius:10px;text-align:center}
+.bt-desktop-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bt-desktop-modal{position:fixed;inset:0;z-index:9999;background:rgba(10,12,14,.92);display:flex;align-items:center;justify-content:center}
+.bt-desktop-modal-body{display:flex;flex-direction:column;gap:10px;align-items:center}
+.bt-desktop-modal-bar{display:flex;align-items:center;gap:8px;color:#e8ecef}
 `;
 
 // apps/integration-client/index.jsx

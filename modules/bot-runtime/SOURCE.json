@@ -457,8 +457,8 @@
     {
       "path": "vendor/ds-bot/src/client/desktop-pane.js",
       "sourcePath": "ds-bot/src/client/desktop-pane.js",
-      "sha256": "bee074d5efc1b4b05a24779d902fb7eae44fa71f0f7a69863a943a89e196769b",
-      "gitBlob": "10448ce17f8c2a6a84e9924b2744a59cb86402a7"
+      "sha256": "f2d5ba54da141d141e701ec7373ca551ddafecae35763334cfe0966b359b9348",
+      "gitBlob": "7428cb0ed12f4920b745c0bed6004ba6fc4b6915"
     },
     {
       "path": "vendor/ds-bot/src/client/details-drawer.js",

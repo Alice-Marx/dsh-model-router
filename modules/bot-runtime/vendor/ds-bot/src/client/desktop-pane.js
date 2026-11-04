@@ -1,18 +1,32 @@
-// The Bot's remote desktop, inside the details drawer.
+// The Bot's remote desktop, inside the details drawer — shaped like the Grok Bot screen: a small
+// card on the right, and the same picture enlarged when you want to look closer or drive it.
 //
-// This pane owns no authority: the product client registers a small bridge on `globalThis`
-// (`__dshDesktop`) whose calls already run as the owner through the plugin's remote channel. When
-// the bridge is absent — an older Host, or a window that never rendered the workbench — the pane
-// says so instead of showing an empty frame.
+// Two things a person decides explicitly:
+//  - 仅观看 (watch) vs 取得控制权 (control): a click only reaches the machine in control mode, so
+//    looking around never types or clicks by accident.
+//  - the card vs the big window: the card is for glancing; the window is for working.
 //
-// A frame is single use: every click/type/key carries the id of the picture the person saw, so a
-// stale screen can never be clicked.
+// This pane owns no authority: the product client registers a bridge on `globalThis`
+// (`__dshDesktop`) whose calls already run as the owner through the plugin's remote channel. A
+// frame is single use, so every action carries the id of the picture that person saw.
 
 import { createElement as h, useCallback, useEffect, useRef, useState } from 'react'
 
 const bridge = () => {
   const value = globalThis.__dshDesktop
   return value && typeof value.view === 'function' ? value : null
+}
+
+/** Map a click inside the rendered box back to pixels of the original frame. */
+function pointOf(event, element, frame) {
+  if (!element || !frame?.width || !frame?.height) return null
+  const rect = element.getBoundingClientRect()
+  const ratio = Math.min(rect.width / frame.width, rect.height / frame.height)
+  if (!Number.isFinite(ratio) || ratio <= 0) return null
+  const x = Math.floor((event.clientX - rect.left - (rect.width - frame.width * ratio) / 2) / ratio)
+  const y = Math.floor((event.clientY - rect.top - (rect.height - frame.height * ratio) / 2) / ratio)
+  if (x < 0 || y < 0 || x >= frame.width || y >= frame.height) return null
+  return { x, y }
 }
 
 export function DesktopPane({ bot }) {
@@ -22,12 +36,15 @@ export function DesktopPane({ bot }) {
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
   const [live, setLive] = useState(false)
-  const imageRef = useRef(null)
+  const [control, setControl] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const smallRef = useRef(null)
+  const bigRef = useRef(null)
 
   const api = bridge()
 
   useEffect(() => {
-    if (!api) return
+    if (!api) return undefined
     let current = true
     Promise.resolve(api.machines?.()).then(
       (rows) => {
@@ -60,15 +77,22 @@ export function DesktopPane({ bot }) {
     }
   }, [api, bot.id, machineId])
 
+  // One frame when the tab opens, then fresh frames only while asked.
+  useEffect(() => {
+    if (!api || !machineId || frame) return
+    void capture()
+  }, [api, machineId, frame, capture])
+
   useEffect(() => {
     if (!live || !api || !machineId) return undefined
-    void capture()
     const timer = setInterval(() => { void capture() }, 1500)
     return () => clearInterval(timer)
   }, [live, api, machineId, capture])
 
   const act = async (action) => {
-    if (!api || !frame?.screenshotId) { setError('先取一帧，再操作。'); return }
+    if (!api || !frame?.screenshotId) return
+    if (!control) { setError('当前是仅观看模式，点「取得控制权」后才会真正操作这台电脑。'); return }
+    setError('')
     try {
       const result = await api.act(bot.id, machineId, frame.screenshotId, action)
       if (result?.status && result.status !== 'succeeded') setError(`操作未成功：${result.status}`)
@@ -78,40 +102,64 @@ export function DesktopPane({ bot }) {
     }
   }
 
-  const click = (event) => {
-    if (!frame?.base64 || !frame?.width || !imageRef.current) return
-    const rect = imageRef.current.getBoundingClientRect()
-    const ratio = Math.min(rect.width / frame.width, rect.height / frame.height)
-    const x = Math.floor((event.clientX - rect.left - (rect.width - frame.width * ratio) / 2) / ratio)
-    const y = Math.floor((event.clientY - rect.top - (rect.height - frame.height * ratio) / 2) / ratio)
-    if (x < 0 || y < 0 || x >= frame.width || y >= frame.height) return
-    void act({ tool: 'click', x, y })
+  const clickOn = (event, element) => {
+    const point = pointOf(event, element, frame)
+    if (point) void act({ tool: 'click', x: point.x, y: point.y })
   }
 
   if (!api) {
     return h('div', { className: 'bt-muted' }, '远程桌面需要工作台已加载：打开一次「电脑」页，再回到这里。')
   }
 
+  const screen = (elementRef, big) => frame?.base64
+    ? h('img', {
+      ref: elementRef,
+      className: big ? 'bt-desktop-frame-big' : 'bt-desktop-frame',
+      alt: '远程桌面画面',
+      src: `data:${frame.mediaType ?? 'image/png'};base64,${frame.base64}`,
+      onClick: event => clickOn(event, elementRef.current),
+      style: { cursor: control ? 'crosshair' : 'zoom-in' },
+    })
+    : h('div', { className: 'bt-muted bt-desktop-empty' }, machineId ? (status === 'capturing' ? '正在取画面…' : '还没有画面，点「刷新画面」。') : '先配对一台电脑。')
+
   return h('div', { className: 'bt-desktop-pane' },
-    h('div', { className: 'bt-section-title' }, '远程桌面'),
-    h('div', { className: 'bt-desktop-row' },
+    h('div', { className: 'bt-desktop-head' },
+      h('span', { className: 'bt-section-title' }, '远程桌面'),
       h('select', {
-        className: 'bt-input', value: machineId, 'aria-label': '电脑',
+        className: 'bt-input bt-desktop-select', value: machineId, 'aria-label': '电脑',
         onChange: event => { setMachineId(event.target.value); setFrame(null) },
       }, machines.length === 0
         ? h('option', { value: '' }, '还没有配对的电脑')
-        : machines.map(item => h('option', { key: item.machineId, value: item.machineId }, item.label ?? item.machineId))),
-      h('button', { type: 'button', className: 'bt-btn', disabled: status === 'capturing' || !machineId, onClick: () => { void capture() } },
-        status === 'capturing' ? '截取中…' : '截取画面'),
+        : machines.map(item => h('option', { key: item.machineId, value: item.machineId }, item.label ?? item.machineId)))),
+
+    h('div', { className: 'bt-desktop-modes', role: 'group', 'aria-label': '桌面模式' },
+      h('button', { type: 'button', className: control ? 'bt-tab' : 'bt-tab is-active', 'aria-pressed': !control, onClick: () => setControl(false) }, '仅观看'),
+      h('button', { type: 'button', className: control ? 'bt-tab is-active' : 'bt-tab', 'aria-pressed': control, onClick: () => setControl(true) }, '取得控制权'),
+      h('span', { className: 'bt-muted bt-desktop-frame-id' }, frame?.screenshotId ? `帧 ${String(frame.screenshotId).slice(-6)}` : '')),
+    error ? h('div', { className: 'bt-error' }, error) : null,
+
+    h('button', {
+      type: 'button', className: 'bt-desktop-open', title: '放大', disabled: !frame?.base64,
+      onClick: () => setExpanded(true),
+    }, screen(smallRef, false)),
+
+    h('div', { className: 'bt-desktop-actions' },
+      h('button', { type: 'button', className: 'bt-btn', disabled: status === 'capturing' || !machineId, onClick: () => { void capture() } }, status === 'capturing' ? '取画面中…' : '刷新画面'),
       h('label', { className: 'bt-muted bt-desktop-live' },
         h('input', { type: 'checkbox', checked: live, onChange: event => setLive(event.target.checked) }), ' 实时'),
-      h('span', { className: 'bt-muted' }, frame?.screenshotId ? `帧 ${String(frame.screenshotId).slice(-6)}` : '')),
-    error ? h('div', { className: 'bt-error' }, error) : null,
-    frame?.base64
-      ? h('img', {
-        ref: imageRef, className: 'bt-desktop-frame', alt: '远程桌面画面', src: `data:${frame.mediaType ?? 'image/png'};base64,${frame.base64}`,
-        onClick: click, style: { cursor: 'crosshair' },
-      })
-      : h('div', { className: 'bt-muted bt-desktop-empty' }, machineId ? '点「截取画面」查看桌面，点画面即点击。' : '先配对一台电脑。'),
+      h('button', { type: 'button', className: 'bt-btn', disabled: !frame?.base64, onClick: () => setExpanded(true) }, '放大')),
+
+    expanded ? h('div', {
+      className: 'bt-desktop-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': '远程桌面',
+      onClick: event => { if (event.target === event.currentTarget) setExpanded(false) },
+    },
+    h('div', { className: 'bt-desktop-modal-body' },
+      h('div', { className: 'bt-desktop-modal-bar' },
+        h('strong', null, `${machines.find(item => item.machineId === machineId)?.label ?? machineId}`),
+        h('button', { type: 'button', className: control ? 'bt-tab' : 'bt-tab is-active', onClick: () => setControl(false) }, '仅观看'),
+        h('button', { type: 'button', className: control ? 'bt-tab is-active' : 'bt-tab', onClick: () => setControl(true) }, '取得控制权'),
+        h('button', { type: 'button', className: 'bt-btn', onClick: () => { void capture() } }, '刷新'),
+        h('button', { type: 'button', className: 'bt-btn', onClick: () => setExpanded(false) }, '关闭')),
+      screen(bigRef, true))) : null,
   )
 }
