@@ -29,13 +29,14 @@ const json = value => { const text = JSON.stringify(value); if (Buffer.byteLengt
 const routeRef = value => `${value.provider}/${value.model}`
 
 export function defaultBotSettings() {
-  return { schemaVersion: 1, enabled: false, model: null, officialTools: [], machineGrants: [], capabilities: [], workspaceRef: null,
+  // `routing` is this Bot's own policy for work it hands out: null inherits the global one.
+  return { schemaVersion: 1, enabled: false, model: null, officialTools: [], machineGrants: [], capabilities: [], workspaceRef: null, routing: null,
     funding: { mode: 'api', scopeId: null, pricing: null, request: null, dailyBudgetUsd: null, monthlyBudgetUsd: null, subscription: null }, maxConcurrentTasks: 1 }
 }
 
 /** Closed stored schema. No executable paths, installer URLs, credentials or arbitrary roots. */
 export function normalizeBotSettings(input) {
-  keys(input, ['schemaVersion', 'enabled', 'model', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks'], 'settings')
+  keys(input, ['schemaVersion', 'enabled', 'model', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks', 'routing'], 'settings')
   const value = { ...defaultBotSettings(), ...input }
   if (value.schemaVersion !== 1) fail('BOT_SETTINGS_VERSION_UNSUPPORTED', 'Bot 绑定版本不受支持，请升级宿主。')
   if (typeof value.enabled !== 'boolean') fail('BOT_SETTINGS_INVALID', 'enabled 必须是布尔值。', { field: 'enabled' })
@@ -60,6 +61,19 @@ export function normalizeBotSettings(input) {
     return { machineId: grant.machineId, rootId: grant.rootId, mode: grant.mode, capabilities: [...capabilities].sort() }
   }).sort((a, b) => `${a.machineId}/${a.rootId}`.localeCompare(`${b.machineId}/${b.rootId}`))
   unique(value.machineGrants.map(grant => `${grant.machineId}/${grant.rootId}`), 'machineGrants')
+  if (value.routing !== null) {
+    keys(value.routing, ['preset', 'dailyBudgetUsd', 'monthlyBudgetUsd'], 'routing')
+    if (value.routing.preset !== undefined && !['economy', 'balanced', 'quality'].includes(value.routing.preset)) fail('BOT_SETTINGS_INVALID', '路由预设必须是 economy / balanced / quality。', { field: 'routing.preset' })
+    for (const field of ['dailyBudgetUsd', 'monthlyBudgetUsd']) {
+      const budget = value.routing[field]
+      if (budget !== undefined && budget !== null && !(typeof budget === 'number' && Number.isFinite(budget) && budget >= 0)) fail('BOT_SETTINGS_INVALID', '预算必须是非负数字或 null。', { field: `routing.${field}` })
+    }
+    value.routing = {
+      preset: value.routing.preset ?? null,
+      dailyBudgetUsd: value.routing.dailyBudgetUsd ?? null,
+      monthlyBudgetUsd: value.routing.monthlyBudgetUsd ?? null,
+    }
+  }
   value.capabilities = [...list(value.capabilities, 128, 'capabilities')].sort()
   if (value.capabilities.some(id => !token(id))) fail('BOT_SETTINGS_INVALID', '能力 ID 无效。', { field: 'capabilities' })
   unique(value.capabilities, 'capabilities')
