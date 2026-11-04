@@ -63,11 +63,19 @@ export function createBotLoop({ store, provider, tools = null, now = Date.now, m
           ...calls.map(call => ({ role: 'assistant', content: '', name: call.name, toolCall: { id: call.id, name: call.name, args: call.args ?? {} } })),
         ])
         if (!tools) fail('BOT_LOOP_TOOLS_UNAVAILABLE')
-        for (const call of calls) {
-          if (typeof call?.name !== 'string' || !call.name) fail('BOT_LOOP_TOOL_CALL_INVALID')
-          const result = await tools.call(call.name, call.args ?? {}, { botId })
+        for (const call of calls) if (typeof call?.name !== 'string' || !call.name) fail('BOT_LOOP_TOOL_CALL_INVALID')
+        // Read-only calls may run together; a mutating call keeps the batch sequential so the
+        // transcript order still matches the order the provider asked for.
+        const concurrent = calls.length > 1 && typeof tools.isReadonly === 'function' && calls.every(call => tools.isReadonly(call.name))
+        let results
+        if (concurrent) results = await Promise.all(calls.map(call => tools.call(call.name, call.args ?? {}, { botId })))
+        else {
+          results = []
+          for (const call of calls) results.push(await tools.call(call.name, call.args ?? {}, { botId }))
+        }
+        for (const [index, call] of calls.entries()) {
           executed.push({ id: call.id, name: call.name })
-          store.append(botId, [{ role: 'tool', name: call.name, content: JSON.stringify(result ?? null) }])
+          store.append(botId, [{ role: 'tool', name: call.name, content: JSON.stringify(results[index] ?? null) }])
         }
       }
       fail('BOT_LOOP_STEP_LIMIT')
