@@ -1,0 +1,73 @@
+{
+  "version": "0.63.2",
+  "date": "2026-11-06",
+  "archiveCommit": "b08043383fc9b5942f5b2999071a8567c260d27a",
+  "productCommit": "7865e364a9c5c7a6c6947c65fef75b6d55d40208",
+  "github": {
+    "url": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.2",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "20261106_acceptance.md",
+        "size": 6505,
+        "digest": "sha256:b2bfa932685e611cba27ea64039805e4543a2b2029ad9d941483bbcb73628e7c"
+      },
+      {
+        "name": "dsh-model-router-0.63.2-source.zip",
+        "size": 4199396,
+        "digest": "sha256:e9e9418f94c9ee6deb094eb599ed5858c2970aeaa80cbb8e2ed6043c2620083b"
+      },
+      {
+        "name": "ljwei-stak-dsh-model-router-0.63.2.tgz",
+        "size": 3495027,
+        "digest": "sha256:8d079ea3a699c3b8f2c031685fb20359c9f4c12650dbe593a6ab580182db233c"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 298,
+        "digest": "sha256:1097ed95d78bbb81dbc71d8348dfba22254cf058dce20d894f7f70fe3f35ec68"
+      }
+    ]
+  },
+  "npm": {
+    "status": "verified",
+    "version": "0.63.2",
+    "latest": "0.63.2",
+    "tarballBytes": 3495027,
+    "sha256": "8d079ea3a699c3b8f2c031685fb20359c9f4c12650dbe593a6ab580182db233c",
+    "integrity": "sha512-76J05LfmBlZKtkfyl6537jN+Rj0LhwegoTau4FKjfjPzq0C38T+/sf8Cg29VWIw8Otd9hJe2TByt8OuC94H0uQ=="
+  },
+  "validation": {
+    "total": 2509,
+    "passed": 2420,
+    "skipped": 89,
+    "failed": 0,
+    "cleanProductTests": 121,
+    "sdk": "0.2.2-rc.1",
+    "isolatedHostChecks": 50,
+    "isolatedInstalledFilesVerified": 462,
+    "runtimeFilesVerified": 187,
+    "isolatedEntryImported": true
+  },
+  "preparedProfile": {
+    "version": "0.63.2",
+    "otherDependencyVersionsUnchanged": true,
+    "registryIntegrityConfirmed": true,
+    "appliedToCurrentProfile": false
+  },
+  "limitations": [
+    "Kimi main task returned HTTP400 INVALID_REQUEST",
+    "Step official CLI returned MR_API_FUNDING_REQUIRED and was not launched",
+    "Step library-read request returned HTTP451 censorship_blocked",
+    "Existing paired remote client permits only original Chief",
+    "Native viewer did not show a frame; independent Agent WebSocket did",
+    "No Bot remote desktop input or routine replay succeeded in this live session"
+  ],
+  "currentDesktop": {
+    "version": "0.63.1",
+    "restart": "awaiting-confirmation-of-task-interruption",
+    "fixesLoaded": false,
+    "oldReceiptRecheck": "not-yet-performed"
+  }
+}
