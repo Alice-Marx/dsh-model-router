@@ -1,0 +1,102 @@
+{
+  "version": "0.63.0",
+  "agentVersion": "0.1.0",
+  "verifiedAt": "2026-11-05T14:22:33.032Z",
+  "status": "published-and-verified",
+  "npm": {
+    "status": "passed",
+    "version": "0.63.0",
+    "latest": "0.63.0",
+    "publishedAt": "2026-11-05T14:15:56.821Z",
+    "tarball": "https://registry.npmjs.org/@ljwei-stak/dsh-model-router/-/dsh-model-router-0.63.0.tgz",
+    "integrity": "sha512-5nCEsn1YCLdAxDhl0lkrG96xjtnZIirJUQuRAknyQFkm/YGfJhb2M7MPRQUM1GuAmktyct7I8conIbIMNcv2SQ==",
+    "sha256": "f7e5608cdeef932faf6d021ec58acaa38624c7310b2e3b7196f38a172be4e4bb",
+    "bytes": 3478131,
+    "anonymousDownloadVerified": true
+  },
+  "source": {
+    "archiveReleaseCommit": "33dcc3a0b0a48ff384765d51f9fdef4693632148",
+    "cleanProductCommit": "3d4ad2847a734d2694275add66484bf8853eff81",
+    "gitlab": "https://gitlab.com/Alice_marx/dsh-model-router",
+    "github": "https://github.com/Alice-Marx/dsh-model-router",
+    "gitlabReleaseTag": "v0.63.0",
+    "githubReleaseTag": "v0.63.0"
+  },
+  "githubRelease": {
+    "assets": [
+      {
+        "browser_download_url": "https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/computer-bot-guide.zh.md",
+        "digest": "sha256:c6c7aad57b454a76239d39158ec5c2a7473b3b0a69b232ddb1c591082fa30b89",
+        "name": "computer-bot-guide.zh.md",
+        "size": 14911,
+        "state": "uploaded"
+      },
+      {
+        "browser_download_url": "https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip",
+        "digest": "sha256:93a9fb6c3bb7357901c7718cbf5fe395e80258a4d56a716a0bdf4d2c614f91dd",
+        "name": "dsh-remote-agent-0.1.0-windows-x64.zip",
+        "size": 55701802,
+        "state": "uploaded"
+      },
+      {
+        "browser_download_url": "https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/ljwei-stak-dsh-model-router-0.63.0.tgz",
+        "digest": "sha256:f7e5608cdeef932faf6d021ec58acaa38624c7310b2e3b7196f38a172be4e4bb",
+        "name": "ljwei-stak-dsh-model-router-0.63.0.tgz",
+        "size": 3478131,
+        "state": "uploaded"
+      },
+      {
+        "browser_download_url": "https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/SHA256SUMS.txt",
+        "digest": "sha256:43d718d66b9e81f6254f897dfe5f3663932772f71053ccaa1a8b873d33bc5c4d",
+        "name": "SHA256SUMS.txt",
+        "size": 301,
+        "state": "uploaded"
+      }
+    ],
+    "draft": false,
+    "html_url": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.0",
+    "prerelease": false,
+    "tag_name": "v0.63.0"
+  },
+  "tests": {
+    "full": {
+      "tests": 2502,
+      "pass": 2413,
+      "skip": 89,
+      "fail": 0
+    },
+    "cleanProduct": {
+      "tests": 114,
+      "pass": 114,
+      "fail": 0
+    },
+    "actualSdkOfflineChecks": {
+      "0.2.1-rc.4": 50,
+      "0.2.2-rc.1": 50
+    },
+    "paidModelCalls": 0
+  },
+  "archive": {
+    "filesVerified": 461,
+    "runtimeFilesVerified": 187
+  },
+  "isolatedInstallation": {
+    "status": "passed",
+    "version": "0.63.0",
+    "isolatedFilesVerified": 461,
+    "localFilesVerified": 461,
+    "ignoreScripts": true,
+    "omittedOptionalDependencies": true,
+    "freshNativeBuildTested": false,
+    "registryArchiveMatchesInstalledArchive": true
+  },
+  "localInstallation": {
+    "status": "installed",
+    "version": "0.63.0",
+    "dependencySource": "npm registry",
+    "dependencySpec": "0.63.0",
+    "otherPluginVersionsUnchanged": true,
+    "userDataModified": false,
+    "activation": "Restart Harness including the tray process"
+  }
+}
