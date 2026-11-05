@@ -327,7 +327,10 @@ function DesktopControl({ snapshot, dispatch, busy }) {
   const [text, setText] = React.useState('')
   const imageRef = React.useRef(null)
   const machine = machines.find(item => item.id === machineId)
-  const rootId = machine?.roots?.[0]?.id ?? ''
+  // The read model reports roots as ids; older shapes nested them as { id }. Accept both rather
+  // than sending an empty rootId, which the Host refuses as INVALID_DESKTOP_REQUEST:rootId.
+  const firstRoot = machine?.roots?.[0]
+  const rootId = typeof firstRoot === 'string' ? firstRoot : firstRoot?.id ?? firstRoot?.rootId ?? ''
   const canView = typeof dispatch === 'function' && Boolean(machineId && rootId && botId)
   const call = async (action, payload) => {
     setError('')
@@ -542,7 +545,11 @@ export function Machines({ snapshot, dispatch, busy }) {
     if (typeof dispatch !== 'function') return undefined
     const rows = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
     globalThis.__dshDesktop = Object.freeze({
-      machines: () => rows.map(item => ({ machineId: item.id, rootId: item.roots?.[0]?.id ?? '', label: item.name ?? item.id })),
+      machines: () => rows.map(item => {
+        const first = item.roots?.[0]
+        const rootId = typeof first === 'string' ? first : first?.id ?? first?.rootId ?? ''
+        return { machineId: item.id, rootId, label: item.name ?? item.id }
+      }),
       view: (botId, machineId) => {
         const machine = rows.find(item => item.id === machineId)
         return dispatch('machine.desktop.view', { botId, machineId, rootId: machine?.roots?.[0]?.id ?? '' })
