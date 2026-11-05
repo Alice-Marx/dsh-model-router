@@ -1,16 +1,41 @@
 # 内置 Bot Runtime
 
 本目录把当前 DS Bot 迁入 MR 的一个插件中。`vendor/ds-bot/` 由
-`scripts/sync-ds-bot.mjs` 从本仓库 `ds-bot/` 同步，构建前更新，`--check` 按字节拒绝旧副本。
-源仓库为 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)。
-`SOURCE.json` 记录全部迁入文件的来源路径及 SHA-256。保留了包内
+`scripts/sync-ds-bot.mjs` 从**显式指定**的上游 checkout 同步，构建前更新，`--check` 按字节
+拒绝旧副本。源仓库为 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)。
+`SOURCE.json` 记录全部迁入文件的来源路径、SHA-256、固定提交与运行时版本；每个文件另带
+`origin`：`upstream`（与上游逐字节相同）、`notice`（`UPSTREAM_LICENSE`/`UPSTREAM_NOTICE`）、
+`overlay`（产品自有改动）、`generated`（按打过补丁的源码重建的 `client.js`）。保留了包内
 `LICENSE`、仓库 `UPSTREAM_LICENSE` 和 `UPSTREAM_NOTICE`；其 Apache-2.0 许可继续适用。
 本仓自有组合器与投影代码沿用本仓许可。生成的客户端也包含上述 Apache 来源代码。
 
-迁入完整的 Bot/群聊、角色与会话、长期记忆、派活/结果回传、侧聊、语音、浏览器、
-Capabilities、秘密、计划任务、Token 用量和主题界面。完整冻结测试也保留在 vendor 中，
-以便从最终仓库复现。内置模块不再单独安装或更新 `ds-bot`；原更新操作会说明从
+```sh
+# 同步：必须给出 checkout 与固定提交；--rebase-overlay 在上游改动后重写产品补丁的基准
+node scripts/sync-ds-bot.mjs --source ../DS-Bot-upstream \
+  --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a --rebase-overlay
+# 校验：不带 --source 只校验 vendor 与 SOURCE.json；带上时逐字节比对上游并重建 client.js
+node scripts/sync-ds-bot.mjs --check [--source ../DS-Bot-upstream]
+# 特性矩阵：逐条给出上游特性、非上游特性与产品改动的证据
+node scripts/check-upstream-parity.mjs [--source ../DS-Bot-upstream] [--diff]
+```
+
+同步不再自动寻找 `../ds-bot` 或仓库内的 `ds-bot/`：没有 `--source` 时只刷新和校验已有字节，
+因此打包后的仓库（没有同级 checkout）同样能 `build:client` / `check:client`。同步不访问网络。
+
+产品对上游的自有改动集中在 `product-overlay/`（Bot 抽屉的「电脑操作」页、侧边栏
+`sidebarAddon`、`sidebar.workspaces` 槽位探测），以「记录的上游基准 + 补丁」的形式保存，
+详见该目录的 README。上游在同一文件里的新改动不会被这些补丁覆盖。
+
+迁入完整的 Bot/群聊、角色与会话、长期记忆（含变更历史与按行恢复）、派活/结果回传、侧聊、
+语音、浏览器面板与浏览器插件、Capabilities、秘密、计划任务、Token 用量和主题界面，以及
+0.2.7 起的分阶段群目标（`group_goal` 与 goal-grill 技能）、Enter 发送/换行偏好与催稿、
+消息时间、新 Bot 默认模型、Models 引导步和失败回合的可操作提示。完整冻结测试也保留在
+vendor 中，以便从最终仓库复现。内置模块不再单独安装或更新 `ds-bot`；原更新操作会说明从
 Harness 插件管理更新统一 MR 插件。
+
+**不属于上游**：远程电脑（配对机器、桌面画面与输入）和文档知识库都是 MR 自己的能力，
+实现在 `packages/orchestration/` 与 `apps/integration-client/`；上游只有浏览器面板和
+头像库。`node scripts/check-upstream-parity.mjs` 用可执行证据守住这条边界。
 
 ## 主插件接入
 
@@ -81,6 +106,8 @@ revision逐次校验。离线撤销保留持久的停止未确认状态，重试
 ```sh
 node scripts/integration-product-source.mjs
 node --test tests/bot-runtime-product.test.mjs tests/bot-runtime-ui.test.mjs
+node scripts/check-upstream-parity.mjs
+node --test tests/upstream-parity.test.mjs
 node scripts/integration-product-upstream-tests.mjs
 node scripts/integration-product-host.mjs
 ```

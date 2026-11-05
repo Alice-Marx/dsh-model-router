@@ -4,6 +4,9 @@ import { botAttentionSummary, deriveBotAttention } from './bot-attention.mjs'
 import { normalizeEndpoint, parsePairingPaste, secretNameFor } from './pairing.mjs'
 import { framePoint } from '../../packages/orchestration/src/desktop-contract.mjs'
 import { BotBindingEditor } from './binding-editor.jsx'
+import { LibraryPanel } from './library-panel.jsx'
+import { DesktopWorkbench } from './desktop-pane.jsx'
+import { RoutinesPanel } from './routines-panel.jsx'
 
 export function ProductNavigation({ openPanel, panels, compact = false }) {
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
@@ -174,32 +177,50 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
   const [text, setText] = React.useState('')
   const [pin, setPin] = React.useState('')
   const [machine, setMachine] = React.useState('')
+  const [root, setRoot] = React.useState('')
+  const [effect, setEffect] = React.useState('read')
   const [decision, setDecision] = React.useState(null)
   const [working, setWorking] = React.useState(false)
+  const dispatchRef = useRef(dispatch)
+  dispatchRef.current = dispatch
+  const call = useCallback(async (action, payload) => {
+    const value = await dispatchRef.current(action, payload)
+    if (value === undefined || value?.ok === false) throw new Error(value?.error?.message ?? '宿主尚未确认这次请求，请刷新后重试。')
+    return value
+  }, [])
 
   const load = React.useCallback(async () => {
     if (typeof dispatch !== 'function') return
     try {
-      const next = await dispatch('botRoutingInspect', {})
+      const next = await call('botRoutingInspect', {})
       setView(next && next.ok === false ? null : next)
       setError(next && next.ok === false ? String(next.error?.message ?? next.error) : '')
     } catch (failure) {
       setError(String(failure?.message ?? failure))
     }
-  }, [dispatch])
-  // Candidates are read when asked: mounting this card must not make every Tasks panel wait on a
-  // Host read it does not need.
+  }, [call])
+  useEffect(() => { void load() }, [load])
+  const saveSettings = async settings => {
+    setWorking(true); setError('')
+    try {
+      const value = await call('botRouting.save', { expectedRevision: view.settingsRevision ?? 0, settings })
+      setView(value); setDecision(null); setDispatched(null)
+    } catch (failure) { setError(String(failure?.message ?? failure)) }
+    finally { setWorking(false) }
+  }
 
   const [dispatched, setDispatched] = React.useState(null)
+  const routeRequest = () => ({ text: text.trim(), requiresMachine: machine !== '',
+    ...(pin ? { pinnedBotId: pin } : {}),
+    ...(machine ? { machineId: machine, rootId: root || snapshot.machines?.items?.find(item => item.id === machine)?.roots?.[0] || '' } : {}),
+    needs: { write: effect === 'write', desktop: effect === 'desktop', browser: effect === 'browser' } })
   const submitRouted = async () => {
     if (!decision?.chosen || working) return
     setWorking(true)
     setError('')
     try {
-      const request = { text: text.trim(), requestKey: crypto.randomUUID(), requiresMachine: machine !== '' }
-      if (pin) request.pinnedBotId = pin
-      if (machine) request.machineId = machine
-      const next = await dispatch('botRouting.dispatch', request)
+      const request = { ...routeRequest(), requestKey: crypto.randomUUID() }
+      const next = await call('botRouting.dispatch', request)
       if (next && next.ok === false) throw new Error(next.error?.message ?? next.error)
       setDispatched(next)
     } catch (failure) {
@@ -213,10 +234,8 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
     setWorking(true)
     setError('')
     try {
-      const request = { text: text.trim(), requiresMachine: machine !== '' }
-      if (pin) request.pinnedBotId = pin
-      if (machine) request.machineId = machine
-      const next = await dispatch('botRoutingDecide', request)
+      const request = routeRequest()
+      const next = await call('botRoutingDecide', request)
       if (next && next.ok === false) throw new Error(next.error?.message ?? next.error)
       setDecision(next)
     } catch (failure) {
@@ -229,12 +248,17 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
 
   if (!view) {
     return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2></div>
-      <p className="bp-muted">{error || '正在读取候选…'}</p></article>
+      <p className="bp-muted">{error || '正在读取候选…'}</p><button type="button" disabled={busy || working} onClick={() => { void load() }}>读取候选</button></article>
   }
   const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
   return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2><Tag>{view.enabled ? `已开启 · ${view.preset}` : '未开启'}</Tag>
     <button type="button" disabled={busy} onClick={() => { void load() }}>{view ? '刷新候选' : '读取候选'}</button></div>
-    {view.enabled ? null : <p className="bp-muted">在插件配置里加 <code>botRouting: &#123; "enabled": true, "preset": "balanced" &#125;</code> 后，主 Bot 才会按候选分配任务。</p>}
+    <div className="bp-actions"><label className="bp-check"><input type="checkbox" checked={view.enabled} disabled={busy || working} onChange={event => { void saveSettings({ enabled: event.target.checked, preset: view.preset, autoGrant: view.autoGrant }) }} />开启 Bot 路由</label>
+      <label>策略<select value={view.preset} disabled={busy || working} onChange={event => { void saveSettings({ enabled: view.enabled, preset: event.target.value, autoGrant: view.autoGrant }) }}>
+        <option value="economy">省钱优先</option><option value="balanced">均衡</option><option value="quality">效果优先</option></select></label>
+      <label className="bp-check"><input type="checkbox" checked={view.autoGrant?.machineTools === true} disabled={busy || working} onChange={event => { void saveSettings({ enabled: view.enabled, preset: view.preset, autoGrant: { ...view.autoGrant, machineTools: event.target.checked } }) }} />自动授予任务所需电脑权限</label></div>
+    {!view.enabled && <p className="bp-muted">开启后，主 Bot 可根据各 Bot 已配置的模型、工具与电脑权限分配任务。手动指定也会检查是否具备执行条件。</p>}
+    {error && <p className="bp-error" role="alert">{error}</p>}
     {view.enabled ? <div className="bp-table-wrap"><table>
       <thead><tr><th>Bot</th><th>模型</th><th>机器</th><th>价格/百万</th><th>质量</th><th>状态</th></tr></thead>
       <tbody>{view.candidates.map(row => <tr key={row.botId}>
@@ -246,14 +270,21 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
         <td>{row.busy ? '正忙' : '空闲'}</td>
       </tr>)}</tbody></table></div> : null}
     {view.enabled ? <div className="bp-form">
-      <label>任务描述<textarea rows={2} value={text} onChange={event => setText(event.target.value)} placeholder="例如：整理上周的发布记录" /></label>
-      <label>路由方式<select value={pin} onChange={event => setPin(event.target.value)}>
+      <label>任务描述<textarea rows={2} value={text} onChange={event => { setText(event.target.value); setDecision(null) }} placeholder="例如：整理上周的发布记录" /></label>
+      <label>路由方式<select value={pin} onChange={event => { setPin(event.target.value); setDecision(null) }}>
         <option value="">自动路由（按预设打分）</option>
         {view.candidates.map(row => <option key={row.botId} value={row.botId}>指定：{row.name}</option>)}
       </select></label>
-      <label>需要远程电脑<select value={machine} onChange={event => setMachine(event.target.value)}>
+      <label>需要远程电脑<select value={machine} onChange={event => { setMachine(event.target.value); setRoot(''); setEffect('read'); setDecision(null) }}>
         <option value="">不需要</option>
         {machines.map(item => <option key={item.id} value={item.id}>{item.name ?? item.id}</option>)}
+      </select></label>
+      {machine && <label>共享目录<select value={root || machines.find(item => item.id === machine)?.roots?.[0] || ''} onChange={event => { setRoot(event.target.value); setDecision(null) }}>
+        {(machines.find(item => item.id === machine)?.roots ?? []).map(id => <option key={id} value={id}>{id}</option>)}
+      </select></label>}
+      <label>任务需要的操作<select value={effect} onChange={event => { setEffect(event.target.value); setDecision(null) }}>
+        <option value="read">只读 / 分析</option><option value="write">写入文件</option>
+        {machine && <><option value="desktop">操作 Windows 桌面</option><option value="browser">操作远程浏览器</option></>}
       </select></label>
       <button type="button" disabled={busy || working || !text.trim()} onClick={() => { void decide() }}>{working ? '计算中…' : '预览路由'}</button>
       {error && <p className="bp-error" role="alert">{error}</p>}
@@ -306,7 +337,7 @@ export function Tasks({ snapshot, dispatch, busy }) {
         <Value label="期限">{task.deadlineAt ? new Date(task.deadlineAt).toLocaleString('zh-CN') : '未取得'}</Value><Value label="MR 运行">{task.legacyRunIds?.join('、')}</Value></dl>
       <h3>执行与收据依据</h3><pre>{JSON.stringify({ attempts: task.attempts, executionRef: task.executionRef, remoteReceipt:task.result?.remote,reconciliation: task.reconciliation, packages: task.packages }, null, 2)}</pre>
     </article>}
-    <BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} />
+    {snapshot.availableActions?.includes('botRoutingInspect') && <BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} />}
   </>
 }
 
@@ -407,11 +438,15 @@ function MachineSetup({ snapshot, dispatch, busy }) {
   const available = snapshot.availableActions ?? []
   const [paste, setPaste] = React.useState('')
   const [address, setAddress] = React.useState('')
-  const [tunnel, setTunnel] = React.useState(true)
+  const [tunnel, setTunnel] = React.useState(false)
   const [status, setStatus] = React.useState('')
   const [error, setError] = React.useState('')
   const [working, setWorking] = React.useState(false)
   const parsed = React.useMemo(() => parsePairingPaste(paste), [paste])
+  React.useEffect(() => {
+    if (parsed.endpoint) setAddress(parsed.endpoint)
+    if (typeof parsed.protectedTunnel === 'boolean') setTunnel(parsed.protectedTunnel)
+  }, [parsed.endpoint, parsed.protectedTunnel])
   const endpoint = React.useMemo(() => normalizeEndpoint(address, {}), [address])
   const ready = parsed.problems.length === 0 && endpoint.problem === ''
   // The Agent prints its own ref (`remote-agent/<machine>/<client>`); the Host requires
@@ -441,18 +476,20 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       }
       await unwrap(await dispatch('machine.secret', { name: secretName, value: parsed.token }))
       const existing = (snapshot.machines?.items ?? []).find(item => item.id === parsed.machineId)
-      await unwrap(await dispatch('machine.pair', {
+      const paired = await unwrap(await dispatch('machine.pair', {
         name: parsed.clientId || parsed.machineId,
         machineId: parsed.machineId,
         endpoint: endpoint.endpoint,
         secretRef: 'ds-secret/' + secretName,
-        roots: ['project'],
-        probeBotId: snapshot.bots?.[0]?.id ?? '',
+        roots: parsed.rootIds.length ? parsed.rootIds : ['project'],
+        probeBotId: snapshot.mainBotId ?? snapshot.bots?.[0]?.id ?? '',
         protectedTunnel: tunnel,
-        tools: ['machine_ping', 'fs_list', 'fs_read', 'fs_write', 'shell_exec', 'operation_status', 'operation_cancel', 'artifact_stat', 'artifact_read', 'desktop_screenshot', 'desktop_click', 'desktop_type', 'desktop_key', 'desktop_scroll'],
+        tools: parsed.tools.length ? parsed.tools : ['machine_ping', 'fs_list', 'fs_read', 'fs_write', 'operation_status', 'operation_cancel', 'artifact_stat', 'artifact_read', 'desktop_screenshot', 'desktop_click', 'desktop_type', 'desktop_key', 'desktop_scroll'],
         expectedRevision: existing?.revision ?? 0,
       }))
-      setStatus('已添加 ' + (parsed.clientId || parsed.machineId) + '，几秒后体检会刷新状态。')
+      setStatus(paired.mainBinding?.status === 'blocked'
+        ? '电脑已配对；主 Bot 绑定尚未完成：' + paired.mainBinding.code + '。请检查此电脑允许的 Bot ID 与授权状态。'
+        : '已添加 ' + (parsed.clientId || parsed.machineId) + '，主 Bot 已绑定；体检会自动刷新状态。')
       setPaste('')
     } catch (failure) {
       setError(String(failure?.message ?? failure))
@@ -461,7 +498,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
     }
   }
   return <details className="bp-card"><summary>添加电脑（导入配对文件）</summary>
-    <p className="bp-muted">在目标电脑上运行 <code>node dist/cli.mjs pair config.json 名称 ceiling.json &gt; pair.json</code>，把生成的 <code>pair.json</code> 导入即可；文件里已有 token、machineId 与 secretRef，不用手抄。</p>
+    <p className="bp-muted">在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 <code>start.cmd</code>，按向导选共享文件夹和连接地址。回到这里导入向导生成的 <code>pairing.private.json</code>，地址、目录和权限会自动填好。</p>
     {available.includes('machine.secret') && available.includes('machine.pair') ? <div className="bp-form">
       <label>配对文件<input type="file" accept=".json,application/json" onChange={event => { void importFile(event) }} /></label>
       <label>或粘贴文件内容<textarea rows={3} value={paste} onChange={event => setPaste(event.target.value)} placeholder='{"clientId":"host-office","token":"...","machineId":"machine-..."}' /></label>
@@ -470,6 +507,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       {paste !== '' && parsed.problems.length > 0 && <p className="bp-error" role="alert">{parsed.problems.join(' ')}</p>}
       {address !== '' && endpoint.problem !== '' && <p className="bp-error" role="alert">{endpoint.problem}</p>}
       {ready && <p className="bp-muted">将保存凭据 <code>ds-secret/{secretName}</code> 并配对 {parsed.machineId}。</p>}
+      {ready && parsed.rootIds.length > 0 && <p className="bp-muted">共享目录：{parsed.rootIds.join('、')}。{parsed.hostManagedBots === true ? '此电脑允许本宿主管理团队 Bot，后续分配无需重新复制 Bot ID。' : parsed.botIds.length > 0 ? `此电脑只允许这些 Bot：${parsed.botIds.join('、')}。` : ''}</p>}
       <button type="button" disabled={!ready || busy || working} onClick={() => { void submit() }}>{working ? '添加中…' : '导入并添加'}</button>
       {status !== '' && <p className="bp-muted" role="status">{status}</p>}
       {error !== '' && <p className="bp-error" role="alert">{error}</p>}
@@ -539,33 +577,10 @@ function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
 }
 
 export function Machines({ snapshot, dispatch, busy }) {
-  // The Bot drawer's desktop tab reads this bridge: it lives in the vendored client, which owns no
-  // remote authority, so every call still runs through this panel's owner channel.
-  React.useEffect(() => {
-    if (typeof dispatch !== 'function') return undefined
-    const rows = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
-    globalThis.__dshDesktop = Object.freeze({
-      machines: () => rows.map(item => {
-        const first = item.roots?.[0]
-        const rootId = typeof first === 'string' ? first : first?.id ?? first?.rootId ?? ''
-        return { machineId: item.id, rootId, label: item.name ?? item.id }
-      }),
-      view: (botId, machineId) => {
-        const machine = rows.find(item => item.id === machineId)
-        return dispatch('machine.desktop.view', { botId, machineId, rootId: machine?.roots?.[0]?.id ?? '' })
-      },
-      act: (botId, machineId, screenshotId, action) => {
-        const machine = rows.find(item => item.id === machineId)
-        return dispatch('machine.desktop.act', { botId, machineId, rootId: machine?.roots?.[0]?.id ?? '', screenshotId, action })
-      },
-    })
-    // The bridge stays for this window: a Bot drawer opened later still needs it, and the panel
-    // that owns the authority has already rendered.
-  }, [dispatch, snapshot.machines])
-
   const section = snapshot.machines
   if (section?.status !== 'available') return <Blocked value={section} />
-  return <>{dispatch&&<><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} />
+  return <>{dispatch&&<><DesktopWorkbench snapshot={snapshot} dispatch={dispatch} />
+    <details><summary>兼容截图操作</summary><DesktopControl snapshot={snapshot} dispatch={dispatch} busy={busy} /></details>
     <MachineSetup snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}{section.items.length ? <div className="bp-grid">{section.items.map(machine => <article className="bp-card" key={machine.id ?? machine.machineId}>
     <div className="bp-card-title"><h2>{machine.name ?? machine.id ?? machine.machineId}</h2><Tag>{machine.status ?? '未知'}</Tag></div>
     <dl className="bp-facts"><Value label="平台">{machine.platform}</Value><Value label="Agent 版本">{machine.version}</Value><Value label="最后在线">{machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString('zh-CN') : '从未取得心跳'}</Value>
@@ -622,72 +637,7 @@ export function Usage({ snapshot, dispatch, busy, openAdvanced }) {
 }
 
 
-/**
- * One Bot's library: its own files, never another Bot's.
- *
- * The Host decides which Bot's directory this is (the caller's own Bot, or the operator's choice), so
- * the panel only names the Bot it is asking about. Paths stay relative; the Host refuses escapes.
- */
-export function Library({ snapshot, dispatch, busy }) {
-  const bots = snapshot.bots ?? []
-  const [botId, setBotId] = React.useState(bots[0]?.id ?? '')
-  const [path, setPath] = React.useState('')
-  const [entries, setEntries] = React.useState(null)
-  const [content, setContent] = React.useState(null)
-  const [draft, setDraft] = React.useState('')
-  const [error, setError] = React.useState('')
-  const [status, setStatus] = React.useState('')
-  const call = async (action, payload) => {
-    if (typeof dispatch !== 'function') return null
-    const value = await dispatch(action, payload)
-    if (value && value.ok === false) throw new Error(value.error?.message ?? value.error ?? '宿主拒绝了这一步。')
-    return value
-  }
-  const list = async () => {
-    setError(''); setStatus('')
-    try { setEntries(await call('library.list', { botId, relativePath: path })) } catch (failure) { setError(String(failure?.message ?? failure)) }
-  }
-  const read = async name => {
-    setError(''); setStatus(''); setContent(null)
-    try {
-      const value = await call('library.read', { botId, relativePath: path ? `${path}/${name}` : name })
-      setContent({ name, text: value?.content ?? '' }); setDraft(value?.content ?? '')
-    } catch (failure) { setError(String(failure?.message ?? failure)) }
-  }
-  const save = async () => {
-    if (!content) return
-    setError('')
-    try {
-      await call('library.write', { botId, relativePath: path ? `${path}/${content.name}` : content.name, content: draft })
-      setStatus(`已保存 ${content.name}`)
-      await list()
-    } catch (failure) { setError(String(failure?.message ?? failure)) }
-  }
-  if (!bots.length) return <p className="bp-empty">还没有 Bot。</p>
-  return <article className="bp-card"><div className="bp-card-title"><h2>资料库</h2><Tag>{botId || '未选择'}</Tag></div>
-    <p className="bp-muted">每个 Bot 有自己的目录；这里看不到别的 Bot 的文件，路径只能是相对的。</p>
-    <div className="bp-form">
-      <label>Bot<select value={botId} onChange={event => { setBotId(event.target.value); setEntries(null); setContent(null) }}>
-        {bots.map(bot => <option key={bot.id} value={bot.id}>{bot.name}</option>)}</select></label>
-      <label>相对路径<input value={path} onChange={event => setPath(event.target.value)} placeholder="留空表示根目录，例如 notes" autoComplete="off" spellCheck={false} /></label>
-      <button type="button" disabled={busy} onClick={() => { void list() }}>列出目录</button>
-      {error && <p className="bp-error" role="alert">{error}</p>}
-      {status && <p className="bp-muted" role="status">{status}</p>}
-    </div>
-    {entries ? (entries.length === 0 ? <p className="bp-muted">这个目录是空的。</p> : <div className="bp-table-wrap"><table>
-      <thead><tr><th>名称</th><th>类型</th><th>大小</th><th>操作</th></tr></thead>
-      <tbody>{entries.map(entry => <tr key={entry.name}>
-        <td>{entry.name}</td><td>{entry.kind === 'directory' ? '目录' : '文件'}</td>
-        <td>{Number.isFinite(entry.size) ? `${entry.size} 字节` : '—'}</td>
-        <td>{entry.kind === 'file' && <button type="button" disabled={busy} onClick={() => { void read(entry.name) }}>查看</button>}</td>
-      </tr>)}</tbody></table></div>) : null}
-    {content ? <div className="bp-blocked"><strong>{content.name}</strong>
-      <label className="bp-form">内容<textarea rows={10} value={draft} onChange={event => setDraft(event.target.value)} /></label>
-      <div className="bp-actions"><button type="button" disabled={busy} onClick={() => { void save() }}>保存</button>
-        <button type="button" disabled={busy} onClick={() => setContent(null)}>关闭</button></div>
-    </div> : null}
-  </article>
-}
+export const Library = LibraryPanel
 
 
 /**
@@ -792,6 +742,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [snapshotStale, setSnapshotStale] = useState(false)
+  const pendingActions = useRef(0)
   const lifecycle = useRef({ live: false, epoch: 0, request: 0 })
   const snapshotApi = useRef(null)
   const refresh = useCallback(async signal => {
@@ -814,24 +765,26 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     const state = lifecycle.current
     state.live = true; state.epoch++
     // A changed product API must not keep the previous host's writable view.
-    setSnapshotStale(true); setBusy(false)
+    setSnapshotStale(true); pendingActions.current = 0; setBusy(false)
     let timer, stopped = false
     const loop = async () => { await refresh(controller.signal); if (!stopped) timer = setTimeout(loop, document.hidden ? 15000 : 4000) }
     void loop()
     return () => { stopped = true; state.live = false; state.epoch++; state.request++; controller.abort(); clearTimeout(timer) }
   }, [refresh])
   const dispatch = async (action, payload) => {
-    if (busy || snapshotStale || snapshot?.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return
+    if (snapshotStale || snapshot?.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return
     const state = lifecycle.current, epoch = state.epoch
     const current = () => state.live && state.epoch === epoch
-    setBusy(true)
+    pendingActions.current++; setBusy(true)
     try {
       const result = await productApi.dispatch(action, payload)
       if (!current()) return result
       await refresh()
       if (current() && result?.warning) setError('宿主已撤销授权，但远程停止尚未确认；请恢复连接并检查 Agent。')
       return result
-    } catch (cause) { if (current()) { state.request++; setSnapshotStale(true); setError(cause.message) } } finally { if (current()) setBusy(false) }
+    } catch (cause) { if (current()) { state.request++; setSnapshotStale(true); setError(cause.message) } } finally {
+      if (current()) { pendingActions.current = Math.max(0, pendingActions.current - 1); setBusy(pendingActions.current > 0) }
+    }
   }
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
   const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
@@ -842,7 +795,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} /><RoleCatalog dispatch={dispatch} busy={disabled} /></>}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
-      {section === 'routine' && <Routines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
+      {section === 'routine' && <RoutinesPanel snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} openAdvanced={() => openPanel('model-router-galgame')} />}
       <footer className="bp-muted">宿主读取时间：{new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}

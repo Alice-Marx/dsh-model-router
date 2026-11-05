@@ -1,4 +1,10 @@
 /** Register bounded Task commands. Identity comes only from the live SDK Agent object. */
+export const TASK_TOOL_CAPABILITIES = Object.freeze({
+  bot_task_plan_start: 'task/submit', bot_task_plan_status: 'task/read', bot_task_plan_cancel: 'task/cancel',
+  bot_task_start: 'task/submit', bot_task_status: 'task/read', bot_task_cancel: 'task/cancel',
+  bot_task_retry: 'task/retry', bot_task_reconcile: 'task/reconcile',
+})
+
 export function registerTaskTools(ctx,defineTool,{service,directory}) {
   const text=description=>({type:'string',required:true,description})
   const commands=[

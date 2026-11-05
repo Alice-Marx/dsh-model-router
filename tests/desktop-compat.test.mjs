@@ -10,8 +10,8 @@ const appBootManifest = JSON.parse(readFileSync(
   'utf8',
 ))
 const DSH_PEER_PREFIX = '@deepseek-ai/dsh-'
-const SUPPORTED_DESKTOP_PEERS = '0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5'
-const SUPPORTED_DESKTOP_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.5']
+const SUPPORTED_DESKTOP_PEERS = '0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.3 || 0.2.1-rc.4 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3'
+const SUPPORTED_DESKTOP_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.5', '0.2.2-rc.1', '0.2.2-rc.2', '0.2.2-rc.3']
 const dshPeerNames = Object.keys(manifest.peerDependencies)
   .filter(name => name.startsWith(DSH_PEER_PREFIX))
 
@@ -33,7 +33,8 @@ function assertRejected(candidate, runtimeVersion) {
   return issue
 }
 
-test('the release accepts the audited Desktop release candidates without exemptions', () => {
+// This verifies the manifest gate, not execution on every declared SDK version.
+test('the manifest gate accepts its declared Desktop release candidates without exemptions', () => {
   assert.ok(dshPeerNames.length > 0)
   for (const name of dshPeerNames) {
     assert.equal(manifest.peerDependencies[name], SUPPORTED_DESKTOP_PEERS)

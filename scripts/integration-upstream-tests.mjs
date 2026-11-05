@@ -11,7 +11,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const execute = promisify(execFile)
 
 /** Only public package.json resolution is used; installed SDK files are never edited. */
-export async function resolverAnchor(hostRoot) {
+export async function resolverAnchor(hostRoot, { expectedVersion = '0.2.1-rc.3' } = {}) {
   const requireHost = createRequire(join(hostRoot, 'package.json'))
   const entry = await realpath(requireHost.resolve('@deepseek-ai/dsh/package.json'))
   const queue = [entry]
@@ -30,7 +30,7 @@ export async function resolverAnchor(hostRoot) {
       queue.push(await realpath(from.resolve(`${name}/package.json`)))
     }
   }
-  if (packages.get('@deepseek-ai/dsh').version !== '0.2.1-rc.3') throw new Error('Expected fixed rc.3 host')
+  if (packages.get('@deepseek-ai/dsh').version !== expectedVersion) throw new Error(`Expected fixed ${expectedVersion} host`)
   const parent = join(ROOT, 'tmp/integration/resolver-anchors')
   await mkdir(parent, { recursive: true })
   const anchor = await mkdtemp(join(parent, 'rc3-'))
@@ -39,7 +39,10 @@ export async function resolverAnchor(hostRoot) {
   for (const [name, record] of packages) {
     await symlink(record.directory, join(anchor, 'node_modules', name), process.platform === 'win32' ? 'junction' : 'dir')
   }
-  const jsdom = dirname(await realpath(requireHost.resolve('jsdom/package.json')))
+  let jsdomManifest
+  try { jsdomManifest = requireHost.resolve('jsdom/package.json') }
+  catch (error) { if (error.code !== 'MODULE_NOT_FOUND') throw error; jsdomManifest = createRequire(import.meta.url).resolve('jsdom/package.json') }
+  const jsdom = dirname(await realpath(jsdomManifest))
   await symlink(jsdom, join(anchor, 'node_modules/jsdom'), process.platform === 'win32' ? 'junction' : 'dir')
   return { anchor, sdkPackages: packages.size }
 }

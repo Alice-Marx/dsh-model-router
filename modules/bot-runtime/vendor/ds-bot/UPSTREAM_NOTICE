@@ -91,35 +91,6 @@ Apache License, Version 2.0, Copyright (c) Microsoft Corporation
   The license is the same Apache License, Version 2.0 that covers this
   repository; see LICENSE for the text.
 
-DSH Model Router (https://github.com/Alice-Marx/dsh-model-router)
-MIT License, Copyright (c) 2026 ljwei-stak
-
-  - model-router/ contains the model router, orchestration, official CLI,
-    remote-computer agent and Windows desktop helper migrated from that project.
-    Its current DS Bot runtime and client are synchronized from this repository's
-    ds-bot/ instead of the older vendored upstream copy. See model-router/LICENSE
-    and model-router/modules/bot-runtime/SOURCE.json.
-
-  Full license text:
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-  SOFTWARE.
-
 No other third-party code is copied into this repository. At run time the
 plugin uses the @deepseek-ai/* packages of the DeepSeek Harness install it
 runs in; they are not bundled. The bundled ds-bot/office.js includes

@@ -34,3 +34,13 @@ export function markManagedModelRequest(request,context){
   managed.set(request,Object.freeze({...context}))
 }
 export const managedModelRequest=request=>managed.get(request)
+
+// A routed Bot turn may contain multiple model requests, each admitted and charged on its own.
+// Correlating those receipts to a task does not assert that a parent invoice already exists.
+const taskCalls = new WeakMap()
+export function markTaskModelRequest(request, context) {
+  if (!request || typeof request !== 'object' || taskCalls.has(request)) throw new Error('MODEL_REQUEST_ALREADY_BOUND')
+  for (const key of ['botId', 'taskId', 'attemptId', 'operationId']) taskRef(context?.[key])
+  taskCalls.set(request, Object.freeze({ ...context }))
+}
+export const taskModelRequest = request => taskCalls.get(request)

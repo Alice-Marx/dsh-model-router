@@ -10,7 +10,16 @@ const missing = {
   machines: blocked('尚未接入远程电脑目录。', '安装并配对同版本 remote-computer-agent，然后在机器目录中登记。'),
   usage: blocked('宿主尚未提供统一费用与预占投影。', '接入唯一 MR 资金库的只读投影；已有 Token 用量仍可在 DS 用量页查看。'),
 }
-const ACTIONS = new Set(['task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve', 'binding.save', 'funding.account.save', 'machine.secret', 'machine.pair', 'machine.bind', 'machine.probe', 'machine.revoke', 'machine.reconcile', 'machine.desktop.view', 'machine.desktop.act'])
+const ACTIONS = new Set([
+  'task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve',
+  'binding.save', 'funding.account.save', 'machine.secret', 'machine.pair', 'machine.bind', 'machine.probe',
+  'machine.revoke', 'machine.reconcile', 'machine.artifact', 'machine.desktop.view', 'machine.desktop.act',
+  'machine.desktop.open', 'machine.desktop.renew', 'machine.desktop.close',
+  'library.list', 'library.read', 'library.write', 'library.upload', 'library.download', 'library.remove', 'library.mkdir', 'library.search',
+  'routine.list', 'routine.run', 'routine.save', 'routine.remove', 'routine.history', 'routine.cancel', 'routine.resolve', 'roles.list',
+  'botRoutingInspect', 'botRoutingDecide', 'botRouting.dispatch', 'botRouting.save',
+  'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage',
+])
 const plain = value => value && typeof value === 'object' && !Array.isArray(value)
 const error = (code, message) => Object.assign(new Error(message), { code })
 
@@ -74,7 +83,7 @@ export function registerProductChannel(ctx, readModel, authorizeRequest) {
       const body = await request.json()
       const value = body?.action === 'snapshot'
         ? await readModel.snapshot({ signal: request.signal })
-        : await readModel.dispatch(body, { ...context, signal: request.signal })
+        : await readModel.dispatch(body, { ...context, clientOrigin: new URL(request.url).origin, signal: request.signal })
       return Response.json({ ok: true, value })
     } catch (cause) {
       return Response.json({ ok: false, error: { code: cause?.code ?? 'PRODUCT_REQUEST_FAILED', message: String(cause?.message ?? cause).slice(0, 500) } }, { status: 400 })

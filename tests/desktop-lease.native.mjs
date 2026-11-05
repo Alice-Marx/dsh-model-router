@@ -9,5 +9,5 @@ test('desktop lease/native: helper arbitration, queued cancellation, confirmed s
   const compiler=join(process.env.SystemRoot,'Microsoft.NET/Framework64/v4.0.30319/csc.exe')
   execFileSync(compiler,['/nologo','/target:exe',`/out:${exe}`,resolve('native/windows-desktop/DesktopLease.cs'),resolve('tests/fixtures/desktop-lease/LeaseTests.cs')],{encoding:'utf8',windowsHide:true})
   const output=execFileSync(exe,[],{encoding:'utf8',windowsHide:true,timeout:10000})
-  assert.ok(output.includes('"passed":10'),output)
+  assert.ok(output.includes('"passed":15'),output)
 })

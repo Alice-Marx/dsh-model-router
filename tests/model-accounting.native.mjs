@@ -6,7 +6,7 @@ import {setTimeout as sleep} from 'node:timers/promises'
 import {createAuthority} from '../packages/capability-broker/src/authority.mjs'
 import {openSqliteRouterState} from '../packages/orchestration/src/sqlite-router-state.mjs'
 import {createModelAccounting} from '../packages/orchestration/src/model-accounting.mjs'
-import {markManagedModelRequest} from '../packages/orchestration/src/model-receipt.mjs'
+import {markManagedModelRequest,markTaskModelRequest} from '../packages/orchestration/src/model-receipt.mjs'
 import {createRouterState} from '../.dsh-plugin/shared/router-state.mjs'
 import {createBudgetReservations} from '../.dsh-plugin/shared/budget-reservations.mjs'
 import {spending} from '../.dsh-plugin/shared/run-ledger.mjs'
@@ -30,6 +30,20 @@ async function setup(t,options={}){
 const request=()=>({...model,messages:[{role:'user',content:'sensitive prompt fixture'}],maxTokens:20,signal:new AbortController().signal})
 const chunks=async function*(){yield {type:'text-delta',text:'reply'};yield {type:'usage',usage:{inputTokens:11,outputTokens:5}};yield {type:'finish',reason:{kind:'stop'}}}
 const drain=async stream=>{const out=[];for await(const c of stream)out.push(c);return out}
+
+test('model/native: routed task receipts keep their task identity while each request receives real independent admission',async t=>{
+  const {store,accounting,identity}=await setup(t)
+  for(let i=0;i<2;i++){
+    const options=request()
+    markTaskModelRequest(options,{botId:'bot-a',taskId:'routed-task',attemptId:'routed-attempt',operationId:'routed-operation',...model})
+    await drain(accounting.stream(options,chunks,identity))
+  }
+  const receipts=(await store.modelCalls({botId:'bot-a'})).items,state=await store.read()
+  assert.equal(receipts.length,2);assert.equal(new Set(receipts.map(row=>row.runId)).size,2)
+  assert.ok(receipts.every(row=>row.taskId==='routed-task'&&row.attemptId==='routed-attempt'&&row.operationId==='routed-operation'&&row.state==='settled'))
+  assert.equal(state.runs.length,2);assert.deepEqual(state.budgetReservations,{})
+  close(spending(state.runs).today,0.000042)
+})
 
 test('model/native: front and auxiliary calls admit before dispatch, retain distinct source rows and one invoice each',async t=>{
   const {store,accounting,identity}=await setup(t)

@@ -25,8 +25,12 @@ export function apply(ctx) {
     }
     async *stream(options) {
       options.signal.throwIfAborted()
-      const latest = options.messages.at(-1)
-      const userText = latest?.role === 'user' ? (typeof latest.content === 'string' ? latest.content : latest.content.filter(block => block.type === 'text').map(block => block.text).join('\n')) : ''
+      const textOf = message => typeof message?.content === 'string' ? message.content : (message?.content ?? []).filter(block => block.type === 'text').map(block => block.text).join('\n')
+      // SDK instruction refreshes may append a user-role system-reminder after the actual user
+      // command. Ignore that envelope only; a real trailing tool result must still end the fixture
+      // step so an earlier command is never dispatched a second time.
+      const latest = options.messages.findLast(message => !(message.role === 'user' && textOf(message).trimStart().startsWith('<system-reminder>')))
+      const userText = latest?.role === 'user' ? textOf(latest) : ''
       if (credential.unavailable) { credential.failures++; throw new Error(`FIXTURE_CREDENTIAL_UNAVAILABLE: missing key for ${options.provider}/${options.model}`) }
       calls.push({ sessionId: options.sessionId ?? null, provider: options.provider, model: options.model,
         agentLoop: isAgentLoopRequest(options), tools: options.tools?.map(tool => tool.name) ?? [],
@@ -50,9 +54,14 @@ export function apply(ctx) {
       }
       let name, args, finalText
       const stage = workflowStages.get(options.sessionId)
-      if (stage === 'browser-opened') { name = 'remote_computer_browser'; args = { machineId: browserFlow.machineId, rootId: 'project', tool: 'browser_script', args: { browserSessionId: browserFlow.browserSessionId, script: 'document.title' }, taskId: browserFlow.taskId, attemptId: browserFlow.attemptId }; workflowStages.set(options.sessionId, 'browser-scripted') }
+      const hasBotTools = options.tools?.some(tool => tool.name === 'bot_library_write')
+      const routedWorker = hasBotTools ? /integration:routed-library:([A-Za-z0-9_-]+)/.exec(userText)?.[1] : null
+      if (hasBotTools && stage === 'routed-library-written') { finalText = 'integration:routed-library-complete'; workflowStages.delete(options.sessionId) }
+      else if (routedWorker) { name = 'bot_library_write'; args = { botId: routedWorker, relativePath: 'routed-proof.txt', content: 'Routed worker wrote this through its real AgentLoop.\n' }; workflowStages.set(options.sessionId, 'routed-library-written') }
+      else if (hasBotTools && userText.startsWith('integration:route-worker:')) { const workerId = userText.trim().slice('integration:route-worker:'.length); name = 'bot_route_task'; args = { text: `integration:routed-library:${workerId}`, pinnedBotId: workerId, needs: { write: true }, requestKey: 'fixture-route-worker' } }
+      else if (stage === 'browser-opened') { name = 'remote_computer_browser'; args = { machineId: browserFlow.machineId, rootId: 'project', tool: 'browser_script', args: { browserSessionId: browserFlow.browserSessionId, script: 'document.title' }, taskId: browserFlow.taskId, attemptId: browserFlow.attemptId }; workflowStages.set(options.sessionId, 'browser-scripted') }
       else if (stage === 'browser-scripted') { name = 'remote_computer_browser'; args = { machineId: browserFlow.machineId, rootId: 'project', tool: 'browser_close', args: { browserSessionId: browserFlow.browserSessionId }, taskId: browserFlow.taskId, attemptId: browserFlow.attemptId }; workflowStages.delete(options.sessionId) }
-      else if (userText.startsWith('integration:remote-browser:')) { name = 'remote_computer_browser'; args = { machineId: userText.trim().slice('integration:remote-browser:'.length), rootId: 'project', tool: 'browser_open', args: { url: browserOrigin } }; workflowStages.set(options.sessionId, 'browser-opened') }
+      else if (userText.startsWith('integration:remote-browser:')) { browserFlow.machineId = userText.trim().slice('integration:remote-browser:'.length); name = 'remote_computer_browser'; args = { machineId: browserFlow.machineId, rootId: 'project', tool: 'browser_open', args: { url: browserOrigin } }; workflowStages.set(options.sessionId, 'browser-opened') }
       else if (stage === 'analysis-written') { finalText = 'integration:analysis-complete'; workflowStages.delete(options.sessionId) }
       else if (stage === 'implementation-written') { finalText = 'integration:implementation-complete'; workflowStages.delete(options.sessionId) }
       else if (stage === 'review-read') { name = 'write'; args = { file_path: 'review.md', content: '# Review\nImplementation approved: analysis and implementation agree.\n' }; workflowStages.set(options.sessionId, 'review-written') }
@@ -151,14 +160,17 @@ export function apply(ctx) {
     }
   }
   ctx.llm.registerAdapter([PROVIDER], new OfflineAdapter())
-  ctx.on('llm/stream', (options, next) => {
-    if (options.provider !== PROVIDER || options.model !== MODEL) throw new Error('Only the offline integration model is permitted')
-    return next()
+  ctx.on('session/event', (_session, event) => {
+    if (event.type === 'turn/end' && event.data?.reason?.kind === 'error') console.error('[offline-fixture turn failure]', JSON.stringify(event.data.reason))
   })
+  ctx.on('llm/stream', (options, next) => (async function* () {
+    if (options.provider !== PROVIDER || options.model !== MODEL) throw new Error('Only the offline integration model is permitted')
+    try { yield* next() } catch (error) { console.error('[offline-fixture stream failure]', error.stack); throw error }
+  })())
   ctx.on('tools/result', (execution, result) => {
     if (execution.name === 'remote_computer_browser' && !result.isError) Object.assign(browserFlow, result.value, result.value?.result)
     if (['create_bot', 'message_bot', 'model_router_routes', 'model_router_consult', 'remote_computer_read','remote_computer_write','remote_computer_browser','read','write','remember','recall','pwsh','ask_user','show_view',
-      'bot_task_start', 'bot_task_status', 'bot_task_cancel', 'bot_task_retry', 'bot_task_reconcile','bot_task_plan_start','bot_task_plan_status','bot_task_plan_cancel'].includes(execution.name)) {
+      'bot_route_task', 'bot_dispatch', 'bot_library_write', 'bot_library_read', 'bot_task_start', 'bot_task_status', 'bot_task_cancel', 'bot_task_retry', 'bot_task_reconcile','bot_task_plan_start','bot_task_plan_status','bot_task_plan_cancel'].includes(execution.name)) {
       toolResults.push({ name: execution.name, agentId: execution.agent?.id ?? null, result })
     }
   })

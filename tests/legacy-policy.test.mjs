@@ -6,6 +6,8 @@ import { OFFICIAL_TOOLS_REMOTE_DESCRIPTORS } from '../.dsh-plugin/shared/officia
 import { createAuthority } from '../packages/capability-broker/src/authority.mjs'
 import { createPrincipalDirectory } from '../packages/orchestration/src/principals.mjs'
 import { createBotPolicy } from '../packages/orchestration/src/bot-policy.mjs'
+import { guardLegacyTools } from '../.dsh-plugin/shared/legacy-policy.mjs'
+import { TASK_TOOL_CAPABILITIES } from '../packages/orchestration/src/task-tools.mjs'
 
 function registrations({ policy, required = false } = {}) {
   const tools = new Map(), commands = new Map()
@@ -20,7 +22,7 @@ function registrations({ policy, required = false } = {}) {
 test('legacy policy: every registered tool and both commands refuse before the body when strict policy is unavailable', async () => {
   const { tools, commands, guard } = registrations({ required: true })
   // 13 router tools plus the Bot's own library tools, which mount with the same product.
-  assert.equal(tools.size, 16)
+  assert.equal(tools.size, 17)
   assert.equal(commands.size, 2)
   for (const tool of tools.values()) {
     assert.match(guard({ name: tool.name }), /unavailable/)
@@ -60,4 +62,25 @@ test('legacy policy: owner RPC keeps the old result shape and ignores a payload 
   const receiver = { ctx:{ get:()=>policy, invocation:{ peer:{ principal:{ kind:'owner' } } } }, services:{ boundaries:()=>{calls++;return { fixture:true }} } }
   assert.deepEqual(await OfficialToolsRemoteService.prototype.boundaries.call(receiver, { botId:'other' }), { ok:true,value:{ fixture:true } })
   assert.equal(calls,1)
+})
+
+test('legacy policy: managed Task tools use their exact task authority without adding tool aliases', () => {
+  const authority = createAuthority(), directory = createPrincipalDirectory(authority)
+  const agent = { session: { id: 'task-session' } }, stranger = { session: { id: 'task-session' } }
+  const policy = createBotPolicy({ authority, directory, machineId: 'm', workspaceId: 'w' })
+  const capabilities = [...new Set(Object.values(TASK_TOOL_CAPABILITIES))]
+  directory.register('worker', { tools: capabilities, modelRoutes: [] }); directory.bind('worker', agent)
+  let guard
+  guardLegacyTools({ get: () => policy, tools: { guard: value => { guard = value } } }, { requireBotPolicy: true })
+  for (const name of Object.keys(TASK_TOOL_CAPABILITIES)) {
+    assert.equal(guard({ name, agent }), undefined, name)
+    assert.match(guard({ name, agent: stranger }), /UNKNOWN_SUBJECT/u)
+    assert.throws(() => policy.check({ kind: 'tool', name, agent }), /TOOL_DENIED/u, 'no new tool alias was granted')
+  }
+  directory.replaceGrant('worker', { tools: ['task/read'], modelRoutes: [] })
+  assert.match(guard({ name: 'bot_task_start', agent }), /TOOL_DENIED/u)
+  assert.equal(guard({ name: 'bot_task_status', agent }), undefined)
+  assert.match(guard({ name: 'bot_library_write', agent }), /TOOL_DENIED/u)
+  assert.match(guard({ name: 'bot_unknown_action', agent }), /TOOL_DENIED/u)
+  authority.dispose()
 })

@@ -25,7 +25,10 @@ export async function assertRuntimeClosure({ root = ROOT, files, manifest } = {}
     // This repository deliberately lists its release files individually. Keep
     // explicit documentation/assets covered as well as executable entry points.
     ...(pkg.files ?? []).filter(path => !/[*?\[\]{}!]/.test(path))].filter(Boolean).map(path => path.replace(/^\.\//, '')))
-  for (const path of required) assert.ok(packed.has(path), `Package is missing declared file: ${path}`)
+  for (const path of required) {
+    if (path.endsWith('/')) assert.ok([...packed].some(file => file.startsWith(path)), `Package is missing declared directory: ${path}`)
+    else assert.ok(packed.has(path), `Package is missing declared file: ${path}`)
+  }
 
   const entries = [...new Set([pkg.main, ...exportTargets(pkg.exports)]
     .filter(path => typeof path === 'string' && /\.(?:mjs|cjs)$/.test(path)))]

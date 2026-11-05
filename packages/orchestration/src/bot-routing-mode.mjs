@@ -28,6 +28,9 @@ export const MACHINE_WORKER_TOOLS = Object.freeze([
 export const MACHINE_DESKTOP_TOOLS = Object.freeze([
   'desktop_screenshot', 'desktop_click', 'desktop_type', 'desktop_key', 'desktop_scroll',
 ])
+export const MACHINE_BROWSER_TOOLS = Object.freeze([
+  'browser_open', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_script', 'browser_upload', 'browser_download', 'browser_close',
+])
 
 const fail = code => { const error = new Error(code); error.code = code; throw error }
 const isPlain = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -67,7 +70,7 @@ export function normalizeBotRouting(value) {
  * @param {{ botId: string, machineId: string, ceiling: string[], needs?: { desktop?: boolean, shell?: boolean, write?: boolean } }} request
  * @returns {{ machineId: string, botId: string, tools: string[], mode: 'read-only'|'workspace-write' } | null}
  */
-export function workerBinding({ botId, machineId, ceiling = [], needs = {} } = {}) {
+export function workerBinding({ botId, machineId, rootId = '', ceiling = [], mode: ceilingMode = null, needs = {} } = {}) {
   if (typeof botId !== 'string' || !botId) fail('INVALID_WORKER_BOT')
   if (typeof machineId !== 'string' || !machineId) fail('INVALID_WORKER_MACHINE')
   const offered = new Set(Array.isArray(ceiling) ? ceiling : [])
@@ -76,12 +79,27 @@ export function workerBinding({ botId, machineId, ceiling = [], needs = {} } = {
   if (needs.shell === true) wanted.push('shell_exec')
   wanted.push('operation_status', 'operation_cancel', 'artifact_stat', 'artifact_read')
   if (needs.desktop === true) wanted.push(...MACHINE_DESKTOP_TOOLS)
+  if (needs.browser === true) wanted.push(...MACHINE_BROWSER_TOOLS)
+  // A partial grant cannot perform the task it is being offered. In particular, never report a
+  // write/desktop binding when the saved ceiling contains only a ping or a file reader.
+  const required = [
+    ...(needs.write === true ? ['fs_write', 'operation_status', 'operation_cancel'] : []),
+    ...(needs.shell === true ? ['container_command_v1', 'operation_status', 'operation_cancel'] : []),
+    ...(needs.desktop === true ? [...MACHINE_DESKTOP_TOOLS, 'artifact_stat', 'artifact_read', 'operation_status', 'operation_cancel'] : []),
+    ...(needs.browser === true ? ['browser_open', 'browser_snapshot', 'browser_close', 'operation_status', 'operation_cancel'] : []),
+  ]
+  if (needs.shell === true && !offered.has('container_command_v1') && offered.has('shell_exec')) {
+    required[required.indexOf('container_command_v1')] = 'shell_exec'
+  }
+  if (required.some(tool => !offered.has(tool))) return null
+  if (needs.shell === true && offered.has('container_command_v1')) wanted.push('container_command_v1')
   const tools = wanted.filter(tool => offered.has(tool))
   // Without a read tool the binding would be decorative: refuse instead of granting nothing.
-  if (!tools.includes('fs_read') && !tools.includes('machine_ping')) return null
+  if (!tools.includes('fs_read') && !tools.includes('machine_ping') && !(needs.browser === true && tools.includes('browser_snapshot')) && !(needs.desktop === true && tools.includes('desktop_screenshot'))) return null
   // Desktop work needs a writable binding: the compiler only grants desktop tools in that mode.
-  const mode = needs.desktop === true || needs.write === true || needs.shell === true ? 'workspace-write' : 'read-only'
-  return { machineId, botId, tools: [...new Set(tools)], mode }
+  const mode = needs.desktop === true || needs.browser === true || needs.write === true || needs.shell === true ? 'workspace-write' : 'read-only'
+  if (mode === 'workspace-write' && ceilingMode === 'read-only') return null
+  return { machineId, botId, ...(rootId ? { rootId } : {}), tools: [...new Set(tools)], mode }
 }
 
 /** The Main Bot keeps its own binding untouched; this only reports whether it needs one. */

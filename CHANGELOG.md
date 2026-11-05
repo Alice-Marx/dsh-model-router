@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.63.0 — 2026-11-05
+
+- Synchronize the pinned DS Bot 0.2.7 upstream with reproducible product overlays.
+- Add continuous full-desktop viewing and acknowledged mouse/keyboard takeover, Windows Agent 0.1.0 setup, pairing metadata and machine heartbeat.
+- Dispatch routed work into the selected Bot AgentLoop using committed model/tool/machine/funding authority and durable receipts.
+- Add private binary library upload/download, text search, acknowledged routine recording and controlled replay.
+- Verify actual Harness SDK 0.2.1-rc.4 and 0.2.2-rc.1 compositions plus a real Windows desktop.
+- Desktop audio, locked/UAC desktop, general visual learning and a product-owned iOS app remain outside this release.
+
+See [the 0.63.0 validation report](docs/releases/0.63.0-validation.md).
+
 ## 0.26.0-preview.2 — 2026-11-03
 
 - Fix rc.5 Host refusing to load preview.1: add only the exact published 0.2.1-rc.5 peer version, retaining the historical supported versions and refusing unverified rc.4/rc.6/alpha versions.

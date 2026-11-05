@@ -1,356 +1,147 @@
-# Model Router · DeepSeek Harness Desktop
+# DSH Bot · Model Router
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![npm version](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![Listed in the DSH plugin directory](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+**Version: 0.63.0 — 2026-11-05.** Older version numbers in historical reports describe those reports, not this checkout. The Windows computer Agent has its own version, **0.1.0**.
 
-[![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
+This build passed the full offline product Host probe on the installed Harness 0.2.2-rc.1 SDK and real Chromium checks. On one 1920×1080 Windows 10 machine over the current WireGuard link, an eight-second desktop sample measured 13.12 FPS, with input ACK p50 = 125 ms / p95 = 274 ms. Dirty-region JPEG updates preserve physical input coordinates; these measurements do not guarantee a fixed frame rate.
 
-Want release notes only? Click **Watch → Custom → Releases** (you do not need Watching all activity).
+One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memory and browser work with model routing, managed tasks, private Bot files, and an independently implemented Windows remote desktop. Configure each Bot's exact model, tools and machine access; a Main Bot can then route and dispatch work to an eligible worker.
 
-**Stable release: 0.26.0.** The unified DS Bot + Model Router product ships as one plugin. Upgrading from 0.25.5 adds the Bot team runtime, the official-tool and remote-computer controls, and the packaged desktop app. Install or update through Harness Desktop > Plugins, or with the exact version `@ljwei-stak/dsh-model-router@0.26.0`. Preview builds stay on the `preview` tag; `latest` now points at this stable release.
+This is an implementation of observable workflows, including workflows described publicly for Grok Bot. It does not claim to reproduce Grok's private system or commercial service. You provide the Windows/cloud computers and accounts; automatic VM provisioning/billing and a product-owned iOS client are not delivered.
 
-A cost-aware model-routing workbench for **DeepSeek Harness Desktop**. Plan locally, compare configured routes, inspect execution permissions, and run dependent work packages through model APIs or supported official vendor CLIs.
-
-Stable version: **0.25.5** (`@ljwei-stak/dsh-model-router`). This update fixes garbled ZCode TUI box drawing, CJK text and broken color sequences in Windows embedded terminals. Each new ZCode PTY enables UTF-8 before Node starts; system settings remain unchanged. The standalone community ZCode CLI retains both npm and GitHub Release installation methods. It retains the **0.2.1-rc.3** SDK and existing Host peer range. API calls use monetary accounting with daily/monthly budget reservations; subscriptions use a separate book of calls and reported tokens. The workbench shows them as two books that are never added together: one is USD, the other is a call count. Confirmed subscription execution is not blocked only because the API budget is exhausted or API prices are missing. A switch to an API must be priced and admitted before that API call; mixed results retain both channel receipts. The workbench keeps API spending/reservations and subscription usage as two books that are never added, with unknown counters kept unknown. The Bot task page leads with what needs a person (receipts to reconcile, approvals, unconfirmed remote effects, failures, blocked tasks) and stays quiet when the team is healthy. Workbench execution shows live elapsed time and per-package progress, supports cancellation with completed results and reported costs retained, and reconnects to the active job when the panel is reopened. Choose algorithm recommendations or manually assign each decomposed package to an exact model API or official tool, preserving dependencies, refreshed cost previews and retry targets. Routing now supports task-specific quality evidence, joint model/effort selection, historical P90 resource estimates and dependency-aware search. Manual mixed execution is read-only; tools use their configured default model, while the existing editable official-team workflow remains available. Compatibility covers **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3**, including Hermes/Pi installation and terminal support; neither has a verified managed runner yet. Real vendor execution evidence remains tied to **0.20.0**, with no new model experiments in this release. The router and [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) have been independent plugins since 0.12.0.
-
-Official CLI teamwork runs packages sequentially with dependency context and no automatic model-directory API fallback. Editable teams explicitly choose the Harness sandbox or the vendor CLI's normal environment. In the latter, Git worktrees collect edits but do not restrict OS access. CLIs retain their configured model unless explicitly mapped. See [real Windows validation and its limits](docs/releases/0.20.0-validation.md).
-
-Both README versions describe the same interfaces, formulas, defaults and limits. [Changelog](CHANGELOG.md) preserves release history. More walkthroughs: [workbench](docs/WORKBENCH_USER_GUIDE.zh.md), [installation](docs/INSTALLATION_GUIDE.zh.md), [migration](docs/archive/MIGRATION.md), and [experiment protocol](docs/ROUTING_SELFTEST_STEPS.zh.md).
-
-<a id="quick-evaluation"></a>
-
-## Quick evaluation
-
-**One-line value:** A cost-aware DSH workbench for planning tasks, routing model calls, and running dependent work packages with explicit execution permissions.
-
-**Category:** **Models & Reasoning** (模型与推理), the best fit in the [community directory's category list](https://www.alldsh.com/categories/); this is a community taxonomy, not an official DSH classification.
-
-**Install (DSH Plugin Hub / web profile):** With the DSH CLI available, install the versioned npm package with:
-
-```sh
-dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.25.5
-```
-
-**Install in Harness Desktop:** Launch Desktop once to initialize its `desktop` profile, quit Desktop fully, then run:
-
-```sh
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.5
-```
-
-You can also paste the package spec into **Harness Desktop → Plugins → Add plugin**. Restart Desktop after installation. A global `npm install -g` by itself does not register a Desktop plugin.
-
-**Package and entry point:** [`@ljwei-stak/dsh-model-router@0.25.5` on npm](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router). The root [`package.json`](package.json) declares the package and bundle patch; [`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs) exports the required `apply(ctx)` entry point. License: [MIT](LICENSE).
-
-**Configuration:** There is no supported import of a user-authored JSON/YAML configuration file. Configure providers, models, and credentials on Harness's **Models** page; configure routing profiles and preferences in the plugin settings. Persistent router state is stored in `$DSH_HOME/model-router/state.json` (default: `~/.dsh/model-router/state.json`). Provider CLIs retain their own login and configuration. The router does not copy API keys into model profiles or terminal logs.
-
-**Screenshots and evidence:** The [workbench screenshot](docs/assets/workbench-task-preview.jpg) uses fixture models, prices, and health data; it is a simulated UI preview, not a live Harness or model run. See the [routing workflow diagram](docs/assets/routing-workflow.svg) for the execution flow. The [real Windows validation report](docs/releases/0.20.0-validation.md) documents specific 0.20.0 executions and their limits; 0.25.5 has no verified end-to-end vendor run. The [live progress screenshot](docs/assets/workbench-run-progress.png) is an offline simulation; see the [0.25.0 acceptance report](docs/releases/0.25.0-validation.md) for API/subscription separation and checkpoints, and the [0.25.1 acceptance report](docs/releases/0.25.1-validation.md) for SDK compatibility and validation boundaries.
-
-**Permissions and risks:** Planning is local and makes no model call. Execution sends the selected task/context to the chosen model API or vendor CLI and may incur charges. The default Harness-restricted environment separates read-only runs from approved `workspace-write` runs. An explicitly selected `cli-native` editable team runs with the current OS user's permissions, outside the Harness process sandbox; a Git worktree collects changes but does not restrict OS access. External providers and CLI services apply their own data handling and billing terms.
-
-**Compatibility:** Declared host support is DeepSeek Harness Desktop **0.2.0-rc.1**, **0.2.0-rc.2**, **0.2.1-rc.2**, and **0.2.1-rc.3**. Source builds pin the published **0.2.1-rc.3** SDK packages; retaining an older peer declaration does not turn offline tests into installed-Desktop acceptance. Node.js **>=22.19** and pnpm **10.34.6** are source development/build requirements, not plugin runtime prerequisites. Compatibility beyond the declared host versions is not claimed.
-
-**Contents:** [Quick evaluation](#quick-evaluation) · [Capabilities](#capabilities) · [Install](#install) · [Workbench](#workbench) · [Architecture](#architecture) · [Session tools](#session-tools) · [Official tools](#official-tools) · [Team lifecycle](#team-lifecycle) · [Costs](#costs) · [Routing algorithm](#routing) · [Data](#data) · [Development](#development) · [Troubleshooting](#troubleshooting)
+**Start here:** [Install](#install) · [First Bot](#quick-evaluation) · [Connect a computer](#computers) · [Routines](#routines) · [Bot routing](#bot-routing) · [Private library](#library) · [Model workbench](#workbench) · [Math reference](#costs) · [Development](#development) · [Troubleshooting](#troubleshooting).
 
 <a id="capabilities"></a>
 
-## What is included
+## Included workflows
 
-| Capability | Current behavior |
+| Area | What you can use |
 | --- | --- |
-| Task planning | Local task classification and complexity analysis; single-route recommendation, dependent team work packages, or an explicit configured model. |
-| Model configuration | Reads exact `provider/model` routes from Harness; optional user-supplied quality, USD prices, specialties, CLI model names, execution and billing preferences. |
-| Routing presets | Economy, balanced and quality-first presets; quality floors, estimated token costs and bounded assignment search. Missing prices stay unknown. |
-| Read-only execution | Preview and confirm a routed run from the workbench, or invoke it in an official Harness session. Supported headless CLIs and model-directory API calls return recorded results. |
-| Editable CLI execution | A sequential CLI team from the workbench, or one supported CLI from a session, using approved isolated Git worktrees and conditional patch integration. |
-| Official tools | Detect, install/update, check launch readiness and inspect login status for thirteen registry tools; installation jobs have logs and cancellation. |
-| Interactive terminal | PowerShell/system shell and all thirteen registry CLI targets (including standalone ZCode CLI TUI), including fixed login commands, live output and multiple sessions. |
-| Costs and subscriptions | API money and concurrent budget reservations are separate from subscription calls/tokens. Unknown subscription usage stays unknown; API fallback is re-estimated and admitted before the paid call. |
-| History and quality | Per-package results, dependency views, failure details, rerun/reassignment, ratings and optional stronger-model review. |
-| Execution boundaries | Shows what each route can read/write and whether its process uses the Harness sandbox. |
+| Bot conversations | Named Bots with their own model, role, working folder, private conversation and permission settings; side chat, questions and approval cards. |
+| Team work | Groups, parallel mentions, staged group goals, Bot-to-Bot handoffs and retained results. |
+| Context and memory | Conversation checkpoints/parts and search; Bot/group/team memories, change history, and reviewable learned-skill/project-rule proposals. |
+| Browser and documents | Per-Bot browser partitions and page tools, Office file reading/previews, connectors and secret-entry cards; avatar library and team appearance settings. |
+| Scheduling | Upstream scheduled-task integration when the Host's Automation tasks service is enabled; continued work requires the Host and relevant Agent to stay running. |
+| Bot routing | Saved economy/balanced/quality policy, committed model/tool/machine candidates, preview with refusal reasons, and actual worker-task dispatch. |
+| Remote computer | A paired Windows desktop, watch/control handoff, keyboard/mouse/text input, monitor selection and enlarged viewing. |
+| Routines | Demonstrate acknowledged inputs, save per Bot, replay through the real desktop session, inspect results and reconcile unknown effects. |
+| Private library | Per-Bot folders, binary upload/download, text editing, name filtering and private text search from the page or granted Bot tools. |
+| Model workbench | Local model-route planning, dependent work packages, official CLI detection/installation/terminal, execution history and separate API/subscription accounting. |
 
-Generating a route recommendation is local: it does not start a vendor CLI or make a paid model call. Actual execution can incur charges.
-
-![Local planning and official-tool execution](docs/assets/routing-workflow.svg)
+The integrated DS Bot runtime is pinned to **DS Bot 0.2.7**, commit **`71d344bf193f3f18185f25de3d8e5c483046910a`**: 352 byte-exact upstream files plus six reproducible product overlays, with product changes maintained separately in `modules/bot-runtime/product-overlay/`. `modules/bot-runtime/SOURCE.json` records origin and hashes. The upstream browser and avatar library are distinct from this product's full desktop and document-file library.
 
 <a id="install"></a>
 
-## Install in DeepSeek Harness Desktop
+## Install
 
-Open **Plugins → Add plugin** and enter:
+Install `@ljwei-stak/dsh-model-router@0.63.0` from npm in Harness Desktop, or import the matching release archive.
 
-```text
-@ljwei-stak/dsh-model-router@0.25.5
+1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.0`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
+2. Enable the plugin, then **fully quit Harness, including its tray process**, and restart. Closing only the window may leave the old Host running.
+3. Check the loaded package version and open the Bot workspace/product navigation. Provider credentials and models are configured in Harness's official **Models** settings.
+
+With the DSH CLI, install the exact release with:
+
+```powershell
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.0
 ```
 
-Use the official HTTPS npm source `https://registry.npmjs.org/` when a mirror lacks that exact version. Enable the plugin, then fully quit Harness (including its tray process) and restart it. Plugin details should show **0.25.5** and the sidebar should contain **模型路由** (Model Router). A global `npm install -g` alone does not register a Desktop plugin.
+A global `npm install -g` alone does not register the plugin. The package name remains `@ljwei-stak/dsh-model-router`; its internal plugin ID remains `model-router-galgame` for retained settings. Remove duplicate old package entries before adding a replacement. GAL is a separate plugin.
 
-You can instead install a local `.tgz` archive or its extracted inner `package` directory through the plugin manager. Both must contain `package.json` and `.dsh-plugin`. See [releases](https://github.com/Alice-Marx/dsh-model-router/releases) for archived builds, or build your own checkout below.
+To build an archive yourself, follow [Development](#development). Use a separate test profile for verification; a dependency declaration or successful build alone does not establish installed-Desktop acceptance.
 
-### Upgrade from the old package name
+<a id="quick-evaluation"></a>
 
-The old name `@ljwei-stak/model-router-galgame` ended at 0.13.0. Remove that plugin entry while retaining your profile/application data, then add `@ljwei-stak/dsh-model-router@0.25.5`. Do not keep both entries installed: they share the internal plugin id `model-router-galgame` and tool names. The retained id lets existing router settings and history carry over.
+## First Bot and first task
 
-For the combined 0.11.x package, back up the profile and export the GAL saves you want to preserve before upgrading. Story playback, artwork, music and saves now belong to the independent `@ljwei-stak/dsh-galgame` package. The detailed save limitations are in [MIGRATION.md](docs/archive/MIGRATION.md).
+1. Add a provider/model in Harness **Models**, then create or select a Bot and choose an exact configured model.
+2. Open **Bot bindings / Bot 绑定**. Review the Bot's tools, working folder, machine permissions and funding settings. A role description does not grant permissions.
+3. Mark your coordinating Bot as Main using the Bot settings. Configure worker Bots with the models and tools they should actually use.
+4. Send a small task with a concrete output and acceptance check. Inspect the task state and the output; an accepted plan ID means work was submitted, not completed.
+5. For computer work, complete the pairing steps below. For delegation, enable [Bot routing](#bot-routing) and first preview the candidate decision.
+
+Integration mode reuses Harness Sessions. The optional independent runtime has its own session store and must be switched explicitly; one Bot must have only one active runtime owner. Group conversations, memories, browsers and long-lived context come from the pinned upstream runtime, not from a placeholder capability list.
+
+Windows computer setup: [download Agent 0.1.0 for Windows x64](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip), extract it and run `start.cmd`.
+
+<a id="computers"></a>
+
+## Connect your Windows or cloud computer
+
+### On the computer being controlled
+
+1. Prepare your own Windows x64 computer/cloud PC and sign into its desktop. Keep the interactive user session available while using desktop capture/control.
+2. Extract the **entire** `DSH-RemoteAgent-windows-x64-…zip` into a directory you will retain. The complete bundle includes Node, production dependencies, `dist`, setup/launch files and native helpers. Copying only `start.cmd` or one executable is insufficient.
+3. Double-click **`start.cmd`**. In the setup wizard choose the workspace directory, the concrete local/private VPN address to listen on, port (default `9701`), and the Agent base URL reachable from the Harness computer.
+4. For another machine, first configure your WireGuard/Tailscale network or a protected tunnel. Confirm the private-tunnel option only for a network you have actually configured. Loopback is suitable for local use or a separately configured SSH forwarding path.
+5. Decide whether to enable **`hostManagedBots`**. Explicitly enabling it lets this trusted authenticated Host authorize current/future team Bots within the paired root/tool ceiling. Disabling it requires fixed allowed Bot IDs. It does not give models the pairing secret or remove root/tool restrictions.
+6. Choose any optional command/browser permissions. Setup registers Agent and desktop-helper tasks for the current signed-in user, without storing a Windows password. It displays the installation path and creates **`private/pairing.private.json`** there. Rerunning setup preserves existing configuration and credentials.
+
+### In Harness
+
+1. Open **Remote computers / 远程电脑 → Add computer** and import the generated **`private/pairing.private.json`** from the installed Agent directory.
+2. The import fills the endpoint, machine/client identity, `rootIds`, tools and tunnel setting. Review them, choose the Bot requested by the form, then pair/probe. Keep this file private: it contains the Host pairing credential; do not publish it in Git or issue reports.
+3. Review **Bot bindings** and the computer's grants. Watching needs screenshot permission; takeover and routine replay need the permitted desktop input tools and write mode. Root IDs such as `project` identify the configured remote workspace, not a path supplied by a model.
+4. In a Bot's right-hand **Computer operations / 电脑操作** tab, or the computer page, select the machine/monitor and click **Connect desktop / 连接桌面**. Start in **Watch / 仅观看**.
+5. Click **Take control / 取得控制权** and wait for the control acknowledgement before using mouse, keyboard, wheel or text entry. Human control fences that Bot's conflicting desktop automation. Click **Watch / 仅观看** to release control and held input.
+6. Use **Enlarge / 放大** for the application-filling viewer, or double-click while watching; **Close enlargement / 关闭放大** returns to the panel. Disconnect when finished and inspect any unconfirmed-stop message.
+
+The desktop engine uses **Windows GDI capture → JPEG → WebSocket** with native input acknowledgements. It is an independent implementation, not the RustDesk protocol. The live viewer shows measured frame rate; no fixed 30 FPS, RustDesk performance equivalence, secure-desktop capture or universal network throughput is promised. Agent reachability alone does not prove that the signed-in desktop helper is available.
+
+<a id="routines"></a>
+
+## Demonstrate, save and replay a routine
+
+1. Connect the desktop, take control, restore the application to a known starting screen, enter a routine name and click **Start recording / 开始录制**.
+2. Demonstrate the workflow. Only inputs acknowledged by that desktop session enter the recording. Consecutive mouse motion is sampled into **200 ms** waypoints; button/key/text/wheel ordering and the final position before those actions are retained.
+3. Click **Finish and save / 结束并保存**. The client drains input, confirms held-input release, and saves to that Bot's private routine store. Typed text is included in the saved routine. Missing save confirmation retains a draft instead of showing success.
+4. Open **Routines / 例行任务**, select the Bot/computer and restore the starting screen. Run the saved routine and inspect its actual result and stopped step.
+5. The recording is limited to **200 retained steps**, with at most **60 seconds** between retained actions. Replay checks the exact display ID, physical dimensions, coordinate system and recorded DPI. Changed layout/application state still requires a new demonstration; sampled pointer motion is unsuitable for fine drawing.
+
+This is bounded coordinate-and-timing playback, not universal visual learning. Replay acquires control, waits for every native input ACK, renews authorization and releases input/control on completion, failure or cancellation. An explicit refusal stops further steps. A sent input with a lost ACK, a disconnect, or an interrupted Host is **unknown**, because its effect may already have happened.
+
+Unknown executions block another routine on that Bot/computer. Inspect the real desktop, determine how far the work got, restore an appropriate starting state and enter your inspection note before unblocking. Inspection does not rewrite the old outcome as success or automatically rerun it. A stop request is not a stop confirmation, and successful input ACKs do not by themselves prove the business objective was met.
+
+<a id="bot-routing"></a>
+
+## Route work between Bots
+
+1. Configure the Main and worker Bots' exact models, official tools and machine/workspace grants first.
+2. On **Tasks / 任务 → Bot routing / Bot 路由**, enable routing and choose **Economy / 省钱优先**, **Balanced / 均衡**, or **Quality / 效果优先**. Save settings using the supplied controls.
+3. Enter a task, choose automatic routing or a pinned Bot, and specify a machine/root and read/write/desktop/browser need when applicable. **Preview routing / 预览路由** shows the chosen candidate, missing conditions/refusal reasons and any proposed binding.
+4. Select **Create task with this route / 按此路由创建任务** for real dispatch. Optional automatic computer authorization remains bounded by the committed machine ceiling and the requesting Main Bot's delegation rights.
+5. A Main Bot can call **`bot_route_task`** or its **`bot_dispatch`** alias. Both dispatch by default. Explicit **`preview:true`** only previews and does not create a task or grant permissions. Inspect actual plan/task state with `bot_task_plan_status` and check the deliverable before reporting completion.
+
+Candidates come from committed Bot model/tool/machine state, including availability and any configured price/quality evidence. A Bot name or prompt cannot grant an endpoint, executable, credential or operation identity. Each worker model request has its own budget admission and receipt linked to the parent task; admitting a task is not blanket approval for every later model request.
+
+<a id="library"></a>
+
+## Use the Bot's private file library
+
+Open **Library / 资料库**, select a Bot and a folder. Upload local files, create/open folders, edit supported text files and download files; the name filter narrows the current directory. For contents, enter a literal query and click **Search text / 搜索文本**. Results show path, line and text; click a path to open and select the matching line, then explicitly Save any edit to that file.
+
+Binary upload/download preserves file bytes and accepts up to **16 MiB per file**. Text reading/editing is limited to **1 MiB per file**. Case-insensitive text search uses up to 256 query characters, scans at most 500 entries/eight directory levels in the selected Bot's library, and returns at most 50 matching lines from eligible text files. The granted `bot_library_search` tool uses the same backend and the actual calling Bot's own library. Same-name uploads are refused.
+
+The library is that Bot's private file area, distinct from the upstream avatar library and the remote machine's workspace. Uploading a PDF or Office file does not promise automatic OCR, semantic indexing or retrieval over every binary format. Models access private files through their granted library tools, not by choosing another Bot's ID.
 
 <a id="workbench"></a>
-
-## Use the workbench
-
-The workbench groups the workflow into four navigation tabs. Its header summarizes registered routes, detected tools and today's recorded API spending.
-
-| Tab | What you do there |
-| --- | --- |
-| **任务与执行** — Task and execution | Describe the task, generate advice, choose routed read-only execution or official CLI teamwork, preview and confirm, then inspect history. |
-| **模型配置** — Model configuration | Refresh/search the model directory and edit exact-route profiles. |
-| **官方工具** — Official tools | Complete onboarding checks, inspect/install tools and use the interactive terminal. |
-| **预算与安全** — Budget and security | Manage API money/budgets and separate subscription usage; inspect subscription state and execution boundaries. |
-
-Switching tabs keeps the panels mounted, preserving in-progress installation and terminal state.
-
-![0.15.0 workbench preview: task planning and routing advice](docs/assets/workbench-task-preview.jpg)
-
-*Screenshot from the local UI preview with fixture models, prices, and health data. No real model or Harness connection was used. Expand a work package to inspect its goal, dependencies, and acceptance checks.*
-
-1. Configure providers, models and credentials on Harness's official **Models** page. In **模型配置**, refresh the directory. A listed route does not prove that its credentials, network or model entitlement work.
-2. Optionally enter quality and prices for the routes you want compared. Prices are **USD per million tokens**; quality is a user-supplied **0–100** estimate. Leave unknown prices blank rather than entering zero.
-3. In **任务与执行**, describe concrete deliverables, constraints and acceptance criteria. Select **单任务** (single recommendation), **团队分工** (dependent packages for sufficiently complex requests), or **指定模型** (one exact route, without comparing others). Team mode alone does not start any team.
-4. Set the per-run estimate target; `0` removes that planning constraint. Click **生成路由建议**. The result appears directly below planning. Check the route, complexity, cost, execution channel and each package's dependencies/checklist.
-5. In **在工作台执行**, choose **模型路由（只读）** for the existing routed executor, or first select **团队分工** and choose **官方工具协作**. For official teamwork, select **只读检查** (read-only) or **编辑文件** (edit files). Editable teams also choose **Harness 受限环境** (Harness sandbox, the default) or **厂商 CLI 正常环境** (normal vendor environment, outside the Harness sandbox). Enter an existing absolute workspace path, or reuse the last run's path. Click **预览执行计划**, review each package, its permissions and required confirmations, then explicitly confirm execution. Tick **演练 · 只记录，不执行** (rehearsal) to keep that review and list what each package would call with its estimated cost, while no model, CLI or file is touched; a rehearsal needs no confirmation and records nothing as spent. The Host rechecks the plan before starting; changed conditions can require confirmation again.
-6. Inspect **执行记录与子任务** for the actual channel, response, failures, cost and ratings. Official teamwork replans using only installed CLIs ready for the selected permission mode. Edits require approval and a clean Git repository; successful worktree changes are conditionally integrated. An unavailable or failed CLI never silently becomes an API call in this mode.
-
-After execution starts, the workbench shows elapsed time, the current package and each package's state. **取消执行** requests cancellation of the active call and stops later packages from starting; **正在取消** remains visible until the executor finishes cleanup. Completed results and reported usage remain in history. Cancelling cannot undo charges already incurred or changes already integrated. Closing the panel does not cancel a run; reopening it in the same browser session can reconnect while the Host retains that job. Host restarts clear these in-memory jobs; durably saved package receipts and budget reservations remain. A confirmed dead execution owner is marked `interrupted`, without automatically resuming calls or releasing its hold.
-
-Preview, progress and cancellation requests stop waiting after 15 seconds. Progress reads retry against the same job; an unacknowledged cancellation can be retried explicitly. A transport timeout does not establish that the Host task stopped and never automatically resubmits `startRun`. Before retrying a recorded step, budget checks include that step and all unfinished downstream packages that will execute; reassignment uses the selected route estimate and unknown prices remain unknown. The [timeout recovery screenshot](docs/assets/workbench-run-timeout.png) is an offline simulation.
-
-History shows active and interrupted budget reservations separately from actual spending. Runs with a reservation cannot be rerun or reassigned. If a Host crash or checkpoint failure leaves a reservation, first inspect the original task, retained worktree and provider bill; this release has no manual reconciliation/release control. Do not delete state to make the capacity appear free.
-
-Changing task text, planning mode, profiles, directory or relevant settings invalidates the prior recommendation. Changing execution inputs also discards the pending or completed preview, so execution requires a new preview of the current request. Previewing execution uses current Host state and can differ from a previous local plan.
-
-Example task:
-
-```text
-Review this project and prepare an implementation plan.
-1. Map the entry points and identify the main UI workflows.
-2. Review the interface at wide and narrow widths; list layout problems.
-3. Check the execution and billing boundaries.
-4. Combine the findings into a prioritized change list with verification steps.
-```
-
-The router plans and delegates text/code tasks. It does not itself render videos, generate artwork or control creative applications.
-
+<a id="official-tools"></a>
+<a id="session-tools"></a>
+<a id="team-lifecycle"></a>
 <a id="architecture"></a>
 
-## Architecture and execution contracts
+## Model workbench, tools and execution boundaries
 
-The Host owns route discovery, settings, approvals, workspace validation, process launching and the persistent ledger. The React client requests previews and renders Host results. Planning, managed execution and installation requests accept fixed tool IDs and typed fields rather than arbitrary shell commands, executable paths, installer packages or download URLs. The same remote namespace separately exposes an explicitly confirmed interactive terminal, which accepts arbitrary user input under current-user permissions.
+Open **Advanced workbench / 高级工作台** for model-route planning, exact-route profiles, official tools, terminals, dependent work packages and API/subscription accounting. Configure provider credentials in Harness Models and vendor CLI logins in their own tools. Detection or installation does not prove login, entitlement or a managed execution mode is available.
 
-```mermaid
-flowchart TD
-  UI[Workbench or Harness session] --> PLAN[Local planner and route profiles]
-  PLAN --> PRE[Host preflight and confirmation]
-  PRE --> ROUTED[Routed read-only executor]
-  PRE --> TEAM[Official CLI team executor]
-  ROUTED --> CLI[Supported headless CLI]
-  ROUTED --> API[Harness model API]
-  TEAM --> MODE{Permission mode}
-  MODE -->|read-only| SANDBOX[Harness sandbox]
-  MODE -->|workspace-write| WT[Isolated worktree]
-  WT --> ENV{Explicit execution environment}
-  ENV --> SANDBOX[Harness sandbox]
-  ENV --> NATIVE[Normal vendor CLI environment]
-  SANDBOX --> PROCESS[Official CLI process]
-  NATIVE --> PROCESS
-  PROCESS -->|editable success| PATCH[Baseline checks and patch integration]
-  PROCESS --> LEDGER
-  CLI --> LEDGER[Results, identity, usage and cost ledger]
-  API --> LEDGER
-  PATCH --> LEDGER
-```
+Planning and candidate previews are local. Execution may send task/context to the selected provider or CLI and incur charges. Model routing selects a model route; Bot routing selects a configured Bot and dispatches its actual worker task. The two workflows share committed Host authority and accounting rather than accepting authority from model parameters.
 
-| Path | Selection and permissions | Failure/fallback behavior |
-| --- | --- | --- |
-| Routed execution | `model_router_execute` / workbench `executor: "routed"`; read-only; CLI or Harness model API according to execution/billing policy. | An eligible API fallback can follow the configured subscription policy. |
-| Official CLI, Harness environment | Single-tool `model_router_tool_run` or team execution; only currently supported/ready CLI modes; Host sandbox required. | Missing confinement or readiness blocks launch. No automatic API fallback. |
-| Official CLI, normal environment | Only editable official teams: `official-team + workspace-write + cli-native`; separate user confirmation. | Runs under current user permissions with `sandboxEnforcement: "none"`. No automatic environment switch or API fallback. |
+The official-tool registry includes Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini, OpenCode, StepCode, Pi, Hermes, ZCode and DSH TUI. Availability depends on the selected platform and supported execution mode shown by the workbench. An interactive terminal uses the current OS user's permissions. An explicitly chosen vendor-native editable process is outside the Harness process sandbox; a worktree collects edits but does not restrict OS access.
 
-**Discovery is not execution acceptance.** Installed version, trusted launch entry, login status, supported permission mode, network connectivity and model entitlement are different checks. A CLI working in an interactive terminal can still be unavailable in a restricted task: the adapter, platform, sandbox and selected installation must all match.
+Tasks retain task/attempt/operation identity, results and unknown-effect evidence. Follow the task's status and acceptance check; do not infer completion from a generated plan, an installation method, a successful permission check or a method name. API money/reservations and subscription calls/reported tokens are separate books. Missing usage remains unknown.
 
-### Workbench RPC
-
-The authenticated Host remote is `ctx.remote.modelRouterOfficialTools`, defined in [official-tools-remote.mjs](.dsh-plugin/shared/official-tools-remote.mjs). It is an internal mounted-client interface, not a standalone public HTTP API. A preview request has this shape:
-
-```json
-{
-  "task": "Analyze this repository's logging, implement a small improvement, and verify it.",
-  "executor": "official-team",
-  "planMode": "team",
-  "executionMode": "workspace-write",
-  "executionEnvironment": "cli-native",
-  "workspace": "C:/work/example-repository",
-  "budgetUsd": 1,
-  "preset": "balanced"
-}
-```
-
-Replace the workspace with an existing clean Git root. Call `previewRun(request)`, decode its response with the client's `unwrapRemote` helper, show the plan and `reasons`, and stop if blocked. Preview does not call a model or create a worktree; entry/version/integrity checks may access the network. Only after the user accepts every current reason may the client call `startRun({ ...request, confirmedReasons: preview.reasons.map(r => r.code) })`.
-
-Native editing normally requires `workspace-write` and `unsandboxed`; an exceeded budget adds `over-budget`. Do not hardcode this list or populate it without consent. `startRun` replans and repeats preflight; it does not consume a frozen preview token. New confirmation requirements return `needs-confirmation` with `missing` and updated reasons. Changing task, mode, workspace or profiles requires a fresh preview. Workbench requests use saved route `cliModel` mappings; temporary `cliModelsJson` bindings belong to the session tool below.
-
-An accepted `startRun` returns a job snapshot with `jobId`, `status` and `progress` before execution finishes. Poll `runStatus({ jobId })`; request cancellation with `cancelRun({ jobId })`. Job states are `running`, `cancelling`, `completed`, `cancelled` or `failed`. A terminal snapshot's `result` contains the final workbench response and ledger `runId` when saved. `completed` means the worker settled; inspect `result.status` for the actual task outcome. Progress contains package identities and states, not answer text. A failed poll does not establish that execution stopped, and clients must not retry `startRun` automatically.
-
-<a id="session-tools"></a>
-
-## Session tools
-
-Ask an official Harness session to invoke these tools. Configure the session workspace before tasks that access local files.
-
-| Tool | Purpose |
-| --- | --- |
-| `model_router_routes` | List configured routes; does not verify account/network availability. |
-| `model_router_plan` | Generate a local `single` or `team` plan. |
-| `model_router_consult` | Ask one configured model for a live second opinion via the model API. |
-| `model_router_execute` | Execute a read-only routed plan, or one explicit `provider`/`model`, with recorded results. |
-| `model_router_tools` / `model_router_health` | Inspect installation/readiness or version/login/billing health. |
-| `model_router_tool_install` | Install one fixed registry tool from its official source. |
-| `model_router_tool_run` | Run one supported CLI in `read-only` or approved `workspace-write` mode. |
-| `model_router_team_execute` | Replan among currently executable CLI routes, then run work packages sequentially. |
-| `model_router_rerun_step` | Rerun a failed step and its unfinished dependents, resume eligible editable teams, or repeat a failed single-tool run. |
-| `model_router_rate` | Record `up`, `down` or `clear` for one stored result. |
-
-Session commands are `/router <task>`, `/tools`, and `/tools install|cancel <tool-id>`.
-
-A local planning request:
-
-```json
-{"task":"Review the architecture and prepare a verification checklist","mode":"team","budgetUsd":10}
-```
-
-A read-only single-tool request:
-
-```json
-{"tool":"codex","task":"Inspect the repository and list UI layout issues; do not edit files","mode":"read-only"}
-```
-
-An editable native-team request to `model_router_team_execute`:
-
-```json
-{
-  "task": "1. Analyze the logging module and propose a small improvement. 2. Implement it and report verification results.",
-  "mode": "workspace-write",
-  "executionEnvironment": "cli-native",
-  "budgetUsd": 1
-}
-```
-
-The session supplies its authorized workspace; configure it as an editable clean Git root first. The tool's approval hook requests the required confirmations. Session tool arguments use `mode`, not the workbench's `executionMode`, and do not accept `workspace`, `executor` or `planMode`. For temporary model binding, `cliModelsJson` is a JSON-encoded **string**, for example `"{\"claude-code\":\"<verified-cli-model-name>\"}"`; replace the placeholder with a model accepted by that installation. This mapping does not force the planner to select that tool.
-
-Supply `provider` and `model` together when selecting an exact catalog route. All CLIs retain their own configured model by default; a catalog recommendation is never automatically passed as a CLI model argument. To switch explicitly, save a verified **官方 CLI 模型名** in the route profile, pass `cliModel` for one tool call, or use team `cliModelsJson`. Team bindings prefer a package id, then a tool id, then the saved route mapping. ZCode uses its own default and cannot switch model per call. History records the recommendation, requested CLI name and reported actual model separately; a request is not proof of the model used. Check vendor records when no actual model is reported.
-
-The CLI team runner is the plugin's own sequential dependency executor. It does not control the model selection or lifecycle of Harness's built-in Agent Teams.
-
-<a id="official-tools"></a>
-
-## Official tools and execution modes
-
-| Registry id | Tool | Managed single-tool/team modes |
-| --- | --- | --- |
-| `kimi-code` | Kimi Code | Approved `workspace-write` |
-| `claude-code` | Claude Code | Windows: `read-only`, approved `workspace-write` |
-| `codex` | Codex CLI | Windows: Harness `read-only`; explicit native editable team supports `workspace-write` |
-| `minimax-code` | MiniMax Code | Approved `workspace-write` |
-| `mimo-code` | MiMo Code | Windows: `read-only`, approved `workspace-write` |
-| `grok-build` | Grok Build | Windows: `read-only`, approved `workspace-write` |
-| `gemini` | Gemini CLI | Routed headless adapter; not the managed single-tool/team runner |
-| `opencode` | OpenCode | Install, probe and login check; no verified restricted execution entry yet |
-| `stepcode` | Step Code | Install, probe and login check; no verified restricted execution entry yet |
-| `hermes` | Hermes Agent | Official Windows/POSIX installer, version checks and interactive terminal; authenticate with `hermes auth`; no verified managed runner |
-| `pi` | Pi | Official npm/pnpm package and interactive terminal; enter `/login` inside Pi; no verified managed runner |
-| `zcode` | ZCode CLI | Standalone TUI and approved `workspace-write` when its runtime entry is ready |
-| `dsh-tui` | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | The DeepSeek tool: Harness terminal UI (pixel whale, live state, session manager). npm/pnpm install, probe and terminal; DeepSeek providers name it as their channel, while calls keep using the model directory API until a verified headless adapter exists |
-
-Hermes uses its [official source installer](https://hermes-agent.nousresearch.com/docs/getting-started/installation) in non-interactive mode, then you run `hermes auth`. A configured shared root places its source in `<root>/hermes-agent`; the plugin binds that checkout's `.hermes/bin` launcher and refuses a different old global copy. Existing configuration, login and history stay in their original Hermes home. Without a shared root, vendor defaults remain in use. The installer may refresh its global convenience command to the selected checkout. Uninstall source installs through `hermes uninstall`. Pi uses [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) through npm/pnpm with `--ignore-scripts` and requires Node.js 22.19 or later. Start `pi`, then enter `/login`. Both tools keep login status unknown until confirmed in their own interface; the plugin does not read their credentials.
-
-Installers use fixed official npm packages at each vendor's `@latest`, the vendor's own installer script, or the [community-maintained ZCode CLI release](https://github.com/Alice-Marx/zcode-cli) archive verified with its published SHA-256. An installation newer than the reported latest is not downgraded. Latest-version lookups are cached for about 12 hours; unavailable lookups leave the version unknown. New vendor releases are not automatically validated by this project. ZCode CLI is an independent Node.js distribution extracted from ZCode, not an official Z.AI release; it requires Node 24.14.0 or newer within Node 24. The default `github-release` method installs its runtime in `<shared root>/zcode-cli`, or `~/.zcode/runtime` when no shared root is set. The new `npm` option installs [`@ljwei-stak/zcode-cli@latest`](https://www.npmjs.com/package/@ljwei-stak/zcode-cli) with the saved npm registry and shared npm prefix. The npm package includes the complete TUI, Web and Agent runtime; installation does not separately download it from GitHub. When preparation is needed, the plugin keeps a verified runtime under `<DSH_HOME>/model-router/zcode-npm/cache`; npm uninstall may retain that cache. It installs, updates, repairs and uninstalls from the same tool card as the other CLIs; login, configuration and session history are kept. It no longer launches or requires the ZCode desktop installer.
-
-**Unified install settings.** The top of the **官方工具** page (also in the plugin settings form) sets the install address for every tool at once: one install directory (empty means each vendor's default location), an npm source, and per-tool overrides for vendor installer-script mirrors. Directories must be absolute; sources must be https. Each row picks its own declared install method: `npm`, `pnpm`, the vendor script (`curl | bash` or `irm | iex`), or ZCode CLI's `github-release` archive; ZCode CLI also offers the `npm` method for its fixed community package. In every row, a method that cannot run on this platform says so on the row instead of being silently swapped. The exact command is shown above the buttons before anything runs.
-
-**Script installs never pipe remote content into an interpreter.** The plugin downloads the script, checks expected vendor markers, rejects HTML/unexpected vendor content, and runs the local copy. Marker checks are not cryptographic proof of its origin or safety. A mirror must rehost the vendor script rather than substitute a different program. Step Code's script accepts an install directory; the OpenCode script hardcodes `~/.opencode/bin`, so a custom directory only applies to it through the package managers' configured global directories. Script installs can be switched off entirely; package-manager methods and the verified ZCode CLI archive remain available.
-
-
-**Update destination.** Click **保存安装设置** after changing the shared directory or sources. Tool actions wait until saving and command refresh finish. npm uses `--prefix`; pnpm uses its own `global-dir`, `global-bin-dir` and store settings. Install jobs retain the chosen configuration even if another settings page changes it while they are queued. Updates check the selected command directory, so a different current copy on PATH cannot make a missing target look installed. Vendor scripts with fixed paths explain their actual destination. ZCode CLI's GitHub Release method uses the shared root's dedicated `zcode-cli` directory; its npm method uses the same npm prefix as other npm tools. Choose the method first, then review its command and target directory. Switching methods does not migrate or uninstall another copy.
-
-**Existing ZCode launchers on Windows.** Before npm installation, the plugin backs up recognized legacy `zcode`, `zcode.cmd` and `zcode.ps1` desktop launchers and records the backup in the install log. npm can then create its own command entries. Failed installation attempts restore the old launchers where this can be done safely. Unrecognized conflicting files stay in place and produce an error; the plugin never adds `--force`. Desktop resources, account configuration, login and session history are kept.
-
-The [workbench guide](./docs/WORKBENCH_USER_GUIDE.zh.md#厂商安装渠道) lists each vendor’s actual channels and native-install execution limits.
-
-With no shared directory, ordinary checks discover the selected manager's packages on PATH. An install, update, repair or removal job resolves and locks that manager's default global destination before comparing versions. If that destination cannot be resolved safely, set and save a shared directory first.
-
-**One-click repair and uninstall.** Repair re-runs the same fixed official command, which is what a broken install needs even when it already reports the latest version. Uninstall removes only the program: a package-manager install goes back through the same manager, and a script install removes its registered command entries and supported PATH records; vendor version directories may remain. The Windows Codex native directory junction has no generic delete-based uninstall. The row explains this limitation. **Configuration, credentials and session history are always kept.**
-
-Installation, trusted launch readiness, account login and model entitlement are separate checks. An unknown login status is not proof of logout. Trust checks depend on the tool and installation source:
-
-| Entry | Implemented verification |
-| --- | --- |
-| Windows Claude / Codex | Valid vendor Authenticode signature on the executable; Codex also checks wrapper/platform-package layout. Claude requires version 2.1.259 or later. |
-| MiMo / Grok | Native executable against the exact official npm platform archive; Grok also verifies the compressed member and its decompressed executable. |
-| Windows MiniMax vendor-script layout | Installed package code against the exact npm release, version-pointer/layout checks and required native-module presence. |
-| Kimi / ordinary MiniMax npm or pnpm, `cli-native` | Additional registry checks on package code, manifest and actual entry. This extra path is not applied to those ordinary copies in the Harness environment. |
-| ZCode CLI | GitHub Release method: archive from the fixed `Alice-Marx/zcode-cli` repository, verified against its published SHA-256 and checked against installed-file digests before launch. npm method: the fixed `@ljwei-stak/zcode-cli` package manifest, launcher, payload manifest and compressed payload are checked against the exact registry release; the expanded runtime is also verified. Local verification records are a trust boundary; neither method supplies an independent publisher signature. |
-
-Here, “npm attestation” means exact registry-release consistency: verify the tarball using its registry `dist.integrity` SHA-512, then compare selected members' SHA-256/size, optionally using a verified cache. It is not npm provenance/Sigstore verification, an independent publisher signature or a proof of every dependency/local file. Gemini's routed adapter and OpenCode/Step terminals do not inherit these managed-entry claims. See [the registry](.dsh-plugin/shared/official-tool-registry.mjs), [executor](.dsh-plugin/shared/official-tool-executor.mjs), [npm checks](.dsh-plugin/shared/npm-attestation.mjs) and [ZCode trust](.dsh-plugin/shared/zcode-bundle.mjs).
-
-Version and CLI login-status checks use the selected installation's concrete entry. A missing selected copy cannot be replaced by a different command on PATH; its login status remains unknown when that entry cannot be checked.
-
-In a session, `/tools install|uninstall|repair|method <tool-id> [method]` does the same; agents can call `model_router_tool_install`, `model_router_tool_repair` and `model_router_tool_uninstall`. The install directory and download sources always come from the user's own plugin settings and never travel over the RPC, so no call can redirect an install at an arbitrary package or URL.
-
-`model_router_execute` has fixed headless adapters for Claude, Codex and Gemini. Other suppliers use the model-directory API unless a supported subscription route applies. Missing/unusable CLIs can fall back to that API; subscription failures follow the policy below.
-
-Editable execution needs a clean Git root and Host approval. The default Harness environment additionally requires process confinement; explicitly confirmed `cli-native` teams run outside that sandbox. Both retain worktree and conditional patch-integration checks described below. Read-only CLI flags do not necessarily limit reads to the workspace; check **安全边界**, especially Codex's broader readable scope.
-
-In the Harness environment, Claude read-only uses restricted mode, Read/Glob/Grep only, no shell, slash commands or existing MCP configuration. Editable Claude retains its normal tools/configuration. The executor forwards a base environment, proxies and an allowlist of vendor configuration/credential variables, not every Host variable; subscription-only launches remove API credentials. Native execution preserves normal vendor state/configuration and can use its skills/MCP if that CLI supports and loads them. It does not verify that every configured skill or MCP service works.
-
-For Windows Codex tasks in the Harness environment, only read-only is available: the outer ACL sandbox grants the original `CODEX_HOME` state and a private temporary directory, while Codex retains `--sandbox read-only`. Explicitly confirmed native editable teams can use Codex with its own workspace-write policy. Codex network readiness remains account/environment dependent and did not pass the real connection checks in this batch.
-
-### Interactive terminal
-
-In **官方工具 → 官方工具终端**, select the shell or an installed CLI, choose interactive/login mode where available, enter an existing absolute directory, and review the startup confirmation. ZCode CLI starts its standalone TUI from the verified runtime. Use `zcode login` for Z.AI or `zcode login bigmodel` for the Coding Plan; the terminal also offers login mode. Login state stays unknown until checked in ZCode because no supported status command is available.
-
-These sessions run **outside the Harness sandbox**, with the Host user's login environment, proxies and API-key variables. Commands typed there can read/write files with that user's permissions. Terminal launches are separate from routed execution and its approval/billing policy.
-
-The optional `@lydell/node-pty` dependency supplies a real pseudo terminal. If it cannot load, the card reports pipe mode: full-screen interfaces, resizing and arrow keys may not work. At most four sessions run concurrently, unread sessions expire after about two minutes, and each session lasts at most six hours. Explicitly end sessions when finished; closing the workbench or unloading the plugin also ends them.
-
-The plugin does not persist terminal input/output. It stores session metadata only. With text selected, Ctrl+C copies; otherwise it interrupts. Ctrl+Shift+V pastes.
-
-<a id="team-lifecycle"></a>
-
-## Team lifecycle, model identity and recovery
-
-The team runtime executes a topologically ordered dependency graph **sequentially**, not concurrently. Each package receives the overall task, its goal/checklist and the outputs of its direct dependencies (up to 2,500 characters per dependency). The first non-successful package stops all remaining packages, including independent packages later in the plan. This is the plugin's executor, independent of Harness's built-in Agent Teams.
-
-### Model identity
-
-Three fields have different meanings: the recommended catalog `provider/model`, the requested `requestedCliModel`, and the CLI-reported `actualModel`. The catalog recommendation is not automatically a CLI argument. Explicit selection follows **package binding > tool binding > saved route.cliModel > vendor CLI default**. ZCode has no per-call model switch; MiniMax/MiMo mappings must use their supported `provider/model` form.
-
-If an explicit binding conflicts with an actual model reported by the CLI, the package becomes `model-mismatch` and downstream work stops. If no unambiguous actual model is reported, identity stays unknown; a successful process does not prove the requested model ran. Reassigning a failed package uses the new route's saved mapping rather than retaining the old tool's mapping.
-
-### Editable worktree and integration
-
-1. Canonicalize the source path, check session authorization and require a clean Git root with a HEAD commit. Record that baseline.
-2. Create a detached isolated worktree. On Windows, Host-derived storage is `os.tmpdir()/.model-router-workspaces/<source-path-hash>/run-<uuid>`; source/worktree overlap and redirected storage are rejected. This avoids source drives whose ACLs cannot initialize the Harness boundary. Other platforms retain their supported in-scope worktree policy.
-3. Run packages in that worktree. Cancellation stops the process tree; failed runs preserve their worktree and earlier package results.
-4. After all packages succeed, stage changes and compute a binary diff against the **original source baseline**, including changes a CLI committed inside the worktree. Git-ignored outputs are not included.
-5. Recheck that the source is clean and its HEAD is unchanged. Run `git apply --check`, then apply the patch to the source. Do not auto-commit. Conflicts, changed source or outputs needing manual handling preserve an `integration-pending` result/worktree.
-
-A worktree separates collected changes; only the selected Harness environment supplies an OS boundary. Native tools/MCP can affect files or services beyond it. Internal execution limits are 64,000 task bytes, 32,000,000 captured output bytes, a 32,000-character output tail, a default 45-minute timeout and a two-hour maximum. Kimi and ZCode additionally reject command-line prompts over 16,000 UTF-8 bytes. These are process limits, not billing caps.
-
-### Failure and retry
-
-Required checkpoints persist package launch state before an external call and its available result, usage and cost before the next paid step. A checkpoint failure stops later steps and preserves the reservation for reconciliation. History stores package status, exit code, bounded scrubbed diagnostics, entry/model evidence and available usage/cost. A later adapter exception does not discard earlier results. `cli-completed` means the runtime completed its process/patch workflow; deliverables still need acceptance checks. `blocked`, `cancelled`, `incomplete` and `integration-pending` distinguish preflight, interruption, package failure and integration problems.
-
-A retry targets a failed package and unfinished downstream packages, preserving other successful results. Eligible editable `incomplete/cancelled` runs require the recorded source, retained worktree and baseline: the Host validates them, creates a fresh worktree, seeds prior unintegrated edits, and continues. Already integrated or `integration-pending` teams cannot use this step-resume path. Native retry again requires write and unsandboxed consent (`confirmWrite` and `confirmUnsandboxed` in the workbench rerun request); disabling the legacy `confirmUnsandboxedCli` setting cannot bypass it. Previous attempt charges remain in spending totals. This retry path requires no active or interrupted reservation on the original run; a crash checkpoint is evidence to reconcile, not an automatic resume token.
-
-Implementation: [official-team-runtime.mjs](.dsh-plugin/shared/official-team-runtime.mjs), [official-tool-executor.mjs](.dsh-plugin/shared/official-tool-executor.mjs), and [run-ledger.mjs](.dsh-plugin/shared/run-ledger.mjs).
+The following preserved mathematical reference describes the **model-route workbench**. Bot selection and desktop routine playback are separate workflows.
 
 <a id="costs"></a>
 
@@ -460,103 +251,80 @@ Implementation: [router.mjs](.dsh-plugin/shared/router.mjs), [assignment-solver.
 
 ## Data and privacy
 
-Router profiles/preferences are held in the Harness plugin settings. Runtime state is stored in `<DSH_HOME>/model-router/state.json` (default `~/.dsh/model-router/state.json`): health/onboarding, subscription cooldown and separate usage aggregates, ratings, up to 200 recent runs, up to 100 execution reservations, 50 terminal metadata records and opt-in public data snapshots. Runs referenced by a reservation are protected from history trimming. Applied rates and data/feedback policy versions are frozen in run records. Preferences are local to that shared DSH_HOME, not authenticated per-user accounts; public data requests do not upload tasks or feedback.
+Harness owns provider credentials and authenticated sessions. Router state/receipts live under `<DSH_HOME>/model-router/`; the product also keeps committed Bot bindings, task records, private libraries and routine/run journals there. The upstream Bot home retains conversations, memory, browser state and related team files according to its configured location. Remote Agent state and pairing credentials remain in the installed computer's directory.
 
-Version 0.15.0 also retains bounded spending aggregates for up to 90 populated calendar dates and 24 months. These contain amounts/counts, not task or response content.
-
-Run history includes task text, output excerpts, route/workspace, failures and costs. Stored task text is capped at 20,000 characters and each answer at 4,000; reruns can therefore depend on truncated stored context. The plugin does not store API keys in model profiles or terminal transcripts. Task execution still sends the selected task/context to the chosen provider or CLI.
-
-State writes use a lock and atomic replacement. Schema v3 preserves separate subscription usage and channel-aware reservations while migrating readable v1/v2 state without discarding API history, holds or old reference fields. Historical missing tokens stay unknown. Older plugin versions reject v3 state; fully stop every Host process before upgrading and back up state before downgrading. Unparseable state is preserved as a `state.json.corrupt-<timestamp>` backup and surfaced as a notice. Avoid sharing unredacted histories or logs.
+Task/context sent to a provider or CLI follows that service's account and billing terms. Saved routines contain the demonstrated text. Treat pairing exports, histories, logs and private files as private data. Back up application state before changing runtime owners or downgrading; do not erase receipts or uncertain-operation journals to bypass a blocked run.
 
 <a id="development"></a>
 
-## Develop from a cloned checkout
+## Develop and build from source
 
-The Git clone is a complete source checkout; the npm package is a runtime distribution and excludes client source, scripts, tests and the experiment project.
-
-Requirements: **Node.js 22.19+** and **pnpm 10.34.6** (pinned in `packageManager`). In PowerShell, from the directory containing your clone:
+Requirements: plain **Node.js 22.19+** and **pnpm 10.34.6** (the repository's package-manager pin). Native SQLite/PTY modules must run through the matching plain Node runtime, not Electron's incompatible ABI. From the repository root:
 
 ```powershell
-cd .\dsh-model-router
-pnpm install --frozen-lockfile --strict-peer-dependencies
+npm install --include=dev
 npm run build:client
-npm test
 npm run check:client
+node scripts/check-readme.mjs
+npm test
+node scripts/integration-product-source.mjs
+npm --prefix remote-computer-agent ci
+npm --prefix remote-computer-agent run build
 npm run pack:local
 ```
 
-If already in the repository, omit the first `cd`. The archive appears in `dist`; install that absolute `.tgz` path through Desktop's plugin manager in a test profile. Do not treat successful unit tests as proof of vendor account access, actual model identity or billing.
+Install the generated `dist/*.tgz` in a test profile. `npm run preview:ui` provides an offline fixture preview, not authenticated Host acceptance. When SDK packages are unavailable from the configured registry, `scripts/setup-harness-dev.mjs` supports an explicitly supplied installed Host tree; follow its options and do not substitute an arbitrary SDK version silently.
 
-To inspect the UI without starting Harness or vendor tools:
+For a Windows x64 Agent bundle after its dependencies are installed:
 
 ```powershell
-npm run preview:ui
+powershell -NoProfile -File scripts/package-remote-agent.ps1
 ```
 
-Open [the local preview](http://127.0.0.1:4173). It uses mock models, tools and history, with populated, empty, error, onboarding and delayed-preview scenarios for layout/interaction checks. Simulated execution does not call providers, install tools or start a terminal. This is not Host integration verification. Use `npm run preview:ui -- --port 4174` if the default port is occupied; refreshing picks up client-source edits.
+The packaging helper builds native helpers, includes the plain Node runtime/dependencies and verifies SQLite before creating its zip under `tmp/integration/remote-agent-package/`. Its output includes the package path and SHA-256. Setup is run on the user-provided Windows computer, not during source packaging.
 
-| Location | Role |
-| --- | --- |
-| `.dsh-plugin/index.mjs` | Host plugin, session tools, settings, execution and remote handlers. |
-| `.dsh-plugin/client/` | React workbench source and CSS. |
-| `shared/router.mjs`, `assignment-solver.mjs`, `harness-plan.mjs` | Local scoring/search and Host model-directory integration (under `.dsh-plugin/`). |
-| `shared/official-tools-remote.mjs`, `official-tools-runtime.mjs` | Fixed RPC codecs, installation selection/jobs and preferences. |
-| `shared/official-tool-executor.mjs`, `official-team-runtime.mjs` | Trusted entry, permissions/process capture, dependency execution and patch integration. |
-| `shared/task-executors.mjs`, `subscription-billing.mjs` | Routed CLI/API execution, subscription policy and fallback. |
-| `shared/run-ledger.mjs`, `router-state.mjs` | Identity/usage/cost records, retained spending and locked atomic persistence. |
-| `shared/budget-reservations.mjs`, `execution-lifecycle.mjs` | Cross-process API budget admission, channel-aware reservations, mandatory checkpoints and interrupted-owner evidence. |
-| `shared/subscription-usage.mjs` | Independent observed subscription usage, calendar aggregation and retry/history retention. |
-| Other `.dsh-plugin/shared/` modules | Terminal contracts, tool health, public snapshots and bounded feedback. |
-| `.dsh-plugin/client.js` | Generated Desktop client bundle; rebuild after client changes. |
-| `scripts/` and `tests/` | Build/package/verification helpers and regression tests. |
-| `experiment-plugin/` | Separate research experiment project; not shipped as part of the router plugin. |
-| `docs/` and dated reports | User documentation and historical verification records. |
+### Reproduce the pinned upstream runtime
 
-`check:readme` guards the six display formulas, inline mathematical symbols, leading zeros in decimals, matching formulas in both languages and the reviewed blob hashes. `npm test` and `prepack` run this check; render changes must also be viewed on GitHub. The math blocks use [GitHub-supported syntax](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions).
+Never edit `modules/bot-runtime/vendor/ds-bot/` directly. Product changes belong in the external overlay. Import from the explicit checkout and pinned commit:
 
-`check:client` rebuilds in memory and compares the generated output with the committed bundle; `prepack` refuses a stale bundle. pnpm 10 has no `pnpm peers check` command: use the strict install above. Unavailable/incompatible host SDK packages may require the installed Harness runtime for local integration testing; [setup-harness-dev.mjs](scripts/setup-harness-dev.mjs) links missing SDK packages from an explicitly supplied Host `node_modules`, and [start-harness-preview.mjs](scripts/start-harness-preview.mjs) starts a separate local web Host profile. These helpers do not replace dependency verification or Desktop acceptance checks.
+```powershell
+node scripts/sync-ds-bot.mjs --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
+node scripts/sync-ds-bot.mjs --check --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
+npm run build:client
+npm run check:client
+```
 
-GitHub Actions runs a Node 24 matrix on Windows and Linux for the frozen strict dependency install, full test suite, committed-client consistency, actual client build and offline preview compilation. It packs the candidate and checks every file against raw Git blobs plus the runtime import closure. These checks use local fixtures and do not exercise real provider billing. After committing a local candidate, reproduce package verification with `node scripts/check-package.mjs` following `npm run pack:local`.
+Without a source argument, `node scripts/sync-ds-bot.mjs --check` checks the recorded vendored bytes; it does not guess a sibling `../ds-bot`. An intended upstream change requires reviewing the source commit and overlay application. `.dsh-plugin/client.js` is generated.
 
-Legacy compatibility/research files and dated reports are preserved for reference; their presence does not make every older integration an active feature of the current packaged plugin. Releases and synchronization follow [AGENTS.md](AGENTS.md); use versioned packages or verified release tags to reproduce a release.
+The paired READMEs retain six display formulas and 33 inline mathematical expressions. After editing both translations, update `README.i18n.yaml` with their exact Git blob SHA-1 values and run `node scripts/check-readme.mjs` plus `node --test tests/readme-math.test.mjs`. Structural checks do not replace a visual renderer check.
 
-### Verification layers and known limits
+## Verification and current limits
 
-| Evidence | What it establishes |
-| --- | --- |
-| Unit/fixture tests | Local planner, contract, ledger, state and failure handling for covered cases; no vendor account access. |
-| Standalone UI preview | Layout and client interaction with fixtures; no authenticated Host execution. |
-| Authenticated Desktop RPC | Actual Host preflight/approval/launch path for the selected run. |
-| Production runtime CLI team | Real vendor processes, dependency context and files for that invocation; not automatically a UI or automatic route-selection test. |
-| Source file readback | The expected artifacts reached the source workspace; business correctness still depends on the chosen checks. |
+The real **SDK 0.2.1-rc.4** Host integration has exercised Main tool → routed worker AgentLoop → private library write → task `succeeded`. Worker requests use separate per-model budget admission linked to the parent task. This is evidence for that path; it does not establish that every Host/browser probe, installed Desktop variant, vendor account or real cloud-PC deployment passed. Keep later acceptance results tied to their actual test configuration.
 
-The 0.20.0 Windows record contains a real Claude workbench RPC run and a separate installed-production-runtime Claude → MiniMax handoff, with file/shell tools and patch integration checked. The handoff used explicitly selected packages; it does not prove automatic route quality. Codex connection checks failed in that batch. Other vendors, every skill/MCP service, cross-platform behavior, billed totals and quality–cost improvements are not all accepted by those runs. [The dated report](docs/releases/0.20.0-validation.md) retains the exact scope. The 0.20.1 retry-confirmation fix has contract/regression coverage; this patch adds no new model experiments or spending.
+Local WebSocket/React tests exercise acknowledged recording, private save/readback, real replay effects with a fake native transport, cancellation, cleanup, unknown recovery and admission refusal. Windows native/Agent checks are separate from that fixture. Actual desktop FPS depends on capture, resolution, network and client decoding; the viewer's measured rate is the relevant observation.
 
-When maintaining these docs, update both languages in the same change: matching stable section anchors, API keys, defaults, formulas, capability tables, examples and evidence limits. Record the paired Git blob hashes in [README.i18n.yaml](README.i18n.yaml); hashes identify the reviewed text and do not prove translation correctness. Keep historical experiment reports tied to the runtime version actually tested.
+The Grok workflow audit uses the previously captured public requirement list. This round's revisit to the website was blocked by network/Cloudflare, so it is not a fresh complete product inventory. Role briefs are templates, not preconnected CRM/advertising/expenses services. No automatic cloud VM provisioning, cloud billing service, product-owned iOS release or commercial Grok parity is claimed.
+
+The full source archive includes [computer/Bot guide](docs/COMPUTER_BOT_GUIDE.zh.md), [upstream evidence](docs/implementation/20261105-upstream-parity.md), [workflow boundaries](docs/implementation/20261105-grok-workflows.md) and [desktop engine evidence](docs/implementation/20261105-desktop-engine.md). Core operation is explained above so the code-and-README distribution remains usable without those archival documents. Project publication policy keeps code and READMEs on GitHub; full documents/history belong in the GitLab archive.
 
 <a id="troubleshooting"></a>
 
 ## Troubleshooting
 
-| Symptom | Check |
+| Symptom | What to check |
 | --- | --- |
-| No routes or planning disabled | Configure Harness Models, refresh the directory and wait for tool detection. |
-| API cost unknown | Supply both input/output USD prices for each compared API route and inspect usage/model evidence. |
-| Subscription usage unknown | The vendor did not report complete counters, or the historical record lacks them. Do not infer tokens from old dollar references or invent remaining quota. |
-| CLI installed but not executable | Review launch-readiness reason, platform/mode support and installation source. |
-| Login/entitlement still fails | Check the vendor account, CLI login, network and actual model access; installation alone is insufficient. |
-| Frontend says Host is older | Fully quit Harness, including the tray process, then restart. |
-| Preview differs from old advice | Directory, login, quota or budget state changed; review the new preview. |
-| Budget remains reserved after interruption | Check the original task, retained worktree and provider bill. The hold is not automatically cleared or replayed, and this release has no manual reconciliation/release control. |
-| Older plugin cannot read state | Schema v3 preserves protected execution and separate subscription usage. Restore a compatible version; do not erase accounting to bypass checks. |
-| Terminal TUI does not render | Check whether the card reports PTY or pipe fallback. |
-| Logged in, but no executable team route | Check `readyModes`, platform, selected install and permission mode; terminal login alone does not establish managed capability. |
-| Skills/MCP missing in Claude read-only | Restricted mode disables them; editable/native choices have different permissions and require the corresponding confirmation. |
-| Editable team stopped | Read the failed package, exit/diagnostic fields and integration state; preserve the worktree before eligible retry/manual review. |
-| Changes not integrated | Check source cleanliness/HEAD, patch conflict and ignored outputs. Do not treat a retained worktree as an applied source change. |
-| Wrong or unknown CLI model | Compare recommendation, requested mapping and reported actual model; check the selected CLI's own default/configuration. |
-| Native run asks again | New starts/retries require current write/unsandboxed consent; preview is not an enduring approval token. |
+| Old UI/version after an update | Fully quit the tray Host, confirm the installed package path/version and restart. |
+| No route or no eligible worker | Exact configured model, allowed tools, machine/root permissions, current availability and the preview refusal reason. |
+| `TOOL_DENIED` or a blocked task | Read the actual committed Bot grant and requested operation; do not broaden a model-supplied identity or assume a role prompt grants access. |
+| Agent online but no desktop | Current signed-in Windows session, both installed tasks, full-desktop helper and its native logs. |
+| Agent cannot be reached | Correct reachable base URL/port and already configured private VPN/tunnel; importing a pairing file does not create that network. |
+| Watch works but takeover is disabled | All required desktop input tools, write-mode grant and current control ownership. |
+| Routine reports display changed | Restore the recorded monitor/resolution/DPI or record a new routine; match the application layout as well. |
+| Unknown effect or unconfirmed stop | Inspect the real computer and the execution record before resolving; do not blindly replay or delete the journal. |
+| Library file is refused | Binary transfer limit is 16 MiB per file; text editing/reading limit is 1 MiB; same-name uploads are refused. |
+| API/subscription amount unknown | Inspect actual model identity, price and provider usage evidence; missing counters are not zero. |
 
-For issues include host/plugin versions, selected mode, tool status and redacted errors: [issue tracker](https://github.com/Alice-Marx/dsh-model-router/issues).
+## Historical releases
 
-License: [MIT](LICENSE).
+Older 0.20.x–0.26.x release notes, screenshots and experiments remain historical evidence for their recorded versions. They are not current installation instructions or a stable-release announcement for this preview. Package: `@ljwei-stak/dsh-model-router`; entry point: `.dsh-plugin/index.mjs`; license: [MIT](LICENSE).

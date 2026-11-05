@@ -64,7 +64,7 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
   // dispatch did or did not happen. Older rows may lack a reference entirely.
   const needsStopProof = (task,attempt,result) => {
     const backend=JSON.parse(task.payload).backend
-    if(!['codex-read','remote-write'].includes(backend))return false
+    if(!['codex-read','remote-write','bot-turn-read','bot-turn-write'].includes(backend))return false
     const operation=stmt('SELECT o.*,b.delivered_ms FROM operations o JOIN task_outbox b ON b.operation_id=o.id WHERE o.attempt_id=?').get(attempt.id)
     const ref=stmt('SELECT reference,reference_hash FROM task_execution_refs WHERE attempt_id=?').get(attempt.id)
     const dispatch=stmt('SELECT * FROM task_dispatch_fences WHERE attempt_id=?').get(attempt.id)
@@ -74,7 +74,7 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
     // a callback never entered. beginDispatch and assertDispatch reject it later.
     if(operation&&dispatch?.operation_id===operation.id&&dispatch.state==='closed'&&!ref)return false
     const proof=result?.summary?.stopProof
-    const evidence=backend==='codex-read'?['native-tree','cli-no-dispatch']:['agent-stop-receipt','agent-write-completed','remote-dispatch-not-sent']
+    const evidence=backend.startsWith('bot-turn-')?['bot-turn-ended','bot-turn-not-sent']:backend==='codex-read'?['native-tree','cli-no-dispatch']:['agent-stop-receipt','agent-write-completed','remote-dispatch-not-sent']
     if(!operation||!ref||!proof||proof.schemaVersion!==1||proof.taskId!==task.id||proof.attemptId!==attempt.id||proof.operationId!==operation.id||proof.targetHash!==JSON.parse(task.payload).targetHash||proof.referenceHash!==ref.reference_hash||!evidence.includes(proof.source)||proof.source!==result?.summary?.stopEvidence||!/^[a-f0-9]{64}$/.test(proof.evidenceHash??'')||result?.summary?.stopConfirmed!==true)return true
     try{const reference=JSON.parse(ref.reference);validateReference(task,{...attempt,operation_id:operation.id},reference);return taskHash(reference)!==proof.referenceHash}catch{return true}
   }
@@ -120,11 +120,17 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
   }
   const validateReference=(task,current,reference)=>{
     const marker=reference?.marker,payload=JSON.parse(task.payload)
-    if(!['mr-run','cli-run','remote-operation'].includes(reference?.kind)||marker?.schemaVersion!==1||marker.taskId!==task.id||marker.attemptId!==current.id||marker.operationId!==current.operation_id||marker.targetHash!==payload.targetHash)fail('INVALID_TASK_EXECUTION_REFERENCE')
+    if(!['mr-run','cli-run','remote-operation','bot-turn'].includes(reference?.kind)||marker?.schemaVersion!==1||marker.taskId!==task.id||marker.attemptId!==current.id||marker.operationId!==current.operation_id||marker.targetHash!==payload.targetHash)fail('INVALID_TASK_EXECUTION_REFERENCE')
     if(reference.kind==='remote-operation'){
       const expected=Object.freeze({'remote-write':'fs_write','remote-command':'container_command_v1'})
       if(!(payload.backend in expected)||payload.target.effect!=='workspace-write'||payload.target.location!=='remote'||reference.operationId!==current.operation_id||reference.machineId!==payload.target.machineId||reference.tool!==expected[payload.backend]||typeof reference.rootId!=='string'||reference.rootId!==payload.input?.rootId)fail('INVALID_TASK_EXECUTION_REFERENCE')
-    }else taskRef(reference.runId)
+    }else {
+      taskRef(reference.runId)
+      if(reference.kind==='bot-turn') {
+        if(!['bot-turn-read','bot-turn-write'].includes(payload.backend))fail('INVALID_TASK_EXECUTION_REFERENCE')
+        taskRef(reference.sessionId)
+      }
+    }
     canonicalTaskJson(reference)
   }
   const operationHasMoney=current=>Boolean(

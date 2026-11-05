@@ -41,3 +41,20 @@ test('pairing: the endpoint accepts a host, host:port or URL, and rejects paths'
   assert.equal(needsTunnel('http://10.0.0.2:9701'), true)
   assert.equal(needsTunnel('http://127.0.0.1:9701'), false)
 })
+
+test('pairing: the setup file imports the actual endpoint, roots and ceiling without enabling absent command tools', () => {
+  const value = parsePairingPaste(JSON.stringify({ token, machineId, endpoint: 'http://10.0.0.2:19701', rootIds: ['project'],
+    tools: ['machine_ping', 'fs_read', 'desktop_screenshot'], protectedTunnel: true, hostManagedBots: true }))
+  assert.deepEqual(value.problems, [])
+  assert.equal(value.endpoint, 'http://10.0.0.2:19701')
+  assert.deepEqual(value.rootIds, ['project'])
+  assert.equal(value.hostManagedBots, true)
+  assert.equal(value.protectedTunnel, true)
+  assert.equal(value.tools.includes('shell_exec'), false)
+})
+
+test('pairing: malformed setup authority and credential-bearing endpoints refuse import', () => {
+  for (const fields of [{ endpoint: 'http://user:password@10.0.0.2' }, { rootIds: ['../other'] }, { tools: 'fs_read' }, { protectedTunnel: 'true' }]) {
+    assert.ok(parsePairingPaste(JSON.stringify({ token, machineId, ...fields })).problems.length > 0)
+  }
+})

@@ -1,356 +1,147 @@
-# 模型路由 · DeepSeek Harness Desktop
+# DSH Bot · 模型路由
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![npm 版本](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+**当前版本：0.63.0，2026-11-05。** 历史报告中的旧版本号只代表当时的报告，不代表当前源码。Windows 电脑 Agent 独立使用 **0.1.0** 版本。
 
-[![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge)
+本构建已通过实际安装的Harness0.2.2-rc.1 SDK完整离线产品Host验收和真实Chromium检查。当前WireGuard链路上的一台Windows10电脑，1920×1080桌面8秒样本实测13.12FPS，输入确认p50为125ms、p95为274ms。变化区域JPEG传输保持物理输入坐标；这些测量不构成固定帧率承诺。
 
-想跟进版本更新？点右上角 **Watch → Custom → 勾选 Releases**（不必 Watching 全部活动）。
+一个 DeepSeek Harness 插件整合长期 Bot 对话、群聊、记忆和浏览器工作，以及模型路由、托管任务、Bot 私有文件和独立实现的 Windows 远程桌面。先为各 Bot 配置准确模型、工具和电脑权限，再由 Main Bot 将工作路由并真实派发给具备条件的执行 Bot。
 
-**手动试用版：0.26.0-preview.2。** 本次兼容更新新增精确的 **0.2.1-rc.5** Host peer 版本，并将源码 SDK 固定到 rc.5；preview.1 在加载插件前即被 rc.5 拒绝。是否已发布以实际 registry 条目为准，本文不构成发布收据。此模型路由插件预览版仅用于隔离试用，不用于生产配置自动升级；DS Bot 桌面应用及电脑操作整合仍在开发，尚未作为完整应用交付。请先准备独立测试 profile/home 和备份，再在 **Harness Desktop → 插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.26.0-preview.2`。下文稳定版安装说明仍为 0.25.5，`latest` 不是试用通道。安装前阅读[试用指南](docs/releases/0.26.0-preview.2-trial.md)和[验证限制](docs/releases/0.26.0-preview.2-validation.md)。完整迁移激活、全域停写及激活后回滚仍不可用；本次不声称完成新的真实厂商或生产配置验收。
+本项目对可观察工作流进行实现，其中包括 Grok Bot 公开描述的工作流；不声称取得或复刻 Grok 私有系统及完整商业服务。Windows/云电脑和账户由你准备；本产品没有自动创建云 VM、代管云账单或交付自有 iOS 客户端。
 
-面向 **DeepSeek Harness Desktop** 的成本感知模型路由工作台。在本地规划任务、比较已配置路线、检查执行权限，并通过模型 API 或支持的厂商官方 CLI 执行有依赖关系的工作包。
-
-稳定版：**0.25.5**（`@ljwei-stak/dsh-model-router`）。本次修复 Windows 内嵌终端中 ZCode TUI 的框线、中文乱码和残留颜色控制序列：在每个新建 ZCode PTY 中先设置 UTF-8，再启动 Node，系统设置不变。独立社区 ZCode CLI 继续提供 npm 和 GitHub Release 两种安装方式。沿用 **0.2.1-rc.3** SDK 与已有 Host peer 范围。API 按金额核算并检查日/月预算和预占；订阅独立统计调用次数与已报告 token 用量。已确认的订阅通道不会仅因 API 预算用满或缺少 API 单价而被阻止；真正转 API 前须对实际路线重新估价并通过预算预占，混合结果分别保留两个通道的收据。工作台把 API 支出/预占与订阅用量分成两本互不相加的账，缺失用量保持未知。Bot 任务页顶部先列出“需要你处理”（待核对收据、待审批、未确认的远程效果、失败与受阻），健康时不占位置。工作台支持实时耗时、逐工作包进度和取消，保留已完成结果与已报告费用；关闭重开面板可接管原任务。支持“按算法推荐分配 / 手动调整分配”：拆分后的工作包可逐个指定模型 API 或官方工具，保留依赖、重新预览费用，并保存重跑目标。同时接入任务相关质量证据、模型与推理档位联合选择、历史资源 P90 估计与依赖感知搜索。手动混合执行当前只读；官方工具使用自身默认模型，原有官方团队编辑流程保留。兼容 **DeepSeek Harness Desktop 0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 / 0.2.1-rc.3**，沿用 Hermes/Pi 安装与终端支持；两者仍无经过验证的托管执行器。真实厂商执行证据仍见 **0.20.0** 报告，本版未新增模型实测。路由器与 [GAL](https://github.com/Alice-Marx/deepseek-harness-galgame) 自 0.12.0 起已拆分为独立插件。
-
-官方 CLI 协作按依赖顺序逐包执行、传递依赖上下文，不会自动回退到模型目录 API。可编辑团队需明确选择 Harness 沙箱或厂商 CLI 正常环境。后者通过 Git worktree 收集修改，但不限制操作系统访问。未显式设置模型映射时，各 CLI 沿用自身配置的模型。参见[真实 Windows 验证及其局限](docs/releases/0.20.0-validation.md)。
-
-两个 README 版本同步说明接口、公式、默认值与限制。[更新日志](CHANGELOG.md)保留版本历史。更多操作说明：[工作台](docs/WORKBENCH_USER_GUIDE.zh.md)、[安装](docs/INSTALLATION_GUIDE.zh.md)、[迁移](docs/archive/MIGRATION.md)、[实验规程](docs/ROUTING_SELFTEST_STEPS.zh.md)。
-
-<a id="quick-evaluation"></a>
-
-## 提交前快速评估
-
-**一句话价值：** 面向 DSH 的成本感知模型路由工作台，可本地规划任务、选择模型路线，并在明确权限下执行有依赖关系的工作包。
-
-**类别：** **模型与推理（Models & Reasoning）**，是[社区目录分类](https://www.alldsh.com/categories/)中最贴切的一类；这是社区分类，并非 DSH 官方分类。
-
-**安装（DSH Plugin Hub / web profile）：** 确保 DSH CLI 可用，然后安装已发布的 npm 包：
-
-```sh
-dsh plugin --profile web add @ljwei-stak/dsh-model-router@0.25.5
-```
-
-**安装到 Harness Desktop：** 首次先启动一次 Desktop 初始化 `desktop` 配置，再彻底退出 Desktop，运行：
-
-```sh
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.25.5
-```
-
-也可以在 **Harness Desktop → 插件 → 添加插件** 中粘贴包名。安装后重启 Desktop。单独运行全局 `npm install -g` 不会注册 Desktop 插件。
-
-**发布包与入口：** [npm 上的 `@ljwei-stak/dsh-model-router@0.25.5`](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router)。根目录[`package.json`](package.json)声明包名和 bundle patch；[`.dsh-plugin/index.mjs`](.dsh-plugin/index.mjs)导出所需的 `apply(ctx)` 入口。[许可证：MIT](LICENSE)。
-
-**配置文件与配置入口：** 当前不支持导入用户编写的 JSON/YAML 配置文件。Provider、模型和凭据在 Harness **模型**页面配置；路由档案与偏好在插件设置中配置。路由器持久状态存于 `$DSH_HOME/model-router/state.json`（默认：`~/.dsh/model-router/state.json`）。Provider CLI 沿用各自的登录和配置；路由器不会把 API 密钥复制进模型档案或终端日志。
-
-**截图与证据：** [工作台截图](docs/assets/workbench-task-preview.jpg)使用固定的模型、价格和健康状态数据，是模拟 UI 预览，不是实时 Harness 或模型运行。[路由流程图](docs/assets/routing-workflow.svg)展示执行路径。[真实 Windows 验证报告](docs/releases/0.20.0-validation.md)记录了 0.20.0 的具体执行及局限；0.25.5 尚无经过验证的端到端厂商运行。[实时进度截图](docs/assets/workbench-run-progress.png)是离线模拟；API/订阅分开计算与检查点见[0.25.0 验收报告](docs/releases/0.25.0-validation.md)，SDK 兼容与验证边界见[0.25.1 验收报告](docs/releases/0.25.1-validation.md)。
-
-**权限与风险：** 任务规划在本地完成，不调用模型。实际执行会把选定任务和上下文发送到所选模型 API 或厂商 CLI，并可能产生费用。默认使用 Harness 受限环境；只读运行不修改工作区，`workspace-write` 需要用户明确批准。明确选择 `cli-native` 的可编辑团队会在 Harness 进程沙箱之外，以当前操作系统用户权限运行；Git worktree 只收集修改，不限制操作系统访问。外部 Provider 和 CLI 服务各自适用其数据处理及计费规则。
-
-**兼容性：** 声明支持 DeepSeek Harness Desktop **0.2.0-rc.1**、**0.2.0-rc.2**、**0.2.1-rc.2**、**0.2.1-rc.3**。源码构建固定使用已发布的 **0.2.1-rc.3** SDK 包；保留旧版 peer 声明不表示离线测试已经替代安装版 Desktop 验收。Node.js **>=22.19** 与 pnpm **10.34.6** 仅为源码开发/构建要求，不是插件运行时前置条件；不承诺超出上述 Host 版本的兼容性。
-
-**目录：** [快速评估](#quick-evaluation) · [功能](#capabilities) · [安装](#install) · [工作台](#workbench) · [架构](#architecture) · [会话工具](#session-tools) · [官方工具](#official-tools) · [团队生命周期](#team-lifecycle) · [费用](#costs) · [路由算法](#routing) · [数据](#data) · [开发](#development) · [排障](#troubleshooting)
+**从这里开始：** [安装](#install) · [第一个 Bot](#quick-evaluation) · [连接电脑](#computers) · [例行任务](#routines) · [Bot 路由](#bot-routing) · [私有资料库](#library) · [模型工作台](#workbench) · [数学参考](#costs) · [源码开发](#development) · [排查问题](#troubleshooting)。
 
 <a id="capabilities"></a>
 
-## 当前功能
+## 已纳入的工作流
 
-| 能力 | 当前行为 |
+| 范围 | 可以使用的能力 |
 | --- | --- |
-| 任务规划 | 本地任务分类与复杂度分析；支持单路线推荐、有依赖关系的团队工作包或显式指定已配置模型。 |
-| 模型配置 | 从 Harness 读取精确的 `provider/model` 路线；可补充质量、美元价格、擅长领域、CLI 模型名、执行与计费偏好。 |
-| 路由预设 | 省钱优先、均衡和效果优先；结合质量下限、估计 token 费用和有界分配搜索。缺失价格保持未知。 |
-| 只读执行 | 在工作台预览并确认路由执行，或在 Harness 官方会话中调用。支持的无头 CLI 与模型目录 API 调用均记录结果。 |
-| 可编辑 CLI 执行 | 从工作台执行顺序 CLI 团队，或在会话中调用单个受支持 CLI；使用获批的隔离 Git worktree，并有条件地合入补丁。 |
-| 官方工具 | 对注册表中的十三种工具检测、安装/更新、检查启动就绪和登录状态；安装任务提供日志和取消功能。 |
-| 交互终端 | PowerShell/系统 shell 与十三种注册表 CLI 目标（包含独立 ZCode CLI TUI）；包含固定登录命令、实时输出和多会话。 |
-| 成本与订阅 | 两本账：**API 调用费用账本**（USD，日/月预算与预占）与**订阅额度账本**（调用次数与已报告 token）；两本账不相加。缺失订阅用量保持未知，转 API 前重新估价并通过预算检查。 |
-| 历史与质量 | 逐包结果、依赖视图、失败详情、重跑/改派、评分与可选的更强模型复核。 |
-| 执行边界 | 显示每条路线可读写的范围，以及进程是否使用 Harness 沙箱。 |
+| Bot 对话 | 各自的模型、角色、工作目录、私有对话和权限设置；侧聊、提问与审批卡片。 |
+| 团队协作 | 群聊、并行提及、分阶段群目标、Bot 之间交接与结果留存。 |
+| 上下文与记忆 | 对话检查点/分段与搜索；Bot/群/团队三类记忆、变更历史，以及可审查的技能/项目规则学习提议。 |
+| 浏览器与文档 | 每 Bot 浏览器分区及页面工具，Office 文件读取/预览，连接器与密钥输入卡片；头像库与团队外观设置。 |
+| 定时工作 | Host 开启 Automation tasks 服务后使用上游定时任务；持续工作要求 Host 和相关 Agent 保持运行。 |
+| Bot 路由 | 保存省钱/均衡/效果策略，读取已提交模型/工具/机器候选，预览拒绝原因并真实派发执行任务。 |
+| 远程电脑 | 配对 Windows 桌面，观看/接管切换，键盘、鼠标和文字输入，显示器选择及放大查看。 |
+| 例行任务 | 演示已确认输入，按 Bot 保存，通过真实桌面会话回放，查看结果并核对未知影响。 |
+| 私有资料库 | 按 Bot 隔离的文件夹、二进制上传下载、文本编辑、名称筛选，以及页面和已授权 Bot 工具的私有文本搜索。 |
+| 模型工作台 | 本地模型路线规划、带依赖工作包、官方 CLI 检测/安装/终端、执行历史及独立的 API/订阅核算。 |
 
-生成路由建议在本地完成：不会启动厂商 CLI，也不会调用付费模型。实际执行可能产生费用。
-
-![本地规划与官方工具执行](docs/assets/routing-workflow.svg)
+集成的 DS Bot 固定为 **0.2.7**，提交 **`71d344bf193f3f18185f25de3d8e5c483046910a`**：包含 352 个与上游字节一致的文件和 6 个可重现产品覆盖，产品修改独立维护在 `modules/bot-runtime/product-overlay/`。`modules/bot-runtime/SOURCE.json` 记录来源和摘要。上游浏览器、头像库与本产品的完整桌面、文档文件资料库分别实现。
 
 <a id="install"></a>
 
-## 安装到 DeepSeek Harness Desktop
+## 安装
 
-打开 **插件 → 添加插件**，输入：
+在 Harness Desktop 从 npm 安装 `@ljwei-stak/dsh-model-router@0.63.0`，或导入对应的 Release 安装包。
 
-```text
-@ljwei-stak/dsh-model-router@0.25.5
+1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入 `@ljwei-stak/dsh-model-router@0.63.0`，也可导入 Release 的 `.tgz` 包；本地解压安装时选择包含 `package.json` 和 `.dsh-plugin` 的内层 `package` 目录。
+2. 启用插件后，**连同托盘进程一起完全退出 Harness**，再重新启动。只关窗口可能仍保留旧 Host。
+3. 检查已加载包的版本并打开 Bot 工作区/产品导航。Provider 凭据和模型在 Harness 官方 **模型** 设置中配置。
+
+使用 DSH CLI 安装指定正式版：
+
+```powershell
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.0
 ```
 
-镜像缺少该精确版本时，使用官方 HTTPS npm 源 `https://registry.npmjs.org/`。启用插件，然后完全退出 Harness（包括托盘进程）并重启。插件详情应显示 **0.25.5**，侧栏应出现 **模型路由**。仅执行全局 `npm install -g` 不会把插件注册到 Desktop。
+仅执行全局 `npm install -g` 不会注册插件。包名仍为 `@ljwei-stak/dsh-model-router`，内部插件 ID 仍为 `model-router-galgame`，以保留设置。替换旧包前先移除重复插件条目；GAL 是独立插件。
 
-也可以通过插件管理器安装本地 `.tgz` 压缩包，或解压后的内部 `package` 目录。两者都必须包含 `package.json` 和 `.dsh-plugin`。历史构建见 [Releases](https://github.com/Alice-Marx/dsh-model-router/releases)，也可按下文从源码构建。
+自己生成归档时参见[源码开发](#development)。验证使用独立测试 profile；依赖声明或构建成功不能直接证明安装版 Desktop 已验收。
 
-### 从旧包名升级
+<a id="quick-evaluation"></a>
 
-旧名称 `@ljwei-stak/model-router-galgame` 停留在 0.13.0。保留配置档/应用数据，移除旧插件条目，再添加 `@ljwei-stak/dsh-model-router@0.25.5`。不要同时保留两条插件：它们共用内部插件 id `model-router-galgame` 和工具名。保留该 id 能让现有路由设置与历史记录继续使用。
+## 第一个 Bot 与第一个任务
 
-从合包 0.11.x 升级前，先备份配置档，并导出需要保留的 GAL 存档。剧情播放、立绘、音乐与存档现属于独立的 `@ljwei-stak/dsh-galgame`。详细存档限制见 [MIGRATION.md](docs/archive/MIGRATION.md)。
+1. 在 Harness **模型** 中添加 Provider/模型，然后新建或选择 Bot，绑定准确的已配置模型。
+2. 打开 **Bot 绑定**，核对该 Bot 的工具、工作目录、机器权限与资金设置。角色说明本身不授予权限。
+3. 在 Bot 设置中将协调 Bot 标记为 Main，并为执行 Bot 分别配置实际要用的模型和工具。
+4. 发送一个产物明确、验收方式具体的小任务。检查任务状态及产物；已受理的计划 ID 代表已提交，不代表已完成。
+5. 需要电脑操作时先完成下方配对；需要委派时开启 [Bot 路由](#bot-routing)，先预览候选决定。
+
+集成模式复用 Harness Sessions。可选的独立运行时使用自己的会话存储，必须显式切换；同一 Bot 只能有一个正在服务的运行时。群聊、记忆、浏览器和长期上下文来自已固定的上游实现，而非占位能力清单。
+
+Windows/云电脑安装：[下载 Agent 0.1.0 完整 Windows x64 包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip)，解压后运行 `start.cmd`。
+
+<a id="computers"></a>
+
+## 连接自己的 Windows 或云电脑
+
+### 在被控制的电脑上
+
+1. 准备自己的 Windows x64 电脑/云电脑，并登录它的桌面。使用画面与输入时保持交互用户会话可用。
+2. 将 **完整** `DSH-RemoteAgent-windows-x64-…zip` 解压到要长期保留的目录。完整包包含 Node、生产依赖、`dist`、安装/启动文件及原生 helper；只复制 `start.cmd` 或单个 exe 不够。
+3. 双击 **`start.cmd`**。向导会让你选择工作目录、监听的具体本机/私有 VPN 地址、端口（默认 `9701`），以及 Harness 所在电脑能够访问的 Agent 基础 URL。
+4. 跨电脑使用前先配置 WireGuard/Tailscale 或受保护隧道。只有已配置该私网时才确认私网隧道选项。本机使用或另行配置的 SSH 端口转发可使用回环地址。
+5. 决定是否开启 **`hostManagedBots`**。显式开启后，这个可信、已认证 Host 可以在配对的目录/工具上限内授权现有及新建团队 Bot；关闭时必须填写固定的允许 Bot ID。它不会把配对密钥交给模型，也不会取消目录/工具限制。
+6. 选择可选的命令/浏览器权限。向导为当前已登录用户注册 Agent 与桌面 helper 任务，不保存 Windows 密码；显示安装路径，并在其中生成 **`private/pairing.private.json`**。再次运行会保留已有配置和凭据。
+
+### 在 Harness 中
+
+1. 打开 **远程电脑 → 添加电脑**，导入 Agent 安装目录生成的 **`private/pairing.private.json`**。
+2. 导入会自动填写 endpoint、机器/客户端标识、`rootIds`、工具和隧道选项。核对后按表单选择 Bot，再配对/探测。该文件包含 Host 配对凭据，应私下保管，不上传 Git 或问题报告。
+3. 检查 **Bot 绑定** 和电脑授权。观看需要截图权限；接管及 routine 回放还需要获准的桌面输入工具和写入模式。`project` 等目录 ID 对应远端已配置工作目录，不是模型指定的路径。
+4. 在 Bot 右侧 **电脑操作** 页签或电脑页面中选择电脑/显示器，点击 **连接桌面**，先以 **仅观看** 模式查看。
+5. 点击 **取得控制权**，等待控制确认后再使用鼠标、键盘、滚轮或文字输入。真人控制期间会阻止该 Bot 冲突的桌面自动化；点击 **仅观看** 归还控制并释放按住的输入。
+6. 点击 **放大** 进入铺满应用的查看界面，或在观看时双击；**关闭放大** 返回面板。结束后断开连接，留意任何停止尚未确认的提示。
+
+桌面引擎使用 **Windows GDI 截图 → JPEG → WebSocket**，输入由原生端逐条确认。这是独立实现，不使用 RustDesk 协议。界面显示实测帧率；不承诺固定 30 FPS、已达到 RustDesk 性能、安全桌面采集或任意网络吞吐。Agent 可访问不等于已登录用户的桌面 helper 可用。
+
+<a id="routines"></a>
+
+## 演示、保存与回放例行任务
+
+1. 连接桌面、取得控制权，将应用恢复到已知起始界面，输入例行任务名称，点击 **开始录制**。
+2. 演示工作流。只有该桌面会话成功确认的输入进入录制。连续鼠标移动按 **200 毫秒** 采样为路径点；保留按钮/按键/文字/滚轮顺序以及这些动作之前的最终位置。
+3. 点击 **结束并保存**。客户端等待输入队列、确认释放按住的输入，再保存到该 Bot 的私有 routine 存储。输入的文字会包含在录制中；缺少保存确认时保留草稿，不显示成功。
+4. 打开 **例行任务**，选择 Bot/电脑并恢复起始界面，运行已保存任务，查看实际结果及停止步骤。
+5. 最多保存 **200 个保留步骤**，保留动作之间的停顿最多 **60 秒**。回放核对准确显示器 ID、物理分辨率、坐标系及已录 DPI。应用状态/布局变化仍需要重新演示；采样鼠标轨迹不适合精细绘图。
+
+这是有界的坐标与时序回放，不是通用视觉学习。回放会取得控制权，每个原生输入都等待 ACK，续期授权，并在完成、失败或取消时释放输入/控制。明确拒绝即停止后续步骤；已经发送但 ACK 丢失、断线或 Host 中断的输入会标记为 **unknown / 结果未知**，因为可能已经生效。
+
+未知执行会阻止这个 Bot/电脑再运行 routine。先检查真实桌面，确认工作已经做到哪里，恢复适合下一次运行的界面，并填写检查说明后再解除阻塞。核对不会将旧结果改为成功，也不会自动重跑。请求停止不等于确认停止；所有输入 ACK 成功也不能单独证明业务目标已经达成。
+
+<a id="bot-routing"></a>
+
+## 在 Bot 之间路由工作
+
+1. 先为 Main 和执行 Bot 配置准确模型、官方工具及机器/工作区授权。
+2. 在 **任务 → Bot 路由** 开启路由，选择 **省钱优先**、**均衡** 或 **效果优先**，使用对应控件保存设置。
+3. 输入任务，选择自动路由或指定 Bot；需要时选择电脑/目录和只读、写入、桌面或浏览器操作。**预览路由** 会显示选中者、缺失条件/落选原因及拟新增绑定。
+4. 点击 **按此路由创建任务** 才会真实派发。可选的自动电脑授权仍受已提交机器上限与发起 Main Bot 可委派范围限制。
+5. Main Bot 可以调用 **`bot_route_task`** 或同义工具 **`bot_dispatch`**，两者默认都会派发。显式 **`preview:true`** 仅预览，不创建任务、不新增授权。通过 `bot_task_plan_status` 查看真实计划/任务状态，并检查产物后再报告完成。
+
+候选来自已提交的 Bot 模型/工具/机器状态，包括可用性与已配置价格/质量证据。Bot 名称或提示词不能授予端点、可执行文件、凭据或操作身份。执行 Bot 的每次模型请求单独进行预算准入并生成与父任务关联的收据；任务获准不等于后续所有模型调用都被统一放行。
+
+<a id="library"></a>
+
+## 使用 Bot 私有文件资料库
+
+打开 **资料库**，选择 Bot 和文件夹，可以上传本地文件、新建/进入文件夹、编辑支持的文本与下载文件；名称筛选只缩小当前目录条目。需要正文检索时输入字面查询并点击 **搜索文本**。结果显示文件路径、行号和匹配文本；点击路径可打开并选中对应行，修改后显式保存到该文件。
+
+二进制上传/下载保留原始字节，每个文件最多 **16 MiB**。文本读取/编辑每文件最多 **1 MiB**。文本搜索不区分大小写，查询最多 256 字符，在选中 Bot 的库内最多扫描 500 个条目/8 层目录，从符合条件的文本文件返回最多 50 行匹配。已授权的 `bot_library_search` 工具复用相同后端，只搜索实际调用 Bot 自己的库。同名上传会被拒绝。
+
+资料库是该 Bot 的私有文件区，与上游头像库、远端机器工作区不同。上传 PDF 或 Office 文件不代表自动提供 OCR、语义索引或对所有二进制格式的检索。模型通过已获准的资料库工具访问自己的文件，不能靠传入另一个 Bot ID 读取其私有区。
 
 <a id="workbench"></a>
-
-## 使用工作台
-
-工作台按流程分为四个导航页签。页头汇总已注册路线、检测到的工具和今日已记录的 API 费用。
-
-| 页签 | 用途 |
-| --- | --- |
-| **任务与执行** | 描述任务、生成建议、选择路由只读执行或官方 CLI 协作、预览并确认，然后查看历史。 |
-| **模型配置** | 刷新/搜索模型目录，编辑精确路线的配置。 |
-| **官方工具** | 完成入门检查，查看/安装工具，使用交互终端。 |
-| **预算与安全** | 设置路由、费用、复核策略，检查订阅状态与执行边界。 |
-
-切换页签时面板保持挂载，正在进行的安装与终端状态不会因此丢失。
-
-![0.15.0 工作台预览：任务规划与路由建议](docs/assets/workbench-task-preview.jpg)
-
-*截图来自本地 UI 预览，使用预置模型、价格与健康数据，未连接真实模型或 Harness。展开工作包可查看目标、依赖和验收项。*
-
-1. 在 Harness 官方的 **模型** 页面配置供应商、模型和凭据，然后到 **模型配置** 刷新目录。路线出现在列表中，不代表凭据、网络或模型权限已可用。
-2. 可选：为需要比较的路线填入质量与价格。价格单位是 **美元/百万 token**；质量是用户给出的 **0–100** 估值。未知价格请留空，不要填零。
-3. 在 **任务与执行** 中描述具体交付物、约束与验收标准。选择 **单任务**（单个推荐）、**团队分工**（请求足够复杂时生成依赖工作包）或 **指定模型**（只使用一条精确路线，不比较其他路线）。只选择团队模式不会启动任何团队。
-4. 设置本次估算预算；`0` 表示移除该规划约束。点击 **生成路由建议**，结果直接显示在规划区下方。检查路线、复杂度、费用、执行通道及各包的依赖/验收清单。
-5. 在 **在工作台执行** 中，选择 **模型路由（只读）** 使用现有路由执行器；或先选择 **团队分工**，再选择 **官方工具协作**。官方协作可选择 **只读检查** 或 **编辑文件**。可编辑团队还需选择 **Harness 受限环境**（默认沙箱）或 **厂商 CLI 正常环境**（在 Harness 沙箱外运行）。填入已存在的工作区绝对路径，或沿用上次运行路径。点击 **预览执行计划**，查看各包、权限与所需确认，然后显式确认执行。勾选 **演练 · 只记录，不执行** 可保留同一份计划，并列出每个工作包本应调用的模型或工具及预计费用，不调用模型、不启动 CLI、不写入文件；演练不需要确认，也不会记为已花费。Host 启动前会重新检查计划；条件变化可能要求重新确认。
-6. 在 **执行记录与子任务** 查看实际通道、回答、失败、费用与评分。官方协作仅使用已安装、且在所选权限模式下就绪的 CLI 重新规划。编辑需要批准和干净的 Git 仓库；成功的 worktree 修改有条件地合入。该模式下，不可用或失败的 CLI 不会静默变成 API 调用。
-
-执行开始后，工作台显示已耗时、当前工作包与每包状态。**取消执行**会请求停止当前调用，并阻止后续工作包启动；执行器完成收尾前持续显示**正在取消**。已完成结果和已报告用量仍保留在历史中。取消不能撤销已经产生的费用或已经整合的改动。关闭面板不会取消执行；同一浏览器会话重新打开后，可在 Host 仍保留该任务时重新连接。Host 重启会清除内存任务，已落盘的工作包结果与预算预占仍保留。确认执行进程已经退出后标记为 `interrupted`，不会自动续跑调用或释放预占。
-
-预览、进度和取消请求最长等待 15 秒。进度读取超时后继续查询同一任务；取消未确认时可手动重试。网络等待超时不代表 Host 任务已停止，也不会自动重发 `startRun`。重跑历史步骤前，预算覆盖该步及实际会执行的全部未完成下游；改派使用所选路线估价，未知价格仍保持未知。[超时恢复截图](docs/assets/workbench-run-timeout.png)为离线模拟。
-
-历史将活动/中断的预算预占与实际支出分别显示；有预占的运行不能重跑或改派。Host 崩溃或检查点保存失败后，请先核对原任务、保留的 worktree 和供应商账单；本版没有手工核对并释放预占的操作入口。不要通过删除状态把占用当成可用额度。
-
-修改任务文本、规划模式、路线配置、目录或相关设置，会使旧建议失效。修改执行输入也会丢弃待确认或已完成的预览，必须对当前请求重新预览。执行预览使用 Host 当前状态，因此可能与先前本地计划不同。
-
-任务示例：
-
-```text
-审查本项目并准备实施计划。
-1. 梳理入口，识别主要 UI 流程。
-2. 在宽、窄视口检查界面，列出布局问题。
-3. 检查执行与计费边界。
-4. 汇总为按优先级排列的改进清单，并给出验证步骤。
-```
-
-路由器规划并委派文本/代码任务。它本身不渲染视频、不生成美术，也不操控创作软件。
-
+<a id="official-tools"></a>
+<a id="session-tools"></a>
+<a id="team-lifecycle"></a>
 <a id="architecture"></a>
 
-## 架构与执行契约
+## 模型工作台、工具与执行边界
 
-Host 负责路线发现、设置、审批、工作区验证、进程启动和持久化账本。React 客户端请求预览并展示 Host 结果。规划、托管执行与安装 RPC 请求使用固定字段，不能指定任意可执行路径、安装包或下载地址。交互终端是独立确认的通道，允许向已启动的 shell/CLI 输入任意用户文本。
+打开 **高级工作台** 使用模型路线规划、准确路线档案、官方工具、终端、带依赖工作包以及 API/订阅核算。Provider 凭据在 Harness 模型页面配置，厂商 CLI 使用自身登录。检测或安装成功不能证明登录、模型权益或某种托管执行模式可用。
 
-```mermaid
-flowchart TD
-  UI[工作台或 Harness 会话] --> PLAN[本地规划器与路线配置]
-  PLAN --> PRE[Host 预检与确认]
-  PRE --> ROUTED[路由只读执行器]
-  PRE --> TEAM[官方 CLI 团队执行器]
-  ROUTED --> CLI[支持的无头 CLI]
-  ROUTED --> API[Harness 模型 API]
-  TEAM --> MODE{权限模式}
-  MODE -->|read-only| SANDBOX[Harness 沙箱]
-  MODE -->|workspace-write| WT[隔离 worktree]
-  WT --> ENV{显式选择执行环境}
-  ENV --> SANDBOX[Harness 沙箱]
-  ENV --> NATIVE[厂商 CLI 正常环境]
-  SANDBOX --> PROCESS[官方 CLI 进程]
-  NATIVE --> PROCESS
-  PROCESS -->|editable success| PATCH[基线检查与补丁合入]
-  PROCESS --> LEDGER
-  CLI --> LEDGER[结果、身份、用量与费用账本]
-  API --> LEDGER
-  PATCH --> LEDGER
-```
+规划与候选预览在本地进行。执行可能将任务/上下文发送给选中的供应商或 CLI，并产生费用。模型路由选择模型路线，Bot 路由选择已配置 Bot 并派发真实执行任务；两者共用已提交的 Host 权限与核算，不从模型参数接受权限。
 
-| 路径 | 选择与权限 | 失败/回退行为 |
-| --- | --- | --- |
-| 模型路由执行 | `model_router_execute` / 工作台 `executor: "routed"`；只读；按执行/计费策略使用 CLI 或 Harness 模型 API。 | 符合条件的 API 回退遵循已配置的订阅策略。 |
-| 官方 CLI，Harness 环境 | 单工具 `model_router_tool_run` 或团队执行；仅支持当前已适配且就绪的 CLI 模式；必须使用 Host 沙箱。 | 缺少约束能力或未就绪时阻止启动。不自动回退 API。 |
-| 官方 CLI，正常环境 | 仅限可编辑官方团队：`official-team + workspace-write + cli-native`；单独要求用户确认。 | 以当前用户权限运行，`sandboxEnforcement: "none"`。不会自动切换环境，也不自动回退 API。 |
+官方工具注册表包括 Kimi Code、Claude Code、Codex、MiniMax Code、MiMo Code、Grok Build、Gemini、OpenCode、StepCode、Pi、Hermes、ZCode 和 DSH TUI。能否运行取决于工作台显示的平台和执行模式。交互终端使用当前系统用户权限；显式选择厂商原生环境的可编辑进程不在 Harness 进程沙箱内，worktree 只归集修改，不限制系统访问。
 
-**检测到不等于执行验收通过。** 安装版本、可信启动入口、登录状态、支持的权限模式、网络连通性和模型权限是不同检查。交互终端中可用的 CLI，在受限任务中仍可能不可用：适配器、平台、沙箱与所选安装必须全部匹配。
+任务保留 task/attempt/operation 身份、结果及未知影响证据。根据任务状态和验收标准判断完成，不从已生成计划、安装方法、权限检查通过或方法名称推断完成。API 金额/预占与订阅调用次数/已报告 token 独立记账，缺失用量保持未知。
 
-### 工作台 RPC
-
-经过认证的 Host remote 是 `ctx.remote.modelRouterOfficialTools`，定义于 [official-tools-remote.mjs](.dsh-plugin/shared/official-tools-remote.mjs)。它是挂载客户端使用的内部接口，并非独立的公共 HTTP API。预览请求结构如下：
-
-```json
-{
-  "task": "Analyze this repository's logging, implement a small improvement, and verify it.",
-  "executor": "official-team",
-  "planMode": "team",
-  "executionMode": "workspace-write",
-  "executionEnvironment": "cli-native",
-  "workspace": "C:/work/example-repository",
-  "budgetUsd": 1,
-  "preset": "balanced"
-}
-```
-
-将工作区替换为已存在且干净的 Git 根目录。调用 `previewRun(request)`，用客户端 `unwrapRemote` 辅助函数解码响应，展示计划和 `reasons`；被阻止时停止。预览不调用模型，也不创建 worktree；入口、版本和完整性检查可能联网。只有用户接受所有当前原因后，客户端才可调用 `startRun({ ...request, confirmedReasons: preview.reasons.map(r => r.code) })`。
-
-正常环境编辑通常要求 `workspace-write` 和 `unsandboxed` 确认；超预算还会增加 `over-budget`。不要硬编码该列表，也不要未经同意自动填入。`startRun` 会重新规划和预检，不会消费一个冻结的预览令牌。出现新的确认要求时，返回 `needs-confirmation`，并给出 `missing` 与更新后的原因。修改任务、模式、工作区或路线配置后必须重新预览。工作台请求使用已保存路线的 `cliModel` 映射；临时 `cliModelsJson` 绑定属于下文的会话工具。
-
-`startRun` 接受执行后，在任务完成前返回含 `jobId`、`status` 和 `progress` 的任务快照。通过 `runStatus({ jobId })` 读取状态，通过 `cancelRun({ jobId })` 请求取消。任务状态为 `running`、`cancelling`、`completed`、`cancelled` 或 `failed`。终态快照的 `result` 包含最终工作台响应，以及成功保存后的账本 `runId`。`completed` 表示后台执行已结束，任务实际结果仍查看 `result.status`。进度仅包含工作包身份与状态，不包含回答正文。读取状态失败不代表执行已停止，客户端不得因此自动重发 `startRun`。
-
-<a id="session-tools"></a>
-
-## 会话工具
-
-请在 Harness 官方会话中调用这些工具。访问本地文件的任务应先配置会话工作区。
-
-| 工具 | 用途 |
-| --- | --- |
-| `model_router_routes` | 列出已配置路线；不验证账号/网络可用性。 |
-| `model_router_plan` | 生成本地 `single` 或 `team` 计划。 |
-| `model_router_consult` | 通过模型 API 向一个已配置模型请求真实的第二意见。 |
-| `model_router_execute` | 执行只读路由计划，或显式指定的 `provider`/`model`，并记录结果。 |
-| `model_router_tools` / `model_router_health` | 检查安装/就绪，或版本/登录/计费健康状态。 |
-| `model_router_tool_install` | 从官方来源安装一个固定注册表工具。 |
-| `model_router_tool_run` | 以 `read-only` 或获批的 `workspace-write` 模式运行一个支持的 CLI。 |
-| `model_router_team_execute` | 在当前可执行 CLI 路线中重新规划，再顺序执行工作包。 |
-| `model_router_rerun_step` | 重跑失败步骤及未完成的后续依赖、恢复符合条件的可编辑团队，或重复失败的单工具执行。 |
-| `model_router_rate` | 对一条已存结果记录 `up`、`down` 或 `clear`。 |
-
-会话命令：`/router <task>`、`/tools` 和 `/tools install|cancel <tool-id>`。
-
-本地规划请求：
-
-```json
-{"task":"Review the architecture and prepare a verification checklist","mode":"team","budgetUsd":10}
-```
-
-只读单工具请求：
-
-```json
-{"tool":"codex","task":"Inspect the repository and list UI layout issues; do not edit files","mode":"read-only"}
-```
-
-向 `model_router_team_execute` 提交可编辑正常环境团队请求：
-
-```json
-{
-  "task": "1. Analyze the logging module and propose a small improvement. 2. Implement it and report verification results.",
-  "mode": "workspace-write",
-  "executionEnvironment": "cli-native",
-  "budgetUsd": 1
-}
-```
-
-工作区由会话提供；请先将它配置为获准编辑、且干净的 Git 根目录。工具的审批钩子会请求所需确认。会话工具参数使用 `mode`，不是工作台的 `executionMode`，也不接受 `workspace`、`executor` 或 `planMode`。临时模型绑定使用 `cliModelsJson`，它是 JSON 编码的**字符串**，例如 `"{\"claude-code\":\"<verified-cli-model-name>\"}"`；将占位符替换为该安装支持的模型名。此映射不会强迫规划器选择该工具。
-
-选择精确目录路线时，必须同时提供 `provider` 和 `model`。所有 CLI 默认沿用自身配置的模型；目录推荐绝不会自动作为 CLI 模型参数传入。如需显式切换，在路线配置中保存已验证的 **官方 CLI 模型名**，为单工具调用传入 `cliModel`，或为团队使用 `cliModelsJson`。团队绑定优先采用工作包 id，其次工具 id，最后才是已保存的路线映射。ZCode 使用自身默认模型，不支持逐次调用切换。历史分别记录推荐模型、请求的 CLI 名称和报告的实际模型；请求本身不能证明实际使用了该模型。未报告实际模型时，应查看厂商记录。
-
-CLI 团队运行器是插件自身的顺序依赖执行器，不控制 Harness 内置 Agent Teams 的模型选择或生命周期。
-
-<a id="official-tools"></a>
-
-## 官方工具与执行模式
-
-| 注册表 id | 工具 | 托管单工具/团队模式 |
-| --- | --- | --- |
-| `kimi-code` | Kimi Code | 获批的 `workspace-write` |
-| `claude-code` | Claude Code | Windows：`read-only`、获批的 `workspace-write` |
-| `codex` | Codex CLI | Windows：Harness 环境 `read-only`；显式选择正常环境的可编辑团队支持 `workspace-write` |
-| `minimax-code` | MiniMax Code | 获批的 `workspace-write` |
-| `mimo-code` | MiMo Code | Windows：`read-only`、获批的 `workspace-write` |
-| `grok-build` | Grok Build | Windows：`read-only`、获批的 `workspace-write` |
-| `gemini` | Gemini CLI | 路由无头适配器；不属于托管单工具/团队运行器 |
-| `opencode` | OpenCode | 安装、探测和登录检查；尚无经过验证的受限执行入口 |
-| `stepcode` | Step Code | 安装、探测和登录检查；尚无经过验证的受限执行入口 |
-| `hermes` | Hermes Agent | Windows/POSIX 官方安装脚本、版本检测、交互终端；使用 `hermes auth` 登录；尚无经过验证的托管执行器 |
-| `pi` | Pi | 官方 npm/pnpm 安装、版本检测、交互终端；启动后输入 `/login`；尚无经过验证的托管执行器 |
-| `zcode` | ZCode CLI | 独立 TUI；运行入口就绪后支持获批的 `workspace-write` |
-| `dsh-tui` | [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | DeepSeek 的工具：Harness 终端 TUI（像素鲸鱼、实时状态、会话管理）。npm/pnpm 安装、探测与交互终端；DeepSeek 的路线把它标为通道，实际调用仍走模型目录 API，直到出现经核验的无头适配器 |
-
-Hermes 使用[官方源码安装器](https://hermes-agent.nousresearch.com/docs/getting-started/installation)的非交互模式，安装后运行 `hermes auth`。设置统一根目录后，源码安装到 `<根目录>/hermes-agent`，插件绑定该源码的 `.hermes/bin` 入口，不会改用其他旧的全局副本。配置、登录和历史仍保留在原 Hermes 数据目录；未设置统一根时沿用厂商默认位置。官方安装器可能将全局便利命令更新为指向所选源码。源码安装请通过 `hermes uninstall` 卸载。Pi 使用 [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)，npm/pnpm 安装带 `--ignore-scripts`，要求 Node.js 22.19 及以上。启动 `pi` 后输入 `/login`。这两种工具的登录状态显示为未知，以各自界面为准；插件不会读取它们的凭据。
-
-安装器使用各厂商 `@latest` 对应的固定官方 npm 包、厂商自有安装脚本，或经过所发布 SHA-256 校验的 [ZCode CLI 社区发行包](https://github.com/Alice-Marx/zcode-cli)。已安装版本高于查询到的最新版本时不降级。最新版本查询约缓存 12 小时；查询不可用时版本保持未知。厂商新版本不会自动获得本项目的验证。ZCode CLI 是从 ZCode 抽取的独立 Node.js 社区发行版，不是 Z.AI 官方发行版；需要 Node 24.14.0 或更新的 Node 24。默认 `github-release` 方式将运行程序安装到 `<统一根目录>/zcode-cli`，统一根目录留空时使用 `~/.zcode/runtime`。新增的 `npm` 方式安装固定的 [`@ljwei-stak/zcode-cli@latest`](https://www.npmjs.com/package/@ljwei-stak/zcode-cli)，使用已保存的 npm 源和统一 npm prefix。npm 包包含完整 TUI、Web 和 Agent 运行资源，安装时不再另行从 GitHub 下载。需要准备运行资源时，插件会使用 `<DSH_HOME>/model-router/zcode-npm/cache` 中的已核验缓存；npm 卸载可能保留该缓存。它与其他 CLI 共用工具卡片的安装、更新、修复与卸载，保留登录、配置和会话历史；不再打开或依赖 ZCode 桌面安装器。
-
-**统一安装设置。** **官方工具** 页顶部（插件设置表单中也有）可一次设置所有工具的安装地址：统一安装目录（留空表示各厂商默认位置）、npm 源，以及各工具的厂商安装脚本镜像覆盖项。目录必须是绝对路径，源必须是 HTTPS。每行选择该工具声明的安装方式：`npm`、`pnpm`、厂商脚本（`curl | bash` 或 `irm | iex`），或 ZCode CLI 的 `github-release` 发行包；ZCode CLI 也可选择 `npm` 安装其固定社区包。当前平台无法运行的方法会在该行说明，不会静默换成其他方法。执行前会在按钮上方显示精确命令。
-
-**脚本安装不会把远程内容直接管道传入解释器。** 插件先下载脚本，检查所需厂商标记，拒绝 HTML 页面与冲突内容，再运行本地副本。这些检查是启发式检查，不能单独证明脚本来自官方；镜像应转存厂商脚本，不应替换程序。Step Code 脚本接受安装目录；OpenCode 脚本将路径固定为 `~/.opencode/bin`，因此自定义目录只在通过包管理器的全局目录配置安装它时生效。可以完全关闭脚本安装，包管理器和经过校验的 ZCode CLI 发行包仍可使用。
-
-
-**更新目标。** 修改统一目录或来源后，点击 **保存安装设置**。工具操作会等待保存和命令刷新完成。npm 使用 `--prefix`；pnpm 使用自己的 `global-dir`、`global-bin-dir` 与 store 设置。即使其他设置页在任务排队期间修改了配置，安装任务仍保留当时选择的配置。更新会检查所选命令目录，PATH 上其他位置的现有副本不会让缺失的目标被误判为已安装。固定路径的厂商脚本会说明真实目标。ZCode CLI 的 GitHub Release 方式使用统一根目录下专属的 `zcode-cli` 子目录；npm 方式与其他 npm 工具共用 prefix。先选择方式，再核对该方式的命令与目标目录；切换方式不会迁移或卸载另一份副本。
-
-**Windows 旧 ZCode 启动入口。** npm 安装前，插件会备份识别出的旧桌面版 `zcode`、`zcode.cmd` 和 `zcode.ps1` 启动脚本，并在安装日志中记录备份位置，再让 npm 创建自己的命令入口。安装失败时会尝试安全恢复旧入口。无法识别的冲突文件保持原样并报错，插件不会添加 `--force`。桌面程序资源、账号配置、登录和会话历史均保留。
-
-[工作台指南](./docs/WORKBENCH_USER_GUIDE.zh.md#厂商安装渠道)列出各厂商的实际渠道与原生安装执行限制。
-
-未设置统一目录时，普通检查会在 PATH 上查找所选包管理器的包。安装、更新、修复或移除任务，会先解析并锁定该管理器的默认全局目标，再比较版本。如果无法安全解析，请先填写并保存统一目录。
-
-**一键修复与卸载。** 修复会重新执行同一条固定官方命令；即使版本已是最新，损坏的安装仍需要这种重新安装。卸载只移除程序：包管理器安装通过同一管理器卸载；脚本安装移除其登记的命令入口和受支持的 PATH 记录，厂商版本目录可能保留。Windows Codex 原生目录联接没有通用的删除式卸载；工具行会说明这一限制。**配置、凭据和会话历史始终保留。**
-
-安装、可信启动就绪、账号登录和模型权限是分别检查的。登录状态未知不代表已退出。信任检查取决于工具及安装来源：
-
-| 入口 | 已实现的验证 |
-| --- | --- |
-| Windows Claude / Codex | 可执行文件上的有效厂商 Authenticode 签名；Codex 还检查包装器/平台包布局。Claude 要求 2.1.259 或更高版本。 |
-| MiMo / Grok | 将原生可执行文件与精确的官方 npm 平台归档比对；Grok 还验证压缩成员及其解压后的可执行文件。 |
-| Windows MiniMax 厂商脚本布局 | 将已安装包代码与精确 npm 版本比对，检查版本指针/布局，以及必需原生模块是否存在。 |
-| Kimi / 普通 MiniMax npm 或 pnpm，`cli-native` | 对包代码、manifest 和真实入口额外进行注册表检查。Harness 环境中的这些普通副本不走这一额外路径。 |
-| ZCode CLI | GitHub Release 方式：固定 `Alice-Marx/zcode-cli` 仓库的归档文件，按发布的 SHA-256 校验，启动前检查已安装文件摘要。npm 方式：固定 `@ljwei-stak/zcode-cli` 包的清单、启动入口、资源清单和压缩资源包与精确注册表版本核对，并校验解包后的运行资源。本地验证记录构成信任边界；两种方式均不提供独立发行者签名。 |
-
-这里的“npm attestation”指与精确注册表发布的一致性：使用注册表 `dist.integrity` 的 SHA-512 验证 tarball，再比较所选成员的 SHA-256/大小，也可使用已验证缓存。它不是 npm provenance/Sigstore 验证、独立发行者签名，也不能证明每个依赖或本地文件。Gemini 的路由适配器以及 OpenCode/Step 终端不继承这些托管入口的保证。参见[注册表](.dsh-plugin/shared/official-tool-registry.mjs)、[执行器](.dsh-plugin/shared/official-tool-executor.mjs)、[npm 检查](.dsh-plugin/shared/npm-attestation.mjs)与 [ZCode 信任](.dsh-plugin/shared/zcode-bundle.mjs)。
-
-版本和 CLI 登录状态检查使用所选安装的具体入口。不能用 PATH 上的另一条命令替代缺失的所选副本；无法检查该入口时，其登录状态保持未知。
-
-会话中的 `/tools install|uninstall|repair|method <tool-id> [method]` 执行同样操作；agent 也可调用 `model_router_tool_install`、`model_router_tool_repair` 和 `model_router_tool_uninstall`。安装目录与下载来源始终来自用户自己的插件设置，不经 RPC 传入，因此调用不能把安装重定向到任意包或 URL。
-
-`model_router_execute` 为 Claude、Codex 和 Gemini 提供固定无头适配器。除非适用受支持的订阅路线，其他供应商使用模型目录 API。CLI 缺失或不可用时可回退到该 API；订阅失败遵循下文策略。
-
-可编辑执行需要干净的 Git 根目录与 Host 批准。默认 Harness 环境还要求进程约束；显式确认的 `cli-native` 团队在该沙箱之外运行。两者都保留下文的 worktree 与条件补丁合入检查。只读 CLI 标志不一定把读取限制在工作区内；请检查 **安全边界**，尤其是 Codex 较广的可读范围。
-
-Harness 环境下，Claude 只读使用受限模式，仅允许 Read/Glob/Grep，无 shell、斜杠命令或现有 MCP 配置。可编辑 Claude 保留正常工具/配置。执行器转发基础环境、代理和厂商配置/凭据变量白名单，而非所有 Host 变量；仅订阅启动会移除 API 凭据。正常环境执行保留厂商原有状态/配置，CLI 支持并加载时可以使用其 skills/MCP。这不代表所有已配置 skill 或 MCP 服务都已验证可用。
-
-Windows Codex 在 Harness 环境中仅支持只读：外层 ACL 沙箱授予原始 `CODEX_HOME` 状态目录和私有临时目录的相应权限，同时 Codex 保持 `--sandbox read-only`。显式确认的正常环境可编辑团队可使用 Codex 自身的 workspace-write 策略。Codex 网络就绪仍取决于账号/环境，本批真实连接检查未通过。
-
-### 交互终端
-
-在 **官方工具 → 官方工具终端** 中，选择 shell 或已安装 CLI，按可用选项选择交互/登录模式，输入已存在的绝对目录，并查看启动确认。ZCode CLI 从核验后的独立运行目录启动 TUI。`zcode login` 登录 Z.AI，`zcode login bigmodel` 登录 Coding Plan；终端也提供登录模式。由于没有支持的状态查询命令，登录状态保持未知，需在 ZCode 中自行核对。
-
-这些会话在 **Harness 沙箱外**运行，使用 Host 用户的登录环境、代理与 API-key 变量。输入的命令能以该用户权限读写文件。终端启动与路由执行及其审批/计费策略相互独立。
-
-可选依赖 `@lydell/node-pty` 提供真实伪终端。加载失败时，卡片会显示管道模式：全屏界面、调整大小和方向键可能无法使用。最多同时运行四个会话；未读取的会话约两分钟后过期，单会话最长六小时。完成后请显式结束；关闭工作台或卸载插件也会结束会话。
-
-插件不持久化终端输入/输出，仅保存会话元数据。选中文本时 Ctrl+C 为复制，否则为中断。Ctrl+Shift+V 为粘贴。
-
-<a id="team-lifecycle"></a>
-
-## 团队生命周期、模型身份与恢复
-
-团队运行时按拓扑顺序**串行**执行依赖图，不并发执行。各包接收总任务、自身目标/验收项，以及直接依赖的输出（每个依赖最多 2,500 字符）。第一个非成功包会停止全部剩余工作，包括独立工作包。这是插件的执行器，与 Harness 内置 Agent Teams 独立。
-
-### 模型身份
-
-三个字段含义不同：推荐的目录 `provider/model`、请求的 `requestedCliModel` 和 CLI 报告的 `actualModel`。目录推荐不会自动成为 CLI 参数。显式选择遵循 **工作包绑定 > 工具绑定 > 已保存 route.cliModel > 厂商 CLI 默认值**。ZCode 不支持逐次调用切换模型；MiniMax/MiMo 映射必须使用其支持的 `provider/model` 格式。
-
-如果显式绑定与 CLI 报告的实际模型冲突，该包变为 `model-mismatch`，后续工作停止。没有无歧义的实际模型报告时，身份保持未知；进程成功并不能证明运行了请求的模型。改派失败包时，会使用新路线保存的映射，不保留旧工具的映射。
-
-### 可编辑 worktree 与合入
-
-1. 规范化源路径、检查会话授权，要求源路径是干净的 Git 根目录且已有 HEAD 提交。记录该基线。
-2. 创建 detached 的隔离 worktree。Windows 使用 Host 派生存储位置 `os.tmpdir()/.model-router-workspaces/<source-path-hash>/run-<uuid>`；拒绝源/worktree 重叠和重定向的存储位置。这样可避开无法初始化 Harness 边界 ACL 的源盘。其他平台保留其受支持的作用域内 worktree 策略。
-3. 在该 worktree 中执行各包。取消会停止进程树；失败会保留 worktree 和先前包结果。
-4. 全部包成功后暂存修改，并针对**原始源基线**计算二进制 diff，包括 CLI 在 worktree 内提交的修改。Git 忽略的输出不包含在内。
-5. 重新检查源仍干净且 HEAD 未变。运行 `git apply --check`，然后把补丁应用到源目录，不自动提交。冲突、源变化或需要手工处理的输出会保留 `integration-pending` 结果/worktree。
-
-worktree 用于分离和收集修改；只有所选 Harness 环境提供操作系统边界。正常环境中的工具/MCP 可影响边界以外的文件或服务。内部执行限制：任务 64,000 字节、捕获输出 32,000,000 字节、输出尾部 32,000 字符、默认超时 45 分钟、最大超时两小时。Kimi/ZCode 还对最终提示词设有 16,000 UTF-8 字节的入口限制。这些是进程限制，不是计费上限。
-
-### 失败与重试
-
-必须保存的检查点在外部调用前记录启动状态，在下一次付费步骤前保存已有结果、用量和费用。检查点保存失败会停止后续步骤，保留预占以供核对。历史保存包状态、退出码、经过脱敏且有长度限制的诊断、入口/模型证据，以及可用的用量/费用。后续适配器异常不会丢弃先前结果。`cli-completed` 表示运行时完成了进程/补丁流程；交付物仍需通过验收。`blocked`、`cancelled`、`incomplete` 和 `integration-pending` 分别区分预检阻止、中断、包失败与合入问题。
-
-重试针对失败包和未完成的后续依赖，保留其他成功结果。符合条件的可编辑 `incomplete/cancelled` 运行要求记录的源目录、保留的 worktree 与基线：Host 验证后创建新 worktree，播种先前尚未合入的修改，再继续执行。已经合入或 `integration-pending` 的团队不能使用这一步骤恢复路径。正常环境重试仍需写入和沙箱外执行的同意（工作台重跑请求中的 `confirmWrite` 与 `confirmUnsandboxed`）；关闭旧设置 `confirmUnsandboxedCli` 也不能绕过。先前尝试的费用保留在支出总额中。原运行必须没有活动或中断预占，才能走这条重试路径；崩溃检查点是待核对证据，不是自动续跑令牌。
-
-实现：[official-team-runtime.mjs](.dsh-plugin/shared/official-team-runtime.mjs)、[official-tool-executor.mjs](.dsh-plugin/shared/official-tool-executor.mjs) 与 [run-ledger.mjs](.dsh-plugin/shared/run-ledger.mjs)。
+下方保留的数学参考描述 **模型路线工作台**；Bot 选择和桌面 routine 回放属于另外的工作流。
 
 <a id="costs"></a>
 
@@ -460,102 +251,80 @@ $`L`$ 为延迟效用：$`t`$ 是匹配历史的 P90 耗时，单位为毫秒；
 
 ## 数据与隐私
 
-路由配置/偏好保存在 Harness 插件设置中。运行时状态写入 `<DSH_HOME>/model-router/state.json`（默认 `~/.dsh/model-router/state.json`）：健康/入门状态、订阅冷却与独立用量汇总、评分、最多 200 条近期运行、最多 100 条执行预占、50 条终端元数据，以及主动启用的公共数据快照。预占引用的运行不会被历史裁剪删除。运行记录会冻结采用的单价、数据/反馈策略版本。偏好属于共享的本地 DSH_HOME，不是经过认证的独立用户账号；公共数据请求不会上传任务或反馈。
+Provider 凭据和认证会话由 Harness 管理。路由状态/收据位于 `<DSH_HOME>/model-router/`；产品还在其中保留已提交 Bot 绑定、任务记录、私有资料库与 routine/执行账本。上游 Bot home 按配置位置保留对话、记忆、浏览器状态及相关团队文件。远程 Agent 状态与配对凭据留在被控电脑的安装目录。
 
-0.15.0 起还保留有界支出汇总，最多覆盖 90 个有数据的日历日期与 24 个月。只包含金额/计数，不含任务或回答内容。
-
-运行历史包含任务文本、输出节选、路线/工作区、失败与费用。保存的任务最多 20,000 字符，每条回答最多 4,000 字符，因此重跑可能依赖被截断的已存上下文。插件不把 API key 存进模型配置，也不保存终端转录。任务执行仍会把所选任务/上下文发送给相应供应商或 CLI。
-
-状态写入使用锁和原子替换。状态结构 v3 保留独立订阅用量和分通道预占，升级可读的 v1/v2 状态时保留 API 历史、预占与旧参考字段；历史缺失 token 保持未知。旧插件会拒绝读取 v3 状态；升级前完全停止所有 Host 进程，降级前备份状态。无法解析的状态保留为 `state.json.corrupt-<timestamp>` 备份并显示提示。不要分享未经脱敏的历史或日志。
+发送给供应商或 CLI 的任务/上下文适用对应服务的账户和计费条款。已保存 routine 包含演示输入的文字。配对导出、历史、日志及私有文件应作为私有数据保管。更换运行时所有者或降级前备份应用状态，不删除收据或未知操作账本来绕过阻塞。
 
 <a id="development"></a>
 
-## 从克隆源码开发
+## 从源码开发和构建
 
-Git 克隆包含完整源码；npm 包是运行时发行包，不含客户端源码、脚本、测试和实验项目。
-
-要求：**Node.js 22.19+** 和 **pnpm 10.34.6**（`packageManager` 已固定）。在 PowerShell 中，从克隆目录的上级目录执行：
+需要普通 **Node.js 22.19+** 和 **pnpm 10.34.6**（仓库固定的包管理器版本）。原生 SQLite/PTY 模块必须使用匹配的普通 Node 运行时，不能通过不兼容的 Electron ABI 加载。在仓库根目录执行：
 
 ```powershell
-cd .\dsh-model-router
-pnpm install --frozen-lockfile --strict-peer-dependencies
+npm install --include=dev
 npm run build:client
-npm test
 npm run check:client
+node scripts/check-readme.mjs
+npm test
+node scripts/integration-product-source.mjs
+npm --prefix remote-computer-agent ci
+npm --prefix remote-computer-agent run build
 npm run pack:local
 ```
 
-若已在仓库中，省略第一个 `cd`。压缩包生成于 `dist`；通过 Desktop 插件管理器，在测试配置档中安装该 `.tgz` 的绝对路径。单元测试通过不能证明厂商账号可用、实际模型身份正确或计费已验证。
+在测试 profile 中安装生成的 `dist/*.tgz`。`npm run preview:ui` 是离线 fixture 预览，不是认证 Host 验收。配置的 registry 无法提供 SDK 包时，`scripts/setup-harness-dev.mjs` 支持显式指定已安装 Host 树；按其选项操作，不静默替换任意 SDK 版本。
 
-无需启动 Harness 或厂商工具，即可查看 UI：
+安装 Agent 依赖后，可以在 Windows x64 上生成完整包：
 
 ```powershell
-npm run preview:ui
+powershell -NoProfile -File scripts/package-remote-agent.ps1
 ```
 
-打开[本地预览](http://127.0.0.1:4173)。它使用模拟模型、工具与历史，提供有数据、空状态、错误、入门引导与延迟预览等场景，用于检查布局/交互。模拟执行不会调用供应商、安装工具或启动终端。这不属于 Host 集成验证。默认端口被占用时可运行 `npm run preview:ui -- --port 4174`；刷新页面即可载入客户端源码修改。
+打包脚本构建原生 helper，包含普通 Node 与生产依赖，验证 SQLite 后在 `tmp/integration/remote-agent-package/` 创建 zip，输出产物路径和 SHA-256。安装向导在用户准备的 Windows 电脑上运行，不在源码打包时运行。
 
-| 位置 | 职责 |
-| --- | --- |
-| `.dsh-plugin/index.mjs` | Host 插件、会话工具、设置、执行与 remote 处理器。 |
-| `.dsh-plugin/client/` | React 工作台源码与 CSS。 |
-| `shared/router.mjs`、`assignment-solver.mjs`、`harness-plan.mjs` | 本地评分/搜索与 Host 模型目录集成（位于 `.dsh-plugin/` 下）。 |
-| `shared/official-tools-remote.mjs`、`official-tools-runtime.mjs` | 固定 RPC 编解码、安装选择/任务与偏好。 |
-| `shared/official-tool-executor.mjs`、`official-team-runtime.mjs` | 可信入口、权限/进程捕获、依赖执行与补丁合入。 |
-| `shared/task-executors.mjs`、`subscription-billing.mjs` | 路由 CLI/API 执行、订阅策略与回退。 |
-| `shared/run-ledger.mjs`、`router-state.mjs` | 身份/用量/费用记录、支出保留与加锁原子持久化。 |
-| `shared/budget-reservations.mjs`、`execution-lifecycle.mjs` | 跨进程预算准入、剩余预占、必须保存的检查点和中断进程证据。 |
-| 其他 `.dsh-plugin/shared/` 模块 | 终端契约、工具健康、公共快照与有界反馈。 |
-| `.dsh-plugin/client.js` | 生成的 Desktop 客户端 bundle；修改客户端后需重建。 |
-| `scripts/` 与 `tests/` | 构建/打包/验证辅助脚本与回归测试。 |
-| `experiment-plugin/` | 独立研究实验项目，不随路由插件发布。 |
-| `docs/` 与带日期报告 | 用户文档与历史验证记录。 |
+### 复现固定上游运行时
 
-`check:readme` 检查六个展示公式、正文行内数学符号、小数前导零、双语公式一致性和审阅后的 blob 哈希；`npm test` 与 `prepack` 均会执行。修改公式后还须在 GitHub 页面查看实际渲染。公式块采用 [GitHub 官方支持的语法](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions)。
+不要直接编辑 `modules/bot-runtime/vendor/ds-bot/`，产品修改应放在外置 overlay。导入时显式指定来源 checkout 和固定提交：
 
-`check:client` 在内存中重建并比较已提交 bundle；`prepack` 会拒绝过期 bundle。pnpm 10 没有 `pnpm peers check` 命令：请使用上述严格安装。Host SDK 包不可用/不兼容时，本地集成测试可能需要已安装的 Harness 运行时；[setup-harness-dev.mjs](scripts/setup-harness-dev.mjs) 从显式提供的 Host `node_modules` 链接缺失 SDK 包，[start-harness-preview.mjs](scripts/start-harness-preview.mjs) 启动独立的本地 Web Host 配置档。这些辅助脚本不能代替依赖验证或 Desktop 验收。
+```powershell
+node scripts/sync-ds-bot.mjs --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
+node scripts/sync-ds-bot.mjs --check --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
+npm run build:client
+npm run check:client
+```
 
-GitHub Actions 通过 Windows/Linux Node 24 矩阵执行冻结锁文件严格依赖安装、全量测试、已提交客户端一致性、实际客户端构建和离线预览编译。打包后逐文件对比原始 Git blob，并检查运行时 import 依赖是否完整。这些检查使用本地预置数据，不验证真实供应商计费。提交本地候选后，可先运行 `npm run pack:local`，再运行 `node scripts/check-package.mjs` 复现包验证。
+不带来源参数的 `node scripts/sync-ds-bot.mjs --check` 只检查已记录的 vendor 字节，不猜测同级 `../ds-bot`。有意升级上游时要检查来源提交与 overlay 应用结果。`.dsh-plugin/client.js` 是生成文件。
 
-旧兼容/研究文件和带日期报告保留作参考；它们的存在不代表当前发行插件仍启用所有旧集成。发布与同步遵循 [AGENTS.md](AGENTS.md)；重现某次发布请使用带版本号的包或已验证的发布 tag。
+双语 README 保留 6 个展示公式和 33 个行内数学表达式。修改两份翻译后，将准确 Git blob SHA-1 写入 `README.i18n.yaml`，运行 `node scripts/check-readme.mjs` 和 `node --test tests/readme-math.test.mjs`。结构校验不能代替实际渲染检查。
 
-### 验证层次与已知局限
+## 验证范围与当前限制
 
-| 证据 | 能证明什么 |
-| --- | --- |
-| 单元/预置数据测试 | 所覆盖场景下的本地规划器、契约、账本、状态和失败处理；不验证厂商账号访问。 |
-| 独立 UI 预览 | 使用预置数据的布局和客户端交互；无经过认证的 Host 执行。 |
-| 经过认证的 Desktop RPC | 所选运行的真实 Host 预检/审批/启动路径。 |
-| 生产运行时 CLI 团队 | 该次调用的真实厂商进程、依赖上下文和文件；不自动等于 UI 或自动路线选择测试。 |
-| 源文件读回 | 预期产物已到达源工作区；业务正确性仍取决于选定的检查。 |
+真实 **SDK 0.2.1-rc.4** Host 集成已经走通 Main 工具 → 路由后的执行 Bot AgentLoop → 私有资料库写入 → 任务 `succeeded`。执行 Bot 每次模型请求分别进行预算准入，并关联父任务。这是该路径的证据，不代表所有 Host/浏览器探针、安装版 Desktop 变体、厂商账户或真实云电脑部署都已通过。后续验收应绑定实际测试配置。
 
-0.20.0 Windows 记录包含真实 Claude 工作台 RPC 运行，以及另一次通过已安装生产运行时执行的 Claude → MiniMax 交接，检查了文件/shell 工具和补丁合入。交接使用显式选择的工作包，不证明自动路由质量。该批 Codex 连接检查失败。其他厂商、所有 skill/MCP 服务、跨平台行为、已结算总费用和质量–成本提升，并未全部由这些运行验收。[带日期报告](docs/releases/0.20.0-validation.md)保留准确范围。0.20.1 的续跑确认修复有契约/回归检查；本版不增加模型实验或费用。
+本地 WebSocket/React 测试覆盖已确认录制、私有保存/读回、使用假 native transport 的真实回放效果、取消、清理、未知恢复与准入拒绝。Windows 原生/Agent 检查与该 fixture 分开。实际桌面 FPS 取决于采集、分辨率、网络及客户端解码，界面显示的实测帧率才是对应观察。
 
-维护文档时应在同一改动中更新两种语言：同步稳定章节锚点、API 字段、默认值、公式、能力表、示例与证据边界。在 [README.i18n.yaml](README.i18n.yaml) 中记录成对的 Git blob 哈希；哈希标识经过审阅的文本，不证明翻译正确。历史实验报告应始终关联实际测试的运行时版本。
+Grok 工作流审计采用此前抓取的公开需求清单；本轮重访官网受网络/Cloudflare 阻挡，并非新的完整产品盘点。岗位简报是模板，不是已接通 CRM/广告/报销系统的业务服务。不宣称提供自动云 VM 创建、云计费服务、自有 iOS 发布或完整商业 Grok 对等实现。
+
+全量源码归档包含[电脑/Bot 指南](docs/COMPUTER_BOT_GUIDE.zh.md)、[上游证据](docs/implementation/20261105-upstream-parity.md)、[工作流边界](docs/implementation/20261105-grok-workflows.md)及[桌面引擎证据](docs/implementation/20261105-desktop-engine.md)。上文已给出核心操作，因此只含代码与 README 的分发也能独立使用。项目发布规则为 GitHub 保留代码和 README，完整文档/历史放到 GitLab 归档。
 
 <a id="troubleshooting"></a>
 
-## 常见问题
+## 排查问题
 
-| 现象 | 检查 |
+| 现象 | 检查内容 |
 | --- | --- |
-| 没有路线或规划被禁用 | 配置 Harness 模型、刷新目录，并等待工具检测完成。 |
-| API 费用未知 | 为每条参与比较的 API 路线填写输入/输出美元单价，并核对用量/模型证据。 |
-| 订阅用量未知 | 厂商未报告完整计数或历史记录缺失；不要从旧参考美元还原 token，也不要推断剩余额度。 |
-| CLI 已安装但不可执行 | 查看启动就绪原因、平台/模式支持和安装来源。 |
-| 登录/模型权限仍失败 | 检查厂商账号、CLI 登录、网络和实际模型访问；仅安装成功不够。 |
-| 前端提示 Host 版本较旧 | 完全退出 Harness（包括托盘进程）后重启。 |
-| 预览与旧建议不同 | 目录、登录、额度或预算状态已变化；请查看新预览。 |
-| 中断后预算仍被预占 | 核对原任务、保留的 worktree 和供应商账单。预占不会自动释放或续跑，本版没有手工核对并释放的操作入口。 |
-| 旧插件无法读取状态 | v3 保留受保护执行和独立订阅用量；恢复兼容版本，不要删除账本绕过检查。 |
-| 终端 TUI 不渲染 | 检查卡片报告的是 PTY 还是管道回退模式。 |
-| 已登录但团队没有可执行路线 | 检查 `readyModes`、平台、所选安装和权限模式；仅终端已登录不能证明具备托管执行能力。 |
-| Claude 只读中没有 skills/MCP | 受限模式会禁用它们；可编辑/正常环境选项权限不同，需要相应确认。 |
-| 可编辑团队停止 | 查看失败包、退出/诊断字段与合入状态；符合条件的重试或手工检查前请保留 worktree。 |
-| 修改未合入 | 检查源是否干净/HEAD 是否变化、补丁冲突与被忽略的输出。保留 worktree 不代表修改已经应用到源目录。 |
-| CLI 模型不对或未知 | 比较推荐、请求映射与报告的实际模型；检查所选 CLI 自身默认值/配置。 |
-| 正常环境运行再次请求确认 | 每次新启动/重试都要求当前的写入/沙箱外执行同意；预览不是长期有效的审批令牌。 |
+| 更新后仍是旧 UI/版本 | 完全退出托盘 Host，确认安装包位置/版本并重启。 |
+| 无路线或没有可用执行 Bot | 准确模型、允许工具、机器/目录授权、当前可用性及预览中的拒绝原因。 |
+| `TOOL_DENIED` 或任务受阻 | 查看实际已提交 Bot 权限和请求操作，不扩大模型提供的身份，也不将角色提示词视为授权。 |
+| Agent 在线但没有桌面 | 当前已登录 Windows 会话、两个安装任务、full-desktop helper 及原生日志。 |
+| 连接不到 Agent | 可访问的基础 URL/端口、已配置的私有 VPN/隧道；导入配对文件不会建立网络。 |
+| 可以观看但接管按钮不可用 | 所需桌面输入工具、写模式授权及当前控制权占用。 |
+| Routine 提示显示器变化 | 恢复录制时显示器/分辨率/DPI，或重新录制；应用布局也要一致。 |
+| 结果未知或停止未确认 | 检查实际电脑和执行记录后再解除阻塞，不盲目重跑、不删除账本。 |
+| 资料库拒绝文件 | 二进制传输每文件最多 16 MiB，文本编辑/读取最多 1 MiB，同名上传会被拒绝。 |
+| API/订阅金额未知 | 检查实际模型身份、价格和供应商用量证据，缺失计数不是零。 |
 
-提交问题时请附 Host/插件版本、所选模式、工具状态与脱敏错误：[问题跟踪](https://github.com/Alice-Marx/dsh-model-router/issues)。
+## 历史版本
 
-许可：[MIT](LICENSE)。
+旧 0.20.x–0.26.x 发布说明、截图和实验仅作为对应版本的历史证据，不是当前安装说明，也不是本 preview 的稳定发布公告。包名：`@ljwei-stak/dsh-model-router`；入口：`.dsh-plugin/index.mjs`；许可证：[MIT](LICENSE)。

@@ -66,6 +66,39 @@ class LeaseTests {
       long now=100;DesktopLease lease=new DesktopLease(delegate{return now;},10,15000);Refused(delegate{lease.Enter("");},"DESKTOP_OWNER_REQUIRED");
       DesktopLease.Ticket active=lease.Enter("agent-a");now=99;Refused(delegate{lease.Check(active);},"DESKTOP_CLOCK_UNAVAILABLE");lease.Exit(active);
     });
+    Case("renew keeps a held session ticket alive and still fences other owners",delegate{
+      long now=0;DesktopLease lease=new DesktopLease(delegate{return now;},10,15000);DesktopLease.Ticket session=lease.Enter("session-owner");
+      now=14000;lease.Check(session);now=15000;Refused(delegate{lease.Check(session);},"DESKTOP_DEADLINE");
+      lease.Renew(session,15000);Refused(delegate{lease.Enter("model-bot");},"DESKTOP_BUSY");
+      now=29000;lease.Check(session);lease.Exit(session);Refused(delegate{lease.Renew(session,15000);},"DESKTOP_CANCELLED");
+      now=30000;DesktopLease.Ticket next=lease.Enter("model-bot");lease.Check(next);lease.Exit(next);
+    });
+    Case("renew after invalidation or cancel stops the session",delegate{
+      DesktopLease lease=new DesktopLease(delegate{return 0L;},10,15000);DesktopLease.Ticket session=lease.Enter("session-owner");lease.Invalidate();
+      Refused(delegate{lease.Renew(session,15000);},"DESKTOP_CANCELLED");lease.Exit(session);
+      DesktopLease.Ticket second=lease.Enter("session-owner");lease.Cancel("session-owner",0);lease.Exit(second);
+      Refused(delegate{lease.Renew(second,15000);},"DESKTOP_CANCELLED");
+    });
+    Case("human takeover fences the active Bot before waiting and releases immediately",delegate{
+      DesktopLease lease=new DesktopLease(delegate{return 0L;},10,15000);DesktopLease.Ticket bot=lease.Enter("bot");
+      Task<DesktopLease.Ticket> acquire=Task.Factory.StartNew(delegate{return lease.Takeover("human",1000);});
+      DateTime end=DateTime.UtcNow.AddSeconds(1);bool fenced=false;
+      while(DateTime.UtcNow<end){try{lease.Check(bot);}catch(InvalidOperationException e){fenced=e.Message=="DESKTOP_CANCELLED";break;}Thread.Sleep(1);}
+      Require(fenced&&!acquire.IsCompleted,"Control cannot be acknowledged before the Bot exits");Refused(delegate{lease.Enter("queued-bot");},"DESKTOP_BUSY");
+      lease.Exit(bot);Require(acquire.Wait(1000),"Control did not acquire after Bot cleanup");DesktopLease.Ticket human=acquire.Result;lease.Check(human);
+      Refused(delegate{lease.Enter("bot");},"DESKTOP_BUSY");Refused(delegate{lease.Takeover("other-human",0);},"DESKTOP_BUSY");lease.Exit(human);
+      DesktopLease.Ticket resumed=lease.Enter("bot");lease.Check(resumed);Require(resumed.Generation!=bot.Generation,"Old screenshots must not survive takeover");lease.Exit(resumed);
+    });
+    Case("human takeover preempts an idle Bot lease without its fifteen-second delay",delegate{
+      DesktopLease lease=new DesktopLease(delegate{return 0L;},10,15000);DesktopLease.Ticket bot=lease.Enter("bot");lease.Exit(bot);
+      DesktopLease.Ticket human=lease.Takeover("human",0);lease.Check(human);lease.Renew(human,15000);lease.Exit(human);
+      DesktopLease.Ticket other=lease.Enter("other-bot");lease.Check(other);lease.Exit(other);
+    });
+    Case("timed-out takeover never reports control while the old input is running",delegate{
+      DesktopLease lease=new DesktopLease(delegate{return 0L;},10,15000);DesktopLease.Ticket bot=lease.Enter("bot");
+      Refused(delegate{lease.Takeover("human",0);},"DESKTOP_TAKEOVER_PENDING");Refused(delegate{lease.Check(bot);},"DESKTOP_CANCELLED");Refused(delegate{lease.Enter("later");},"DESKTOP_BUSY");
+      lease.Exit(bot);DesktopLease.Ticket later=lease.Enter("later");lease.Check(later);lease.Exit(later);
+    });
     Console.WriteLine("{\"passed\":"+passed+"}");
   }
 }

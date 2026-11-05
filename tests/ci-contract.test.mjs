@@ -32,6 +32,14 @@ test('package closure rejects an omitted transitive runtime module', async t => 
   await assert.rejects(assertRuntimeClosure(options), /missing runtime dependency: runtime\/dependency\.mjs/)
 })
 
+test('package closure verifies directory declarations against real archived children', async t => {
+  const options = await fixture(t)
+  options.manifest.files.push('runtime/')
+  await assertRuntimeClosure(options)
+  options.manifest.files.push('missing-assets/')
+  await assert.rejects(assertRuntimeClosure(options), /missing declared directory: missing-assets\//)
+})
+
 test('package closure rejects missing conditional exports, patch and declared documentation', async t => {
   const options = await fixture(t)
   for (const missing of ['client.js', 'cordis.patch.yml', 'README.md']) {

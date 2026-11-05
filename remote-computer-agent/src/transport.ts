@@ -7,6 +7,7 @@ import { Server, WebStandardStreamableHTTPServerTransport, SUPPORTED_PROTOCOL_VE
 import { AgentError, AGENT_VERSION, CATALOG, fail } from './protocol.js'
 import type { Agent } from './agent.js'
 import {AuthThrottle,validateAuthLimits,type AuthLimits} from './auth-throttle.js'
+import {WebSocketServer} from 'ws'
 export type NetworkConfig={mode?:'loopback'|'wireguard'|'tailscale'|'cloudflare-tunnel'|'public-tls';host?:string;port?:number;protectedTunnel?:boolean;allowedHosts?:string[];allowedOrigins?:string[];trustedProxies?:string[];authLimits?:AuthLimits;tls?:{keyFile:string;certFile:string;caFile?:string;requireClientCertificate?:boolean}}
 const loopback=(host:string)=>['127.0.0.1','::1','::ffff:127.0.0.1'].includes(host)
 export function validateNetwork(c:NetworkConfig){const host=c.host??'127.0.0.1',mode=c.mode??'loopback';if(['0.0.0.0','::','localhost'].includes(host))fail('BIND_ADDRESS_REQUIRED')
@@ -26,13 +27,18 @@ export function validateNetwork(c:NetworkConfig){const host=c.host??'127.0.0.1',
 }
 export async function serve(agent:Agent,c:NetworkConfig={}){
   c=structuredClone(c);validateNetwork(c);const throttle=new AuthThrottle(c.authLimits),host=c.host??'127.0.0.1'
+  const requestBoundary=(req:http.IncomingMessage,upgrade=false)=>{
+    const address=server.address() as any,defaultHost=`${host.includes(':')?`[${host}]`:host}:${address.port}`
+    if(!(c.allowedHosts??[defaultHost]).includes(req.headers.host??''))fail('HOST_DENIED',403)
+    const origin=req.headers.origin
+    if(origin!==undefined&&!(c.allowedOrigins??[]).includes(origin)&&!(upgrade&&agent.desktopSessions.hasOrigin(origin)))fail('ORIGIN_DENIED',403)
+    if(c.mode==='public-tls'&&!c.tls&&(!(c.trustedProxies??[]).includes(req.socket.remoteAddress??'unknown')||req.headers['x-forwarded-proto']!=='https'))fail('TLS_REQUIRED',403)
+    return defaultHost
+  }
   const handler=async(req:http.IncomingMessage,res:http.ServerResponse)=>{
     let context:any;const source=req.socket.remoteAddress??'unknown';const json=(status:number,value:any)=>{res.writeHead(status,{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff'});res.end(JSON.stringify(value))}
     try{
-      const address=server.address() as any,defaultHost=`${host.includes(':')?`[${host}]`:host}:${address.port}`
-      if(!(c.allowedHosts??[defaultHost]).includes(req.headers.host??''))fail('HOST_DENIED',403)
-      const origin=req.headers.origin;if(origin!==undefined&&!(c.allowedOrigins??[]).includes(origin))fail('ORIGIN_DENIED',403)
-      if(c.mode==='public-tls'&&!c.tls&&(!(c.trustedProxies??[]).includes(source)||req.headers['x-forwarded-proto']!=='https'))fail('TLS_REQUIRED',403)
+      const defaultHost=requestBoundary(req)
       const reject=(decision:ReturnType<AuthThrottle['failure']>)=>{
         if(decision.audit)agent.store.audit(decision.code)
         if(decision.retryAfterMs)res.setHeader('retry-after',String(Math.max(1,Math.ceil(decision.retryAfterMs/1000))))
@@ -52,7 +58,10 @@ export async function serve(agent:Agent,c:NetworkConfig={}){
       // A cached pre-body identity cannot authorize a later management action.
       authenticate()
       if(url.pathname==='/control/v1/grants'){json(200,agent.store.issue(client,parsed));return}
-      if(url.pathname==='/control/v1/grants/revoke'){json(200,agent.store.revokeGrants(client,parsed));return}
+      if(url.pathname==='/control/v1/grants/revoke'){const result=agent.store.revokeGrants(client,parsed);await agent.desktopSessions.sweep();json(200,result);return}
+      if(url.pathname==='/desktop/v1/session'){json(200,await agent.desktopSessions.open(context,parsed));return}
+      if(url.pathname==='/desktop/v1/session/renew'){json(200,await agent.desktopSessions.renew(context,parsed));return}
+      if(url.pathname==='/desktop/v1/session/close'){json(200,await agent.desktopSessions.closeSession(context,parsed));return}
       if(url.pathname!=='/mcp')fail('NOT_FOUND',404)
       const mcp=new Server({name:'dsh-remote-computer-agent',version:AGENT_VERSION},{capabilities:{tools:{}},supportedProtocolVersions:SUPPORTED_PROTOCOL_VERSIONS})
       const transport=new WebStandardStreamableHTTPServerTransport({enableJsonResponse:true,sessionIdGenerator:undefined,maxRequestBodySize:2097152})
@@ -66,6 +75,15 @@ export async function serve(agent:Agent,c:NetworkConfig={}){
   }
   const tls=c.tls?{key:readFileSync(c.tls.keyFile),cert:readFileSync(c.tls.certFile),ca:c.tls.caFile?readFileSync(c.tls.caFile):undefined,requestCert:!!c.tls.requireClientCertificate,rejectUnauthorized:!!c.tls.requireClientCertificate}:null
   const server=tls?https.createServer(tls,handler):http.createServer(handler);server.requestTimeout=30000;server.headersTimeout=10000;server.maxConnections=128
+  const websocket=new WebSocketServer({noServer:true,clientTracking:true,maxPayload:65536,perMessageDeflate:false})
+  server.on('upgrade',(req,socket,head)=>{
+    try{
+      const defaultHost=requestBoundary(req,true),url=new URL(req.url??'/',`http://${defaultHost}`)
+      if(url.pathname!=='/desktop/v1/socket'||url.search)fail('NOT_FOUND',404)
+      if(websocket.clients.size>=16)fail('DESKTOP_CONNECTION_LIMIT',429)
+      websocket.handleUpgrade(req,socket,head,ws=>{websocket.emit('connection',ws,req);agent.desktopSessions.accept(ws,req.headers.origin,c.allowedOrigins??[])})
+    }catch(e){const status=e instanceof AgentError?e.status:500;socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)}
+  })
   await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(c.port??9701,host,()=>resolve())})
-  return {server,address:server.address(),supportedMcpVersions:SUPPORTED_PROTOCOL_VERSIONS,close:()=>new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()))}
+  return {server,address:server.address(),supportedMcpVersions:SUPPORTED_PROTOCOL_VERSIONS,close:async()=>{await agent.desktopSessions.close();for(const client of websocket.clients)client.terminate();await new Promise<void>(resolve=>websocket.close(()=>resolve()));await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()))}}
 }

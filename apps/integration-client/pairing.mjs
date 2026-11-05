@@ -33,7 +33,7 @@ export function secretNameFor({ clientId = '', machineId = '' } = {}) {
 export function parsePairingPaste(text) {
   const raw = String(text ?? '').trim()
   const problems = []
-  const result = { token: '', machineId: '', clientId: '', secretRef: '' }
+  const result = { token: '', machineId: '', clientId: '', secretRef: '', endpoint: '', rootIds: [], tools: [], botIds: [] }
   if (!raw) return { ...result, problems: ['请先粘贴 Agent 的 pair 输出。'] }
 
   // 1) The JSON blob, when the whole paste is one object.
@@ -44,6 +44,22 @@ export function parsePairingPaste(text) {
       result.machineId = pick(value, 'machineId')
       result.clientId = pick(value, 'clientId')
       result.secretRef = pick(value, 'secretRef')
+      if (value.endpoint !== undefined) {
+        const endpoint = normalizeEndpoint(value.endpoint)
+        if (endpoint.problem) problems.push(endpoint.problem)
+        else result.endpoint = endpoint.endpoint
+      }
+      for (const field of ['rootIds', 'tools', 'botIds']) {
+        if (value[field] === undefined) continue
+        if (!Array.isArray(value[field]) || value[field].length > 128 || value[field].some(item => typeof item !== 'string' || !ID.test(item))) {
+          problems.push(`配对文件的 ${field} 无效。`)
+        } else result[field] = [...new Set(value[field])]
+      }
+      for (const field of ['protectedTunnel', 'hostManagedBots']) {
+        if (value[field] === undefined) continue
+        if (typeof value[field] !== 'boolean') problems.push(`配对文件的 ${field} 应为布尔值。`)
+        else result[field] = value[field]
+      }
     } catch {
       problems.push('这段看起来是 JSON，但没法解析。请整段复制 pair 的输出。')
     }
@@ -80,6 +96,7 @@ export function normalizeEndpoint(input, { port = 9701 } = {}) {
   const withScheme = /^https?:\/\//iu.test(raw) ? raw : `http://${raw}`
   let url
   try { url = new URL(withScheme) } catch { return { endpoint: '', problem: '地址格式不对，例如 10.0.0.2 或 http://10.0.0.2:9701。' } }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return { endpoint: '', problem: '地址只接受不含用户名和密码的 HTTP / HTTPS URL。' }
   if (!url.port) url.port = String(port)
   if (url.pathname !== '/' || url.search || url.hash) return { endpoint: '', problem: '只填主机与端口，不要带路径或参数。' }
   return { endpoint: `${url.protocol}//${url.host}`, problem: '' }

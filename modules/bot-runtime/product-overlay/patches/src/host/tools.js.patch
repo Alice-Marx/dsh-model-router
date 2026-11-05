@@ -1,0 +1,11 @@
+--- a/src/host/tools.js
++++ b/src/host/tools.js
+@@ -844,7 +844,7 @@
+       const assembled = await next()
+       return {
+         ...assembled,
+-        tools: assembled.tools.filter(tool => !HIDDEN_TOOLS.includes(tool.name)),
++        tools: (assembled.tools ?? []).filter(tool => !HIDDEN_TOOLS.includes(tool.name)),
+         sections: assembled.sections.filter(section => !HIDDEN_SECTIONS.has(section.name)),
+       }
+     })

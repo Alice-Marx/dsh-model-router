@@ -175,6 +175,7 @@ test('registers router tools and manual command without intercepting the main ag
     // full surface this test pins.
     'bot_library_list',
     'bot_library_read',
+    'bot_library_search',
     'bot_library_write',
     'model_router_consult',
     'model_router_execute',

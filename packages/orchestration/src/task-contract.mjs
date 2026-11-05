@@ -136,9 +136,16 @@ export function parseTaskPlan(value) {
     if (!EFFECT_CLASSES.has(item.effectClass)) throw new PolicyError('TASK_PLAN_EFFECT_CLASS')
     if(item.execution!==undefined){
       const execution=closed(item.execution,['backend','input'])
-      if(item.effectClass!=='workspace-write'||!['remote-write','remote-command'].includes(execution.backend))throw new PolicyError('TASK_PLAN_EXECUTION_INVALID')
-      if(execution.backend==='remote-write')parseRemoteTaskWrite(execution.input)
-      else parseRemoteTaskCommand(execution.input)
+      if(['bot-turn-read','bot-turn-write'].includes(execution.backend)) {
+        if(item.effectClass!==(execution.backend==='bot-turn-read'?'read':'workspace-write'))throw new PolicyError('TASK_PLAN_EXECUTION_INVALID')
+        const botInput = closed(execution.input,['task','machineId','rootId'])
+        text(botInput.task,'execution.input.task')
+        for(const key of ['machineId','rootId'])if(botInput[key]!==undefined)taskRef(botInput[key])
+      } else {
+        if(item.effectClass!=='workspace-write'||!['remote-write','remote-command'].includes(execution.backend))throw new PolicyError('TASK_PLAN_EXECUTION_INVALID')
+        if(execution.backend==='remote-write')parseRemoteTaskWrite(execution.input)
+        else parseRemoteTaskCommand(execution.input)
+      }
     }
     if (!Array.isArray(item.acceptance) || item.acceptance.length > 16) throw new PolicyError('INVALID_TASK_PLAN')
     for (const entry of item.acceptance) text(entry, 'acceptance')
@@ -149,7 +156,7 @@ export function parseTaskPlan(value) {
     origin: { kind: origin.kind, botId: origin.botId, sessionId: origin.sessionId ?? null },
     planRevision: plan.planRevision,
     packages: plan.packages.map(item => ({ id: item.id, targetBotId: item.targetBotId, objective: item.objective,
-      dependsOn: [...item.dependsOn], acceptance: [...item.acceptance], effectClass: item.effectClass,...(item.execution===undefined?{}:{execution:{backend:item.execution.backend,input:item.execution.backend==='remote-write'?parseRemoteTaskWrite(item.execution.input):parseRemoteTaskCommand(item.execution.input)}}) })) }
+      dependsOn: [...item.dependsOn], acceptance: [...item.acceptance], effectClass: item.effectClass,...(item.execution===undefined?{}:{execution:{backend:item.execution.backend,input:['bot-turn-read','bot-turn-write'].includes(item.execution.backend)?{task:item.execution.input.task,...(item.execution.input.machineId===undefined?{}:{machineId:item.execution.input.machineId}),...(item.execution.input.rootId===undefined?{}:{rootId:item.execution.input.rootId})}:item.execution.backend==='remote-write'?parseRemoteTaskWrite(item.execution.input):parseRemoteTaskCommand(item.execution.input)}}) })) }
 }
 
 /**

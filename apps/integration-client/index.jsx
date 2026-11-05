@@ -5,6 +5,8 @@ import { apply as applyMr } from '../../.dsh-plugin/client/official-harness.jsx'
 import { createProductApi, PRODUCT_PANELS } from './api.mjs'
 import { ProductNavigation, ProductPage } from './panels.jsx'
 import css from './product.css'
+import { installDesktopBridge } from './desktop-bridge.mjs'
+import { DesktopPane } from './desktop-pane.jsx'
 
 export const inject = [...new Set([...dsInject, 'remote'])]
 export { ProductPage, ProductNavigation, PRODUCT_PANELS }
@@ -27,6 +29,7 @@ export function productSlots(slots, openPanel) {
 
 export async function apply(ctx) {
   const api = createProductApi()
+  ctx.effect(() => installDesktopBridge(api, props => <DesktopPane {...props} />), 'bot-product: desktop bridge')
   const openPanel = id => ctx.layout.selectPanel(id)
   const slots = productSlots(ctx.slots, openPanel)
   const dsContext = new Proxy(ctx, { get: (target, key) => key === 'slots' ? slots : Reflect.get(target, key, target) })

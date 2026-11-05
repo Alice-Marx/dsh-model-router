@@ -4,8 +4,9 @@ import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
 import { canonical, fail, identifier, matches, secret, sha, TOOL_NAMES, type Context } from './protocol.js'
 export class Store {
-  db:any;machineId:string;private lockFd:number|undefined;private lockPath:string;private controllerGuard:any;private closed=false
+  db:any;machineId:string;private lockFd:number|undefined;private lockPath:string;private controllerGuard:any;private closed=false;private admin=false
   constructor(public dataDir:string,Database?:any,options:{admin?:boolean}={}) {
+    this.admin=options.admin===true
     mkdirSync(dataDir,{recursive:true,mode:0o700});chmodSync(dataDir,0o700)
     this.lockPath=join(dataDir,'agent.lock')
     try {
@@ -51,10 +52,15 @@ export class Store {
       }
     }finally{if(this.controllerGuard){try{this.controllerGuard.exec('ROLLBACK')}catch{};this.controllerGuard.close();this.controllerGuard=undefined}}
   }
-  pair(id:string,ceiling:{botIds:string[];roots:string[];tools:string[]}) {
-    identifier(id);if(!ceiling.botIds?.length||!ceiling.roots?.length||!ceiling.tools?.length||ceiling.tools.some(x=>!TOOL_NAMES.includes(x)))fail('INVALID_CEILING')
-    ceiling.botIds.forEach(identifier);ceiling.roots.forEach(identifier)
-    const token=secret();this.db.prepare('INSERT INTO clients VALUES (?,?,1,0,?)').run(id,sha(token),canonical(ceiling));return {clientId:id,token,machineId:this.machineId,secretRef:`remote-agent/${this.machineId}/${id}`}
+  pair(id:string,ceiling:{botIds?:string[];hostManagedBots?:boolean;roots:string[];tools:string[]}) {
+    identifier(id)
+    if(!ceiling||ceiling.hostManagedBots!==undefined&&typeof ceiling.hostManagedBots!=='boolean'||!Array.isArray(ceiling.botIds??[])||!Array.isArray(ceiling.roots)||!ceiling.roots.length||!Array.isArray(ceiling.tools)||!ceiling.tools.length||ceiling.tools.some(x=>!TOOL_NAMES.includes(x)))fail('INVALID_CEILING')
+    const managed=ceiling.hostManagedBots===true,botIds=ceiling.botIds??[]
+    if(managed&&!this.admin)fail('ADMIN_REQUIRED',403)
+    if(!managed&&!botIds.length)fail('INVALID_CEILING')
+    botIds.forEach(identifier);ceiling.roots.forEach(identifier)
+    const saved={botIds,roots:ceiling.roots,tools:ceiling.tools,...(managed?{hostManagedBots:true}:{})}
+    const token=secret();this.db.prepare('INSERT INTO clients VALUES (?,?,1,0,?)').run(id,sha(token),canonical(saved));return {clientId:id,token,machineId:this.machineId,secretRef:`remote-agent/${this.machineId}/${id}`,hostManagedBots:managed}
   }
   client(token:string) {if(typeof token!=='string'||token.length>256)fail('AUTH_INVALID',401);const row=this.db.prepare('SELECT * FROM clients WHERE digest=?').get(sha(token));const verified=matches(token,row?.digest??'0'.repeat(64));if(!verified||!row||row.revoked)fail('AUTH_INVALID',401);return row}
   rotate(id:string) {const token=secret();if(!this.db.prepare('UPDATE clients SET digest=?,revision=revision+1,revoked=0 WHERE id=?').run(sha(token),identifier(id)).changes)fail('AUTH_INVALID',401);return {clientId:id,token}}
@@ -63,7 +69,7 @@ export class Store {
   issue(client:any,request:any) {
     client=this.currentClient(client)
     const ceiling=JSON.parse(client.ceiling);for(const key of ['botId','taskId','attemptId'])identifier(request[key])
-    if(!ceiling.botIds.includes(request.botId)||!Array.isArray(request.roots)||!Array.isArray(request.tools)||request.roots.some((x:string)=>!ceiling.roots.includes(x))||request.tools.some((x:string)=>!ceiling.tools.includes(x)))fail('SCOPE_DENIED',403)
+    if(ceiling.hostManagedBots!==true&&!ceiling.botIds.includes(request.botId)||!Array.isArray(request.roots)||!Array.isArray(request.tools)||request.roots.some((x:string)=>!ceiling.roots.includes(x))||request.tools.some((x:string)=>!ceiling.tools.includes(x)))fail('SCOPE_DENIED',403)
     const ttl=request.ttlMs??300000;if(!Number.isSafeInteger(ttl)||ttl<1000||ttl>300000)fail('INVALID_ARGUMENT')
     this.db.prepare("DELETE FROM grants WHERE json_extract(context,'$.expiresAt')<=?").run(Date.now())
     if(this.db.prepare('SELECT count(*) AS count FROM grants').get().count>=4096)fail('GRANT_LIMIT',429)
@@ -75,7 +81,7 @@ export class Store {
   revokeGrants(client:any,request:any) {
     client=this.currentClient(client)
     identifier(request.botId)
-    if(!JSON.parse(client.ceiling).botIds.includes(request.botId))fail('SCOPE_DENIED',403)
+    const ceiling=JSON.parse(client.ceiling);if(ceiling.hostManagedBots!==true&&!ceiling.botIds.includes(request.botId))fail('SCOPE_DENIED',403)
     // An authenticated Host may revoke its own tickets, never another client's.
     const result=this.db.prepare("DELETE FROM grants WHERE json_extract(context,'$.clientId')=? AND json_extract(context,'$.botId')=?").run(client.id,request.botId)
     return {machineId:this.machineId,agentApiMajor:1,revoked:result.changes,botId:request.botId}

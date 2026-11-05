@@ -61,3 +61,6 @@
 /modules/bot-runtime/** -text
 /docs/releases/0.26.0-preview.* -text
 /docs/integration/** -text -whitespace
+
+/remote-computer-agent/dist/** -text
+/modules/bot-runtime/product-overlay/patches/** -whitespace

@@ -2,8 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import * as fs from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { createBotLibrary } from '../packages/orchestration/src/bot-library.mjs'
 import { libraryRoot, registerLibraryTools } from '../.dsh-plugin/shared/library-tools.mjs'
 
@@ -18,7 +17,8 @@ function harness({ callerBotId = null, passthrough = undefined } = {}) {
   }
   const config = passthrough === undefined ? {} : { operatorPassthrough: { enabled: passthrough } }
   const registerPolicyTool = (_ctx, _config, definition) => ctx.tools.register(definition)
-  const root = mkdtempSync(join(tmpdir(), 'lib-tools-'))
+  const parent = resolve('tmp/integration/library-tools'); fs.mkdirSync(parent, { recursive: true })
+  const root = mkdtempSync(join(parent, 'case-'))
   const library = createBotLibrary({ root, fs })
   registerLibraryTools({ ctx, config, defineTool: definition => definition, registerPolicyTool, library, jsonOutput, jsonValue, stateDir: root })
   const call = async (name, args) => {
@@ -44,9 +44,21 @@ test('tools: a Bot that can be identified may only touch its own library', async
   await assert.rejects(call('bot_library_read', { botId: 'bot-b', relativePath: 'x.md' }), error => error.code === 'LIBRARY_BOT_MISMATCH')
 })
 
+test('tools: text search reads disk matches only from the actual calling Bot private library', async () => {
+  const { call, library } = harness({ callerBotId: 'bot-a', passthrough: false })
+  library.write('bot-a', 'notes/topic.md', 'heading\nAlpha own evidence\nother alpha line')
+  library.write('bot-b', 'notes/topic.md', 'Alpha private to Bot B')
+  library.upload('bot-a', 'raw.bin', Buffer.from('Alpha binary').toString('base64'))
+  const result = await call('bot_library_search', { botId: 'bot-a', query: 'ALPHA' })
+  assert.deepEqual(result.results, [{ path: 'notes/topic.md', line: 2, text: 'Alpha own evidence' }, { path: 'notes/topic.md', line: 3, text: 'other alpha line' }])
+  await assert.rejects(call('bot_library_search', { botId: 'bot-b', query: 'Alpha' }), { code: 'LIBRARY_BOT_MISMATCH' })
+  await assert.rejects(call('bot_library_search', { botId: 'bot-a', query: ' ' }), { code: 'LIBRARY_QUERY_INVALID' })
+})
+
 test('tools: an unidentifiable session is refused when the operator passthrough is off', async () => {
   const { call } = harness({ passthrough: false })
   await assert.rejects(call('bot_library_list', { botId: 'bot-a' }), error => error.code === 'LIBRARY_OPERATOR_DISABLED')
+  await assert.rejects(call('bot_library_search', { botId: 'bot-a', query: 'private' }), error => error.code === 'LIBRARY_OPERATOR_DISABLED')
 })
 
 test('tools: an invalid bot id is refused before the library is touched', async () => {

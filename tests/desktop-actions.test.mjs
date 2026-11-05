@@ -89,3 +89,24 @@ test('desktop: an unknown Bot is refused before the machine is touched', async (
   await assert.rejects(actions.view({ botId: 'session-ghost', machineId: 'machine-1', rootId: 'project' }), /UNKNOWN_BOT/)
   assert.equal(called, false)
 })
+
+test('desktop: a real Agent operation receipt is read and its frame keeps the same owner for input', async () => {
+  const calls = []
+  const actions = createDesktopActions({ directory: { forBot: botId => ({ botId }) }, machines: {
+    async call(subject, input) {
+      calls.push(input)
+      assert.ok(input.operationId, 'screenshots also require an operation identity at the real Agent')
+      return { status: 'succeeded', operationId: input.operationId, result: input.tool === 'desktop_screenshot'
+        ? { artifactId: 'artifact-a', screenshotId: 'shot_abcdefgh', width: 100, height: 100 } : { clicked: true } }
+    },
+    async download() { return { content: Buffer.from('frame').toString('base64') } },
+  } })
+  const request = { botId: 'bot-a', machineId: 'machine-a', rootId: 'project' }
+  const frame = await actions.view(request)
+  assert.equal(frame.screenshotId, 'shot_abcdefgh')
+  const result = await actions.act({ ...request, screenshotId: frame.screenshotId, action: { tool: 'click', x: 10, y: 10 } })
+  assert.equal(result.value.clicked, true)
+  assert.equal(calls[0].taskId, calls[1].taskId)
+  assert.equal(calls[0].attemptId, calls[1].attemptId)
+  assert.notEqual(calls[0].operationId, calls[1].operationId)
+})

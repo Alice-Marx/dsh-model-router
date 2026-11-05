@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "kind": "ds-bot-product-overlay",
+  "upstream": "https://github.com/Fei2411/DS-Bot",
+  "notes": "Product-owned changes on top of the vendored DS Bot runtime. A sync copies upstream, then puts these back on top; nothing here is edited by hand in the vendor tree.",
+  "entries": [
+    {
+      "path": "src/client/desktop-pane.js",
+      "kind": "product-file",
+      "summary": "Grok-Bot-style remote desktop tab for the Bot drawer, over the product client's __dshDesktop bridge; delegates to the bridge's renderPane when the product client registered one."
+    },
+    {
+      "path": "src/client/details-drawer.js",
+      "kind": "patched",
+      "summary": "Adds the 电脑操作 (desktop) tab to a 1:1 Bot's drawer and renders DesktopPane in it.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "f4917de604dc7c3daf3b4a5267a04c326c9b20aea94bb5e27bfcb6e106396172"
+      }
+    },
+    {
+      "path": "src/client/sidebar.js",
+      "kind": "patched",
+      "summary": "Renders the product's sidebarAddon (the router panel navigation) under the team list.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "6c3fec6a4d648c29edf01ac72ff18c5233945d9bd54e2fe09254f5c39e538d09"
+      }
+    },
+    {
+      "path": "src/client/index.js",
+      "kind": "patched",
+      "summary": "Accepts a wrapped TeamSidebar in the sidebar.workspaces slot probe, so the product's own wrapper still counts as the DS Bot team surface.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "4fd22b26d817ca3ae5454e5a8042c1c4b806ff4ae78c9e38f90ee5ee3c996b9a"
+      }
+    },
+    {
+      "path": "src/host/tools.js",
+      "kind": "patched",
+      "summary": "Supports Harness 0.2.2 section-only prompt assembly while retaining the independent hidden-tool execution guard.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "902efc325fd21cd605e748f46ff0c3831f5ed6c6588265930b2f4610264f930a"
+      }
+    },
+    {
+      "path": "src/host/schedules.js",
+      "kind": "patched",
+      "summary": "Adapts legacy per-Session schedules to the explicit Host-wide Schedule API in Harness 0.2.2 without changing task targets.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "3818fea953dc7a766d7dcb738661a448a922f84ac42b8d434ac7fb83e09b9c65"
+      }
+    }
+  ]
+}

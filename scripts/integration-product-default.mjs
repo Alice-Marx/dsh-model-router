@@ -16,7 +16,11 @@ const ROOT = resolve(import.meta.dirname, '..')
 const hostIndex = process.argv.indexOf('--host-root')
 const hostRoot = resolve(hostIndex >= 0 ? process.argv[hostIndex + 1] : join(ROOT, 'tests/fixtures/integration-host'))
 const source = await verifyProductSource()
-const { anchor } = await resolverAnchor(hostRoot)
+const requireHost = createRequire(join(hostRoot, 'package.json'))
+const manifestPath = requireHost.resolve('@deepseek-ai/dsh/package.json')
+const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+assert.ok(['0.2.1-rc.3', '0.2.1-rc.4', '0.2.2-rc.1'].includes(manifest.version), `Unaudited integration Host: ${manifest.version}`)
+const { anchor } = await resolverAnchor(hostRoot, { expectedVersion: manifest.version })
 await copyFile(join(ROOT, 'tests/fixtures/integration-combined/mock-plugin.mjs'), join(anchor, 'offline-model.mjs'))
 const parent = join(ROOT, 'tmp/integration/product-default'); await mkdir(parent, { recursive: true })
 const run = await mkdtemp(join(parent, 'run-')), home = join(run, 'home'), profile = join(home, 'profiles/integration'), workspace = join(run, 'workspace')
@@ -35,9 +39,6 @@ overlay.push({ id: 'model-router-galgame', config: { taskCli: {
   sessionFactory: pathToFileURL(join(ROOT, 'tests/fixtures/integration-combined/cli-session-factory.mjs')).href,
 } } })
 await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(overlay, null, 2))
-const requireHost = createRequire(join(hostRoot, 'package.json'))
-const manifestPath = requireHost.resolve('@deepseek-ai/dsh/package.json')
-const manifest = JSON.parse(await readFile(manifestPath, 'utf8')); assert.equal(manifest.version, '0.2.1-rc.3')
 const bin = resolve(dirname(manifestPath), manifest.bin.dsh)
 const listener = createServer(); await new Promise(done => listener.listen(0, '127.0.0.1', done)); const port = listener.address().port; await new Promise(done => listener.close(done))
 const base = `http://127.0.0.1:${port}`
@@ -46,6 +47,7 @@ const checks = []
 const launch = () => {
   chunks = []; closed = false
   child = spawn(process.execPath, ['--import', pathToFileURL(join(ROOT, 'modules/bot-runtime/vendor/ds-bot/test/harness-resolve.mjs')).href,
+    '--import', pathToFileURL(join(ROOT, 'tests/fixtures/integration-combined/product-resolve.mjs')).href,
     '--import', pathToFileURL(join(ROOT, 'tests/fixtures/integration-combined/offline-preload.mjs')).href,
     bin, '--profile', 'integration', '--no-open', '--host', '127.0.0.1', '--port', String(port)],
   { cwd: workspace, env: isolatedHostEnvironment(home, anchor), windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] })
@@ -53,7 +55,7 @@ const launch = () => {
   let bytes = 0
   const capture = chunk => { bytes += chunk.length; if (bytes <= 8 * 1024 * 1024) chunks.push(chunk); else killProcessTree(child) }
   child.stdout.on('data', capture); child.stderr.on('data', capture)
-  timer = setTimeout(() => killProcessTree(child), 120000)
+  timer = setTimeout(() => killProcessTree(child), 240000)
 }
 const output = () => Buffer.concat(chunks).toString('utf8')
 const stop = async label => {
@@ -137,6 +139,34 @@ try {
   assert.equal(savedWorker.value.status, 'available')
   checks.push('N06b: worker binding is configured through a real owner action before its first prompt')
   checks.push('Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool')
+  const routingSettings = await product('botRoutingInspect')
+  assert.equal(routingSettings.ok, true, JSON.stringify(routingSettings))
+  const routingSaved = await product('botRouting.save', { payload: { expectedRevision: routingSettings.value.settingsRevision,
+    settings: { enabled: true, preset: 'balanced', autoGrant: { machineTools: false, cliTools: false } } } })
+  assert.equal(routingSaved.ok, true, JSON.stringify(routingSaved))
+  await api('send', { sessionId: mainId, text: `integration:route-worker:${workerId}` }); current = await quiet()
+  const routedCall = current.diagnostic.toolResults.find(item => item.name === 'bot_route_task' && !item.result.isError)
+  assert.ok(routedCall, JSON.stringify(current.diagnostic.toolResults))
+  const routedValue = routedCall.result.value
+  assert.equal(routedValue.dispatched, true, JSON.stringify(routedValue))
+  await wait(async () => {
+    const state = await product('snapshot')
+    return state.value?.tasks?.plans?.some(item => item.planId === routedValue.planId && item.state === 'succeeded')
+  })
+  const library = await product('library.read', { payload: { botId: workerId, relativePath: 'routed-proof.txt' } })
+  assert.equal(library.ok, true, JSON.stringify(library))
+  assert.equal(library.value.content, 'Routed worker wrote this through its real AgentLoop.\n')
+  checks.push('Bot routing: Main model tool -> owner settings -> real worker AgentLoop -> private library write -> durable successful task')
+  const ownerRoute=await product('botRouting.dispatch',{payload:{text:`integration:routed-library:${workerId}`,pinnedBotId:workerId,requesterBotId:mainId,needs:{write:true},requestKey:'fixture-owner-route'}})
+  assert.equal(ownerRoute.ok,true,JSON.stringify(ownerRoute));assert.equal(ownerRoute.value.accepted,true)
+  assert.equal(ownerRoute.value.botId,workerId);assert.equal(ownerRoute.value.originBotId,mainId)
+  await wait(async()=>{const value=(await product('snapshot')).value;return value.tasks.plans.some(item=>item.planId===ownerRoute.value.planId&&item.state==='succeeded')})
+  await quiet()
+  const routedEvidence=new Database(join(home,'model-router/orchestration.sqlite'),{readonly:true})
+  try{
+    for(const planId of [routedValue.planId,ownerRoute.value.planId])assert.equal(routedEvidence.prepare('SELECT state FROM bot_routed_deliveries WHERE plan_id=?').get(planId)?.state,'delivered')
+  }finally{routedEvidence.close()}
+  checks.push('Bot routing: authenticated owner workbench channel dispatches to the same real worker; both model and owner plans deliver terminal results to Main')
   await api('send', { sessionId: workerId, text: 'integration:router-routes' }); current = await quiet()
   assert.ok(current.diagnostic.toolResults.some(item => item.name === 'model_router_routes' && !item.result.isError))
   checks.push('Default entry: worker executes permitted MR routing with the composed Bot grant')
@@ -162,7 +192,10 @@ try {
   assert.equal(snapshot.lifecycle.healthy, true)
   assert.ok(snapshot.bots.some(bot => bot.id === mainId && bot.main))
   assert.ok(snapshot.bots.some(bot => bot.id === workerId))
-  assert.deepEqual([...snapshot.availableActions].sort(), ['binding.save','funding.account.save','machine.bind','machine.pair','machine.probe','machine.reconcile','machine.revoke','machine.secret','task.cancel','task.plan.submit','task.plan.cancel','task.reconcile','task.retry','usage.resolve'].sort())
+  assert.deepEqual([...snapshot.availableActions].sort(), ['binding.save','funding.account.save','machine.bind','machine.pair','machine.probe','machine.reconcile','machine.revoke','machine.secret','task.cancel','task.plan.submit','task.plan.cancel','task.reconcile','task.retry','usage.resolve',
+    'botRoutingInspect','botRoutingDecide','botRouting.dispatch','botRouting.save','library.list','library.read','library.write','library.upload','library.download','library.mkdir','library.remove','library.search',
+    'machine.artifact','machine.desktop.act','machine.desktop.view','machine.desktop.open','machine.desktop.renew','machine.desktop.close',
+    'roles.list','routine.list','routine.save','routine.remove','routine.run','routine.history','routine.cancel','routine.resolve'].sort())
   assert.equal(snapshot.bindings.status, 'available')
   const binding = snapshot.bindings.items.find(item => item.botId === workerId)
   assert.ok(binding.tools.includes('tool/model_router_routes'))
@@ -175,9 +208,10 @@ try {
     return {status:response.status,body:response.status===200?await response.json():null}
   }
   const ledger=await rpc('ledger');assert.equal(ledger.status,200);assert.equal(ledger.body.result.ok,true,JSON.stringify(ledger.body));assert.equal(ledger.body.result.value.ok,true)
-  const mutate=await rpc('completeOnboarding');assert.equal(mutate.status,200);assert.equal(mutate.body.result.ok,false);assert.match(JSON.stringify(mutate.body),/TOOL_DENIED/)
+  const mutate=await rpc('completeOnboarding');assert.equal(mutate.status,200);assert.equal(mutate.body.result.ok,true)
   assert.ok([401,403].includes((await rpc('ledger',false)).status))
-  checks.push('Default owner can read the original advanced ledger through real Gateway; ungranted mutations and unauthenticated requests stay denied')
+  assert.ok([401,403].includes((await rpc('completeOnboarding',false)).status))
+  checks.push('Authenticated owner uses the original advanced workbench through real Gateway; unauthenticated read and mutation stay denied')
   assert.equal(snapshot.machines.status,'available');assert.equal(snapshot.machines.items.length,0)
   // N09: every product section is wired now, so no section may report a blocked
   // placeholder; the actionable blocked text stays covered by unit fixtures.
@@ -361,6 +395,15 @@ try {
   assert.equal(sharedSecret.ok,false,'existing DS secret UI cannot offer machine control credentials to Bot shells')
   const saved=await product('machine.pair',{payload:{name:'Product test Agent',machineId:paired.machineId,endpoint:`http://127.0.0.1:${remoteServer.address.port}`,secretRef:secret.value.secretRef,probeBotId:workerId,roots:['project'],tools:TOOL_NAMES,expectedRevision:0}})
   assert.equal(saved.ok,true,JSON.stringify(saved));assert.equal(saved.value.status,'online')
+  assert.equal(saved.value.mainBinding?.status,'available',JSON.stringify(saved.value.mainBinding))
+  const automaticMainGrant=saved.value.bindings.find(item=>item.botId===mainId)
+  assert.ok(automaticMainGrant&&!automaticMainGrant.revoked&&automaticMainGrant.roots.includes('project'))
+  assert.ok(TOOL_NAMES.every(tool=>automaticMainGrant.tools.includes(tool)))
+  await api('send',{sessionId:mainId,text:`integration:remote-read:${paired.machineId}`});current=await quiet()
+  const mainRemoteRead=current.diagnostic.toolResults.filter(item=>item.name==='remote_computer_read'&&item.agentId===mainId).at(-1)
+  assert.ok(mainRemoteRead&&!mainRemoteRead.result.isError,JSON.stringify(mainRemoteRead))
+  assert.match(JSON.stringify(mainRemoteRead.result),/owned remote product fixture|b3duZWQgcmVtb3RlIHByb2R1Y3QgZml4dHVyZQ/)
+  checks.push('Machine pairing automatically binds Main at its own revision; Main immediately reads through its real AgentLoop without another manual grant')
   let granted=await product('machine.bind',{payload:{machineId:paired.machineId,botId:workerId,expectedRevision:0,roots:['project'],tools:['machine_ping','fs_read'],mode:'read-only'}})
   assert.equal(granted.ok,true,JSON.stringify(granted));assert.equal(granted.value.remoteRevoked,true)
   const read=await product('machine.probe',{payload:{machineId:paired.machineId,botId:workerId,rootId:'project',relativePath:'README.md'}})
@@ -393,7 +436,8 @@ try {
   granted=await product('machine.bind',{payload:{machineId:paired.machineId,botId:workerId,expectedRevision:4,roots:['project'],tools:TOOL_NAMES,mode:'workspace-write'}})
   assert.equal(granted.ok,true,JSON.stringify(granted))
   await api('send',{sessionId:workerId,text:`integration:remote-command:${paired.machineId}`});current=await quiet()
-  const commandTask=await settleTask((await latestTask('remote-command',workerId)).taskId,docker?'succeeded':'failed')
+  const commandTaskId=await wait(async()=>(await latestTask('remote-command',workerId))?.taskId)
+  const commandTask=await settleTask(commandTaskId,docker?'succeeded':'failed')
   const commandResult=commandTask.result,commandRemote=commandResult.remote
   assert.ok(commandRemote,JSON.stringify(commandTask))
   if(docker){
@@ -409,11 +453,12 @@ try {
   await sleep(5100)
   await api('send',{sessionId:workerId,text:`integration:remote-browser:${paired.machineId}`});current=await quiet()
   const browserActions=current.diagnostic.toolResults.filter(item=>item.name==='remote_computer_browser')
-  assert.equal(browserActions.length,3,JSON.stringify(browserActions));assert.ok(browserActions.every(item=>!item.result.isError&&item.result.value.status==='succeeded'),JSON.stringify(browserActions))
+  assert.equal(browserActions.length,3,JSON.stringify(browserActions));assert.ok(browserActions.every(item=>!item.result.isError&&!item.result.value.operationStatus),JSON.stringify(browserActions))
   const openedBrowser=browserActions[0].result.value,scriptedBrowser=browserActions[1].result.value,closedBrowser=browserActions[2].result.value
-  assert.equal(scriptedBrowser.result.result,'Product browser fixture',JSON.stringify(browserActions));assert.equal(closedBrowser.result.closed,true)
+  assert.equal(scriptedBrowser.result,'Product browser fixture',JSON.stringify(browserActions));assert.equal(closedBrowser.closed,true)
   assert.equal(openedBrowser.taskId,scriptedBrowser.taskId);assert.equal(openedBrowser.attemptId,closedBrowser.attemptId)
   assert.equal(remoteAgent.store.db.prepare("SELECT count(*) n FROM operations WHERE tool LIKE 'browser_%'").get().n,3)
+  assert.equal(remoteAgent.store.db.prepare("SELECT count(*) n FROM operations WHERE tool LIKE 'browser_%' AND status='succeeded'").get().n,3)
   checks.push('Remote browser: the default product AgentLoop opens, scripts and closes one scoped remote browser under the original task/attempt')
   const callsBeforeCredential=(await request('integration-probe')).calls.length
   await request('integration-probe',{action:'credential-outage'})

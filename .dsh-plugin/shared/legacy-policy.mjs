@@ -1,3 +1,5 @@
+import { TASK_TOOL_CAPABILITIES } from '../../packages/orchestration/src/task-tools.mjs'
+
 /** Stable optional seam; normal legacy profiles keep their existing behavior. */
 export function legacyPolicy(ctx, required = false) {
   let policy
@@ -43,7 +45,12 @@ export function guardLegacyTools(ctx, config) {
     // and routine tools are registered through the same wrapper, so a strict profile must refuse
     // them before their body runs rather than relying on the body to notice.
     if (!exec.name.startsWith('model_router_') && !exec.name.startsWith('bot_')) return
-    try { legacyPolicy(ctx, policyRequired(config))?.check({ kind: 'tool', name: exec.name, agent: exec.agent }) }
+    const taskCapability = TASK_TOOL_CAPABILITIES[exec.name]
+    // Managed Task commands have their own committed task/* authority. Their tool schema name is
+    // a facade, not another permission: inventing tool/bot_task_start here denied valid task/submit.
+    const call = taskCapability ? { kind: 'task', name: taskCapability.slice('task/'.length), agent: exec.agent }
+      : { kind: 'tool', name: exec.name, agent: exec.agent }
+    try { legacyPolicy(ctx, policyRequired(config))?.check(call) }
     catch (error) { return error.message }
   })
 }

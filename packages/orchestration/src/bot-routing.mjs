@@ -25,9 +25,11 @@ function rejection(candidate, task) {
   if (candidate.enabled === false) return 'BOT_DISABLED'
   if (!candidate.botId) return 'MISSING_BOT_ID'
   if (!candidate.model?.provider || !candidate.model?.model) return 'BOT_MODEL_UNBOUND'
+  if (candidate.routingRefusal) return candidate.routingRefusal
   // A task that names a tool can only go to a Bot whose grant carries it.
   for (const tool of list(task.requiredTools)) {
-    if (!list(candidate.tools).includes(tool)) return `BOT_MISSING_TOOL:${tool}`
+    const allowed = list(candidate.tools)
+    if (!allowed.includes(tool) && !allowed.includes(`tool/${tool}`) && !allowed.includes(`remote/${tool}`)) return `BOT_MISSING_TOOL:${tool}`
   }
   // A task that needs a machine can only go to a Bot whose machine is reachable.
   if (task.requiresMachine === true && candidate.machineOnline !== true) return 'BOT_MACHINE_OFFLINE'
@@ -37,6 +39,16 @@ function rejection(candidate, task) {
   }
   return null
 }
+
+/**
+ * The single answer to "may this Bot take this task at all", or the reason it may not.
+ *
+ * Every entry point — an automatic pick, a person's pin, a Bot's own request — must ask this same
+ * question, so a pin can never reach a Bot the router would have refused.
+ *
+ * @returns {string|null} null when eligible, otherwise a coded reason.
+ */
+export const botRejection = (candidate, task = {}) => rejection(candidate, task)
 
 /** Lower is better. Unknown cost sorts after known cost but is never silently free. */
 function score(candidate, preset, maxPrice) {

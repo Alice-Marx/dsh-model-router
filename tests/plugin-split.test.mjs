@@ -174,9 +174,11 @@ test('managed terminal backend and its product/protocol regressions are packaged
     'packages/cli-runtime/src/native-terminal-peer.ps1',
     '.dsh-plugin/shared/cli-terminal.mjs',
   ]) assert.ok(manifest.files.includes(path), `${path} must ship`)
-  assert.match(manifest.scripts.test, /tests\/native-terminal-protocol\.test\.mjs/)
-  assert.match(manifest.scripts.test, /tests\/cli-terminal-managed-pty\.native\.mjs/)
-  assert.match(manifest.scripts.test, /tests\/cli-terminal-managed-product\.native\.mjs/)
+  assert.equal(manifest.scripts.test, 'node scripts/run-tests.mjs')
+  const scheduled = JSON.parse(read('scripts/test-plan.json')).stages.flat()
+  for (const file of ['tests/native-terminal-protocol.test.mjs', 'tests/cli-terminal-managed-pty.native.mjs', 'tests/cli-terminal-managed-product.native.mjs']) {
+    assert.ok(scheduled.includes(file), `${file} must run in the test plan`)
+  }
 })
 
 test('router remote retains installer methods and owns no GAL endpoints', () => {

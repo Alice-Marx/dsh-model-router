@@ -1,0 +1,17 @@
+--- a/src/host/schedules.js
++++ b/src/host/schedules.js
+@@ -1,3 +1,5 @@
++import { adaptScheduleService } from '../../../../schedule-compat.mjs'
++
+ // Scheduled tasks. DSH's schedule service stores each task with the Session it belongs
+ // to and, when it is due, sends its prompt to that Session as a new message. This
+ // module lists the team's tasks for Settings, creates and removes them there, and moves
+@@ -73,7 +75,7 @@
+   let service = null
+ 
+   const attach = (sub) => {
+-    const own = sub.schedule
++    const own = adaptScheduleService(sub.schedule)
+     service = own
+     sub.effect(() => () => { if (service === own) service = null }, 'ds-bot: schedule service')
+   }
