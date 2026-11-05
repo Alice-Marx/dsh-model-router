@@ -1,7 +1,11 @@
 import { createBotRoutingService } from './bot-routing-service.mjs'
-import { buildRoutedPlan } from './bot-routing-dispatch.mjs'
+import { openBotRoutingSettings } from './bot-routing-settings.mjs'
+import { createWorkerBindingCommitter } from './bot-routing-dispatch.mjs'
+import { createBotTurnBackends } from './bot-routing-runtime.mjs'
+import { createRoutineExecutionService } from './routine-execution.mjs'
+import { createMachineHeartbeat } from './machine-heartbeat.mjs'
+import { pairMainMachine } from './pair-main-machine.mjs'
 import { assertHandoffAllowed, buildHandoff, createHandoffLedger } from './bot-handoff.mjs'
-import { routineStepToTool } from './remote-computer-tools.mjs'
 import { listRoles } from './bot-roles.mjs'
 import { hostname } from 'node:os'
 import { join, dirname, isAbsolute } from 'node:path'
@@ -41,7 +45,8 @@ export const PRODUCT_TOOLS = Object.freeze(['model/infer',
   'tool/model_router_routes', 'tool/model_router_plan', 'tool/model_router_consult', 'tool/model_router_health', 'tool/model_router_tools',
   'tool/model_router_execute', 'tool/model_router_team_execute', 'tool/model_router_tool_run', 'tool/model_router_rerun_step',
   'tool/model_router_tool_install', 'tool/model_router_tool_repair', 'tool/model_router_tool_uninstall', 'tool/model_router_rate',
-  'command/router'])
+  'command/router', 'tool/bot_library_list', 'tool/bot_library_read', 'tool/bot_library_write', 'tool/bot_library_search', 'tool/bot_route_task',
+  'tool/bot_routine_list', 'tool/bot_routine_save', 'tool/bot_routine_run'])
 export const PRODUCT_OWNER_READ_METHODS = Object.freeze(['list','installSettings','status','health','ledger','boundaries','previewRun','runStatus','terminalInfo','terminalRead'])
 export const PRODUCT_OWNER_WRITE_METHODS = Object.freeze(['completeOnboarding','rateResult','rerunStep','startRun','cancelRun','installTool','uninstallTool','repairTool','cancel','terminalStart','terminalWrite','terminalResize','terminalStop'])
 // The Bot runtime reports descriptive call origins; the durable receipt schema
@@ -66,7 +71,8 @@ const CLI_MODEL = /^gpt-[A-Za-z0-9_.-]+$/
 const CLI_ENTRY_VERSION = /^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/
 const TASK_TOOLS = Object.freeze(['task/execute', 'task/submit', 'task/read', 'task/cancel', 'task/retry', 'task/reconcile'])
 const TASK_CAPABILITY = Object.freeze({ id: 'managed-tasks', label: '托管任务',
-  tools: Object.freeze([...TASK_TOOLS, 'execution/mr-api', 'execution/mr-retry', 'execution/mr-observe']) })
+  tools: Object.freeze([...TASK_TOOLS, 'execution/mr-api', 'execution/mr-retry', 'execution/mr-observe',
+    'execution/bot-turn', 'execution/bot-turn-retry', 'execution/bot-turn-observe']) })
 const CLI_GRANT_TOOLS = Object.freeze(['cli/codex', 'cli/cancel', 'cli/read', 'cli/retry'])
 const MR_BACKEND = Object.freeze({ id: 'mr-api', version: 'mr-read-product-v1',
   capability: 'execution/mr-api', retryCapability: 'execution/mr-retry', reconcileCapability: 'execution/mr-observe' })
@@ -256,7 +262,7 @@ function createRemoteCliTaskBackend({machines,directory,store,authority,profiles
  * arrive with the unified SQLite money authority.
  */
 export function startBotProduct(ctx, options = {}) {
-  const { discoverRoutes, accountStream, actions = {}, machineId = `local-${hostname()}`, workspaceId = 'default',
+  const { discoverRoutes, accountStream, config = {}, actions = {}, machineId = `local-${hostname()}`, workspaceId = 'default',
     runtimeConfig, onBind, refreshIntervalMs = ROUTE_REFRESH_MS, now = Date.now, failClosed = true,
     deferredRouterState = null, legacyFile = defaultStatePath(), pricingFor = async () => null, mr = null, taskCli = null,
     Database = createRequire(import.meta.url)('better-sqlite3'), storageFile = join(resolveStateHome(), 'model-router', 'orchestration.sqlite') } = options
@@ -293,6 +299,9 @@ export function startBotProduct(ctx, options = {}) {
   }
   const authority = createAuthority()
   const directory = createPrincipalDirectory(authority)
+  ctx.provide('botIdForAgent', agent => {
+    try { return authority.describe(directory.forAgent(agent)).botId } catch { return null }
+  })
   const ownerTools=[...PRODUCT_OWNER_READ_METHODS,...PRODUCT_OWNER_WRITE_METHODS].map(name=>`remote/${name}`)
   const policy = createBotPolicy({ authority, directory, machineId, workspaceId,ownerGrant:{tools:ownerTools} })
   ctx.provide('botIntegrationPolicy', policy)
@@ -302,24 +311,52 @@ export function startBotProduct(ctx, options = {}) {
   // Handing work between Bots: the ledger makes loops impossible, the plan carries the sender.
   const handoffLedger = createHandoffLedger()
   const handoffTask = async (args, context) => {
+    if (context?.kind !== 'bot' || context.botId !== args.fromBotId
+      || !product?.lifecycle.committedMainBotIds().includes(context.botId)) throw new Error('BOT_ROUTING_HANDOFF_DENIED')
     assertHandoffAllowed({ taskId: args.taskId, fromBotId: args.fromBotId, toBotId: args.toBotId, ledger: handoffLedger })
     const { plan } = buildHandoff({ taskId: args.taskId, fromBotId: args.fromBotId, toBotId: args.toBotId, objective: args.objective })
     if (!taskService) throw new Error('TASK_SERVICE_UNAVAILABLE')
-    const submitted = await taskService.submitPlan(taskOwner({ botId: args.toBotId }), { requestKey: `handoff-${args.taskId}-${args.toBotId}`, plan }, { owner: true })
+    plan.origin.sessionId = context.sessionId
+    for (const item of plan.packages) item.execution = { backend: 'bot-turn-read', input: { task: item.objective } }
+    const submitted = await taskService.submitPlan(taskOwner({ botId: args.fromBotId }), { requestKey: `handoff-${args.taskId}-${args.toBotId}`, plan }, { sessionId: context.sessionId })
+    turnBackends?.watchPlan({ planId: submitted.planId, botId: args.toBotId, originBotId: args.fromBotId })
     handoffLedger.held(args.taskId, args.fromBotId)
     handoffLedger.held(args.taskId, args.toBotId)
     return { plan, submitted }
   }
-  const botLibrary = (() => { try { return ctx.get?.('botLibrary') ?? null } catch { return null } })()
-  const botRuntimeAdapter = (() => { try { return ctx.get?.('botRuntimeAdapter') ?? null } catch { return null } })()
-  const routineStore = (() => { try { return ctx.get?.('routineStore') ?? null } catch { return null } })()
+  const routingSettingsFor = botId => {
+      try { const row = botSettings?.get(botId, { publishChange: false }); return row ? { ...row.settings, grant: row.grant, status: row.status } : null }
+      catch { return null }
+  }
+  const commitWorkerBinding = createWorkerBindingCommitter({ machines: () => machines, settingsFor: routingSettingsFor,
+    mainBotIds: () => product?.rt.state.mainBotIds ?? [] })
   const botRouting = createBotRoutingService({
     bots: () => product?.rt?.state?.bots ?? [],
-    settingsFor: botId => { try { return botSettings?.get(botId, { publishChange: false })?.settings ?? null } catch { return null } },
+    settingsFor: routingSettingsFor,
     machineHealth: machineId => {
-      try { const row = machines?.readModel?.().items?.find(item => item.id === machineId); return { online: row?.status === 'available' || row?.health?.lastSeenAt !== undefined } } catch { return null }
+      try { const row = machines?.readModel?.().items?.find(item => item.id === machineId); return { online: row?.status === 'online' } } catch { return null }
     },
-    routing: () => config?.botRouting,
+    routing: () => routingSettings?.get().settings ?? config.botRouting,
+    mainBotIds: () => product?.rt.state.mainBotIds ?? [],
+    subjectFor: botId => directory.forBot(botId),
+    submitPlan: (subject, request, caller) => {
+      if (!taskService) throw new Error('TASK_SERVICE_UNAVAILABLE')
+      return taskService.submitPlan(subject, request, caller)
+    },
+    bindWorker: (binding, context) => commitWorkerBinding(binding, context),
+    executionBackendFor: effect => effect === 'read' ? 'bot-turn-read' : 'bot-turn-write',
+    onAccepted: report => turnBackends?.watchPlan(report),
+    busyFor: botId => product?.rt.live?.get(product.rt.chatOf(botId))?.turn !== undefined,
+    priceFor: route => {
+      for (const bot of product?.lifecycle.committedBots() ?? []) {
+        const settings = routingSettingsFor(bot.id)
+        if (settings?.model?.provider === route.provider && settings.model.model === route.model) {
+          const price = settings.funding?.pricing
+          if (typeof price?.input === 'number' && typeof price.output === 'number') return (price.input + price.output) / 2
+        }
+      }
+      return null
+    },
   })
   ctx.provide('botRouting', botRouting)
   const describeBot = subject => { try { return authority.describe(subject).botId } catch { return null } }
@@ -346,7 +383,7 @@ export function startBotProduct(ctx, options = {}) {
   }
 
   const grants = new Map()
-  let machines, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting
+  let machines, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat
   let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission
   const committedBots = new Map()
   let ownerCatalogStamp=''
@@ -377,7 +414,8 @@ export function startBotProduct(ctx, options = {}) {
     // The Main Bot is the operator's own assistant: it may switch model in its panel at any time,
     // so its grant carries every hydrated route instead of only the one saved at that moment.
     if ((product?.rt.state?.mainBotIds ?? []).includes(bot.id) && hydrated && routes.size > 0) {
-      grant = { ...grant, modelRoutes: [...routes.keys()].map(key => { const at = key.indexOf('/'); return { provider: key.slice(0, at), model: key.slice(at + 1) } }) }
+      grant = { ...grant, tools: [...grant.tools, 'tool/bot_dispatch', 'tool/bot_handoff_task'],
+        modelRoutes: [...routes.keys()].map(key => { const at = key.indexOf('/'); return { provider: key.slice(0, at), model: key.slice(at + 1) } }) }
     }
     const names = {machine_ping:'remote_computer_ping',fs_list:'remote_computer_list',fs_read:'remote_computer_read',fs_write:'remote_computer_write'}
     // Grant compilation is synchronous and runs on every DS save/load: an
@@ -453,7 +491,7 @@ export function startBotProduct(ctx, options = {}) {
     }
     for(const machine of machines?.readModel().items??[]){
       if(machine.status==='revoked')continue
-      const roots=machine.roots.map(rootId=>({rootId,label:rootId,modes:['read-only','workspace-write'],capabilities:[]}))
+      const roots=machine.roots.map(rootId=>({rootId,label:rootId,modes:['read-only','workspace-write'],capabilities:[...machine.tools]}))
       remoteMachines.set(machine.id,{machineId:machine.id,label:machine.name,location:'remote',status:machine.status,roots})
     }
     return { models, tools: cliConfig ? [{ toolId: 'codex', modes: ['read-only'], grantTools: [...CLI_GRANT_TOOLS] }] : [],
@@ -463,6 +501,8 @@ export function startBotProduct(ctx, options = {}) {
         { id: 'model-inference', label: '模型推理', tools: ['model/infer'] },
         { id: 'mr-routing', label: '模型路由', tools: PRODUCT_TOOLS.filter(name=>name!=='model/infer') },
         { ...TASK_CAPABILITY },
+        ...[...new Set((machines?.readModel().items ?? []).filter(machine => machine.status !== 'revoked').flatMap(machine => machine.tools))]
+          .map(tool => ({ id: tool, label: tool, tools: [`remote/${tool}`] })),
       ],
       taskBackends: taskBackends ? taskBackends.catalog() : [],
       fundingScopes: fundingAccounts ? fundingAccounts.catalog().filter(scope => scope.enabled).map(scope => ({ id: scope.id, label: scope.provider, modes: ['api','subscription'] })) : [] }
@@ -527,6 +567,7 @@ export function startBotProduct(ctx, options = {}) {
           })
         },
       }))
+      routingSettings = openBotRoutingSettings({ Database, file: storageFile, initial: () => config.botRouting, now })
       machines = openRemoteMachines({ Database, file:storageFile, authority, cliProfiles:cliConfig?.remote??[],
         botExists:id=>Boolean(product&&Object.hasOwn(product.rt.state?.bots??{},id)), now,
         resolveSecret:async secretRef=>{
@@ -589,18 +630,22 @@ export function startBotProduct(ctx, options = {}) {
           cli: cliConfig?.entry ? { entry: cliConfig.entry, sessionFactory: cliSessionFactory ?? (await import('../../cli-runtime/src/codex-runtime.mjs')).createCodexSession } : null })
         const remoteWrite=createRemoteWriteBackend({machines:()=>machines,directory})
         const remoteCommand=createRemoteCommandBackend({machines:()=>machines,directory})
-        if(cliConfig?.remote.length)remoteCliBackend=createRemoteCliTaskBackend({machines:()=>machines,directory,store:funding.store,authority,profiles:cliConfig.remote,bindingFor:botId=>botSettings.get(botId,{publishChange:false})})
+        turnBackends = createBotTurnBackends({ ctx, runtime: () => product?.rt, directory, authority, Database, storeFile: storageFile,
+          bindingFor: botId => botSettings.get(botId, { publishChange: false }), machines: () => machines,
+          readPlan: report => taskService.getPlan(directory.forBot(report.originBotId), { planId: report.planId }), now })
+        if(cliConfig?.remote.length)remoteCliBackend=createRemoteCliReadBackend({machines:()=>machines,directory,store:funding.store,authority,profiles:cliConfig.remote,bindingFor:botId=>botSettings.get(botId,{publishChange:false})})
         const remoteBackends=[remoteWrite,remoteCommand,...(remoteCliBackend?[remoteCliBackend]:[])]
         taskBackends=Object.freeze({backends:Object.freeze([...modelBackends.backends,...remoteBackends]),catalog:()=>[...modelBackends.catalog(),...remoteBackends.map(backend=>({id:backend.id,version:backend.version,effect:backend.effect,location:'remote',capability:backend.capability,label:backend.id==='remote-codex-read'?'已授权远程官方 CLI 只读任务':backend.id==='remote-write'?'已授权远程文件写入任务':'已授权容器命令任务（仅别名argv）'}))]})
-        taskService = createTaskService({ journal, authority, directory, backends: [...taskBackends.backends],
+        taskService = createTaskService({ journal, authority, directory, backends: [...turnBackends.backends, ...taskBackends.backends],
           within: (subject, signal, work) => policy.executionContext(subject, signal, work),
           planTargetsFor: (subject,plan,caller) => {
             const id=authority.describe(subject).botId
             const bot=product?.lifecycle.committedBot(id)
-            const privateCall=caller.owner===true||bot&&caller.sessionId===(bot.sessionId??bot.id)
+            const privateSession=product?.rt.chatOf(id)??bot?.sessionId??bot?.id
+            const privateCall=caller.owner===true||bot&&caller.sessionId===privateSession
             if(caller.sessionId!==undefined&&plan.origin.kind==='private'&&!privateCall)throw Object.assign(new Error('TASK_PLAN_ORIGIN_MISMATCH'),{code:'TASK_PLAN_ORIGIN_MISMATCH'})
-            if(caller.owner===true&&plan.origin.kind==='private'&&plan.origin.sessionId!==null&&plan.origin.sessionId!==(bot?.sessionId??bot?.id))throw Object.assign(new Error('TASK_PLAN_ORIGIN_MISMATCH'),{code:'TASK_PLAN_ORIGIN_MISMATCH'})
-            return privateCall&&plan.origin.kind==='private'&&product?.lifecycle.committedMainBotIds().includes(id)?product.lifecycle.committedBots().map(bot=>bot.id):[id]
+            if(caller.owner===true&&plan.origin.kind==='private'&&plan.origin.sessionId!==null&&plan.origin.sessionId!==privateSession)throw Object.assign(new Error('TASK_PLAN_ORIGIN_MISMATCH'),{code:'TASK_PLAN_ORIGIN_MISMATCH'})
+            return privateCall&&['private','handoff'].includes(plan.origin.kind)&&product?.lifecycle.committedMainBotIds().includes(id)?product.lifecycle.committedBots().map(bot=>bot.id):[id]
           },
           runnerTtlMs: TASK_RUNNER_TTL_MS, taskTtlMs: TASK_TTL_MS,
           // The committed binding's maxConcurrentTasks is the per-Bot limit; an
@@ -623,29 +668,21 @@ export function startBotProduct(ctx, options = {}) {
         releaseTaskTools = registerTaskTools(ctx, defineTool, { service: taskService, directory })
       }
       const machineActions=Object.fromEntries(['pair','bind','probe','revoke','reconcile'].map(name=>[`machine.${name}`,(payload,context)=>machines[name](payload,context)]))
-      // A newly paired machine is usable by the Main Bot at once: pairing already binds the probe
-      // bot, and the Main Bot is the operator's own assistant, so it gets the same full ceiling
-      // instead of needing a second trip through the binding form.
-      machineActions['machine.pair'] = async (payload, context) => {
-        const paired = await machines.pair(payload, context)
-        try {
-          const mainId = (product?.rt.state?.mainBotIds ?? [])[0]
-          if (mainId && mainId !== payload?.probeBotId) {
-            const record = machines.readModel().items.find(item => item.id === (paired?.machineId ?? payload?.machineId))
-            const config = record?.config ?? record ?? {}
-            const binding = (record?.bindings ?? []).find(item => item.botId === payload?.probeBotId)
-            const roots = Array.isArray(config.roots) ? config.roots : (Array.isArray(binding?.roots) ? binding.roots : [])
-            const tools = Array.isArray(config.tools) ? config.tools : (Array.isArray(binding?.tools) ? binding.tools : [])
-            if (roots.length && tools.length) await machines.bind({ machineId: record?.id ?? payload?.machineId, botId: mainId, roots, tools, mode: 'workspace-write', expectedRevision: record?.revision ?? 0 }, context)
-          }
-        } catch { /* the Main Bot binding is a convenience; pairing itself already succeeded */ }
-        return paired
-      }
+      machineActions['machine.pair'] = (payload, context) => pairMainMachine({ machines,
+        mainBotId: () => product?.rt.state?.mainBotIds?.[0] }, payload, context)
       machineActions['machine.artifact']=(payload,context)=>machines.download(taskOwner(payload),payload,context)
       // Desktop control: a person watches one frame and acts on it. Both calls run as that
       // person's Bot, so the Bot grant and the machine ceiling decide, and the operations land
       // under that Bot instead of an anonymous console.
       const desktopActions = createDesktopActions({ machines, directory })
+      for (const [action, method] of [['open', 'desktopSession'], ['renew', 'renewDesktopSession'], ['close', 'closeDesktopSession']]) {
+        machineActions[`machine.desktop.${action}`] = (payload, context) => {
+          if (context?.kind !== 'owner') throw new Error('REMOTE_OWNER_REQUIRED')
+          if (!payload || typeof payload.botId !== 'string') throw new Error('INVALID_DESKTOP_REQUEST')
+          const { botId, ...request } = payload
+          return machines[method](taskOwner({ botId }), request, context)
+        }
+      }
       machineActions['machine.desktop.view'] = (payload, context) => {
         if (context?.kind !== 'owner') throw new Error('REMOTE_OWNER_REQUIRED')
         return desktopActions.view(payload)
@@ -662,8 +699,13 @@ export function startBotProduct(ctx, options = {}) {
         await product.rt.secretEndpoint('secret-set',{name:payload.name,value:payload.value,scope:[],purpose:'远程电脑控制面凭据，仅供宿主使用；不得授予 Bot shell。'})
         return {secretRef,stored:true}
       }
+      const botLibrary = (() => { try { return ctx.get?.('botLibrary') ?? null } catch { return null } })()
+      const botRuntimeAdapter = (() => { try { return ctx.get?.('botRuntimeAdapter') ?? null } catch { return null } })()
+      const routineStore = (() => { try { return ctx.get?.('routineStore') ?? null } catch { return null } })()
+      if (routineStore) routineExecution = createRoutineExecutionService({ machines, store: routineStore, botIdForSubject: describeBot })
       product = createBotProduct(ctx, { authority, directory, policy, grantFor,
         accountStream: (streamOptions, next, meta) => {
+          turnBackends?.tagModelRequest(streamOptions)
           const enriched = meta?.subject ? { ...meta, botId: describeBot(meta.subject) } : meta
           // N06b: the unified admission owns every Bot model call; the diagnostic
           // decorator only remains for lightweight contexts without the store.
@@ -761,26 +803,24 @@ export function startBotProduct(ctx, options = {}) {
           'roles.list': async () => listRoles(),
           ...(routineStore ? {
             'routine.list': async payload => routineStore.inspect(payload?.botId),
-            'routine.run': async (payload, context) => {
-              const routine = routineStore.get(payload?.botId, payload?.routineId)
-              const subject = operatorSubject() ?? (typeof context?.subject === 'string' ? context.subject : null)
-              if (!subject) throw new Error('UNKNOWN_SUBJECT')
-              const steps = []
-              for (const [index, step] of routine.steps.entries()) {
-                const mapped = routineStepToTool(step)
-                if (!mapped) { await new Promise(resolve => setTimeout(resolve, step.ms)); steps.push(index); continue }
-                const identity = { taskId: `routine-${randomUUID()}`, attemptId: `attempt-${randomUUID()}`, operationId: `operation-${randomUUID()}` }
-                const record = await machines.call(subject, { machineId: payload?.machineId, rootId: payload?.rootId || 'project', ...identity, tool: mapped.tool, args: mapped.args })
-                if (record?.status && record.status !== 'succeeded') return { status: 'failed', steps, stoppedAt: index, error: record.error?.message ?? record.status }
-                steps.push(index)
-              }
-              return { status: 'succeeded', steps, stoppedAt: null }
-            },
+            'routine.save': async payload => routineStore.save(payload?.botId, payload?.routine),
+            'routine.remove': async payload => routineStore.remove(payload?.botId, payload?.routineId),
+            'routine.history': async payload => routineExecution.history(payload?.botId),
+            'routine.cancel': async payload => routineExecution.cancel(payload?.botId, payload?.runId),
+            'routine.resolve': async (payload, context) => routineExecution.resolve(payload?.botId, payload?.runId, payload?.note, context),
+            'routine.run': async (payload, context) => routineExecution.run({ subject: taskOwner(payload),
+              botId: payload?.botId, routineId: payload?.routineId, machineId: payload?.machineId, rootId: payload?.rootId,
+              context, signal: context.signal }),
           } : {}),
           ...(botLibrary ? {
             'library.list': async payload => botLibrary.list(payload?.botId, payload?.relativePath ?? ''),
             'library.read': async payload => ({ content: botLibrary.read(payload?.botId, payload?.relativePath ?? '') }),
+            'library.search': async payload => ({ results: botLibrary.search(payload?.botId, payload?.query) }),
             'library.write': async payload => botLibrary.write(payload?.botId, payload?.relativePath ?? '', payload?.content ?? ''),
+            'library.upload': async payload => botLibrary.upload(payload?.botId, payload?.relativePath, payload?.contentBase64, payload?.overwrite),
+            'library.download': async payload => botLibrary.download(payload?.botId, payload?.relativePath),
+            'library.remove': async payload => botLibrary.remove(payload?.botId, payload?.relativePath),
+            'library.mkdir': async payload => botLibrary.mkdir(payload?.botId, payload?.relativePath),
           } : {}),
           // The Bot runtime card is a panel: its buttons dispatch on this channel, so the same four
           // operations the owner RPC exposes must exist here as well.
@@ -789,19 +829,25 @@ export function startBotProduct(ctx, options = {}) {
             'botRuntimeMove': async payload => botRuntimeAdapter.move(payload?.botId, payload?.mode),
             'botRuntimeHistory': async payload => botRuntimeAdapter.history(payload?.botId, { limit: payload?.limit }),
             'botRuntimeMessage': async payload => {
-              if (valueOf(config, 'independentRuntime.fullTextHistory', false) !== true) throw new Error('HISTORY_FULLTEXT_DISABLED')
+              if (config.independentRuntime?.fullTextHistory !== true) throw new Error('HISTORY_FULLTEXT_DISABLED')
               return botRuntimeAdapter.readMessage(payload?.botId, payload?.index)
             },
           } : {}),
           // The workbench reads Bot routing through the same product channel as every other panel
           // action. Registering it here is what makes the routing card work at runtime; the owner
           // RPC methods are a second door onto the same service.
-          'botRoutingInspect': async () => botRouting.inspect(),
+          'botRoutingInspect': async () => ({ ...botRouting.inspect(), settingsRevision: routingSettings.get().revision }),
+          'botRouting.save': async (payload, context) => {
+            const saved = routingSettings.save(payload, context)
+            return { ...botRouting.inspect(), settingsRevision: saved.revision }
+          },
           'botRoutingDecide': async payload => botRouting.decide({
             text: payload?.text,
             pinnedBotId: payload?.pinnedBotId ?? '',
             requiresMachine: payload?.requiresMachine === true,
             machineId: payload?.machineId ?? '',
+            rootId: payload?.rootId ?? '',
+            needs: payload?.needs ?? {},
             requiredTools: Array.isArray(payload?.requiredTools) ? payload.requiredTools : [],
             requesterBotId: typeof payload?.requesterBotId === 'string' ? payload.requesterBotId : '',
           }),
@@ -830,24 +876,7 @@ export function startBotProduct(ctx, options = {}) {
             // Bot routing turns a preview into a real package: the decision names the Bot, the
             // worker binding is committed first, and only then is the plan submitted. A failure in
             // either step leaves no half-dispatched task behind.
-            'botRouting.dispatch': async (payload, context) => {
-              if (!taskService) throw new Error('TASK_SERVICE_UNAVAILABLE')
-              const requesterBotId = typeof payload?.requesterBotId === 'string' ? payload.requesterBotId : ''
-              const decision = botRouting.decide({
-                text: payload?.text, pinnedBotId: payload?.pinnedBotId ?? '',
-                requiresMachine: payload?.requiresMachine === true, machineId: payload?.machineId ?? '',
-                requesterBotId,
-              })
-              if (!decision.chosen) throw new Error('BOT_ROUTING_NO_ELIGIBLE')
-              if (decision.binding) {
-                const roots = (() => { try { const row = machines.readModel().items.find(item => item.id === decision.binding.machineId); return row?.roots?.map(root => root.id ?? root) ?? ['project'] } catch { return ['project'] } })()
-                await machineActions['machine.bind']({ ...decision.binding, roots, expectedRevision: undefined }, context)
-              }
-              const taskId = `task-${randomUUID()}`
-              const plan = buildRoutedPlan({ decision, text: payload.text, taskId, requesterBotId, acceptance: Array.isArray(payload?.acceptance) ? payload.acceptance : [], effectClass: decision.binding ? 'workspace-write' : 'read' })
-              const submitted = await taskService.submitPlan(taskOwner({ botId: decision.chosen.botId }), { requestKey: payload?.requestKey ?? `route-${taskId}`, plan }, { owner: true })
-              return { decision, plan, submitted }
-            },
+            'botRouting.dispatch': (payload, context) => botRouting.dispatch(payload, context),
             'task.plan.submit': payload => taskService.submitPlan(taskOwner(payload),{requestKey:payload?.requestKey,plan:payload?.plan},{owner:true}),
             'task.plan.cancel': payload => taskService.cancelPlan(taskOwner(payload),{planId:payload?.planId}),
             'task.cancel': payload => taskService.cancel(taskOwner(payload), { taskId: payload?.taskId }),
@@ -866,19 +895,26 @@ export function startBotProduct(ctx, options = {}) {
         authorizeRequest })
       releaseMachineSecrets=guardMachineSecrets(ctx,product.rt,machines)
       ctx.provide('botRemoteMachines', machines)
-      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject,botRouting,routineStore,handoffTask})
+      registerRemoteComputerTools(ctx,{runtime:product.rt,directory,machines,taskService,remoteCliBackend,operatorSubject,botRouting,routineStore,routineExecution,handoffTask,
+        routedExecution: turnBackends, botIdFor: exec => describeBot(directory.forAgent(exec?.agent)), routingBotIds: () => product.rt.state.mainBotIds ?? [] })
       // The MR execution paths project their routes through the same Bot
       // binding, so a consult run carries the binding price instead of an
       // unknown-cost package.
       if (funding) ctx.provide('botFunding', funding.funded)
       deferredRouterState?.resolve(funding.state)
+      machineHeartbeat = createMachineHeartbeat({ machines: () => machines, preferredBotIds: () => product.rt.state.mainBotIds ?? [] })
+      machineHeartbeat.start()
       timer = setInterval(() => { void refresh() }, refreshIntervalMs)
       timer.unref()
       return product
     }catch(error){
-      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close()])try{cleanup()}catch{}
+      await machineHeartbeat?.close?.()
+      await routineExecution?.close?.()
+      await machines?.closeDesktopSessions?.()
+      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close()])try{cleanup()}catch{}
       if(taskService)await taskService.close().catch(()=>{})
       else journal?.close()
+      turnBackends?.close()
       if(remoteCliBackend)await remoteCliBackend.close().catch(()=>{})
       if(funding)await funding.close().catch(()=>{})
       if(deferredRouterState)try{deferredRouterState.reject(error)}catch{}
@@ -902,9 +938,13 @@ export function startBotProduct(ctx, options = {}) {
       if (timer) clearInterval(timer)
       const product = await boot.then(value => value, () => null)
       try{
-        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close()])try{cleanup()}catch{}
+        await machineHeartbeat?.close?.()
+        await routineExecution?.close?.()
+        await machines?.closeDesktopSessions?.()
+        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close()])try{cleanup()}catch{}
         if(taskService)await taskService.close().catch(()=>{})
         else journal?.close()
+        turnBackends?.close()
         if(remoteCliBackend)await remoteCliBackend.close().catch(()=>{})
         if(funding)await funding.close()
       }finally{authority.dispose();if(sharedAdmission)await sharedAdmission.release()}

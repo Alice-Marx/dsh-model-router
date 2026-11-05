@@ -1,0 +1,11 @@
+--- a/src/client/index.js
++++ b/src/client/index.js
+@@ -1082,7 +1082,7 @@
+       let landed = false
+       let declared = true
+       try {
+-        landed = ctx.slots.entries('sidebar.workspaces').some(entry => entry.component === TeamSidebar)
++        landed = ctx.slots.entries('sidebar.workspaces').some(entry => entry.component === TeamSidebar || entry.component?.dsBotTeamSidebar === TeamSidebar)
+         declared = ctx.slots.spec?.('sidebar.workspaces') !== undefined
+       } catch {
+         declared = false

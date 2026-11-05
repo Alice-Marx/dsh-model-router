@@ -1,0 +1,10 @@
+--- a/src/client/sidebar.js
++++ b/src/client/sidebar.js
+@@ -586,6 +586,7 @@
+         : entry.kind === 'room'
+           ? h(RoomRow, { key: entry.item.id, ...rowProps, room: entry.item, marked: markedUnread[entry.item.id] === true })
+           : h(AgentRow, { key: entry.item.id, ...rowProps, agent: entry.item, marked: markedUnread[entry.item.id] === true })))),
++    typeof actions.sidebarAddon === 'function' ? h(actions.sidebarAddon, { wide: wideContent }) : null,
+     foot)
+   return h(Fragment, null,
+     h(TitleToggle, { hidden: mode === 'hidden', onToggle }),

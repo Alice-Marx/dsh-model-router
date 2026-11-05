@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
-class DesktopHelper {
+partial class DesktopHelper {
   const int ProtocolVersion = 2;
   static readonly string InstanceId = Guid.NewGuid().ToString("N");
   static readonly DesktopLease Leases = new DesktopLease();
@@ -27,9 +27,14 @@ class DesktopHelper {
   [ThreadStatic] static long FrameExpiresAt;
   static volatile bool Paused = false, Stopping = false;
   static string Token, AllowedProcess, PipeName; static int Session;
+  static bool FullDesktop;
+  const int StreamVersion = 1;
+  const long SessionLeaseMs = 15000;
   static Dictionary<string, Capture> Captures = new Dictionary<string, Capture>();
   static object Gate = new object();
-  class Capture { public IntPtr Window,Foreground; public Rectangle Bounds; public uint Dpi; public long Created,Generation;public int Epoch;public string Hash,Owner; }
+  class Capture { public IntPtr Window,Foreground; public Rectangle Bounds; public uint Dpi; public long Created,Generation;public int Epoch;public string Hash,Owner,DisplayId;public bool Full; }
+  static readonly HashSet<ushort> ModelHeldKeys = new HashSet<ushort>();
+  static readonly HashSet<uint> ModelHeldButtons = new HashSet<uint>();
   [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)] struct MOUSEINPUT { public int dx, dy; public uint mouseData, dwFlags, time; public IntPtr extra; }
   [StructLayout(LayoutKind.Sequential)] struct KEYBDINPUT { public ushort vk, scan; public uint flags, time; public IntPtr extra; }
@@ -54,6 +59,10 @@ class DesktopHelper {
   [DllImport("user32.dll", SetLastError=true)] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
   [DllImport("user32.dll")] static extern bool CloseDesktop(IntPtr desktop);
   [DllImport("user32.dll")] static extern bool GetUserObjectInformation(IntPtr handle, int index, StringBuilder data, int length, out int needed);
+  [DllImport("gdi32.dll")] static extern IntPtr CreateDC(string driver, string device, string output, IntPtr init);
+  [DllImport("gdi32.dll")] static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height, IntPtr source, int srcX, int srcY, int raster);
+  [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
+  [DllImport("gdi32.dll")] static extern int GetDeviceCaps(IntPtr dc, int index);
   static void Require(bool condition, string code) { if (!condition) throw new InvalidOperationException(code); }
   // JSON numbers arrive as int, long or decimal; a null, a string or a fraction is a request
   // error, not a zero. Coercing them silently would click the window origin or type nothing.
@@ -67,6 +76,11 @@ class DesktopHelper {
   }
   static string TextArg(Dictionary<string,object> args, string key) {
     object value; Require(args.TryGetValue(key, out value) && value is string, "INVALID_ARGUMENT"); return (string)value;
+  }
+  static long LongArg(Dictionary<string,object> args,string key) {
+    object value;Require(args.TryGetValue(key,out value)&&value!=null,"INVALID_ARGUMENT");
+    if(value is long)return (long)value;if(value is int)return (int)value;
+    throw new InvalidOperationException("INVALID_ARGUMENT");
   }
   static INPUT Mouse(uint flags, uint data = 0) { return new INPUT { type = 0, value = new UNION { mouse = new MOUSEINPUT { mouseData = data, dwFlags = flags } } }; }
   static void ForwardKey(ushort key, uint flags) { Input(Keyboard(key, 0, flags), Keyboard(key, 0, flags | 0x2)); }
@@ -107,14 +121,21 @@ class DesktopHelper {
   }
   static string Hash(byte[] bytes) { using (SHA256 hash = SHA256.Create()) return Convert.ToBase64String(hash.ComputeHash(bytes)); }
   static long UnixMilliseconds(){return (long)(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds;}
-  static void Input(params INPUT[] input) { Ready();Leases.Check(ActiveTicket);InputStarted=true;Require(SendInput((uint)input.Length,input,Marshal.SizeOf(typeof(INPUT))) == input.Length,"INPUT_REJECTED"); }
+  static void Input(params INPUT[] input) {
+    Ready();Leases.Check(ActiveTicket);InputStarted=true;
+    foreach(INPUT item in input){if(item.type==1&&item.value.keyboard.vk!=0&&(item.value.keyboard.flags&2)==0)ModelHeldKeys.Add(item.value.keyboard.vk);if(item.type==0){uint f=item.value.mouse.dwFlags;if((f&2)!=0)ModelHeldButtons.Add(4);if((f&8)!=0)ModelHeldButtons.Add(16);if((f&32)!=0)ModelHeldButtons.Add(64);}}
+    Require(SendInput((uint)input.Length,input,Marshal.SizeOf(typeof(INPUT))) == input.Length,"INPUT_REJECTED");
+    foreach(INPUT item in input){if(item.type==1&&(item.value.keyboard.flags&2)!=0)ModelHeldKeys.Remove(item.value.keyboard.vk);if(item.type==0){uint f=item.value.mouse.dwFlags;if((f&4)!=0)ModelHeldButtons.Remove(4);if((f&16)!=0)ModelHeldButtons.Remove(16);if((f&64)!=0)ModelHeldButtons.Remove(64);}}
+  }
+  static bool ReleaseModelInput(){bool ok=true;foreach(ushort key in ModelHeldKeys)if(SendInput(1,new[]{Keyboard(key,0,2)},Marshal.SizeOf(typeof(INPUT)))!=1)ok=false;foreach(uint flag in ModelHeldButtons)if(SendInput(1,new[]{Mouse(flag)},Marshal.SizeOf(typeof(INPUT)))!=1)ok=false;if(ok){ModelHeldKeys.Clear();ModelHeldButtons.Clear();}return ok;}
   static INPUT Keyboard(ushort vk,ushort scan,uint flags) { return new INPUT { type=1, value=new UNION { keyboard=new KEYBDINPUT { vk=vk,scan=scan,flags=flags } } }; }
   static object Execute(string name,Dictionary<string,object> args,string owner) {
+    if(FullDesktop)return ExecuteFull(name,args,owner);
     Ready();IntPtr w = Target(args,name!="desktop_screenshot"&&name!="desktop_click");Rectangle bounds=Bounds(w);uint dpi=Dpi(w);
     Screen selected=Screen.FromHandle(w);if(!args.ContainsKey("displayId"))args["displayId"]=selected.DeviceName;Require(String.Equals(Convert.ToString(args["displayId"]),selected.DeviceName,StringComparison.Ordinal),"DISPLAY_MISMATCH");
     DesktopLease.Ticket ticket=Leases.Enter(owner);ActiveTicket=ticket;
     try{Leases.Check(ticket);return ExecuteOwned(name,args,owner,w,bounds,dpi,ticket);}
-    finally{ActiveTicket=null;Leases.Exit(ticket);}
+    finally{ReleaseModelInput();ActiveTicket=null;Leases.Exit(ticket);}
   }
   static object ExecuteOwned(string name,Dictionary<string,object> args,string owner,IntPtr w,Rectangle bounds,uint dpi,DesktopLease.Ticket ticket) {
     if(name=="desktop_screenshot") {
@@ -228,17 +249,22 @@ class DesktopHelper {
     try {
       Dictionary<string,string> options=new Dictionary<string,string>();for(int i=0;i+1<args.Length;i+=2)options[args[i]]=args[i+1];
       Session=Process.GetCurrentProcess().SessionId;Require(Environment.UserInteractive&&Session!=0,"DESKTOP_UNAVAILABLE");
-      PipeName=options["--pipe"];Require(System.Text.RegularExpressions.Regex.IsMatch(PipeName,"^dsh-desktop-[-a-zA-Z0-9]{1,64}$"),"INVALID_PIPE");AllowedProcess=options["--allowed-process"];Token=File.ReadAllText(options["--secret-file"]).Trim();Require(Token.Length>=43,"AUTH_INVALID");
+      PipeName=options["--pipe"];Require(System.Text.RegularExpressions.Regex.IsMatch(PipeName,"^dsh-desktop-[-a-zA-Z0-9]{1,64}$"),"INVALID_PIPE");Token=File.ReadAllText(options["--secret-file"]).Trim();Require(Token.Length>=43,"AUTH_INVALID");
+      // Full-desktop interactive streaming is opt-in per launch. The proven
+      // single-window --allowed-process path is unchanged and stays the default.
+      FullDesktop=options.ContainsKey("--desktop-mode")&&options["--desktop-mode"]=="full";
+      if(FullDesktop)AllowedProcess="";else{Require(options.ContainsKey("--allowed-process"),"INVALID_PIPE");AllowedProcess=options["--allowed-process"];}
       try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch{try{SetProcessDpiAwareness(2);}catch{}}
       bool created;using(Mutex lease=new Mutex(true,"Local\\DSH-Desktop-Exclusive",out created)) {
         Require(created,"DESKTOP_BUSY");PipeSecurity security=new PipeSecurity();security.SetAccessRuleProtection(true,false);
         SecurityIdentifier current=WindowsIdentity.GetCurrent().User;security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.NetworkSid,null),PipeAccessRights.FullControl,AccessControlType.Deny));security.AddAccessRule(new PipeAccessRule(current,PipeAccessRights.FullControl,AccessControlType.Allow));
         if(options.ContainsKey("--agent-sid"))security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(options["--agent-sid"]),PipeAccessRights.ReadWrite,AccessControlType.Allow));
         Application.EnableVisualStyles();NotifyIcon tray=new NotifyIcon{Icon=SystemIcons.Application,Text="DSH desktop control",Visible=true};ContextMenuStrip menu=new ContextMenuStrip();
-        menu.Items.Add("Pause / resume",null,delegate{Paused=!Paused;Leases.Invalidate();Interlocked.Increment(ref CaptureEpoch);tray.Text=Paused?"DSH desktop control paused":"DSH desktop control";});
-        menu.Items.Add("Stop and revoke session",null,delegate{Stopping=true;Token="";Leases.Invalidate();Interlocked.Increment(ref CaptureEpoch);tray.Visible=false;Application.Exit();});tray.ContextMenuStrip=menu;
+        menu.Items.Add("Pause / resume",null,delegate{Paused=!Paused;Leases.Invalidate();Interlocked.Increment(ref CaptureEpoch);if(Paused)StopStreams("DESKTOP_PAUSED");tray.Text=Paused?"DSH desktop control paused":"DSH desktop control";});
+        menu.Items.Add("Stop and revoke session",null,delegate{Stopping=true;Token="";Leases.Invalidate();Interlocked.Increment(ref CaptureEpoch);StopStreams("DESKTOP_STOPPED");tray.Visible=false;Application.Exit();});tray.ContextMenuStrip=menu;
         new Thread(delegate(){Loop(security,false);}){IsBackground=true}.Start();
         for(int i=0;i<8;i++)new Thread(delegate(){Loop(security,true);}){IsBackground=true}.Start();
+        if(FullDesktop)new Thread(delegate(){StreamLoop(security);}){IsBackground=true}.Start();
         Application.Run();tray.Dispose();lease.ReleaseMutex();
       } return 0;
     } catch(Exception e){Console.Error.WriteLine(e is InvalidOperationException?e.Message:"HELPER_START_FAILED");return 2;}

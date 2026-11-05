@@ -98,6 +98,18 @@ export const Config = z.object({
   // The former ds-bot entry's runtime options, kept separately from MR settings.
   // Non-volatile: changing home/workspace restarts the owning runtime.
   botRuntime: BotRuntimeConfig,
+  botRouting: z.object({
+    enabled: z.boolean().default(false),
+    preset: z.union(['economy', 'balanced', 'quality']).default('balanced'),
+    autoGrant: z.object({ machineTools: z.boolean().default(true), cliTools: z.boolean().default(false) })
+      .default({ machineTools: true, cliTools: false }),
+  }).default({ enabled: false, preset: 'balanced', autoGrant: { machineTools: true, cliTools: false } }),
+  operatorPassthrough: z.object({ enabled: z.boolean().default(true) }).default({ enabled: true }),
+  independentRuntime: z.object({
+    enabled: z.boolean().default(false), provider: z.string().default(''), model: z.string().default(''),
+    dir: z.string().max(4096).default(''), workspaceRoot: z.string().max(4096).default(''),
+    maxSteps: z.number().step(1).min(1).max(200).default(16), fullTextHistory: z.boolean().default(false),
+  }).default({ enabled: false }),
   budgetUsd: z.number().min(0).max(1_000_000).default(DEFAULT_ROUTER_SETTINGS.budgetUsd).volatile(),
   maxConsultOutputChars: z.number().step(1).min(500).max(50_000).default(12_000).volatile(),
   modelProfilesJson: z.string().max(32_000).default('[]').volatile(),
@@ -2331,7 +2343,7 @@ export function apply(ctx, config = {}) {
   let botProduct
   const taskCli = (() => { const value = config?.taskCli; return (typeof value === 'function' ? value() : value) ?? null })()
   try {
-    botProduct = productHost ? startBotProduct(ctx, { accountStream: createDiagnosticAccountStream(),
+    botProduct = productHost ? startBotProduct(ctx, { config, accountStream: createDiagnosticAccountStream(),
       deferredRouterState, storageFile: deferredRouterState?.state.file, legacyFile: defaultStatePath(),
       // N09: the managed Task runner reuses this plugin's own execution entries,
       // so the composition never needs a second copy of the MR runtime.
@@ -2382,13 +2394,19 @@ export function apply(ctx, config = {}) {
     try {
       const runtime = createPluginRuntime({
         ctx,
-        settings: { ...(valueOf(config, 'independentRuntime', {}) ?? {}), ...(ctx.get?.('botRemoteToolInvoker') ? { remoteInvoke: (botId, tool, args) => ctx.get('botRemoteToolInvoker').invoke(botId, tool, args) } : {}) },
+        settings: { ...(valueOf(config, 'independentRuntime', {}) ?? {}), remoteInvoke: (botId, tool, args) => {
+          const invoker = ctx.get?.('botRemoteToolInvoker')
+          if (!invoker) throw new Error('REMOTE_TOOL_SERVICE_UNAVAILABLE')
+          return invoker.invoke(botId, tool, args)
+        } },
         stateDir: dirname(routerStateStore().file),
       })
       if (runtime) botRuntime = {
         // One row per moved Bot: the runtime it is on plus its transcript size, never message bodies.
         list: async () => runtime.inventory(runtime.list().map(row => row.botId)).map(row => ({ botId: row.botId, mode: row.runtime, changedAt: row.updatedAt ?? null, turns: row.turns, messages: row.messages })),
         move: (botId, mode) => runtime.move(botId, mode),
+        history: (botId, options) => runtime.history(botId, options),
+        readMessage: (botId, index) => runtime.readMessage(botId, index),
       }
     } catch (error) {
       ctx.logger?.('model-router: independent runtime unavailable: %s', error?.message ?? error)

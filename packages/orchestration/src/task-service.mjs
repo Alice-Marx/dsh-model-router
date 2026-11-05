@@ -15,14 +15,17 @@ export function createTaskService({journal,authority,directory,backends,within=(
     for(const key of ['capability','retryCapability'])if(typeof backend[key]!=='string'||!backend[key]||backend[key].length>256)fail('INVALID_TASK_BACKEND')
     if((backend.reconcile!==undefined||backend.reconcileCapability!==undefined)&&(typeof backend.reconcile!=='function'||typeof backend.reconcileCapability!=='string'||!backend.reconcileCapability||backend.reconcileCapability.length>256))fail('INVALID_TASK_BACKEND')
     if(registry.has(backend.id)||!['read','workspace-write'].includes(backend.effect)||!['local','remote'].includes(backend.location)||typeof backend.parse!=='function'||typeof backend.run!=='function'||backend.targetFor!==undefined&&typeof backend.targetFor!=='function')fail('INVALID_TASK_BACKEND')
-    if(backend.effect==='workspace-write'&&(!['scoped-remote-file-v1','scoped-remote-command-v1'].includes(backend.writeContract)||backend.location!=='remote'||typeof backend.targetFor!=='function'||typeof backend.canObserve!=='function'||typeof backend.reconcile!=='function'))fail('INVALID_TASK_BACKEND')
+    const botTurn=backend.id==='bot-turn-write'&&backend.writeContract==='tracked-bot-turn-v1'
+    if(backend.effect==='workspace-write'&&((!botTurn&&!['scoped-remote-file-v1','scoped-remote-command-v1'].includes(backend.writeContract))||!botTurn&&backend.location!=='remote'||typeof backend.targetFor!=='function'||typeof backend.canObserve!=='function'||typeof backend.reconcile!=='function'))fail('INVALID_TASK_BACKEND')
     registry.set(backend.id,backend)
   }
   const target=backend=>({backend:backend.id,version:backend.version,effect:backend.effect,machineId:backend.machineId,workspaceId:backend.workspaceId,location:backend.location,capability:backend.capability,retryCapability:backend.retryCapability,model:backend.model??null,...(backend.reconcileCapability?{reconcileCapability:backend.reconcileCapability}:{})})
   const resolvedTarget=(backend,subject,input)=>{
     const base=target(backend);if(!backend.targetFor)return base
     const value=backend.targetFor(subject,input)
-    if(!value||Object.keys(value).some(k=>!['machineId','workspaceId','remoteMachineRevision','remoteBindingRevision'].includes(k)))fail('INVALID_TASK_BACKEND_TARGET')
+    const botTurn=['bot-turn-read','bot-turn-write'].includes(backend.id)
+    if(!value||Object.keys(value).some(k=>!['machineId','workspaceId','remoteMachineRevision','remoteBindingRevision',...(botTurn?['location']:[])].includes(k))
+      ||value.location!==undefined&&!['local','remote'].includes(value.location))fail('INVALID_TASK_BACKEND_TARGET')
     taskRef(value.machineId);taskRef(value.workspaceId)
     for(const key of ['remoteMachineRevision','remoteBindingRevision'])if(!Number.isSafeInteger(value[key])||value[key]<1)fail('INVALID_TASK_BACKEND_TARGET')
     return {...base,...value}

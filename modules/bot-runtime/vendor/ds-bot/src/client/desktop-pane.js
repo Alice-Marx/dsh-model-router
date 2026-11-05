@@ -9,12 +9,23 @@
 // This pane owns no authority: the product client registers a bridge on `globalThis`
 // (`__dshDesktop`) whose calls already run as the owner through the plugin's remote channel. A
 // frame is single use, so every action carries the id of the picture that person saw.
+//
+// The product owns this file: it has no upstream counterpart. The product client also owns the
+// real desktop frontend; when it registered a renderer on the bridge, that renderer draws this
+// tab and the pane below stays as the fallback for a host that never installed one.
 
 import { createElement as h, useCallback, useEffect, useRef, useState } from 'react'
 
 const bridge = () => {
   const value = globalThis.__dshDesktop
   return value && typeof value.view === 'function' ? value : null
+}
+
+// The product's own desktop pane, registered by the product client. It receives the drawer's
+// subject and the bridge, and calls the same owner channel this pane would.
+const renderer = () => {
+  const value = globalThis.__dshDesktop
+  return value && typeof value.renderPane === 'function' ? value.renderPane : null
 }
 
 /** Map a click inside the rendered box back to pixels of the original frame. */
@@ -42,9 +53,12 @@ export function DesktopPane({ bot }) {
   const bigRef = useRef(null)
 
   const api = bridge()
+  // The bridge can appear or disappear between renders, so every hook below stays
+  // unconditional and only stands down while the product's own pane draws this tab.
+  const pane = renderer()
 
   useEffect(() => {
-    if (!api) return undefined
+    if (!api || pane) return undefined
     let current = true
     Promise.resolve(api.machines?.()).then(
       (rows) => {
@@ -55,10 +69,10 @@ export function DesktopPane({ bot }) {
       () => {},
     )
     return () => { current = false }
-  }, [api])
+  }, [api, pane])
 
   const capture = useCallback(async () => {
-    if (!api || !machineId) return
+    if (!api || !machineId || pane) return
     setStatus('capturing')
     setError('')
     try {
@@ -75,19 +89,19 @@ export function DesktopPane({ bot }) {
       setStatus('error')
       setError(String(failure?.message ?? failure))
     }
-  }, [api, bot.id, machineId])
+  }, [api, bot.id, machineId, pane])
 
   // One frame when the tab opens, then fresh frames only while asked.
   useEffect(() => {
-    if (!api || !machineId || frame) return
+    if (!api || !machineId || frame || pane) return
     void capture()
-  }, [api, machineId, frame, capture])
+  }, [api, machineId, frame, capture, pane])
 
   useEffect(() => {
-    if (!live || !api || !machineId) return undefined
+    if (!live || !api || !machineId || pane) return undefined
     const timer = setInterval(() => { void capture() }, 1500)
     return () => clearInterval(timer)
-  }, [live, api, machineId, capture])
+  }, [live, api, machineId, capture, pane])
 
   const act = async (action) => {
     if (!api || !frame?.screenshotId) return
@@ -106,6 +120,8 @@ export function DesktopPane({ bot }) {
     const point = pointOf(event, element, frame)
     if (point) void act({ tool: 'click', x: point.x, y: point.y })
   }
+
+  if (pane) return h(pane, { bot, api })
 
   if (!api) {
     return h('div', { className: 'bt-muted' }, '远程桌面需要工作台已加载：打开一次「电脑」页，再回到这里。')

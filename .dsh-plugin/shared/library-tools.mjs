@@ -53,7 +53,11 @@ export function registerLibraryTools({ ctx, config, defineTool, registerPolicyTo
   register('bot_library_read', 'Read one UTF-8 file from a Bot\'s own library. Bounded to 1 MiB.', target,
     async (args, exec) => jsonValue({ content: library.read(libraryFor({ ...exec, arguments: args }), args.relativePath ?? '') }))
 
-  register('bot_library_write', 'Write one UTF-8 file into a Bot\'s own library. Bounded to 1 MiB.', target,
+  register('bot_library_search', 'Search literal text in the calling Bot\'s own UTF-8 library files (each at most 1 MiB). Returns up to 50 path/line/text matches; no OCR or binary-content search.', {
+    botId: target.botId, query: { type: 'string', required: true },
+  }, async (args, exec) => jsonValue({ results: library.search(libraryFor({ ...exec, arguments: args }), args.query) }))
+
+  register('bot_library_write', 'Write one UTF-8 file into a Bot\'s own library. Bounded to 1 MiB.', { ...target, content: { type: 'string', required: true } },
     async (args, exec) => jsonValue(library.write(libraryFor({ ...exec, arguments: args }), args.relativePath ?? '', args.content ?? '')))
 
   return true

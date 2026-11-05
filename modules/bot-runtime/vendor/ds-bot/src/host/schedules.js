@@ -1,3 +1,5 @@
+import { adaptScheduleService } from '../../../../schedule-compat.mjs'
+
 // Scheduled tasks. DSH's schedule service stores each task with the Session it belongs
 // to and, when it is due, sends its prompt to that Session as a new message. This
 // module lists the team's tasks for Settings, creates and removes them there, and moves
@@ -73,7 +75,7 @@ export function install(rt) {
   let service = null
 
   const attach = (sub) => {
-    const own = sub.schedule
+    const own = adaptScheduleService(sub.schedule)
     service = own
     sub.effect(() => () => { if (service === own) service = null }, 'ds-bot: schedule service')
   }
@@ -93,11 +95,16 @@ export function install(rt) {
 
   async function schedulesView() {
     if (service === null) return { available: false, tasks: [] }
+    const now = Date.now()
     const tasks = []
     for (const entry of await service.catalog()) {
       const owner = ownerOf(entry.sessionId)
       if (!known(owner)) continue
-      tasks.push({ ...entry, ...owner })
+      // The state DSH derives for its own view: a task past its next firing reads
+      // overdue; an inactive one is finished. DSH 0.2.1's catalog() carries the
+      // status but not this state, so it is derived the same way here.
+      const state = entry.status === 'active' ? (now >= Date.parse(entry.scheduledAt) ? 'overdue' : 'scheduled') : 'finished'
+      tasks.push({ ...entry, ...owner, state })
     }
     return { available: true, tasks }
   }

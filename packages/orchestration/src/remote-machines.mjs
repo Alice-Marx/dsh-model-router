@@ -1,6 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { createDesktopSessionHost } from './desktop-sessions.mjs'
 
 export const REMOTE_TOOLS = Object.freeze(['machine_ping','fs_list','fs_read','fs_write','shell_exec','container_command_v1','cli_probe_v1','cli_task_v1',
   'operation_status','operation_cancel','artifact_stat','artifact_read','worktree_create','worktree_diff','worktree_integrate',
@@ -118,8 +119,13 @@ export function openRemoteMachines({ Database, file, resolveSecret, botExists, a
     platform: row.health?.platform ?? null, version: row.health?.version ?? null, capabilities: row.health?.capabilities ?? [], desktop: row.health?.desktop ?? {status:'unverified'},
     revocations:db.prepare('SELECT bot_id,status,at_ms FROM remote_machine_revocations WHERE machine_id=?').all(row.id).map(r=>({botId:r.bot_id,status:r.status,at:r.at_ms})),
     bindings: db.prepare('SELECT bot_id,revision,scope,revoked FROM remote_machine_bindings WHERE machine_id=?').all(row.id).map(b => ({botId:b.bot_id,revision:b.revision,revoked:Boolean(b.revoked),...JSON.parse(b.scope)})) })
+  const desktopSessions = createDesktopSessionHost({ machine, binding, authority, issue, request, event, now })
   const store = {
     schemaVersion:1, file,
+    desktopSession: (subject, input, context) => desktopSessions.open(subject, input, context),
+    renewDesktopSession: (subject, input, context) => desktopSessions.renew(subject, input, context),
+    closeDesktopSession: (subject, input, context) => desktopSessions.close(subject, input, context),
+    closeDesktopSessions: () => desktopSessions.closeAll(),
     async pair(input,context) {
       owner(context); alive(); keys(input,['machineId','name','endpoint','secretRef','protectedTunnel','roots','tools','probeBotId','expectedRevision'])
       if (!ref(input.machineId) || !ref(input.probeBotId) || !botExists(input.probeBotId)) fail('INVALID_MACHINE_ID')

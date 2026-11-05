@@ -6,7 +6,9 @@ New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $output = [IO.Path]::GetFullPath((Join-Path $OutputDirectory 'dsh-desktop-helper.exe')).Replace('/', '\')
 $source = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'Program.cs')).Path.Replace('/', '\')
 $leaseSource = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'DesktopLease.cs')).Path
-& $compiler /nologo /optimize+ /target:winexe /platform:anycpu "/out:$output" /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll $source $leaseSource
+$streamSource = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'DesktopStream.cs')).Path
+$fullSource = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'FullDesktop.cs')).Path
+& $compiler /nologo /optimize+ /target:winexe /platform:anycpu "/out:$output" /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll $source $leaseSource $streamSource $fullSource
 if ($LASTEXITCODE -ne 0) { throw 'Desktop helper compilation failed' }
 function Show-Sha256([string]$File) {
   $hash = [Security.Cryptography.SHA256]::Create()

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "stages": [
+    [
+      "scripts/check-readme.mjs"
+    ],
+    [
+      "--test",
+      "tests/readme-math.test.mjs",
+      "tests/desktop-compat.test.mjs"
+    ],
+    [
+      "--test",
+      "tests/product-channel-dispatch.test.mjs",
+      "tests/bot-library-files.test.mjs",
+      "tests/library-panel.integration.test.mjs",
+      "tests/desktop-session-host.test.mjs",
+      "tests/desktop-stream-viewer.test.mjs",
+      "tests/bot-routing-bindings.test.mjs",
+      "tests/bot-routing-runtime.test.mjs",
+      "tests/bot-routing-settings.test.mjs",
+      "tests/bot-routing-tools.test.mjs",
+      "tests/routing-end-to-end.test.mjs",
+      "tests/desktop-session.test.mjs",
+      "tests/desktop-setup.test.mjs",
+      "tests/routine-recorder.test.mjs",
+      "tests/routine-desktop-workflow.test.mjs",
+      "tests/routines-panel.integration.test.mjs",
+      "tests/machine-heartbeat.test.mjs",
+      "tests/pair-main-machine.test.mjs",
+      "tests/desktop-viewer-adaptive.integration.test.mjs",
+      "tests/desktop-delta.native.mjs",
+      "tests/schedule-compat.test.mjs",
+      "tests/product-library-sequence.integration.test.mjs"
+    ]
+  ]
+}

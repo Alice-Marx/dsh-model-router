@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { replayRoutine } from './bot-routine.mjs'
+import { registerBotRoutingTools } from './bot-routing-tools.mjs'
+import { taskHash } from './task-contract.mjs'
+import { createRemoteWriteBackend } from './remote-execution.mjs'
+import { createRemoteCommandBackend } from './remote-command-execution.mjs'
 
 const JSON_OUTPUT = {
   schema: { type: 'json' },
@@ -52,26 +55,68 @@ export function routineStepToTool(step) {
   }
 }
 
-export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null, botRouting = null, routineStore = null, botIdFor = null, handoffTask = null }) {
+export function registerRemoteComputerTools(ctx, { runtime, directory, machines, taskService, remoteCliBackend = null, operatorSubject = null, botRouting = null, routingBotIds = [], routedExecution = null, routineStore = null, routineExecution = null, botIdFor = null, handoffTask = null }) {
   // A session that is not a Bot (the operator's own agent) is otherwise refused as
   // UNKNOWN_SUBJECT. When passthrough is enabled the Host supplies the Main Bot's subject, so the
   // call carries that Bot's grants and audit trail instead of a second permission set.
-  const subject = exec => directory.forAgent(exec.agent) ?? (typeof operatorSubject === 'function' ? operatorSubject() : null)
+  const subject = exec => {
+    try { return directory.forAgent(exec?.agent) }
+    catch (error) {
+      if (error?.code !== 'UNKNOWN_SUBJECT') throw error
+      const principal = typeof operatorSubject === 'function' ? operatorSubject() : null
+      if (!principal) throw error
+      return principal
+    }
+  }
+  // Routing/routines act only as a live bound Bot, even when ordinary operator tools support an
+  // explicitly configured Main passthrough. Agent string fields are never an identity lookup.
+  const callerBot = exec => {
+    directory.forAgent(exec?.agent)
+    const id = typeof botIdFor === 'function' ? botIdFor(exec) : ctx.get?.('botIdForAgent')?.(exec?.agent)
+    if (typeof id !== 'string' || !id) throw Object.assign(new Error('UNKNOWN_SUBJECT'), { code: 'UNKNOWN_SUBJECT' })
+    return id
+  }
   const register = (name, description, parameters, execute, output = JSON_OUTPUT) => ctx.tools.register(defineTool({ name, description, parameters, output, execute }))
   const call = async (exec, args, tool, business, identity = {}) => {
     await runtime.load()
-    const session = remoteSessionIdentity(exec)
+    const routed = routedExecution?.currentIdentity(exec)
+    if (routed && (routed.machineId !== args.machineId || routed.rootId !== args.rootId)) throw Object.assign(new Error('BOT_TURN_MACHINE_TARGET_MISMATCH'), { code: 'BOT_TURN_MACHINE_TARGET_MISMATCH' })
+    if (routed) routedExecution.assertOperationReady(routed, tool)
+    const session = routed ?? remoteSessionIdentity(exec)
     const taskId = identity.taskId ?? session.taskId
     const attemptId = identity.attemptId ?? session.attemptId
     const operationId = identity.operationId ?? `operation-${randomUUID()}`
-    const record = await machines.call(subject(exec), { machineId: args.machineId, rootId: args.rootId, taskId, attemptId, operationId,
-      tool, args: business, ...(identity.operationId || tool.startsWith('desktop_') || tool.startsWith('browser_') ? { operationId } : {}) }, { signal: exec.signal })
+    const note = status => { if (routed) routedExecution.recordOperation(routed, { machineId: args.machineId, rootId: args.rootId, operationId, tool, status }) }
+    note('dispatching')
+    let record
+    try {
+      record = await machines.call(subject(exec), { machineId: args.machineId, rootId: args.rootId, taskId, attemptId, operationId,
+        tool, args: business }, { signal: exec.signal })
+    } catch (error) { note('unknown'); throw error }
     const { value, status } = operationOutcome(record, tool)
+    note(status ?? 'succeeded')
     return { value, record, status, taskId, attemptId, operationId }
   }
   const target = {
     machineId: { type: 'string', required: true },
     rootId: { type: 'string', required: true },
+  }
+  let routedWrites, routedCommands
+  const routedMachineTask = async (exec, args, backend, tool) => {
+    const identity = routedExecution.currentIdentity(exec)
+    if (identity.machineId !== args.machineId || identity.rootId !== args.rootId) throw Object.assign(new Error('BOT_TURN_MACHINE_TARGET_MISMATCH'), { code: 'BOT_TURN_MACHINE_TARGET_MISMATCH' })
+    routedExecution.assertOperationReady(identity, tool)
+    const input = backend.parse(args), principal = subject(exec), descriptor = backend.targetFor(principal, input)
+    const target = { backend: backend.id, version: backend.version, effect: backend.effect, location: backend.location, ...descriptor }
+    const operationId = `operation-${randomUUID()}`
+    let reference
+    const note = (status, extra = {}) => routedExecution.recordOperation(identity, { machineId: input.machineId, rootId: input.rootId, operationId, tool, status, ...extra })
+    note('prepared')
+    const result = await backend.run({ input, target, ownerBotId: identity.botId, binding: { taskId: identity.taskId, attemptId: identity.attemptId, ...descriptor, location: 'remote' }, operationId,
+      targetHash: taskHash(target), signal: exec.signal ?? new AbortController().signal, attemptNumber: 1, legacyRunIds: [],
+      checkpoint: value => { reference = value; note('dispatching', { reference }) }, beforeRequest: () => exec.signal?.throwIfAborted() })
+    note(result.outcome, { ...(reference ? { reference } : {}), stopConfirmed: result.summary?.stopConfirmed === true })
+    return json({ ...result, taskId: identity.taskId, attemptId: identity.attemptId, operationId, status: result.outcome })
   }
 
   // Passing work to another Bot: the rules live in bot-handoff, the Host applies them, and this
@@ -79,29 +124,19 @@ export function registerRemoteComputerTools(ctx, { runtime, directory, machines,
   if (typeof handoffTask === 'function') {
     register('bot_handoff_task', 'Hand a task to another Bot. Refused on a self-handoff, a cycle, or a chain that is too deep.', {
       taskId: { type: 'string', required: true },
-      fromBotId: { type: 'string', required: true },
       toBotId: { type: 'string', required: true },
       objective: { type: 'string', required: true },
-    }, async (args, exec) => json(await handoffTask(args, exec)))
+    }, async (args, exec) => {
+      await runtime.load()
+      const fromBotId = callerBot(exec)
+      const mains = typeof routingBotIds === 'function' ? routingBotIds() : routingBotIds
+      if (!mains.includes(fromBotId)) throw Object.assign(new Error('BOT_ROUTING_HANDOFF_DENIED'), { code: 'BOT_ROUTING_HANDOFF_DENIED' })
+      return json(await handoffTask({ taskId: args.taskId, fromBotId, toBotId: args.toBotId, objective: args.objective }, { kind: 'bot', botId: fromBotId, sessionId: exec.agent.session.id, signal: exec.signal }))
+    })
   }
 
-  // The Main Bot consults routing before it hands work out. This reads the same decision the
-  // workbench shows: it dispatches nothing, binds nothing and spends nothing, so a Bot cannot
-  // widen its own reach by asking who should do something.
-  if (botRouting && typeof botRouting.decide === 'function') {
-    register('bot_route_task', 'Decide which Bot should take a task, and why. A preview only: it dispatches nothing and grants nothing.', {
-      text: { type: 'string', required: true },
-      pinnedBotId: { type: 'string' },
-      requiresMachine: { type: 'boolean' },
-      machineId: { type: 'string' },
-      requiredTools: { type: 'array', items: { type: 'string' } },
-    }, async args => json(botRouting.decide({
-      text: args.text,
-      pinnedBotId: args.pinnedBotId ?? '',
-      requiresMachine: args.requiresMachine === true,
-      machineId: args.machineId ?? '',
-      requiredTools: Array.isArray(args.requiredTools) ? args.requiredTools : [],
-    })))
+  if (botRouting && typeof botRouting.dispatch === 'function') {
+    registerBotRoutingTools(ctx, { routing: botRouting, allowedBotIds: routingBotIds, botIdFor: callerBot, beforeCall: () => runtime.load() })
   }
 
   register('remote_computer_ping', 'Check an explicitly paired remote computer and its desktop/browser capabilities.', target,
@@ -116,11 +151,21 @@ export function registerRemoteComputerTools(ctx, { runtime, directory, machines,
 
   if (taskService) register('remote_computer_write', 'Submit a tracked UTF-8 file-write Task, at most 8192 bytes, with an expected current SHA256 or null for a new file.',
     { requestKey: { type: 'string', required: true }, ...target, relativePath: { type: 'string', required: true }, content: { type: 'string', required: true }, expectedHash: { type: 'json', required: true } },
-    async (args, exec) => { await runtime.load(); const { requestKey, ...input } = args; return taskService.submit(subject(exec), { requestKey, backend: 'remote-write', input }) })
+    async (args, exec) => {
+      await runtime.load(); const { requestKey, ...input } = args
+      // A routed turn already owns its managed task. Nested machine effects use that task/attempt
+      // and the Agent's durable operation ledger instead of queuing a child Task behind itself.
+      if (routedExecution?.currentIdentity(exec)) return routedMachineTask(exec, input, routedWrites ??= createRemoteWriteBackend({ machines: () => machines, directory }), 'fs_write')
+      return taskService.submit(subject(exec), { requestKey, backend: 'remote-write', input })
+    })
 
   if (taskService) register('remote_computer_command', 'Run an owner-approved argv command in the remote container profile as a tracked Task. No shell string, executable path or automatic retry is accepted.',
     { requestKey: { type: 'string', required: true }, ...target, workspaceRelativePath: { type: 'string', required: true }, argv: { type: 'array', required: true }, timeoutMs: { type: 'integer' } },
-    async (args, exec) => { await runtime.load(); const { requestKey, ...input } = args; return taskService.submit(subject(exec), { requestKey, backend: 'remote-command', input }) })
+    async (args, exec) => {
+      await runtime.load(); const { requestKey, ...input } = args
+      if (routedExecution?.currentIdentity(exec)) return routedMachineTask(exec, { ...input, timeoutMs: input.timeoutMs ?? 60000 }, routedCommands ??= createRemoteCommandBackend({ machines: () => machines, directory }), 'container_command_v1')
+      return taskService.submit(subject(exec), { requestKey, backend: 'remote-command', input })
+    })
 
   register('remote_computer_browser', 'Use the current Bot\'s granted remote browser. All browser actions of one Bot chat share one browser session; never ask for a task id.',
     { ...target, tool: { type: 'string', required: true, enum: ['browser_open', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_script', 'browser_upload', 'browser_download', 'browser_close'] }, args: { type: 'json', required: true } },
@@ -132,35 +177,31 @@ export function registerRemoteComputerTools(ctx, { runtime, directory, machines,
   // Routines a Bot can keep and run again. The store owns ids and validation; this surface only
   // moves a saved routine onto one machine, stopping at the first failed step.
   if (routineStore) {
-    const botFor = args => {
-      const asked = typeof args?.botId === 'string' && args.botId !== '' ? args.botId : null
-      return asked ?? (typeof botIdFor === 'function' ? botIdFor(exec => exec) : null)
+    const botFor = (args, exec) => {
+      const actual = callerBot(exec)
+      if (args?.botId && args.botId !== actual) throw Object.assign(new Error('BOT_ROUTINE_PRIVATE'), { code: 'BOT_ROUTINE_PRIVATE' })
+      return actual
     }
     register('bot_routine_list', 'List the routines saved for one Bot. Steps are not returned — use run or inspect.', {
-      botId: { type: 'string', required: true },
-    }, async args => json(routineStore.inspect(args.botId)))
+      botId: { type: 'string' },
+    }, async (args, exec) => { await runtime.load(); return json(routineStore.inspect(botFor(args, exec))) })
 
     register('bot_routine_save', 'Save a recorded routine for one Bot. Steps are validated before they are stored.', {
-      botId: { type: 'string', required: true },
+      botId: { type: 'string' },
       name: { type: 'string', required: true },
-      steps: { type: 'array', required: true, items: { type: 'object' } },
-    }, async args => json(routineStore.save(args.botId, { name: args.name, steps: args.steps })))
+      steps: { type: 'array', required: true, items: { type: 'object', properties: {}, additionalProperties: true } },
+    }, async (args, exec) => { await runtime.load(); return json(routineStore.save(botFor(args, exec), { name: args.name, steps: args.steps })) })
 
     register('bot_routine_run', 'Run one saved routine against a machine. Stops at the first failed step and reports where.', {
-      botId: { type: 'string', required: true },
+      botId: { type: 'string' },
       routineId: { type: 'string', required: true },
       machineId: { type: 'string', required: true },
       rootId: { type: 'string', required: true },
     }, async (args, exec) => {
-      const routine = routineStore.get(args.botId, args.routineId)
-      const result = await replayRoutine(routine, {
-        signal: exec.signal,
-        act: async step => {
-          const mapped = routineStepToTool(step)
-          if (!mapped) { await new Promise(resolve => setTimeout(resolve, step.ms)); return }
-          await call(exec, { machineId: args.machineId, rootId: args.rootId }, mapped.tool, mapped.args)
-        },
-      })
+      await runtime.load()
+      if (typeof routineExecution?.run !== 'function') throw Object.assign(new Error('ROUTINE_EXECUTION_UNAVAILABLE'), { code: 'ROUTINE_EXECUTION_UNAVAILABLE' })
+      const botId = botFor(args, exec)
+      const result = await routineExecution.run({ subject: directory.forAgent(exec.agent), botId, routineId: args.routineId, machineId: args.machineId, rootId: args.rootId, context: exec, signal: exec.signal })
       return json(result)
     })
   }

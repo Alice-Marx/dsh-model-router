@@ -1,7 +1,7 @@
 import {randomUUID,createHash} from 'node:crypto'
 import {createBudgetReservations} from '../../../.dsh-plugin/shared/budget-reservations.mjs'
 import {actualCost} from '../../../.dsh-plugin/shared/run-ledger.mjs'
-import {managedModelRequest} from './model-receipt.mjs'
+import {managedModelRequest,taskModelRequest} from './model-receipt.mjs'
 import {assessFundingAdmission} from './funding-admission.mjs'
 import {taskHash} from './task-contract.mjs'
 
@@ -29,10 +29,10 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
   if(store?.kind!=='sqlite-router-state'||typeof store.recordModelReceipt!=='function'||typeof pricingFor!=='function')fail('MODEL_ACCOUNTING_STORAGE_REQUIRED')
   const active=new Set();let closed=false
   const controllerSet=new Set()
-  const receiptBase=(identity,options,policy,managed)=>{
+  const receiptBase=(identity,options,policy,managed,task)=>{
     const id=uuid('call'),createdAt=now()
     return {schemaVersion:1,id,runId:managed?.runId??uuid('inference'),packageId:managed?(managed.packageId??'direct'):'inference',botId:identity.botId,
-      sessionId:identity.sessionId??null,taskId:managed?.taskId??null,attemptId:managed?.attemptId??uuid('model-attempt'),operationId:managed?.operationId??uuid('model-operation'),
+      sessionId:identity.sessionId??null,taskId:managed?.taskId??task?.taskId??null,attemptId:managed?.attemptId??task?.attemptId??uuid('model-attempt'),operationId:managed?.operationId??task?.operationId??uuid('model-operation'),
       source:managed?(managed.source??'mr-api'):identity.source,provider:options.provider,model:options.model,funding:policy.funding,pricing:policy.pricing??null,
       ...(policy.scopeId?{fundingScopeId:policy.scopeId}:{}),...(policy.projectId?{fundingProjectId:policy.projectId}:{}),
       requestHash:requestHash(options),createdAt,ownerPid:process.pid,state:'admitted',finishedAt:null,usage:null,usageComplete:false,actualModel:null,reportedCostUsd:null,finishKind:null,outcome:null}
@@ -56,6 +56,7 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
   },{...options,modelReceipt:receipt})})
   function stream(options,next,identity){
     const managed=managedModelRequest(options)
+    const task=taskModelRequest(options)
     const ready=deferred(),done=deferred()
     return (async function*(){
       if(closed)fail('MODEL_ACCOUNTING_CLOSED')
@@ -63,6 +64,7 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
       authority.assertModel(identity.subject,options.provider,options.model)
       authority.assertTool(identity.subject,'model/infer')
       if(authority.describe(identity.subject).botId!==identity.botId)fail('MODEL_OWNER_MISMATCH')
+      if(task&&(task.botId!==identity.botId||task.provider!==options.provider||task.model!==options.model))fail('MODEL_TASK_OWNER_MISMATCH')
       const config=await pricingFor({botId:identity.botId,provider:options.provider,model:options.model,source:identity.source})
       if(active.size>=maxActive||active.has(options))fail('MODEL_CONCURRENCY_LIMIT')
       if(!config||!['api','subscription'].includes(config.funding))fail('MODEL_FUNDING_REQUIRED')
@@ -85,7 +87,7 @@ export function createModelAccounting({store,authority,pricingFor,inputBoundFor,
       const descriptor=Object.getOwnPropertyDescriptor(options,'signal'),tokenDescriptor=Object.getOwnPropertyDescriptor(options,'maxTokens')
       const carrier=descriptor?descriptor.writable:Object.isExtensible(options)
       const clampable=carrier&&!(tokenDescriptor&&!tokenDescriptor.writable)&&Boolean(tokenDescriptor||Object.isExtensible(options))
-      const record=receiptBase(identity,{...options,...(effectiveOutput!==undefined?{maxTokens:effectiveOutput}:{})},config,managed)
+      const record=receiptBase(identity,{...options,...(effectiveOutput!==undefined?{maxTokens:effectiveOutput}:{})},config,managed,task)
       let manager,accepted,binding,lease,guard,inner,estimate,previousSignal=options.signal,changedOutput=false,leaseSignal=null
       let started=false,exhausted=false,terminal=false,finishKind=null,observed={usage:null,complete:false},primaryError,cleanupError,propagated=false,aborted=false,consumerClosed=false
       const controller=new AbortController();controllerSet.add(controller);active.add(options)

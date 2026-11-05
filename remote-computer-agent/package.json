@@ -1,12 +1,27 @@
 {
   "name": "@ljwei-stak/dsh-remote-computer-agent",
-  "version": "0.1.0-preview.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": {"dsh-remote-agent": "dist/cli.mjs"},
-  "engines": {"node": ">=22.19"},
-  "scripts": {"build": "node build.mjs", "start": "node dist/cli.mjs"},
-  "dependencies": {"@modelcontextprotocol/server": "2.4.0", "better-sqlite3": "13.0.3"},
-  "optionalDependencies": {"playwright": "1.64.1"},
-  "devDependencies": {"esbuild": "0.28.2"}
+  "bin": {
+    "dsh-remote-agent": "dist/cli.mjs"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/cli.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "better-sqlite3": "13.0.3",
+    "ws": "8.22.1"
+  },
+  "optionalDependencies": {
+    "playwright": "1.64.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
 }

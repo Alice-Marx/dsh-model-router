@@ -24,20 +24,24 @@ export function createDesktopActions({ machines, directory, now = Date.now, uuid
     if (!subject) fail('UNKNOWN_BOT')
     return subject
   }
+  const owners = new Map()
   const context = request => {
-    const stamp = String(now()).replace(/[^0-9]/gu, '')
-    return { machineId: request.machineId, rootId: request.rootId, taskId: `owner-desktop-${stamp}-${uuid().replace(/-/gu, '').slice(0, 12)}` }
+    const key = JSON.stringify([request.botId, request.machineId, request.rootId])
+    if (!owners.has(key)) {
+      if (owners.size >= 4096) fail('DESKTOP_SESSION_LIMIT')
+      owners.set(key, { taskId: `owner-desktop-${uuid()}`, attemptId: `owner-attempt-${uuid()}` })
+    }
+    return { machineId: request.machineId, rootId: request.rootId, ...owners.get(key) }
   }
   return Object.freeze({
     async view(payload) {
       const request = parseDesktopView(payload)
       const subject = subjectFor(request.botId)
       const base = context(request)
-      const attemptId = `owner-attempt-${uuid().replace(/-/gu, '').slice(0, 12)}`
-      const record = await machines.call(subject, { ...base, attemptId, tool: 'desktop_screenshot', args: {} })
-      const value = record?.value ?? {}
+      const record = await machines.call(subject, { ...base, operationId: `owner-op-${uuid()}`, tool: 'desktop_screenshot', args: {} })
+      const value = record?.result ?? record?.value ?? {}
       if (!value?.artifactId) return { unavailable: true, reason: record?.status === 'succeeded' ? 'FRAME_MISSING' : 'FRAME_UNAVAILABLE', operationId: record?.operationId ?? null }
-      const image = await machines.download(subject, { ...base, attemptId, operationId: record.operationId, artifactId: value.artifactId })
+      const image = await machines.download(subject, { ...base, operationId: record.operationId, artifactId: value.artifactId })
       const base64 = typeof image?.content === 'string' ? image.content : Buffer.from(image?.content ?? []).toString('base64')
       return {
         mediaType: value.mediaType ?? 'image/png', base64,
@@ -49,9 +53,8 @@ export function createDesktopActions({ machines, directory, now = Date.now, uuid
       const request = parseDesktopAct(payload)
       const subject = subjectFor(request.botId)
       const base = context(request)
-      const attemptId = `owner-attempt-${uuid().replace(/-/gu, '').slice(0, 12)}`
-      const record = await machines.call(subject, { ...base, attemptId, operationId: `owner-op-${uuid().replace(/-/gu, '').slice(0, 16)}`, tool: request.tool, args: request.args })
-      return { tool: request.tool, status: record?.status ?? 'unknown', value: record?.value ?? null, operationId: record?.operationId ?? null }
+      const record = await machines.call(subject, { ...base, operationId: `owner-op-${uuid()}`, tool: request.tool, args: request.args })
+      return { tool: request.tool, status: record?.status ?? 'unknown', value: record?.result ?? record?.value ?? null, operationId: record?.operationId ?? null }
     },
   })
 }

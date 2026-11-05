@@ -8,6 +8,7 @@ import { Store } from './store.js'
 import { Roots } from './scope.js'
 import { BrowserTools } from './browser.js'
 import { DesktopTools } from './desktop.js'
+import { DesktopSessions } from './desktop-session.js'
 import {ContainerCommands,type ContainerCommandConfig} from './container-command.js'
 import {WorkspacePin} from './workspace-identity.js'
 import {WorkspaceAdmissions} from './workspace-admission.js'
@@ -18,7 +19,7 @@ const execFileAsync=promisify(execFile)
 const ARTIFACT_QUOTA_BYTES=256*1024*1024
 export type AgentConfig={dataDir:string;roots:Record<string,string>;executables?:Record<string,string>;shell?:string;windowsJobRunner?:string;browserOrigins?:string[];browserExecutablePath?:string;browserProfiles?:Record<string,string>;isolation?:'os-account'|'container'|'application';container?:ContainerCommandConfig;desktop?:{pipeName:string;secretFile:string};cliProfiles?:CliProfileConfig[]}
 export class Agent {
-  store:Store;roots:Roots;browser:BrowserTools;desktop:DesktopTools;workspaces:WorkspaceAdmissions;container?:ContainerCommands;cliTasks:CliTasks;rootsGeneration:string;private processes=new Map<string,any>();private jobs=new Map<string,Promise<any>>();private desktopJobs=new Map<string,{context:Context;cancel:(why:string)=>Promise<void>}>();private cancelRequested=new Set<string>();private writes=new Set<string>();private authTimer:any
+  store:Store;roots:Roots;browser:BrowserTools;desktop:DesktopTools;desktopSessions:DesktopSessions;workspaces:WorkspaceAdmissions;container?:ContainerCommands;cliTasks:CliTasks;rootsGeneration:string;private processes=new Map<string,any>();private jobs=new Map<string,Promise<any>>();private desktopJobs=new Map<string,{context:Context;cancel:(why:string)=>Promise<void>}>();private cancelRequested=new Set<string>();private writes=new Set<string>();private authTimer:any
   constructor(public config:AgentConfig,Database?:any){const cliProfiles=validateCliProfiles(config.cliProfiles,config.dataDir,config.roots);this.store=new Store(resolve(config.dataDir),Database);this.roots=new Roots(config.roots,{protectedPaths:[resolve(config.dataDir),...(config.desktop?[resolve(config.desktop.secretFile)]:[])]});this.cliTasks=new CliTasks(cliProfiles,this.store,this.roots);this.browser=new BrowserTools(config.browserOrigins??[],config.browserExecutablePath,undefined,config.browserProfiles);this.desktop=new DesktopTools(config.desktop,{validate:c=>this.store.validate(c)})
     try{
      // Which roots configuration produced the persisted workspace state. A
@@ -35,6 +36,7 @@ export class Agent {
      if(generationChange.changed)this.store.audit('WORKSPACE_ROOTS_GENERATION_CHANGED')
      if(config.container){if(config.isolation!=='container'||Object.keys(config.executables??{}).length||config.shell||config.windowsJobRunner)fail('CONTAINER_CONFIG_INVALID');this.container=new ContainerCommands(this.store,config.container)}else if(config.isolation==='container')fail('CONTAINER_CONFIG_INVALID')
     }catch(e){this.store.close();throw e}
+    this.desktopSessions=new DesktopSessions(config.desktop,{validate:c=>this.store.validate(c),audit:(code,actor,operation)=>this.store.audit(code,actor,operation)})
     this.authTimer=setInterval(()=>{for(const p of [...this.processes.values(),...this.desktopJobs.values()]){try{this.store.validate(p.context)}catch{void p.cancel('GRANT_REVOKED')}};void this.container?.sweep((data,c)=>this.artifact(data,c,'text/plain')).catch(()=>{})},100);this.authTimer.unref()}
   async call(name:string,args:any,c:Context,operationId?:string) {
     this.store.validate(c);if(!TOOL_NAMES.includes(name)||!c.tools.includes(name))fail('SCOPE_DENIED',403)
@@ -302,5 +304,5 @@ export class Agent {
     const patchFile=join(this.config.dataDir,`patch-${randomUUID()}`);await writeFile(patchFile,patch+'\n',{mode:0o600})
     try{if(!patch)return {status:'no-changes'};await this.git(row.source,['apply','--check',patchFile]);this.store.validate(c);await this.git(row.source,['apply',patchFile]);return {status:'integrated',sourceHead:row.head,patchSha256:sha(patch)}}catch(e){if(e instanceof AgentError)throw e;return {status:'integration-pending',reason:'PATCH_CONFLICT',worktreeId:a.worktreeId}}finally{await unlink(patchFile)}
   }
-  async close(){clearInterval(this.authTimer);for(const id of this.jobs.keys())this.cancelRequested.add(id);await Promise.all([...this.processes.values(),...this.desktopJobs.values()].map(p=>p.cancel('CANCELLED')));await this.container?.close();const desktop=await this.desktop.close();await Promise.all([...this.jobs.values()]);await this.browser.close();this.store.close();return {desktopStopConfirmed:desktop.stopConfirmed}}
+  async close(){clearInterval(this.authTimer);const sessions=await this.desktopSessions.close();for(const id of this.jobs.keys())this.cancelRequested.add(id);await Promise.all([...this.processes.values(),...this.desktopJobs.values()].map(p=>p.cancel('CANCELLED')));await this.container?.close();const desktop=await this.desktop.close();await Promise.all([...this.jobs.values()]);await this.browser.close();this.store.close();return {desktopStopConfirmed:desktop.stopConfirmed&&sessions.stopConfirmed}}
 }

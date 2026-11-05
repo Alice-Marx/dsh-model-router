@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-export const AGENT_VERSION = '0.1.0-preview.1'
+export const AGENT_VERSION = '0.1.0'
 export const AGENT_API_MAJOR = 1
 export class AgentError extends Error { constructor(public code:string, public status=400) { super(code) } }
 export const fail = (code:string,status=400):never => { throw new AgentError(code,status) }
