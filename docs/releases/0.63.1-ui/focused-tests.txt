@@ -1,0 +1,16 @@
+✔ a reduced JPEG maps a real canvas pointer to physical monitor pixels (142.5881ms)
+✔ a user uploads and downloads unchanged binary bytes through the real authenticated product channel (214.4108ms)
+✔ a user searches real private text files through the authenticated owner channel and opens/edits the exact matching path and line (83.6869ms)
+✔ a product page permits a successful upload to immediately refresh its library through the same owner dispatcher (243.1652ms)
+✔ binding page reads optional catalog once and stays writable after a snapshot refresh (71.5747ms)
+✔ workspace navigation retains the selected page when the Host remounts its sidebar (23.7314ms)
+✔ recording controls wait for ACK/release and save the demonstrated routine through the authenticated owner channel (170.8586ms)
+✔ recording controls retain the draft and show an unconfirmed save until a saved record is returned (22.6963ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3351.8109

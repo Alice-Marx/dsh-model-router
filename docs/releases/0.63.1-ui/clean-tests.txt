@@ -1,0 +1,156 @@
+
+> @ljwei-stak/dsh-model-router@0.63.1 build:client
+> node scripts/build-client.mjs
+
+[build-client] generated 2443096 bytes
+
+> @ljwei-stak/dsh-model-router@0.63.1 pretest
+> node scripts/prepare-product-tests.mjs
+
+
+Algorithm Hash                                                             Path                                        
+--------- ----                                                             ----                                        
+SHA256    4F6F952FEE36C8F3B935F614E5F39554E9E9E909FA426CFB4C30361079D9DAFF F:\everyAI\dsh-model-router-all\dsh-model...
+SHA256    F19A147FC57B6EA5DD2D987C6553E2DDDF11F3941EE4B55366F514439F988316 F:\everyAI\dsh-model-router-all\dsh-model...
+
+
+
+> @ljwei-stak/dsh-model-router@0.63.1 test
+> node scripts/run-tests.mjs
+
+[tests] 1/3: scripts/check-readme.mjs
+README math structure passed: 6 paired formulas and 33 paired inline expressions and translation hashes. TeX compilation and GitHub rendering require separate verification.
+[tests] 2/3: Node test suite
+✔ the manifest gate accepts its declared Desktop release candidates without exemptions (5.8221ms)
+✔ the installed app-boot gate accepts the release manifest without an exemption (0.215ms)
+✔ the 0.10.1 rc.1-only manifest is rejected by Desktop rc.2 without an exemption (0.6328ms)
+✔ the 0.8 0.1.7-rc.2-only manifest is rejected by all supported Desktop hosts (0.4853ms)
+✔ the original 0.20.0 manifest reproduces the Desktop 0.2.1-rc.2 rejection (0.169ms)
+✔ the original 0.25.0 manifest reproduces the Desktop 0.2.1-rc.3 rejection (0.1972ms)
+✔ typed remote methods avoid 0.2 client namespace service members (0.124ms)
+✔ the immutable preview.1 peer manifest is rejected by rc.5 without weakening the gate (0.2276ms)
+✔ six paired math fences accept single-line formulas, cases, whitespace and ordinary code examples (3.5325ms)
+✔ a formula cannot regress into a text or inline-code block (0.4724ms)
+✔ missing, duplicate, empty and unclosed formulas fail with useful errors (0.8053ms)
+✔ translation formula drift and unanchored math are rejected (0.4183ms)
+✔ legacy delimiters and unescaped currency fail outside literal code (0.6333ms)
+✔ prose symbols render as inline math while implementation fields remain inline code (1.1048ms)
+✔ inline math is single-line, nonempty and uses one dollar on each side (0.3726ms)
+✔ paired inline math matches translation count, order and normalized content (0.6935ms)
+✔ GitHub enhanced inline math survives adjacent Chinese punctuation without becoming code (0.4306ms)
+✔ plain inline math cannot regress to known GitHub failures next to Chinese text or slashes (1.1176ms)
+✔ decimal fractions use a leading zero in prose, tables and formulas without flagging code or paths (0.6591ms)
+✔ a macro rejected by the actual GitHub renderer cannot be reintroduced (0.1489ms)
+✔ ordinary formulas remain on one line while genuine conditions may use cases (0.0999ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 174.1764
+[tests] 3/3: Node test suite
+✔ library preserves binary uploads, refuses accidental replacement, and downloads the original bytes (10.3461ms)
+✔ library rejects writes through a linked parent even when the final nested file does not exist (5.4457ms)
+✔ library navigation and text search preserve Bot ownership and exact source lines (17.3366ms)
+✔ worker binding commit: an existing wider grant is verified without narrowing or mutation while auto-grant is off (2.6603ms)
+✔ worker binding commit: only owner or a committed Main may expand, under the exact saved root ceiling (1.1574ms)
+✔ worker binding commit: a per-root Cartesian widening is refused before the machine is touched (0.3308ms)
+✔ worker binding commit: revoked rows keep their real revision and unconfirmed remote revocation cannot count as applied (0.3297ms)
+✔ worker binding commit: the Main Bot is not rebound and a task needing missing write tools is ineligible (0.5209ms)
+✔ worker turn: registered bot_route_task creates a real task, executes a private library tool and delivers its result (286.9608ms)
+✔ worker turn: a read turn executes read tools while write attempts fail under its task scope (120.1849ms)
+✔ worker turn: preview and disabled routing never enqueue a worker turn or create a task (77.3038ms)
+✔ worker turn: the actual Agent binding defeats forged requester/session/owner arguments (37.9242ms)
+✔ worker turn: worker/model failure is durable and the reply reports failure (259.1574ms)
+✔ worker turn: remote writes use the parent task/attempt and unknown operations cannot become success (177.8606ms)
+✔ worker turn: an explicitly selected second machine is committed into the plan, execution target and worker input (73.1853ms)
+✔ worker turn: cancel is uncertain until the exact worker turn ends, then reconciliation uses its original receipt (135.3925ms)
+✔ worker turn: repeated request keys retain the original task/attempt/operation and never enqueue the work twice (76.4288ms)
+✔ worker turn: a fresh observer reconciles the exact persisted turn after receipt interruption, without redelivering it (101.5939ms)
+✔ owner routing switch persists and stale writes cannot silently replace a newer choice (26.9023ms)
+✔ routing tools: a service without a dispatch is refused instead of half-registered (0.9748ms)
+✔ routing tools: the dispatch tool passes only the task, and the caller comes from the session (3.7419ms)
+✔ routing tools: a Bot outside the allowlist is refused before anything is dispatched (0.5492ms)
+✔ routing tools: the allowlist may be read live, and an empty one refuses everyone (0.8527ms)
+✔ routing tools: a refusal from the service is reported as a refusal, not as a dispatch (1.2881ms)
+✔ routing tools: the answer is plain JSON a model can read back (0.5237ms)
+✔ native desktop patches preserve changed pixel coverage and recover after dropped frames (459.7278ms)
+✔ desktop Host mints a session ticket using committed state, keeps grants private and renews the original task identity (3.0855ms)
+✔ desktop Host refuses caller-supplied endpoints and a revoked or insufficient machine scope (0.8884ms)
+✔ desktop session: trusted HTTP grants, no frames before first-message auth, random session-only credentials (165.8397ms)
+✔ desktop session: watch input is refused; native takeover ACK precedes input and release preserves video (164.473ms)
+✔ desktop session: read-only grant and rejected native takeover cannot inject input (93.9145ms)
+✔ desktop session: Host/Origin/network boundary and exact ticket Origin on upgrade and auth (48.2139ms)
+✔ desktop session: same-owner renewal keeps socket/control alive past old grant expiry; revocation releases it (598.4427ms)
+✔ desktop session: expiry, client disconnect and confirmed HTTP stop tear down native input (328.8761ms)
+✔ desktop session: invalid/replayed/out-of-bounds input never reaches native; lost ACK is unknown without retry (74.5224ms)
+✔ desktop session: backpressure drops frames and waits for browser pong beyond the last flushed JPEG (188.1497ms)
+✔ desktop session: slow receiver adapts encoded pixels while preserving physical input metadata (170.8324ms)
+✔ desktop session: two small patches retain distinct pong credits without cancelling an already scheduled capture (62.6087ms)
+✔ desktop session: RemoteAgentClient uses trusted session/renew/close endpoints (16.2048ms)
+✔ desktop session: lost control/release acknowledgements stay unknown and close the native session without retry (76.3686ms)
+✔ desktop session: unauthenticated socket times out and concurrent openings respect native capacity (137.3854ms)
+✔ desktop session/native pipe: fragmented metadata, JPEG framing and correlated native stop acknowledgement (6.4701ms)
+✔ desktop session/native pipe: disconnect after input dispatch is unknown and never retried (4.0246ms)
+✔ desktop setup authority: hostManagedBots requires local admin opt-in, keeps roots/tools/revision and fixed Bot ceilings (74.4301ms)
+✔ desktop setup wizard: isolated config, private secrets/pair export, interactive tasks and safe repeat backup (2012.5724ms)
+✔ desktop setup wizard: an existing scheduled-task name is refused without replacing files/tasks (577.1061ms)
+✔ viewer authenticates the socket before input and waits for the remote control acknowledgement (1.8054ms)
+✔ desktop bridge exists independently of the computers page and resolves string root IDs from fresh Host state (1.4704ms)
+✔ a reduced JPEG maps a real canvas pointer to physical monitor pixels (135.2117ms)
+✔ a user uploads and downloads unchanged binary bytes through the real authenticated product channel (177.2554ms)
+✔ a user searches real private text files through the authenticated owner channel and opens/edits the exact matching path and line (68.7533ms)
+✔ heartbeat uses a committed live binding and prefers Main without adding permissions (1.7632ms)
+✔ heartbeat bounds concurrency and aborts pending probes on shutdown (1.2105ms)
+✔ pairing Main itself still commits its first binding with revision zero (1.5002ms)
+✔ pairing with another probe Bot uses Main binding revision rather than machine revision (0.1755ms)
+✔ pairing success remains explicit when remote stop or Main fixed-ID scope cannot be confirmed (1.2555ms)
+✔ the authenticated product channel reaches the library, routines, routing and history handlers used by its pages (2.5732ms)
+✔ product actions still require the owner and reject unregistered or unknown actions (0.6152ms)
+✔ a product page permits a successful upload to immediately refresh its library through the same owner dispatcher (203.6364ms)
+✔ binding page reads optional catalog once and stays writable after a snapshot refresh (68.0458ms)
+✔ workspace navigation retains the selected page when the Host remounts its sidebar (21.8953ms)
+✔ real WebSocket: demonstrate acknowledged desktop input, save privately, replay actual effects with audit identity (189.3961ms)
+✔ real WebSocket: hundreds of mouse ACKs plus drag/click/text save below the limit and replay their sampled effects (307.8077ms)
+✔ real WebSocket: explicit native rejection stops the next step, releases held input, reports failed (38.3807ms)
+✔ real WebSocket: a lost native ACK is unknown, applied once, persisted, and cannot be blindly replayed (147.7038ms)
+✔ real WebSocket: disconnect after applying an input remains unknown (28.0018ms)
+✔ real WebSocket: cancellation between acknowledged steps stops cleanly and releases keys (31.5792ms)
+✔ real WebSocket: cancelling an input already sent is unknown and never retries it (30.7844ms)
+✔ real WebSocket: legacy click/type/key/scroll/wait routines use acknowledged full-desktop input (102.618ms)
+✔ real WebSocket: changed recorded display geometry refuses all inputs (16.1677ms)
+✔ real WebSocket: authorization is renewed during a routine without reconnecting the desktop (87.2492ms)
+✔ host interruption and corrupt execution journal cannot erase uncertain prior work (18.2156ms)
+✔ host rejects a caller attempting to run another Bot private routine (4.5648ms)
+✔ Host close fences new runs, cancels all active machines, and awaits native release plus Host close confirmation (73.7ms)
+✔ Host close preserves an in-flight unknown input and an unconfirmed remote close (33.8043ms)
+✔ demonstration cannot save a sent input until its native ACK and release are confirmed (3.4425ms)
+✔ demonstration lost ACK invalidates the recording rather than saving a partial successful tape (0.2905ms)
+✔ demonstration preserves acknowledged send order and timing even if ACK callbacks arrive out of order (0.2704ms)
+✔ demonstration refuses a changed session or display and never treats watch mode as control (0.2287ms)
+✔ hundreds of 60 Hz mouse ACKs become timed waypoints while every button/key/text and drag endpoint survives (4.435ms)
+✔ more than 200 non-coalescible acknowledged actions still invalidate the whole demonstration (1.2257ms)
+✔ recording controls wait for ACK/release and save the demonstrated routine through the authenticated owner channel (134.2588ms)
+✔ recording controls retain the draft and show an unconfirmed save until a saved record is returned (17.5984ms)
+✔ routing end to end: a routed task reaches the worker, runs there, and its result comes back (81.003ms)
+✔ routing end to end: a worker that refuses is reported as a failure, never as a submitted success (59.8348ms)
+✔ routing end to end: a preview dispatches nothing, binds nothing and submits nothing (29.7077ms)
+✔ routing end to end: the grant comes from the committed ceiling of the machine the task names (31.2479ms)
+✔ routing end to end: a pinned Bot passes the same hard requirements as an automatic pick (77.0146ms)
+✔ routing end to end: a machine task is not dispatched while its grant was never committed (28.8931ms)
+✔ routing end to end: a machine task commits the binding before the plan is submitted (64.489ms)
+✔ routing end to end: a plan id with no accepted task is a refusal, not a success (33.2503ms)
+✔ routing end to end: the model path dispatches for an allowed Bot and refuses the others (57.4767ms)
+✔ routing end to end: the Main Bot keeps its own access and is never narrowed by routing (77.3159ms)
+✔ existing session-scoped Schedule APIs pass through unchanged (0.7628ms)
+✔ Host-wide schedules retain the exact Session target, timing and delete revision (1.6196ms)
+ℹ tests 95
+ℹ suites 0
+ℹ pass 95
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3258.9605

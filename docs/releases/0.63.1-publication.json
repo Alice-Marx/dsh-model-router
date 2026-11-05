@@ -1,0 +1,63 @@
+{
+  "version": "0.63.1",
+  "status": "published-and-installed",
+  "archiveReleaseCommit": "8d3a5d8a7982f876e13af5bae2b8fa2ffcfbc533",
+  "githubCommit": "2946d8cf27549f475e803cb7ca6f57e6c34d4085",
+  "registry": {
+    "status": "passed",
+    "version": "0.63.1",
+    "latest": "0.63.1",
+    "publishedAt": "2026-11-05T15:34:20.790Z",
+    "tarball": "https://registry.npmjs.org/@ljwei-stak/dsh-model-router/-/dsh-model-router-0.63.1.tgz",
+    "integrity": "sha512-LcPC4kUqjCC7Ww3siYIkHAXeCjUMROk50jnnT2TBJjoqUnh/JIBQjqyH6IBpcNOZYwDQC+EBDklGTl+M8Jem6A==",
+    "sha256": "220753b0fb55fcb28b953cc1fdc3a49babac0b2f7bb54a1f7a6261f87340ca5b",
+    "bytes": 3494364,
+    "anonymousDownloadVerified": true
+  },
+  "remote": {
+    "status": "passed",
+    "github": "2946d8cf27549f475e803cb7ca6f57e6c34d4085\trefs/heads/main\n16b5f89e70014b6903caae5807851c63c8f5cd2a\trefs/tags/v0.63.1\n2946d8cf27549f475e803cb7ca6f57e6c34d4085\trefs/tags/v0.63.1^{}",
+    "gitlab": "8d3a5d8a7982f876e13af5bae2b8fa2ffcfbc533\trefs/heads/archive/preview6\n8d3a5d8a7982f876e13af5bae2b8fa2ffcfbc533\trefs/heads/main\n8d3a5d8a7982f876e13af5bae2b8fa2ffcfbc533\trefs/tags/v0.63.1",
+    "releaseUrl": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.1",
+    "assetsVerified": 4
+  },
+  "localInstall": {
+    "status": "installed",
+    "version": "0.63.1",
+    "previousVersion": "0.63.0",
+    "installedPath": "F:\\DeepSeek_harness\\.dsh\\profiles\\desktop\\node_modules\\@ljwei-stak\\dsh-model-router",
+    "backupPath": "F:\\DeepSeek_harness\\.dsh\\profiles\\desktop\\.router-backups\\20261105-0631-ui",
+    "packageSha256": "220753b0fb55fcb28b953cc1fdc3a49babac0b2f7bb54a1f7a6261f87340ca5b",
+    "verifiedPackageFiles": 462,
+    "otherPluginVersionsUnchanged": true,
+    "activation": "Restart Harness including the tray process",
+    "userDataModified": false,
+    "installedFilesVerified": 462,
+    "installedLocksConsistent": true
+  },
+  "isolatedInstall": {
+    "status": "passed",
+    "version": "0.63.1",
+    "filesVerified": 462,
+    "moduleLoaderRegistrationVerified": true,
+    "lifecycleScripts": "ignored",
+    "optionalDependencies": "omitted",
+    "userProfileUntouched": true
+  },
+  "tests": {
+    "stages": 30,
+    "total": 2504,
+    "passed": 2415,
+    "skipped": 89,
+    "failed": 0,
+    "cleanTreePassed": 116,
+    "focusedPassed": 8,
+    "browserPassed": 6,
+    "browserErrors": 0,
+    "actualModelCalls": 0
+  },
+  "screenshots": 7,
+  "agentVersion": "0.1.0",
+  "desktopPerformanceRetested": false,
+  "activation": "Fully quit Harness including the tray process, then restart"
+}

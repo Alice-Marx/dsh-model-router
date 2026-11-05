@@ -1,0 +1,7 @@
+{
+  "status": "passed",
+  "github": "2946d8cf27549f475e803cb7ca6f57e6c34d4085\trefs/heads/main\n16b5f89e70014b6903caae5807851c63c8f5cd2a\trefs/tags/v0.63.1\n2946d8cf27549f475e803cb7ca6f57e6c34d4085\trefs/tags/v0.63.1^{}",
+  "gitlab": "8d3a5d8a7982f876e13af5bae2b8fa2ffcfbc533\trefs/heads/archive/preview6\n8d3a5d8a7982f876e13af5bae2b8fa2ffcfbc533\trefs/heads/main\n8d3a5d8a7982f876e13af5bae2b8fa2ffcfbc533\trefs/tags/v0.63.1",
+  "releaseUrl": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.1",
+  "assetsVerified": 4
+}

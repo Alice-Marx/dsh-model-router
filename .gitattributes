@@ -64,3 +64,6 @@
 
 /remote-computer-agent/dist/** -text
 /modules/bot-runtime/product-overlay/patches/** -whitespace
+
+# Preserve the terminal evidence exactly, including its alignment whitespace.
+/docs/releases/0.63.1-ui/*.txt -text -whitespace
