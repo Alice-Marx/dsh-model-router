@@ -29849,7 +29849,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.59.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.60.0", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message) {
   let value = String(message ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -32489,7 +32489,7 @@ function Tasks({ snapshot, dispatch, busy }) {
   })))), task && /* @__PURE__ */ import_react61.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react61.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react61.default.createElement("h2", null, "任务详情"), /* @__PURE__ */ import_react61.default.createElement("button", { onClick: () => setSelected(null) }, "关闭")), /* @__PURE__ */ import_react61.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Task" }, task.taskId ?? task.id), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Package" }, task.packageId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Attempt" }, task.attemptId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "Operation" }, task.operationId), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "期限" }, task.deadlineAt ? new Date(task.deadlineAt).toLocaleString("zh-CN") : "未取得"), /* @__PURE__ */ import_react61.default.createElement(Value, { label: "MR 运行" }, task.legacyRunIds?.join("、"))), /* @__PURE__ */ import_react61.default.createElement("h3", null, "执行与收据依据"), /* @__PURE__ */ import_react61.default.createElement("pre", null, JSON.stringify({ attempts: task.attempts, executionRef: task.executionRef, remoteReceipt: task.result?.remote, reconciliation: task.reconciliation, packages: task.packages }, null, 2))), /* @__PURE__ */ import_react61.default.createElement(BotRoutingCard, { snapshot, dispatch, busy }));
 }
 function DesktopControl({ snapshot, dispatch, busy }) {
-  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react61.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react61.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react61.default.useState(null), [status, setStatus] = import_react61.default.useState("idle"), [error, setError] = import_react61.default.useState(""), [live, setLive] = import_react61.default.useState(!1), [text7, setText] = import_react61.default.useState(""), imageRef = import_react61.default.useRef(null), rootId = machines.find((item) => item.id === machineId)?.roots?.[0]?.id ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
+  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react61.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react61.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react61.default.useState(null), [status, setStatus] = import_react61.default.useState("idle"), [error, setError] = import_react61.default.useState(""), [live, setLive] = import_react61.default.useState(!1), [text7, setText] = import_react61.default.useState(""), imageRef = import_react61.default.useRef(null), firstRoot = machines.find((item) => item.id === machineId)?.roots?.[0], rootId = typeof firstRoot == "string" ? firstRoot : firstRoot?.id ?? firstRoot?.rootId ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
     setError("");
     try {
       return await dispatch(action, payload);
@@ -32631,7 +32631,10 @@ function Machines({ snapshot, dispatch, busy }) {
     if (typeof dispatch != "function") return;
     let rows2 = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked");
     globalThis.__dshDesktop = Object.freeze({
-      machines: () => rows2.map((item) => ({ machineId: item.id, rootId: item.roots?.[0]?.id ?? "", label: item.name ?? item.id })),
+      machines: () => rows2.map((item) => {
+        let first = item.roots?.[0], rootId = typeof first == "string" ? first : first?.id ?? first?.rootId ?? "";
+        return { machineId: item.id, rootId, label: item.name ?? item.id };
+      }),
       view: (botId, machineId) => {
         let machine = rows2.find((item) => item.id === machineId);
         return dispatch("machine.desktop.view", { botId, machineId, rootId: machine?.roots?.[0]?.id ?? "" });
