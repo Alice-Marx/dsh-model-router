@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "errors": [],
+  "measurements": {
+    "window": 780,
+    "documentWidth": 780,
+    "pageWidth": 501,
+    "bodyTheme": "1"
+  },
+  "screenshots": 7
+}

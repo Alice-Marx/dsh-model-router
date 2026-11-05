@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.63.1 — 2026-11-05
+
+- Refresh the workspace with Grok Bot-inspired neutral surfaces, clearer navigation, outline icons, balanced spacing and matching light/dark styles.
+- Simplify Bot permissions, the library toolbar, computer setup and empty routine screens; keep technical identities in details.
+- Retain the selected sidebar entry across Host remounts and prevent repeated catalog loads from leaving bindings busy.
+- Verify file upload/search/creation, pairing import, responsive layout and existing desktop/routine interactions.
+
+See [the 0.63.1 validation report](docs/releases/0.63.1-validation.md).
+
 ## 0.63.0 — 2026-11-05
 
 - Synchronize the pinned DS Bot 0.2.7 upstream with reproducible product overlays.

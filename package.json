@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.63.0",
+  "version": "0.63.1",
   "type": "module",
   "description": "A unified DS Bot workspace for DeepSeek Harness Desktop: model and Bot routing, private libraries, recorded desktop routines and scoped remote computer control.",
   "repository": {

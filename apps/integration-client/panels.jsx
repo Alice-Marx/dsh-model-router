@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { TASK_STATES, modelName, money } from './api.mjs'
+import { PRODUCT_PANELS, TASK_STATES, modelName, money } from './api.mjs'
 import { botAttentionSummary, deriveBotAttention } from './bot-attention.mjs'
 import { normalizeEndpoint, parsePairingPaste, secretNameFor } from './pairing.mjs'
 import { framePoint } from '../../packages/orchestration/src/desktop-contract.mjs'
@@ -7,15 +7,33 @@ import { BotBindingEditor } from './binding-editor.jsx'
 import { LibraryPanel } from './library-panel.jsx'
 import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
+import { UiIcon } from './ui-icons.jsx'
+
+const NAV_EVENT = 'bot-product:navigation'
+let activePanel = null
+const announcePanel = (id, clear = false) => {
+  if (clear) { if (activePanel === id) activePanel = null }
+  else activePanel = id
+  document.dispatchEvent(new document.defaultView.CustomEvent(NAV_EVENT, { detail: { id: activePanel } }))
+}
 
 export function ProductNavigation({ openPanel, panels, compact = false }) {
+  const [active, setActive] = useState(() => activePanel)
+  useEffect(() => {
+    const change = event => setActive(event.detail.id)
+    document.addEventListener(NAV_EVENT, change)
+    setActive(activePanel)
+    return () => document.removeEventListener(NAV_EVENT, change)
+  }, [])
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
+    <p className="bp-nav-label">工作空间</p>
     {[
-      [panels.bindings, 'Bot 绑定', '◈', '绑定'], [panels.tasks, '任务', '☑', '任务'], [panels.machines, '远程电脑', '▣', '电脑'],
-      [panels.library, '资料库', '▤', '资料'], [panels.routine, '例行任务', '↻', '例行'], [panels.usage, '费用与用量', '◷', '费用'], ['model-router-galgame', '高级工作台', '⚙', '工作台'],
-    ].map(([id, label, icon, caption]) => <button key={id} type="button" onClick={() => openPanel(id)} title={label} aria-label={label}>
+      [panels.bindings, 'Bot 绑定', 'team', '绑定'], [panels.tasks, '任务', 'tasks', '任务'], [panels.machines, '远程电脑', 'computer', '电脑'],
+      [panels.library, '资料库', 'folder', '资料'], [panels.routine, '例行任务', 'repeat', '例行'], [panels.usage, '费用与用量', 'chart', '费用'], ['model-router-galgame', '高级工作台', 'settings', '工作台'],
+    ].map(([id, label, icon, caption]) => <button key={id} type="button" aria-current={active === id ? 'page' : undefined}
+      onClick={() => { announcePanel(id); openPanel(id) }} title={label} aria-label={label}>
       {/* A narrow column still says what each icon opens, so the row is readable without hovering. */}
-      <span aria-hidden="true">{icon}</span>{compact ? <span className="bp-nav-caption">{caption}</span> : <span>{label}</span>}
+      <UiIcon name={icon} size={17} /><span className="bp-nav-name">{label}</span><span className="bp-nav-caption">{caption}</span>
     </button>)}
   </nav>
 }
@@ -117,24 +135,30 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
   const bot = bots.find(row => row.id === selected) ?? bots[0]
   const section = snapshot.botBindings ?? snapshot.bindings
   const binding = section?.items?.find(row => row.botId === bot?.id)
+  const capabilities = binding?.tools ?? binding?.capabilities ?? []
+  const permissionGroups = [
+    ['模型调用', /^model\//], ['模型工作台', /^(?:command\/router|tool\/model_router_)/],
+    ['任务管理', /^task\//], ['Bot 协作', /^(?:execution\/bot-turn|tool\/bot_route_task)/],
+    ['资料库', /^tool\/bot_library_/], ['例行任务', /^tool\/bot_routine_/], ['远程工具', /^remote\//],
+  ].filter(([, pattern]) => capabilities.some(value => pattern.test(value))).map(([label]) => label)
   if (!bots.length) return <p>还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。</p>
   return <div className="bp-columns">
     <div className="bp-bot-list" aria-label="Bot 列表">{bots.map(item => <button key={item.id} aria-current={item.id === bot?.id ? 'true' : undefined} onClick={() => setSelected(item.id)}>
-      <strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}<small>{item.role || item.id}</small></button>)}</div>
-    <article className="bp-card"><div className="bp-card-title"><h2>{bot.name}</h2><button onClick={() => openSession(bot.sessionId)}>打开私聊</button></div>
-      <dl className="bp-facts"><Value label="稳定 Bot ID">{bot.id}</Value><Value label="职责">{bot.role || '未填写'}</Value>
+      <span className="bp-person-avatar"><UiIcon name="bot" size={23} /></span><span className="bp-person-copy"><strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}<small>{item.role || '尚未填写职责'}</small></span></button>)}</div>
+    <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.main ? '团队协调 Bot' : '团队成员'}</p></div></div><button className="bp-button-primary" onClick={() => openSession(bot.sessionId)}>打开私聊<UiIcon name="arrow" size={15} /></button></div>
+      <dl className="bp-facts"><Value label="职责">{bot.role || '未填写'}</Value>
         <Value label="准确模型">{modelName(bot.model)}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value>
         <Value label="工作区">{binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? '未指定，请在 Bot 详情选择文件夹'}</Value>
         <Value label="执行位置">{binding?.machineId ?? binding?.workspaceRef?.machineId ?? '尚未取得宿主绑定'}</Value>
-        <Value label="预算范围">{binding?.budgetScope}</Value><Value label="最大并发">{binding?.maxConcurrentTasks}</Value></dl>
+        <Value label="最大并发">{binding?.maxConcurrentTasks}</Value></dl>
       {section?.status === 'blocked' ? <Blocked value={section} /> : binding ? <>
         <h3>官方工具</h3>{binding.officialTools?.length ? <ul>{binding.officialTools.map(tool => <li key={tool.toolId}>{tool.toolId} · {tool.cliModel ?? '未核验模型'} · {tool.identityStatus ?? tool.identityPolicy ?? '未知'}</li>)}</ul> : <p className="bp-muted">此 Bot 没有官方工具绑定。</p>}
-        <h3>有效权限</h3><p className="bp-code">{(binding.tools ?? binding.capabilities ?? []).join('、') || '无额外能力'}</p>
+        <h3>有效权限 <span className="bp-inline-count">{capabilities.length} 项</span></h3><div className="bp-permission-chips">{permissionGroups.map(label => <span key={label}><UiIcon name="check" size={13} />{label}</span>)}{!capabilities.length && <p className="bp-muted">无额外能力</p>}</div>
         {binding.blockedReason && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
       </> : <Blocked value={{ reason: '此 Bot 尚未取得有效绑定。', nextAction: '在宿主 Bot 绑定配置中授予明确工具、机器与工作区。' }} />}
       <p className="bp-muted">角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。</p>
-      <BotRuntimeRow botId={bot.id} dispatch={dispatch} busy={busy} />
-      {dispatch && <BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} />}
+      {dispatch && <details className="bp-edit-section"><summary><UiIcon name="settings" size={16} />编辑权限与预算</summary><BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} /></details>}
+      <details className="bp-technical"><summary>连接与运行详情</summary><dl className="bp-facts"><Value label="稳定 Bot ID">{bot.id}</Value><Value label="预算范围">{binding?.budgetScope}</Value></dl><h3>完整权限标识</h3><p className="bp-code">{capabilities.join('、') || '无额外能力'}</p>{snapshot.availableActions?.includes('botRuntimeStatus') && <BotRuntimeRow botId={bot.id} dispatch={dispatch} busy={busy} />}</details>
     </article>
   </div>
 }
@@ -308,21 +332,24 @@ export function Tasks({ snapshot, dispatch, busy }) {
   const rows = section.items
   const task = rows.find(row => (row.taskId ?? row.id) === selected)
   const actions = snapshot.availableActions ?? []
-  return <><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map(plan=><article className="bp-card" key={plan.planId}>
-    <div className="bp-card-title"><h2>计划 {plan.planId}</h2><Tag>{TASK_STATES[plan.state]??plan.state}</Tag>
-      {actions.includes('task.plan.cancel')&&!['succeeded','cancelled'].includes(plan.state)&&<button disabled={busy} onClick={()=>dispatch('task.plan.cancel',{botId:plan.ownerBotId,planId:plan.planId})}>停止整个计划</button>}</div>
+  return <><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map((plan, index)=><article className="bp-card" key={plan.planId}>
+    <div className="bp-card-title"><div><h2>协作计划 {index + 1}</h2><p className="bp-muted">{plan.packages.length} 个工作包 · {plan.packages.filter(item => item.state === 'succeeded').length} 个已完成</p></div><div className="bp-actions"><Tag>{TASK_STATES[plan.state]??plan.state}</Tag>
+      {actions.includes('task.plan.cancel')&&!['succeeded','cancelled'].includes(plan.state)&&<button disabled={busy} onClick={()=>dispatch('task.plan.cancel',{botId:plan.ownerBotId,planId:plan.planId})}>停止整个计划</button>}</div></div>
     {plan.needsReconciliation&&<p role="status">有工作包停止尚未确认，请核对原收据；计划尚未完成停止。</p>}
-    <ul>{plan.packages.map(item=><li key={item.id}><strong>{item.id}</strong> · {snapshot.bots?.find(bot=>bot.id===item.targetBotId)?.name??item.targetBotId} · {TASK_STATES[item.state]??item.state}
-      {item.dependsOn.length>0&&<small> 前置：{item.dependsOn.join('、')}</small>}{item.result?.code==='DEPENDENCY_FAILED'&&<small> 前置包失败，尚未执行</small>}</li>)}</ul>
+    <ul className="bp-plan-list">{plan.packages.map((item, step) => {
+      const linkedTask = rows.find(row => (row.taskId ?? row.id) === item.taskId)
+      return <li key={item.id}><span className="bp-plan-step">{item.state === 'succeeded' ? <UiIcon name="check" size={13} /> : step + 1}</span><div className="bp-plan-copy"><strong>{linkedTask?.title ?? linkedTask?.input?.task ?? plan.plan?.packages?.find(pkg => pkg.id === item.id)?.objective ?? `工作包 ${step + 1}`}</strong><small>{snapshot.bots?.find(bot=>bot.id===item.targetBotId)?.name??item.targetBotId}
+      {item.dependsOn.length>0&&` · 前置：${item.dependsOn.join('、')}`}{item.result?.code==='DEPENDENCY_FAILED'&&' · 前置包失败，尚未执行'}</small></div><Tag>{TASK_STATES[item.state]??item.state}</Tag></li>
+    })}</ul><details className="bp-technical bp-plan-id"><summary>计划编号</summary><p className="bp-code">{plan.planId}</p></details>
   </article>)}{rows.length === 0 ? <p className="bp-empty">尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。</p> : <div className="bp-table-wrap"><table>
-    <thead><tr><th>任务</th><th>Bot</th><th>状态</th><th>执行尝试</th><th>操作</th></tr></thead><tbody>{rows.map(row => {
+    <thead><tr><th>任务</th><th>Bot</th><th>状态</th><th>执行尝试</th><th>操作</th></tr></thead><tbody>{rows.map((row, index) => {
       const id = row.taskId ?? row.id
       const canCancel = !['cancelled', 'succeeded', 'failed', 'skipped'].includes(row.state)
       const remote = row.result?.remote
       // A terminal Task state alone does not prove that the original remote
       // operation stopped. The host still makes the authoritative decision.
       const stopKnown = !remote || remote.stopConfirmed === true
-      return <tr key={id}><td><button className="bp-text-button" onClick={() => setSelected(id)}>{row.title ?? row.input?.task ?? id}</button><small>{id}</small></td>
+      return <tr key={id}><td><button className="bp-text-button" onClick={() => setSelected(id)}>{row.title ?? row.input?.task ?? `任务 ${index + 1}`}</button></td>
         <td>{snapshot.bots?.find(bot => bot.id === row.botId)?.name ?? row.botId ?? '未取得归属'}</td><td><Tag>{TASK_STATES[row.state] ?? row.state}</Tag>{row.blockedReason && <small>{row.blockedReason}</small>}
           {remote&&(!stopKnown?<small role="status">写入或停止尚未确认，请核对原操作；不会自动重发，也暂不能重试。</small>:remote.notStarted===true&&remote.possiblyApplied!==true?<small>原操作未启动。</small>:remote.status==='succeeded'?<small>写入已确认。{row.state==='cancelled'?'取消未撤销文件变更。':''}</small>:remote.possiblyApplied===true&&<small>操作已停止，文件可能已改变；重试不会撤销已有变更，请先核对产物。</small>)}
         </td>
@@ -497,7 +524,7 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       setWorking(false)
     }
   }
-  return <details className="bp-card"><summary>添加电脑（导入配对文件）</summary>
+  return <details className="bp-card bp-machine-setup"><summary>添加电脑（导入配对文件）</summary>
     <p className="bp-muted">在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 <code>start.cmd</code>，按向导选共享文件夹和连接地址。回到这里导入向导生成的 <code>pairing.private.json</code>，地址、目录和权限会自动填好。</p>
     {available.includes('machine.secret') && available.includes('machine.pair') ? <div className="bp-form">
       <label>配对文件<input type="file" accept=".json,application/json" onChange={event => { void importFile(event) }} /></label>
@@ -589,7 +616,7 @@ export function Machines({ snapshot, dispatch, busy }) {
     {machine.revocations?.some(item=>item.status!=='revoked')&&<aside className="bp-blocked" role="status"><strong>远程停止尚未确认</strong><p>本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。</p>
       {dispatch&&snapshot.availableActions?.includes('machine.reconcile')&&<button type="button" disabled={busy} onClick={()=>dispatch('machine.reconcile',{machineId:machine.id})}>重试确认远程撤销</button>}</aside>}
     {dispatch&&machine.status!=='revoked'&&<><MachineControls machine={machine} snapshot={snapshot} dispatch={dispatch} busy={busy} /><ArtifactDownload machine={machine} snapshot={snapshot} dispatch={dispatch} busy={busy} /></>}
-  </article>)}</div> : <p className="bp-empty">尚未配对远程电脑。安装同版本 Agent，核验指纹并授予所需根目录后，机器会显示在这里。</p>}</>
+  </article>)}</div> : !dispatch && <p className="bp-empty">尚未配对远程电脑。安装 Agent，核验指纹并授予所需根目录后，机器会显示在这里。</p>}</>
 }
 
 function UnknownReview({ item, dispatch, busy }) {
@@ -738,6 +765,11 @@ export function RoleCatalog({ dispatch, busy }) {
 }
 
 export function ProductPage({ section, productApi, openSession, openPanel }) {
+  useEffect(() => {
+    const id = PRODUCT_PANELS[section]
+    announcePanel(id)
+    return () => announcePanel(id, true)
+  }, [section])
   const [snapshot, setSnapshot] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -745,6 +777,8 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   const pendingActions = useRef(0)
   const lifecycle = useRef({ live: false, epoch: 0, request: 0 })
   const snapshotApi = useRef(null)
+  const dispatchState = useRef(null)
+  dispatchState.current = { snapshotStale, readOnly: snapshot?.readOnly }
   const refresh = useCallback(async signal => {
     const state = lifecycle.current
     if (!state.live) return
@@ -771,8 +805,8 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     void loop()
     return () => { stopped = true; state.live = false; state.epoch++; state.request++; controller.abort(); clearTimeout(timer) }
   }, [refresh])
-  const dispatch = async (action, payload) => {
-    if (snapshotStale || snapshot?.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return
+  const dispatch = useCallback(async (action, payload) => {
+    if (dispatchState.current.snapshotStale || dispatchState.current.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return
     const state = lifecycle.current, epoch = state.epoch
     const current = () => state.live && state.epoch === epoch
     pendingActions.current++; setBusy(true)
@@ -785,19 +819,32 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     } catch (cause) { if (current()) { state.request++; setSnapshotStale(true); setError(cause.message) } } finally {
       if (current()) { pendingActions.current = Math.max(0, pendingActions.current - 1); setBusy(pendingActions.current > 0) }
     }
-  }
+  }, [productApi, refresh])
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
   const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
-  return <main className="bp-page"><header><div><p className="bp-eyebrow">BOT 工作系统</p><h1>{title}</h1></div><button disabled={busy} onClick={() => refresh()}>刷新</button></header>
+  const meta = {
+    bindings: ['team', '让每位伙伴各司其职。管理模型、工具和工作空间。'],
+    tasks: ['tasks', '把工作交给合适的 Bot，在这里关注进展与结果。'],
+    machines: ['computer', '连接你自己的电脑，随时查看桌面或接过控制权。'],
+    library: ['folder', '给 Bot 一份有序的资料，让每次协作都有据可循。'],
+    routine: ['repeat', '演示一次，保存步骤，把重复的工作交给 Bot。'],
+    usage: ['chart', '查看真实使用记录，清楚掌握每一笔费用。'],
+  }[section] ?? ['bot', '']
+  return <main className="bp-page" data-section={section}><div className="bp-page-inner"><header className="bp-page-header">
+    <div className="bp-page-heading"><p className="bp-eyebrow"><UiIcon name={meta[0]} size={14} />工作空间<UiIcon name="chevron" size={12} /><span>{title}</span></p><h1>{title}</h1><p className="bp-page-description">{meta[1]}</p></div>
+    <div className="bp-page-tools"><span className="bp-sync" data-state={snapshotStale ? 'stale' : snapshot ? 'ready' : 'loading'}>{snapshotStale ? '等待同步' : snapshot ? '已同步' : '正在连接'}</span>
+      <button className="bp-refresh" disabled={busy} onClick={() => refresh()} title="刷新当前页面"><UiIcon name="refresh" size={16} className={busy ? 'bp-spinning' : ''} /><span>刷新</span></button></div>
+    </header><div className="bp-page-body">
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
-    {!snapshot && !error && <p role="status">正在读取宿主状态…</p>}
-    {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} /><RoleCatalog dispatch={dispatch} busy={disabled} /></>}
+    {!snapshot && !error && <div className="bp-loading" role="status"><span className="bp-loading-line" aria-hidden="true" /><span className="bp-loading-line" aria-hidden="true" /><p>正在读取宿主状态…</p></div>}
+    {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />{snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
-      {section === 'routine' && <RoutinesPanel snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
+      {section === 'routine' && <RoutinesPanel snapshot={snapshot} dispatch={dispatch} busy={disabled} onOpenMachines={() => openPanel(PRODUCT_PANELS.machines)} />}
       {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'usage' && <Usage snapshot={snapshot} dispatch={dispatch} busy={disabled} openAdvanced={() => openPanel('model-router-galgame')} />}
-      <footer className="bp-muted">宿主读取时间：{new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
+      <footer className="bp-page-footer bp-muted">上次同步 {new Date(snapshot.observedAt).toLocaleString('zh-CN')}</footer></>}
+    </div></div>
   </main>
 }

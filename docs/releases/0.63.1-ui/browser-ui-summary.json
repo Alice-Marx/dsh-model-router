@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "checks": [
+    "Task page renders real routing candidates and saved settings",
+    "Real browser file upload and text search reach the authenticated owner API",
+    "New-file menu creates a real private library file",
+    "Dark mode keeps readable controls after theme transitions",
+    "Routines page mounts without a renderer error",
+    "Pairing metadata fills the endpoint without submitting a credential or machine change"
+  ],
+  "errors": [],
+  "actualModelCalls": 0
+}
