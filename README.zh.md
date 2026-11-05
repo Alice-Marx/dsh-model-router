@@ -2,7 +2,9 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-**当前版本：0.63.1，2026-11-05。** 历史报告中的旧版本号只代表当时的报告，不代表当前源码。Windows 电脑 Agent 独立使用 **0.1.0** 版本。
+**当前版本：0.63.2，2026-11-06。** 历史报告中的旧版本号只代表当时的报告，不代表当前源码。Windows 电脑 Agent 独立使用 **0.1.0** 版本。
+
+0.63.2 修复 Harness 自动注入时间和运行上下文时，已分派任务被误判为混入输入的问题，并在桌面连接关闭后保留错误原因。已安装桌面的真实验收仍发现接入失败：Kimi 请求被服务商拒绝，Step 官方 CLI 调用被资金适配器拒绝，现有远程配对只允许原始 Bot。创建工人并取得正确的 Step 回答，不代表派单收据、官方工具和远程控制全部通过。实际结果与限制见[实机验收报告](docs/releases/0.63.2-validation.md)。
 
 0.63.1 参考 Grok Bot 的简洁工作区布局，统一灰白底色、侧栏、线性图标和 Bot 权限分组，重新整理电脑、资料库与例行任务页面；通过 Chromium 检查浅色、深色及窄屏。0.63.0 运行时基线通过已安装 Harness 0.2.2-rc.1 SDK 的完整离线产品 Host 验收；本次界面更新的验证见[发布报告](docs/releases/0.63.1-validation.md)。基线在当前 WireGuard 链路的一台 Windows 10 电脑上，1920×1080 桌面 8 秒样本实测 13.12 FPS，输入确认 p50 为 125 ms、p95 为 274 ms。变化区域 JPEG 传输保持物理输入坐标；这些测量不构成固定帧率承诺。
 
@@ -37,16 +39,16 @@
 
 ## 安装
 
-在 Harness Desktop 从 npm 安装 `@ljwei-stak/dsh-model-router@0.63.1`，或导入对应的 Release 安装包。
+在 Harness Desktop 从 npm 安装 `@ljwei-stak/dsh-model-router@0.63.2`，或导入对应的 Release 安装包。
 
-1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入 `@ljwei-stak/dsh-model-router@0.63.1`，也可导入 Release 的 `.tgz` 包；本地解压安装时选择包含 `package.json` 和 `.dsh-plugin` 的内层 `package` 目录。
+1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入 `@ljwei-stak/dsh-model-router@0.63.2`，也可导入 Release 的 `.tgz` 包；本地解压安装时选择包含 `package.json` 和 `.dsh-plugin` 的内层 `package` 目录。
 2. 启用插件后，**连同托盘进程一起完全退出 Harness**，再重新启动。只关窗口可能仍保留旧 Host。
 3. 检查已加载包的版本并打开 Bot 工作区/产品导航。Provider 凭据和模型在 Harness 官方 **模型** 设置中配置。
 
 使用 DSH CLI 安装指定正式版：
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.1
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.2
 ```
 
 仅执行全局 `npm install -g` 不会注册插件。包名仍为 `@ljwei-stak/dsh-model-router`，内部插件 ID 仍为 `model-router-galgame`，以保留设置。替换旧包前先移除重复插件条目；GAL 是独立插件。

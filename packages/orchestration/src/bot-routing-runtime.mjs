@@ -10,6 +10,11 @@ const textOf = content => (Array.isArray(content) ? content.filter(block => bloc
 const digest = value => createHash('sha256').update(value).digest('hex')
 const UNKNOWN = code => ({ outcome: 'unknown', summary: { code, stopConfirmed: false } })
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled'])
+// Harness prepares a turn by appending its own context as user/message events.
+// These snapshots describe the same input; they are not a second assignment.
+// Keep the list explicit: real user/Bot messages must still invalidate a receipt.
+const CONTEXT_SOURCES = new Set(['runtime-context', 'time-context', 'ds-bot-time-context'])
+const isContextSnapshot = source => source?.form === 'snapshot' && CONTEXT_SOURCES.has(source.kind)
 const READ_TOOLS = new Set(['read', 'glob', 'grep', 'read_file', 'file_read', 'file_list', 'file_search', 'list_directory', 'view_image',
   'bot_library_list', 'bot_library_read', 'bot_library_search', 'bot_task_status', 'bot_task_plan_status', 'list_bots', 'recall',
   'remote_computer_ping', 'remote_computer_list', 'remote_computer_read',
@@ -107,6 +112,7 @@ export function createBotTurnBackends({ ctx, runtime, directory, authority, Data
     if (event.type === 'user/message') {
       const source = event.data?.source
       if (source?.kind !== 'bot' || source.role !== 'routed-task') {
+        if (isContextSnapshot(source)) return
         const running = activeFor(session.id)
         if (running?.read && source?.kind !== 'subagent-settled') running.contaminated = true
         return
@@ -210,7 +216,11 @@ export function createBotTurnBackends({ ctx, runtime, directory, authority, Data
   }
   const recoverReceipt = async (row, reference, signal) => {
     const history = rt()?.eventsBackwards
-    if (typeof history !== 'function' || waiting.has(reference.runId) || row.result_json) return
+    if (typeof history !== 'function' || waiting.has(reference.runId)) return
+    // Older Hosts classified their own clock snapshots as mixed input. Only that
+    // uncertain receipt may be re-read from the exact marked Session turn; other
+    // persisted conclusions remain authoritative and no work is redelivered.
+    if (row.result_json && !(row.state === 'unknown' && JSON.parse(row.result_json)?.summary?.code === 'BOT_TURN_MIXED_INPUT')) return
     let terminal = null, texts = [], toolCalls = 0, matched = false, otherInputs = 0
     for await (const event of history.call(rt(), reference.sessionId, signal)) {
       signal?.throwIfAborted()
@@ -222,7 +232,7 @@ export function createBotTurnBackends({ ctx, runtime, directory, authority, Data
       else if (event.type === 'user/message') {
         const source = event.data?.source
         if (source?.kind === 'bot' && source.role === 'routed-task' && source.exchangeId === reference.runId && taskHash(source.routedTask ?? null) === taskHash(reference.marker)) matched = true
-        else otherInputs++
+        else if (!isContextSnapshot(source) && source?.kind !== 'subagent-settled') otherInputs++
       } else if (event.type === 'turn/start') {
         if (matched) {
           if (!terminal || terminal.data?.turn !== event.data?.turn) return

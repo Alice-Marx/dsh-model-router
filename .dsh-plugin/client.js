@@ -30926,7 +30926,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.63.1", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.63.2", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -33597,7 +33597,9 @@ function connectDesktopStream({
   if (!ticket?.websocketUrl || typeof WebSocketImpl != "function") throw new Error("桌面连接不可用。");
   let socket = new WebSocketImpl(ticket.websocketUrl);
   socket.binaryType = "arraybuffer";
-  let closed2 = !1, mode = "watch", desiredMode = ticket.mode === "control" ? "control" : "watch", nextId = 0, frameMetadata, pending = /* @__PURE__ */ new Map(), send = (value) => closed2 || socket.readyState !== 1 ? !1 : (socket.send(JSON.stringify(value)), !0), failed = (row, failure) => {
+  let closed2 = !1, mode = "watch", desiredMode = ticket.mode === "control" ? "control" : "watch", nextId = 0, lastError = "", reportError = (error, extra = {}) => {
+    lastError ||= error, onState?.({ status: "error", mode, error: lastError, ...extra });
+  }, frameMetadata, pending = /* @__PURE__ */ new Map(), send = (value) => closed2 || socket.readyState !== 1 ? !1 : (socket.send(JSON.stringify(value)), !0), failed = (row, failure) => {
     pending.delete(row.id) && (clearTimeout(row.timer), row.event && onInputFailure?.(row.event, { ...row.meta, failure }), row.reject(Object.assign(new Error(failure.code), failure)));
   }, failPending = (code) => {
     for (let row of [...pending.values()]) failed(row, { code, possiblyApplied: !0 });
@@ -33609,7 +33611,7 @@ function connectDesktopStream({
     });
     let row = { id: id2, event, meta, promise, resolve: resolve2, reject };
     row.timer = setTimeout(() => {
-      failed(row, { code: "DESKTOP_INPUT_ACK_LOST", possiblyApplied: !0 }), mode = "watch", onState?.({ status: "error", mode, error: "远端未确认输入，已断开以释放控制。请检查电脑后重新连接。" }), socket.close();
+      failed(row, { code: "DESKTOP_INPUT_ACK_LOST", possiblyApplied: !0 }), mode = "watch", reportError("远端未确认输入，已断开以释放控制。请检查电脑后重新连接。"), socket.close();
     }, ackTimeoutMs), pending.set(id2, row);
     try {
       if (event && onBeforeInput?.(event, meta), !send({ type, id: id2, ...event ? { event } : {} })) throw Object.assign(new Error("DESKTOP_DISCONNECTED"), { code: "DESKTOP_DISCONNECTED" });
@@ -33630,28 +33632,28 @@ function connectDesktopStream({
     try {
       value = JSON.parse(event.data);
     } catch {
-      onState?.({ status: "error", error: "桌面消息格式无效。", mode });
+      reportError("桌面消息格式无效。");
       return;
     }
     if (value.type === "input" || value.type === "release-input") {
       let row = pending.get(value.id);
       if (!row || value.type !== (row.event ? "input" : "release-input")) return;
       if (value.ok !== !0) {
-        failed(row, { code: value.code ?? "DESKTOP_INPUT_REJECTED", possiblyApplied: value.possiblyApplied === !0 }), onState?.({ status: "error", mode, error: value.code ?? "远端拒绝了输入。" });
+        failed(row, { code: value.code ?? "DESKTOP_INPUT_REJECTED", possiblyApplied: value.possiblyApplied === !0 }), reportError(value.code ?? "远端拒绝了输入。");
         return;
       }
       pending.delete(row.id), clearTimeout(row.timer), row.event && onInputAcknowledged?.(row.event, { ...row.meta, acknowledgedAt: now() }), row.resolve({ ok: !0, id: row.id });
       return;
     }
-    value.type === "ready" ? (mode = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onMetadata?.(value), onState?.({ ...value, status: "connected", mode })) : value.type === "control" || value.type === "mode" ? (mode = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onState?.({ ...value, status: value.mode === "control" && desiredMode === "watch" ? "releasing" : "connected", mode })) : value.type === "frame" || value.type === "displays" ? (value.type === "frame" && (frameMetadata = value), onMetadata?.(value)) : value.type === "error" ? onState?.({ status: "error", error: value.message ?? value.code ?? "桌面操作失败。", mode }) : value.type === "status" && (value.mode && (mode = value.mode), onState?.({ ...value, mode }));
-  }, socket.onerror = () => onState?.({ status: "error", mode: "watch", error: "桌面传输连接失败，请检查远程 Agent 的连接地址和桌面会话。" }), socket.onclose = (event) => {
-    failPending("DESKTOP_DISCONNECTED"), mode = "watch", closed2 || onState?.({ status: "disconnected", mode, error: event.reason || "" });
+    value.type === "ready" ? (mode = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onMetadata?.(value), onState?.({ ...value, status: "connected", mode })) : value.type === "control" || value.type === "mode" ? (mode = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onState?.({ ...value, status: value.mode === "control" && desiredMode === "watch" ? "releasing" : "connected", mode })) : value.type === "frame" || value.type === "displays" ? (value.type === "frame" && (frameMetadata = value), onMetadata?.(value)) : value.type === "error" ? reportError(value.message ?? value.code ?? "桌面操作失败。") : value.type === "status" && (value.mode && (mode = value.mode), onState?.({ ...value, mode }));
+  }, socket.onerror = () => reportError("桌面传输连接失败，请检查远程 Agent 的连接地址和桌面会话。", { mode: "watch" }), socket.onclose = (event) => {
+    failPending("DESKTOP_DISCONNECTED"), mode = "watch", closed2 || onState?.({ status: lastError ? "error" : "disconnected", mode, error: lastError || event.reason || "" });
   }, Object.freeze({
     setMode(next) {
       return ["watch", "control"].includes(next) ? (desiredMode = next, next === "watch" && (mode = "watch", onState?.({ status: "releasing", mode })), send({ type: "control", action: next === "control" ? "acquire" : "release" })) : !1;
     },
     input(event) {
-      return mode !== "control" || closed2 || socket.readyState !== 1 ? !1 : pending.size >= 64 ? (mode = "watch", socket.close(), onState?.({ status: "error", mode, error: "输入确认积压，连接已停止。请检查远程电脑。" }), !1) : enqueue("input", event) !== null;
+      return mode !== "control" || closed2 || socket.readyState !== 1 ? !1 : pending.size >= 64 ? (mode = "watch", reportError("输入确认积压，连接已停止。请检查远程电脑。"), socket.close(), !1) : enqueue("input", event) !== null;
     },
     drain: () => Promise.all([...pending.values()].map((row) => row.promise)),
     releaseInput() {
