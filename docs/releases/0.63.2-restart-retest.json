@@ -1,0 +1,51 @@
+{
+  "version": "0.63.2",
+  "date": "2026-11-06",
+  "userAuthorizedRestart": true,
+  "normalApplicationExit": true,
+  "installedFilesVerified": 462,
+  "profileDualLocksMatch": true,
+  "otherDependencyVersionsUnchanged": true,
+  "fixesLoaded": true,
+  "modelCallsBefore": 31,
+  "modelCallsAfter": 31,
+  "newModelCalls": 0,
+  "taskAttemptOperationIdentitiesUnchanged": true,
+  "workers": [
+    {
+      "worker": "Step",
+      "previousTaskState": "needs-reconciliation",
+      "taskState": "succeeded",
+      "receiptOutcome": "succeeded",
+      "stopConfirmed": true,
+      "attempts": 1,
+      "resultChecks": [
+        "19*23=437",
+        "sum(1..20)=210"
+      ]
+    },
+    {
+      "worker": "Kimi",
+      "previousTaskState": "needs-reconciliation",
+      "taskState": "cancelled",
+      "receiptOutcome": "failed",
+      "code": "INVALID_REQUEST",
+      "stopConfirmed": true,
+      "attempts": 1,
+      "existingCancellationPreserved": true
+    }
+  ],
+  "desktop": {
+    "nativeViewerConnection": "failed",
+    "failureMessageRetained": true,
+    "message": "桌面传输连接失败，请检查远程 Agent 的连接地址和桌面会话。",
+    "viewerSessionCloseConfirmed": true,
+    "remoteInputActionsSent": 0
+  },
+  "remainingProblems": [
+    "Kimi provider HTTP400 INVALID_REQUEST",
+    "Step official CLI MR_API_FUNDING_REQUIRED; no CLI started",
+    "Existing remote client ceiling excludes new worker Bots",
+    "Native viewer transport failure remains; Bot desktop control not passed"
+  ]
+}

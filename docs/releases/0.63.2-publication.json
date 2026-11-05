@@ -54,7 +54,7 @@
     "version": "0.63.2",
     "otherDependencyVersionsUnchanged": true,
     "registryIntegrityConfirmed": true,
-    "appliedToCurrentProfile": false
+    "appliedToCurrentProfile": true
   },
   "limitations": [
     "Kimi main task returned HTTP400 INVALID_REQUEST",
@@ -65,9 +65,20 @@
     "No Bot remote desktop input or routine replay succeeded in this live session"
   ],
   "currentDesktop": {
-    "version": "0.63.1",
-    "restart": "awaiting-confirmation-of-task-interruption",
-    "fixesLoaded": false,
-    "oldReceiptRecheck": "not-yet-performed"
+    "version": "0.63.2",
+    "restart": "completed-after-user-confirmation",
+    "fixesLoaded": true,
+    "oldReceiptRecheck": "passed-without-replay",
+    "retestReport": "0.63.2-restart-retest.json"
+  },
+  "restartRetest": {
+    "stepTask": "succeeded",
+    "kimiTask": "cancelled",
+    "kimiReceipt": "failed:INVALID_REQUEST",
+    "existingKimiCancellationPreserved": true,
+    "newModelCalls": 0,
+    "executionIdentitiesUnchanged": true,
+    "nativeViewerStillFails": true,
+    "desktopErrorRetained": true
   }
 }
