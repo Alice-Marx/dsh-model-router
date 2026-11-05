@@ -34,8 +34,14 @@ export async function apply(ctx) {
   const slots = productSlots(ctx.slots, openPanel)
   const dsContext = new Proxy(ctx, { get: (target, key) => key === 'slots' ? slots : Reflect.get(target, key, target) })
   ctx.effect(() => {
+    const previous = document.body.getAttribute('data-bot-product-ui')
+    document.body.setAttribute('data-bot-product-ui', '1')
     const style = document.createElement('style'); style.dataset.botProduct = '1'; style.textContent = css; document.head.append(style)
-    return () => style.remove()
+    return () => {
+      style.remove()
+      if (previous === null) document.body.removeAttribute('data-bot-product-ui')
+      else document.body.setAttribute('data-bot-product-ui', previous)
+    }
   }, 'bot-product: styles')
   applyDs(dsContext)
   const disposeMr = await applyMr(ctx)

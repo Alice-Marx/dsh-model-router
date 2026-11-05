@@ -2,15 +2,17 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-**Version: 0.63.0 — 2026-11-05.** Older version numbers in historical reports describe those reports, not this checkout. The Windows computer Agent has its own version, **0.1.0**.
+**Version: 0.63.1 — 2026-11-05.** Older version numbers in historical reports describe those reports, not this checkout. The Windows computer Agent has its own version, **0.1.0**.
 
-This build passed the full offline product Host probe on the installed Harness 0.2.2-rc.1 SDK and real Chromium checks. On one 1920×1080 Windows 10 machine over the current WireGuard link, an eight-second desktop sample measured 13.12 FPS, with input ACK p50 = 125 ms / p95 = 274 ms. Dirty-region JPEG updates preserve physical input coordinates; these measurements do not guarantee a fixed frame rate.
+The 0.63.1 interface refresh follows Grok Bot’s restrained workspace layout: neutral surfaces, a clearer sidebar, outline icons, grouped Bot permissions and simpler computer/library/routine screens. Light/dark themes and narrow layouts are checked in Chromium. The 0.63.0 runtime baseline passed the full offline product Host probe on the installed Harness 0.2.2-rc.1 SDK; this patch is validated separately in [the release report](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.1-validation.md). On one 1920×1080 Windows 10 machine over the current WireGuard link, the baseline eight-second desktop sample measured 13.12 FPS, with input ACK p50 = 125 ms / p95 = 274 ms. Dirty-region JPEG updates preserve physical input coordinates; these measurements do not guarantee a fixed frame rate.
 
 One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memory and browser work with model routing, managed tasks, private Bot files, and an independently implemented Windows remote desktop. Configure each Bot's exact model, tools and machine access; a Main Bot can then route and dispatch work to an eligible worker.
 
 This is an implementation of observable workflows, including workflows described publicly for Grok Bot. It does not claim to reproduce Grok's private system or commercial service. You provide the Windows/cloud computers and accounts; automatic VM provisioning/billing and a product-owned iOS client are not delivered.
 
 **Start here:** [Install](#install) · [First Bot](#quick-evaluation) · [Connect a computer](#computers) · [Routines](#routines) · [Bot routing](#bot-routing) · [Private library](#library) · [Model workbench](#workbench) · [Math reference](#costs) · [Development](#development) · [Troubleshooting](#troubleshooting).
+
+![DSH Bot workspace](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workspace-0.63.1-light.png)
 
 <a id="capabilities"></a>
 
@@ -35,16 +37,16 @@ The integrated DS Bot runtime is pinned to **DS Bot 0.2.7**, commit **`71d344bf1
 
 ## Install
 
-Install `@ljwei-stak/dsh-model-router@0.63.0` from npm in Harness Desktop, or import the matching release archive.
+Install `@ljwei-stak/dsh-model-router@0.63.1` from npm in Harness Desktop, or import the matching release archive.
 
-1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.0`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
+1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.1`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
 2. Enable the plugin, then **fully quit Harness, including its tray process**, and restart. Closing only the window may leave the old Host running.
 3. Check the loaded package version and open the Bot workspace/product navigation. Provider credentials and models are configured in Harness's official **Models** settings.
 
 With the DSH CLI, install the exact release with:
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.1
 ```
 
 A global `npm install -g` alone does not register the plugin. The package name remains `@ljwei-stak/dsh-model-router`; its internal plugin ID remains `model-router-galgame` for retained settings. Remove duplicate old package entries before adding a replacement. GAL is a separate plugin.

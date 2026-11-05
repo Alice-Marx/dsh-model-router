@@ -3,6 +3,7 @@ import { framePoint } from '../../packages/orchestration/src/desktop-contract.mj
 import { connectDesktopStream } from './desktop-stream.mjs'
 import { createAcknowledgedRoutineRecorder } from './routine-recorder.mjs'
 import { RoutineCaptureControls } from './routines-panel.jsx'
+import { UiIcon } from './ui-icons.jsx'
 
 const rootOf = machine => typeof machine?.roots?.[0] === 'string' ? machine.roots[0] : machine?.rootId ?? machine?.roots?.[0]?.id ?? ''
 const STATUS = { idle: '未连接', connecting: '连接中', authenticating: '验证中', connected: '已连接', releasing: '归还控制中', disconnected: '已断开', error: '连接异常' }
@@ -160,16 +161,18 @@ export function DesktopViewer({ botId, machines, openSession, renewSession, clos
     <button disabled={state.status !== 'connected' || state.mode === 'watch'} onClick={() => { release(); streamRef.current?.setMode('watch') }}>仅观看</button>
     <button disabled={state.status !== 'connected' || state.mode === 'control' || !canControl} onClick={() => streamRef.current?.setMode('control')}>取得控制权</button>
     <span role="status">{state.mode === 'control' ? '你正在控制这台电脑' : '仅观看'}</span></div>
-  return <section className="bp-desktop-viewer"><div className="bp-card-title"><h3>远程桌面</h3><span>{STATUS[state.status] ?? state.status}</span></div>
+  return <section className="bp-desktop-viewer"><div className="bp-card-title"><h3><UiIcon name="computer" size={16} /> 远程桌面</h3><span className="bp-desktop-status" data-connected={state.status === 'connected'}>{STATUS[state.status] ?? state.status}</span></div>
     <div className="bp-actions"><select aria-label="远程桌面电脑" value={machineId} onChange={event => { void stop(); setMachineId(event.target.value); setDisplayId(''); setState({ status: 'idle', mode: 'watch' }) }}>
       {machines.map(item => <option key={item.machineId ?? item.id} value={item.machineId ?? item.id}>{item.label ?? item.name ?? item.machineId ?? item.id}</option>)}</select>
       {displays.length > 1 && <select aria-label="远程显示器" value={displayId} onChange={event => { void stop(); setDisplayId(event.target.value); setState({ status: 'idle', mode: 'watch' }) }}>
         <option value="">主显示器</option>{displays.map(display => <option key={display.id ?? display.displayId} value={display.id ?? display.displayId}>{display.name ?? display.id ?? display.displayId}</option>)}</select>}
-      <button disabled={!machineId || !botId || ['connecting', 'authenticating'].includes(state.status)} onClick={() => { void connect() }}>{state.status === 'connected' ? '重新连接' : '连接桌面'}</button>
+      <button className="bp-button-primary" disabled={!machineId || !botId || ['connecting', 'authenticating'].includes(state.status)} onClick={() => { void connect() }}>{state.status === 'connected' ? '重新连接' : '连接桌面'}</button>
       <button disabled={!ticketRef.current} onClick={() => { void stop().then(result => setState(result?.stopConfirmed === true ? { status: 'idle', mode: 'watch' }
         : { status: 'error', mode: 'watch', error: '画面连接已关闭，但远端尚未确认释放输入，请检查远程电脑。' })) }}>断开</button></div>
     {state.error && <p className="bp-error" role="alert">{state.error}</p>}{controls}
-    <div className="bp-stream-screen" onDoubleClick={() => { if (state.mode === 'watch') setExpanded(true) }}>{screen(canvasRef)}</div>
+    <div className="bp-stream-screen" data-connected={state.status === 'connected'} onDoubleClick={() => { if (state.mode === 'watch') setExpanded(true) }}>{screen(canvasRef)}
+      {state.status !== 'connected' && <div className="bp-desktop-idle"><UiIcon name="computer" size={34} /><strong>{['connecting', 'authenticating'].includes(state.status) ? '正在连接你的电脑…' : '你的电脑，就在这里'}</strong><span>连接后查看实时桌面，或取得鼠标键盘控制权</span></div>}
+    </div>
     <div className="bp-actions"><small>{stats.width ? `${stats.width} × ${stats.height} · ${stats.fps} 帧/秒${stats.frameWidth && stats.frameWidth !== stats.width ? ` · 传输 ${stats.frameWidth} × ${stats.frameHeight}` : ''}` : '连接后显示整台电脑的桌面。'}</small><button onClick={() => setExpanded(true)}>放大</button></div>
     {state.mode === 'control' && <div className="bp-actions"><input aria-label="发送到远程电脑的文字" value={text} onChange={event => setText(event.target.value)} placeholder="中文或多行文字" />
       <button disabled={!text} onClick={() => { if (streamRef.current?.input({ type: 'text', text })) setText('') }}>发送文字</button></div>}
@@ -199,6 +202,7 @@ export function DesktopWorkbench({ snapshot, dispatch }) {
   const renewSession = useCallback((id, sessionId) => current.current.dispatch('machine.desktop.renew', { botId: id, sessionId }), [])
   const closeSession = useCallback((id, sessionId) => current.current.dispatch('machine.desktop.close', { botId: id, sessionId }), [])
   const saveRoutine = useCallback((id, routine) => current.current.dispatch('routine.save', { botId: id, routine }), [])
-  return <section className="bp-card"><label>以哪个 Bot 连接<select value={botId} onChange={event => setBotId(event.target.value)}>{bots.map(bot => <option key={bot.id} value={bot.id}>{bot.name ?? bot.id}</option>)}</select></label>
+  if (!machines.length) return <section className="bp-card"><div className="bp-empty-state"><span className="bp-empty-icon"><UiIcon name="computer" size={29} /></span><strong>连接你的第一台电脑</strong><p>在自己的 Windows 或云电脑上运行 Agent，再导入配对文件，就能在这里查看和接管桌面。</p><div className="bp-actions"><a className="bp-download-link" href="https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip" target="_blank" rel="noopener noreferrer"><UiIcon name="arrow" size={15} />下载 Windows Agent</a><button className="bp-button-primary" onClick={() => { const setup = document.querySelector('.bp-machine-setup'); if (setup) { setup.open = true; setup.scrollIntoView({ block: 'start', behavior: 'smooth' }) } }}>导入配对文件</button></div></div></section>
+  return <section className="bp-card"><div className="bp-actions" style={{ marginBottom: 20 }}><label>连接身份<select value={botId} onChange={event => setBotId(event.target.value)}>{bots.map(bot => <option key={bot.id} value={bot.id}>{bot.name ?? bot.id}</option>)}</select></label></div>
     <DesktopViewer key={botId} botId={botId} machines={machines} openSession={openSession} renewSession={renewSession} closeSession={closeSession} saveRoutine={saveRoutine} /></section>
 }

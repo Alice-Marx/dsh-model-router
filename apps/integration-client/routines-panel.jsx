@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { normalizeRoutine } from '../../packages/orchestration/src/bot-routine.mjs'
+import { UiIcon } from './ui-icons.jsx'
 
 const message = failure => String(failure?.message ?? failure)
 const rootOf = machine => typeof machine?.roots?.[0] === 'string' ? machine.roots[0]
@@ -54,7 +55,7 @@ export function RoutineCaptureControls({ recorder, sessionId, metadata, mode, co
 }
 
 /** Owner operations all use the authenticated product channel; model tools cannot reconcile. */
-export function RoutinesPanel({ snapshot, dispatch, busy = false }) {
+export function RoutinesPanel({ snapshot, dispatch, busy = false, onOpenMachines }) {
   const bots = snapshot.bots ?? [], machines = (snapshot.machines?.items ?? []).filter(row => row.status !== 'revoked')
   const [botId, setBotId] = useState(bots[0]?.id ?? ''), [machineId, setMachineId] = useState(machines[0]?.id ?? machines[0]?.machineId ?? '')
   const [rows, setRows] = useState([]), [runs, setRuns] = useState([]), [result, setResult] = useState(null)
@@ -97,14 +98,14 @@ export function RoutinesPanel({ snapshot, dispatch, busy = false }) {
   }
   if (!bots.length) return <p className="bp-empty">还没有 Bot。</p>
   return <article className="bp-card"><h2>例行任务</h2>
-    <p className="bp-muted">先在远程桌面取得控制权，演示并保存动作。这里会真正连接所选电脑逐条回放，每个输入都等待远端确认；中途失败即停，确认丢失会阻止再次运行，直到你检查电脑上的实际结果。</p>
+    <p className="bp-muted">在远程电脑中演示并保存动作，再选择电脑回放。每一步都等待确认；失败会停止，结果未知时需检查电脑后再运行。</p>
     <div className="bp-actions"><label>Bot<select disabled={running} value={botId} onChange={event => { setBotId(event.target.value); setResult(null); setError('') }}>
       {bots.map(bot => <option key={bot.id} value={bot.id}>{bot.name ?? bot.id}</option>)}</select></label>
       <label>电脑<select disabled={running} value={machineId} onChange={event => setMachineId(event.target.value)}>
         {machines.map(machine => <option key={machine.id ?? machine.machineId} value={machine.id ?? machine.machineId}>{machine.name ?? machine.label ?? machine.id ?? machine.machineId}</option>)}</select></label>
       <button disabled={busy} onClick={() => { void refresh() }}>刷新</button></div>
     {error && <p className="bp-error" role="alert">{error}</p>}
-    {!rows.length ? <p className="bp-muted">这个 Bot 还没有保存例行任务。</p> : <div className="bp-table-wrap"><table>
+    {!rows.length ? <div className="bp-empty-state"><span className="bp-empty-icon"><UiIcon name="repeat" size={27} /></span><strong>把重复的事，交给 Bot</strong><p>这个 Bot 还没有保存例行任务。在远程电脑中演示并保存，之后就能在这里运行。</p>{onOpenMachines && <button className="bp-button-primary" onClick={onOpenMachines}><UiIcon name="computer" size={15} />去电脑中演示</button>}</div> : <div className="bp-table-wrap"><table>
       <thead><tr><th>名称</th><th>来源 / 步数</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}>
         <td>{row.name}{row.display && <small>{row.display.width} × {row.display.height} · {row.display.displayId}</small>}</td>
         <td>{row.demonstrated ? '桌面演示' : '手工步骤'} / {row.steps}</td>
