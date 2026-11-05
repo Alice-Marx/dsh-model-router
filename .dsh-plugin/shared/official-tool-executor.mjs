@@ -151,7 +151,7 @@ function checkedTimeout(timeoutMs) {
 const API_KEY_VARIABLES = Object.freeze(['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'KIMI_API_KEY',
   'MOONSHOT_API_KEY', 'MINIMAX_API_KEY', 'MIMO_API_KEY', 'XAI_API_KEY', 'ZAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'])
 
-export function executionEnvironment(toolId, { sessionOnly = false, env: source = process.env } = {}) {
+export function executionEnvironment(toolId, { sessionOnly = false, env: source = process.env, extraKeys = [] } = {}) {
   const vendorKeys = {
     'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL',
@@ -161,10 +161,14 @@ export function executionEnvironment(toolId, { sessionOnly = false, env: source 
     'minimax-code': ['MINIMAX_API_KEY', 'MINIMAX_BASE_URL'],
     'mimo-code': ['MIMO_API_KEY'],
     'grok-build': ['XAI_API_KEY', 'GROK_HOME'],
+    'dsh-tui': ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DSH_TUI_HOME'],
     zcode: ['ZCODE_DATA_BASE_DIR', 'ZCODE_PERSONAL_PROVIDER_CONFIG_FILE', 'ZCODE_STORAGE_DIR',
       'ZCODE_SESSION_DB_PATH', 'ZCODE_LOG_DIR', 'ZCODE_HTTP_PROXY', 'ZCODE_NO_PROXY', 'ZCODE_AGENT_CA_CERT'],
   }
-  const keys = [...ENVIRONMENT_KEYS, ...(vendorKeys[toolId] ?? [])]
+  // Declared prerequisites are additive: a person names one variable for one tool and it joins
+  // that tool's whitelist, without opening the rest of the environment.
+  const declared = Array.isArray(extraKeys) ? extraKeys.filter(key => typeof key === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/u.test(key)) : []
+  const keys = [...new Set([...ENVIRONMENT_KEYS, ...(vendorKeys[toolId] ?? []), ...declared])]
     .filter(key => !sessionOnly || !API_KEY_VARIABLES.includes(key))
   const env = {}
   for (const key of keys) {
