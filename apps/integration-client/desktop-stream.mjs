@@ -5,6 +5,11 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
   const socket = new WebSocketImpl(ticket.websocketUrl)
   socket.binaryType = 'arraybuffer'
   let closed = false, mode = 'watch', desiredMode = ticket.mode === 'control' ? 'control' : 'watch', nextId = 0
+  let lastError = ''
+  const reportError = (error, extra = {}) => {
+    lastError ||= error
+    onState?.({ status: 'error', mode, error: lastError, ...extra })
+  }
   let frameMetadata
   const pending = new Map()
   const send = value => {
@@ -26,7 +31,7 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
     const row = { id, event, meta, promise, resolve, reject }
     row.timer = setTimeout(() => {
       failed(row, { code: 'DESKTOP_INPUT_ACK_LOST', possiblyApplied: true })
-      mode = 'watch'; onState?.({ status: 'error', mode, error: '远端未确认输入，已断开以释放控制。请检查电脑后重新连接。' }); socket.close()
+      mode = 'watch'; reportError('远端未确认输入，已断开以释放控制。请检查电脑后重新连接。'); socket.close()
     }, ackTimeoutMs)
     pending.set(id, row)
     try {
@@ -40,13 +45,13 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
     if (closed) return
     if (typeof event.data !== 'string') { onFrame?.(event.data, frameMetadata); return }
     let value
-    try { value = JSON.parse(event.data) } catch { onState?.({ status: 'error', error: '桌面消息格式无效。', mode }); return }
+    try { value = JSON.parse(event.data) } catch { reportError('桌面消息格式无效。'); return }
     if (value.type === 'input' || value.type === 'release-input') {
       const row = pending.get(value.id)
       if (!row || value.type !== (row.event ? 'input' : 'release-input')) return
       if (value.ok !== true) {
         failed(row, { code: value.code ?? 'DESKTOP_INPUT_REJECTED', possiblyApplied: value.possiblyApplied === true })
-        onState?.({ status: 'error', mode, error: value.code ?? '远端拒绝了输入。' }); return
+        reportError(value.code ?? '远端拒绝了输入。'); return
       }
       pending.delete(row.id); clearTimeout(row.timer)
       if (row.event) onInputAcknowledged?.(row.event, { ...row.meta, acknowledgedAt: now() })
@@ -59,11 +64,11 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
       mode = value.mode === 'control' && desiredMode === 'control' ? 'control' : 'watch'
       onState?.({ ...value, status: value.mode === 'control' && desiredMode === 'watch' ? 'releasing' : 'connected', mode })
     } else if (value.type === 'frame' || value.type === 'displays') { if (value.type === 'frame') frameMetadata = value; onMetadata?.(value) }
-    else if (value.type === 'error') onState?.({ status: 'error', error: value.message ?? value.code ?? '桌面操作失败。', mode })
+    else if (value.type === 'error') reportError(value.message ?? value.code ?? '桌面操作失败。')
     else if (value.type === 'status') { if (value.mode) mode = value.mode; onState?.({ ...value, mode }) }
   }
-  socket.onerror = () => onState?.({ status: 'error', mode: 'watch', error: '桌面传输连接失败，请检查远程 Agent 的连接地址和桌面会话。' })
-  socket.onclose = event => { failPending('DESKTOP_DISCONNECTED'); mode = 'watch'; if (!closed) onState?.({ status: 'disconnected', mode, error: event.reason || '' }) }
+  socket.onerror = () => reportError('桌面传输连接失败，请检查远程 Agent 的连接地址和桌面会话。', { mode: 'watch' })
+  socket.onclose = event => { failPending('DESKTOP_DISCONNECTED'); mode = 'watch'; if (!closed) onState?.({ status: lastError ? 'error' : 'disconnected', mode, error: lastError || event.reason || '' }) }
   return Object.freeze({
     setMode(next) {
       if (!['watch', 'control'].includes(next)) return false
@@ -73,7 +78,7 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
     },
     input(event) {
       if (mode !== 'control' || closed || socket.readyState !== 1) return false
-      if (pending.size >= 64) { mode = 'watch'; socket.close(); onState?.({ status: 'error', mode, error: '输入确认积压，连接已停止。请检查远程电脑。' }); return false }
+      if (pending.size >= 64) { mode = 'watch'; reportError('输入确认积压，连接已停止。请检查远程电脑。'); socket.close(); return false }
       return enqueue('input', event) !== null
     },
     drain: () => Promise.all([...pending.values()].map(row => row.promise)),

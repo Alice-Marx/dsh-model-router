@@ -28,7 +28,7 @@ async function until(check) {
   throw new Error('routed turn did not reach the required state')
 }
 
-async function hostFixture(t, { hold = false, ignoreCancel = false, unknownMachine = false, routingEnabled = true, remoteWorkspace = false } = {}) {
+async function hostFixture(t, { hold = false, ignoreCancel = false, unknownMachine = false, routingEnabled = true, remoteWorkspace = false, contextMessages = [] } = {}) {
   await mkdir(resolve('tmp/integration/routed-worker-turns'), { recursive: true })
   const dir = await mkdtemp(resolve('tmp/integration/routed-worker-turns/case-'))
   const file = join(dir, 'host.sqlite')
@@ -82,6 +82,7 @@ async function hostFixture(t, { hold = false, ignoreCancel = false, unknownMachi
           live.set(session.id, { turn })
           emit('session/event', session, { type: 'turn/start', data: { turn } })
           emit('session/event', session, { type: 'user/message', data: message })
+          for (const source of contextMessages) emit('session/event', session, { type: 'user/message', data: { source, content: [{ type: 'text', text: 'additional turn context' }] } })
           const options = { sessionId: session.id, provider: 'offline', model: 'worker-model' }
           backend.tagModelRequest(options); modelIdentities.push(taskModelRequest(options))
           if (hold) return
@@ -191,6 +192,26 @@ test('worker turn: worker/model failure is durable and the reply reports failure
   assert.match(f.deliveries[0].text, /failed/u)
 })
 
+test('worker turn: Host context snapshots do not turn a completed assignment into mixed input', async t => {
+  const contextMessages = ['runtime-context', 'time-context', 'ds-bot-time-context'].map(kind => ({ kind, form: 'snapshot' }))
+  const f = await hostFixture(t, { contextMessages })
+  const report = await f.routing.dispatch({ text: 'READ with Host context' }, { kind: 'owner' })
+  await until(() => f.task(report).state === 'succeeded')
+  assert.equal(f.task(report).result.summary.stopConfirmed, true)
+  assert.match(f.task(report).result.summary.text, /worker private input/u)
+})
+
+test('worker turn: genuine additional input still refuses a success receipt', async t => {
+  for (const source of [{ kind: 'user' }, { kind: 'bot', form: 'relay', role: 'post' },
+    { kind: 'unknown-context', form: 'snapshot' }, { kind: 'time-context', form: 'relay' }]) {
+    const f = await hostFixture(t, { contextMessages: [source] })
+    const report = await f.routing.dispatch({ text: 'READ with another input' }, { kind: 'owner' })
+    await until(() => f.task(report).state === 'needs-reconciliation')
+    assert.equal(f.task(report).result.summary.code, 'BOT_TURN_MIXED_INPUT')
+    assert.equal(f.task(report).result.summary.stopConfirmed, false)
+  }
+})
+
 test('worker turn: remote writes use the parent task/attempt and unknown operations cannot become success', async t => {
   const f = await hostFixture(t, { remoteWorkspace: true })
   const report = await f.routing.dispatch({ text: 'REMOTE write', needs: { write: true } }, { kind: 'owner' })
@@ -245,8 +266,8 @@ test('worker turn: repeated request keys retain the original task/attempt/operat
   assert.equal(f.messages.length, 1)
 })
 
-test('worker turn: a fresh observer reconciles the exact persisted turn after receipt interruption, without redelivering it', async t => {
-  const f = await hostFixture(t, { hold: true, ignoreCancel: true })
+test('worker turn: a fresh observer reconciles the exact persisted turn with Host context after receipt interruption, without redelivering it', async t => {
+  const f = await hostFixture(t, { hold: true, ignoreCancel: true, contextMessages: ['runtime-context', 'time-context', 'ds-bot-time-context'].map(kind => ({ kind, form: 'snapshot' })) })
   const report = await f.routing.dispatch({ text: 'READ before interruption' }, { kind: 'owner' })
   await until(() => f.modelIdentities.length === 1)
   const original = f.task(report)
@@ -263,4 +284,30 @@ test('worker turn: a fresh observer reconciles the exact persisted turn after re
   assert.equal(observed.state, 'succeeded'); assert.equal(observed.operationId, original.operationId); assert.equal(observed.attempts.length, 1)
   assert.equal(observed.result.summary.text, 'persisted exact worker answer')
   assert.equal(f.messages.length, 1)
+})
+
+test('worker turn: a historical mixed-input receipt is rechecked without replay, and real extra input stays unknown', async t => {
+  for (const contaminated of [false, true]) {
+    const contextMessages = [{ kind: 'time-context', form: 'snapshot' }, ...(contaminated ? [{ kind: 'user' }] : [])]
+    const f = await hostFixture(t, { hold: true, ignoreCancel: true, contextMessages })
+    const report = await f.routing.dispatch({ text: 'READ original assignment' }, { kind: 'owner' })
+    await until(() => f.modelIdentities.length === 1)
+    const original = f.task(report)
+    f.backend.close(); await f.service.close()
+    f.finish('worker', { kind: 'completed' }, 'original result, not a repeated run')
+    // Model the legacy receipt already saved by 0.63.1; only this isolated fixture DB is written.
+    const fixtureDb = new Database(f.file)
+    fixtureDb.prepare('UPDATE bot_routed_turns SET state=?,result_json=? WHERE run_id=?').run('unknown', JSON.stringify({ outcome: 'unknown', summary: { code: 'BOT_TURN_MIXED_INPUT', stopConfirmed: false } }), original.executionRef.runId)
+    fixtureDb.close()
+    const backend = createBotTurnBackends({ ctx: f.ctx, runtime: f.runtime, directory: f.directory, authority: f.authority, Database, storeFile: f.file, bindingFor: f.saved, machines: f.machines })
+    const service = createTaskService({ authority: f.authority, directory: f.directory, journal: openTaskJournal(Database, f.file), backends: [...backend.backends] })
+    service.start()
+    t.after(async () => { backend.close(); await service.close() })
+    const observed = await service.reconcile(f.directory.forBot('worker'), { taskId: original.taskId, requestKey: 'recheck-legacy-clock' })
+    assert.equal(observed.state, contaminated ? 'needs-reconciliation' : 'succeeded')
+    assert.equal(observed.operationId, original.operationId)
+    assert.equal(observed.attempts.length, 1)
+    assert.equal(f.messages.length, 1)
+    if (!contaminated) assert.equal(observed.result.summary.text, 'original result, not a repeated run')
+  }
 })

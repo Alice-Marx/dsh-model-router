@@ -44,3 +44,37 @@ test('desktop bridge exists independently of the computers page and resolves str
     assert.equal(calls.length, 1)
   } finally { dispose() }
 })
+
+test('viewer retains the failure when a transport error is followed by an empty close event', () => {
+  let socket
+  class Socket {
+    readyState = 1
+    constructor() { socket = this }
+    send() {}
+    close() { this.readyState = 3 }
+  }
+  const states = []
+  connectDesktopStream({ ticket: { websocketUrl: 'ws://127.0.0.1/desktop/v1/socket' }, WebSocketImpl: Socket, onState: value => states.push(value) })
+  socket.onerror()
+  socket.onclose({ code: 1006, reason: '' })
+  assert.equal(states.at(-1).status, 'error')
+  assert.match(states.at(-1).error, /桌面传输连接失败/u)
+  assert.equal(states.at(-1).mode, 'watch')
+})
+
+test('viewer retains the remote refusal instead of replacing it with a later generic socket error', () => {
+  let socket
+  class Socket {
+    readyState = 1
+    constructor() { socket = this }
+    send() {}
+    close() { this.readyState = 3 }
+  }
+  const states = []
+  connectDesktopStream({ ticket: { websocketUrl: 'ws://127.0.0.1/desktop/v1/socket' }, WebSocketImpl: Socket, onState: value => states.push(value) })
+  socket.onmessage({ data: JSON.stringify({ type: 'error', code: 'GRANT_REVOKED' }) })
+  socket.onerror()
+  socket.onclose({ code: 1008, reason: '' })
+  assert.equal(states.at(-1).status, 'error')
+  assert.equal(states.at(-1).error, 'GRANT_REVOKED')
+})
