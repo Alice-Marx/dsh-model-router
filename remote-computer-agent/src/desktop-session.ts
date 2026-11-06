@@ -17,7 +17,10 @@ type Authority={validate:(context:Context)=>void;audit?:(code:string,actor?:stri
 export type DesktopSessionOptions={nativeFactory?:(config:Config,request:any)=>Promise<NativeDesktopSession>;authTimeoutMs?:number;maxBufferedAmount?:number;sweepMs?:number}
 const inputTools=['desktop_click','desktop_type','desktop_key','desktop_scroll']
 const unknown=()=>Object.assign(new AgentError('OUTCOME_UNKNOWN',409),{possiblyApplied:true,stopConfirmed:false})
-const safeOrigin=(value:any)=>{if(typeof value!=='string')fail('INVALID_ORIGIN');try{const url=new URL(value);if(!['http:','https:'].includes(url.protocol)||url.origin!==value)fail('INVALID_ORIGIN');return value}catch{fail('INVALID_ORIGIN')}}
+// Native Harness has a standard Electron origin that Node's URL serializes as
+// "null". Permit this exact origin only when bound to an authenticated ticket;
+// it is not added to the Agent's global HTTP Origin allowlist.
+const safeOrigin=(value:any)=>{if(value==='dsh-app://app')return value;if(typeof value!=='string')fail('INVALID_ORIGIN');try{const url=new URL(value);if(!['http:','https:'].includes(url.protocol)||url.origin!==value)fail('INVALID_ORIGIN');return value}catch{fail('INVALID_ORIGIN')}}
 const ownerIdentity=(c:Context)=>canonical({client:c.clientId,bot:c.botId,task:c.taskId,attempt:c.attemptId,revision:c.revision,roots:[...c.roots].sort()})
 
 /** Private native pipe; no helper token or Host grant is sent to the renderer. */

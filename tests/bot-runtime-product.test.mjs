@@ -83,6 +83,34 @@ test('bot product: browser requests remain base-relative and carry cookies; abse
   await assert.rejects(createProductApi(async () => new Response('', { status: 404 })).snapshot(), /更新宿主/)
 })
 
+test('bot product: native viewer origin survives the protocol bridge without changing owner admission', async () => {
+  let route, dispatched
+  const ctx = { connection: { fetch: { register(value) { route = value; return () => {} } } } }
+  registerProductChannel(ctx, { dispatch: async (body, context) => { dispatched = { body, context }; return 'accepted' } },
+    request => request.headers.get('x-test-auth') === 'verified' ? { kind: 'owner' } : null)
+  const request = (origin, auth = true) => new Request('http://127.0.0.1:49168/api/bot-product', { method: 'POST',
+    headers: { 'content-type': 'application/json', ...(auth ? { 'x-test-auth': 'verified' } : {}), ...(origin === undefined ? {} : { 'x-dsh-desktop-origin': origin }) },
+    body: JSON.stringify({ action: 'machine.desktop.open', payload: { machineId: 'machine-a', clientOrigin: 'https://forged.example' } }) })
+  assert.equal((await route.fetch(request('dsh-app://app', false))).status, 403)
+  assert.equal(dispatched, undefined)
+  assert.equal((await route.fetch(request('dsh-app://app'))).status, 200)
+  assert.equal(dispatched.context.clientOrigin, 'dsh-app://app')
+  await route.fetch(request(undefined))
+  assert.equal(dispatched.context.clientOrigin, 'http://127.0.0.1:49168')
+  for (const origin of ['null', 'dsh-app://other', 'dsh-app://app/', 'https://attacker.example']) {
+    assert.equal((await (await route.fetch(request(origin))).json()).error.code, 'INVALID_CLIENT_ORIGIN')
+  }
+  const sent = []
+  const fetcher = async (url, options) => { sent.push(options); return Response.json({ ok: true, value: {} }) }
+  const native = createProductApi(fetcher, { protocol: 'dsh-app:', host: 'app' })
+  await native.dispatch('machine.desktop.open', {})
+  await native.dispatch('machine.desktop.renew', {})
+  await native.snapshot()
+  await createProductApi(fetcher, { protocol: 'https:', host: 'owner.example' }).dispatch('machine.desktop.open', {})
+  await createProductApi(fetcher, { protocol: 'dsh-app:', host: 'other' }).dispatch('machine.desktop.open', {})
+  assert.deepEqual(sent.map(options => options.headers['x-dsh-desktop-origin']), ['dsh-app://app', 'dsh-app://app', undefined, undefined, undefined])
+})
+
 test('bot product: one real browser bundle includes every DS feature and MR advanced panel', async () => {
   const result = await bundleProductClient()
   for (const feature of ['side-chat.js', 'speech.js', 'memory-panel.js', 'schedules.js', 'capability-settings.js', 'group-settings.js', 'bot-settings.js', 'usage-page.js']) {

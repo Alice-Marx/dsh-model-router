@@ -2,6 +2,32 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectDesktopStream } from '../apps/integration-client/desktop-stream.mjs'
 import { installDesktopBridge } from '../apps/integration-client/desktop-bridge.mjs'
+import { desktopKeyboardInput } from '../packages/orchestration/src/desktop-contract.mjs'
+
+test('virtual keyboards retain real codes and normalize empty codes without forwarding unidentified keys', () => {
+  for (const [key, code, extra] of [['a', 'KeyA'], ['A', 'KeyA'], ['1', 'Digit1'], ['1', 'Numpad1', { location: 3 }],
+    ['Enter', 'Enter'], ['Enter', 'NumpadEnter', { location: 3 }], ['Control', 'ControlRight', { location: 2 }], ['ArrowLeft', 'ArrowLeft'], ['F12', 'F12']]) {
+    for (const action of ['down', 'up']) assert.deepEqual(desktopKeyboardInput({ key, code: '', ...extra }, action), { type: 'key', key, code, action })
+  }
+  assert.equal(desktopKeyboardInput({ key: 'z', code: 'KeyY' }, 'down').code, 'KeyY', 'physical codes preserve non-US layouts')
+  assert.deepEqual(desktopKeyboardInput({ key: '中', code: '' }, 'down'), { type: 'text', text: '中' })
+  assert.equal(desktopKeyboardInput({ key: '中', code: '' }, 'up'), null)
+  assert.equal(desktopKeyboardInput({ key: '中', code: '', ctrlKey: true }, 'down'), null)
+  assert.equal(desktopKeyboardInput({ key: 'Unidentified', code: '' }, 'down'), null)
+})
+
+test('rejected input closes the stream and fences control while the Agent releases held keys', () => {
+  let socket
+  class Socket { readyState = 1; sent = []; constructor() { socket = this }; send(value) { this.sent.push(JSON.parse(value)) }; close() { this.readyState = 3 } }
+  const states = [], client = connectDesktopStream({ ticket: { websocketUrl: 'ws://localhost/' }, WebSocketImpl: Socket, onState: state => states.push(state) })
+  socket.onmessage({ data: JSON.stringify({ type: 'ready', mode: 'watch' }) }); client.setMode('control')
+  socket.onmessage({ data: JSON.stringify({ type: 'control', mode: 'control' }) })
+  client.input({ type: 'key', action: 'down', code: 'KeyA', key: 'a' })
+  const packet = socket.sent.find(value => value.type === 'input')
+  socket.onmessage({ data: JSON.stringify({ type: 'input', id: packet.id, ok: false, code: 'INVALID_ARGUMENT', possiblyApplied: false }) })
+  assert.equal(socket.readyState, 3); assert.equal(states.at(-1).mode, 'watch'); assert.equal(states.at(-1).error, 'INVALID_ARGUMENT')
+  assert.equal(client.input({ type: 'text', text: 'late' }), false)
+})
 
 test('viewer authenticates the socket before input and waits for the remote control acknowledgement', () => {
   let socket

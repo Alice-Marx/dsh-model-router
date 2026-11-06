@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { framePoint } from '../../packages/orchestration/src/desktop-contract.mjs'
+import { framePoint, desktopKeyboardInput } from '../../packages/orchestration/src/desktop-contract.mjs'
 import { connectDesktopStream } from './desktop-stream.mjs'
 import { createAcknowledgedRoutineRecorder } from './routine-recorder.mjs'
 import { RoutineCaptureControls } from './routines-panel.jsx'
@@ -142,14 +142,15 @@ export function DesktopViewer({ botId, machines, openSession, renewSession, clos
       pendingMove.current = packet
       if (moveTimer.current === null) moveTimer.current = requestAnimationFrame(() => { moveTimer.current = null; if (pendingMove.current) streamRef.current?.input(pendingMove.current); pendingMove.current = null })
     } else {
-      if (action === 'down') { event.currentTarget.focus(); event.currentTarget.setPointerCapture?.(event.pointerId) }
+      if (action === 'down') { event.currentTarget.focus({ preventScroll: true }); event.currentTarget.setPointerCapture?.(event.pointerId) }
       streamRef.current?.input(packet)
     }
   }
   const keyboard = (event, action) => {
     if (state.mode !== 'control' || event.isComposing) return
     event.preventDefault(); event.stopPropagation()
-    streamRef.current?.input({ type: 'key', action, code: event.code, key: event.key })
+    const input = desktopKeyboardInput(event, action)
+    if (input) streamRef.current?.input(input)
   }
   const screen = (ref, big = false) => <canvas ref={ref} tabIndex={0} aria-label="远程桌面，取得控制权后可用鼠标键盘操作" className={big ? 'bp-stream-canvas bp-stream-large' : 'bp-stream-canvas'}
     onPointerMove={event => pointer(event, 'move')} onPointerDown={event => pointer(event, 'down')} onPointerUp={event => pointer(event, 'up')}

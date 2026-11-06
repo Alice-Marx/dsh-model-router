@@ -1,0 +1,52 @@
+{
+  "productVersion": "0.63.3",
+  "agentVersion": "0.1.1",
+  "hostVersion": "0.2.2-rc.1",
+  "platform": "Windows 10 remote desktop; native Windows Harness viewer",
+  "transport": "session-bound JPEG WebSocket over existing private VPN",
+  "viewerOrigin": "dsh-app://app",
+  "sourceGeometry": {
+    "width": 1920,
+    "height": 1080
+  },
+  "observedViewerFps": {
+    "min": 8,
+    "max": 15,
+    "fixedRateGuarantee": false
+  },
+  "acceptance": {
+    "nativeVideo": true,
+    "liveClockUpdates": true,
+    "controlAcknowledged": true,
+    "mouseClickCounter": 2,
+    "firstClickWithoutPageScroll": true,
+    "remoteWindowMaximizedByMouse": true,
+    "keyboardReachedRemoteInputMethod": true,
+    "chineseTextReadBack": "a远程桌面连接验收成功 20261106",
+    "watchContinuesAfterRelease": true,
+    "watchClickDoesNotChangeRemoteCounter": true,
+    "expandedViewer": true,
+    "confirmedClose": true
+  },
+  "checks": {
+    "tests": 2513,
+    "pass": 2424,
+    "fail": 0,
+    "skipped": 89,
+    "cancelled": 0
+  },
+  "scope": "One existing Chief Bot pairing on one Windows computer. Worker pairing ceilings, provider requests and official CLI funding adapters are not changed by this desktop patch.",
+  "artifacts": {
+    "native-control.png": "008059bef5df266b0c546761f28e5af5bb47b0517cd88f3a115adfdf039f4207",
+    "native-watch.png": "5f5cdebf7cdb96a0443698dcf6deff4085830796d132251ab9dedf03cd09fb68",
+    "remote-fixture-result.json": "2e3634faafbd907fc2047b174bd2330fe9256e35d7903652c04d05346254d176",
+    "desktop-acceptance.ps1": "6ee51519fb99c25874e7ec55e4a0c59d8737f48e174efeaf11081c6fe2c367d7"
+  },
+  "sdkProbe": {
+    "status": "passed",
+    "sdkVersion": "0.2.2-rc.1",
+    "checks": 50,
+    "actualModelCalls": 0,
+    "scope": "isolated offline default Host composition"
+  }
+}

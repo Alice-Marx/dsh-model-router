@@ -51,7 +51,7 @@ export function connectDesktopStream({ ticket, onFrame, onState, onMetadata, onB
       if (!row || value.type !== (row.event ? 'input' : 'release-input')) return
       if (value.ok !== true) {
         failed(row, { code: value.code ?? 'DESKTOP_INPUT_REJECTED', possiblyApplied: value.possiblyApplied === true })
-        reportError(value.code ?? '远端拒绝了输入。'); return
+        mode = 'watch'; reportError(value.code ?? '远端拒绝了输入。'); socket.close(); return
       }
       pending.delete(row.id); clearTimeout(row.timer)
       if (row.event) onInputAcknowledged?.(row.event, { ...row.meta, acknowledgedAt: now() })

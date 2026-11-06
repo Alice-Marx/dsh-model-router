@@ -1,9 +1,15 @@
 export const PRODUCT_PANELS = Object.freeze({ bindings: 'bot-product-bindings', tasks: 'bot-product-tasks', machines: 'bot-product-machines', library: 'bot-product-library', routine: 'bot-product-routine', usage: 'bot-product-usage' })
 
-export function createProductApi(fetcher = globalThis.fetch) {
+export function createProductApi(fetcher = globalThis.fetch, clientLocation = globalThis.location) {
   const call = async (action, payload, signal) => {
+    // Desktop's protocol bridge removes Origin before forwarding to the HTTP
+    // Host. Preserve only the known native viewer origin as a transport hint;
+    // owner admission and Bot/machine authority still belong to the Host.
+    const nativeDesktop = ['machine.desktop.open', 'machine.desktop.renew'].includes(action)
+      && clientLocation?.protocol === 'dsh-app:' && clientLocation?.host === 'app'
     const response = await fetcher('api/bot-product', { method: 'POST', credentials: 'same-origin',
-      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, ...(payload === undefined ? {} : { payload }) }), signal })
+      headers: { 'content-type': 'application/json', ...(nativeDesktop ? { 'x-dsh-desktop-origin': 'dsh-app://app' } : {}) },
+      body: JSON.stringify({ action, ...(payload === undefined ? {} : { payload }) }), signal })
     if (response.status === 404) throw new Error('当前宿主尚未启用统一产品入口。请更新宿主并接入 botProductReadModel 服务。')
     const body = await response.json()
     if (!response.ok || body.ok !== true) throw Object.assign(new Error(body.error?.message ?? `宿主请求失败（HTTP ${response.status}）`), { code: body.error?.code })

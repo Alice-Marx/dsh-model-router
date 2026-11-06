@@ -30926,7 +30926,7 @@ var xterm_default = `/**
 `;
 
 // .dsh-plugin/client/host-version.mjs
-var ROUTER_CLIENT_VERSION = "0.63.2", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
+var ROUTER_CLIENT_VERSION = "0.63.3", STALE_HOST_MESSAGE = "插件后台版本较旧，请完全退出并重启 Harness（包括托盘图标）后再使用。";
 function isMissingRemoteMethod(message2) {
   let value = String(message2 ?? "");
   return /transport failure for [^:]+: HTTP 404\b/.test(value) || /Remote method \S+ is no longer mounted/.test(value);
@@ -33155,12 +33155,12 @@ var styles = Object.freeze({
 
 // apps/integration-client/api.mjs
 var PRODUCT_PANELS = Object.freeze({ bindings: "bot-product-bindings", tasks: "bot-product-tasks", machines: "bot-product-machines", library: "bot-product-library", routine: "bot-product-routine", usage: "bot-product-usage" });
-function createProductApi(fetcher = globalThis.fetch) {
+function createProductApi(fetcher = globalThis.fetch, clientLocation = globalThis.location) {
   let call2 = async (action, payload, signal) => {
-    let response = await fetcher("api/bot-product", {
+    let nativeDesktop = ["machine.desktop.open", "machine.desktop.renew"].includes(action) && clientLocation?.protocol === "dsh-app:" && clientLocation?.host === "app", response = await fetcher("api/bot-product", {
       method: "POST",
       credentials: "same-origin",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...nativeDesktop ? { "x-dsh-desktop-origin": "dsh-app://app" } : {} },
       body: JSON.stringify({ action, ...payload === void 0 ? {} : { payload } }),
       signal
     });
@@ -33339,6 +33339,39 @@ var ACTIONS2 = Object.freeze({
   key: ["screenshotId", "key", "modifiers"],
   scroll: ["screenshotId", "delta", "x", "y"]
 });
+function desktopKeyboardInput(event, action) {
+  if (!["down", "up"].includes(action) || typeof event?.key != "string") return null;
+  let key = event.key, code = event.code && event.code !== "Unidentified" ? event.code : "";
+  if (!code) {
+    let side = event.location === 2 ? "Right" : "Left", aliases = {
+      " ": "Space",
+      Control: `Control${side}`,
+      Shift: `Shift${side}`,
+      Alt: `Alt${side}`,
+      Meta: `Meta${side}`,
+      OS: `Meta${side}`,
+      "+": "Equal",
+      "-": "Minus",
+      "=": "Equal",
+      "[": "BracketLeft",
+      "]": "BracketRight",
+      "\\": "Backslash",
+      ";": "Semicolon",
+      "'": "Quote",
+      ",": "Comma",
+      ".": "Period",
+      "/": "Slash",
+      "`": "Backquote"
+    };
+    if (/^[a-z]$/i.test(key)) code = `Key${key.toUpperCase()}`;
+    else if (/^[0-9]$/.test(key)) code = `${event.location === 3 ? "Numpad" : "Digit"}${key}`;
+    else if (key === "Enter") code = event.location === 3 ? "NumpadEnter" : "Enter";
+    else if (Object.hasOwn(aliases, key)) code = aliases[key];
+    else if (/^(?:F(?:[1-9]|1[0-9]|2[0-4])|Escape|Backspace|Tab|Delete|Insert|Home|End|PageUp|PageDown|Arrow(?:Left|Right|Up|Down)|CapsLock|NumLock|ScrollLock|ContextMenu)$/.test(key)) code = key;
+    else return action === "down" && [...key].length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey ? { type: "text", text: key } : null;
+  }
+  return { type: "key", action, code, key };
+}
 function framePoint({ clientX, clientY, rect, frame }) {
   (!rect || !frame || !Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) && fail2("INVALID_FRAME_GEOMETRY"), (!Number.isSafeInteger(frame.width) || !Number.isSafeInteger(frame.height) || frame.width <= 0 || frame.height <= 0) && fail2("INVALID_FRAME_GEOMETRY");
   let ratio = Math.min(rect.width / frame.width, rect.height / frame.height);
@@ -33639,7 +33672,7 @@ function connectDesktopStream({
       let row = pending.get(value.id);
       if (!row || value.type !== (row.event ? "input" : "release-input")) return;
       if (value.ok !== !0) {
-        failed(row, { code: value.code ?? "DESKTOP_INPUT_REJECTED", possiblyApplied: value.possiblyApplied === !0 }), reportError(value.code ?? "远端拒绝了输入。");
+        failed(row, { code: value.code ?? "DESKTOP_INPUT_REJECTED", possiblyApplied: value.possiblyApplied === !0 }), mode = "watch", reportError(value.code ?? "远端拒绝了输入。"), socket.close();
         return;
       }
       pending.delete(row.id), clearTimeout(row.timer), row.event && onInputAcknowledged?.(row.event, { ...row.meta, acknowledgedAt: now() }), row.resolve({ ok: !0, id: row.id });
@@ -34104,9 +34137,12 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
     let packet = { type: "pointer", action, ...position, button: ["left", "middle", "right"][event.button] ?? "left" };
     action === "move" ? (pendingMove.current = packet, moveTimer.current === null && (moveTimer.current = requestAnimationFrame(() => {
       moveTimer.current = null, pendingMove.current && streamRef.current?.input(pendingMove.current), pendingMove.current = null;
-    }))) : (action === "down" && (event.currentTarget.focus(), event.currentTarget.setPointerCapture?.(event.pointerId)), streamRef.current?.input(packet));
+    }))) : (action === "down" && (event.currentTarget.focus({ preventScroll: !0 }), event.currentTarget.setPointerCapture?.(event.pointerId)), streamRef.current?.input(packet));
   }, keyboard = (event, action) => {
-    state.mode !== "control" || event.isComposing || (event.preventDefault(), event.stopPropagation(), streamRef.current?.input({ type: "key", action, code: event.code, key: event.key }));
+    if (state.mode !== "control" || event.isComposing) return;
+    event.preventDefault(), event.stopPropagation();
+    let input = desktopKeyboardInput(event, action);
+    input && streamRef.current?.input(input);
   }, screen = (ref, big = !1) => /* @__PURE__ */ import_react66.default.createElement(
     "canvas",
     {

@@ -93,6 +93,29 @@ test('desktop session: Host/Origin/network boundary and exact ticket Origin on u
     const query=new WebSocket(f.url+'?token='+ticket.token);query.on('error',()=>{});assert.equal(await new Promise(resolve=>query.once('unexpected-response',(req,res)=>{res.resume();resolve(res.statusCode);query.terminate()})),404)
   }finally{await f.close()}
 })
+test('desktop session: native Harness Origin is accepted only by its exact authenticated session ticket',async()=>{
+  const f=await fixture(),nativeOrigin='dsh-app://app'
+  const rejectedUpgrade=async options=>{const socket=new WebSocket(f.url,options);socket.on('error',()=>{});return new Promise(resolve=>socket.once('unexpected-response',(req,res)=>{res.resume();resolve(res.statusCode);socket.terminate()}))}
+  try{
+    assert.equal(await rejectedUpgrade({origin:nativeOrigin}),403,'no native session means no native Origin admission')
+    for(const invalid of ['null','file://','dsh-app://other','dsh-app://app/','dsh-app://app:123','dsh-app://app/path']){
+      const result=await f.post('/desktop/v1/session',{origin:invalid});assert.equal(result.response.status,400);assert.equal(result.value.error.code,'INVALID_ORIGIN')
+    }
+    assert.equal(f.natives.length,0)
+    const ticket=await f.open({origin:nativeOrigin})
+    assert.equal(await rejectedUpgrade({origin:'dsh-app://other'}),403)
+    const http=await fetch(f.endpoint+'/desktop/v1/session',{method:'POST',headers:{authorization:`Bearer ${f.granted.token}`,origin:nativeOrigin,'content-type':'application/json'},body:'{}'})
+    assert.equal(http.status,403,'native session does not relax HTTP API Origin checks')
+    const wrong=peer(f.url,{origin:'https://globally-allowed.example'});await wrong.opened();wrong.send({type:'auth',sessionId:ticket.sessionId,token:ticket.token});assert.equal((await wrong.wait(m=>m.type==='error')).code,'ORIGIN_DENIED')
+    const p=peer(f.url,{origin:nativeOrigin});await p.opened();p.send({type:'auth',sessionId:ticket.sessionId,token:ticket.token});await p.wait(m=>m.type==='ready')
+    f.natives[0].emit('frame',JPEG);assert.deepEqual(await p.wait(Buffer.isBuffer),JPEG)
+    const next=f.issue(),renewed=await f.post('/desktop/v1/session/renew',{sessionId:ticket.sessionId,origin:nativeOrigin},next.token);assert.equal(renewed.response.status,200)
+    assert.equal((await f.post('/desktop/v1/session/renew',{sessionId:ticket.sessionId,origin},next.token)).response.status,403)
+    assert.equal((await f.post('/desktop/v1/session/close',{sessionId:ticket.sessionId},next.token)).value.stopConfirmed,true)
+    assert.equal(await rejectedUpgrade({origin:nativeOrigin}),403,'closed ticket no longer admits native Origin')
+  }finally{await f.close()}
+})
+
 test('desktop session: same-owner renewal keeps socket/control alive past old grant expiry; revocation releases it',async()=>{
   const f=await fixture();try{
     const old=f.issue({expiresAt:Date.now()+450}),ticket=await f.open({},old.token),p=await authenticated(f,ticket),native=f.natives[0]

@@ -1,4 +1,6 @@
-# DSH remote-computer-agent (preview)
+# DSH remote-computer-agent 0.1.1
+
+Harness Desktop's native viewer uses `dsh-app://app`. Version 0.1.1 accepts this exact Origin only for a live desktop session minted by an authenticated Host; it does not enable it for HTTP API requests or other sessions. Model Router 0.63.3 carries the native viewer Origin through Desktop's HTTP bridge. Upgrade both sides when using the native application; ordinary HTTP/HTTPS viewers retain their existing exact-Origin checks.
 
 Credentials are checked again after reading the request body and before each management action. Cached client rows from an older revision cannot issue or revoke newer tickets, and `tools/list` rechecks a live grant. Rotation during a slow request therefore cannot use the old request to revoke a fresh ticket. Temporary cooling also handles wall-clock rollback without extending its backoff beyond the configured cap.
 
