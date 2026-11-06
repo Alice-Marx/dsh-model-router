@@ -1,0 +1,61 @@
+{
+  "productVersion": "0.63.3",
+  "agentVersion": "0.1.1",
+  "publishedPackageSha256": "b434938fbe3058c5134656b36ceb7d98fc804a1b4a5f4df3fd539a25a8545b63",
+  "npmLatest": "0.63.3",
+  "anonymousRegistryDownloadVerified": true,
+  "installedFilesVerified": 462,
+  "profileDependency": "0.63.3",
+  "dualLocksMatch": true,
+  "otherDependenciesUnchanged": true,
+  "afterFinalPackageRestart": {
+    "nativeVideoConnected": true,
+    "sourceGeometry": "1920x1080",
+    "pageFpsObserved": [
+      8,
+      11
+    ],
+    "controlAcknowledged": true,
+    "mouseClickIndependentlyConfirmed": true,
+    "mouseCounterObserved": 2,
+    "keyboardRetest": "Not repeated after final restart because the UI reported ongoing human input; the identical published client bytes passed the earlier native keyboard/Chinese acceptance.",
+    "leftConnectedForUser": true
+  },
+  "earlierIdenticalClientAcceptance": {
+    "mouse": true,
+    "keyboard": true,
+    "chineseText": "a远程桌面连接验收成功 20261106",
+    "expandedViewer": true,
+    "watchInputFence": true,
+    "confirmedClose": true,
+    "clientSha256": "5f89e17b433bc714f46ea74df15f2dc29d8a1a3f105ec62cb629cf494bf524ec"
+  },
+  "checks": {
+    "full": {
+      "tests": 2513,
+      "pass": 2424,
+      "fail": 0,
+      "skipped": 89,
+      "cancelled": 0
+    },
+    "cleanProduct": {
+      "tests": 124,
+      "pass": 124,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "sdkHost": {
+      "version": "0.2.2-rc.1",
+      "passed": 50,
+      "actualModelCalls": 0
+    }
+  },
+  "publication": {
+    "gitlabSourceCommit": "b51ebd0c5b9d4bbb7f254cd632042542518fb35d",
+    "githubProductCommit": "2379192a693f3cac2bdd7f063bfdf4b951a3da91",
+    "tag": "v0.63.3",
+    "githubRelease": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.3"
+  },
+  "recordedAtUtc": "2026-11-06T04:27:25.541380+00:00"
+}
