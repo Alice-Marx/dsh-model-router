@@ -2,6 +2,10 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
+[![npm 版本](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+
+[![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge)
+
 **当前版本：0.63.3，2026-11-06。** 历史报告中的旧版本号只代表当时的报告，不代表当前源码。Windows 电脑 Agent 独立使用 **0.1.1** 版本。
 
 0.63.3 修复原生 Harness 的桌面连接：在应用转发 HTTP 请求时保留查看器准确的 `dsh-app://app` 来源。原生观看需要同时升级插件和 **Agent 0.1.1**；拥有者鉴权、Bot/电脑权限与桌面会话的来源校验继续生效。原生应用已实测实时画面、鼠标/键盘与中文输入、归还观看和确认断开；同时修复虚拟键盘缺少按键编码、首次点击引起页面滚动的问题。见[桌面连接验收](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.3-validation.md)。

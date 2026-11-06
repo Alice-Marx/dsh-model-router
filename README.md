@@ -2,6 +2,10 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
+[![npm version](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![Listed in the DSH plugin directory](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+
+[![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
+
 **Version: 0.63.3 — 2026-11-06.** Older version numbers in historical reports describe those reports, not this checkout. The Windows computer Agent has its own version, **0.1.1**.
 
 0.63.3 fixes the native Harness desktop connection by preserving the viewer’s exact `dsh-app://app` Origin across the application’s HTTP bridge. Native viewing requires Agent **0.1.1** as well as the updated plugin; authenticated owner admission, Bot/machine permissions and session-bound Origin checks remain in force. Native acceptance verified live video, mouse/keyboard and Chinese text input, return to watch mode and confirmed disconnect. Missing virtual-keyboard codes and first-click page scrolling are also fixed. See the [desktop connection validation](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.3-validation.md).
