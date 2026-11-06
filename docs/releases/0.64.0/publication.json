@@ -1,0 +1,133 @@
+{
+  "version": "0.64.0",
+  "status": "published-installed-and-tested",
+  "date": "2026-11-06",
+  "sourceCommit": "c6bf7246600ab30c1b97505ed2f33c8edf178008",
+  "githubCommit": "caeac29fa63693dc464436b50508593be431536d",
+  "githubRelease": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.64.0",
+  "npm": [
+    {
+      "name": "@ljwei-stak/dsh-model-route-bot",
+      "status": "verified",
+      "version": "0.64.0",
+      "latest": "0.64.0",
+      "anonymousDownloadMatchesLocal": true,
+      "bytes": 3500540,
+      "sha256": "c7ddc2bdcae07cedd63bd2f9d212a5f20537da270c0777d20e57637c59d7d070",
+      "integrity": "sha512-n2JmIDK+r5PNOv19EFEj9VK75QxfHptZh0pGk7/DjKXvcxojJ0L8tC03dgbCYJe4jEaZD+TR3Ts0x6Z/cG6M8A==",
+      "tarball": "https://registry.npmjs.org/@ljwei-stak/dsh-model-route-bot/-/dsh-model-route-bot-0.64.0.tgz"
+    },
+    {
+      "name": "@ljwei-stak/dsh-model-router",
+      "status": "verified",
+      "version": "0.64.0",
+      "latest": "0.64.0",
+      "anonymousDownloadMatchesLocal": true,
+      "bytes": 553394,
+      "sha256": "f6c5f30cb8314b9208511d9ae6082eff539dccd1463ee4b7c902025e979f176f",
+      "integrity": "sha512-kz8fMTH05sJb+DkvP8haxjURVvWaH3XCrMXQHqAM54MlH2G8hc46QWk4eO8T1zCq2HIX2O5sIDThsFXHxX2bqw==",
+      "tarball": "https://registry.npmjs.org/@ljwei-stak/dsh-model-router/-/dsh-model-router-0.64.0.tgz"
+    }
+  ],
+  "fullEdition": {
+    "package": "@ljwei-stak/dsh-model-route-bot",
+    "version": "0.64.0",
+    "filesVerified": 468,
+    "runtimeFilesVerified": 190,
+    "tarballBytes": 3500540,
+    "integrity": "sha512-n2JmIDK+r5PNOv19EFEj9VK75QxfHptZh0pGk7/DjKXvcxojJ0L8tC03dgbCYJe4jEaZD+TR3Ts0x6Z/cG6M8A=="
+  },
+  "routerEdition": {
+    "package": "@ljwei-stak/dsh-model-router",
+    "version": "0.64.0",
+    "filesVerified": 62,
+    "runtimeFilesVerified": 53,
+    "tarballBytes": 553394,
+    "integrity": "sha512-kz8fMTH05sJb+DkvP8haxjURVvWaH3XCrMXQHqAM54MlH2G8hc46QWk4eO8T1zCq2HIX2O5sIDThsFXHxX2bqw==",
+    "reproducibleFromSource": true,
+    "sourceFilesChecked": 80
+  },
+  "tests": {
+    "all-tests-final.log": {
+      "tests": 2517,
+      "pass": 2428,
+      "fail": 0,
+      "skipped": 89,
+      "cancelled": 0
+    },
+    "clean-tests-final.log": {
+      "tests": 128,
+      "pass": 128,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "packaging-regression.log": {
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "sdk-full.log": {
+      "status": "passed",
+      "sdkVersion": "0.2.2-rc.1",
+      "checks": 50,
+      "actualModelCalls": 0
+    },
+    "sdk-router.log": {
+      "status": "passed",
+      "sdkVersion": "0.2.2-rc.1",
+      "checks": 3,
+      "actualModelCalls": 0
+    }
+  },
+  "nativeFullEditionAcceptance": {
+    "edition": "@ljwei-stak/dsh-model-route-bot",
+    "version": "0.64.0",
+    "originalBotsAndConversationsVisible": true,
+    "originalProductTasksVisible": true,
+    "taskTemplateFilled": true,
+    "draftRetainedAcrossProductPageRemount": true,
+    "nextStepNavigatesToPreview": true,
+    "executionPreviewGenerated": true,
+    "previewRequiresExplicitConfirmation": true,
+    "previewCancelled": true,
+    "noExecutionConfirmed": true,
+    "failedReminderOpensHistoryAndSelectsFailedRun": true,
+    "attentionPreferencePreserved": true,
+    "attentionClosedAtEnd": true,
+    "taskPanelOpenAtEnd": true,
+    "staleHostWarning": false
+  },
+  "installation": {
+    "name": "@ljwei-stak/dsh-model-route-bot",
+    "version": "0.64.0",
+    "filesVerified": 468,
+    "otherDependenciesUnchanged": true,
+    "routerConfigurationPreserved": true,
+    "profileDataDirectoriesRetained": true,
+    "dualLocksIdentical": true
+  },
+  "lockValidation": "pnpm 11.28.5 offline frozen lockfile validation passed",
+  "readme": {
+    "originalBadgesAndCardRetained": true,
+    "addedFullEditionNpmBadge": true,
+    "formulaAnchors": 6,
+    "pairedInlineExpressions": 33,
+    "githubEnglishBlob": "afef5bcc1da8a3e264e9f9b48a38e3afc872f955",
+    "githubChineseBlob": "c0bd204102f287caf6d2658738bc6edac194d9ad"
+  },
+  "checks": {
+    "generatedClientMatchesSource": true,
+    "pinnedSourceFiles": 361,
+    "agentCiAndBuild": true,
+    "agentVersion": "0.1.1",
+    "githubReleaseDigestsMatchBothArchives": true
+  },
+  "validationScope": [
+    "Full edition was migrated and tested in the actual native desktop app.",
+    "Router-only edition was tested in an isolated actual SDK Host and its client/module closure; it was not installed over the user's complete Bot workspace.",
+    "UI acceptance generated a preview and cancelled it; no paid model execution was confirmed."
+  ]
+}
