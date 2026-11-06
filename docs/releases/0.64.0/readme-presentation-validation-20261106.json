@@ -1,0 +1,77 @@
+{
+  "formulas": 6,
+  "inlineMathPairs": 33,
+  "files": [
+    {
+      "file": "README.md",
+      "localLinksChecked": 13,
+      "anchors": 18,
+      "bytes": 31451,
+      "privateArchiveLinks": 0
+    },
+    {
+      "file": "README.zh.md",
+      "localLinksChecked": 13,
+      "anchors": 18,
+      "bytes": 28421,
+      "privateArchiveLinks": 0
+    },
+    {
+      "file": "packages/model-router-plugin/README.md",
+      "localLinksChecked": 1,
+      "anchors": 0,
+      "bytes": 4793,
+      "privateArchiveLinks": 0
+    },
+    {
+      "file": "packages/model-router-plugin/README.zh.md",
+      "localLinksChecked": 1,
+      "anchors": 0,
+      "bytes": 4186,
+      "privateArchiveLinks": 0
+    }
+  ],
+  "assets": [
+    {
+      "file": "readme-cover.png",
+      "bytes": 1799217,
+      "sha256": "b17ddf8c11eebf8cba8ebc64d1f25dff85d37f1132b9debeddcb75aefbd4f243"
+    },
+    {
+      "file": "workbench-task.png",
+      "bytes": 122095,
+      "sha256": "acb57ebf21363564ffaa9218f6790bb0d523ccd9bdced4dd6efabdf7204b3944"
+    },
+    {
+      "file": "workbench-execution-preview.png",
+      "bytes": 64239,
+      "sha256": "c3c4eb347ff9fdc7188e01e80e510628aaee29a2845783c4016d63b01e78464b"
+    }
+  ],
+  "rendered": [
+    {
+      "file": "README.md",
+      "htmlBytes": 48374,
+      "imageElements": 10,
+      "mathElements": 39
+    },
+    {
+      "file": "README.zh.md",
+      "htmlBytes": 45265,
+      "imageElements": 10,
+      "mathElements": 39
+    },
+    {
+      "file": "packages/model-router-plugin/README.md",
+      "htmlBytes": 6650,
+      "imageElements": 2,
+      "mathElements": 0
+    },
+    {
+      "file": "packages/model-router-plugin/README.zh.md",
+      "htmlBytes": 6031,
+      "imageElements": 2,
+      "mathElements": 0
+    }
+  ]
+}

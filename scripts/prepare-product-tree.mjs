@@ -16,7 +16,7 @@ const tracked = [...new Set(execFileSync('git', ['ls-files', '-c', '-o', '--excl
 }).split('\0').filter(Boolean))]
 const top = new Set(['.gitignore', '.gitattributes', 'AGENTS.md', 'LICENSE', 'README.md', 'README.zh.md',
   'README.i18n.yaml', 'package.json', 'package-lock.json', 'cordis.patch.yml'])
-const prefixes = ['.dsh-plugin/', 'apps/integration-client/', 'apps/desktop-client/', 'packages/',
+const prefixes = ['.github/assets/', '.dsh-plugin/', 'apps/integration-client/', 'apps/desktop-client/', 'packages/',
   'modules/bot-runtime/', 'native/', 'remote-computer-agent/', 'deploy/']
 const scripts = ['build-client.mjs', 'build-router-package.mjs', 'sync-ds-bot.mjs', 'prepack.mjs', 'check-readme.mjs',
   'check-package.mjs', 'check-router-package.mjs', 'verify-release.mjs', 'integration-product-source.mjs', 'run-tests.mjs',
@@ -68,16 +68,12 @@ pkg.scripts = {
 }
 writeFileSync(resolve(output, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`)
 writeFileSync(resolve(output, 'scripts/test-plan.json'), `${JSON.stringify(plan, null, 2)}\n`)
-const archive = 'https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/'
-for (const file of ['README.md', 'README.zh.md']) {
-  let text = readFileSync(resolve(output, file), 'utf8')
-  text = text.replace(/\]\((?:\.\/)?(docs\/[^)]+|CHANGELOG\.md(?:#[^)]*)?)\)/g,
-    (_, target) => `](${archive}${target})`)
-  const note = file === 'README.md'
-    ? 'This GitHub tree contains the current program, build tools and focused product tests. The complete test suite, history and validation reports are in the [GitLab archive](https://gitlab.com/Alice_marx/dsh-model-router).'
-    : 'GitHub 保留当前程序、构建工具和针对产品的测试；完整测试、历史文档和验收报告位于 [GitLab 全量归档](https://gitlab.com/Alice_marx/dsh-model-router)。'
-  text = text.replace('<a id="development"></a>', `${note}\n\n<a id="development"></a>`)
-  writeFileSync(resolve(output, file), text)
+// Public presentation is self-contained. Never rewrite links to the private archive.
+for (const file of ['README.md', 'README.zh.md',
+  'packages/model-router-plugin/README.md', 'packages/model-router-plugin/README.zh.md']) {
+  const text = readFileSync(resolve(output, file), 'utf8')
+  assert.ok(!/https?:\/\/(?:[^/]*\.)?gitlab\.com(?:[/:]|$)/i.test(text), `${file}: private archive URL in public README`)
+  assert.ok(!/\]\((?:\.\/)?(?:docs\/|CHANGELOG\.md)/.test(text), `${file}: link to excluded archive documentation`)
 }
 let pairing = readFileSync(resolve(output, 'README.i18n.yaml'), 'utf8')
 for (const file of ['README.md', 'README.zh.md']) {
