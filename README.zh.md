@@ -6,19 +6,11 @@
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-**当前版本：0.63.3，2026-11-06。** 历史报告中的旧版本号只代表当时的报告，不代表当前源码。Windows 电脑 Agent 独立使用 **0.1.1** 版本。
-
-0.63.3 修复原生 Harness 的桌面连接：在应用转发 HTTP 请求时保留查看器准确的 `dsh-app://app` 来源。原生观看需要同时升级插件和 **Agent 0.1.1**；拥有者鉴权、Bot/电脑权限与桌面会话的来源校验继续生效。原生应用已实测实时画面、鼠标/键盘与中文输入、归还观看和确认断开；同时修复虚拟键盘缺少按键编码、首次点击引起页面滚动的问题。见[桌面连接验收](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.3-validation.md)。
-
-0.63.2 修复 Harness 自动注入时间和运行上下文时，已分派任务被误判为混入输入的问题，并在桌面连接关闭后保留错误原因。已安装桌面的真实验收仍发现接入失败：Kimi 请求被服务商拒绝，Step 官方 CLI 调用被资金适配器拒绝，现有远程配对只允许原始 Bot。创建工人并取得正确的 Step 回答，不代表派单收据、官方工具和远程控制全部通过。实际结果与限制见[实机验收报告](docs/releases/0.63.2-validation.md)。
-
-0.63.1 参考 Grok Bot 的简洁工作区布局，统一灰白底色、侧栏、线性图标和 Bot 权限分组，重新整理电脑、资料库与例行任务页面；通过 Chromium 检查浅色、深色及窄屏。0.63.0 运行时基线通过已安装 Harness 0.2.2-rc.1 SDK 的完整离线产品 Host 验收；本次界面更新的验证见[发布报告](docs/releases/0.63.1-validation.md)。基线在当前 WireGuard 链路的一台 Windows 10 电脑上，1920×1080 桌面 8 秒样本实测 13.12 FPS，输入确认 p50 为 125 ms、p95 为 274 ms。变化区域 JPEG 传输保持物理输入坐标；这些测量不构成固定帧率承诺。
+**当前正式版：0.63.3 · Windows Agent：0.1.1。**
 
 一个 DeepSeek Harness 插件整合长期 Bot 对话、群聊、记忆和浏览器工作，以及模型路由、托管任务、Bot 私有文件和独立实现的 Windows 远程桌面。先为各 Bot 配置准确模型、工具和电脑权限，再由 Main Bot 将工作路由并真实派发给具备条件的执行 Bot。
 
-本项目对可观察工作流进行实现，其中包括 Grok Bot 公开描述的工作流；不声称取得或复刻 Grok 私有系统及完整商业服务。Windows/云电脑和账户由你准备；本产品没有自动创建云 VM、代管云账单或交付自有 iOS 客户端。
-
-**从这里开始：** [安装](#install) · [第一个 Bot](#quick-evaluation) · [连接电脑](#computers) · [例行任务](#routines) · [Bot 路由](#bot-routing) · [私有资料库](#library) · [模型工作台](#workbench) · [数学参考](#costs) · [源码开发](#development) · [排查问题](#troubleshooting)。
+**从这里开始：** [安装](#install) · [第一个 Bot](#quick-evaluation) · [日常工作](#daily-work) · [连接电脑](#computers) · [例行任务](#routines) · [Bot 路由](#bot-routing) · [私有资料库](#library) · [模型工作台](#workbench) · [数学参考](#costs) · [排查问题](#troubleshooting)。
 
 ![DSH Bot workspace](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workspace-0.63.1-light.png)
 
@@ -39,8 +31,6 @@
 | 私有资料库 | 按 Bot 隔离的文件夹、二进制上传下载、文本编辑、名称筛选，以及页面和已授权 Bot 工具的私有文本搜索。 |
 | 模型工作台 | 本地模型路线规划、带依赖工作包、官方 CLI 检测/安装/终端、执行历史及独立的 API/订阅核算。 |
 
-集成的 DS Bot 固定为 **0.2.7**，提交 **`71d344bf193f3f18185f25de3d8e5c483046910a`**：包含 352 个与上游字节一致的文件和 6 个可重现产品覆盖，产品修改独立维护在 `modules/bot-runtime/product-overlay/`。`modules/bot-runtime/SOURCE.json` 记录来源和摘要。上游浏览器、头像库与本产品的完整桌面、文档文件资料库分别实现。
-
 <a id="install"></a>
 
 ## 安装
@@ -59,8 +49,6 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.3
 
 仅执行全局 `npm install -g` 不会注册插件。包名仍为 `@ljwei-stak/dsh-model-router`，内部插件 ID 仍为 `model-router-galgame`，以保留设置。替换旧包前先移除重复插件条目；GAL 是独立插件。
 
-自己生成归档时参见[源码开发](#development)。验证使用独立测试 profile；依赖声明或构建成功不能直接证明安装版 Desktop 已验收。
-
 <a id="quick-evaluation"></a>
 
 ## 第一个 Bot 与第一个任务
@@ -74,6 +62,18 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.3
 集成模式复用 Harness Sessions。可选的独立运行时使用自己的会话存储，必须显式切换；同一 Bot 只能有一个正在服务的运行时。群聊、记忆、浏览器和长期上下文来自已固定的上游实现，而非占位能力清单。
 
 Windows/云电脑安装：[下载 Agent 0.1.1 完整 Windows x64 包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.3/dsh-remote-agent-0.1.1-windows-x64.zip)，解压后运行 `start.cmd`。
+
+<a id="daily-work"></a>
+
+## 对话、群聊、记忆、浏览器与定时工作
+
+| 要做的事 | 操作方法 |
+| --- | --- |
+| 与 Bot 对话 | 在侧栏创建或选择 Bot，在 Bot 设置中选择模型和角色，再发送消息；遇到提问或审批卡片时先处理卡片。 |
+| 多 Bot 群聊 | 从聊天选择器中选择所需 Bot 建立群聊；在群设置中配置成员/管理员、谁来回答、工作目录和群公告，用 `@` 指定回答者。 |
+| 管理长期上下文 | 从侧栏搜索对话，用对话分段/检查点管理长任务；打开 Bot、群或团队的记忆入口查看、编辑、删除记忆及其变更，审核后再接受技能/项目规则学习提议。 |
+| 使用浏览器与文档 | 打开当前 Bot 的浏览器面板管理页面和网页工作；附加支持的 Office 文档进行读取/预览。按需配置连接器，通过密钥输入卡片填写凭据；头像库与私有文件资料库分别管理。 |
+| 定时执行工作 | 宿主开启 Automation tasks 服务后，从 Bot 设置或定时任务页面选择目标 Bot/群、任务内容和可用时间规则并保存，检查下次执行状态；Host 与相关 Agent 必须保持运行。 |
 
 <a id="computers"></a>
 
@@ -151,7 +151,12 @@ Windows/云电脑安装：[下载 Agent 0.1.1 完整 Windows x64 包](https://gi
 
 任务保留 task/attempt/operation 身份、结果及未知影响证据。根据任务状态和验收标准判断完成，不从已生成计划、安装方法、权限检查通过或方法名称推断完成。API 金额/预占与订阅调用次数/已报告 token 独立记账，缺失用量保持未知。
 
-下方保留的数学参考描述 **模型路线工作台**；Bot 选择和桌面 routine 回放属于另外的工作流。
+1. 在 **模型配置** 中刷新准确路线，填写已知价格、质量证据、计费偏好与 CLI 模型映射；未知信息留空。
+2. 在 **任务与执行** 中填写任务，选择单路线、依赖团队或逐包手动分配；生成建议，核对预览，再确认需要执行的操作。
+3. 在 **官方工具** 中检测/安装 CLI，检查支持模式和登录情况，按需使用交互终端；CLI 已安装不代表每个模型都有可用的托管执行器。
+4. 在 **预算与安全** 和费用页面设置 API 限额/订阅偏好并查看收据；通过任务/历史页面跟踪执行，按记录状态取消、重试或核对结果。
+
+下方成本与路由计算说明适用于 **模型路线工作台**；Bot 选择和桌面 routine 回放属于另外的工作流。
 
 <a id="costs"></a>
 
@@ -251,11 +256,9 @@ $`L`$ 为延迟效用：$`t`$ 是匹配历史的 P90 耗时，单位为毫秒；
 4. 按字典序比较分配：更少放宽包、更小质量缺口、更高效用、更低费用、更少路线切换，最后稳定的路线顺序。最小费用模式先比较费用，再比较效用。每条跨越 `provider/model` 路线的依赖边从效用中扣除 0.015。
 5. 报告搜索元数据与可行性。正预算下若不存在可行分配，仍可返回最小费用备选，但标记 `budgetFeasible: false`。显示了计划不代表预算已满足。
 
-“精确”仅适用于保留下来的候选空间与代理目标。候选上限和 beam 裁剪意味着不能声称在所有已配置模型上全局最优。单元/合成测试验证机制，不证明真实回答质量提升。研究审查使用的公开 2026-06-25 LiveBench 分数/费用表属于汇总数据；未取得逐题配对的质量/费用矩阵，因此不主张真实路由收益。参见[研究](docs/ROUTING_RESEARCH.zh.md)、[推导/实验](docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md)与[验证规程](docs/ROUTING_LIVEBENCH_VALIDATION.zh.md)。
+“精确”仅适用于保留下来的候选空间与代理目标。候选上限和 beam 裁剪意味着不保证在所有已配置模型中全局最优；请在预览中核对所选路线与是否放宽了质量下限。
 
 证据导入、回退条件、推理档位与可选 JSON 验收升级的设置参见[算法优化使用说明](docs/ROUTING_ALGORITHM_OPTIMIZATION.zh.md)。验收升级默认关闭，启用后仍需通过计费与预算检查，最多增加一次普通 API 调用。
-
-实现：[router.mjs](.dsh-plugin/shared/router.mjs)、[assignment-solver.mjs](.dsh-plugin/shared/assignment-solver.mjs)、[routing-evidence.mjs](.dsh-plugin/shared/routing-evidence.mjs)、[harness-plan.mjs](.dsh-plugin/shared/harness-plan.mjs) 与 [quality-gates.mjs](.dsh-plugin/shared/quality-gates.mjs)。
 
 <a id="data"></a>
 
@@ -264,59 +267,6 @@ $`L`$ 为延迟效用：$`t`$ 是匹配历史的 P90 耗时，单位为毫秒；
 Provider 凭据和认证会话由 Harness 管理。路由状态/收据位于 `<DSH_HOME>/model-router/`；产品还在其中保留已提交 Bot 绑定、任务记录、私有资料库与 routine/执行账本。上游 Bot home 按配置位置保留对话、记忆、浏览器状态及相关团队文件。远程 Agent 状态与配对凭据留在被控电脑的安装目录。
 
 发送给供应商或 CLI 的任务/上下文适用对应服务的账户和计费条款。已保存 routine 包含演示输入的文字。配对导出、历史、日志及私有文件应作为私有数据保管。更换运行时所有者或降级前备份应用状态，不删除收据或未知操作账本来绕过阻塞。
-
-<a id="development"></a>
-
-## 从源码开发和构建
-
-需要普通 **Node.js 22.19+** 和 **pnpm 10.34.6**（仓库固定的包管理器版本）。原生 SQLite/PTY 模块必须使用匹配的普通 Node 运行时，不能通过不兼容的 Electron ABI 加载。在仓库根目录执行：
-
-```powershell
-npm install --include=dev
-npm run build:client
-npm run check:client
-node scripts/check-readme.mjs
-npm test
-node scripts/integration-product-source.mjs
-npm --prefix remote-computer-agent ci
-npm --prefix remote-computer-agent run build
-npm run pack:local
-```
-
-在测试 profile 中安装生成的 `dist/*.tgz`。`npm run preview:ui` 是离线 fixture 预览，不是认证 Host 验收。配置的 registry 无法提供 SDK 包时，`scripts/setup-harness-dev.mjs` 支持显式指定已安装 Host 树；按其选项操作，不静默替换任意 SDK 版本。
-
-安装 Agent 依赖后，可以在 Windows x64 上生成完整包：
-
-```powershell
-powershell -NoProfile -File scripts/package-remote-agent.ps1
-```
-
-打包脚本构建原生 helper，包含普通 Node 与生产依赖，验证 SQLite 后在 `tmp/integration/remote-agent-package/` 创建 zip，输出产物路径和 SHA-256。安装向导在用户准备的 Windows 电脑上运行，不在源码打包时运行。
-
-### 复现固定上游运行时
-
-不要直接编辑 `modules/bot-runtime/vendor/ds-bot/`，产品修改应放在外置 overlay。导入时显式指定来源 checkout 和固定提交：
-
-```powershell
-node scripts/sync-ds-bot.mjs --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
-node scripts/sync-ds-bot.mjs --check --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
-npm run build:client
-npm run check:client
-```
-
-不带来源参数的 `node scripts/sync-ds-bot.mjs --check` 只检查已记录的 vendor 字节，不猜测同级 `../ds-bot`。有意升级上游时要检查来源提交与 overlay 应用结果。`.dsh-plugin/client.js` 是生成文件。
-
-双语 README 保留 6 个展示公式和 33 个行内数学表达式。修改两份翻译后，将准确 Git blob SHA-1 写入 `README.i18n.yaml`，运行 `node scripts/check-readme.mjs` 和 `node --test tests/readme-math.test.mjs`。结构校验不能代替实际渲染检查。
-
-## 验证范围与当前限制
-
-真实 **SDK 0.2.1-rc.4** Host 集成已经走通 Main 工具 → 路由后的执行 Bot AgentLoop → 私有资料库写入 → 任务 `succeeded`。执行 Bot 每次模型请求分别进行预算准入，并关联父任务。这是该路径的证据，不代表所有 Host/浏览器探针、安装版 Desktop 变体、厂商账户或真实云电脑部署都已通过。后续验收应绑定实际测试配置。
-
-本地 WebSocket/React 测试覆盖已确认录制、私有保存/读回、使用假 native transport 的真实回放效果、取消、清理、未知恢复与准入拒绝。Windows 原生/Agent 检查与该 fixture 分开。实际桌面 FPS 取决于采集、分辨率、网络及客户端解码，界面显示的实测帧率才是对应观察。
-
-Grok 工作流审计采用此前抓取的公开需求清单；本轮重访官网受网络/Cloudflare 阻挡，并非新的完整产品盘点。岗位简报是模板，不是已接通 CRM/广告/报销系统的业务服务。不宣称提供自动云 VM 创建、云计费服务、自有 iOS 发布或完整商业 Grok 对等实现。
-
-全量源码归档包含[电脑/Bot 指南](docs/COMPUTER_BOT_GUIDE.zh.md)、[上游证据](docs/implementation/20261105-upstream-parity.md)、[工作流边界](docs/implementation/20261105-grok-workflows.md)及[桌面引擎证据](docs/implementation/20261105-desktop-engine.md)。上文已给出核心操作，因此只含代码与 README 的分发也能独立使用。项目发布规则为 GitHub 保留代码和 README，完整文档/历史放到 GitLab 归档。
 
 <a id="troubleshooting"></a>
 
@@ -329,12 +279,11 @@ Grok 工作流审计采用此前抓取的公开需求清单；本轮重访官网
 | `TOOL_DENIED` 或任务受阻 | 查看实际已提交 Bot 权限和请求操作，不扩大模型提供的身份，也不将角色提示词视为授权。 |
 | Agent 在线但没有桌面 | 当前已登录 Windows 会话、两个安装任务、full-desktop helper 及原生日志。 |
 | 连接不到 Agent | 可访问的基础 URL/端口、已配置的私有 VPN/隧道；导入配对文件不会建立网络。 |
+| Chief 能连接而新工人不能 | 检查 Agent 配对的 Bot 名单/`hostManagedBots` 上限，再保存工人的电脑与工具授权；固定名单不会自动包含新建 Bot。 |
 | 可以观看但接管按钮不可用 | 所需桌面输入工具、写模式授权及当前控制权占用。 |
 | Routine 提示显示器变化 | 恢复录制时显示器/分辨率/DPI，或重新录制；应用布局也要一致。 |
 | 结果未知或停止未确认 | 检查实际电脑和执行记录后再解除阻塞，不盲目重跑、不删除账本。 |
 | 资料库拒绝文件 | 二进制传输每文件最多 16 MiB，文本编辑/读取最多 1 MiB，同名上传会被拒绝。 |
 | API/订阅金额未知 | 检查实际模型身份、价格和供应商用量证据，缺失计数不是零。 |
 
-## 历史版本
-
-旧 0.20.x–0.26.x 发布说明、截图和实验仅作为对应版本的历史证据，不是当前安装说明，也不是本 preview 的稳定发布公告。包名：`@ljwei-stak/dsh-model-router`；入口：`.dsh-plugin/index.mjs`；许可证：[MIT](LICENSE)。
+[版本更新记录（GitLab）](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/CHANGELOG.md) · [源码构建指南（GitLab）](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/DEVELOPMENT.md) · [MIT 许可证](LICENSE)

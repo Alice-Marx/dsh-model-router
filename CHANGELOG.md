@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.63.3 — 2026-11-06
+
+- Bind native Harness desktop tickets to the exact `dsh-app://app` viewer Origin; Remote Agent 0.1.1 accepts it only for the authenticated session.
+- Normalize missing virtual-keyboard codes and prevent the first canvas focus from scrolling between pointer down/up.
+- Release the stream after rejected input. Native acceptance covers video, mouse/double-click, keyboard/Chinese input, watch-only fencing, confirmed close and reconnection.
+
+See [native acceptance](docs/releases/0.63.3-validation.md) and [publication receipt](docs/releases/0.63.3/publication.json).
+
+## 0.63.2 — 2026-11-06
+
+- Reconcile routed receipts when Harness injects its own time/runtime context, without replaying the original model request.
+- Keep desktop transport errors visible after the socket closes.
+- Record actual provider, official-CLI funding and fixed-pairing limits rather than claiming every integration passed.
+
+See [the live acceptance report](docs/releases/0.63.2-validation.md).
+
 ## 0.63.1 — 2026-11-05
 
 - Refresh the workspace with Grok Bot-inspired neutral surfaces, clearer navigation, outline icons, balanced spacing and matching light/dark styles.
