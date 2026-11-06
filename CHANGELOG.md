@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.4 — 2026-11-06
+
+- Add a close button to the advanced workbench's “需要你处理” panel.
+- Remember panel visibility on the current device and provide a “显示待处理提醒” button to restore it.
+- Keep keyboard focus on the corresponding control when hiding or restoring the panel. Task history, billing records and execution decisions remain unchanged.
+
 ## 0.63.3 — 2026-11-06
 
 - Bind native Harness desktop tickets to the exact `dsh-app://app` viewer Origin; Remote Agent 0.1.1 accepts it only for the authenticated session.

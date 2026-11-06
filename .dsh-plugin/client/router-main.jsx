@@ -16,6 +16,7 @@ import stylesheet from './router-main.css'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
 const text = value => typeof value === 'string' ? value.trim() : ''
+const ATTENTION_VISIBILITY_KEY = 'dsh-model-router.workbench.attention-hidden'
 const routingSettingsSignature = value => JSON.stringify([
   value.modelProfilesJson, value.routingPreset, value.allowManualReassign,
   ...Object.keys(ADAPTIVE_DEFAULTS).map(key => value[key] ?? ADAPTIVE_DEFAULTS[key]),
@@ -915,6 +916,12 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
     return routingSettingsSignature(value)
   })
   const [view, setView] = React.useState('plan')
+  const [attentionHidden, setAttentionHidden] = React.useState(() => {
+    try { return globalThis.localStorage?.getItem(ATTENTION_VISIBILITY_KEY) === 'true' } catch { return false }
+  })
+  const restoreAttentionButton = React.useRef(null)
+  const closeAttentionButton = React.useRef(null)
+  const attentionVisibilityChanged = React.useRef(false)
   const tabRefs = React.useRef({})
   const resultHeading = React.useRef(null)
   const budgetEdited = React.useRef(false)
@@ -924,6 +931,18 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const generationRequest = React.useRef(0)
   const generationInputs = React.useRef('')
   generationInputs.current = JSON.stringify([task, budget, mode, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools])
+
+  const changeAttentionVisibility = hidden => {
+    try { globalThis.localStorage?.setItem(ATTENTION_VISIBILITY_KEY, String(hidden)) } catch { /* storage may be disabled */ }
+    attentionVisibilityChanged.current = true
+    setAttentionHidden(hidden)
+  }
+  React.useEffect(() => {
+    if (!attentionVisibilityChanged.current) return
+    attentionVisibilityChanged.current = false
+    const button = attentionHidden ? restoreAttentionButton : closeAttentionButton
+    button.current?.focus({ preventScroll: true })
+  }, [attentionHidden])
 
   React.useEffect(() => {
     if (plan) resultHeading.current?.focus({ preventScroll: true })
@@ -1093,7 +1112,10 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
             <h1 className="mr-title">模型路由工作台</h1>
             <p className="mr-subtitle">把任务交给合适的模型。从本地规划，到可确认的执行。</p>
           </div>
-          <div className="mr-status"><span className={`mr-status-dot ${catalogState.status === 'loading' ? 'loading' : catalogState.status === 'error' ? 'error' : ''}`} />{catalogState.status === 'ready' ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === 'loading' ? '正在读取模型目录' : '模型目录读取失败'}</div>
+          <div className="mr-header-actions">
+            <div className="mr-status"><span className={`mr-status-dot ${catalogState.status === 'loading' ? 'loading' : catalogState.status === 'error' ? 'error' : ''}`} />{catalogState.status === 'ready' ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === 'loading' ? '正在读取模型目录' : '模型目录读取失败'}</div>
+            {attentionHidden && <button ref={restoreAttentionButton} className="mr-button mr-button-secondary" type="button" onClick={() => changeAttentionVisibility(false)}>显示待处理提醒{attention.length > 0 ? `（${attention.length}）` : ''}</button>}
+          </div>
         </header>
 
         <div className="mr-overview" aria-label="工作台概览">
@@ -1110,8 +1132,12 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         {(workbench.health.report?.notices ?? []).map(notice => (
           <div key={`${notice.kind}-${notice.at}`} className="mr-error" role="alert">{notice.message}</div>
         ))}
-        {attention.length > 0 && <section className="mr-card mr-attention" aria-label="需要你处理">
-          <div className="mr-card-head"><div><h2 className="mr-card-title">需要你处理</h2><p className="mr-card-copy">{attentionSummary(attention)}</p></div></div>
+        {!attentionHidden && attention.length > 0 && <section className="mr-card mr-attention" aria-label="需要你处理">
+          <div className="mr-card-head"><div><h2 className="mr-card-title">需要你处理</h2><p className="mr-card-copy">{attentionSummary(attention)}</p></div>
+            <button ref={closeAttentionButton} className="mr-attention-close" type="button" aria-label="关闭待处理提醒" title="关闭待处理提醒，可在工作台顶部重新显示" onClick={() => changeAttentionVisibility(true)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+            </button>
+          </div>
           <ul className="mr-attention-list">
             {attention.map(row => <li key={row.key} className={`mr-attention-row mr-attention-${row.stage}`}>
               <div><strong>{row.title}</strong><p className="mr-caption">{row.detail}</p></div>
