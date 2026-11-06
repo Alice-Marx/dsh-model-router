@@ -18,8 +18,14 @@
     "controlAcknowledged": true,
     "mouseClickIndependentlyConfirmed": true,
     "mouseCounterObserved": 2,
-    "keyboardRetest": "Not repeated after final restart because the UI reported ongoing human input; the identical published client bytes passed the earlier native keyboard/Chinese acceptance.",
-    "leftConnectedForUser": true
+    "leftConnectedForUser": true,
+    "keyboardPassed": true,
+    "chineseTextReadBack": "b正式版0.63.3键盘复测成功",
+    "expandedViewer": true,
+    "watchInputFence": true,
+    "confirmedClose": true,
+    "reconnectedAfterConfirmedClose": true,
+    "finalMode": "watch"
   },
   "earlierIdenticalClientAcceptance": {
     "mouse": true,
@@ -57,5 +63,5 @@
     "tag": "v0.63.3",
     "githubRelease": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.3"
   },
-  "recordedAtUtc": "2026-11-06T04:27:25.541380+00:00"
+  "recordedAtUtc": "2026-11-06T04:35:28.452036+00:00"
 }
