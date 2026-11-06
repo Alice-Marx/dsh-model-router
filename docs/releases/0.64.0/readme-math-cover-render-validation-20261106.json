@@ -1,0 +1,21 @@
+{
+  "formulasUnchanged": true,
+  "inlineMathUnchanged": true,
+  "badgesAndCardUnchanged": true,
+  "markdownApi": [
+    {
+      "file": "README.md",
+      "displayMath": 6,
+      "inlineMath": 33,
+      "rawMathCodeBlocks": 0,
+      "imageNodes": 10
+    },
+    {
+      "file": "README.zh.md",
+      "displayMath": 6,
+      "inlineMath": 33,
+      "rawMathCodeBlocks": 0,
+      "imageNodes": 10
+    }
+  ]
+}

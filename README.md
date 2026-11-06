@@ -6,7 +6,7 @@
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-![DSH Bot · Model Router — model routing, Bot collaboration and remote desktop](https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/readme-cover.png)
+![DSH Bot · Model Router — model routing, Bot collaboration and remote desktop](https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/readme-cover-v2.png)
 
 **Model routing and a persistent Bot workspace for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).**
 
@@ -253,8 +253,7 @@ Use [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) for r
 
 Project extensions are [MIT licensed](LICENSE). The bundled DS Bot source retains its **Apache-2.0** license and notices; provenance is recorded in [SOURCE.json](modules/bot-runtime/SOURCE.json). Thanks to [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [DS Bot](https://github.com/Fei2411/DS-Bot) for the Host and Bot foundations.
 
-<details>
-<summary><strong>Technical reference: accounting formulas and routing algorithm</strong></summary>
+## Technical reference: accounting and routing
 
 ### Actual cost versus planning estimate
 
@@ -343,5 +342,3 @@ Base quality floors are **0.75 / 0.78 / 0.82** for simple/balanced/complex tasks
 “Exact” applies only to the retained candidate space and proxy objective. Candidate caps and beam pruning prevent a guarantee of global optimality over all configured models; use the preview to inspect the selected route and any relaxed quality floor.
 
 Routing profiles support matching resource evidence, fallback rules, reasoning-effort handling, and optional JSON validation with escalation. Escalation defaults to off and permits at most one additional ordinary API request after billing and budget checks.
-
-</details>

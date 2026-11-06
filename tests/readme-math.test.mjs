@@ -14,6 +14,16 @@ test('six paired math fences accept single-line formulas, cases, whitespace and 
   assert.deepEqual(checkReadmePair(markdown, translated).errors, [])
 })
 
+test('display formulas cannot regress into collapsible HTML while normal details remain available', () => {
+  const collapsed = `<details>\n<summary>Technical reference</summary>\n\n${sample}\n\nQuality $q$.\n\n</details>`
+  const invalid = checkReadme(collapsed)
+  assert.equal(invalid.ok, false)
+  assert.equal(invalid.errors.filter(error => error.includes('Display math must stay outside <details>')).length, 6)
+  const ordinaryDetails = '<details>\n<summary>More</summary>\n\nOrdinary text.\n\n</details>'
+  assert.deepEqual(checkReadme(`${ordinaryDetails}\n\n${sample}\n\nQuality $q$.`).errors, [])
+  assert.deepEqual(checkReadme(`Literal \`<details>\`.\n\n${sample}`).errors, [])
+})
+
 test('a formula cannot regress into a text or inline-code block', () => {
   const ordinary = checkReadme(sample.replace('```math', '```text'))
   assert.equal(ordinary.ok, false)

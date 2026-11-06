@@ -42,7 +42,7 @@ export function checkReadme(markdown, name = 'README.md') {
   const lines = String(markdown).replace(/\r\n?/g, '\n').split('\n')
   const errors = [], formulas = {}, inlineMath = [], counts = new Map()
   const error = (line, message) => errors.push(`${name}:${line}: ${message}`)
-  let fence = null, pending = null
+  let fence = null, pending = null, detailsDepth = 0
   const checkLeadingDecimals = (line, number, prose = false) => {
     const text = prose ? line.replace(/https?:\/\/[^\s<>]+/g, '')
       .replace(/(?<=\]\()[^)\s]+(?=\))/g, '')
@@ -116,6 +116,12 @@ export function checkReadme(markdown, name = 'README.md') {
       continue
     }
 
+    // Mixed inline/display math inside collapsible HTML regressed to raw code
+    // in the actual GitHub README renderer. Keep display equations in Markdown.
+    const html = withoutInlineCode(line).replace(/<!--[\s\S]*?-->/g, '')
+    for (const tag of html.matchAll(/<\/?details(?:\s[^>]*)?>/gi)) {
+      detailsDepth = Math.max(0, detailsDepth + (/^<\//.test(tag[0]) ? -1 : 1))
+    }
     const anchor = line.match(/^ {0,3}<!--\s*formula:([a-z0-9-]+)\s*-->\s*$/)
     if (anchor) {
       if (pending) error(pending.line, `Formula ${pending.id} must be followed by a math fence`)
@@ -130,6 +136,7 @@ export function checkReadme(markdown, name = 'README.md') {
     const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
     if (opening) {
       const math = opening[2].trim() === 'math'
+      if (math && detailsDepth > 0) error(number, 'Display math must stay outside <details>; GitHub can show it as raw code when mixed with inline math')
       if (pending && !math) error(pending.line, `Formula ${pending.id} must use a math fence, not an ordinary code fence`)
       if (math && !pending) error(number, 'Math fence must follow a formula anchor')
       fence = { marker: opening[1][0], length: opening[1].length, line: number,
