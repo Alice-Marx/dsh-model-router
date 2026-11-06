@@ -1,0 +1,46 @@
+{
+  "programVersion": "0.64.0",
+  "publication": "documentation-only",
+  "githubCommit": "42b7cb0105f6e7f7d5b365ce628e70b15f14be88",
+  "archiveSourceCommit": "4ee17be78d057ccaef21f01d20e14c7a4f41cc5d",
+  "publicFiles": [
+    {
+      "file": "README.md",
+      "status": 200,
+      "bytes": 31380,
+      "sha256": "d0127f7d4916cff1369a4e01f27d5444537011c5a9d9b2ce90a69cf47c4ccaff"
+    },
+    {
+      "file": "README.zh.md",
+      "status": 200,
+      "bytes": 28369,
+      "sha256": "0d721c82ca90c0b7f4e8ac8559fbb9fe37ac24e2e048778faca0f35d3cd09458"
+    },
+    {
+      "file": "README.i18n.yaml",
+      "status": 200,
+      "bytes": 233,
+      "sha256": "50201042f29a086731fc4d5352c665529253730344091a9d092fae89c17361ec"
+    },
+    {
+      "file": "scripts/check-readme.mjs",
+      "status": 200,
+      "bytes": 11251,
+      "sha256": "f5bd889340836ff1941d3f66fdf000e94ec2973d7865411630209800b25de0e5"
+    },
+    {
+      "file": "tests/readme-math.test.mjs",
+      "status": 200,
+      "bytes": 8948,
+      "sha256": "505c90bd3d52fcf4b1a3fb8023e04befb32053153e8ea123584346118dbe1435"
+    },
+    {
+      "file": ".github/assets/readme-cover-v2.png",
+      "status": 200,
+      "bytes": 1691303,
+      "sha256": "c3a6109a165a4837e529ac895a2a161f125e6fa815144025676b5bcaeb60df7b"
+    }
+  ],
+  "npmPublished": false,
+  "tagsChanged": false
+}

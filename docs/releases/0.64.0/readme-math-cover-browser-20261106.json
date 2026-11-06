@@ -1,0 +1,176 @@
+[
+  {
+    "file": "README.zh.md",
+    "url": "https://github.com/Alice-Marx/dsh-model-router/blob/main/README.zh.md",
+    "displayFormulas": [
+      {
+        "index": 0,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 50.46875,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 0,
+        "source": "\n  \n    C\n    a\n  \n  =\n  \n    \n      \n        I\n        u\n      \n      \n        p\n        i\n      \n      +\n      O\n      \n        p\n        o\n      \n      +\n      R\n      \n        p\n        r\n      \n      +\n      W\n     ",
+        "shadow": false
+      },
+      {
+        "index": 1,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 50.46875,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 0,
+        "source": "\n  C\n  =\n  \n    \n      (\n      I\n      −\n      R\n      −\n      W\n      )\n      \n        p\n        i\n      \n      +\n      O\n      \n        p\n        o\n      \n      +\n      R\n      \n        p\n        r\n      \n      +\n     ",
+        "shadow": false
+      },
+      {
+        "index": 2,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 47.46875,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 0,
+        "source": "\n  \n    U\n    c\n  \n  =\n  \n    1\n    \n      1\n      +\n      C\n      \n        /\n      \n      max\n      (\n      \n        C\n        \n          \n            ref\n          \n        \n      \n      ,\n      \n        10\n        \n  ",
+        "shadow": false
+      },
+      {
+        "index": 3,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 68.359375,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 2,
+        "source": "\n  L\n  =\n  \n    {\n    \n      \n        \n          \n            \n              1\n              \n                1\n                +\n                t\n                \n                  /\n                \n                10",
+        "shadow": false
+      },
+      {
+        "index": 4,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 28.578125,
+        "errors": 0,
+        "fractions": 0,
+        "tableRows": 0,
+        "source": "\n  u\n  =\n  \n    w\n    q\n  \n  q\n  +\n  \n    w\n    c\n  \n  \n    U\n    c\n  \n  +\n  \n    w\n    ℓ\n  \n  L\n  +\n  \n    w\n    s\n  \n  s\n  +\n  \n    w\n    r\n  \n  r\n  −\n  \n    w\n    k\n  \n  k\n  −\n  α\n  max\n  (\n  0\n  ,\n  f\n  −\n  q\n  )\n  +",
+        "shadow": false
+      },
+      {
+        "index": 5,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 41,
+        "errors": 0,
+        "fractions": 0,
+        "tableRows": 0,
+        "source": "\n  S\n  =\n  \n    ∑\n    \n      j\n      =\n      1\n    \n    \n      n\n    \n  \n  \n    u\n    j\n  \n  −\n  0.015\n  \n    ∑\n    \n      (\n      i\n      ,\n      j\n      )\n      ∈\n      E\n    \n  \n  \n    1\n  \n  [\n  \n    ρ\n    i\n  \n  ≠\n ",
+        "shadow": false
+      }
+    ],
+    "inlineMath": 33,
+    "inlineMathML": 33,
+    "rawMathCodeBlocks": 0,
+    "privateArchiveLinks": false,
+    "cover": {
+      "loaded": true,
+      "width": 1983,
+      "height": 793
+    }
+  },
+  {
+    "file": "README.md",
+    "url": "https://github.com/Alice-Marx/dsh-model-router/blob/main/README.md",
+    "displayFormulas": [
+      {
+        "index": 0,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 50.46875,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 0,
+        "source": "\n  \n    C\n    a\n  \n  =\n  \n    \n      \n        I\n        u\n      \n      \n        p\n        i\n      \n      +\n      O\n      \n        p\n        o\n      \n      +\n      R\n      \n        p\n        r\n      \n      +\n      W\n     ",
+        "shadow": false
+      },
+      {
+        "index": 1,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 50.46875,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 0,
+        "source": "\n  C\n  =\n  \n    \n      (\n      I\n      −\n      R\n      −\n      W\n      )\n      \n        p\n        i\n      \n      +\n      O\n      \n        p\n        o\n      \n      +\n      R\n      \n        p\n        r\n      \n      +\n     ",
+        "shadow": false
+      },
+      {
+        "index": 2,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 47.46875,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 0,
+        "source": "\n  \n    U\n    c\n  \n  =\n  \n    1\n    \n      1\n      +\n      C\n      \n        /\n      \n      max\n      (\n      \n        C\n        \n          \n            ref\n          \n        \n      \n      ,\n      \n        10\n        \n  ",
+        "shadow": false
+      },
+      {
+        "index": 3,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 68.359375,
+        "errors": 0,
+        "fractions": 1,
+        "tableRows": 2,
+        "source": "\n  L\n  =\n  \n    {\n    \n      \n        \n          \n            \n              1\n              \n                1\n                +\n                t\n                \n                  /\n                \n                10",
+        "shadow": false
+      },
+      {
+        "index": 4,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 28.578125,
+        "errors": 0,
+        "fractions": 0,
+        "tableRows": 0,
+        "source": "\n  u\n  =\n  \n    w\n    q\n  \n  q\n  +\n  \n    w\n    c\n  \n  \n    U\n    c\n  \n  +\n  \n    w\n    ℓ\n  \n  L\n  +\n  \n    w\n    s\n  \n  s\n  +\n  \n    w\n    r\n  \n  r\n  −\n  \n    w\n    k\n  \n  k\n  −\n  α\n  max\n  (\n  0\n  ,\n  f\n  −\n  q\n  )\n  +",
+        "shadow": false
+      },
+      {
+        "index": 5,
+        "renderElement": "math",
+        "namespace": "http://www.w3.org/1998/Math/MathML",
+        "width": 1012,
+        "height": 41,
+        "errors": 0,
+        "fractions": 0,
+        "tableRows": 0,
+        "source": "\n  S\n  =\n  \n    ∑\n    \n      j\n      =\n      1\n    \n    \n      n\n    \n  \n  \n    u\n    j\n  \n  −\n  0.015\n  \n    ∑\n    \n      (\n      i\n      ,\n      j\n      )\n      ∈\n      E\n    \n  \n  \n    1\n  \n  [\n  \n    ρ\n    i\n  \n  ≠\n ",
+        "shadow": false
+      }
+    ],
+    "inlineMath": 33,
+    "inlineMathML": 33,
+    "rawMathCodeBlocks": 0,
+    "privateArchiveLinks": false,
+    "cover": {
+      "loaded": true,
+      "width": 1983,
+      "height": 793
+    }
+  }
+]
