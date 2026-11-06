@@ -1,0 +1,87 @@
+{
+  "version": "0.63.4",
+  "status": "published-and-installed",
+  "date": "2026-11-06",
+  "sourceCommit": "bd230b3e1b05b0ba9914ebf14e721e77dbf92891",
+  "githubCommit": "b7a8271f87eedfa31d70b493fdf8b609be7efe75",
+  "githubRelease": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.4",
+  "npm": {
+    "status": "verified",
+    "version": "0.63.4",
+    "latest": "0.63.4",
+    "integrity": "sha512-KKcnxWaSATSqFNM32BzxTNB9g8q5/wqc2GN30dRbcQ3ksu4SXq4YBr14AIH9kURxM77ofVyvck8cPE23wJ4vDw==",
+    "tarball": "https://registry.npmjs.org/@ljwei-stak/dsh-model-router/-/dsh-model-router-0.63.4.tgz",
+    "bytes": 3494960,
+    "sha256": "35d9ae828d7a370918576d9376bc6d575edbab58193cd1b219f0e71fef60ed50",
+    "anonymousDownloadMatchesLocal": true
+  },
+  "githubAssets": [
+    {
+      "name": "ljwei-stak-dsh-model-router-0.63.4.tgz",
+      "size": 3494960,
+      "digest": "sha256:35d9ae828d7a370918576d9376bc6d575edbab58193cd1b219f0e71fef60ed50"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 106,
+      "digest": "sha256:6ffd33a14f9542cd44ce6f56066d98d1bfafca5fea880824c07fce154789e0b0"
+    }
+  ],
+  "packageVerification": {
+    "filesVerified": 462,
+    "runtimeFilesVerified": 187,
+    "integrity": "sha512-KKcnxWaSATSqFNM32BzxTNB9g8q5/wqc2GN30dRbcQ3ksu4SXq4YBr14AIH9kURxM77ofVyvck8cPE23wJ4vDw==",
+    "sha1": "3232316f39d2f127ef0f088c2dd122222188d47a",
+    "tarballBytes": 3494960
+  },
+  "tests": {
+    "tests.log": {
+      "tests": 2513,
+      "pass": 2424,
+      "fail": 0,
+      "skipped": 89,
+      "cancelled": 0
+    },
+    "clean-tests.log": {
+      "tests": 124,
+      "pass": 124,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    }
+  },
+  "otherChecks": {
+    "clientGeneratedAndChecked": true,
+    "readmeMathAndTranslationHashes": true,
+    "pinnedSourceFiles": 361,
+    "remoteAgentCiAndBuild": true
+  },
+  "readme": {
+    "badgesAndCardPerLanguage": 6,
+    "pairedFormulaAnchors": 6,
+    "pairedInlineExpressions": 33,
+    "githubEnglishBlob": "4bc7a66fb7a18e693d825e8edef94d5e5945a6b6",
+    "githubChineseBlob": "1db8a93f487de1612d63521717dbdc14a7888e24"
+  },
+  "installed": {
+    "version": "0.63.4",
+    "filesVerified": 462,
+    "dualLocksIdentical": true,
+    "otherDependenciesUnchanged": true,
+    "lockValidation": "pnpm 11.28.5 --lockfile-only --frozen-lockfile --ignore-scripts --offline"
+  },
+  "nativeAcceptance": {
+    "version": "0.63.4",
+    "nativeHarness": true,
+    "restoredExistingThreeReminders": true,
+    "closeButtonHidesEntirePanel": true,
+    "hiddenAfterNavigatingAwayAndBack": true,
+    "hiddenAfterNormalAppExitAndRestart": true,
+    "restoreWorksAfterCompletePackageInstall": true,
+    "finalPanelHidden": true,
+    "restoreButtonCount": 3,
+    "staleHostVersionWarning": false
+  },
+  "agentVersion": "0.1.1",
+  "realModelCalls": 0
+}
