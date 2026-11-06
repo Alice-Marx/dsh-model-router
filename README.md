@@ -6,7 +6,7 @@
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-**Current release: 0.63.3 · Windows Agent: 0.1.1.**
+**Current release: 0.63.4 · Windows Agent: 0.1.1.**
 
 One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memory and browser work with model routing, managed tasks, private Bot files, and an independently implemented Windows remote desktop. Configure each Bot's exact model, tools and machine access; a Main Bot can then route and dispatch work to an eligible worker.
 
@@ -35,16 +35,16 @@ One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memor
 
 ## Install
 
-Install `@ljwei-stak/dsh-model-router@0.63.3` from npm in Harness Desktop, or import the matching release archive.
+Install `@ljwei-stak/dsh-model-router@0.63.4` from npm in Harness Desktop, or import the matching release archive.
 
-1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.3`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
+1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.4`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
 2. Enable the plugin, then **fully quit Harness, including its tray process**, and restart. Closing only the window may leave the old Host running.
 3. Check the loaded package version and open the Bot workspace/product navigation. Provider credentials and models are configured in Harness's official **Models** settings.
 
 With the DSH CLI, install the exact release with:
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.3
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.4
 ```
 
 A global `npm install -g` alone does not register the plugin. The package name remains `@ljwei-stak/dsh-model-router`; its internal plugin ID remains `model-router-galgame` for retained settings. Remove duplicate old package entries before adding a replacement. GAL is a separate plugin.
@@ -144,6 +144,8 @@ The library is that Bot's private file area, distinct from the upstream avatar l
 ## Model workbench, tools and execution boundaries
 
 Open **Advanced workbench / 高级工作台** for model-route planning, exact-route profiles, official tools, terminals, dependent work packages and API/subscription accounting. Configure provider credentials in Harness Models and vendor CLI logins in their own tools. Detection or installation does not prove login, entitlement or a managed execution mode is available.
+
+Close the **Needs your attention / 需要你处理** panel with its top-right **×**. The choice is remembered on this device, including after restarting. Use **显示待处理提醒** at the top of the workbench to show it again; task records remain available in history and cost pages.
 
 Planning and candidate previews are local. Execution may send task/context to the selected provider or CLI and incur charges. Model routing selects a model route; Bot routing selects a configured Bot and dispatches its actual worker task. The two workflows share committed Host authority and accounting rather than accepting authority from model parameters.
 
