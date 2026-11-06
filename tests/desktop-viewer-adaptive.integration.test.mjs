@@ -50,10 +50,22 @@ test('a reduced JPEG maps a real canvas pointer to physical monitor pixels', asy
     await act(async () => button('取得控制权').click())
     await act(async () => message({ type: 'control', mode: 'control', ok: true }))
     const canvas = container.querySelector('canvas')
-    canvas.getBoundingClientRect = () => ({ left: 100, top: 50, width: 960, height: 540 })
+    let top = 50
+    canvas.getBoundingClientRect = () => ({ left: 100, top, width: 960, height: 540 })
+    canvas.focus = options => { if (!options?.preventScroll) top -= 100 }
     await act(async () => canvas.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true, clientX: 580, clientY: 320, button: 0 })))
     const packet = socket.sent.find(item => item.type === 'input')
     assert.equal(packet.event.x, 960); assert.equal(packet.event.y, 540)
     await act(async () => message({ type: 'input', id: packet.id, ok: true }))
+    await act(async () => canvas.dispatchEvent(new dom.window.MouseEvent('pointerup', { bubbles: true, clientX: 580, clientY: 320, button: 0 })))
+    const released = socket.sent.filter(item => item.type === 'input').at(-1)
+    assert.deepEqual(released.event, { ...packet.event, action: 'up' }, 'focusing an offscreen canvas must not move the pointer-up position')
+    await act(async () => message({ type: 'input', id: released.id, ok: true }))
+    for (const type of ['keydown', 'keyup']) {
+      await act(async () => canvas.dispatchEvent(new dom.window.KeyboardEvent(type, { bubbles: true, key: 'Enter', code: '' })))
+      const input = socket.sent.filter(item => item.type === 'input').at(-1)
+      assert.deepEqual(input.event, { type: 'key', action: type === 'keydown' ? 'down' : 'up', code: 'Enter', key: 'Enter' })
+      await act(async () => message({ type: 'input', id: input.id, ok: true }))
+    }
   } finally { await act(async () => root.unmount()); for (const key of globals) globalThis[key] = previous[key]; dom.window.close() }
 })

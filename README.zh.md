@@ -2,7 +2,9 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-**当前版本：0.63.2，2026-11-06。** 历史报告中的旧版本号只代表当时的报告，不代表当前源码。Windows 电脑 Agent 独立使用 **0.1.0** 版本。
+**当前版本：0.63.3，2026-11-06。** 历史报告中的旧版本号只代表当时的报告，不代表当前源码。Windows 电脑 Agent 独立使用 **0.1.1** 版本。
+
+0.63.3 修复原生 Harness 的桌面连接：在应用转发 HTTP 请求时保留查看器准确的 `dsh-app://app` 来源。原生观看需要同时升级插件和 **Agent 0.1.1**；拥有者鉴权、Bot/电脑权限与桌面会话的来源校验继续生效。原生应用已实测实时画面、鼠标/键盘与中文输入、归还观看和确认断开；同时修复虚拟键盘缺少按键编码、首次点击引起页面滚动的问题。见[桌面连接验收](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.3-validation.md)。
 
 0.63.2 修复 Harness 自动注入时间和运行上下文时，已分派任务被误判为混入输入的问题，并在桌面连接关闭后保留错误原因。已安装桌面的真实验收仍发现接入失败：Kimi 请求被服务商拒绝，Step 官方 CLI 调用被资金适配器拒绝，现有远程配对只允许原始 Bot。创建工人并取得正确的 Step 回答，不代表派单收据、官方工具和远程控制全部通过。实际结果与限制见[实机验收报告](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.2-validation.md)。
 
@@ -39,16 +41,16 @@
 
 ## 安装
 
-在 Harness Desktop 从 npm 安装 `@ljwei-stak/dsh-model-router@0.63.2`，或导入对应的 Release 安装包。
+在 Harness Desktop 从 npm 安装 `@ljwei-stak/dsh-model-router@0.63.3`，或导入对应的 Release 安装包。
 
-1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入 `@ljwei-stak/dsh-model-router@0.63.2`，也可导入 Release 的 `.tgz` 包；本地解压安装时选择包含 `package.json` 和 `.dsh-plugin` 的内层 `package` 目录。
+1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入 `@ljwei-stak/dsh-model-router@0.63.3`，也可导入 Release 的 `.tgz` 包；本地解压安装时选择包含 `package.json` 和 `.dsh-plugin` 的内层 `package` 目录。
 2. 启用插件后，**连同托盘进程一起完全退出 Harness**，再重新启动。只关窗口可能仍保留旧 Host。
 3. 检查已加载包的版本并打开 Bot 工作区/产品导航。Provider 凭据和模型在 Harness 官方 **模型** 设置中配置。
 
 使用 DSH CLI 安装指定正式版：
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.3
 ```
 
 仅执行全局 `npm install -g` 不会注册插件。包名仍为 `@ljwei-stak/dsh-model-router`，内部插件 ID 仍为 `model-router-galgame`，以保留设置。替换旧包前先移除重复插件条目；GAL 是独立插件。
@@ -67,7 +69,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.2
 
 集成模式复用 Harness Sessions。可选的独立运行时使用自己的会话存储，必须显式切换；同一 Bot 只能有一个正在服务的运行时。群聊、记忆、浏览器和长期上下文来自已固定的上游实现，而非占位能力清单。
 
-Windows/云电脑安装：[下载 Agent 0.1.0 完整 Windows x64 包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip)，解压后运行 `start.cmd`。
+Windows/云电脑安装：[下载 Agent 0.1.1 完整 Windows x64 包](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.3/dsh-remote-agent-0.1.1-windows-x64.zip)，解压后运行 `start.cmd`。
 
 <a id="computers"></a>
 

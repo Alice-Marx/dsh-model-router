@@ -63,4 +63,11 @@
 /docs/integration/** -text -whitespace
 
 /remote-computer-agent/dist/** -text
+/remote-computer-agent/src/** -text
+/remote-computer-agent/package.json -text
+/remote-computer-agent/README.md -text
+/apps/integration-client/** -text
 /modules/bot-runtime/product-overlay/patches/** -whitespace
+
+# Preserve the terminal evidence exactly, including its alignment whitespace.
+/docs/releases/0.63.1-ui/*.txt -text -whitespace

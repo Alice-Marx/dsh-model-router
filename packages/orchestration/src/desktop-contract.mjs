@@ -28,6 +28,26 @@ const ACTIONS = Object.freeze({
   scroll: ['screenshotId', 'delta', 'x', 'y'],
 })
 
+/** Virtual/remote keyboards can provide key with an empty physical code. */
+export function desktopKeyboardInput(event, action) {
+  if (!['down', 'up'].includes(action) || typeof event?.key !== 'string') return null
+  const key = event.key
+  let code = event.code && event.code !== 'Unidentified' ? event.code : ''
+  if (!code) {
+    const side = event.location === 2 ? 'Right' : 'Left'
+    const aliases = { ' ': 'Space', Control: `Control${side}`, Shift: `Shift${side}`, Alt: `Alt${side}`, Meta: `Meta${side}`,
+      OS: `Meta${side}`, '+': 'Equal', '-': 'Minus', '=': 'Equal', '[': 'BracketLeft', ']': 'BracketRight', '\\': 'Backslash',
+      ';': 'Semicolon', "'": 'Quote', ',': 'Comma', '.': 'Period', '/': 'Slash', '`': 'Backquote' }
+    if (/^[a-z]$/i.test(key)) code = `Key${key.toUpperCase()}`
+    else if (/^[0-9]$/.test(key)) code = `${event.location === 3 ? 'Numpad' : 'Digit'}${key}`
+    else if (key === 'Enter') code = event.location === 3 ? 'NumpadEnter' : 'Enter'
+    else if (Object.hasOwn(aliases, key)) code = aliases[key]
+    else if (/^(?:F(?:[1-9]|1[0-9]|2[0-4])|Escape|Backspace|Tab|Delete|Insert|Home|End|PageUp|PageDown|Arrow(?:Left|Right|Up|Down)|CapsLock|NumLock|ScrollLock|ContextMenu)$/.test(key)) code = key
+    else return action === 'down' && [...key].length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey ? { type: 'text', text: key } : null
+  }
+  return { type: 'key', action, code, key }
+}
+
 /** One frame request: which machine and root, for which Bot. */
 export function parseDesktopView(payload) {
   const value = closed(payload, ['botId', 'machineId', 'rootId'], 'view')

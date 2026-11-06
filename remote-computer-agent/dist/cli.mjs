@@ -13,7 +13,7 @@ import { promisify as promisify2 } from "node:util";
 
 // src/protocol.ts
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-var AGENT_VERSION = "0.1.0";
+var AGENT_VERSION = "0.1.1";
 var AGENT_API_MAJOR = 1;
 var AgentError = class extends Error {
   constructor(code, status = 400) {
@@ -830,6 +830,7 @@ import { randomUUID as randomUUID4 } from "node:crypto";
 var inputTools = ["desktop_click", "desktop_type", "desktop_key", "desktop_scroll"];
 var unknown = () => Object.assign(new AgentError("OUTCOME_UNKNOWN", 409), { possiblyApplied: true, stopConfirmed: false });
 var safeOrigin = (value) => {
+  if (value === "dsh-app://app") return value;
   if (typeof value !== "string") fail("INVALID_ORIGIN");
   try {
     const url = new URL(value);

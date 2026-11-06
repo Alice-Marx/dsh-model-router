@@ -2,7 +2,9 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-**Version: 0.63.2 — 2026-11-06.** Older version numbers in historical reports describe those reports, not this checkout. The Windows computer Agent has its own version, **0.1.0**.
+**Version: 0.63.3 — 2026-11-06.** Older version numbers in historical reports describe those reports, not this checkout. The Windows computer Agent has its own version, **0.1.1**.
+
+0.63.3 fixes the native Harness desktop connection by preserving the viewer’s exact `dsh-app://app` Origin across the application’s HTTP bridge. Native viewing requires Agent **0.1.1** as well as the updated plugin; authenticated owner admission, Bot/machine permissions and session-bound Origin checks remain in force. Native acceptance verified live video, mouse/keyboard and Chinese text input, return to watch mode and confirmed disconnect. Missing virtual-keyboard codes and first-click page scrolling are also fixed. See the [desktop connection validation](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.3-validation.md).
 
 0.63.2 fixes routed tasks being marked as mixed input when Harness adds its own time/runtime snapshots, and keeps desktop connection errors visible after the socket closes. Live acceptance on the installed desktop found remaining integration failures: Kimi requests were rejected by the provider, Step's official CLI call was refused by the funding adapter, and the existing remote pairing allowed only its original Bot. Creating workers and obtaining a correct Step answer did not establish complete delegation, official-tool or desktop-control acceptance. See the [live acceptance report](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.2-validation.md) for results and limits.
 
@@ -39,16 +41,16 @@ The integrated DS Bot runtime is pinned to **DS Bot 0.2.7**, commit **`71d344bf1
 
 ## Install
 
-Install `@ljwei-stak/dsh-model-router@0.63.2` from npm in Harness Desktop, or import the matching release archive.
+Install `@ljwei-stak/dsh-model-router@0.63.3` from npm in Harness Desktop, or import the matching release archive.
 
-1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.2`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
+1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.3`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
 2. Enable the plugin, then **fully quit Harness, including its tray process**, and restart. Closing only the window may leave the old Host running.
 3. Check the loaded package version and open the Bot workspace/product navigation. Provider credentials and models are configured in Harness's official **Models** settings.
 
 With the DSH CLI, install the exact release with:
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.2
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.3
 ```
 
 A global `npm install -g` alone does not register the plugin. The package name remains `@ljwei-stak/dsh-model-router`; its internal plugin ID remains `model-router-galgame` for retained settings. Remove duplicate old package entries before adding a replacement. GAL is a separate plugin.
@@ -67,7 +69,7 @@ To build an archive yourself, follow [Development](#development). Use a separate
 
 Integration mode reuses Harness Sessions. The optional independent runtime has its own session store and must be switched explicitly; one Bot must have only one active runtime owner. Group conversations, memories, browsers and long-lived context come from the pinned upstream runtime, not from a placeholder capability list.
 
-Windows computer setup: [download Agent 0.1.0 for Windows x64](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip), extract it and run `start.cmd`.
+Windows computer setup: [download Agent 0.1.1 for Windows x64](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.3/dsh-remote-agent-0.1.1-windows-x64.zip), extract it and run `start.cmd`.
 
 <a id="computers"></a>
 

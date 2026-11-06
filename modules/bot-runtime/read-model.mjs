@@ -22,6 +22,16 @@ const ACTIONS = new Set([
 ])
 const plain = value => value && typeof value === 'object' && !Array.isArray(value)
 const error = (code, message) => Object.assign(new Error(message), { code })
+const desktopClientOrigin = request => {
+  // This is a session restriction, never authentication. The native shell's
+  // bridge strips the browser Origin, so its viewer supplies one exact hint.
+  const nativeOrigin = request.headers.get('x-dsh-desktop-origin')
+  if (nativeOrigin !== null) {
+    if (nativeOrigin !== 'dsh-app://app') throw error('INVALID_CLIENT_ORIGIN', '无效的桌面来源。')
+    return nativeOrigin
+  }
+  return new URL(request.url).origin
+}
 
 /** Read-through projections; never creates a second config or monetary store. */
 export function createProductReadModel({ runtime, lifecycle, providers = {}, actions = {} }) {
@@ -83,7 +93,7 @@ export function registerProductChannel(ctx, readModel, authorizeRequest) {
       const body = await request.json()
       const value = body?.action === 'snapshot'
         ? await readModel.snapshot({ signal: request.signal })
-        : await readModel.dispatch(body, { ...context, clientOrigin: new URL(request.url).origin, signal: request.signal })
+        : await readModel.dispatch(body, { ...context, clientOrigin: desktopClientOrigin(request), signal: request.signal })
       return Response.json({ ok: true, value })
     } catch (cause) {
       return Response.json({ ok: false, error: { code: cause?.code ?? 'PRODUCT_REQUEST_FAILED', message: String(cause?.message ?? cause).slice(0, 500) } }, { status: 400 })
