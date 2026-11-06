@@ -21,6 +21,15 @@
 .mr-shell { width: min(1320px, 100%); margin: 0 auto; padding: 24px 32px 48px; }
 .mr-header { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .mr-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.mr-template-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: 0 0 10px; }
+.mr-template-button { padding: 5px 10px; border: 1px solid var(--mr-line); border-radius: 999px; background: var(--mr-card); color: var(--mr-ink); font: inherit; font-size: 12px; cursor: pointer; }
+.mr-template-button:hover { border-color: var(--mr-accent); background: var(--mr-soft); }
+.mr-template-button:focus-visible, .mr-execution-section:focus-visible { outline: 2px solid var(--mr-accent); outline-offset: 3px; }
+.mr-form-options { margin: 14px 0; border: 1px solid var(--mr-line); border-radius: 10px; padding: 10px 12px; }
+.mr-form-options > summary { color: var(--mr-muted); font-size: 12px; cursor: pointer; line-height: 1.6; }
+.mr-form-options[open] > summary { margin-bottom: 14px; }
+.mr-form-options .mr-controls { margin-top: 0; }
+.mr-execution-section { scroll-margin-top: 18px; border-radius: 14px; }
 .mr-eyebrow { margin: 0 0 8px; color: var(--mr-accent); font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
 .mr-title { margin: 0; font-size: clamp(25px, 3vw, 30px); letter-spacing: -.035em; line-height: 1.3; }
 .mr-subtitle { margin: 10px 0 0; color: var(--mr-muted); font-size: 14px; line-height: 1.65; }

@@ -2,6 +2,10 @@
 /.dsh-plugin/client.js -text
 /.dsh-plugin/official-tools-remote-service.mjs -text
 /.dsh-plugin/index.mjs -text
+/.dsh-plugin/router-core.mjs -text
+/.dsh-plugin/router-only.mjs -text
+/.dsh-plugin/bot-product.mjs -text
+/packages/model-router-plugin/** -text
 /.dsh-plugin/shared/*.mjs -text
 /package.json -text
 /CHANGELOG.md -text

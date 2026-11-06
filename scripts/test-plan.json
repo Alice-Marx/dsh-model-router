@@ -31,7 +31,9 @@
       "tests/desktop-viewer-adaptive.integration.test.mjs",
       "tests/desktop-delta.native.mjs",
       "tests/schedule-compat.test.mjs",
-      "tests/product-library-sequence.integration.test.mjs"
+      "tests/product-library-sequence.integration.test.mjs",
+      "tests/package-editions.test.mjs",
+      "tests/workbench-navigation.test.mjs"
     ]
   ]
 }

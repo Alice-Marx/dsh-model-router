@@ -329,10 +329,14 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
   return (
     <section className="mr-card" aria-label="在工作台执行">
       <div className="mr-card-head"><div>
-        <h2 className="mr-card-title">在工作台执行</h2>
-        <p className="mr-card-copy">使用上方的任务描述与规划模式，先预览执行计划、权限与预估费用，确认后才会启动执行。模型路由执行只读任务；官方工具协作可选择只读检查，或在隔离工作树中使用 CLI 的正常工具编辑文件。</p>
+        <h2 className="mr-card-title">预览与执行</h2>
+        <p className="mr-card-copy">先预览，核对模型、工作区与费用，再确认开始。预览不会调用模型；确认执行才会启动模型或 CLI。</p>
       </div></div>
       <div className="mr-card-body">
+        <div className="mr-control-group mr-launch-workspace"><label className="mr-control-label" htmlFor="mr-launch-workspace">工作区（可选）</label>
+          <input className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '可填写项目绝对路径，最终使用的目录会显示在预览中'} onChange={event => setWorkspace(event.target.value)} />
+        </div>
+        <details className="mr-form-options"><summary>执行选项 · {runExecutor === 'official-team' ? '官方工具协作' : manual ? '手动分配' : '模型路由'} · {runMode === 'workspace-write' ? '编辑文件' : '只读'} · {ROUTING_PRESETS[runPreset]?.label ?? runPreset}</summary>
         <div className="mr-controls">
           <div className="mr-control-group"><span className="mr-control-label" id="mr-launch-executor">执行方式</span>
             <div className="mr-segment" role="group" aria-labelledby="mr-launch-executor">
@@ -357,9 +361,6 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
               {Object.values(ROUTING_PRESETS).map(item => <button key={item.id} type="button" title={manual ? '手动分配沿用当前建议的方案；更改方案后请重新生成建议。' : item.description} aria-pressed={runPreset === item.id} disabled={busy || mode === 'direct' || manual} onClick={() => setPreset(item.id)}>{item.label}</button>)}
             </div>
           </div>
-          <div className="mr-control-group mr-launch-workspace"><label className="mr-control-label" htmlFor="mr-launch-workspace">工作区（绝对路径）</label>
-            <input className="mr-input" id="mr-launch-workspace" value={workspace} disabled={busy} placeholder={lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : '例如 D:\\projects\\demo 或 /home/user/demo'} onChange={event => setWorkspace(event.target.value)} />
-          </div>
           <div className="mr-control-group mr-launch-dryrun">
             <span className="mr-control-label">演练</span>
             <label className="mr-check">
@@ -374,6 +375,7 @@ export function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset,
           : mode === 'direct' ? `指定模型：${directRoute ? `${directRoute.provider}/${directRoute.model}` : '未选择'}（跳过路由，方案不生效）` : mode === 'team' ? '团队分工：按依赖执行只读工作包，每步使用可用的官方 CLI 或模型目录 API。' : '单任务：按方案选择一条路线。'}</p>
         {mode !== 'team' && !manual && <p className="mr-caption">使用官方工具协作前，先在上方选择“团队分工”。</p>}
         {runEnvironment === 'cli-native' && <p className="mr-caption">厂商 CLI 使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。独立 Git 工作树用于收集改动，不是操作系统读写边界；不会自动切换到此环境。</p>}
+        </details>
         <div className="mr-actions">
           <button className="mr-button" type="button" disabled={Boolean(blocked) || busy} onClick={() => { void preview() }}>{phase.kind === 'previewing' ? '正在生成预览…' : '预览执行计划'}</button>
           {blocked && <span className="mr-caption">{blocked}</span>}

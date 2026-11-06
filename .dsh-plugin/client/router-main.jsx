@@ -13,6 +13,8 @@ import { CliTerminalCard } from './cli-terminal.jsx'
 import { remoteErrorText, staleHostNotice } from './host-version.mjs'
 import { ADAPTIVE_DEFAULTS } from './adaptive-state.mjs'
 import stylesheet from './router-main.css'
+import { ROUTER_PACKAGE_NAME } from './package-info.mjs'
+import { WORKSPACE_VIEWS, TASK_TEMPLATES, validWorkbenchView, savedWorkbenchView, rememberWorkbenchView, workbenchDraft, rememberWorkbenchDraft } from './workbench-state.mjs'
 
 const money = value => value === null || value === undefined ? '价格待配置' : `$${Number(value).toFixed(4)}`
 const text = value => typeof value === 'string' ? value.trim() : ''
@@ -738,13 +740,6 @@ export function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettin
 
 /** Root-scoped official Desktop panel. The plan is local; real calls remain in Host tools. */
 const HEADLESS_TOOLS = new Set(['claude-code', 'codex', 'gemini'])
-const WORKSPACE_VIEWS = [
-  { id: 'plan', label: '任务与执行', number: '01' },
-  { id: 'models', label: '模型配置', number: '02' },
-  { id: 'tools', label: '官方工具', number: '03' },
-  { id: 'controls', label: '预算与安全', number: '04' },
-]
-
 /** Workbench RPC state: health check, run ledger and security boundaries. */
 function useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }) {
   const [health, setHealth] = React.useState({ report: null, error: '', refreshing: false })
@@ -901,10 +896,15 @@ function TuiPromptBox({ tool, tuiPrompt }) {
 export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt }) {
   const workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries })
   const [catalogState, setCatalogState] = React.useState({ status: 'loading', catalog: null, error: '' })
-  const [task, setTask] = React.useState('')
-  const [mode, setMode] = React.useState('single')
-  const [directKey, setDirectKey] = React.useState('')
-  const [budget, setBudget] = React.useState(() => String(settingsScope.getSnapshot().value?.budgetUsd ?? 0))
+  const [task, setTask] = React.useState(() => workbenchDraft().task)
+  const [mode, setMode] = React.useState(() => workbenchDraft().mode)
+  const [directKey, setDirectKey] = React.useState(() => workbenchDraft().directKey)
+  const [budget, setBudget] = React.useState(() => workbenchDraft().budget ?? String(settingsScope.getSnapshot().value?.budgetUsd ?? 0))
+  const [templateUndo, setTemplateUndo] = React.useState(null)
+  const [historyRunId, setHistoryRunId] = React.useState(null)
+  const taskInput = React.useRef(null)
+  const executionSection = React.useRef(null)
+  const workspaceElement = React.useRef(null)
   const [query, setQuery] = React.useState('')
   const [plan, setPlan] = React.useState(null)
   const [assignmentMode, setAssignmentMode] = React.useState('algorithm')
@@ -915,7 +915,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
     const value = settingsScope.getSnapshot().value ?? {}
     return routingSettingsSignature(value)
   })
-  const [view, setView] = React.useState('plan')
+  const [view, setView] = React.useState(savedWorkbenchView)
   const [attentionHidden, setAttentionHidden] = React.useState(() => {
     try { return globalThis.localStorage?.getItem(ATTENTION_VISIBILITY_KEY) === 'true' } catch { return false }
   })
@@ -924,13 +924,18 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   const attentionVisibilityChanged = React.useRef(false)
   const tabRefs = React.useRef({})
   const resultHeading = React.useRef(null)
-  const budgetEdited = React.useRef(false)
+  const budgetEdited = React.useRef(workbenchDraft().budget !== undefined)
   const budgetValue = React.useRef(budget)
   const mounted = React.useRef(false)
   const catalogRequest = React.useRef(0)
   const generationRequest = React.useRef(0)
   const generationInputs = React.useRef('')
   generationInputs.current = JSON.stringify([task, budget, mode, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools])
+
+  React.useEffect(() => {
+    rememberWorkbenchDraft({ task, mode, directKey, budget: budgetEdited.current ? budget : undefined })
+  }, [task, mode, directKey, budget])
+  React.useEffect(() => { rememberWorkbenchView(view) }, [view])
 
   const changeAttentionVisibility = hidden => {
     try { globalThis.localStorage?.setItem(ATTENTION_VISIBILITY_KEY, String(hidden)) } catch { /* storage may be disabled */ }
@@ -945,12 +950,25 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
   }, [attentionHidden])
 
   React.useEffect(() => {
-    if (plan) resultHeading.current?.focus({ preventScroll: true })
+    if (plan) {
+      resultHeading.current?.scrollIntoView?.({ block: 'start', behavior: 'auto' })
+      resultHeading.current?.focus({ preventScroll: true })
+    }
   }, [plan])
 
   const selectView = id => {
-    setView(id)
-    tabRefs.current[id]?.focus({ preventScroll: true })
+    const next = validWorkbenchView(id)
+    setView(next)
+    if (workspaceElement.current) workspaceElement.current.scrollTop = 0
+    tabRefs.current[next]?.focus({ preventScroll: true })
+  }
+  const goToExecution = () => {
+    executionSection.current?.scrollIntoView?.({ block: 'start', behavior: 'auto' })
+    executionSection.current?.focus({ preventScroll: true })
+  }
+  const openAttention = row => {
+    if (row.target === 'history') setHistoryRunId(row.runId ?? null)
+    selectView(row.target)
   }
   const navigateTabs = (event, index) => {
     const next = event.key === 'ArrowRight' ? (index + 1) % WORKSPACE_VIEWS.length
@@ -1103,7 +1121,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
 
   const summary = healthSummary(workbench.health.report?.tools)
   return (
-    <main className="mr-workspace">
+    <main className="mr-workspace" ref={workspaceElement}>
       <style>{stylesheet}</style>
       <div className="mr-shell">
         <header className="mr-header">
@@ -1125,7 +1143,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
         </div>
 
         <div className="mr-workspace-tabs" role="tablist" aria-label="工作台功能">
-          {WORKSPACE_VIEWS.map((item, index) => <button key={item.id} ref={element => { tabRefs.current[item.id] = element }} type="button" role="tab" id={`mr-tab-${item.id}`} aria-selected={view === item.id} aria-controls={`mr-panel-${item.id}`} tabIndex={view === item.id ? 0 : -1} onKeyDown={event => navigateTabs(event, index)} onClick={() => setView(item.id)}><span className="mr-tab-number" aria-hidden="true">{item.number}</span>{item.label}</button>)}
+          {WORKSPACE_VIEWS.map((item, index) => <button key={item.id} ref={element => { tabRefs.current[item.id] = element }} type="button" role="tab" id={`mr-tab-${item.id}`} aria-selected={view === item.id} aria-controls={`mr-panel-${item.id}`} tabIndex={view === item.id ? 0 : -1} onKeyDown={event => navigateTabs(event, index)} onClick={() => selectView(item.id)}><span className="mr-tab-number" aria-hidden="true">{item.number}</span>{item.label}</button>)}
         </div>
 
         {staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: Boolean(toolProbes?.probes?.length) }) && <div className="mr-error" role="alert">{staleHostNotice({ hostVersion: toolProbes?.hostVersion })}</div>}
@@ -1141,7 +1159,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           <ul className="mr-attention-list">
             {attention.map(row => <li key={row.key} className={`mr-attention-row mr-attention-${row.stage}`}>
               <div><strong>{row.title}</strong><p className="mr-caption">{row.detail}</p></div>
-              <button className="mr-button mr-button-secondary" type="button" onClick={() => selectView(row.target)}>{row.target === 'tools' ? '查看官方工具' : '查看费用与用量'}</button>
+              <button className="mr-button mr-button-secondary" type="button" onClick={() => openAttention(row)}>{row.target === 'tools' ? '查看官方工具' : row.target === 'history' ? '查看执行记录' : '查看预算与用量'}</button>
             </li>)}
           </ul>
         </section>}
@@ -1151,21 +1169,25 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
             <div className="mr-card-head"><div><h2 className="mr-card-title">任务规划</h2><p className="mr-card-copy">写清目标与验收标准，先生成本地建议，再预览执行。</p></div><span className="mr-pill">本地规划 · 不消耗 token</span></div>
             <div className="mr-card-body">
               <label className="mr-label" htmlFor="mr-task">任务描述</label>
-              <textarea className="mr-textarea" id="mr-task" value={task} onChange={event => { setTask(event.target.value); invalidatePlan() }} placeholder="例如：分析项目架构，分工修复关键问题，并给出验收清单" aria-describedby="mr-task-hint" />
-              <p className="mr-caption mr-task-hint" id="mr-task-hint">团队任务可按编号写出步骤、交付物和依赖；规划不会更改主会话模型。</p>
+              <div className="mr-template-bar" aria-label="任务模板"><span className="mr-caption">快速开始</span>{TASK_TEMPLATES.map(template => <button key={template.id} type="button" className="mr-template-button" onClick={() => { setTemplateUndo({ task, mode, directKey }); setTask(template.task); setMode(template.mode); invalidatePlan(); taskInput.current?.focus({ preventScroll: true }) }}>{template.label}</button>)}{templateUndo && <button type="button" className="mr-template-button" onClick={() => { setTask(templateUndo.task); setMode(templateUndo.mode); setDirectKey(templateUndo.directKey); setTemplateUndo(null); invalidatePlan(); taskInput.current?.focus({ preventScroll: true }) }}>撤销模板</button>}</div>
+              <textarea ref={taskInput} className="mr-textarea" id="mr-task" value={task} onChange={event => { setTask(event.target.value); invalidatePlan() }} placeholder="你想完成什么？希望得到什么结果？可以先选一个模板再修改。" aria-describedby="mr-task-hint" />
+              <p className="mr-caption mr-task-hint" id="mr-task-hint">切换页面会保留当前窗口的任务草稿。模板只填写描述；是否调用模型、使用哪些工具，以执行预览和你的确认为准。</p>
+              <details className="mr-form-options"><summary>路由与预算设置 · {{ single: '单任务', team: '团队分工', direct: '指定模型' }[mode]} · {Number.isFinite(Number(budget)) && Number(budget) >= 0 ? Number(budget) > 0 ? `本次估算上限 ${budget} USD` : '未设本次估算上限' : '预算待修正'}</summary>
               <div className="mr-controls">
                 <div className="mr-control-group"><span className="mr-control-label">规划模式</span><div className="mr-segment" role="group" aria-label="规划模式"><button type="button" aria-pressed={mode === 'single'} onClick={() => { setMode('single'); invalidatePlan() }}>单任务</button><button type="button" aria-pressed={mode === 'team'} onClick={() => { setMode('team'); invalidatePlan() }}>团队分工</button><button type="button" aria-pressed={mode === 'direct'} onClick={() => { setMode('direct'); invalidatePlan() }}>指定模型</button></div></div>
                 {mode === 'direct' && <div className="mr-control-group mr-direct"><label className="mr-control-label" htmlFor="mr-direct-model">直接使用</label><select className="mr-input" id="mr-direct-model" value={directKey || (routes[0] ? `${routes[0].provider}/${routes[0].model}` : '')} onChange={event => { setDirectKey(event.target.value); invalidatePlan() }}>{routes.map(route => <option key={`${route.provider}/${route.model}`} value={`${route.provider}/${route.model}`}>{route.provider}/{route.model}</option>)}</select></div>}
                 <div className="mr-control-group mr-budget"><label className="mr-control-label" htmlFor="mr-budget">本次估算预算（USD）</label><input className="mr-input" id="mr-budget" type="number" min="0" step="0.01" value={budget} onChange={event => { budgetEdited.current = true; budgetValue.current = event.target.value; setBudget(event.target.value); invalidatePlan() }} /></div>
               </div>
-              <div className="mr-actions"><button className="mr-button" type="button" disabled={catalogState.status !== 'ready' || routes.length === 0 || toolProbes === null} onClick={generate}>生成路由建议</button><span className="mr-caption">{catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在 Harness 的“模型”页添加模型。' : toolProbes === null ? '正在检测官方工具…' : '预算 0 为不限；费用为估算。'}</span></div>
+              </details>
+              <div className="mr-actions"><button className="mr-button" type="button" disabled={!text(task) || catalogState.status !== 'ready' || routes.length === 0} onClick={goToExecution}>下一步：预览执行</button><button className="mr-button mr-button-secondary" type="button" disabled={!text(task) || catalogState.status !== 'ready' || routes.length === 0 || toolProbes === null} onClick={generate}>比较路由（可选）</button></div>
+              <p className="mr-caption">{catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在 Harness 的“模型”页添加模型。' : '预览不会调用模型。需要比较路线或逐包手动分配时，可先比较路由。'}</p>
               {planError && <p className="mr-error" role="alert">{planError}</p>}
             </div>
           </section>
 
           <aside className="mr-planning-guide" aria-label="规划使用提示">
-            <p className="mr-eyebrow">工作流程</p>
-            <ol className="mr-workflow"><li><span>01</span><div><strong>描述任务</strong><p>选择单任务、团队分工或指定模型。</p></div></li><li><span>02</span><div><strong>核对路由建议</strong><p>检查模型、工作包依赖和估算费用。</p></div></li><li><span>03</span><div><strong>预览并确认执行</strong><p>确认后调用模型，结果写入执行记录。</p></div></li></ol>
+            <p className="mr-eyebrow">{text(task) ? '下一步：核对执行预览' : '从一个清楚的目标开始'}</p>
+            <ol className="mr-workflow"><li><span>01</span><div><strong>填写目标</strong><p>可用模板起步；更多选项按需展开。</p></div></li><li><span>02</span><div><strong>预览执行方案</strong><p>检查模型、工具、工作区和预估费用。</p></div></li><li><span>03</span><div><strong>确认后开始</strong><p>结果在“执行记录”查看，失败步骤按记录处理。</p></div></li></ol>
             <div className="mr-guide-links"><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('models')}>配置模型价格与能力 →</button><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('tools')}>检查官方工具与登录 →</button></div>
             <p className="mr-caption">缺少价格时会提示“价格待配置”。只读检查可直接预览；修改文件时，先选“团队分工”，再在执行区选择“官方工具协作”和“编辑文件”权限，核对预览后确认执行。</p>
           </aside>
@@ -1175,14 +1197,17 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           assignmentMode={effectiveAssignmentMode} packageAssignments={packageAssignments} assignmentOptions={assignmentOptions} manualAllowed={manualAllowed}
           onAssignmentModeChange={changeAssignmentMode} onPackageAssignmentChange={changePackageAssignment}
           onRestoreAssignments={() => { if (manualAllowed && currentPackagePlanKey) setPackageAssignments(initialPackageAssignments(plan)) }} />}
-        <RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun} runStatus={runStatus} cancelRun={cancelRun}
+        <div ref={executionSection} tabIndex={-1} className="mr-execution-section" aria-label="执行预览区域"><RunLauncher task={task} mode={mode} budgetUsd={budget} ledger={workbench.ledger.value} previewRun={previewRun} startRun={startRun} runStatus={runStatus} cancelRun={cancelRun}
           planningRevision={`${routingSettings}/${dataRevision}/${feedbackRevision}/${evidenceRevision}`}
           assignmentMode={effectiveAssignmentMode} packageAssignments={effectiveAssignmentMode === 'manual' ? packageAssignments : {}} packagePlanKey={currentPackagePlanKey}
           directRoute={mode === 'direct' ? routes.find(route => `${route.provider}/${route.model}` === directKey) ?? routes[0] ?? null : null}
           defaultPreset={settingsScope.getSnapshot().value?.routingPreset ?? 'balanced'}
           disabledReason={catalogState.status === 'loading' ? '正在读取模型目录…' : catalogState.status === 'error' ? '模型目录读取失败，请在“模型配置”中刷新。' : routes.length === 0 ? '请先在官方“模型”页配置至少一条模型路线。' : ''}
-          onStarted={() => { void workbench.refreshLedger() }} />
+          onStarted={() => { void workbench.refreshLedger() }} /><div className="mr-actions"><button className="mr-button mr-button-secondary" type="button" onClick={() => selectView('history')}>打开执行记录</button><span className="mr-caption">查看任务结果、费用和受支持的重试。</span></div></div>
+        </div>
+        <div className="mr-view mr-stack" role="tabpanel" id="mr-panel-history" aria-labelledby="mr-tab-history" hidden={view !== 'history'}>
         <RunHistoryCard ledger={workbench.ledger.value} routes={routes} busy={workbench.busy} error={workbench.ledger.error}
+          selectedRunId={historyRunId} onNewTask={() => selectView('plan')}
           onRefresh={() => { void workbench.refreshLedger() }} onRate={(runId, packageId, rating, expectedFinishedAt) => { void workbench.rate(runId, packageId, rating, expectedFinishedAt) }}
           onRerun={(runId, packageId, override, choice) => { void workbench.rerun(runId, packageId, override, choice) }} />
         </div>
@@ -1226,7 +1251,7 @@ export function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, 
           refreshing={workbench.health.refreshing} onRefresh={() => { void workbench.refreshHealth(true) }} />
         <SecurityCard data={workbench.boundaries.value} error={workbench.boundaries.error} onRefresh={() => { void workbench.refreshBoundaries() }} />
         </div>
-        <footer className="mr-footer">主会话模型由 Harness 管理。更多设置：插件 → 已安装 → <code>@ljwei-stak/dsh-model-router</code>。</footer>
+        <footer className="mr-footer">主会话模型由 Harness 管理。更多设置：插件 → 已安装 → <code>{ROUTER_PACKAGE_NAME}</code>。</footer>
       </div>
     </main>
   )

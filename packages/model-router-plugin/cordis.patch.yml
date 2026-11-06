@@ -1,0 +1,4 @@
+# Routing workbench only. The stable ID preserves existing router settings.
+- insert:
+    - id: model-router-galgame
+      name: '@ljwei-stak/dsh-model-router'

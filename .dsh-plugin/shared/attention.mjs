@@ -35,13 +35,13 @@ export function deriveAttention({ budget = null, reserved = null, probes = [], h
   // 1. A budget that pauses execution stops everything: the person decides whether to raise it.
   if (budget?.exceeded === true && budget?.action === 'pause') {
     add('blocked', 'budget', '预算已用完，新的执行会先暂停',
-      budget.message || '调高预算，或把超预算动作改为“自动降级”。', 'usage')
+      budget.message || '调高预算，或把超预算动作改为“自动降级”。', 'controls')
   }
   // 2. An interrupted execution already started, so its cost is an estimate until someone checks.
   const interrupted = Number(reserved?.interruptedCount)
   if (Number.isFinite(interrupted) && interrupted > 0) {
     add('blocked', 'interrupted', `${interrupted} 次执行中断，费用尚未核验`,
-      '这些执行在中断前已经开始，费用按预估计入。核对后再继续。', 'usage')
+      '这些执行在中断前已经开始，费用按预估计入。核对后再继续。', 'controls')
   }
   // 3. A tool the check could not read is unknown, not missing: say which one and how.
   for (const probe of probes) {
@@ -55,7 +55,8 @@ export function deriveAttention({ budget = null, reserved = null, probes = [], h
     if (run?.status !== 'failed') continue
     const task = short(run.task, 60) || '未命名任务'
     add('failed', `run:${run.id ?? task}`, `上次执行失败：${task}`,
-      run.error ? short(run.error) : '打开执行记录查看每一步的结果，确认后再重试。', 'usage')
+      run.error ? short(run.error) : '打开执行记录查看每一步的结果，确认后再重试。', 'history')
+    rows[rows.length - 1].runId = run.id ?? null
   }
   // 5. An installed tool that is logged out cannot serve a subscription channel.
   for (const tool of health) {

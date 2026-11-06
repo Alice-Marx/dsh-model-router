@@ -1,8 +1,8 @@
 {
-  "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.63.4",
+  "name": "@ljwei-stak/dsh-model-route-bot",
+  "version": "0.64.0",
   "type": "module",
-  "description": "A unified DS Bot workspace for DeepSeek Harness Desktop: model and Bot routing, private libraries, recorded desktop routines and scoped remote computer control.",
+  "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Alice-Marx/dsh-model-router.git"
@@ -325,10 +325,13 @@
     "remote-computer-agent/build.mjs",
     "remote-computer-agent/package-lock.json",
     "modules/bot-runtime/schedule-compat.mjs",
-    "modules/bot-runtime/product-overlay/"
+    "modules/bot-runtime/product-overlay/",
+    ".dsh-plugin/router-core.mjs",
+    ".dsh-plugin/bot-product.mjs"
   ],
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
+    "build:router-package": "node scripts/build-router-package.mjs",
     "check:client": "node scripts/build-client.mjs --check",
     "build:agent": "node remote-computer-agent/build.mjs",
     "check:source": "node scripts/integration-product-source.mjs",
