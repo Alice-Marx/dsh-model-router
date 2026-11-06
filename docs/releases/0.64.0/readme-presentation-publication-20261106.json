@@ -1,0 +1,67 @@
+{
+  "programVersion": "0.64.0",
+  "publication": "documentation-only",
+  "githubCommit": "f188984763fd81d70150858efaffbe1b28a49028",
+  "archiveSourceCommit": "f9f2a736222c62b4fc7db96b5469e63a0cc12ec0",
+  "publicReadme": "https://github.com/Alice-Marx/dsh-model-router/blob/main/README.zh.md",
+  "publicFiles": [
+    {
+      "file": "README.md",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "bytes": 31451,
+      "sha256": "347e5d1db6b0496608f14128b2019ef564002b26b138c282c5fc36259aba3e3a"
+    },
+    {
+      "file": "README.zh.md",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "bytes": 28421,
+      "sha256": "247d7f25642bdc9b4e7444e465cf593ab1a359488eb8d7928831103b9afe3c0d"
+    },
+    {
+      "file": "README.i18n.yaml",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "bytes": 233,
+      "sha256": "854f05fbc5e2d00ccf31131f8f8c7418d3f34d3e7fc6a64589c8f169c9f5494a"
+    },
+    {
+      "file": "packages/model-router-plugin/README.md",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "bytes": 4793,
+      "sha256": "0d7bd02d49ed51c17fd7f1f1770270cd52da615d5d11cab52a1544e50142a5fa"
+    },
+    {
+      "file": "packages/model-router-plugin/README.zh.md",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "bytes": 4186,
+      "sha256": "42a6f77e704a8561674ecf7287530de2ea3b04ba232d41a759cb4fd1665d827c"
+    },
+    {
+      "file": ".github/assets/readme-cover.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 1799217,
+      "sha256": "b17ddf8c11eebf8cba8ebc64d1f25dff85d37f1132b9debeddcb75aefbd4f243"
+    },
+    {
+      "file": ".github/assets/workbench-task.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 122095,
+      "sha256": "acb57ebf21363564ffaa9218f6790bb0d523ccd9bdced4dd6efabdf7204b3944"
+    },
+    {
+      "file": ".github/assets/workbench-execution-preview.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 64239,
+      "sha256": "c3c4eb347ff9fdc7188e01e80e510628aaee29a2845783c4016d63b01e78464b"
+    }
+  ],
+  "npmPublished": false,
+  "tagsChanged": false
+}

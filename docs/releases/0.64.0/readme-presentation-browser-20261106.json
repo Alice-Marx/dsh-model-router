@@ -1,0 +1,85 @@
+{
+  "url": "https://github.com/Alice-Marx/dsh-model-router/blob/main/README.zh.md",
+  "title": "dsh-model-router/README.zh.md at main · Alice-Marx/dsh-model-router · GitHub",
+  "images": [
+    {
+      "alt": "Bot npm",
+      "loaded": true,
+      "width": 87,
+      "height": 20,
+      "source": "https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-route-bot"
+    },
+    {
+      "alt": "npm 版本",
+      "loaded": true,
+      "width": 87,
+      "height": 20,
+      "source": "https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router"
+    },
+    {
+      "alt": "dshfind",
+      "loaded": true,
+      "width": 108,
+      "height": 20,
+      "source": "https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=zh"
+    },
+    {
+      "alt": "dshfind",
+      "loaded": true,
+      "width": 137,
+      "height": 20,
+      "source": "https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=zh"
+    },
+    {
+      "alt": "已收录至 DSH 插件目录",
+      "loaded": true,
+      "width": 132,
+      "height": 20,
+      "source": "https://dsh-plugin.org/badges/listed.svg"
+    },
+    {
+      "alt": "Awesome DSH Plugin",
+      "loaded": true,
+      "width": 168,
+      "height": 20,
+      "source": "https://awesome-dsh-plugin.com/badge.svg"
+    },
+    {
+      "alt": "dshfind",
+      "loaded": true,
+      "width": 440,
+      "height": 122,
+      "source": "https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=zh"
+    },
+    {
+      "alt": "DSH Bot · 模型路由——模型调度、Bot 协作与远程桌面",
+      "loaded": true,
+      "width": 1983,
+      "height": 793,
+      "source": "https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/readme-cover.png"
+    },
+    {
+      "alt": "当前工作台：可编辑任务模板与清晰的下一步引导",
+      "loaded": true,
+      "width": 1400,
+      "height": 966,
+      "source": "https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/workbench-task.png"
+    },
+    {
+      "alt": "执行预览：工作包分配、估算、工作区与执行确认",
+      "loaded": true,
+      "width": 1256,
+      "height": 708,
+      "source": "https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/workbench-execution-preview.png"
+    }
+  ],
+  "mathRendererElements": 33,
+  "formulaDetailsOpen": "",
+  "archiveUrlInArticle": false,
+  "failures": [
+    {
+      "url": "https://github.com/_global-navigation/payloads.json?can_toggle_site_admin_and_employee_status=0&is_admin_mode_on=0&is_ui_opted_out=0&show_ui_opt_out=0&v=8",
+      "status": 404
+    }
+  ]
+}
