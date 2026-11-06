@@ -6,7 +6,7 @@
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-![DSH Bot · 模型路由——模型调度、Bot 协作与远程桌面](https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/readme-cover.png)
+![DSH Bot · 模型路由——模型调度、Bot 协作与远程桌面](https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/readme-cover-v2.png)
 
 **面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的模型路由与持久化 Bot 工作区。**
 
@@ -253,8 +253,7 @@ Provider 凭据和认证会话由 Harness 管理。路由状态、收据、Bot �
 
 本项目扩展采用 [MIT 许可证](LICENSE)。内置 DS Bot 源码保留 **Apache-2.0** 许可证及声明，来源记录见 [SOURCE.json](modules/bot-runtime/SOURCE.json)。感谢 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供宿主基础，以及 [DS Bot](https://github.com/Fei2411/DS-Bot) 提供 Bot 基础。
 
-<details>
-<summary><strong>技术参考：费用公式与路由算法</strong></summary>
+## 技术参考：费用核算与路由算法
 
 ### 实际费用与规划估计
 
@@ -343,5 +342,3 @@ $`L`$ 为延迟效用：$`t`$ 是匹配历史的 P90 耗时，单位为毫秒；
 “精确”仅适用于保留下来的候选空间与代理目标。候选上限和 beam 裁剪意味着不保证在所有已配置模型中全局最优；请在预览中核对所选路线与是否放宽了质量下限。
 
 路线档案支持匹配的资源证据、回退条件、推理档位与可选 JSON 验收升级。验收升级默认关闭，启用后仍需通过计费与预算检查，最多增加一次普通 API 调用。
-
-</details>
