@@ -7,6 +7,7 @@
  */
 
 import React from 'react'
+import { ROUTER_PACKAGE_NAME } from './package-info.mjs'
 import { parseModelProfilesJson } from '../shared/model-profiles.mjs'
 import { parseQuotaPatterns } from '../shared/subscription-billing.mjs'
 import { toolBoundary } from '../shared/security-boundaries.mjs'
@@ -31,7 +32,7 @@ import {
 // Profile entry id and panel id predate the 0.13.0 package rename; they stay
 // unchanged so existing settings and layout state keep applying.
 export const ROUTER_NAMESPACE = 'model-router-galgame'
-export const ROUTER_PACKAGE = '@ljwei-stak/dsh-model-router'
+export const ROUTER_PACKAGE = ROUTER_PACKAGE_NAME
 export const ROUTER_PANEL = 'model-router-galgame'
 
 /** Required Cordis services supplied by the official desktop client. */

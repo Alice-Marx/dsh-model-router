@@ -10,7 +10,7 @@ import { resolverAnchor } from '../scripts/integration-upstream-tests.mjs'
 import { legacyCombinedProfile } from '../scripts/integration-combined-host.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const PACKAGE = '@ljwei-stak/dsh-model-router'
+const PACKAGE = '@ljwei-stak/dsh-model-route-bot'
 const SEARCH = `${PACKAGE}/web-search`
 const bundle = loadOverlayPatches('web-search-config-test', join(ROOT, 'cordis.patch.yml'))
 const fixtureHome = await mkdtemp(join(tmpdir(), 'web-search-config-'))

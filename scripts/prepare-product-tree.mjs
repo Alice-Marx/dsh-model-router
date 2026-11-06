@@ -18,8 +18,8 @@ const top = new Set(['.gitignore', '.gitattributes', 'AGENTS.md', 'LICENSE', 'RE
   'README.i18n.yaml', 'package.json', 'package-lock.json', 'cordis.patch.yml'])
 const prefixes = ['.dsh-plugin/', 'apps/integration-client/', 'apps/desktop-client/', 'packages/',
   'modules/bot-runtime/', 'native/', 'remote-computer-agent/', 'deploy/']
-const scripts = ['build-client.mjs', 'sync-ds-bot.mjs', 'prepack.mjs', 'check-readme.mjs',
-  'check-package.mjs', 'verify-release.mjs', 'integration-product-source.mjs', 'run-tests.mjs',
+const scripts = ['build-client.mjs', 'build-router-package.mjs', 'sync-ds-bot.mjs', 'prepack.mjs', 'check-readme.mjs',
+  'check-package.mjs', 'check-router-package.mjs', 'verify-release.mjs', 'integration-product-source.mjs', 'run-tests.mjs',
   'test-plan.json', 'package-remote-agent.ps1', 'prepare-product-tree.mjs', 'prepare-product-tests.mjs'].map(name => `scripts/${name}`)
 const scriptGraph = await esbuild.build({
   absWorkingDir: root, entryPoints: scripts.filter(file => file.endsWith('.mjs')),
@@ -58,6 +58,7 @@ pkg.files = pkg.files.filter(file => !file.startsWith('docs/') && file !== 'CHAN
     || file === 'remote-computer-agent/dist/')
 pkg.scripts = {
   'build:client': 'node scripts/build-client.mjs',
+  'build:router-package': 'node scripts/build-router-package.mjs',
   'check:client': 'node scripts/build-client.mjs --check',
   'build:agent': 'node remote-computer-agent/build.mjs',
   'check:source': 'node scripts/integration-product-source.mjs',

@@ -10,7 +10,7 @@ import {createMigrationLedgerArchive,exportMigrationLedger} from '../packages/or
 import {rehearseMigrationRollback} from '../packages/orchestration/src/migration-rollback-rehearsal.mjs'
 import {openRecoveryStore,recoveryRoot,makeSettled,makeActive,makeWaitingBudget,makeNeedsReconciliation,makeBlocked,insertReceipt,insertHold,clock} from './fixtures/migration-recovery-audit-fixture.mjs'
 
-const ROOT=resolve(import.meta.dirname,'..'),PRODUCT='@ljwei-stak/dsh-model-router',json=value=>JSON.stringify(value)+'\n'
+const ROOT=resolve(import.meta.dirname,'..'),PRODUCT='@ljwei-stak/dsh-model-route-bot',json=value=>JSON.stringify(value)+'\n'
 await mkdir(recoveryRoot,{recursive:true})
 async function fixture(t,{prepare}={}){
  const f=await openRecoveryStore(t),home=join(f.dir,'home'),profile=join(home,'profiles','desktop'),bot=join(home,'bot'),sessions=join(home,'sessions')

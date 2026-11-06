@@ -22,9 +22,9 @@ const run = await mkdtemp(join(parent, 'run-')), home = join(run, 'home'), profi
 const workspace = join(run, '工作目录 workspace'), botHome = join(run, '自定义团队 custom home')
 await mkdir(join(profile, 'node_modules/@ljwei-stak'), { recursive: true })
 await mkdir(workspace)
-await symlink(ROOT, join(profile, 'node_modules/@ljwei-stak/dsh-model-router'), process.platform === 'win32' ? 'junction' : 'dir')
+await symlink(ROOT, join(profile, 'node_modules/@ljwei-stak/dsh-model-route-bot'), process.platform === 'win32' ? 'junction' : 'dir')
 await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'web-search-config-offline-profile', private: true,
-  dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@ljwei-stak/dsh-model-router'] } } }))
+  dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@ljwei-stak/dsh-model-route-bot'] } } }))
 const profiles = '[{"provider":"integration-gpt-fixture","model":"gpt-fixture","fixture":true}]'
 const supportingDomainsFixture=process.argv.includes('--migration-supporting-fixture')
 const runtimeConfig = { home: botHome, workspace, mainName: '保留主助理', mainRole: '保留原角色', memory: supportingDomainsFixture, browser: false,
@@ -35,7 +35,7 @@ async function overlay({ overridden = false } = {}) {
     dailyBudgetUsd: 17, monthlyBudgetUsd: 31 } },
   { insert: [{ id: 'web-search-config-probe', name: pathToFileURL(join(anchor, 'web-search-config-probe.mjs')).href }] })
   if (overridden) patches.push({ id: 'web', config: { searchProvider: 'fixture-search', fetchProvider: 'http' } },
-    { id: 'web-search-auto', name: '@ljwei-stak/dsh-model-router/web-search', disabled: true })
+    { id: 'web-search-auto', name: '@ljwei-stak/dsh-model-route-bot/web-search', disabled: true })
   await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify(patches, null, 2))
 }
 const requireHost = createRequire(join(hostRoot, 'package.json'))

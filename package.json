@@ -1,8 +1,8 @@
 {
-  "name": "@ljwei-stak/dsh-model-router",
-  "version": "0.63.4",
+  "name": "@ljwei-stak/dsh-model-route-bot",
+  "version": "0.64.0",
   "type": "module",
-  "description": "A unified DS Bot workspace for DeepSeek Harness Desktop: model and Bot routing, private libraries, recorded desktop routines and scoped remote computer control.",
+  "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Alice-Marx/dsh-model-router.git"
@@ -367,7 +367,9 @@
     "remote-computer-agent/package-lock.json",
     "modules/bot-runtime/schedule-compat.mjs",
     "modules/bot-runtime/product-overlay/",
-    "docs/releases/0.63.0-validation.md"
+    "docs/releases/0.63.0-validation.md",
+    ".dsh-plugin/router-core.mjs",
+    ".dsh-plugin/bot-product.mjs"
   ],
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
@@ -418,7 +420,8 @@
     "integration:migrate-profile": "node scripts/integration-migrate-profile.mjs",
     "integration:probe-migration-audit": "node scripts/integration-migration-audit.mjs",
     "integration:probe-remote-container": "node scripts/integration-remote-container.mjs",
-    "integration:probe-cli-installed": "node scripts/integration-cli-installed.mjs"
+    "integration:probe-cli-installed": "node scripts/integration-cli-installed.mjs",
+    "build:router-package": "node scripts/build-router-package.mjs"
   },
   "license": "MIT",
   "engines": {

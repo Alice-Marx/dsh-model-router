@@ -2,11 +2,20 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![npm 版本](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![Bot npm](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-route-bot)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-route-bot) [![npm 版本](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge) [![已收录至 DSH 插件目录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=zh)](https://dshfind.com/zh/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-**当前正式版：0.63.4 · Windows Agent：0.1.1。**
+**当前正式版：0.64.0 · Windows Agent：0.1.1。**
+
+在 **插件 → 添加插件** 中按需选择：
+
+| 输入的包名 | 安装内容 |
+|---|---|
+| `@ljwei-stak/dsh-model-route-bot` | 完整 Bot 工作区及模型路由，包含电脑、资料库和例行任务。 |
+| `@ljwei-stak/dsh-model-router` | Harness 原界面中的模型路由工作台，不安装 DS Bot。 |
+
+每个 profile 选择一种安装形态。在插件管理中切换时，先移除原安装入口，再添加所需包；保留 profile 和 Bot 数据目录，并沿用已配置的 Bot 目录；内部路由配置标识沿用原值。[纯路由操作说明](packages/model-router-plugin/README.zh.md)。
 
 一个 DeepSeek Harness 插件整合长期 Bot 对话、群聊、记忆和浏览器工作，以及模型路由、托管任务、Bot 私有文件和独立实现的 Windows 远程桌面。先为各 Bot 配置准确模型、工具和电脑权限，再由 Main Bot 将工作路由并真实派发给具备条件的执行 Bot。
 
@@ -35,16 +44,16 @@
 
 ## 安装
 
-在 Harness Desktop 从 npm 安装 `@ljwei-stak/dsh-model-router@0.63.4`，或导入对应的 Release 安装包。
+在 Harness Desktop 从 npm 安装 `@ljwei-stak/dsh-model-route-bot@0.64.0`，或导入对应的 Release 安装包。
 
-1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入 `@ljwei-stak/dsh-model-router@0.63.4`，也可导入 Release 的 `.tgz` 包；本地解压安装时选择包含 `package.json` 和 `.dsh-plugin` 的内层 `package` 目录。
+1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入 `@ljwei-stak/dsh-model-route-bot@0.64.0`，也可导入 Release 的 `.tgz` 包；本地解压安装时选择包含 `package.json` 和 `.dsh-plugin` 的内层 `package` 目录。
 2. 启用插件后，**连同托盘进程一起完全退出 Harness**，再重新启动。只关窗口可能仍保留旧 Host。
 3. 检查已加载包的版本并打开 Bot 工作区/产品导航。Provider 凭据和模型在 Harness 官方 **模型** 设置中配置。
 
 使用 DSH CLI 安装指定正式版：
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.4
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.64.0
 ```
 
 仅执行全局 `npm install -g` 不会注册插件。包名仍为 `@ljwei-stak/dsh-model-router`，内部插件 ID 仍为 `model-router-galgame`，以保留设置。替换旧包前先移除重复插件条目；GAL 是独立插件。
@@ -144,6 +153,8 @@ Windows/云电脑安装：[下载 Agent 0.1.1 完整 Windows x64 包](https://gi
 ## 模型工作台、工具与执行边界
 
 打开 **高级工作台** 使用模型路线规划、准确路线档案、官方工具、终端、带依赖工作包以及 API/订阅核算。Provider 凭据在 Harness 模型页面配置，厂商 CLI 使用自身登录。检测或安装成功不能证明登录、模型权益或某种托管执行模式可用。
+
+可用 **项目检查、整理说明、方案比较** 模板起步，再修改任务；**撤销模板** 可恢复原文。当前窗口内切换页面会保留任务草稿。路由/预算与执行选项按需展开；点击 **下一步：预览执行** 前往执行预览，比较路由是可选步骤。结果及受支持的重试集中在 **执行记录**，失败提醒会打开对应记录。选择模板或切页不会启动执行。
 
 点击 **需要你处理** 面板右上角的 **×** 即可关闭；当前设备会记住选择，重启后仍保持关闭。需要时点击工作台顶部的 **显示待处理提醒** 重新打开；任务记录仍可在历史及费用页面查看。
 

@@ -15,7 +15,7 @@ const entryListSchema = JSON_SCHEMA.extend(new Type('tag:yaml.org,2002:js', {
   kind: 'scalar', resolve: data => typeof data === 'string', construct: data => ({ __jsExpr: data }),
 }))
 const DEFAULT_LIMITS = Object.freeze({ maxFileBytes: 2 * 1024 * 1024, maxTotalBytes: 16 * 1024 * 1024, maxSources: 256, maxNodes: 50000, maxDepth: 64 })
-const PRODUCT = '@ljwei-stak/dsh-model-router'
+const PRODUCT = '@ljwei-stak/dsh-model-route-bot'
 const MR = 'model-router-galgame'
 const AUTO = 'web-search-auto'
 const SEARCH = `${PRODUCT}/web-search`

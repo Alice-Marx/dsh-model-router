@@ -12,7 +12,7 @@ import {beginMigrationExclusive} from '../packages/orchestration/src/migration-f
 import {rehearseMigrationRollback} from '../packages/orchestration/src/migration-rollback-rehearsal.mjs'
 import {openRecoveryStore,recoveryRoot,makeSettled,insertReceipt,clock} from './fixtures/migration-recovery-audit-fixture.mjs'
 
-const ROOT=resolve(import.meta.dirname,'..'),PRODUCT='@ljwei-stak/dsh-model-router',json=value=>JSON.stringify(value)+'\n'
+const ROOT=resolve(import.meta.dirname,'..'),PRODUCT='@ljwei-stak/dsh-model-route-bot',json=value=>JSON.stringify(value)+'\n'
 await mkdir(recoveryRoot,{recursive:true})
 async function fixture(t,phase){
  const f=await openRecoveryStore(t),home=join(f.dir,'home'),profile=join(home,'profiles','desktop'),bot=join(home,'bot'),sessions=join(home,'sessions')

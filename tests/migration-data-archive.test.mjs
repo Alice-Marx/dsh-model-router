@@ -9,7 +9,7 @@ import {inspectMigrationSources} from '../packages/orchestration/src/migration-s
 import {createMigrationDataArchive,verifyMigrationDataArchive,summarizeMigrationDataArchive} from '../packages/orchestration/src/migration-data-archive.mjs'
 
 const ROOT=resolve(import.meta.dirname,'..'),parent=resolve('tmp/integration/migration-data-archive');await mkdir(parent,{recursive:true})
-const PRODUCT='@ljwei-stak/dsh-model-router',json=v=>JSON.stringify(v)+'\n'
+const PRODUCT='@ljwei-stak/dsh-model-route-bot',json=v=>JSON.stringify(v)+'\n'
 async function fixture(){
  const dir=await mkdtemp(join(parent,'case-')),home=join(dir,'home'),profile=join(home,'profiles','desktop'),bot=join(home,'bot'),sessions=join(home,'sessions')
  for(const path of [profile,bot,sessions])await mkdir(path,{recursive:true})

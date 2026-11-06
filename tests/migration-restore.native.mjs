@@ -12,7 +12,7 @@ import {restoreMigrationArchives} from '../packages/orchestration/src/migration-
 import {openSqliteRouterState} from '../packages/orchestration/src/sqlite-router-state.mjs'
 
 const ROOT=resolve(import.meta.dirname,'..'),parent=resolve('tmp/integration/migration-restore-crash');await mkdir(parent,{recursive:true})
-const PRODUCT='@ljwei-stak/dsh-model-router',json=value=>JSON.stringify(value)+'\n'
+const PRODUCT='@ljwei-stak/dsh-model-route-bot',json=value=>JSON.stringify(value)+'\n'
 async function fixture(phase){
  const dir=await mkdtemp(join(parent,'case-')),home=join(dir,'home'),profile=join(home,'profiles','desktop'),bot=join(home,'bot'),sessions=join(home,'sessions')
  for(const path of [profile,bot,sessions])await mkdir(path,{recursive:true})

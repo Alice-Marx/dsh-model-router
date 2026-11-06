@@ -488,9 +488,12 @@ function PausedNode({ run, item, busy, onRerun, rerun }) {
 }
 
 /** 路由决策 + 子任务可视化: recent runs with their DAG, channels, real errors, costs and ratings. */
-export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, busy, error }) {
+export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, busy, error, selectedRunId, onNewTask }) {
   const runs = ledger?.runs ?? []
   const [openId, setOpenId] = React.useState(null)
+  React.useEffect(() => {
+    if (selectedRunId && runs.some(run => run.id === selectedRunId)) setOpenId(selectedRunId)
+  }, [selectedRunId, runs])
   const current = runs.find(run => run.id === openId) ?? runs[0]
   const support = rerunSupport(current, ledger)
   const unresolved = ['running', 'interrupted'].includes(current?.status)
@@ -509,12 +512,12 @@ export function RunHistoryCard({ ledger, routes, onRefresh, onRate, onRerun, bus
       <div className="mr-card-body">
         {error && <p className="mr-error" role="alert">{error}</p>}
         {!ledger && !error && <p className="mr-empty" role="status">正在读取执行记录…</p>}
-        {ledger && runs.length === 0 && <p className="mr-empty">还没有执行记录。可在上方“在工作台执行”中预览并执行，或在官方会话中调用 model_router_execute、model_router_team_execute、model_router_tool_run，这里会显示决策和结果。</p>}
+        {ledger && runs.length === 0 && <div className="mr-empty"><p>还没有执行记录。填写任务，预览并确认执行后，结果会显示在这里。</p>{onNewTask && <button type="button" className="mr-button mr-button-secondary" onClick={onNewTask}>开始一个任务</button>}</div>}
         {runs.length > 0 && (
           <>
             <label className="mr-label" htmlFor="mr-run-select">选择记录</label>
             <select className="mr-input" id="mr-run-select" value={current?.id ?? ''} onChange={event => setOpenId(event.target.value)}>
-              {runs.map(run => <option key={run.id} value={run.id}>{new Date(run.createdAt).toLocaleString()} · {RUN_KIND_LABEL[run.kind ?? 'assign'] ?? run.kind} · {RUN_STATUS_LABEL[run.status] ?? run.status} · {run.task.slice(0, 40)}</option>)}
+              {runs.map(run => <option key={run.id} value={run.id}>{new Date(run.createdAt).toLocaleString()} · {RUN_KIND_LABEL[run.kind ?? 'assign'] ?? run.kind} · {RUN_STATUS_LABEL[run.status] ?? run.status} · {(String(run.task ?? '').trim() || '未命名任务').slice(0, 40)}</option>)}
             </select>
             {current && (
               <div className="mr-run">

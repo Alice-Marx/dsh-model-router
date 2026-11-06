@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.64.0 — 2026-11-06
+
+- Split installation into `@ljwei-stak/dsh-model-route-bot` (complete Bot workspace and routing) and `@ljwei-stak/dsh-model-router` (routing workbench only).
+- Extract a shared routing core and isolate Bot schema, Host composition and client code. The router-only archive excludes DS Bot, independent Bot runtime, remote computers and browser dependencies.
+- Add editable task templates with undo, an in-memory draft across page remounts, concise next-step guidance and expandable advanced options.
+- Give execution history its own tab; failed-run reminders open the corresponding record, and budget reminders open budget controls instead of an invalid page.
+- Keep router configuration and protocol identities stable. Correct the Claude execution-profile import and bind update checks to the installed edition.
+
 ## 0.63.4 — 2026-11-06
 
 - Add a close button to the advanced workbench's “需要你处理” panel.

@@ -25,8 +25,8 @@ await copyFile(join(ROOT, 'tests/fixtures/integration-combined/mock-plugin.mjs')
 const parent = join(ROOT, 'tmp/integration/product-default'); await mkdir(parent, { recursive: true })
 const run = await mkdtemp(join(parent, 'run-')), home = join(run, 'home'), profile = join(home, 'profiles/integration'), workspace = join(run, 'workspace')
 await mkdir(join(profile, 'node_modules/@ljwei-stak'), { recursive: true }); await mkdir(workspace)
-await symlink(ROOT, join(profile, 'node_modules/@ljwei-stak/dsh-model-router'), process.platform === 'win32' ? 'junction' : 'dir')
-await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'bot-product-default-fixture', private: true, dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@ljwei-stak/dsh-model-router'] } } }))
+await symlink(ROOT, join(profile, 'node_modules/@ljwei-stak/dsh-model-route-bot'), process.platform === 'win32' ? 'junction' : 'dir')
+await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'bot-product-default-fixture', private: true, dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@ljwei-stak/dsh-model-route-bot'] } } }))
 // No test fixture plugin: the shipped default entry composes the unified Bot product itself.
 const overlay = combinedOverlay(join(anchor, 'offline-model.mjs')).filter(item => item.id !== 'bot')
 // N09: the managed CLI backend only exists once the host declares an

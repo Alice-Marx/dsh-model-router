@@ -2,11 +2,20 @@
 
 [English](README.md) · [简体中文](README.zh.md)
 
-[![npm version](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![Listed in the DSH plugin directory](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![Bot npm](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-route-bot)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-route-bot) [![npm version](https://flat.badgen.net/npm/v/@ljwei-stak/dsh-model-router)](https://www.npmjs.com/package/@ljwei-stak/dsh-model-router) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![dshfind](https://dshfind.com/api/badge/Alice-Marx/dsh-model-router?metric=downloads&lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge) [![Listed in the DSH plugin directory](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/alice-marx/dsh-model-router) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-**Current release: 0.63.4 · Windows Agent: 0.1.1.**
+**Current release: 0.64.0 · Windows Agent: 0.1.1.**
+
+Choose the package in **Plugins → Add plugin**:
+
+| Package | Installed interface |
+|---|---|
+| `@ljwei-stak/dsh-model-route-bot` | Complete Bot workspace plus model routing, computers, library and routines. |
+| `@ljwei-stak/dsh-model-router` | Routing workbench in the standard Harness interface; no DS Bot. |
+
+Use one edition in each profile. When switching in Plugin Manager, remove the previous package entry before adding the chosen edition; retain the profile and Bot data directories, and reuse your configured Bot directory. The router configuration ID stays the same. [Router-only instructions](packages/model-router-plugin/README.md).
 
 One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memory and browser work with model routing, managed tasks, private Bot files, and an independently implemented Windows remote desktop. Configure each Bot's exact model, tools and machine access; a Main Bot can then route and dispatch work to an eligible worker.
 
@@ -35,16 +44,16 @@ One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memor
 
 ## Install
 
-Install `@ljwei-stak/dsh-model-router@0.63.4` from npm in Harness Desktop, or import the matching release archive.
+Install `@ljwei-stak/dsh-model-route-bot@0.64.0` from npm in Harness Desktop, or import the matching release archive.
 
-1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-router@0.63.4`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
+1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-route-bot@0.64.0`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
 2. Enable the plugin, then **fully quit Harness, including its tray process**, and restart. Closing only the window may leave the old Host running.
 3. Check the loaded package version and open the Bot workspace/product navigation. Provider credentials and models are configured in Harness's official **Models** settings.
 
 With the DSH CLI, install the exact release with:
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.4
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.64.0
 ```
 
 A global `npm install -g` alone does not register the plugin. The package name remains `@ljwei-stak/dsh-model-router`; its internal plugin ID remains `model-router-galgame` for retained settings. Remove duplicate old package entries before adding a replacement. GAL is a separate plugin.
@@ -144,6 +153,8 @@ The library is that Bot's private file area, distinct from the upstream avatar l
 ## Model workbench, tools and execution boundaries
 
 Open **Advanced workbench / 高级工作台** for model-route planning, exact-route profiles, official tools, terminals, dependent work packages and API/subscription accounting. Configure provider credentials in Harness Models and vendor CLI logins in their own tools. Detection or installation does not prove login, entitlement or a managed execution mode is available.
+
+Start with **项目检查**, **整理说明** or **方案比较** to fill an editable task template; **撤销模板** restores the previous text. The current window keeps your draft when you switch pages. Expand routing/budget or execution options only when needed. **下一步：预览执行** takes you to the execution preview; comparing routes is optional. The **执行记录** tab contains results and supported retries, and failed-run reminders open the corresponding record. Templates and page navigation never start execution.
 
 Close the **Needs your attention / 需要你处理** panel with its top-right **×**. The choice is remembered on this device, including after restarting. Use **显示待处理提醒** at the top of the workbench to show it again; task records remain available in history and cost pages.
 

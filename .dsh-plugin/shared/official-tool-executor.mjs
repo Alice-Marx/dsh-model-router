@@ -29,6 +29,7 @@ import { CODE_FILE, npmAttestor } from './npm-attestation.mjs'
 import { compareReleaseVersions, isReleaseVersion } from './latest-versions.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser, installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
 import { emptyOutputError, outputIsEmpty, redactDiagnostic, usageFromEvents, usageFromOutput } from './task-executors.mjs'
+import { cliProfile } from './cli-profiles.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000

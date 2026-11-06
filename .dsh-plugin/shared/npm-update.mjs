@@ -1,8 +1,15 @@
 import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const ROUTER_PACKAGE_NAME = '@ljwei-stak/dsh-model-router'
+export const ROUTER_PACKAGE_NAME = (() => {
+  try {
+    const name = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).name
+    if (['@ljwei-stak/dsh-model-router', '@ljwei-stak/dsh-model-route-bot'].includes(name)) return name
+  } catch { /* portable fallback for a standalone legacy helper */ }
+  return '@ljwei-stak/dsh-model-router'
+})()
 export const ROUTER_NPM_REGISTRY = 'https://registry.npmjs.org/'
 export const ROUTER_UPDATE_CHANNEL = '/model-router-update'
 export const ROUTER_UPDATE_ENDPOINT = 'install-plugin'

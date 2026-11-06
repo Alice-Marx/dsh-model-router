@@ -10,7 +10,7 @@ import { inspectMigrationSources } from '../packages/orchestration/src/migration
 
 const ROOT = resolve(import.meta.dirname, '..')
 const PARENT = join(ROOT, 'tmp/integration/migration-provider-selection')
-const PRODUCT = '@ljwei-stak/dsh-model-router'
+const PRODUCT = '@ljwei-stak/dsh-model-route-bot'
 const DOMAIN = '@deepseek-ai/dsh-storage-domain'
 const json = value => JSON.stringify(value) + '\n'
 const sha = value => createHash('sha256').update(value).digest('hex')

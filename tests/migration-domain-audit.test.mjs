@@ -12,7 +12,7 @@ import {inspectMigrationSources} from '../packages/orchestration/src/migration-s
 import {createMigrationDataArchive} from '../packages/orchestration/src/migration-data-archive.mjs'
 import {auditMigrationDataDomains,summarizeMigrationDomainAudit,reconcileMigrationDomainAudits} from '../packages/orchestration/src/migration-domain-audit.mjs'
 
-const ROOT=resolve(import.meta.dirname,'..'),parent=resolve('tmp/integration/migration-domain-audit'),PRODUCT='@ljwei-stak/dsh-model-router',tz=Intl.DateTimeFormat().resolvedOptions().timeZone;await mkdir(parent,{recursive:true})
+const ROOT=resolve(import.meta.dirname,'..'),parent=resolve('tmp/integration/migration-domain-audit'),PRODUCT='@ljwei-stak/dsh-model-route-bot',tz=Intl.DateTimeFormat().resolvedOptions().timeZone;await mkdir(parent,{recursive:true})
 const json=x=>JSON.stringify(x)+'\n',line=x=>Buffer.from(json(x))
 async function fixture({compression='none',simple=false}={}){
  const dir=await mkdtemp(join(parent,'case-')),home=join(dir,'home'),profile=join(home,'profiles/desktop'),bot=join(home,'bot'),sessions=join(home,'sessions'),attachments=join(home,'attachments'),router=join(home,'model-router')

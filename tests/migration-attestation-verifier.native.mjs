@@ -14,7 +14,7 @@ import { beginMigrationCommitOperation } from '../packages/orchestration/src/mig
 import { createMigrationAttestationBundle, observeMigrationAttestationContext, verifyMigrationAttestationBundle } from '../packages/orchestration/src/migration-attestation-verifier.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const PRODUCT = '@ljwei-stak/dsh-model-router'
+const PRODUCT = '@ljwei-stak/dsh-model-route-bot'
 const parent = resolve('tmp/integration/migration-attestation-verifier-native')
 await mkdir(parent, { recursive: true })
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')

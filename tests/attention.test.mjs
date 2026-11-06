@@ -22,6 +22,7 @@ test('attention: a paused budget comes before failures and names the decision', 
   })
   assert.equal(rows[0].stage, 'blocked')
   assert.equal(rows[0].key, 'budget')
+  assert.equal(rows[0].target, 'controls')
   assert.match(rows[0].detail, /预算已用完/)
   assert.equal(rows[1].stage, 'failed')
   assert.equal(rows[2].stage, 'login')
@@ -50,6 +51,8 @@ test('attention: a failed run keeps a readable task name and its error', () => {
   assert.equal(rows.length, 1)
   assert.match(rows[0].title, /修复登录流程/)
   assert.equal(rows[0].detail, 'MODEL_DENIED')
+  assert.equal(rows[0].target, 'history')
+  assert.equal(rows[0].runId, 'r2')
 })
 
 test('attention: only logged-out installed tools are a login row', () => {

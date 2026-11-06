@@ -133,8 +133,8 @@ test('invalid Host install settings reject previews and actions before any CLI i
   }
 })
 
-test('router upgrade retains its package identity and contains no GAL payload', () => {
-  assert.equal(manifest.name, '@ljwei-stak/dsh-model-router')
+test('full Bot edition has its explicit package identity and contains no GAL payload', () => {
+  assert.equal(manifest.name, '@ljwei-stak/dsh-model-route-bot')
   assert.match(manifest.version, /^0\.(?:2[6-9]|[3-9]\d)\.\d+(?:-preview\.\d+)?$/)
   assert.ok(manifest.files.every(file => !/gal-story|gal-module|GAL_|ECHO_CITY|aipicture|gal-.*preview/.test(file)))
   const client = read('.dsh-plugin/client/official-harness.jsx')
@@ -151,17 +151,17 @@ test('router upgrade retains its package identity and contains no GAL payload', 
   assert.doesNotMatch(bundle, /GalModulePage|GAL_PANEL|cancelGalReply|galReply/)
 })
 
-test('0.13.0 package rename: the loader imports the new name, the profile entry id stays for existing settings', async () => {
+test('full-edition rename preserves the profile entry while loading its actual package', async () => {
   const patch = read('cordis.patch.yml')
   assert.match(patch, /^\s+- id: model-router-galgame$/m, 'entry id kept so saved settings and panel state still apply')
   assert.match(patch, new RegExp(`^\\s+name: '${manifest.name.replace('/', '\\/')}'$`, 'm'), 'inserted row must import this package')
   assert.doesNotMatch(patch, /name: '@ljwei-stak\/model-router-galgame'/)
   const client = read('.dsh-plugin/client/official-harness.jsx')
-  assert.match(client, new RegExp(`export const ROUTER_PACKAGE = '${manifest.name}'`))
+  assert.ok(read('.dsh-plugin/client.js').includes(`id: ${JSON.stringify(manifest.name)}`), 'generated loader must use the installed full-edition package')
   assert.match(client, /export const ROUTER_PANEL = 'model-router-galgame'/)
   const { OFFICIAL_TOOLS_REMOTE_PACKAGE } = await import('../.dsh-plugin/shared/official-tools-remote.mjs')
   const { ROUTER_PACKAGE_NAME } = await import('../.dsh-plugin/shared/npm-update.mjs')
-  assert.equal(OFFICIAL_TOOLS_REMOTE_PACKAGE, manifest.name)
+  assert.equal(OFFICIAL_TOOLS_REMOTE_PACKAGE, '@ljwei-stak/dsh-model-router', 'shared router protocol IDs remain stable in both editions')
   assert.equal(ROUTER_PACKAGE_NAME, manifest.name, 'update checks query the renamed package')
   const host = await import('../.dsh-plugin/index.mjs')
   assert.equal(host.name, 'model-router-galgame')

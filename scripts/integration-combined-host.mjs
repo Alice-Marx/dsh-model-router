@@ -44,7 +44,7 @@ export function combinedOverlay(mockPlugin) {
 export function legacyCombinedProfile(mockPlugin) {
   return {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'ds-bot'],
-    patches: [...combinedOverlay(mockPlugin), { insert: [{ id: 'model-router-galgame', name: '@ljwei-stak/dsh-model-router',
+    patches: [...combinedOverlay(mockPlugin), { insert: [{ id: 'model-router-galgame', name: '@ljwei-stak/dsh-model-route-bot',
       config: { botProduct: false } }] }],
   }
 }
@@ -76,7 +76,7 @@ export async function runCombinedHost({ dsRoot, hostRoot, serve = false, securit
   const workspace = join(run, 'workspace')
   await mkdir(join(profile, 'node_modules/@ljwei-stak'), { recursive: true })
   await mkdir(workspace)
-  await symlink(ROOT, join(profile, 'node_modules/@ljwei-stak/dsh-model-router'), process.platform === 'win32' ? 'junction' : 'dir')
+  await symlink(ROOT, join(profile, 'node_modules/@ljwei-stak/dsh-model-route-bot'), process.platform === 'win32' ? 'junction' : 'dir')
   await symlink(join(dsRoot, 'ds-bot'), join(profile, 'node_modules/ds-bot'), process.platform === 'win32' ? 'junction' : 'dir')
   const composition = legacyCombinedProfile(mockPlugin)
   await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'integration-combined-profile', private: true,

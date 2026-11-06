@@ -22,7 +22,7 @@ import {
 
 const ROOT = resolve(import.meta.dirname, '..')
 const CWD = resolve('.')
-const PRODUCT = '@ljwei-stak/dsh-model-router'
+const PRODUCT = '@ljwei-stak/dsh-model-route-bot'
 const FIXTURE = join(ROOT, 'tests', 'fixtures', 'migration-commit-orchestration-crash.mjs')
 const DOMAIN_FIXTURE = join(ROOT, 'tests', 'fixtures', 'migration-domain-evidence-crash.mjs')
 const parent = resolve('tmp/integration/migration-commit-orchestration')

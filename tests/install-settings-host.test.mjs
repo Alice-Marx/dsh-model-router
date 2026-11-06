@@ -194,7 +194,7 @@ test('health probes and latest lookup use one captured installation preference s
     await rm(directory, { recursive: true, force: true })
   })
   // A separate Host module instance gives this check an isolated persistent store.
-  const isolatedHost = await import('../.dsh-plugin/index.mjs?health-preferences-test')
+  const isolatedHost = await import('../.dsh-plugin/router-core.mjs?health-preferences-test')
   const expected = { installDir: 'D:/selected/npm-tools', registry: 'https://registry.npmmirror.com/',
     methods: { zcode: 'npm' }, scriptUrls: {}, allowScriptInstall: false }
   setInstallPreferences(expected)

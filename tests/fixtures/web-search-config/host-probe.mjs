@@ -21,7 +21,7 @@ export function apply(ctx) {
       const value = value => typeof value?.get === 'function' ? value.get() : value
       return Response.json({ autoRegistered: ctx.web.searchProviders.has('auto'), fixtureSearchCalls,
         searchProvider: value(ctx.web.config.searchProvider), fetchProvider: value(ctx.web.config.fetchProvider),
-        routerEntries: entries.filter(entry => entry.options.name === '@ljwei-stak/dsh-model-router').length,
+        routerEntries: entries.filter(entry => entry.options.name === '@ljwei-stak/dsh-model-route-bot').length,
         legacyBotEntries: entries.filter(entry => entry.options.name === 'ds-bot').length,
         legacySearchEntries: entries.filter(entry => entry.options.name === 'ds-bot/web-search').length,
         runtimeHome: router?.fiber?.config.botRuntime?.home,

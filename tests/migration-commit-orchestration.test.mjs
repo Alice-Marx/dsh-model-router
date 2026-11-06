@@ -24,7 +24,7 @@ import {
 } from '../packages/orchestration/src/migration-commit-orchestration.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const PRODUCT = '@ljwei-stak/dsh-model-router'
+const PRODUCT = '@ljwei-stak/dsh-model-route-bot'
 const parent = resolve('tmp/integration/migration-commit-orchestration')
 await mkdir(parent, { recursive: true })
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')

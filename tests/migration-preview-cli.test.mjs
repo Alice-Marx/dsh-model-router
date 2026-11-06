@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mkdir,mkdtemp,readFile,writeFile,stat,symlink} from 'node:fs/promises'
 import {resolve,join} from 'node:path'
 import {spawnSync,execFileSync} from 'node:child_process'
-const ROOT=resolve(import.meta.dirname,'..'),CLI=join(ROOT,'scripts/integration-migrate-profile.mjs'),PRODUCT='@ljwei-stak/dsh-model-router'
+const ROOT=resolve(import.meta.dirname,'..'),CLI=join(ROOT,'scripts/integration-migrate-profile.mjs'),PRODUCT='@ljwei-stak/dsh-model-route-bot'
 await mkdir(resolve('tmp/integration/migration-preview-cli'),{recursive:true})
 const json=value=>JSON.stringify(value,null,2)+'\n'
 async function fixture(){

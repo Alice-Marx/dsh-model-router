@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { previewProfileMigration, summarizeProfileMigration, verifyProfileMigrationSources } from '../packages/orchestration/src/profile-migration-plan.mjs'
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 
-const PRODUCT = '@ljwei-stak/dsh-model-router', MR = 'model-router-galgame', AUTO = 'web-search-auto'
+const PRODUCT = '@ljwei-stak/dsh-model-route-bot', MR = 'model-router-galgame', AUTO = 'web-search-auto'
 const json = value => JSON.stringify(value, null, 2) + '\n'
 const ROOT = resolve(import.meta.dirname, '..')
 const find = (entries, id) => {

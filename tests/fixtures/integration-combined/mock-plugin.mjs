@@ -184,7 +184,7 @@ export function apply(ctx) {
       return Response.json({ calls, toolResults, credential, providers: ctx.llm.listProviders(), registeredTools: ctx.tools.schemas().map(tool => tool.name),
         searchProviders: [...(ctx.get('web')?.searchProviders?.keys() ?? [])],
         automaticSearchEntries: [...ctx.root.get('loader').entries()]
-          .filter(entry => entry.fiber?.state === 2 && ['ds-bot/web-search', '@ljwei-stak/dsh-model-router/web-search'].includes(entry.options.name))
+          .filter(entry => entry.fiber?.state === 2 && ['ds-bot/web-search', '@ljwei-stak/dsh-model-route-bot/web-search'].includes(entry.options.name))
           .map(entry => entry.options.name),
       })
     },

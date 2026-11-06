@@ -33,7 +33,9 @@ async function fixture(t,overrides={}){
     funding.bindModelRequest(options)
     return accounting.stream(options,()=>{dispatches++;return chunks()},{...policy.modelIdentity(options),source:'aux'})
   })}}
-  const mr=await import(`../.dsh-plugin/index.mjs?funding-native=${randomUUID()}`);mr.installRouterStateStore(funding.state)
+  // The immutable state authority lives in the shared router core. Each fixture
+  // needs a fresh core instance, rather than a fresh full-product wrapper.
+  const mr=await import(`../.dsh-plugin/router-core.mjs?funding-native=${randomUUID()}`);mr.installRouterStateStore(funding.state)
   t.after(async()=>{await accounting.close();await store.close();authority.dispose()})
   return{store,funding,accounting,authority,policy,agents,ctx,mr,dispatches:()=>dispatches,call:(id,operation)=>policy.run({kind:'tool',name:'model_router_consult',agent:agents[id]},operation)}
 }

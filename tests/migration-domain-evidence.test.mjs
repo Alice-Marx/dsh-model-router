@@ -16,7 +16,7 @@ import { createMigrationDomainAuditArtifact, migrationDomainAuditInputDigests, v
 import { observeCapturedMigrationDomainInventory } from '../packages/orchestration/src/migration-domain-inventory.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const PRODUCT = '@ljwei-stak/dsh-model-router'
+const PRODUCT = '@ljwei-stak/dsh-model-route-bot'
 const parent = resolve('tmp/integration/migration-domain-evidence')
 await mkdir(parent, { recursive: true })
 const json = value => JSON.stringify(value) + '\n'

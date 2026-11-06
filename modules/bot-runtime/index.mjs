@@ -21,7 +21,7 @@ export function createBotProduct(ctx, options = {}) {
   if (typeof accountStream !== 'function') throw new TypeError('BOT_PRODUCT_ACCOUNTING_REQUIRED: provide the shared accounting stream decorator')
   // An integrated module must never install/update a second ds-bot bundle.
   const rt = createRuntime(ctx, { mainName: 'Main', mainRole: '主助理', ...options.runtimeConfig, updateCheck: false })
-  const integratedUpdate = () => ({ available: false, phase: 'idle', source: 'integrated', name: '@ljwei-stak/dsh-model-router', reason: '请通过 Bot 工作系统插件统一更新。' })
+  const integratedUpdate = () => ({ available: false, phase: 'idle', source: 'integrated', name: '@ljwei-stak/dsh-model-route-bot', reason: '请通过 Bot 工作系统插件统一更新。' })
   rt.updateCheck = async () => integratedUpdate()
   rt.updateView = integratedUpdate
   rt.updateStart = () => { throw Object.assign(new Error('请在 Harness 插件管理中更新 Bot 工作系统；内置 DS 模块随同发布。'), { code: 'bot/integrated-update' }) }

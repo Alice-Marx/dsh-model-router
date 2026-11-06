@@ -18,7 +18,7 @@ node --test tests/bot-runtime-product.test.mjs tests/bot-runtime-ui.test.mjs
 默认生成 `apps/integration-client/client.js`；`--output <path>` 可写入主包统一的
 `.dsh-plugin/client.js`。构建 API `bundleProductClient()` 返回 `{code,inputs,bytes}`，
 `generateProductClient({output,check})` 可供主构建脚本调用。生成物只有一个 loader id
-`@ljwei-stak/dsh-model-router`，没有单独 `ds-bot` 的 loader 或第二个客户端包。
+`@ljwei-stak/dsh-model-route-bot`，没有单独 `ds-bot` 的 loader。纯路由包 `@ljwei-stak/dsh-model-router` 使用独立工作台入口，不导入此集成客户端。
 React、ReactDOM 与 Harness UI primitives 继续由宿主提供。
 
 当前完整功能并集 bundle 约 2 MiB。旧 MR 的单独客户端保持原构建方式，是否切换默认
