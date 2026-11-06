@@ -6,184 +6,255 @@
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-**Current release: 0.64.0 · Windows Agent: 0.1.1.**
+![DSH Bot · Model Router — model routing, Bot collaboration and remote desktop](https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/readme-cover.png)
 
-Choose the package in **Plugins → Add plugin**:
+**Model routing and a persistent Bot workspace for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).**
 
-| Package | Installed interface |
-|---|---|
-| `@ljwei-stak/dsh-model-route-bot` | Complete Bot workspace plus model routing, computers, library and routines. |
-| `@ljwei-stak/dsh-model-router` | Routing workbench in the standard Harness interface; no DS Bot. |
+Turn a task into a reviewable execution plan, select suitable configured models or native CLI tools, and follow the results in one workspace. Add the full Bot edition for long-running conversations, multi-Bot delegation, private files, and your own Windows computers.
 
-Use one edition in each profile. When switching in Plugin Manager, remove the previous package entry before adding the chosen edition; retain the profile and Bot data directories, and reuse your configured Bot directory. The router configuration ID stays the same. [Router-only instructions](packages/model-router-plugin/README.md).
+This is a community plugin. It reuses Harness model configuration and Host services; each provider or CLI uses its own account and access rights.
 
-One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memory and browser work with model routing, managed tasks, private Bot files, and an independently implemented Windows remote desktop. Configure each Bot's exact model, tools and machine access; a Main Bot can then route and dispatch work to an eligible worker.
+**Current stable version: 0.64.0 · Windows Remote Agent: 0.1.1**
 
-**Start here:** [Install](#install) · [First Bot](#quick-evaluation) · [Daily work](#daily-work) · [Connect a computer](#computers) · [Routines](#routines) · [Bot routing](#bot-routing) · [Private library](#library) · [Model workbench](#workbench) · [Math reference](#costs) · [Troubleshooting](#troubleshooting).
+[Choose an edition](#editions) · [Install](#install) · [First task](#quick-evaluation) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
 
-![DSH Bot workspace](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workspace-0.63.1-light.png)
+<a id="editions"></a>
+
+## Choose the workspace you need
+
+| Edition | Package to enter in **Plugins → Add plugin** | What it adds |
+| --- | --- | --- |
+| **DSH Bot + Model Router** | `@ljwei-stak/dsh-model-route-bot` | The full Bot workspace, model-routing workbench, Bot delegation, remote computers, private libraries, and routines. |
+| **Model Router** | `@ljwei-stak/dsh-model-router` | A **Model Router** entry in the standard Harness interface, with route planning, tools, execution, and accounting. DS Bot is not installed. |
+
+Use **one edition per Harness profile**. Both editions share the routing configuration. To switch, remove the existing package entry in plugin management, add the other edition in the same profile, and retain your data directories and configured Bot home. [Routing-only guide](packages/model-router-plugin/README.md).
 
 <a id="capabilities"></a>
 
-## Included workflows
+## Capabilities at a glance
 
-| Area | What you can use |
-| --- | --- |
-| Bot conversations | Named Bots with their own model, role, working folder, private conversation and permission settings; side chat, questions and approval cards. |
-| Team work | Groups, parallel mentions, staged group goals, Bot-to-Bot handoffs and retained results. |
-| Context and memory | Conversation checkpoints/parts and search; Bot/group/team memories, change history, and reviewable learned-skill/project-rule proposals. |
-| Browser and documents | Per-Bot browser partitions and page tools, Office file reading/previews, connectors and secret-entry cards; avatar library and team appearance settings. |
-| Scheduling | Upstream scheduled-task integration when the Host's Automation tasks service is enabled; continued work requires the Host and relevant Agent to stay running. |
-| Bot routing | Saved economy/balanced/quality policy, committed model/tool/machine candidates, preview with refusal reasons, and actual worker-task dispatch. |
-| Remote computer | A paired Windows desktop, watch/control handoff, keyboard/mouse/text input, monitor selection and enlarged viewing. |
-| Routines | Demonstrate acknowledged inputs, save per Bot, replay through the real desktop session, inspect results and reconcile unknown effects. |
-| Private library | Per-Bot folders, binary upload/download, text editing, name filtering and private text search from the page or granted Bot tools. |
-| Model workbench | Local model-route planning, dependent work packages, official CLI detection/installation/terminal, execution history and separate API/subscription accounting. |
+| Workflow | What you can do | Edition |
+| --- | --- | --- |
+| Task-oriented model routing | Start from a task template; compare economy, balanced, or quality-first plans; use one route, a dependency-based team, or an exact model. | Both |
+| Reviewable execution | Inspect models, tools, workspace, permissions, and estimates before confirming; track progress, results, cancellation, and supported retries. | Both |
+| Native CLI tools | Detect and install registered tools, check login and mode readiness, and open an interactive terminal. | Both |
+| Budgets and feedback | Set API limits, track reservations and receipts, inspect subscription calls/tokens separately, and use optional reviews and explicit ratings. | Both |
+| Persistent Bot conversations | Give each Bot its own model, role, work directory, private chat, and permissions; handle side chats, questions, and approval cards. | Full Bot |
+| Groups and shared context | Use mentions, staged group goals, handoffs, conversation search/checkpoints, and Bot/group/team memory with revision history. | Full Bot |
+| Browser and document work | Use per-Bot browser partitions, supported Office reading/previews, connectors, credential cards, avatars, and team appearance settings. | Full Bot |
+| Scheduled work | Schedule a target Bot or group through the Host's Automation tasks service. | Full Bot |
+| Bot-to-Bot routing | Let a Main Bot select an eligible execution Bot from committed model, tool, computer, and funding settings, then dispatch real tasks. | Full Bot |
+| Windows computers and routines | Pair your own computer, watch or control its desktop, record confirmed input, and replay saved routines. | Full Bot |
+| Private file libraries | Organize files per Bot, upload/download binary files, edit text, and search private text with line-level results. | Full Bot |
 
 <a id="install"></a>
 
-## Install
+## Installation
 
-Install `@ljwei-stak/dsh-model-route-bot@0.64.0` from npm in Harness Desktop, or import the matching release archive.
+1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.64.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.64.0`
+2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
+3. Configure provider credentials and models in the official Harness **Models** settings. Open the Bot workspace for the full edition, or **Model Router** in the sidebar for the routing-only edition.
 
-1. In Harness Desktop, open **Plugins → Add plugin** and enter `@ljwei-stak/dsh-model-route-bot@0.64.0`, or import the matching release `.tgz`. For an extracted archive, choose its inner `package` directory containing `package.json` and `.dsh-plugin`.
-2. Enable the plugin, then **fully quit Harness, including its tray process**, and restart. Closing only the window may leave the old Host running.
-3. Check the loaded package version and open the Bot workspace/product navigation. Provider credentials and models are configured in Harness's official **Models** settings.
-
-With the DSH CLI, install the exact release with:
+CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
+# Full Bot workspace
 dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.64.0
+
+# Routing-only workspace
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.64.0
 ```
 
-A global `npm install -g` alone does not register the plugin. The package name remains `@ljwei-stak/dsh-model-router`; its internal plugin ID remains `model-router-galgame` for retained settings. Remove duplicate old package entries before adding a replacement. GAL is a separate plugin.
+Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
 
 <a id="quick-evaluation"></a>
 
-## First Bot and first task
+## Complete your first task
 
-1. Add a provider/model in Harness **Models**, then create or select a Bot and choose an exact configured model.
-2. Open **Bot bindings / Bot 绑定**. Review the Bot's tools, working folder, machine permissions and funding settings. A role description does not grant permissions.
-3. Mark your coordinating Bot as Main using the Bot settings. Configure worker Bots with the models and tools they should actually use.
-4. Send a small task with a concrete output and acceptance check. Inspect the task state and the output; an accepted plan ID means work was submitted, not completed.
-5. For computer work, complete the pairing steps below. For delegation, enable [Bot routing](#bot-routing) and first preview the candidate decision.
+The model-routing workbench is available in both editions. In the full Bot workspace, open **Advanced workbench**.
 
-Integration mode reuses Harness Sessions. The optional independent runtime has its own session store and must be switched explicitly; one Bot must have only one active runtime owner. Group conversations, memories, browsers and long-lived context come from the pinned upstream runtime, not from a placeholder capability list.
+1. **Prepare a model.** Add a working provider/model in Harness. In **Model configuration**, refresh routes and enter known prices and capabilities. Leave unknown information blank.
+2. **Describe the result.** In **Task & execution**, choose **Project check**, **Organize documentation**, or **Compare approaches**, then edit the task and acceptance criteria. **Undo template** restores your previous text.
+3. **Go to the preview.** Click **Next: preview execution**, then **Preview execution plan**. Check the selected models/tools, workspace, permissions, and estimated API cost or subscription usage.
+4. **Confirm the run.** Read the confirmation items and choose **Confirm all and execute**. Creating or previewing a plan does not invoke a model; confirmation starts execution.
+5. **Inspect the result.** Open **Execution history** for output, receipts, status, cancellation, and supported retry actions. Verify the requested artifact before treating the task as complete.
 
-Windows computer setup: [download Agent 0.1.1 for Windows x64](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.3/dsh-remote-agent-0.1.1-windows-x64.zip), extract it and run `start.cmd`.
+The application currently uses Chinese interface labels; English descriptions here explain the corresponding controls.
+
+![Current workbench: editable task template and guided next step](https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/workbench-task.png)
+
+*Actual workbench component with offline demonstration data. Models, prices, usage, and paths shown in these screenshots are examples.*
+
+<a id="workbench"></a>
+
+## Model-routing workbench
+
+| Tab | Main use |
+| --- | --- |
+| **Task & execution / 任务与执行** | Write a task, choose a planning mode, optionally compare or assign packages, preview, and confirm execution. |
+| **Model configuration / 模型配置** | Manage exact configured routes, prices, quality evidence, billing preferences, and CLI model mappings. |
+| **Native tools / 官方工具** | Inspect tool installation, login, and execution-mode readiness; manage installations and terminals. |
+| **Budget & safety / 预算与安全** | Set API limits and execution policy; inspect actual spend, reservations, and subscription usage. |
+| **Execution history / 执行记录** | Review task output, receipts, interrupted/unknown states, cancellation, and supported recovery actions. |
+
+Choose **Single task** for one route, **Team** for packages with dependencies, or **Exact model** to use a specific configured route. **Compare routes** is optional; after comparison, you can keep the recommendations or manually select an API model/tool for each package.
+
+Route/budget and execution options are collapsed until needed. Draft task text, mode, selected model, and explicit per-task estimate stay in the **current window's memory** when pages remount; closing the app or reloading the client clears this draft. The **Needs your attention** panel can be closed with **×** and restored from the header; this visibility preference is remembered on the device. Failed-task reminders open the relevant execution record.
+
+![Execution preview: assigned work packages, estimates, workspace and confirmation](https://raw.githubusercontent.com/Alice-Marx/dsh-model-router/main/.github/assets/workbench-execution-preview.png)
+
+*Offline preview example; no model was called. In a live workspace, confirmation starts the selected model or supported CLI.*
+
+Model routing executes read-only analysis. To modify files, choose **Team → Native-tool collaboration → Edit files**, then review the execution preview. A separate worktree collects changes; it does not restrict system access outside that tree.
+
+<a id="official-tools"></a>
+<a id="session-tools"></a>
+<a id="team-lifecycle"></a>
+
+### Use native tools with their own accounts
+
+The tool registry includes **Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini, OpenCode, StepCode, Pi, Hermes, ZCode, and DSH TUI**. In **Native tools**, detect the tool, choose an available install method, complete the vendor's login, then check readiness for the execution mode you want.
+
+An interactive terminal exposes the installed tool's own workflow and capabilities. Managed single-tool and team execution use supported adapters; installation or login alone does not establish readiness for every mode or model. Vendor-native processes run with the current system user's permissions. Provider credentials and coding-plan endpoints remain in Harness settings.
 
 <a id="daily-work"></a>
 
-## Chat, groups, memory, browsers and schedules
+## Build a persistent Bot workspace
 
-| What you want to do | Operation |
+**Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings**, commit its allowed tools, computer/workspace access, and funding settings. Mark a coordinating Bot as **Main** when you want it to delegate work.
+
+| To do this | Use this workflow |
 | --- | --- |
-| Talk to a Bot | Create/select the Bot in the sidebar, choose its model and role in Bot settings, then send a message. Review question and approval cards before continuing an operation. |
-| Work with a group | Create a group from the chat picker with the required Bots. In group settings choose members/admin, who answers, the working folder and shared instructions; use `@` to select respondents. |
-| Keep and find context | Search conversations from the sidebar; use conversation parts/checkpoints to manage long work. Open the Bot/group/team memory entry to review, edit or remove retained memories and inspect changes. Review skill/project-rule learning proposals before accepting them. |
-| Use a browser or document | Open the selected Bot's browser pane for its pages and browser workflow. Attach supported Office documents for reading/preview. Configure available connectors and enter credentials through the supplied secret-entry cards. Avatar choices are managed separately from the file library. |
-| Schedule work | When the Host enables its Automation tasks service, open schedules in Bot settings or the schedule page, choose the target Bot/group, task text and a supported timing rule, then save. Check the next-run state; Host and relevant Agent must remain running. |
+| Hold a private conversation | Select a Bot in the sidebar, send a message, and respond to questions or approval cards as they appear. |
+| Collaborate in a group | Create a group from the chat selector, set members/administrators and response rules, and use `@` mentions to address Bots. Configure staged goals for longer work. |
+| Manage long-term context | Search conversations, use checkpoints/segments, and edit Bot, group, or team memories. Review proposed skill/project-rule learning before accepting it. |
+| Work with pages and documents | Open the current Bot's browser panel, manage pages, and attach supported Office documents for reading/preview. Configure connectors and enter secrets through credential cards when needed. |
+| Schedule recurring work | Enable the Host's Automation tasks service, choose the target Bot/group, task, and schedule, then check the next-run state. The Host and relevant Agent must remain running. |
+| Customize the workspace | Manage avatars and team appearance independently of the private file library. |
+
+Integration mode reuses Harness Sessions. An optional independent runtime has its own session store; switch ownership explicitly so a Bot is served by one runtime at a time.
+
+<a id="bot-routing"></a>
+
+## Delegate from a Main Bot to execution Bots
+
+**Full Bot edition.** Model routing chooses a model route; Bot routing chooses a configured Bot and dispatches a task to it.
+
+```mermaid
+flowchart LR
+    U["Task + acceptance criteria"] --> M["Main Bot"]
+    M --> R["Check eligible Bots and preview route"]
+    R --> A["Research Bot · configured model/tools"]
+    R --> B["Build Bot · configured model/tools"]
+    R --> C["Review Bot · configured model/tools"]
+    A --> E["Task records + outputs + receipts"]
+    B --> E
+    C --> E
+```
+
+*An example team arrangement. Create these Bots and commit their access before routing work to them.*
+
+1. Configure the Main Bot and execution Bots with their actual models, allowed tools, computer/workspace grants, and funding settings.
+2. Open **Tasks → Bot routing**, enable it, select **Economy**, **Balanced**, or **Quality first**, and save the policy.
+3. Enter a task and choose automatic routing or a specific Bot. Select the computer/directory and operation type if required. **Preview route** explains the selection, missing conditions, rejection reasons, and proposed bindings.
+4. Choose **Create task with this route** to dispatch. Follow the task record and inspect the output. An accepted plan ID means submitted, not completed.
+
+The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both dispatch by default; `preview: true` only previews. `bot_task_plan_status` returns the actual plan/task state. Each execution Bot's model call has its own budget admission and receipt linked to the parent task. Role text does not grant tool or computer permissions.
 
 <a id="computers"></a>
 
 ## Connect your Windows or cloud computer
 
-### On the computer being controlled
+**Full Bot edition.** Bring your own **Windows x64 computer or cloud desktop**. The setup wizard creates the local Agent configuration and pairing file; the Host must be able to reach the Agent over your configured network, VPN, or tunnel.
 
-1. Prepare your own Windows x64 computer/cloud PC and sign into its desktop. Keep the interactive user session available while using desktop capture/control.
-2. Extract the **entire** `DSH-RemoteAgent-windows-x64-…zip` into a directory you will retain. The complete bundle includes Node, production dependencies, `dist`, setup/launch files and native helpers. Copying only `start.cmd` or one executable is insufficient.
-3. Double-click **`start.cmd`**. In the setup wizard choose the workspace directory, the concrete local/private VPN address to listen on, port (default `9701`), and the Agent base URL reachable from the Harness computer.
-4. For another machine, first configure your WireGuard/Tailscale network or a protected tunnel. Confirm the private-tunnel option only for a network you have actually configured. Loopback is suitable for local use or a separately configured SSH forwarding path.
-5. Decide whether to enable **`hostManagedBots`**. Explicitly enabling it lets this trusted authenticated Host authorize current/future team Bots within the paired root/tool ceiling. Disabling it requires fixed allowed Bot IDs. It does not give models the pairing secret or remove root/tool restrictions.
-6. Choose any optional command/browser permissions. Setup registers Agent and desktop-helper tasks for the current signed-in user, without storing a Windows password. It displays the installation path and creates **`private/pairing.private.json`** there. Rerunning setup preserves existing configuration and credentials.
+**On the computer to control:**
 
-### In Harness
+1. Download the [complete Windows Agent 0.1.1 package](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.3/dsh-remote-agent-0.1.1-windows-x64.zip), extract it into a permanent directory, and run `start.cmd`. Keep the interactive Windows user signed in.
+2. In the setup wizard, configure the accessible address, port, approved work directories, and optional command/browser capabilities. It registers the Agent and desktop helper for the current user and generates `private/pairing.private.json` without storing a Windows password. Subsequent runs retain the existing configuration.
 
-1. Open **Remote computers / 远程电脑 → Add computer** and import the generated **`private/pairing.private.json`** from the installed Agent directory.
-2. The import fills the endpoint, machine/client identity, `rootIds`, tools and tunnel setting. Review them, choose the Bot requested by the form, then pair/probe. Keep this file private: it contains the Host pairing credential; do not publish it in Git or issue reports.
-3. Review **Bot bindings** and the computer's grants. Watching needs screenshot permission; takeover and routine replay need the permitted desktop input tools and write mode. Root IDs such as `project` identify the configured remote workspace, not a path supplied by a model.
-4. In a Bot's right-hand **Computer operations / 电脑操作** tab, or the computer page, select the machine/monitor and click **Connect desktop / 连接桌面**. Start in **Watch / 仅观看**.
-5. Click **Take control / 取得控制权** and wait for the control acknowledgement before using mouse, keyboard, wheel or text entry. Human control fences that Bot's conflicting desktop automation. Click **Watch / 仅观看** to release control and held input.
-6. Use **Enlarge / 放大** for the application-filling viewer, or double-click while watching; **Close enlargement / 关闭放大** returns to the panel. Disconnect when finished and inspect any unconfirmed-stop message.
+**In Harness:**
 
-The desktop engine uses **Windows GDI capture → JPEG → WebSocket** with native input acknowledgements. It is an independent implementation, not the RustDesk protocol. The live viewer shows measured frame rate; no fixed 30 FPS, RustDesk performance equivalence, secure-desktop capture or universal network throughput is promised. Agent reachability alone does not prove that the signed-in desktop helper is available.
+3. Open **Remote computers → Add computer** and import `private/pairing.private.json`. Check the populated endpoint and grants, select the allowed Bots, then pair/probe the computer. Keep this pairing file private.
+4. In **Bot bindings**, save the Bot's computer and tool grants. Open **Computer operations** or the computer page, select a display, and choose **Connect desktop** to watch first.
+5. Choose **Take control** and wait for confirmation before sending keyboard, mouse, wheel, or text input. **Watch only** returns control and releases held input. Use **Expand** or double-click while watching for a larger view; disconnect when finished.
+
+Desktop viewing uses adaptive JPEG streaming with native input acknowledgements and a visible measured frame rate. Human control prevents conflicting Bot desktop automation. The current desktop implementation targets an available, signed-in Windows interactive session; performance depends on resolution and network conditions. Secure/UAC desktops are outside this capture scope. Computer pairing configures access; it does not provision a cloud machine or establish network connectivity.
 
 <a id="routines"></a>
 
-## Demonstrate, save and replay a routine
+## Record and replay a routine
 
-1. Connect the desktop, take control, restore the application to a known starting screen, enter a routine name and click **Start recording / 开始录制**.
-2. Demonstrate the workflow. Only inputs acknowledged by that desktop session enter the recording. Consecutive mouse motion is sampled into **200 ms** waypoints; button/key/text/wheel ordering and the final position before those actions are retained.
-3. Click **Finish and save / 结束并保存**. The client drains input, confirms held-input release, and saves to that Bot's private routine store. Typed text is included in the saved routine. Missing save confirmation retains a draft instead of showing success.
-4. Open **Routines / 例行任务**, select the Bot/computer and restore the starting screen. Run the saved routine and inspect its actual result and stopped step.
-5. The recording is limited to **200 retained steps**, with at most **60 seconds** between retained actions. Replay checks the exact display ID, physical dimensions, coordinate system and recorded DPI. Changed layout/application state still requires a new demonstration; sampled pointer motion is unsuitable for fine drawing.
+**Full Bot edition.** Routines save a demonstrated desktop sequence privately for the selected Bot.
 
-This is bounded coordinate-and-timing playback, not universal visual learning. Replay acquires control, waits for every native input ACK, renews authorization and releases input/control on completion, failure or cancellation. An explicit refusal stops further steps. A sent input with a lost ACK, a disconnect, or an interrupted Host is **unknown**, because its effect may already have happened.
+1. Connect to the desktop, take control, restore the application to a known starting state, enter a routine name, and choose **Start recording**.
+2. Demonstrate the workflow. Only successfully acknowledged inputs are recorded; mouse movement is sampled into 200 ms waypoints.
+3. Choose **Stop and save**. Saving waits for queued input and confirmed release of held keys/buttons. Recorded text is part of the saved routine.
+4. Open **Routines**, select the Bot/computer, restore the same starting layout, and run the saved sequence. Check the result and any stopped step.
 
-Unknown executions block another routine on that Bot/computer. Inspect the real desktop, determine how far the work got, restore an appropriate starting state and enter your inspection note before unblocking. Inspection does not rewrite the old outcome as success or automatically rerun it. A stop request is not a stop confirmation, and successful input ACKs do not by themselves prove the business objective was met.
-
-<a id="bot-routing"></a>
-
-## Route work between Bots
-
-1. Configure the Main and worker Bots' exact models, official tools and machine/workspace grants first.
-2. On **Tasks / 任务 → Bot routing / Bot 路由**, enable routing and choose **Economy / 省钱优先**, **Balanced / 均衡**, or **Quality / 效果优先**. Save settings using the supplied controls.
-3. Enter a task, choose automatic routing or a pinned Bot, and specify a machine/root and read/write/desktop/browser need when applicable. **Preview routing / 预览路由** shows the chosen candidate, missing conditions/refusal reasons and any proposed binding.
-4. Select **Create task with this route / 按此路由创建任务** for real dispatch. Optional automatic computer authorization remains bounded by the committed machine ceiling and the requesting Main Bot's delegation rights.
-5. A Main Bot can call **`bot_route_task`** or its **`bot_dispatch`** alias. Both dispatch by default. Explicit **`preview:true`** only previews and does not create a task or grant permissions. Inspect actual plan/task state with `bot_task_plan_status` and check the deliverable before reporting completion.
-
-Candidates come from committed Bot model/tool/machine state, including availability and any configured price/quality evidence. A Bot name or prompt cannot grant an endpoint, executable, credential or operation identity. Each worker model request has its own budget admission and receipt linked to the parent task; admitting a task is not blanket approval for every later model request.
+A routine holds up to **200 retained steps**, with pauses up to **60 seconds**, and checks display identity, physical resolution, coordinates, and recorded DPI. It replays coordinates and timing, so application/layout changes may require a new recording. If an input may have taken effect but its acknowledgement was lost, the result is **unknown**. Inspect the real desktop and provide a reconciliation note before unblocking another run. A stop request remains pending until stopping is confirmed.
 
 <a id="library"></a>
 
-## Use the Bot's private file library
+## Give each Bot a private file library
 
-Open **Library / 资料库**, select a Bot and a folder. Upload local files, create/open folders, edit supported text files and download files; the name filter narrows the current directory. For contents, enter a literal query and click **Search text / 搜索文本**. Results show path, line and text; click a path to open and select the matching line, then explicitly Save any edit to that file.
+**Full Bot edition.** Open **Library**, select a Bot and folder, then upload/download files, create folders, or edit supported text. Name filtering narrows the current folder. **Search text** scans the selected Bot's private text files and returns file paths, line numbers, and matching lines; open a result to edit and explicitly save the file.
 
-Binary upload/download preserves file bytes and accepts up to **16 MiB per file**. Text reading/editing is limited to **1 MiB per file**. Case-insensitive text search uses up to 256 query characters, scans at most 500 entries/eight directory levels in the selected Bot's library, and returns at most 50 matching lines from eligible text files. The granted `bot_library_search` tool uses the same backend and the actual calling Bot's own library. Same-name uploads are refused.
-
-The library is that Bot's private file area, distinct from the upstream avatar library and the remote machine's workspace. Uploading a PDF or Office file does not promise automatic OCR, semantic indexing or retrieval over every binary format. Models access private files through their granted library tools, not by choosing another Bot's ID.
-
-<a id="workbench"></a>
-<a id="official-tools"></a>
-<a id="session-tools"></a>
-<a id="team-lifecycle"></a>
-<a id="architecture"></a>
-
-## Model workbench, tools and execution boundaries
-
-Open **Advanced workbench / 高级工作台** for model-route planning, exact-route profiles, official tools, terminals, dependent work packages and API/subscription accounting. Configure provider credentials in Harness Models and vendor CLI logins in their own tools. Detection or installation does not prove login, entitlement or a managed execution mode is available.
-
-Start with **项目检查**, **整理说明** or **方案比较** to fill an editable task template; **撤销模板** restores the previous text. The current window keeps your draft when you switch pages. Expand routing/budget or execution options only when needed. **下一步：预览执行** takes you to the execution preview; comparing routes is optional. The **执行记录** tab contains results and supported retries, and failed-run reminders open the corresponding record. Templates and page navigation never start execution.
-
-Close the **Needs your attention / 需要你处理** panel with its top-right **×**. The choice is remembered on this device, including after restarting. Use **显示待处理提醒** at the top of the workbench to show it again; task records remain available in history and cost pages.
-
-Planning and candidate previews are local. Execution may send task/context to the selected provider or CLI and incur charges. Model routing selects a model route; Bot routing selects a configured Bot and dispatches its actual worker task. The two workflows share committed Host authority and accounting rather than accepting authority from model parameters.
-
-The official-tool registry includes Kimi Code, Claude Code, Codex, MiniMax Code, MiMo Code, Grok Build, Gemini, OpenCode, StepCode, Pi, Hermes, ZCode and DSH TUI. Availability depends on the selected platform and supported execution mode shown by the workbench. An interactive terminal uses the current OS user's permissions. An explicitly chosen vendor-native editable process is outside the Harness process sandbox; a worktree collects edits but does not restrict OS access.
-
-Tasks retain task/attempt/operation identity, results and unknown-effect evidence. Follow the task's status and acceptance check; do not infer completion from a generated plan, an installation method, a successful permission check or a method name. API money/reservations and subscription calls/reported tokens are separate books. Missing usage remains unknown.
-
-1. In **Model configuration**, refresh the configured routes and enter any known prices, quality evidence, billing preference and CLI model mapping. Keep unknown values empty.
-2. In **Task and execution**, enter the task and choose a single route, a dependent team, or manual per-package assignments. Generate recommendations, inspect the preview and confirm the actual execution you want.
-3. In **Official tools**, detect/install the required CLI and check its available modes and login. Use the interactive terminal when appropriate; configured access to a CLI does not imply every model has a managed runner.
-4. In **Budget and security** and the usage page, configure API limits/subscription preferences and inspect receipts. Follow running work in the task/history view; cancel, retry or reconcile from its recorded state.
-
-The following cost and routing reference describes the **model-route workbench**. Bot selection and desktop routine playback are separate workflows.
+Binary transfers preserve the original bytes, with a **16 MiB per-file limit**; text reading/editing is limited to **1 MiB per file**. Same-name uploads are rejected. Authorized `bot_library_search` calls use the calling Bot's own library. PDF/Office uploads are stored as files; searchable text here is not a general OCR or semantic-indexing service.
 
 <a id="costs"></a>
 
-## Costs, subscriptions and quality
+## Understand execution and accounting
 
-- **API budgets:** per-run planning targets and daily/monthly monetary checks apply to API-billed execution. Admission atomically checks recorded API spending plus other API reservations, then reserves the new API estimate. Unknown API prices, costs or reservations under a finite limit require explicit confirmation. Later API calls recheck fresh spending and holds. Confirmed subscriptions do not consume API money or fail only because its budget is full or its price is missing. Switching a subscription to API is a new monetary admission: estimate the actual API route, obtain any required confirmation, and reserve atomically before the call. Local estimates are not a hard provider billing cap.
-- **Checkpoints and interruption:** routed executions, retries/reassignment, official teams, single-tool runs and session consultations use the durable lifecycle. Optional reviews and quality upgrades reserve extra capacity before another call. Before a quality upgrade starts, the first receipt and the pending additional attempt are saved, so interruption cannot erase the first charge or imply the second attempt was free. The UI displays actual spending and reservations separately; a reservation is not an invoice. Confirmed dead owners retain interrupted holds and unknown usage evidence until reconciled; elapsed time alone does not free them, and no call is automatically replayed.
-- **Subscription-first:** the default is to prefer a detected CLI account subscription or a configured coding-plan route. API-key environment variables are removed for CLI subscription attempts. `billing` can be `subscription-first`, `api-only` or `subscription-only`; `subscription` can be `cli-login`, `plan-key` or `none`.
-- **Fallback:** detected quota exhaustion/rate limits mark a subscription in cooldown and can retry the routed step on its configured API route, subject to policy and availability. Other attempted subscription failures pause by default (`onSubscriptionFailure: "ask"`): choose API retry, subscription retry or cancel in history. A subscription-to-API route change must pass a fresh estimate and reservation check for the actual API route. A missing price or exceeded finite budget requires the applicable confirmation; without it, the API call stops. Managed editable/single-tool/team runs do not automatically retry on the API.
-- **Subscription usage:** record daily/monthly calls, reported input/output/cache tokens and unknown/incomplete-usage counts, with provider/tool/model groups. Missing counters are not zero. A subscription-to-API attempt keeps the subscription usage receipt as well as the API financial result. Historical reference-dollar fields may remain in old records, but current subscription statistics do not convert them to money or fabricate missing token data. Token counts do not establish a vendor subscription allowance, remaining quota or percentage.
-- **API accounting:** valid CLI-reported money, including zero, takes precedence for API-billed results. Otherwise token-based CLI cost requires complete usage and an actual reported model matching configured pricing or an explicit CLI mapping. Unknown or mismatched identity keeps API cost unknown; the recommended price does not prove actual cost. A CLI using an API key still belongs to API accounting. Provider bills remain authoritative. Replaced retry receipts and evicted history retain prior accounting.
-- **Quality and preference:** optional `off`/`sample`/`always` stronger-model review can add paid calls; it is not treated as human feedback. Explicit ratings adjust separate subjective utility for the exact route and task type, using time decay and low-sample shrinkage (default limit ±0.04, configurable up to ±0.1). They do not change objective quality scores or their hard floors; learning can be disabled, ratings withdrawn, or its starting point reset.
+- **Plan locally.** Route comparison and execution preflight do not call models. Confirmed execution sends the selected task/context to a provider or CLI and may incur charges.
+- **Control API spending.** Per-task estimates and daily/monthly limits check recorded spend plus active reservations. Unknown prices or amounts require the relevant confirmation under a finite budget. Estimates are planning controls; provider bills remain authoritative.
+- **Track subscriptions separately.** Subscription calls and reported input/output/cache tokens are recorded independently of API money. Missing usage remains unknown and does not imply zero usage or prove a vendor's remaining quota.
+- **Choose fallback behavior.** Billing preferences can favor subscription, require subscription, or use API only. A subscription-to-API change requires fresh API estimation, budget admission, and any required confirmation. Managed editable/single-tool/team runs do not automatically retry on API.
+- **Recover from evidence.** Execution records retain attempts, receipts, reservations, and unknown effects. Review interrupted work before retrying; elapsed time or a stop request does not prove that a remote action stopped.
+- **Refine routing deliberately.** Optional stronger-model reviews may add calls. Explicit ratings adjust a bounded preference term; they do not raise measured quality or bypass quality floors. Learning can be disabled, ratings withdrawn, and the learning baseline reset.
 
-Coding-plan keys and endpoints stay in Harness provider settings. A `plan-key` profile may name an exact configured `apiRoute` as its fallback; the profile editor does not accept credentials or arbitrary commands. Vendor plan eligibility and terms must be checked with the vendor.
+<a id="architecture"></a>
+<a id="data"></a>
+
+## Integration, data, and compatibility
+
+The Host owns committed model, tool, computer, funding, and operation identity. Bot dispatch, model-originated tools, and owner workbench actions follow this authority. Worktree isolation organizes code changes; vendor-native processes use the current user's system access.
+
+Provider credentials and authenticated sessions are managed by Harness. Routing state, receipts, committed Bot bindings, private libraries, and routine ledgers live under `<DSH_HOME>/model-router/`. The configured Bot home stores upstream conversations, memory, browser state, and team files. Agent configuration and pairing credentials remain on the controlled computer. Back up these locations before changing runtime ownership; keep pairing files, recordings, logs, and private files out of public reports.
+
+| Component | Current scope |
+| --- | --- |
+| Harness integration | Declared Host versions are listed in [package.json](package.json); integration verification uses the actual Harness SDK **0.2.2-rc.1**. |
+| Bot foundation | Pinned [DS Bot](https://github.com/Fei2411/DS-Bot) **0.2.7**, with project-specific integration and product overlays. |
+| Remote desktop | Windows x64 Agent **0.1.1**, with an available signed-in interactive desktop. |
+| Tool execution | Availability depends on the local platform, installed CLI, account, exact model, and supported execution adapter shown by the workbench. |
+
+<a id="troubleshooting"></a>
+
+## Troubleshooting and support
+
+| Symptom | What to check |
+| --- | --- |
+| Old interface after an update | Fully quit the tray Host, verify the installed package/version, and restart. |
+| No route or eligible execution Bot | Check configured exact models, allowed tools, grants, availability, and the route preview's rejection reasons. |
+| Tool installed but execution blocked | Check login, model access, mode-specific readiness, workspace, and committed permissions. |
+| Agent reachable but desktop unavailable | Check the signed-in Windows session, Agent/helper tasks, display access, and native logs. |
+| New Bot cannot use a paired computer | Check the pairing's allowed Bots/managed-Bot limit, then save that Bot's computer and tool grants. |
+| Can watch but cannot take control | Check desktop-input permission, write access, and current control ownership. |
+| Interrupted, unknown, or stop pending | Inspect execution records and the actual remote result; reconcile before another attempt. |
+| Routine reports a display change | Restore the original display, resolution, DPI, and application layout, or record again. |
+| Library upload/edit refused | Check file size and same-name collisions; binary transfer and text-edit limits differ. |
+| Cost or usage unknown | Check actual model identity, configured prices, and reported usage. Missing data is not zero. |
+
+Use [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) for reproducible problems and [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) for installation files. Include the edition, plugin/Host versions, platform, steps, and a sanitized screenshot or error. Remove credentials, pairing files, and private task content.
+
+## License and acknowledgements
+
+Project extensions are [MIT licensed](LICENSE). The bundled DS Bot source retains its **Apache-2.0** license and notices; provenance is recorded in [SOURCE.json](modules/bot-runtime/SOURCE.json). Thanks to [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [DS Bot](https://github.com/Fei2411/DS-Bot) for the Host and Bot foundations.
+
+<details>
+<summary><strong>Technical reference: accounting formulas and routing algorithm</strong></summary>
 
 ### Actual cost versus planning estimate
 
@@ -204,13 +275,13 @@ For example, a complete API result with 1,000 uncached input tokens at \$1/milli
 
 <a id="routing"></a>
 
-## How routing works
+### How routing works
 
-Manual assignment: after planning, choose algorithm recommendations or select an API model / official tool for each package. See the [manual assignment guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/MANUAL_TASK_ASSIGNMENT.zh.md).
+Manual assignment: after planning, choose algorithm recommendations or select an API model / official tool for each package. See the [workbench workflow](#workbench).
 
 The planner is a deterministic local heuristic, not a trained success predictor. It classifies text, estimates complexity, creates suitable analysis/execution/verification/synthesis packages, discovers exact configured routes, overlays profiles, and applies capability/quality constraints. An explicit route bypasses comparison with other routes. Catalog quality/latency/risk hints are experimental priors, not measured success probabilities or live vendor quotes. Execution is currently text-oriented; a vision label does not establish an end-to-end multimodal pipeline.
 
-### Token and price estimate
+#### Token and price estimate
 
 Without matching resource evidence, base input tokens are $`\max(80,\lceil n/3.7\rceil)`$, then adjusted by package-stage multipliers. Base output is 900, adjusted by stage/reasoning effort, with minimum 220. Here $`n`$ is the JavaScript `text.length` value. This is a text-length heuristic, not a vendor tokenizer. Sufficient matching, complete history replaces these heuristics with empirical P90 resource estimates, without applying effort or stage multipliers again. Let $`I`$ be total estimated input, $`R`$/$`W`$ the cached-read/write portions, $`O`$ output, and prices USD per million tokens:
 
@@ -226,7 +297,7 @@ U_c = \frac{1}{1+C/\max(C_{\mathrm{ref}},10^{-12})}
 
 $`U_c`$ is `costUtility`. The price symbols are the same as above. $`C_{\mathrm{ref}}`$ uses fixed reference prices (input 1, output 5, cache read/write 1 USD/million), not a vendor offer. Fixed scaling prevents an unrelated expensive candidate from flattening all cost penalties. Unknown prices produce a public estimate of `null` and cost utility 0. Internal unconstrained search uses a cost sentinel of 0, but finite-budget assignment excludes unknown-price candidates; the sentinel never means free execution.
 
-### Candidate objective and quality floors
+#### Candidate objective and quality floors
 
 With normalized quality $`q`$ and normalized latency, specialty, reasoning-fit and risk proxies:
 
@@ -261,7 +332,7 @@ Quality first uses sufficient matching objective task evidence, then falls back 
 
 Base quality floors are **0.75 / 0.78 / 0.82** for simple/balanced/complex tasks; critical complex packages raise the floor, and complex synthesis is at least 0.84. The economy preset multiplies quality/cost/latency weights by 0.75/1.6/1.1 and lowers the floor by 0.04. Quality-first multiplies quality/cost/specialty/reasoning by 1.35/0.5/1.2/1.2 and raises the floor by 0.04. Tilted weights are renormalized to the original total; adjusted floors are clamped to [0.5, 0.97]. Balanced applies no tilt.
 
-### Candidate pruning and assignment search
+#### Candidate pruning and assignment search
 
 1. Prefer candidates meeting each package's floor. If none qualify, retain up to three highest-quality fallbacks and report relaxation.
 2. Keep at most **12 candidates per package**, including anchors for lowest known cost, greatest utility and highest quality. Local Pareto pruning is disabled when dependencies exist, because route identity affects handoffs.
@@ -271,32 +342,6 @@ Base quality floors are **0.75 / 0.78 / 0.82** for simple/balanced/complex tasks
 
 “Exact” applies only to the retained candidate space and proxy objective. Candidate caps and beam pruning prevent a guarantee of global optimality over all configured models; use the preview to inspect the selected route and any relaxed quality floor.
 
-See the [algorithm optimization guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_ALGORITHM_OPTIMIZATION.zh.md) for evidence import, fallback rules, effort handling, and optional JSON validation with escalation. Escalation defaults to off and permits at most one additional ordinary API request after billing and budget checks.
+Routing profiles support matching resource evidence, fallback rules, reasoning-effort handling, and optional JSON validation with escalation. Escalation defaults to off and permits at most one additional ordinary API request after billing and budget checks.
 
-<a id="data"></a>
-
-## Data and privacy
-
-Harness owns provider credentials and authenticated sessions. Router state/receipts live under `<DSH_HOME>/model-router/`; the product also keeps committed Bot bindings, task records, private libraries and routine/run journals there. The upstream Bot home retains conversations, memory, browser state and related team files according to its configured location. Remote Agent state and pairing credentials remain in the installed computer's directory.
-
-Task/context sent to a provider or CLI follows that service's account and billing terms. Saved routines contain the demonstrated text. Treat pairing exports, histories, logs and private files as private data. Back up application state before changing runtime owners or downgrading; do not erase receipts or uncertain-operation journals to bypass a blocked run.
-
-<a id="troubleshooting"></a>
-
-## Troubleshooting
-
-| Symptom | What to check |
-| --- | --- |
-| Old UI/version after an update | Fully quit the tray Host, confirm the installed package path/version and restart. |
-| No route or no eligible worker | Exact configured model, allowed tools, machine/root permissions, current availability and the preview refusal reason. |
-| `TOOL_DENIED` or a blocked task | Read the actual committed Bot grant and requested operation; do not broaden a model-supplied identity or assume a role prompt grants access. |
-| Agent online but no desktop | Current signed-in Windows session, both installed tasks, full-desktop helper and its native logs. |
-| Agent cannot be reached | Correct reachable base URL/port and already configured private VPN/tunnel; importing a pairing file does not create that network. |
-| Chief connects but a new worker cannot | Check the Agent pairing Bot-ID/`hostManagedBots` ceiling, then save that worker's computer/tool grant. A fixed allowlist does not automatically include new Bots. |
-| Watch works but takeover is disabled | All required desktop input tools, write-mode grant and current control ownership. |
-| Routine reports display changed | Restore the recorded monitor/resolution/DPI or record a new routine; match the application layout as well. |
-| Unknown effect or unconfirmed stop | Inspect the real computer and the execution record before resolving; do not blindly replay or delete the journal. |
-| Library file is refused | Binary transfer limit is 16 MiB per file; text editing/reading limit is 1 MiB; same-name uploads are refused. |
-| API/subscription amount unknown | Inspect actual model identity, price and provider usage evidence; missing counters are not zero. |
-
-[Update history (GitLab)](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/CHANGELOG.md) · [Source build guide (GitLab)](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/DEVELOPMENT.md) · [MIT license](LICENSE)
+</details>
