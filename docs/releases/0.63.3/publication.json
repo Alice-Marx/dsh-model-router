@@ -1,0 +1,41 @@
+{
+  "version": "0.63.3",
+  "agentVersion": "0.1.1",
+  "github": {
+    "status": "verified",
+    "release": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.63.3",
+    "publishedAt": "2026-11-06T04:14:56Z",
+    "assets": [
+      {
+        "name": "dsh-remote-agent-0.1.1-windows-x64.zip",
+        "bytes": 55702360,
+        "digest": "sha256:60b1f1255b7f7e60907ee800dccd4eda6b3d3fa5c02a3d8756879fbbb56a1da4"
+      },
+      {
+        "name": "ljwei-stak-dsh-model-router-0.63.3.tgz",
+        "bytes": 3496817,
+        "digest": "sha256:b434938fbe3058c5134656b36ceb7d98fc804a1b4a5f4df3fd539a25a8545b63"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "bytes": 212,
+        "digest": "sha256:7d76503d671dbb4234d3b1419193bafc7a965fd6c12261ccd50dfc11b033bddc"
+      }
+    ]
+  },
+  "npm": {
+    "version": "0.63.3",
+    "integrity": "sha512-FRGHXXlMLG9Agi9GVrz99VqA4J6VbV49Z5Fy8+WLry2VqRPRSdbFZsMdcN3NKHNG/jWguqST6rN5m3ow1ohwxQ==",
+    "sha256": "b434938fbe3058c5134656b36ceb7d98fc804a1b4a5f4df3fd539a25a8545b63",
+    "bytes": 3496817,
+    "anonymousDownloadVerified": true,
+    "tarball": "https://registry.npmjs.org/@ljwei-stak/dsh-model-router/-/dsh-model-router-0.63.3.tgz"
+  },
+  "distTags": {
+    "next": "0.14.0",
+    "preview": "0.26.0-preview.10",
+    "latest": "0.63.3"
+  },
+  "sourceTagCommit": "b51ebd0c5b9d4bbb7f254cd632042542518fb35d",
+  "githubProductCommit": "2379192a693f3cac2bdd7f063bfdf4b951a3da91"
+}
