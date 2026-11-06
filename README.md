@@ -6,19 +6,11 @@
 
 [![dshfind](https://dshfind.com/api/card/Alice-Marx/dsh-model-router?lang=en)](https://dshfind.com/en/plugins/Alice-Marx/dsh-model-router?ref=badge)
 
-**Version: 0.63.3 — 2026-11-06.** Older version numbers in historical reports describe those reports, not this checkout. The Windows computer Agent has its own version, **0.1.1**.
-
-0.63.3 fixes the native Harness desktop connection by preserving the viewer’s exact `dsh-app://app` Origin across the application’s HTTP bridge. Native viewing requires Agent **0.1.1** as well as the updated plugin; authenticated owner admission, Bot/machine permissions and session-bound Origin checks remain in force. Native acceptance verified live video, mouse/keyboard and Chinese text input, return to watch mode and confirmed disconnect. Missing virtual-keyboard codes and first-click page scrolling are also fixed. See the [desktop connection validation](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.3-validation.md).
-
-0.63.2 fixes routed tasks being marked as mixed input when Harness adds its own time/runtime snapshots, and keeps desktop connection errors visible after the socket closes. Live acceptance on the installed desktop found remaining integration failures: Kimi requests were rejected by the provider, Step's official CLI call was refused by the funding adapter, and the existing remote pairing allowed only its original Bot. Creating workers and obtaining a correct Step answer did not establish complete delegation, official-tool or desktop-control acceptance. See the [live acceptance report](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.2-validation.md) for results and limits.
-
-The 0.63.1 interface refresh follows Grok Bot’s restrained workspace layout: neutral surfaces, a clearer sidebar, outline icons, grouped Bot permissions and simpler computer/library/routine screens. Light/dark themes and narrow layouts are checked in Chromium. The 0.63.0 runtime baseline passed the full offline product Host probe on the installed Harness 0.2.2-rc.1 SDK; this patch is validated separately in [the release report](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/releases/0.63.1-validation.md). On one 1920×1080 Windows 10 machine over the current WireGuard link, the baseline eight-second desktop sample measured 13.12 FPS, with input ACK p50 = 125 ms / p95 = 274 ms. Dirty-region JPEG updates preserve physical input coordinates; these measurements do not guarantee a fixed frame rate.
+**Current release: 0.63.3 · Windows Agent: 0.1.1.**
 
 One DeepSeek Harness plugin combines long-lived Bot conversations, groups, memory and browser work with model routing, managed tasks, private Bot files, and an independently implemented Windows remote desktop. Configure each Bot's exact model, tools and machine access; a Main Bot can then route and dispatch work to an eligible worker.
 
-This is an implementation of observable workflows, including workflows described publicly for Grok Bot. It does not claim to reproduce Grok's private system or commercial service. You provide the Windows/cloud computers and accounts; automatic VM provisioning/billing and a product-owned iOS client are not delivered.
-
-**Start here:** [Install](#install) · [First Bot](#quick-evaluation) · [Connect a computer](#computers) · [Routines](#routines) · [Bot routing](#bot-routing) · [Private library](#library) · [Model workbench](#workbench) · [Math reference](#costs) · [Development](#development) · [Troubleshooting](#troubleshooting).
+**Start here:** [Install](#install) · [First Bot](#quick-evaluation) · [Daily work](#daily-work) · [Connect a computer](#computers) · [Routines](#routines) · [Bot routing](#bot-routing) · [Private library](#library) · [Model workbench](#workbench) · [Math reference](#costs) · [Troubleshooting](#troubleshooting).
 
 ![DSH Bot workspace](https://gitlab.com/Alice_marx/dsh-model-router/-/raw/main/docs/assets/workspace-0.63.1-light.png)
 
@@ -39,8 +31,6 @@ This is an implementation of observable workflows, including workflows described
 | Private library | Per-Bot folders, binary upload/download, text editing, name filtering and private text search from the page or granted Bot tools. |
 | Model workbench | Local model-route planning, dependent work packages, official CLI detection/installation/terminal, execution history and separate API/subscription accounting. |
 
-The integrated DS Bot runtime is pinned to **DS Bot 0.2.7**, commit **`71d344bf193f3f18185f25de3d8e5c483046910a`**: 352 byte-exact upstream files plus six reproducible product overlays, with product changes maintained separately in `modules/bot-runtime/product-overlay/`. `modules/bot-runtime/SOURCE.json` records origin and hashes. The upstream browser and avatar library are distinct from this product's full desktop and document-file library.
-
 <a id="install"></a>
 
 ## Install
@@ -59,8 +49,6 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.63.3
 
 A global `npm install -g` alone does not register the plugin. The package name remains `@ljwei-stak/dsh-model-router`; its internal plugin ID remains `model-router-galgame` for retained settings. Remove duplicate old package entries before adding a replacement. GAL is a separate plugin.
 
-To build an archive yourself, follow [Development](#development). Use a separate test profile for verification; a dependency declaration or successful build alone does not establish installed-Desktop acceptance.
-
 <a id="quick-evaluation"></a>
 
 ## First Bot and first task
@@ -74,6 +62,18 @@ To build an archive yourself, follow [Development](#development). Use a separate
 Integration mode reuses Harness Sessions. The optional independent runtime has its own session store and must be switched explicitly; one Bot must have only one active runtime owner. Group conversations, memories, browsers and long-lived context come from the pinned upstream runtime, not from a placeholder capability list.
 
 Windows computer setup: [download Agent 0.1.1 for Windows x64](https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.3/dsh-remote-agent-0.1.1-windows-x64.zip), extract it and run `start.cmd`.
+
+<a id="daily-work"></a>
+
+## Chat, groups, memory, browsers and schedules
+
+| What you want to do | Operation |
+| --- | --- |
+| Talk to a Bot | Create/select the Bot in the sidebar, choose its model and role in Bot settings, then send a message. Review question and approval cards before continuing an operation. |
+| Work with a group | Create a group from the chat picker with the required Bots. In group settings choose members/admin, who answers, the working folder and shared instructions; use `@` to select respondents. |
+| Keep and find context | Search conversations from the sidebar; use conversation parts/checkpoints to manage long work. Open the Bot/group/team memory entry to review, edit or remove retained memories and inspect changes. Review skill/project-rule learning proposals before accepting them. |
+| Use a browser or document | Open the selected Bot's browser pane for its pages and browser workflow. Attach supported Office documents for reading/preview. Configure available connectors and enter credentials through the supplied secret-entry cards. Avatar choices are managed separately from the file library. |
+| Schedule work | When the Host enables its Automation tasks service, open schedules in Bot settings or the schedule page, choose the target Bot/group, task text and a supported timing rule, then save. Check the next-run state; Host and relevant Agent must remain running. |
 
 <a id="computers"></a>
 
@@ -151,7 +151,12 @@ The official-tool registry includes Kimi Code, Claude Code, Codex, MiniMax Code,
 
 Tasks retain task/attempt/operation identity, results and unknown-effect evidence. Follow the task's status and acceptance check; do not infer completion from a generated plan, an installation method, a successful permission check or a method name. API money/reservations and subscription calls/reported tokens are separate books. Missing usage remains unknown.
 
-The following preserved mathematical reference describes the **model-route workbench**. Bot selection and desktop routine playback are separate workflows.
+1. In **Model configuration**, refresh the configured routes and enter any known prices, quality evidence, billing preference and CLI model mapping. Keep unknown values empty.
+2. In **Task and execution**, enter the task and choose a single route, a dependent team, or manual per-package assignments. Generate recommendations, inspect the preview and confirm the actual execution you want.
+3. In **Official tools**, detect/install the required CLI and check its available modes and login. Use the interactive terminal when appropriate; configured access to a CLI does not imply every model has a managed runner.
+4. In **Budget and security** and the usage page, configure API limits/subscription preferences and inspect receipts. Follow running work in the task/history view; cancel, retry or reconcile from its recorded state.
+
+The following cost and routing reference describes the **model-route workbench**. Bot selection and desktop routine playback are separate workflows.
 
 <a id="costs"></a>
 
@@ -251,11 +256,9 @@ Base quality floors are **0.75 / 0.78 / 0.82** for simple/balanced/complex tasks
 4. Compare assignments lexicographically: fewer relaxed packages, smaller quality shortfall, higher utility, lower cost, fewer route switches, then stable route order. Minimum-cost mode compares cost before utility. Each dependency crossing a `provider/model` route subtracts 0.015 from utility.
 5. Report search metadata and feasibility. When a positive budget has no feasible assignment, a minimum-cost alternative can still be returned with `budgetFeasible: false`. A displayed plan is not proof that the budget is satisfied.
 
-“Exact” applies only to the retained candidate space and proxy objective. Candidate caps and beam pruning preclude a claim of global optimality over every configured model. Unit/synthetic tests establish mechanisms, not actual answer-quality gains. The public 2026-06-25 LiveBench score/cost tables used by the research audit are aggregate data; a paired per-question quality/cost matrix was not obtained, so no real routing gain is claimed. See [research](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_RESEARCH.zh.md), [derivation/experiments](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_DERIVATION_EXPERIMENTS.zh.md), and [validation protocol](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_LIVEBENCH_VALIDATION.zh.md).
+“Exact” applies only to the retained candidate space and proxy objective. Candidate caps and beam pruning prevent a guarantee of global optimality over all configured models; use the preview to inspect the selected route and any relaxed quality floor.
 
 See the [algorithm optimization guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/ROUTING_ALGORITHM_OPTIMIZATION.zh.md) for evidence import, fallback rules, effort handling, and optional JSON validation with escalation. Escalation defaults to off and permits at most one additional ordinary API request after billing and budget checks.
-
-Implementation: [router.mjs](.dsh-plugin/shared/router.mjs), [assignment-solver.mjs](.dsh-plugin/shared/assignment-solver.mjs), [routing-evidence.mjs](.dsh-plugin/shared/routing-evidence.mjs), [harness-plan.mjs](.dsh-plugin/shared/harness-plan.mjs) and [quality-gates.mjs](.dsh-plugin/shared/quality-gates.mjs).
 
 <a id="data"></a>
 
@@ -264,61 +267,6 @@ Implementation: [router.mjs](.dsh-plugin/shared/router.mjs), [assignment-solver.
 Harness owns provider credentials and authenticated sessions. Router state/receipts live under `<DSH_HOME>/model-router/`; the product also keeps committed Bot bindings, task records, private libraries and routine/run journals there. The upstream Bot home retains conversations, memory, browser state and related team files according to its configured location. Remote Agent state and pairing credentials remain in the installed computer's directory.
 
 Task/context sent to a provider or CLI follows that service's account and billing terms. Saved routines contain the demonstrated text. Treat pairing exports, histories, logs and private files as private data. Back up application state before changing runtime owners or downgrading; do not erase receipts or uncertain-operation journals to bypass a blocked run.
-
-This GitHub tree contains the current program, build tools and focused product tests. The complete test suite, history and validation reports are in the [GitLab archive](https://gitlab.com/Alice_marx/dsh-model-router).
-
-<a id="development"></a>
-
-## Develop and build from source
-
-Requirements: plain **Node.js 22.19+** and **pnpm 10.34.6** (the repository's package-manager pin). Native SQLite/PTY modules must run through the matching plain Node runtime, not Electron's incompatible ABI. From the repository root:
-
-```powershell
-npm install --include=dev
-npm run build:client
-npm run check:client
-node scripts/check-readme.mjs
-npm test
-node scripts/integration-product-source.mjs
-npm --prefix remote-computer-agent ci
-npm --prefix remote-computer-agent run build
-npm run pack:local
-```
-
-Install the generated `dist/*.tgz` in a test profile. `npm run preview:ui` provides an offline fixture preview, not authenticated Host acceptance. When SDK packages are unavailable from the configured registry, `scripts/setup-harness-dev.mjs` supports an explicitly supplied installed Host tree; follow its options and do not substitute an arbitrary SDK version silently.
-
-For a Windows x64 Agent bundle after its dependencies are installed:
-
-```powershell
-powershell -NoProfile -File scripts/package-remote-agent.ps1
-```
-
-The packaging helper builds native helpers, includes the plain Node runtime/dependencies and verifies SQLite before creating its zip under `tmp/integration/remote-agent-package/`. Its output includes the package path and SHA-256. Setup is run on the user-provided Windows computer, not during source packaging.
-
-### Reproduce the pinned upstream runtime
-
-Never edit `modules/bot-runtime/vendor/ds-bot/` directly. Product changes belong in the external overlay. Import from the explicit checkout and pinned commit:
-
-```powershell
-node scripts/sync-ds-bot.mjs --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
-node scripts/sync-ds-bot.mjs --check --source ../DS-Bot-upstream --source-commit 71d344bf193f3f18185f25de3d8e5c483046910a
-npm run build:client
-npm run check:client
-```
-
-Without a source argument, `node scripts/sync-ds-bot.mjs --check` checks the recorded vendored bytes; it does not guess a sibling `../ds-bot`. An intended upstream change requires reviewing the source commit and overlay application. `.dsh-plugin/client.js` is generated.
-
-The paired READMEs retain six display formulas and 33 inline mathematical expressions. After editing both translations, update `README.i18n.yaml` with their exact Git blob SHA-1 values and run `node scripts/check-readme.mjs` plus `node --test tests/readme-math.test.mjs`. Structural checks do not replace a visual renderer check.
-
-## Verification and current limits
-
-The real **SDK 0.2.1-rc.4** Host integration has exercised Main tool → routed worker AgentLoop → private library write → task `succeeded`. Worker requests use separate per-model budget admission linked to the parent task. This is evidence for that path; it does not establish that every Host/browser probe, installed Desktop variant, vendor account or real cloud-PC deployment passed. Keep later acceptance results tied to their actual test configuration.
-
-Local WebSocket/React tests exercise acknowledged recording, private save/readback, real replay effects with a fake native transport, cancellation, cleanup, unknown recovery and admission refusal. Windows native/Agent checks are separate from that fixture. Actual desktop FPS depends on capture, resolution, network and client decoding; the viewer's measured rate is the relevant observation.
-
-The Grok workflow audit uses the previously captured public requirement list. This round's revisit to the website was blocked by network/Cloudflare, so it is not a fresh complete product inventory. Role briefs are templates, not preconnected CRM/advertising/expenses services. No automatic cloud VM provisioning, cloud billing service, product-owned iOS release or commercial Grok parity is claimed.
-
-The full source archive includes [computer/Bot guide](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/COMPUTER_BOT_GUIDE.zh.md), [upstream evidence](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261105-upstream-parity.md), [workflow boundaries](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261105-grok-workflows.md) and [desktop engine evidence](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/implementation/20261105-desktop-engine.md). Core operation is explained above so the code-and-README distribution remains usable without those archival documents. Project publication policy keeps code and READMEs on GitHub; full documents/history belong in the GitLab archive.
 
 <a id="troubleshooting"></a>
 
@@ -331,12 +279,11 @@ The full source archive includes [computer/Bot guide](https://gitlab.com/Alice_m
 | `TOOL_DENIED` or a blocked task | Read the actual committed Bot grant and requested operation; do not broaden a model-supplied identity or assume a role prompt grants access. |
 | Agent online but no desktop | Current signed-in Windows session, both installed tasks, full-desktop helper and its native logs. |
 | Agent cannot be reached | Correct reachable base URL/port and already configured private VPN/tunnel; importing a pairing file does not create that network. |
+| Chief connects but a new worker cannot | Check the Agent pairing Bot-ID/`hostManagedBots` ceiling, then save that worker's computer/tool grant. A fixed allowlist does not automatically include new Bots. |
 | Watch works but takeover is disabled | All required desktop input tools, write-mode grant and current control ownership. |
 | Routine reports display changed | Restore the recorded monitor/resolution/DPI or record a new routine; match the application layout as well. |
 | Unknown effect or unconfirmed stop | Inspect the real computer and the execution record before resolving; do not blindly replay or delete the journal. |
 | Library file is refused | Binary transfer limit is 16 MiB per file; text editing/reading limit is 1 MiB; same-name uploads are refused. |
 | API/subscription amount unknown | Inspect actual model identity, price and provider usage evidence; missing counters are not zero. |
 
-## Historical releases
-
-Older 0.20.x–0.26.x release notes, screenshots and experiments remain historical evidence for their recorded versions. They are not current installation instructions or a stable-release announcement for this preview. Package: `@ljwei-stak/dsh-model-router`; entry point: `.dsh-plugin/index.mjs`; license: [MIT](LICENSE).
+[Update history (GitLab)](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/CHANGELOG.md) · [Source build guide (GitLab)](https://gitlab.com/Alice_marx/dsh-model-router/-/blob/main/docs/DEVELOPMENT.md) · [MIT license](LICENSE)
