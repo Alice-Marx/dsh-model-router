@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "package": "@ljwei-stak/dsh-model-route-bot",
+  "version": "0.66.0",
+  "releasedAt": "2026-11-07",
+  "registry": "https://registry.npmjs.org/",
+  "distTag": "latest",
+  "source": {
+    "branch": "release/0.66.0",
+    "commit": "a997e514fd97f94a4855da19f965846230cc522a",
+    "tag": "v0.66.0",
+    "tagObjectCommit": "a997e51",
+    "worktreeWasDirtyBeforeCommit": true,
+    "note": "The tag points at the release commit on release/0.66.0. `origin/main` sits on a separate lineage (its own 0.65.0 commits, receipt ac9f5cd); this branch is neither ahead nor behind it in a fast-forward sense, and main was deliberately not rewritten. See divergence."
+  },
+  "editions": [
+    {
+      "package": "@ljwei-stak/dsh-model-route-bot",
+      "version": "0.66.0",
+      "tarball": "ljwei-stak-dsh-model-route-bot-0.66.0.tgz",
+      "bytes": 3535117,
+      "sha256": "b9072472b3b1662ee3b8dd16d2eb8dc2fb1d144112394e2e3f3f617b22be0c58",
+      "files": 474,
+      "runtimeFiles": 193,
+      "integrity": "sha512-DxUmWZOiSklj3Nt3JEBmJhZoMarT2CHqMKwRNcdGHl+ElLXdKo8hlaMFstilL6Rxets/2jfs4MoPFqqUTLGr7A==",
+      "anonymousDownloadMatches": true
+    },
+    {
+      "package": "@ljwei-stak/dsh-model-router",
+      "version": "0.66.0",
+      "tarball": "ljwei-stak-dsh-model-router-0.66.0.tgz",
+      "bytes": 554932,
+      "sha256": "45e1fe1a5105e78964154df165c05557fc9ee5c37c9db681b413e0cc84f018d9",
+      "files": 62,
+      "runtimeFiles": 53,
+      "integrity": "sha512-K9tnjND3QL11rud/J9piV9oklRHby2sFNw7K9U38V7Sm+i8pA2BfKSThY2eNacUml/4Hg2TUgjt9PB+DCU7y9w==",
+      "anonymousDownloadMatches": true
+    }
+  ],
+  "githubRelease": {
+    "url": "https://github.com/Alice-Marx/dsh-model-router/releases/tag/v0.66.0",
+    "assets": [
+      "ljwei-stak-dsh-model-route-bot-0.66.0.tgz",
+      "ljwei-stak-dsh-model-router-0.66.0.tgz"
+    ]
+  },
+  "verification": {
+    "npmTest": { "stages": 32, "tests": 1848, "passed": 1841, "failed": 0, "skipped": 7 },
+    "taskProbe": { "tests": 54, "passed": 54, "actualModelCalls": 0 },
+    "financeProbe": { "tests": 35, "passed": 35 },
+    "checkPackage": { "filesMatchHead": 474, "runtimeFiles": 193 },
+    "checkRouterPackage": { "files": 62, "runtimeFiles": 53, "reproducibleFromSource": true },
+    "checkContracts": { "contracts": 5, "fixtures": 17, "productActions": 28, "taskActionPayloads": 5 },
+    "checkClient": "ok",
+    "checkReadme": "6 formulas, 33 inline expressions, translation hashes"
+  },
+  "divergence": {
+    "finding": "Local tag v0.65.0 pointed at c611013, while origin/main carries the published 0.65.0 as 879c7b2 plus receipt ac9f5cd. The working branch archive/preview6 is 108 commits ahead of origin/main and 93 behind it, so this release is not an ancestor-consistent continuation of main.",
+    "decision": "Released from release/0.66.0 (a branch off the verified working tree) and documented here rather than rewriting history. The published artifact is byte-verified; main still shows the earlier lineage.",
+    "followUp": [
+      "Decide whether main should be fast-forwarded to release/0.66.0 or reconciled with a merge commit; both are visible, public changes to the default branch and were left to the owner.",
+      "The stale local tag v0.65.0 (c611013) does not match the GitHub release for 0.65.0. It should be deleted locally or re-pointed after that decision."
+    ]
+  },
+  "notVerified": [
+    "No install into the user's live desktop profile; the plugin was not mounted in a running Host after publication.",
+    "No Windows installer or durable remote-agent package was rebuilt; Remote Agent stays 0.1.1.",
+    "GitLab mirror was not pushed in this round.",
+    "GitHub rendering of the release notes and README math requires the published page, not a local check."
+  ]
+}
