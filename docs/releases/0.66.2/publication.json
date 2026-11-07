@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "version": "0.66.2",
+  "releasedAt": "2026-11-07",
+  "why": "0.66.1 put the execution attribution on the task view, but the public projection that feeds the Tasks panel rebuilds the object and dropped it, so the column showed 已停止 with nothing under it. Found by opening the running app — the only place the gap was visible.",
+  "fix": [
+    "projectProductTask carries attribution {code, label} while keeping its narrowing (no input, execution reference or reconciliation proof).",
+    "attribution codes get their own validator: a lower-case word is not an error code, and reusing the [A-Z0-9_:-] shape turned every value into unknown.",
+    "new regression: the projection must carry it, an older row may omit it, a bad code is not echoed, and executionRef still never leaks."
+  ],
+  "source": {
+    "githubMain": "01647b2",
+    "githubTag": "v0.66.2"
+  },
+  "editions": [
+    {
+      "package": "@ljwei-stak/dsh-model-route-bot",
+      "version": "0.66.2",
+      "files": 434,
+      "runtimeFiles": 193,
+      "integrity": "sha512-HU8y5R91+tSzELvtXkDHv72Z1tW1tCAfkvDz6OkhQnSsXkY806mqP1OWmUUUHRkGWKfPOoMMCVpU1nZUr3lXTA==",
+      "anonymousDownloadMatches": true,
+      "sha256": "b8eb6ff433d84930e3ee0008e569a3810eb723f63b99ace264d385a7e2b43974"
+    },
+    {
+      "package": "@ljwei-stak/dsh-model-router",
+      "version": "0.66.2",
+      "files": 62,
+      "runtimeFiles": 53,
+      "anonymousDownloadMatches": true,
+      "sha256": "5fbdda44185fceafec9adc1cad03e95f5714fa38713f897b077904f67292da87"
+    }
+  ],
+  "installedInto": {
+    "profile": "C:/Users/Jianw/.dsh/profiles/desktop",
+    "from": "0.66.1",
+    "to": "0.66.2",
+    "verified": [
+      "installed 0.66.2",
+      "the installed projection returns attribution {code:'cancelled', label:'已取消，未执行'}"
+    ]
+  },
+  "notVerified": [
+    "The visible line was NOT seen in the running app: the Host loads the server-side projection at start-up, and restarting the Electron app would end the session that is doing the work. The owner has to restart and look.",
+    "GitLab archive was not pushed for 0.66.2 at the time of writing."
+  ],
+  "ownerAction": [
+    "Restart DeepSeek Harness (tray → quit, then launch) so the 0.66.2 host code loads.",
+    "Open 工作空间 → 任务 and look under the 状态 tag: each row should show one of 未执行：执行前失败 / 未执行：检查未通过 / 已执行，执行后失败 / 已执行，结果未确认 / 已取消，未执行.",
+    "Rollback: restore desktop/.backup-0.66.0-before-0661/package.json and pnpm-lock.yaml, then pnpm install."
+  ]
+}
