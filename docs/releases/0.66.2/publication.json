@@ -10,7 +10,8 @@
   ],
   "source": {
     "githubMain": "01647b2",
-    "githubTag": "v0.66.2"
+    "githubTag": "v0.66.2",
+    "gitlabMain": "834ef4f"
   },
   "editions": [
     {
@@ -41,12 +42,28 @@
     ]
   },
   "notVerified": [
-    "The visible line was NOT seen in the running app: the Host loads the server-side projection at start-up, and restarting the Electron app would end the session that is doing the work. The owner has to restart and look.",
-    "GitLab archive was not pushed for 0.66.2 at the time of writing."
+    "The visible line was NOT seen in the running app: the Host loads the server-side projection at start-up, and restarting the Electron app would end the session that is doing the work. The owner has to restart and look."
   ],
   "ownerAction": [
     "Restart DeepSeek Harness (tray → quit, then launch) so the 0.66.2 host code loads.",
     "Open 工作空间 → 任务 and look under the 状态 tag: each row should show one of 未执行：执行前失败 / 未执行：检查未通过 / 已执行，执行后失败 / 已执行，结果未确认 / 已取消，未执行.",
     "Rollback: restore desktop/.backup-0.66.0-before-0661/package.json and pnpm-lock.yaml, then pnpm install."
-  ]
+  ],
+  "liveEvidence": {
+    "what": "The live journal (C:/Users/Jianw/.dsh/model-router/orchestration.sqlite) was copied and read through the installed 0.66.2 code; the copy was deleted afterwards.",
+    "rows": 2,
+    "results": [
+      {
+        "state": "cancelled",
+        "viewLabel": "已取消，未执行",
+        "panelLabel": "已取消，未执行"
+      },
+      {
+        "state": "succeeded",
+        "viewLabel": "已完成",
+        "panelLabel": "已完成"
+      }
+    ],
+    "meaning": "The projection now carries the label the view computes. Before the fix the panel side was null for the same rows, which is exactly what the running app showed."
+  }
 }
