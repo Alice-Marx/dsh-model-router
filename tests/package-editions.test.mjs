@@ -13,6 +13,16 @@ const run = await mkdtemp(join(parent, 'run-'))
 process.env.DSH_HOME = join(run, 'home')
 const { apply, Config, inject } = await import('../.dsh-plugin/router-only.mjs')
 
+test('full edition declares all independent-runtime files required by its Bot entry', async () => {
+  const manifest = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'))
+  assert.equal(manifest.name, '@ljwei-stak/dsh-model-route-bot')
+  for (const name of ['index.mjs', 'remote-tools.mjs', 'workspace-tools.mjs']) {
+    const path = `modules/independent-runtime/${name}`
+    assert.ok(manifest.files.some(item => path === item || item.endsWith('/') && path.startsWith(item)), `Full edition must include ${path}`)
+    assert.ok((await readFile(join(ROOT, path))).length > 0)
+  }
+})
+
 test('router edition builds a self-contained Host and client without DS Bot or full-product dependencies', async () => {
   const report = await buildRouterPackage({ output: join(run, 'package') })
   assert.equal(report.name, '@ljwei-stak/dsh-model-router')

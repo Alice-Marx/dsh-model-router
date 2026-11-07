@@ -18,7 +18,7 @@ const top = new Set(['.gitignore', '.gitattributes', 'AGENTS.md', 'LICENSE', 'RE
   'README.i18n.yaml', 'package.json', 'package-lock.json', 'cordis.patch.yml',
   'docs/integration/agents-anywhere-tasks.md', 'docs/releases/0.65.0-validation.md'])
 const prefixes = ['.github/assets/', '.dsh-plugin/', 'apps/integration-client/', 'apps/desktop-client/', 'packages/',
-  'modules/bot-runtime/', 'native/', 'remote-computer-agent/', 'deploy/']
+  'modules/bot-runtime/', 'modules/independent-runtime/', 'native/', 'remote-computer-agent/', 'deploy/']
 const scripts = ['build-client.mjs', 'build-router-package.mjs', 'sync-ds-bot.mjs', 'prepack.mjs', 'check-readme.mjs',
   'check-package.mjs', 'check-router-package.mjs', 'verify-release.mjs', 'integration-product-source.mjs', 'run-tests.mjs',
   'test-plan.json', 'package-remote-agent.ps1', 'prepare-product-tree.mjs', 'prepare-product-tests.mjs'].map(name => `scripts/${name}`)
