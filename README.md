@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It reuses Harness model configuration and Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.64.0 · Windows Remote Agent: 0.1.1**
+**Current stable version: 0.65.0 · Windows Remote Agent: 0.1.1**
 
 [Choose an edition](#editions) · [Install](#install) · [First task](#quick-evaluation) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
 
@@ -52,8 +52,8 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.64.0`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.64.0`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.65.0`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.65.0`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. Configure provider credentials and models in the official Harness **Models** settings. Open the Bot workspace for the full edition, or **Model Router** in the sidebar for the routing-only edition.
 
@@ -61,10 +61,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.64.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.65.0
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.64.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -136,11 +136,31 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 
 Integration mode reuses Harness Sessions. An optional independent runtime has its own session store; switch ownership explicitly so a Bot is served by one runtime at a time.
 
+<a id="task-progress"></a>
+
+## Multi-Bot task progress and pending items
+
+**Available in the full Bot edition 0.65.0.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
+
+**Needs your attention** reports the full count and expands beyond six items. Each reminder opens the original task; approval reminders can open the owning Bot's conversation to show its original request. Open a task's **timeline** for queue, admission, execution, stop-request, and reconciliation events, with the original identities for each attempt. Reading history does not dispatch tasks or invoke models; stop requests still require confirmation. Older Hosts without history support retain existing receipt details.
+
+The Host loads at most **512 tasks**, prioritizing pending and active work before newer historical records, and explicitly reports loaded and total counts when truncated. History reads the latest **80 events** on demand and reports its total when truncated. These are durable managed-task records; they do not cover every chat message or live provider output.
+
+This iteration draws on [Agents Anywhere](https://github.com/anywhere-labs/Agents-Anywhere)'s timeline and capability-based actions. See the [task workspace notes](docs/integration/agents-anywhere-tasks.md) for implementation and verification.
+
 <a id="bot-routing"></a>
 
 ## Delegate from a Main Bot to execution Bots
 
 **Full Bot edition.** Model routing chooses a model route; Bot routing chooses a configured Bot and dispatches a task to it.
+
+Routing uses each Bot's own saved prices, including when Bots share the same model. Invalid prices or quality scores remain unknown. When scores tie, a known price takes precedence before the Bot ID.
+
+Changing a task, refreshing candidates, or switching Hosts retires the previous preview. Expand **View comparison basis** to inspect candidate scores and unknown information. Creating a task requires a current preview; a confirmed submission shows its plan ID and disables repeat creation. If the acknowledgement is missing or incomplete, refresh the task records and check the original submission before creating another task. On narrow screens, scroll tables horizontally to inspect all columns.
+
+**Check original submission** reads the original request's durable plan and operation IDs without resubmitting, granting access, or calling a model. A missing record is a current observation: the original request may still complete. The reminder survives page remounts for the same connected Host in this window, and stores only the submission reference in memory. Reloading the app clears it. After checking the records yourself, an explicit reminder dismissal only clears the notice; it does not stop the original task or create another one.
+
+Before reloading, expand **Save submission code** and copy the code. After reloading, connect to the original Host and paste it into **Check a saved submission** to query the original record. The code contains only the original Bot and request IDs; it contains no task text or credentials and does not authorize execution. Invalid codes are rejected locally. If clipboard access is unavailable, select and copy the code manually. Lookup failures explain whether to sign in again, update the Host, check a mismatched record, or reconnect; the reference remains available for another read.
 
 ```mermaid
 flowchart LR

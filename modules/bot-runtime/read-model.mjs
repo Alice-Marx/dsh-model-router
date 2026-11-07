@@ -11,13 +11,13 @@ const missing = {
   usage: blocked('宿主尚未提供统一费用与预占投影。', '接入唯一 MR 资金库的只读投影；已有 Token 用量仍可在 DS 用量页查看。'),
 }
 const ACTIONS = new Set([
-  'task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve',
+  'task.inspect', 'task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve',
   'binding.save', 'funding.account.save', 'machine.secret', 'machine.pair', 'machine.bind', 'machine.probe',
   'machine.revoke', 'machine.reconcile', 'machine.artifact', 'machine.desktop.view', 'machine.desktop.act',
   'machine.desktop.open', 'machine.desktop.renew', 'machine.desktop.close',
   'library.list', 'library.read', 'library.write', 'library.upload', 'library.download', 'library.remove', 'library.mkdir', 'library.search',
   'routine.list', 'routine.run', 'routine.save', 'routine.remove', 'routine.history', 'routine.cancel', 'routine.resolve', 'roles.list',
-  'botRoutingInspect', 'botRoutingDecide', 'botRouting.dispatch', 'botRouting.save',
+  'botRoutingInspect', 'botRoutingDecide', 'botRouting.dispatch', 'botRouting.save', 'botRouting.status',
   'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage',
 ])
 const plain = value => value && typeof value === 'object' && !Array.isArray(value)

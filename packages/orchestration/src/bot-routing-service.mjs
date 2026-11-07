@@ -17,16 +17,18 @@
 import { botRoutingCandidates, candidateMachineGrant, withMachineFact } from './bot-routing-candidates.mjs'
 import { routeBot } from './bot-routing.mjs'
 import { normalizeBotRouting, workerBinding } from './bot-routing-mode.mjs'
-import { dispatchRoutedTask, pinnedMachineRefusal, workerGrantFact, routedEffectClass } from './bot-routing-dispatch.mjs'
+import { assertPlanAccepted, dispatchRoutedTask, pinnedMachineRefusal, workerGrantFact, routedEffectClass } from './bot-routing-dispatch.mjs'
+import { canonicalTaskJson, taskRef } from './task-contract.mjs'
 import { createHash } from 'node:crypto'
 const fail = code => { const error = new Error(code); error.code = code; throw error }
+const submittedPlanId = (originBotId, requestKey) => `route_${createHash('sha256').update(`${originBotId}:${requestKey}`).digest('hex').slice(0, 48)}`
 
 /**
  * @param {{
  *   bots: () => Array<object>,
  *   settingsFor: (botId: string) => object | null,
  *   machineHealth?: (machineId: string) => { online?: boolean } | null,
- *   priceFor?: (route: object) => number | null,
+ *   priceFor?: (route: object, botId: string) => number | null,
  *   qualityFor?: (botId: string) => number | null,
  *   loadFor?: (botId: string) => number | null,
  *   busyFor?: (botId: string) => boolean,
@@ -36,9 +38,10 @@ const fail = code => { const error = new Error(code); error.code = code; throw e
  *   subjectFor?: (botId: string) => unknown,
  *   bindWorker?: (binding: object) => Promise<unknown> | unknown,
  *   newTaskId?: () => string,
+ *   readSubmittedPlan?: (originBotId: string, planId: string) => object | Promise<object>,
  * }} source
  */
-export function createBotRoutingService({ bots, settingsFor, machineHealth, priceFor, qualityFor, loadFor, busyFor, routing, mainBotIds = [], submitPlan = null, subjectFor = null, bindWorker = null, newTaskId = null, executionBackendFor = null, settle = null, deliver = null, onAccepted = null }) {
+export function createBotRoutingService({ bots, settingsFor, machineHealth, priceFor, qualityFor, loadFor, busyFor, routing, mainBotIds = [], submitPlan = null, subjectFor = null, bindWorker = null, newTaskId = null, readSubmittedPlan = null, executionBackendFor = null, settle = null, deliver = null, onAccepted = null }) {
   if (typeof bots !== 'function') fail('BOT_ROUTING_REQUIRES_BOTS')
   if (typeof settingsFor !== 'function') fail('BOT_ROUTING_REQUIRES_SETTINGS')
 
@@ -81,7 +84,7 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
         quality: candidate.quality,
         busy: candidate.busy,
       }))
-      return { enabled: settings.enabled, preset: settings.preset, autoGrant: settings.autoGrant, candidates: rows }
+      return { enabled: settings.enabled, preset: settings.preset, autoGrant: settings.autoGrant, requesterBotId: readMainBotIds()[0] ?? null, candidates: rows }
     },
 
     /**
@@ -132,6 +135,27 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
       }
     },
 
+    /** Owner-only observation: no candidate reads, grant changes, runner or routing switch needed. */
+    async submissionStatus(payload, context = {}) {
+      if (context?.kind !== 'owner') fail('REMOTE_OWNER_REQUIRED')
+      const value = JSON.parse(canonicalTaskJson(payload))
+      if (!value || Array.isArray(value) || Object.keys(value).some(key => !['requestKey', 'requesterBotId'].includes(key))) fail('INVALID_TASK_REQUEST')
+      const requestKey = taskRef(value.requestKey), originBotId = taskRef(value.requesterBotId)
+      if (typeof readSubmittedPlan !== 'function') fail('BOT_ROUTING_STATUS_UNAVAILABLE')
+      const planId = submittedPlanId(originBotId, requestKey)
+      let plan
+      try { plan = await readSubmittedPlan(originBotId, planId) }
+      catch (error) {
+        if (error?.code !== 'TASK_PLAN_NOT_FOUND') throw error
+        // This is a point-in-time read. An original request may still commit later.
+        return { found: false, planId, originBotId, planState: null, packages: [] }
+      }
+      if (plan?.planId !== planId || plan?.ownerBotId !== originBotId) fail('BOT_ROUTING_SUBMISSION_IDENTITY_MISMATCH')
+      const accepted = assertPlanAccepted(plan)
+      return { found: true, accepted: true, planId, originBotId, planState: accepted.state,
+        packages: accepted.packages.map(({ id, targetBotId, taskId, attemptId, operationId, state }) => ({ id, targetBotId, taskId, attemptId, operationId, state })) }
+    },
+
     /**
      * Dispatch for real. The Host injects plan submission and the subject directory; without them
      * this refuses, because a dispatch that cannot create a task must not look like one.
@@ -153,6 +177,7 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
       if (!subjectFor(originBotId)) fail('ROUTING_SUBJECT_UNKNOWN')
       if (!owner && !readMainBotIds().includes(requesterBotId)) fail(`BOT_ROUTING_DISPATCH_DENIED:${requesterBotId}`)
       if (!owner && (typeof context.sessionId !== 'string' || context.sessionId === '')) fail('BOT_ROUTING_SESSION_REQUIRED')
+      if (payload.requestKey !== undefined && payload.requestKey !== '') taskRef(payload.requestKey)
       const needs = routingNeeds(payload)
       const decision = service.decide({ ...payload, needs, requesterBotId })
       if (!decision.chosen) fail(`BOT_ROUTING_NO_ELIGIBLE:${decision.rejected.map(row => row.reason).join(',') || 'none'}`)
@@ -184,7 +209,7 @@ export function createBotRoutingService({ bots, settingsFor, machineHealth, pric
         settle: typeof settle === 'function' ? report => settle(report, context) : null,
         deliver: typeof deliver === 'function' ? report => deliver(report, context) : null,
         newTaskId: typeof payload.requestKey === 'string' && payload.requestKey !== ''
-          ? () => `route_${createHash('sha256').update(`${originBotId}:${payload.requestKey}`).digest('hex').slice(0, 48)}`
+          ? () => submittedPlanId(originBotId, payload.requestKey)
           : typeof newTaskId === 'function' ? newTaskId : undefined,
       })
       if (typeof onAccepted === 'function') await onAccepted(report, context)

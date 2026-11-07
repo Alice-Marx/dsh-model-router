@@ -19,7 +19,7 @@ const short = (value, limit = 80) => {
 }
 
 /** A remote result that never confirmed its stop is unknown, not "stopped". */
-function remoteUncertain(row) {
+export function remoteUncertain(row) {
   const remote = row?.result?.remote
   if (!remote || typeof remote !== 'object') return false
   // An operation that never started has nothing to confirm — but a receipt that also claims its
@@ -59,7 +59,7 @@ export function deriveBotAttention(snapshot, { limit = 6 } = {}) {
         task.blockedReason || '此任务需要你批准后才能继续。', 'approve', { botId: task.botId, taskId: id })
       continue
     }
-    if (task.state === 'waiting-budget' || task.state === 'admitting') {
+    if (task.state === 'waiting-budget') {
       add('budget', `budget:${id}`, `${bot} 等待预算：${title}`,
         task.blockedReason || '预算或资金准入未通过，任务已停在启动前。', 'budget', { botId: task.botId, taskId: id })
       continue

@@ -97,6 +97,35 @@ html body[data-bot-product-ui][data-ds-dark-theme] {
 .bp-person-copy { min-width: 0; }
 .bp-person-copy strong { font-size: 13px; font-weight: 550; }
 .bp-plan-list { list-style: none; display: grid; gap: 0; margin: 12px 0 0; padding: 0; }
+.bp-task-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+.bp-task-overview .bp-card-title > .bp-tag { flex-shrink: 0; white-space: nowrap; }
+.bp-task-counts button { display: grid; justify-items: start; gap: 2px; padding: 14px 16px; text-align: left; background: var(--bp-subtle); border-color: transparent; }
+.bp-task-counts strong { font-size: 25px; font-weight: 600; line-height: 1.3; }
+.bp-task-counts span { color: var(--bp-muted); font-size: 12px; }
+.bp-task-counts button[aria-pressed=true], .bp-task-bots button[aria-pressed=true] { border-color: var(--bp-focus); background: var(--bp-surface); }
+.bp-task-bots { display: flex; flex-wrap: wrap; gap: 8px; }
+.bp-task-bots button { text-align: left; max-width: 100%; overflow-wrap: anywhere; }
+.bp-task-bots small { margin: 1px 0 0; font-size: 10px; }
+.bp-task-search { display: flex; align-items: flex-end; gap: 12px; margin: 10px 0 18px; }
+.bp-task-search label { display: grid; gap: 6px; width: min(100%, 520px); color: var(--bp-muted); font-size: 12px; }
+.bp-task-search input { width: 100%; color: var(--bp-ink); }
+.bp-task-detail { scroll-margin-top: 16px; }
+.bp-task-detail .bp-card-title p { overflow-wrap: anywhere; }
+.bp-task-detail .bp-actions { flex-wrap: wrap; }
+.bp-task-timeline { list-style: none; margin: 20px 0; padding: 0; }
+.bp-task-timeline li { position: relative; display: flex; gap: 15px; padding: 0 0 20px; }
+.bp-task-timeline li::before { content: ''; position: absolute; top: 12px; bottom: 0; left: 4px; width: 1px; background: var(--bp-border); }
+.bp-task-timeline li:last-child::before { display: none; }
+.bp-timeline-dot { width: 9px; height: 9px; margin-top: 7px; border: 2px solid var(--bp-focus); background: var(--bp-surface); border-radius: 50%; flex-shrink: 0; }
+.bp-task-timeline strong { font-size: 13px; font-weight: 550; }
+.bp-task-plans > button { margin: 0 0 16px; }
+@container (max-width: 600px) {
+  .bp-task-counts { gap: 6px; }
+  .bp-task-counts button { padding: 12px 9px; }
+  .bp-task-counts strong { font-size: 21px; }
+  .bp-task-search { flex-wrap: wrap; }
+  .bp-attention-row > .bp-actions { flex-wrap: wrap; }
+}
 .bp-plan-list li { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-top: 1px solid var(--bp-border); }
 .bp-plan-step { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none; margin-top: 1px; border: 1px solid var(--bp-border); border-radius: 7px; color: var(--bp-muted); background: var(--bp-subtle); font-size: 11px; }
 .bp-plan-copy { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -137,6 +166,10 @@ html body[data-bot-product-ui][data-ds-dark-theme] {
 .bp-page tbody tr:last-child td { border-bottom: 0; }
 .bp-page tbody tr:hover { background: var(--bp-subtle); }
 .bp-page td:first-child { max-width: 360px; overflow-wrap: anywhere; }
+.bp-page .bp-routing-candidates { min-width: 680px; }
+.bp-page .bp-routing-comparison { min-width: 480px; }
+.bp-page :is(.bp-routing-candidates, .bp-routing-comparison) :is(th,td):first-child { min-width: 128px; }
+.bp-page .bp-routing-comparison td:nth-child(2) { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bp-page .bp-text-button { background: transparent; border: 0; padding: 0; min-height: 24px; text-align: left; justify-content: flex-start; font-weight: 500; }
 .bp-page pre { overflow: auto; max-height: 400px; margin: 14px 0; padding: 15px; border: 1px solid var(--bp-border); border-radius: 9px; background: var(--bp-subtle); font: 11px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace; }
 .bp-code { overflow-wrap: anywhere; font: 11px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace; color: var(--bp-muted); }
@@ -262,6 +295,9 @@ body[data-bot-product-ui] .mr-workspace { background: var(--bp-bg); color: var(-
 @media (prefers-reduced-motion: reduce) {
   .bp-page *, .bp-nav *, .bp-desktop-viewer * { animation: none !important; transition: none !important; }
 }
+.bp-submission-code { width: 100%; min-width: 0; box-sizing: border-box; font-family: var(--bp-mono, monospace); }
+.bp-submission-restore { display: grid; gap: 10px; margin-top: 10px; }
+.bp-submission-restore > button { justify-self: start; }
 /* Sidebar width belongs to the Bot surface, independently of the Harness rail. */
 .bp-nav { container-name: workspace-navigation; container-type: inline-size; }
 .bp-nav-compact { padding: 14px 11px 10px; gap: 2px; }
