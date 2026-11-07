@@ -343,7 +343,8 @@
     "pretest": "node scripts/prepare-product-tests.mjs",
     "test": "node scripts/run-tests.mjs",
     "prepack": "node remote-computer-agent/build.mjs && node scripts/prepack.mjs",
-    "prepare:native": "node scripts/prepare-native-driver.mjs"
+    "prepare:native": "node scripts/prepare-native-driver.mjs",
+    "check:github-math": "node scripts/check-github-math.mjs"
   },
   "license": "MIT",
   "engines": {
