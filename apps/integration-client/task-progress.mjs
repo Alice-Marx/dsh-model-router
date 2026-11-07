@@ -3,6 +3,17 @@ import { deriveBotAttention } from './bot-attention.mjs'
 export const taskIdOf = row => row.taskId ?? row.id
 export const taskKey = row => JSON.stringify([row.botId ?? '', taskIdOf(row)])
 export const taskTitle = row => row.title || row.input?.task || taskIdOf(row) || '未命名任务'
+
+/**
+ * The one line the status cell adds under its tag. It says how far the work got,
+ * which the tag cannot: 已停止 does not tell you whether anything ran. When the
+ * attribution only repeats the tag it adds nothing, so it is not shown at all.
+ * The state label is passed in so this stays a pure function of the row.
+ */
+export function progressNote(row, stateLabel = '') {
+  const label = typeof row?.attribution?.label === 'string' ? row.attribution.label.trim() : ''
+  return label && label !== String(stateLabel ?? '').trim() ? label : ''
+}
 export const TASK_FILTERS = Object.freeze([['all', '全部'], ['active', '进行中'], ['attention', '待处理'], ['finished', '已结束']])
 const active = new Set(['queued', 'ready', 'running', 'admitting', 'cancelling'])
 const ended = new Set(['succeeded', 'cancelled', 'skipped'])

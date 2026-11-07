@@ -28,3 +28,16 @@ test('filters combine Bot, status and task or operation identity while retaining
   assert.equal(filterTasks(value, { botId: 'b' })[0].state, 'brand-new-state')
   assert.equal(taskProgress({ tasks: { status: 'blocked', items: [{}] } }).items.length, 0)
 })
+
+test('progress note: says something the tag cannot, and stays quiet when it cannot', async () => {
+  const { progressNote } = await import('../apps/integration-client/task-progress.mjs')
+  // The tag says 已停止, which does not tell you whether any work ran.
+  assert.equal(progressNote({ state: 'cancelled', attribution: { label: '已取消，未执行' } }, '已停止'), '已取消，未执行')
+  assert.equal(progressNote({ state: 'failed', attribution: { label: '已执行，执行后失败' } }, '失败'), '已执行，执行后失败')
+  // Repeating the tag is noise, not information.
+  assert.equal(progressNote({ state: 'succeeded', attribution: { label: '已完成' } }, '已完成'), '')
+  assert.equal(progressNote({ state: 'succeeded', attribution: { label: '  已完成  ' } }, '已完成'), '')
+  // An older row without one, or an empty label, shows nothing.
+  assert.equal(progressNote({ state: 'running' }, '进行中'), '')
+  assert.equal(progressNote({ state: 'running', attribution: { label: '   ' } }, '进行中'), '')
+})
