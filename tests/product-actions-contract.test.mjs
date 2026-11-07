@@ -49,3 +49,19 @@ test('product channel: every action that is not a Bot surface is wrapped or expl
   assert.ok(source.includes('[`machine.desktop.${action}`]'), 'the desktop action loop must stay name-driven')
   assert.match(source, /context\?\.kind !== 'owner'/, 'the owner check itself must stay in the composition')
 })
+
+test('product view: the narrowed projection still carries how far the work got', async () => {
+  // The public task view is deliberately narrow, and it rebuilt the object — so a
+  // field added to the journal view never reached the panel. This is the check
+  // that would have caught it.
+  const {projectProductTask} = await import('../packages/orchestration/src/task-product.mjs')
+  const base = {ownerBotId: 'bot', taskId: 'task', packageId: 'pkg', attemptId: 'attempt', state: 'failed', input: {backend: 'fixture'}, attempts: [{}]}
+  const view = projectProductTask({...base, attribution: {code: 'failed-after-dispatch', label: '已执行，执行后失败'}})
+  assert.deepEqual(view.attribution, {code: 'failed-after-dispatch', label: '已执行，执行后失败'})
+  assert.equal(Object.hasOwn(projectProductTask(base), 'attribution'), false, 'an older row stays without one')
+  // A code that is not lower-case kebab is not passed through as if it were one.
+  assert.equal(projectProductTask({...base, attribution: {code: 'NOT A CODE', label: 'x'}}).attribution.code, null)
+  // And the narrowing still holds: nothing about inputs or proofs leaks with it.
+  const forged = projectProductTask({...base, attribution: {code: 'not-executed', label: 'x'}, executionRef: {secret: 1}, reconciliation: {at: 1, outcome: 'unknown'}})
+  assert.equal('executionRef' in forged, false)
+})

@@ -2,6 +2,9 @@
 // execution references, raw event details or reconciliation proofs.
 const short = (value, limit = 160) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : ''
 const code = value => typeof value === 'string' && /^[A-Z0-9_:-]{1,128}$/.test(value) ? value : null
+// Attribution codes are lower-case words ('failed-after-dispatch'), not error
+// codes, so they get their own shape instead of being forced through `code()`.
+const attributionCode = value => typeof value === 'string' && /^[a-z][a-z-]{1,40}$/.test(value) ? value : null
 
 export function projectProductTask(task) {
   const input = task.input?.input ?? {}
@@ -14,6 +17,10 @@ export function projectProductTask(task) {
     location: task.input?.target?.location, machineId: task.input?.target?.machineId, workspaceId: task.input?.target?.workspaceId,
     createdAt: task.createdAt, updatedAt: task.updatedAt, deadlineAt: task.deadlineAt,
     attemptNumber: task.attemptNumber, operationId: task.operationId, attempts: task.attempts.length,
+    // How far the work actually got. This projection is deliberately narrow, and
+    // a derived label is exactly the kind of fact it is meant to carry: it says
+    // nothing about inputs, references or proofs.
+    ...(task.attribution ? { attribution: { code: attributionCode(task.attribution.code), label: short(task.attribution.label, 40) } } : {}),
     legacyRunIds: task.legacyRunIds,
     result: task.result ? { code: code(task.result.code ?? remote?.code),
       ...(task.executionRef?.kind === 'remote-operation' ? { remote: {
