@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "version": "0.66.4",
+  "releasedAt": "2026-11-07",
+  "why": "The shipped package.json now carries two maintenance scripts, so the artifact a consumer installs differs from 0.66.3 by 33 bytes. Every runtime file is identical to 0.66.3.",
+  "runtimeIdenticalTo": "0.66.3",
+  "manifestAdditions": [
+    "prepare:native — prepares the pinned better-sqlite3 the native specs need",
+    "check:github-math — renders both READMEs through GitHub's own Markdown API and checks the formulas survived"
+  ],
+  "source": {
+    "githubMain": "6412cac",
+    "githubTag": "v0.66.4",
+    "gitlabMain": "545ff56",
+    "gitlabTag": "v0.66.4"
+  },
+  "editions": [
+    {"package": "@ljwei-stak/dsh-model-route-bot", "version": "0.66.4", "bytes": 2696499, "sha256": "018b6d2b99423a8e", "files": 434, "runtimeFiles": 193, "integrity": "sha512-9QGbFvkg5Au5BGMTT246sHauOg2++v+00fE/p9S0X9yFK6QDPZZiy7SErzmT+6W2o8VmJgNAv5k0NIxIoakjfw==", "anonymousDownloadMatches": true},
+    {"package": "@ljwei-stak/dsh-model-router", "version": "0.66.4", "bytes": 554934, "sha256": "cac4a1c3464a0751", "files": 62, "runtimeFiles": 53, "reproducibleFromSource": true, "anonymousDownloadMatches": true}
+  ],
+  "verification": {
+    "checkPackage": "434 files match HEAD, 193 runtime files",
+    "checkRouterPackage": "62 files, 53 runtime, reproducible from source",
+    "checkContracts": "passed",
+    "checkClient": "ok",
+    "checkReadme": "6 formulas, 33 inline, translation hashes",
+    "checkGithubMath": "6 display + 33 inline in both READMEs, 0 formulas collapsed into code blocks"
+  },
+  "installedInto": {"profile": "C:/Users/Jianw/.dsh/profiles/desktop", "from": "0.66.3", "to": "0.66.4", "verified": ["installed 0.66.4"]},
+  "alsoClosedThisRound": [
+    "Remote Agent rebuild is byte-identical (nothing to release); Windows desktop helpers compile with recorded SHA256 a1b66f2b… and d09eeb89…",
+    "GitHub rendering of both READMEs verified through GitHub's own API, not a local approximation",
+    "The router-only edition mounts in a real Host: 71 plugin descriptors, its 969 KB client bundle served, no Bot product API (404)"
+  ],
+  "notVerified": [
+    "The router-only edition's routing panel itself was never opened: the fixture Host cannot persist the onboarding acknowledgement that gates it ('暂时无法保存确认状态'). Composition, mounting and the edition boundary are verified; the panel contents are not.",
+    "Windows has no MSI/NSIS installer in this repo; the install entry point is deploy/remote-agent/install-windows.ps1."
+  ]
+}
