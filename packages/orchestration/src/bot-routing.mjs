@@ -16,7 +16,7 @@
 export const BOT_ROUTING_PRESETS = Object.freeze(['economy', 'balanced', 'quality'])
 
 const fail = code => { const error = new Error(code); error.code = code; throw error }
-const finite = value => (typeof value === 'number' && Number.isFinite(value) ? value : null)
+const finite = (value, max = Infinity) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= max ? value : null)
 const list = value => (Array.isArray(value) ? value : [])
 
 /** Hard requirements a Bot must satisfy before it is even scored. */
@@ -53,7 +53,7 @@ export const botRejection = (candidate, task = {}) => rejection(candidate, task)
 /** Lower is better. Unknown cost sorts after known cost but is never silently free. */
 function score(candidate, preset, maxPrice) {
   const price = finite(candidate.pricePerMTokUsd)
-  const quality = finite(candidate.quality)
+  const quality = finite(candidate.quality, 1)
   const load = finite(candidate.load) ?? 0
   // Cost is normalised against the most expensive eligible Bot, so one very expensive route
   // cannot swamp quality evidence: what matters is the ratio within this decision, not dollars.
@@ -91,9 +91,11 @@ export function routeBot({ task = {}, candidates = [], preset = 'balanced', limi
   const scored = []
   for (const candidate of eligible) {
     scored.push({ botId: candidate.botId, score: score(candidate, preset, maxPrice), model: candidate.model,
-      pricePerMTokUsd: finite(candidate.pricePerMTokUsd), quality: finite(candidate.quality) })
+      pricePerMTokUsd: finite(candidate.pricePerMTokUsd), quality: finite(candidate.quality, 1) })
   }
-  scored.sort((left, right) => left.score - right.score || String(left.botId).localeCompare(String(right.botId)))
+  scored.sort((left, right) => left.score - right.score
+    || Number(left.pricePerMTokUsd === null) - Number(right.pricePerMTokUsd === null)
+    || String(left.botId).localeCompare(String(right.botId)))
   const ranked = scored.slice(0, Math.max(1, limit))
   return {
     preset,

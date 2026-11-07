@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { PRODUCT_PANELS, TASK_STATES, modelName, money } from './api.mjs'
-import { botAttentionSummary, deriveBotAttention } from './bot-attention.mjs'
+import { TaskWorkspace } from './tasks-panel.jsx'
 import { normalizeEndpoint, parsePairingPaste, secretNameFor } from './pairing.mjs'
 import { framePoint } from '../../packages/orchestration/src/desktop-contract.mjs'
 import { BotBindingEditor } from './binding-editor.jsx'
@@ -8,6 +8,7 @@ import { LibraryPanel } from './library-panel.jsx'
 import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
 import { UiIcon } from './ui-icons.jsx'
+import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 
 const NAV_EVENT = 'bot-product:navigation'
 let activePanel = null
@@ -165,37 +166,32 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
 
 
 /**
- * What the team needs from a person, above the task table. Healthy state renders nothing,
- * and each row offers the action it names instead of a link into a report.
- */
-function BotAttention({ snapshot, dispatch, busy, openTask }) {
-  const rows = deriveBotAttention(snapshot)
-  if (rows.length === 0) return null
-  const actions = snapshot?.availableActions ?? []
-  const run = (row, action, payload) => {
-    if (!dispatch || busy || !actions.includes(action)) return
-    void dispatch(action, { botId: row.botId, taskId: row.taskId, requestKey: crypto.randomUUID(), ...payload })
-  }
-  return <section className="bp-card bp-attention" aria-label="需要你处理">
-    <div className="bp-card-title"><h2>需要你处理</h2><Tag>{botAttentionSummary(rows)}</Tag></div>
-    <ul className="bp-attention-list">{rows.map(row => <li key={row.key} className={`bp-attention-row bp-attention-${row.stage}`}>
-      <div><strong>{row.title}</strong><p className="bp-muted">{row.detail}</p></div>
-      {row.action === 'reconcile' && actions.includes('task.reconcile') && <button disabled={busy} onClick={() => run(row, 'task.reconcile')}>核对原收据</button>}
-      {row.action === 'retry' && actions.includes('task.retry') && <button disabled={busy} onClick={() => run(row, 'task.retry')}>重试</button>}
-      {row.action !== 'reconcile' && row.action !== 'retry' && <button disabled={busy} onClick={() => openTask(row.taskId)}>打开任务</button>}
-    </li>)}</ul>
-  </section>
-}
-
-
-/**
  * Bot routing: who should take this task, and why.
  *
- * The card only previews. It reads the candidate table the Host builds from committed state and
- * asks for one decision; nothing is dispatched, no machine is bound and no money moves until a
- * person acts on it elsewhere.
+ * Preview is read-only. Only an explicit create action can submit the captured, current task.
+ * A late response must not revive an edited draft or move a decision to another Host.
  */
-function BotRoutingCard({ snapshot, dispatch, busy }) {
+const routingPresetLabel = preset => ({ economy: '省钱优先', balanced: '均衡', quality: '效果优先' })[preset] ?? '当前策略'
+const routingRefusalMessage = reason => {
+  const code = String(reason ?? '').split(':')[0]
+  return ({ INVALID_CANDIDATE: '候选信息不完整', BOT_DISABLED: '已停用', MISSING_BOT_ID: '缺少 Bot 标识', BOT_MODEL_UNBOUND: '尚未绑定模型',
+    BOT_MACHINE_OFFLINE: '所需电脑未在线', BOT_BUSY: '正在处理其他任务', BOT_MISSING_TOOL: '缺少任务所需工具', BOT_MISSING_CAPABILITY: '缺少任务所需能力',
+    BOT_ROUTING_WORKER_CEILING_INSUFFICIENT: '保存的电脑权限不足' })[code] ?? '不满足本次执行条件'
+}
+const validRoutingView = value => value && typeof value.enabled === 'boolean' && ['economy', 'balanced', 'quality'].includes(value.preset)
+  && Array.isArray(value.candidates) && value.candidates.every(row => row && typeof row.botId === 'string' && row.botId !== '')
+const submissionFailureMessage = failure => {
+  const code = failure?.code
+  if (code === 'REMOTE_OWNER_REQUIRED') return '请重新登录宿主拥有者账号后核对原提交；请保留核对码，不要重新创建任务。'
+  if (['BOT_ROUTING_STATUS_UNAVAILABLE', 'PRODUCT_ACTION_UNAVAILABLE'].includes(code)) return '当前宿主尚不支持原提交核对，请更新宿主或在任务记录中核对；请保留核对码。'
+  if (['BOT_ROUTING_SUBMISSION_IDENTITY_MISMATCH', 'INVALID_ROUTING_SUBMISSION_STATUS'].includes(code)) return '返回记录与原提交身份不一致，尚不能确认结果。请在原宿主核对任务记录并保留核对码。'
+  if (code === 'PRODUCT_READ_ONLY') return '宿主目前处于只读状态，请恢复宿主后核对原提交；请保留核对码，不要重新创建任务。'
+  return '原提交核对尚未完成，请恢复宿主连接后再次核对；请保留核对码，不会重新提交任务。'
+}
+
+function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }) {
+  const submissions = useMemo(() => routingSubmissions(submissionScope), [submissionScope])
+  const submission = useSyncExternalStore(submissions.subscribe, submissions.getSnapshot, submissions.getSnapshot)
   const [view, setView] = React.useState(null)
   const [error, setError] = React.useState('')
   const [text, setText] = React.useState('')
@@ -204,86 +200,218 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
   const [root, setRoot] = React.useState('')
   const [effect, setEffect] = React.useState('read')
   const [decision, setDecision] = React.useState(null)
-  const [working, setWorking] = React.useState(false)
-  const dispatchRef = useRef(dispatch)
-  dispatchRef.current = dispatch
+  const [working, setWorking] = React.useState('')
+  const [savedCode, setSavedCode] = useState('')
+  const [copyStatus, setCopyStatus] = useState('')
+  const codeInput = useRef(null)
+  const [viewReady, setViewReady] = React.useState(false)
+  const control = useRef({ live: false, epoch: 0, draft: 0, active: null, prepared: null, ready: false })
+  const form = useRef({ text: '', pin: '', machine: '', root: '', effect: 'read' })
+  const busyRef = useRef(busy)
+  busyRef.current = busy
   const call = useCallback(async (action, payload) => {
-    const value = await dispatchRef.current(action, payload)
-    if (value === undefined || value?.ok === false) throw new Error(value?.error?.message ?? '宿主尚未确认这次请求，请刷新后重试。')
+    if (typeof dispatch !== 'function') throw new Error('宿主接口尚未就绪。')
+    const value = await dispatch(action, payload, { errorResult: true })
+    if (value === undefined || value?.ok === false) throw Object.assign(new Error(value?.error?.message ?? '宿主尚未确认这次请求，请刷新后重试。'), { code: value?.error?.code })
     return value
+  }, [dispatch])
+  const invalidate = useCallback(() => {
+    control.current.draft++; control.current.prepared = null
+    setDecision(null)
   }, [])
-
+  const editDraft = changes => {
+    const next = { ...form.current, ...changes }
+    form.current = next
+    setText(next.text); setPin(next.pin); setMachine(next.machine); setRoot(next.root); setEffect(next.effect)
+    const previous = submissions.getSnapshot()
+    if (previous?.state === 'confirmed') submissions.clear(previous)
+    invalidate()
+  }
+  const begin = useCallback(kind => {
+    const state = control.current
+    if (!state.live || state.active || busyRef.current) return null
+    const token = { epoch: state.epoch }
+    state.active = token; setWorking(kind); setError('')
+    return token
+  }, [])
+  const current = token => control.current.live && control.current.epoch === token.epoch && control.current.active === token
+  const finish = token => { if (current(token)) { control.current.active = null; setWorking('') } }
+  const staleView = () => { control.current.ready = false; setViewReady(false) }
   const load = React.useCallback(async () => {
-    if (typeof dispatch !== 'function') return
+    const token = begin('inspect')
+    if (!token) return
+    invalidate(); staleView()
     try {
       const next = await call('botRoutingInspect', {})
-      setView(next && next.ok === false ? null : next)
-      setError(next && next.ok === false ? String(next.error?.message ?? next.error) : '')
+      if (!current(token)) return
+      if (!validRoutingView(next)) throw new Error('宿主未返回完整候选信息，请刷新后重试。')
+      setView(next); control.current.ready = true; setViewReady(true)
     } catch (failure) {
-      setError(String(failure?.message ?? failure))
-    }
-  }, [call])
-  useEffect(() => { void load() }, [load])
+      if (current(token)) setError(String(failure?.message ?? failure))
+    } finally { finish(token) }
+  }, [call, begin, invalidate])
+  useEffect(() => {
+    const state = control.current
+    state.live = true; state.epoch++; state.active = null; state.ready = false
+    setView(null); setViewReady(false); setWorking(''); setSavedCode(''); setCopyStatus(''); setError(''); invalidate()
+    void load()
+    return () => { state.live = false; state.epoch++; state.draft++; state.active = null; state.prepared = null; state.ready = false }
+  }, [load, invalidate])
+  useEffect(() => { setCopyStatus('') }, [submissions, submission?.requestKey])
+  useEffect(() => {
+    if (!busy && !view && control.current.live && !control.current.active) void load()
+  }, [busy, view, load])
   const saveSettings = async settings => {
-    setWorking(true); setError('')
+    if (!control.current.ready) return
+    const token = begin('settings')
+    if (!token) return
+    invalidate(); staleView()
     try {
       const value = await call('botRouting.save', { expectedRevision: view.settingsRevision ?? 0, settings })
-      setView(value); setDecision(null); setDispatched(null)
-    } catch (failure) { setError(String(failure?.message ?? failure)) }
-    finally { setWorking(false) }
+      if (!current(token)) return
+      if (!validRoutingView(value)) throw new Error('设置保存结果尚未确认，请刷新候选核对。')
+      setView(value); control.current.ready = true; setViewReady(true)
+    } catch (failure) { if (current(token)) setError(String(failure?.message ?? failure)) }
+    finally { finish(token) }
   }
 
-  const [dispatched, setDispatched] = React.useState(null)
-  const routeRequest = () => ({ text: text.trim(), requiresMachine: machine !== '',
-    ...(pin ? { pinnedBotId: pin } : {}),
-    ...(machine ? { machineId: machine, rootId: root || snapshot.machines?.items?.find(item => item.id === machine)?.roots?.[0] || '' } : {}),
-    needs: { write: effect === 'write', desktop: effect === 'desktop', browser: effect === 'browser' } })
+  const routeRequest = () => {
+    const input = form.current
+    return { text: input.text.trim(), requiresMachine: input.machine !== '',
+      requesterBotId: view.requesterBotId ?? snapshot.mainBotId ?? snapshot.bots?.find(bot => bot.main)?.id ?? '',
+      ...(input.pin ? { pinnedBotId: input.pin } : {}),
+      ...(input.machine ? { machineId: input.machine, rootId: input.root || snapshot.machines?.items?.find(item => item.id === input.machine)?.roots?.[0] || '' } : {}),
+      needs: { write: input.effect === 'write', desktop: input.effect === 'desktop', browser: input.effect === 'browser' } }
+  }
   const submitRouted = async () => {
-    if (!decision?.chosen || working) return
-    setWorking(true)
-    setError('')
+    const state = control.current, prepared = state.prepared
+    if (!state.ready || submissions.getSnapshot() || !prepared || prepared.draft !== state.draft || prepared.epoch !== state.epoch) return
+    const token = begin('dispatch')
+    if (!token) return
+    let reference
     try {
-      const request = { ...routeRequest(), requestKey: crypto.randomUUID() }
+      prepared.requestKey ??= crypto.randomUUID()
+      const request = { ...prepared.request, requestKey: prepared.requestKey }
+      if (!request.requesterBotId) throw new Error('尚未取得提交任务的主 Bot，请刷新候选后重试。')
+      reference = { requestKey: request.requestKey, requesterBotId: request.requesterBotId }
+      if (!submissions.start(reference)) return
       const next = await call('botRouting.dispatch', request)
-      if (next && next.ok === false) throw new Error(next.error?.message ?? next.error)
-      setDispatched(next)
+      const planId = next?.planId ?? next?.taskId
+      if (next?.accepted !== true || typeof planId !== 'string' || !planId.trim()) throw new Error('未取得有效的任务计划编号。')
+      // The receipt belongs to the captured Host even if its card was unmounted meanwhile.
+      submissions.update(reference, { state: 'confirmed', planId, planState: next.planState })
+      if (current(token)) state.prepared = null
     } catch (failure) {
-      setError(String(failure?.message ?? failure))
-    } finally {
-      setWorking(false)
+      if (reference) submissions.update(reference, { state: 'unknown' })
+      if (current(token)) {
+        invalidate(); staleView()
+        setError(reference ? '提交结果尚未确认，请刷新任务列表或核对原提交，避免重复创建。' : String(failure?.message ?? failure))
+      }
+    } finally { finish(token) }
+  }
+  const checkSubmission = async () => {
+    const reference = submissions.getSnapshot()
+    if (!reference || !snapshot.availableActions?.includes('botRouting.status')) return
+    const token = begin('status')
+    if (!token) return
+    try {
+      const next = await call('botRouting.status', { requestKey: reference.requestKey, requesterBotId: reference.requesterBotId })
+      if (typeof next?.found !== 'boolean' || next.originBotId !== reference.requesterBotId
+        || next.found && (next.accepted !== true || typeof next.planId !== 'string' || !next.planId.trim())) throw Object.assign(new Error('宿主未返回有效的原提交记录。'), { code: 'INVALID_ROUTING_SUBMISSION_STATUS' })
+      submissions.update(reference, next.found ? { state: 'confirmed', planId: next.planId, planState: next.planState } : { state: 'not-found' })
+    } catch (failure) {
+      if (current(token)) setError(submissionFailureMessage(failure))
+    } finally { finish(token) }
+  }
+  const restoreSubmission = event => {
+    event.preventDefault()
+    if (busyRef.current || control.current.active || !control.current.live || submissions.getSnapshot()) return
+    try {
+      if (!submissions.restore(savedCode)) return
+      setSavedCode(''); invalidate()
+      void checkSubmission()
+    } catch { setError('核对码格式无效或版本不支持，请粘贴完整的提交核对码。') }
+  }
+  const copySubmission = async () => {
+    const reference = submissions.getSnapshot(), epoch = control.current.epoch
+    if (!reference) return
+    const code = submissionCode(reference)
+    const stillCurrent = () => control.current.live && control.current.epoch === epoch
+      && submissions.getSnapshot()?.requestKey === reference.requestKey && submissions.getSnapshot()?.requesterBotId === reference.requesterBotId
+    codeInput.current?.focus(); codeInput.current?.select()
+    try {
+      if (typeof globalThis.navigator?.clipboard?.writeText !== 'function') throw new Error('CLIPBOARD_UNAVAILABLE')
+      await globalThis.navigator.clipboard.writeText(code)
+      if (stillCurrent()) setCopyStatus('已复制核对码，请保存后用于原宿主查询。')
+    } catch {
+      if (stillCurrent()) setCopyStatus('请选中核对码后手动复制，并保存用于原宿主查询。')
     }
   }
   const decide = async () => {
-    if (!text.trim() || working) return
-    setWorking(true)
-    setError('')
+    const state = control.current
+    if (!state.ready || submissions.getSnapshot() || !view.enabled || !form.current.text.trim()) return
+    const token = begin('preview')
+    if (!token) return
+    invalidate()
+    const draft = state.draft, request = routeRequest()
     try {
-      const request = routeRequest()
       const next = await call('botRoutingDecide', request)
-      if (next && next.ok === false) throw new Error(next.error?.message ?? next.error)
+      if (!current(token) || state.draft !== draft) return
+      if (!next || !Object.hasOwn(next, 'chosen') || !Array.isArray(next.ranked) || !Array.isArray(next.rejected)
+        || next.chosen !== null && typeof next.chosen?.botId !== 'string') throw new Error('宿主未返回完整预览，请刷新后重试。')
+      state.prepared = next.chosen ? { request, draft, epoch: token.epoch, requestKey: null } : null
       setDecision(next)
     } catch (failure) {
-      setDecision(null)
-      setError(String(failure?.message ?? failure))
-    } finally {
-      setWorking(false)
-    }
+      if (current(token) && state.draft === draft) { invalidate(); staleView(); setError(String(failure?.message ?? failure)) }
+    } finally { finish(token) }
   }
 
+  const submissionNotice = submission && <section className="bp-blocked" role="region" aria-label="原提交核对">
+    {submission.state === 'confirmed' ? <p role="status">已提交：{submission.planId}。{TASK_STATES[submission.planState] ?? '请在任务记录中跟踪执行结果。'}</p>
+      : submission.state === 'not-found' ? <p role="status">当前尚未查到原提交，原请求仍可能完成，请稍后再次核对。</p>
+        : <p role="status">{submission.state === 'submitting' && working === 'dispatch' ? '正在提交任务…' : '提交结果尚未确认，请核对原提交。'}</p>}
+    <p>核对只读取原任务记录，不会再次提交或授予权限。</p>
+    <details className="bp-technical"><summary>保存提交核对码</summary>
+      <p>重载应用前可保存核对码，之后在原宿主粘贴查询。核对码只包含提交编号，不包含任务正文或登录凭据。</p>
+      <label>当前提交核对码<input ref={codeInput} aria-label="当前提交核对码" className="bp-submission-code" readOnly value={submissionCode(submission)} onFocus={event => event.target.select()} /></label>
+      <div className="bp-actions"><button type="button" onClick={() => { void copySubmission() }}>复制核对码</button>{copyStatus && <small role="status">{copyStatus}</small>}</div>
+    </details>
+    <div className="bp-actions">
+      {snapshot.availableActions?.includes('botRouting.status') ? <button type="button" disabled={busy || Boolean(working)} onClick={() => { void checkSubmission() }}>核对原提交</button>
+        : <small>当前宿主尚未提供原提交核对，请先在任务记录中核对。</small>}
+      {submission.state === 'confirmed' && <button type="button" disabled={busy || Boolean(working)} onClick={() => { submissions.clear(submission); invalidate() }}>新建另一项任务</button>}
+    </div>
+    {submission.state === 'not-found' && <details className="bp-technical"><summary>已自行核对记录</summary>
+      <p>原请求仍可能完成。清除提醒不会停止原任务，再次创建可能重复；只有自行核对后才清除。</p>
+      <button type="button" disabled={busy || Boolean(working)} onClick={() => { submissions.dismissUnconfirmed(submission); invalidate() }}>清除本窗口提醒</button>
+    </details>}
+  </section>
+  const savedSubmissionForm = !submission && snapshot.availableActions?.includes('botRouting.status') && <details className="bp-technical">
+    <summary>核对已保存的提交</summary><p>请连接原宿主并粘贴之前保存的核对码。此操作只查询原记录，不会创建任务。</p>
+    <form className="bp-submission-restore" onSubmit={restoreSubmission}>
+      <label>已保存的提交核对码<input aria-label="已保存的提交核对码" className="bp-submission-code" value={savedCode} maxLength={1024} autoComplete="off" spellCheck={false} disabled={busy || Boolean(working)} onChange={event => setSavedCode(event.target.value)} placeholder="dsh-route-v1:…" /></label>
+      <button type="submit" disabled={busy || Boolean(working) || !savedCode.trim()}>核对已保存的提交</button>
+    </form>
+  </details>
   if (!view) {
     return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2></div>
-      <p className="bp-muted">{error || '正在读取候选…'}</p><button type="button" disabled={busy || working} onClick={() => { void load() }}>读取候选</button></article>
+      <p className="bp-muted">{error || '正在读取候选…'}</p><button type="button" disabled={busy || working} onClick={() => { void load() }}>读取候选</button>{submissionNotice}{savedSubmissionForm}</article>
   }
   const machines = (snapshot.machines?.items ?? []).filter(item => item.status !== 'revoked')
-  return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2><Tag>{view.enabled ? `已开启 · ${view.preset}` : '未开启'}</Tag>
-    <button type="button" disabled={busy} onClick={() => { void load() }}>{view ? '刷新候选' : '读取候选'}</button></div>
-    <div className="bp-actions"><label className="bp-check"><input type="checkbox" checked={view.enabled} disabled={busy || working} onChange={event => { void saveSettings({ enabled: event.target.checked, preset: view.preset, autoGrant: view.autoGrant }) }} />开启 Bot 路由</label>
-      <label>策略<select value={view.preset} disabled={busy || working} onChange={event => { void saveSettings({ enabled: view.enabled, preset: event.target.value, autoGrant: view.autoGrant }) }}>
+  const inputDisabled = busy || !viewReady || working === 'dispatch' || working === 'settings'
+  const nameOf = botId => view.candidates.find(row => row.botId === botId)?.name ?? botId
+  return <article className="bp-card"><div className="bp-card-title"><h2>Bot 路由</h2><Tag>{view.enabled ? `已开启 · ${routingPresetLabel(view.preset)}` : '未开启'}</Tag>
+    <button type="button" disabled={busy || Boolean(working)} onClick={() => { void load() }}>刷新候选</button></div>
+    <div className="bp-actions"><label className="bp-check"><input type="checkbox" checked={view.enabled} disabled={busy || Boolean(working) || !viewReady} onChange={event => { void saveSettings({ enabled: event.target.checked, preset: view.preset, autoGrant: view.autoGrant }) }} />开启 Bot 路由</label>
+      <label>策略<select value={view.preset} disabled={busy || Boolean(working) || !viewReady} onChange={event => { void saveSettings({ enabled: view.enabled, preset: event.target.value, autoGrant: view.autoGrant }) }}>
         <option value="economy">省钱优先</option><option value="balanced">均衡</option><option value="quality">效果优先</option></select></label>
-      <label className="bp-check"><input type="checkbox" checked={view.autoGrant?.machineTools === true} disabled={busy || working} onChange={event => { void saveSettings({ enabled: view.enabled, preset: view.preset, autoGrant: { ...view.autoGrant, machineTools: event.target.checked } }) }} />自动授予任务所需电脑权限</label></div>
+      <label className="bp-check"><input type="checkbox" checked={view.autoGrant?.machineTools === true} disabled={busy || Boolean(working) || !viewReady} onChange={event => { void saveSettings({ enabled: view.enabled, preset: view.preset, autoGrant: { ...view.autoGrant, machineTools: event.target.checked } }) }} />自动授予任务所需电脑权限</label></div>
     {!view.enabled && <p className="bp-muted">开启后，主 Bot 可根据各 Bot 已配置的模型、工具与电脑权限分配任务。手动指定也会检查是否具备执行条件。</p>}
     {error && <p className="bp-error" role="alert">{error}</p>}
-    {view.enabled ? <div className="bp-table-wrap"><table>
+    {submissionNotice}
+    {savedSubmissionForm}
+    {!viewReady && !working && <p className="bp-muted">候选尚未更新，请刷新候选后再预览。</p>}
+    {view.enabled ? <div className="bp-table-wrap"><table className="bp-routing-candidates">
       <thead><tr><th>Bot</th><th>模型</th><th>机器</th><th>价格/百万</th><th>质量</th><th>状态</th></tr></thead>
       <tbody>{view.candidates.map(row => <tr key={row.botId}>
         <td>{row.name}{row.main ? <Tag>Main</Tag> : null}<small>{row.botId}</small></td>
@@ -294,78 +422,51 @@ function BotRoutingCard({ snapshot, dispatch, busy }) {
         <td>{row.busy ? '正忙' : '空闲'}</td>
       </tr>)}</tbody></table></div> : null}
     {view.enabled ? <div className="bp-form">
-      <label>任务描述<textarea rows={2} value={text} onChange={event => { setText(event.target.value); setDecision(null) }} placeholder="例如：整理上周的发布记录" /></label>
-      <label>路由方式<select value={pin} onChange={event => { setPin(event.target.value); setDecision(null) }}>
+      <label>任务描述<textarea rows={2} value={text} disabled={inputDisabled} onChange={event => editDraft({ text: event.target.value })} placeholder="例如：整理上周的发布记录" /></label>
+      <label>路由方式<select value={pin} disabled={inputDisabled} onChange={event => editDraft({ pin: event.target.value })}>
         <option value="">自动路由（按预设打分）</option>
         {view.candidates.map(row => <option key={row.botId} value={row.botId}>指定：{row.name}</option>)}
       </select></label>
-      <label>需要远程电脑<select value={machine} onChange={event => { setMachine(event.target.value); setRoot(''); setEffect('read'); setDecision(null) }}>
+      <label>需要远程电脑<select value={machine} disabled={inputDisabled} onChange={event => editDraft({ machine: event.target.value, root: '', effect: 'read' })}>
         <option value="">不需要</option>
         {machines.map(item => <option key={item.id} value={item.id}>{item.name ?? item.id}</option>)}
       </select></label>
-      {machine && <label>共享目录<select value={root || machines.find(item => item.id === machine)?.roots?.[0] || ''} onChange={event => { setRoot(event.target.value); setDecision(null) }}>
+      {machine && <label>共享目录<select value={root || machines.find(item => item.id === machine)?.roots?.[0] || ''} disabled={inputDisabled} onChange={event => editDraft({ root: event.target.value })}>
         {(machines.find(item => item.id === machine)?.roots ?? []).map(id => <option key={id} value={id}>{id}</option>)}
       </select></label>}
-      <label>任务需要的操作<select value={effect} onChange={event => { setEffect(event.target.value); setDecision(null) }}>
+      <label>任务需要的操作<select value={effect} disabled={inputDisabled} onChange={event => editDraft({ effect: event.target.value })}>
         <option value="read">只读 / 分析</option><option value="write">写入文件</option>
         {machine && <><option value="desktop">操作 Windows 桌面</option><option value="browser">操作远程浏览器</option></>}
       </select></label>
-      <button type="button" disabled={busy || working || !text.trim()} onClick={() => { void decide() }}>{working ? '计算中…' : '预览路由'}</button>
-      {error && <p className="bp-error" role="alert">{error}</p>}
+      <button type="button" disabled={busy || Boolean(working) || Boolean(submission) || !viewReady || !text.trim()} onClick={() => { void decide() }}>{working === 'preview' ? '计算中…' : '预览路由'}</button>
     </div> : null}
-    {decision ? <div className="bp-blocked">
+    {decision ? <div className="bp-blocked" role="region" aria-label="路由预览结果">
       <strong>选中：{decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? '（手动指定）' : ''}` : '没有可用的 Bot'}</strong>
-      {decision.binding ? <p>将授予该 Bot：{decision.binding.mode} · {decision.binding.tools.length} 项工具（{decision.binding.tools.join('、')}）</p> : null}
-      {decision.rejected?.length ? <p>落选：{decision.rejected.map(row => `${row.botId}（${row.reason}）`).join('；')}</p> : null}
+      <p>{decision.pinned ? '手动指定的 Bot 已通过本次执行条件检查，未与其他 Bot 比较评分。' : `按${routingPresetLabel(decision.preset)}策略比较，综合评分越低越靠前。`}</p>
+      {decision.binding ? <><p>所需电脑权限：{decision.binding.mode === 'read-only' ? '只读' : '读写'} · {decision.binding.tools.length} 项工具。</p>
+        <p>{decision.grant?.autoGrant === false ? '自动授权已关闭，创建任务时会核对已有授权；权限不足时需先配置。' : '创建任务时才会按已保存的权限上限核对和授权。'}</p></> : null}
+      {decision.rejected?.length ? <p>未满足条件：{decision.rejected.map(row => `${nameOf(row.botId)}（${routingRefusalMessage(row.reason)}）`).join('；')}</p> : null}
+      {!decision.pinned && decision.ranked?.length > 0 && <details className="bp-technical"><summary>查看比较依据</summary>
+        <p>评分只用于本次候选排序，不代表成功率。未知价格按保守值计算，未知质量按中间值参与比较。</p>
+        <div className="bp-table-wrap"><table className="bp-routing-comparison" aria-label="候选比较"><thead><tr><th>Bot</th><th>综合评分</th><th>价格/百万</th><th>参考质量</th></tr></thead>
+          <tbody>{decision.ranked.map(row => <tr key={row.botId}><td>{nameOf(row.botId)}</td><td>{Number.isFinite(row.score) ? row.score.toFixed(6) : '未知'}</td>
+            <td>{Number.isFinite(row.pricePerMTokUsd) ? `$${row.pricePerMTokUsd}` : '未知'}</td><td>{Number.isFinite(row.quality) ? row.quality : '未知'}</td></tr>)}</tbody></table></div>
+      </details>}
+      {(decision.binding || decision.rejected?.length > 0) && <details className="bp-technical"><summary>执行条件详情</summary>
+        {decision.binding && <p>所需工具：{decision.binding.tools.join('、')}</p>}
+        {decision.rejected?.map(row => <p key={row.botId}>{row.botId}：{row.reason}</p>)}
+      </details>}
       {decision.chosen ? <div className="bp-actions">
-        <button type="button" disabled={busy} onClick={() => { void submitRouted() }}>按此路由创建任务</button>
-        {dispatched ? <small role="status">已提交：{dispatched.plan?.taskId ?? dispatched.submitted?.taskId ?? '已受理'}</small> : null}
+        <button type="button" disabled={busy || Boolean(working) || !viewReady || Boolean(submission)} onClick={() => { void submitRouted() }}>按此路由创建任务</button>
       </div> : null}
     </div> : null}
   </article>
 }
 
-export function Tasks({ snapshot, dispatch, busy }) {
-  const section = snapshot.tasks
-  const [selected, setSelected] = useState(null)
-  if (section?.status !== 'available') return <Blocked value={section} />
-  const rows = section.items
-  const task = rows.find(row => (row.taskId ?? row.id) === selected)
-  const actions = snapshot.availableActions ?? []
-  return <><BotAttention snapshot={snapshot} dispatch={dispatch} busy={busy} openTask={setSelected} />{section.plans?.map((plan, index)=><article className="bp-card" key={plan.planId}>
-    <div className="bp-card-title"><div><h2>协作计划 {index + 1}</h2><p className="bp-muted">{plan.packages.length} 个工作包 · {plan.packages.filter(item => item.state === 'succeeded').length} 个已完成</p></div><div className="bp-actions"><Tag>{TASK_STATES[plan.state]??plan.state}</Tag>
-      {actions.includes('task.plan.cancel')&&!['succeeded','cancelled'].includes(plan.state)&&<button disabled={busy} onClick={()=>dispatch('task.plan.cancel',{botId:plan.ownerBotId,planId:plan.planId})}>停止整个计划</button>}</div></div>
-    {plan.needsReconciliation&&<p role="status">有工作包停止尚未确认，请核对原收据；计划尚未完成停止。</p>}
-    <ul className="bp-plan-list">{plan.packages.map((item, step) => {
-      const linkedTask = rows.find(row => (row.taskId ?? row.id) === item.taskId)
-      return <li key={item.id}><span className="bp-plan-step">{item.state === 'succeeded' ? <UiIcon name="check" size={13} /> : step + 1}</span><div className="bp-plan-copy"><strong>{linkedTask?.title ?? linkedTask?.input?.task ?? plan.plan?.packages?.find(pkg => pkg.id === item.id)?.objective ?? `工作包 ${step + 1}`}</strong><small>{snapshot.bots?.find(bot=>bot.id===item.targetBotId)?.name??item.targetBotId}
-      {item.dependsOn.length>0&&` · 前置：${item.dependsOn.join('、')}`}{item.result?.code==='DEPENDENCY_FAILED'&&' · 前置包失败，尚未执行'}</small></div><Tag>{TASK_STATES[item.state]??item.state}</Tag></li>
-    })}</ul><details className="bp-technical bp-plan-id"><summary>计划编号</summary><p className="bp-code">{plan.planId}</p></details>
-  </article>)}{rows.length === 0 ? <p className="bp-empty">尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。</p> : <div className="bp-table-wrap"><table>
-    <thead><tr><th>任务</th><th>Bot</th><th>状态</th><th>执行尝试</th><th>操作</th></tr></thead><tbody>{rows.map((row, index) => {
-      const id = row.taskId ?? row.id
-      const canCancel = !['cancelled', 'succeeded', 'failed', 'skipped'].includes(row.state)
-      const remote = row.result?.remote
-      // A terminal Task state alone does not prove that the original remote
-      // operation stopped. The host still makes the authoritative decision.
-      const stopKnown = !remote || remote.stopConfirmed === true
-      return <tr key={id}><td><button className="bp-text-button" onClick={() => setSelected(id)}>{row.title ?? row.input?.task ?? `任务 ${index + 1}`}</button></td>
-        <td>{snapshot.bots?.find(bot => bot.id === row.botId)?.name ?? row.botId ?? '未取得归属'}</td><td><Tag>{TASK_STATES[row.state] ?? row.state}</Tag>{row.blockedReason && <small>{row.blockedReason}</small>}
-          {remote&&(!stopKnown?<small role="status">写入或停止尚未确认，请核对原操作；不会自动重发，也暂不能重试。</small>:remote.notStarted===true&&remote.possiblyApplied!==true?<small>原操作未启动。</small>:remote.status==='succeeded'?<small>写入已确认。{row.state==='cancelled'?'取消未撤销文件变更。':''}</small>:remote.possiblyApplied===true&&<small>操作已停止，文件可能已改变；重试不会撤销已有变更，请先核对产物。</small>)}
-        </td>
-        <td>{Number.isSafeInteger(row.attempts)?row.attempts:row.attempts?.length ?? row.attemptCount ?? '未知'}</td><td className="bp-actions">
-          {actions.includes('task.cancel') && canCancel && <button disabled={busy} onClick={() => dispatch('task.cancel', { botId:row.botId,taskId: id })}>停止</button>}
-          {actions.includes('task.retry') && ['failed', 'cancelled', 'waiting-budget'].includes(row.state) && <button disabled={busy || !stopKnown} onClick={() => { if (stopKnown) dispatch('task.retry', { botId:row.botId,taskId: id, requestKey: crypto.randomUUID() }) }}>重试</button>}
-          {actions.includes('task.reconcile') && row.state === 'needs-reconciliation' && <button disabled={busy} onClick={() => dispatch('task.reconcile', { botId:row.botId,taskId: id, requestKey: crypto.randomUUID() })}>核对原收据</button>}
-        </td></tr>
-    })}</tbody></table></div>}
-    {task && <article className="bp-card"><div className="bp-card-title"><h2>任务详情</h2><button onClick={() => setSelected(null)}>关闭</button></div>
-      <dl className="bp-facts"><Value label="Task">{task.taskId ?? task.id}</Value><Value label="Package">{task.packageId}</Value><Value label="Attempt">{task.attemptId}</Value><Value label="Operation">{task.operationId}</Value>
-        <Value label="期限">{task.deadlineAt ? new Date(task.deadlineAt).toLocaleString('zh-CN') : '未取得'}</Value><Value label="MR 运行">{task.legacyRunIds?.join('、')}</Value></dl>
-      <h3>执行与收据依据</h3><pre>{JSON.stringify({ attempts: task.attempts, executionRef: task.executionRef, remoteReceipt:task.result?.remote,reconciliation: task.reconciliation, packages: task.packages }, null, 2)}</pre>
-    </article>}
-    {snapshot.availableActions?.includes('botRoutingInspect') && <BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} />}
-  </>
+export function Tasks({ snapshot, dispatch, busy, submissionScope = dispatch, inspect, openSession }) {
+  if (snapshot.tasks?.status !== 'available') return <Blocked value={snapshot.tasks} />
+  return <TaskWorkspace snapshot={snapshot} dispatch={dispatch} busy={busy} scope={submissionScope} inspect={inspect} openSession={openSession}
+    routingCard={snapshot.availableActions?.includes('botRoutingInspect') ? <BotRoutingCard snapshot={snapshot} dispatch={dispatch} busy={busy} submissionScope={submissionScope} /> : null} />
 }
 
 
@@ -805,7 +906,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     void loop()
     return () => { stopped = true; state.live = false; state.epoch++; state.request++; controller.abort(); clearTimeout(timer) }
   }, [refresh])
-  const dispatch = useCallback(async (action, payload) => {
+  const dispatch = useCallback(async (action, payload, { errorResult = false } = {}) => {
     if (dispatchState.current.snapshotStale || dispatchState.current.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return
     const state = lifecycle.current, epoch = state.epoch
     const current = () => state.live && state.epoch === epoch
@@ -816,10 +917,14 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
       await refresh()
       if (current() && result?.warning) setError('宿主已撤销授权，但远程停止尚未确认；请恢复连接并检查 Agent。')
       return result
-    } catch (cause) { if (current()) { state.request++; setSnapshotStale(true); setError(cause.message) } } finally {
+    } catch (cause) {
+      if (current()) { state.request++; setSnapshotStale(true); setError(errorResult ? '宿主请求未完成，请查看操作区域的提示并刷新记录。' : cause.message) }
+      if (errorResult) return { ok: false, error: { code: cause?.code ?? 'PRODUCT_REQUEST_FAILED', message: String(cause?.message ?? cause) } }
+    } finally {
       if (current()) { pendingActions.current = Math.max(0, pendingActions.current - 1); setBusy(pendingActions.current > 0) }
     }
   }, [productApi, refresh])
+  const inspectTask = useCallback((payload, signal) => productApi.dispatch('task.inspect', payload, signal), [productApi])
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
   const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
   const meta = {
@@ -839,7 +944,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <div className="bp-loading" role="status"><span className="bp-loading-line" aria-hidden="true" /><span className="bp-loading-line" aria-hidden="true" /><p>正在读取宿主状态…</p></div>}
     {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />{snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
-      {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
+      {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} submissionScope={productApi} inspect={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : undefined} openSession={openSession} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'routine' && <RoutinesPanel snapshot={snapshot} dispatch={dispatch} busy={disabled} onOpenMachines={() => openPanel(PRODUCT_PANELS.machines)} />}
       {section === 'library' && <Library snapshot={snapshot} dispatch={dispatch} busy={disabled} />}

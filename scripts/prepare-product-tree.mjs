@@ -15,7 +15,8 @@ const tracked = [...new Set(execFileSync('git', ['ls-files', '-c', '-o', '--excl
   cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
 }).split('\0').filter(Boolean))]
 const top = new Set(['.gitignore', '.gitattributes', 'AGENTS.md', 'LICENSE', 'README.md', 'README.zh.md',
-  'README.i18n.yaml', 'package.json', 'package-lock.json', 'cordis.patch.yml'])
+  'README.i18n.yaml', 'package.json', 'package-lock.json', 'cordis.patch.yml',
+  'docs/integration/agents-anywhere-tasks.md', 'docs/releases/0.65.0-validation.md'])
 const prefixes = ['.github/assets/', '.dsh-plugin/', 'apps/integration-client/', 'apps/desktop-client/', 'packages/',
   'modules/bot-runtime/', 'native/', 'remote-computer-agent/', 'deploy/']
 const scripts = ['build-client.mjs', 'build-router-package.mjs', 'sync-ds-bot.mjs', 'prepack.mjs', 'check-readme.mjs',
@@ -30,7 +31,11 @@ const buildDependencies = new Set(Object.keys(scriptGraph.metafile.inputs).map(p
 const originalPlan = JSON.parse(readFileSync(resolve(root, 'scripts/test-plan.json'), 'utf8'))
 const focused = originalPlan.stages.at(-1).filter(arg => arg !== 'tests/upstream-parity.test.mjs')
 const plan = { schemaVersion: 1, stages: [['scripts/check-readme.mjs'],
-  ['--test', 'tests/readme-math.test.mjs', 'tests/desktop-compat.test.mjs'], focused] }
+  ['--test', 'tests/readme-math.test.mjs', 'tests/desktop-compat.test.mjs',
+    'tests/bot-attention.test.mjs', 'tests/bot-routing.test.mjs', 'tests/bot-routing-candidates.test.mjs',
+    'tests/bot-routing-service.test.mjs', 'tests/product-actions-contract.test.mjs',
+    'tests/product-refresh-order.test.mjs', 'tests/bot-runtime-ui.test.mjs',
+    'tests/task-product.native.mjs', 'tests/remote-agent-build.test.mjs'], focused] }
 const tests = new Set(plan.stages.flat().filter(arg => arg.startsWith('tests/')))
 // Keep only helpers imported by the focused tests, plus their native fixture source.
 for (const file of tests) {
@@ -44,7 +49,7 @@ for (const file of tracked.filter(file => file.startsWith('tests/fixtures/deskto
 const files = tracked.filter(file => top.has(file) || scripts.includes(file) || buildDependencies.has(file) || tests.has(file)
   || prefixes.some(prefix => file.startsWith(prefix)))
 assert.ok(files.every(file => !isAbsolute(file) && !file.split('/').includes('..')))
-assert.ok(!files.some(file => /^(?:docs|output|tmp|node_modules)\//.test(file)))
+assert.ok(!files.some(file => /^(?:docs|output|tmp|node_modules)\//.test(file) && !top.has(file)))
 mkdirSync(output, { recursive: true })
 for (const file of files) {
   const target = resolve(output, file)
@@ -73,7 +78,10 @@ for (const file of ['README.md', 'README.zh.md',
   'packages/model-router-plugin/README.md', 'packages/model-router-plugin/README.zh.md']) {
   const text = readFileSync(resolve(output, file), 'utf8')
   assert.ok(!/https?:\/\/(?:[^/]*\.)?gitlab\.com(?:[/:]|$)/i.test(text), `${file}: private archive URL in public README`)
-  assert.ok(!/\]\((?:\.\/)?(?:docs\/|CHANGELOG\.md)/.test(text), `${file}: link to excluded archive documentation`)
+  for (const match of text.matchAll(/\]\(((?:\.\/)?docs\/[^)#]+)(?:#[^)]*)?\)/g)) {
+    assert.ok(included.has(match[1].replace(/^\.\//, '')), `${file}: link to excluded archive documentation: ${match[1]}`)
+  }
+  assert.ok(!/\]\((?:\.\/)?CHANGELOG\.md/.test(text), `${file}: link to excluded archive changelog`)
 }
 let pairing = readFileSync(resolve(output, 'README.i18n.yaml'), 'utf8')
 for (const file of ['README.md', 'README.zh.md']) {

@@ -8,16 +8,16 @@
 
 写清期望结果，选择合适的已配置模型或原生 CLI 工具，审查计划后启动，并在同一工作台跟踪执行和费用。此版本保留现有 Harness 工作区，在侧栏增加 **模型路由** 入口。
 
-**当前正式版：0.64.0。** 如需 Bot 对话、多 Bot 分工、远程电脑、私有资料库和例行任务，请使用 [完整 Bot 版本](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.zh.md)：**`@ljwei-stak/dsh-model-route-bot`**。同一 profile 选择一种版本。
+**当前正式版：0.65.0。** 如需 Bot 对话、多 Bot 分工、远程电脑、私有资料库和例行任务，请使用 [完整 Bot 版本](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.zh.md)：**`@ljwei-stak/dsh-model-route-bot`**。同一 profile 选择一种版本。
 
 ## 安装
 
-1. 在 Harness **插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.64.0`。
+1. 在 Harness **插件 → 添加插件** 输入 `@ljwei-stak/dsh-model-router@0.65.0`。
 2. 启用后，连同托盘进程完全退出 Harness，再重新启动。
 3. 在 Harness **模型** 中配置 Provider 凭据和模型，从侧栏打开 **模型路由**。
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.64.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
 ```
 
 ## 完成第一个任务

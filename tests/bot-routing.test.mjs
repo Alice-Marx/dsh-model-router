@@ -35,6 +35,44 @@ test('bot routing: unknown price is not free and unknown quality is not worst', 
   assert.equal(unknownQuality.chosen.botId, 'q')
 })
 
+test('bot routing: equal scores prefer known prices before Bot identity in every preset', () => {
+  const candidates = [bot({ botId: 'a-unknown', pricePerMTokUsd: null }), bot({ botId: 'z-priced' })]
+  for (const preset of ['economy', 'balanced', 'quality']) {
+    for (const rows of [candidates, [...candidates].reverse()]) {
+      const result = routeBot({ candidates: rows, preset })
+      assert.equal(result.chosen.botId, 'z-priced', preset)
+      assert.deepEqual(result.ranked.map(row => row.botId), ['z-priced', 'a-unknown'])
+    }
+  }
+  assert.equal(routeBot({ preset: 'quality', candidates: [
+    bot({ botId: 'unknown', pricePerMTokUsd: null, quality: 1 }),
+    bot({ botId: 'priced', quality: 0.1 }),
+  ] }).chosen.botId, 'unknown', 'unknown price remains a scoring penalty, not an eligibility veto')
+})
+
+test('bot routing: invalid prices and out-of-range quality cannot earn a scoring advantage', () => {
+  for (const price of [-1, Number.NaN, Infinity, '0']) {
+    const result = routeBot({ preset: 'economy', candidates: [
+      bot({ botId: 'a-invalid', pricePerMTokUsd: price }), bot({ botId: 'z-valid' }),
+    ] })
+    assert.equal(result.chosen.botId, 'z-valid', String(price))
+    assert.equal(result.ranked.find(row => row.botId === 'a-invalid').pricePerMTokUsd, null)
+  }
+  for (const quality of [-1, 80, Number.NaN, Infinity, '0.9']) {
+    const result = routeBot({ preset: 'quality', candidates: [
+      bot({ botId: 'invalid', quality }), bot({ botId: 'valid', quality: 0.95 }),
+    ] })
+    assert.equal(result.chosen.botId, 'valid', String(quality))
+    assert.equal(result.ranked.find(row => row.botId === 'invalid').quality, null)
+    assert.ok(result.ranked.every(row => Number.isFinite(row.score) && row.score >= 0))
+  }
+  for (const quality of [0, 1]) {
+    assert.equal(routeBot({ candidates: [bot({ quality, pricePerMTokUsd: 0 })] }).chosen.quality, quality)
+  }
+  const invalidLoad = routeBot({ candidates: [bot({ load: -100 })] })
+  assert.equal(invalidLoad.chosen.score, routeBot({ candidates: [bot()] }).chosen.score)
+})
+
 test('bot routing: a busy Bot is skipped unless the task allows it, and ties break by id', () => {
   const busy = routeBot({ candidates: [bot({ botId: 'busy', busy: true })] })
   assert.equal(busy.reason, 'NO_BOT_ELIGIBLE')

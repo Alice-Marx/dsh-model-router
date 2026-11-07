@@ -134,13 +134,20 @@ try {
     activity: current.state.activity, providerCalls: current.diagnostic.calls.length,
     diagnostics: String(await api('diagnostics-log')).slice(0, 2500),
     toolResults: current.diagnostic.toolResults.map(item => ({ name: item.name, isError: item.result?.isError, text: String(item.result?.content?.[0]?.text ?? item.result?.error ?? '').slice(0, 300) })) }))
-  const savedWorker = await product('binding.save', { payload: { botId: workerId, expectedRevision: 0, settings: bindingSettings } })
+  const workerPricing = { input: 0.000003, output: 0.000004 }
+  const savedWorker = await product('binding.save', { payload: { botId: workerId, expectedRevision: 0,
+    settings: { ...bindingSettings, funding: { ...bindingSettings.funding, pricing: workerPricing } } } })
   assert.equal(savedWorker.ok, true, JSON.stringify(savedWorker))
   assert.equal(savedWorker.value.status, 'available')
   checks.push('N06b: worker binding is configured through a real owner action before its first prompt')
   checks.push('Default entry: migrated Main AgentLoop creates worker through the original DS create_bot tool')
   const routingSettings = await product('botRoutingInspect')
   assert.equal(routingSettings.ok, true, JSON.stringify(routingSettings))
+  assert.equal(routingSettings.value.candidates.find(row => row.botId === mainId).pricePerMTokUsd,
+    (bindingSettings.funding.pricing.input + bindingSettings.funding.pricing.output) / 2)
+  assert.equal(routingSettings.value.candidates.find(row => row.botId === workerId).pricePerMTokUsd,
+    (workerPricing.input + workerPricing.output) / 2)
+  checks.push('Bot routing: two Bots sharing the same model retain their own committed funding prices in the real owner preview')
   const routingSaved = await product('botRouting.save', { payload: { expectedRevision: routingSettings.value.settingsRevision,
     settings: { enabled: true, preset: 'balanced', autoGrant: { machineTools: false, cliTools: false } } } })
   assert.equal(routingSaved.ok, true, JSON.stringify(routingSaved))
@@ -162,6 +169,14 @@ try {
   assert.equal(ownerRoute.value.botId,workerId);assert.equal(ownerRoute.value.originBotId,mainId)
   await wait(async()=>{const value=(await product('snapshot')).value;return value.tasks.plans.some(item=>item.planId===ownerRoute.value.planId&&item.state==='succeeded')})
   await quiet()
+  const beforeLookup = (await request('integration-probe')).calls.length
+  const originalStatus = await product('botRouting.status', { payload: { requesterBotId: mainId, requestKey: 'fixture-owner-route' } })
+  assert.equal(originalStatus.ok, true, JSON.stringify(originalStatus))
+  assert.equal(originalStatus.value.found, true); assert.equal(originalStatus.value.planId, ownerRoute.value.planId)
+  assert.equal(originalStatus.value.planState, 'succeeded')
+  assert.deepEqual(originalStatus.value.packages.map(item => item.operationId), ownerRoute.value.packages.map(item => item.operationId))
+  assert.equal((await request('integration-probe')).calls.length, beforeLookup)
+  checks.push('Submission observation: the owner queries the original request key and durable operations with no new model turn, grant or task')
   const routedEvidence=new Database(join(home,'model-router/orchestration.sqlite'),{readonly:true})
   try{
     for(const planId of [routedValue.planId,ownerRoute.value.planId])assert.equal(routedEvidence.prepare('SELECT state FROM bot_routed_deliveries WHERE plan_id=?').get(planId)?.state,'delivered')
@@ -192,8 +207,8 @@ try {
   assert.equal(snapshot.lifecycle.healthy, true)
   assert.ok(snapshot.bots.some(bot => bot.id === mainId && bot.main))
   assert.ok(snapshot.bots.some(bot => bot.id === workerId))
-  assert.deepEqual([...snapshot.availableActions].sort(), ['binding.save','funding.account.save','machine.bind','machine.pair','machine.probe','machine.reconcile','machine.revoke','machine.secret','task.cancel','task.plan.submit','task.plan.cancel','task.reconcile','task.retry','usage.resolve',
-    'botRoutingInspect','botRoutingDecide','botRouting.dispatch','botRouting.save','library.list','library.read','library.write','library.upload','library.download','library.mkdir','library.remove','library.search',
+  assert.deepEqual([...snapshot.availableActions].sort(), ['binding.save','funding.account.save','machine.bind','machine.pair','machine.probe','machine.reconcile','machine.revoke','machine.secret','task.inspect','task.cancel','task.plan.submit','task.plan.cancel','task.reconcile','task.retry','usage.resolve',
+    'botRoutingInspect','botRoutingDecide','botRouting.dispatch','botRouting.save','botRouting.status','library.list','library.read','library.write','library.upload','library.download','library.mkdir','library.remove','library.search',
     'machine.artifact','machine.desktop.act','machine.desktop.view','machine.desktop.open','machine.desktop.renew','machine.desktop.close',
     'roles.list','routine.list','routine.save','routine.remove','routine.run','routine.history','routine.cancel','routine.resolve'].sort())
   assert.equal(snapshot.bindings.status, 'available')
@@ -277,7 +292,7 @@ try {
   assert.equal(savedCli.ok, true, JSON.stringify(savedCli))
   assert.equal(savedCli.value.status, 'available')
   const taskSection = async () => (await product('snapshot')).value.tasks
-  const latestTask = async (backend, botId) => (await taskSection()).items.filter(item => item.backend === backend && item.botId === botId).at(-1)
+  const latestTask = async (backend, botId) => (await taskSection()).items.filter(item => item.backend === backend && item.botId === botId).sort((a, b) => b.createdAt - a.createdAt)[0]
   const settleTask = async (taskId, state) => {
     const deadline = Date.now() + 25_000
     for (;;) {
@@ -304,6 +319,16 @@ try {
   assert.equal(retriedTask.attempts, 2)
   assert.equal(retriedTask.legacyRunIds.length, 1)
   checks.push('N09: an owner/Bot retry of a failed Task adds a linked attempt and succeeds without a second invoice')
+  const inspected = await product('task.inspect', { payload: { botId: workerId, taskId: retriedTask.taskId } })
+  assert.equal(inspected.ok, true, JSON.stringify(inspected))
+  assert.equal(inspected.value.task.operationId, retriedTask.operationId)
+  assert.equal(inspected.value.attempts.length, 2)
+  assert.ok(inspected.value.timeline.items.some(item => item.kind === 'settled'))
+  assert.equal((await product('task.inspect', { payload: { botId: mainId, taskId: retriedTask.taskId } })).ok, false)
+  const deniedInspection = await fetch(`${base}/api/bot-product`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'task.inspect', payload: { botId: workerId, taskId: retriedTask.taskId } }), signal: AbortSignal.timeout(30000) })
+  assert.equal(deniedInspection.status, 401)
+  checks.push('Task timeline: owner reads both durable attempts under the original Bot; wrong Bot and unauthenticated reads are refused')
   await api('send', { sessionId: workerId, text: 'integration:task-cancel' }); await quiet()
   await settleTask((await latestTask('mr-api', workerId)).taskId, 'running')
   await api('send', { sessionId: workerId, text: `integration:task-cancel-task:${(await latestTask('mr-api', workerId)).taskId}` }); await quiet()
@@ -656,6 +681,10 @@ try {
   }
   checks.push('Scheduler: cold Host startup preserves dependency edges, terminal plans and original execution identities')
   const coldCalls=(await request('integration-probe')).calls.length
+  const coldStatus = await product('botRouting.status', { payload: { requesterBotId: mainId, requestKey: 'fixture-owner-route' } })
+  assert.equal(coldStatus.ok, true, JSON.stringify(coldStatus)); assert.deepEqual(coldStatus.value, originalStatus.value)
+  assert.equal((await request('integration-probe')).calls.length, coldCalls)
+  checks.push('Submission observation: cold Host startup finds the same original plan and operations without replaying it')
   const coldReplay=await product('task.plan.submit',{payload:{botId:mainId,requestKey:'fixture-plan-success',plan:successPlan.plan}})
   assert.equal(coldReplay.ok,true,JSON.stringify(coldReplay));assert.equal(coldReplay.value.replayed,true)
   assert.deepEqual(coldReplay.value.packages.map(item=>item.operationId),successPlan.packages.map(item=>item.operationId))

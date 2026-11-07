@@ -14,7 +14,7 @@
 
 本项目是社区插件，复用 Harness 的模型配置和 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.64.0 · Windows Remote Agent：0.1.1**
+**当前正式版：0.65.0 · Windows Remote Agent：0.1.1**
 
 [选择版本](#editions) · [安装](#install) · [第一个任务](#quick-evaluation) · [Bot 分工](#bot-routing) · [远程电脑](#computers) · [问题反馈](#troubleshooting)
 
@@ -52,8 +52,8 @@
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.64.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.64.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.65.0`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.65.0`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 在 Harness 官方 **模型** 设置中配置 Provider 凭据和模型。完整版本进入 Bot 工作区；纯路由版本从侧栏打开 **模型路由**。
 
@@ -61,10 +61,10 @@
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.64.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.65.0
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.64.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -136,11 +136,31 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.64.0
 
 集成模式复用 Harness Sessions；可选独立运行时拥有自己的会话存储。切换时需显式转移运行时所有权，同一 Bot 同时由一个运行时服务。
 
+<a id="task-progress"></a>
+
+## 多 Bot 任务进度与待处理
+
+**适用于完整 Bot 版本 0.65.0。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
+
+**需要你处理** 显示完整数量，超过六项时可展开全部。每项都能打开原任务；等待审批时可进入对应 Bot 私聊查看原请求。打开任务后可查看 **任务时间线**，了解排队、资金准入、执行、停止请求及收据核对，并展开每次尝试的原编号。日志读取不会重新派发任务或调用模型；停止请求仍需等待确认。旧宿主未提供时间线时，页面保留现有收据详情。
+
+宿主最多加载 **512 条任务**，优先待处理与进行中的记录，再显示较新的历史任务；超出时明确显示加载数量和总数。时间线按需读取最近 **80 条事件**，截断时显示实际总数。这些数量是持久任务记录的范围，不包括全部私聊消息或厂商实时输出。
+
+本轮参考 [Agents Anywhere](https://github.com/anywhere-labs/Agents-Anywhere) 的时间线与按能力开放操作的方式；实现与验证说明见 [任务工作区说明](docs/integration/agents-anywhere-tasks.md)。
+
 <a id="bot-routing"></a>
 
 ## 由 Main Bot 分配任务给执行 Bot
 
 **适用于完整 Bot 版本。** 模型路由选择模型路线；Bot 路由选择已配置的 Bot 并向它真实派发任务。
+
+路由使用每个 Bot 自己保存的价格，即使多个 Bot 使用相同模型也分别读取。无效的价格或质量评分保留为未知；评分相同时，优先选择价格已知的 Bot，再按 Bot ID 排序。
+
+修改任务、刷新候选或切换宿主后，原预览会失效。展开 **查看比较依据** 可检查候选评分与未知信息。创建任务需要当前有效的预览；取得受理记录后会显示计划编号并停用重复创建按钮。若提交响应丢失或不完整，请先刷新任务记录、核对原提交，再决定是否创建另一项任务。窄屏下可横向滚动表格查看全部列。
+
+**核对原提交** 只读取原请求对应的持久计划和操作编号，不会重发任务、授予权限或调用模型。暂未查到只表示当前查询结果，原请求仍可能完成。同一窗口内切换页面后提醒会保留，并且只在内存保存提交引用；重新加载应用会清除。自行核对记录后，可显式清除本窗口提醒；清除不会停止原任务，也不会创建另一项任务。
+
+重载前可展开 **保存提交核对码** 并复制核对码；重载后连接原宿主，在 **核对已保存的提交** 中粘贴，即可查询原记录。核对码只包含原 Bot 与请求编号，不含任务正文或登录凭据，也不能授予执行权限。无效核对码会在本地拦截；剪贴板不可用时可选中后手动复制。核对失败会按原因提示重新登录、更新宿主、核对不一致记录或恢复连接，并保留原引用供再次查询。
 
 ```mermaid
 flowchart LR

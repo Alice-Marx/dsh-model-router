@@ -541,6 +541,29 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
       })
     },
     events(owner,id) {owned(owner,id);return stmt('SELECT * FROM task_events WHERE task_id=? ORDER BY seq').all(id)},
+    timeline(owner,id,{limit=80}={}) {
+      owned(owner,id)
+      if(!Number.isSafeInteger(limit)||limit<1||limit>200)fail('INVALID_TASK_HISTORY_LIMIT')
+      const total=stmt('SELECT COUNT(*) AS n FROM task_events WHERE task_id=?').get(id).n
+      const items=stmt('SELECT * FROM task_events WHERE task_id=? ORDER BY seq DESC LIMIT ?').all(id,limit).reverse()
+      return {items,total,truncated:total>items.length}
+    },
+    // Product lists must not permanently hide new tasks behind a Bot's first 128 records.
+    // This read is global across the Host's known Bots; it never changes runner queue ordering.
+    productList(owners,{limit=512}={}) {
+      if(!Array.isArray(owners)||!Number.isSafeInteger(limit)||limit<1||limit>512)fail('INVALID_TASK_LIST')
+      const ids=[...new Set(owners.map(taskRef))]
+      if(!ids.length)return {items:[],total:0,truncated:false}
+      const visible=new Set(ids)
+      const total=stmt('SELECT owner_bot,COUNT(*) AS n FROM tasks GROUP BY owner_bot').all()
+        .reduce((sum,row)=>sum+(visible.has(row.owner_bot)?row.n:0),0)
+      // Filter owners before the limit, including when old/deleted Bots still have records.
+      const items=stmt(`SELECT id,owner_bot FROM tasks WHERE owner_bot IN (SELECT value FROM json_each(?))
+        ORDER BY CASE WHEN state IN ('needs-reconciliation','waiting-approval','waiting-budget','blocked') THEN 0
+          WHEN state IN ('ready','queued','running','cancelling','admitting') THEN 1 WHEN state='failed' THEN 2 ELSE 3 END,
+          updated_ms DESC,id LIMIT ?`).all(JSON.stringify(ids),limit).map(row=>view(row.owner_bot,row.id))
+      return {items,total,truncated:total>items.length}
+    },
     // One Bot's durable tasks, oldest first; the read model never invents a task.
     list(owner) {taskRef(owner);return stmt('SELECT id FROM tasks WHERE owner_bot=? ORDER BY created_ms,id LIMIT 128').all(owner).map(row=>view(owner,row.id))},
     close() {if(!closed){closed=true;if(!borrowed)db.close();onClose()}},

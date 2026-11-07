@@ -9,13 +9,13 @@
  * machine: `candidateMachineGrant` is the only way a caller may read one, and an unnamed machine
  * resolves to the Bot's own first grant rather than to a guess.
  *
- * Everything is injected — bots, their saved settings, machine health — so the same function runs
- * in the Host and in a test without a database or a live machine.
+ * Quality is a fraction between 0 and 1. Everything is injected — bots, their saved settings,
+ * machine health — so the same function runs in the Host and in a test without a database or a live machine.
  */
 
 import { workerBinding } from './bot-routing-mode.mjs'
 
-const finite = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null)
+const finite = (value, max = Infinity) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= max ? value : null)
 const list = value => (Array.isArray(value) ? value : [])
 
 /** Tools a Bot may actually use, from its compiled grant rather than from its own claims. */
@@ -96,7 +96,7 @@ export function candidateMachineGrant(candidate, machineId = '', rootId = '') {
  *   settingsFor: (botId: string) => { enabled?: boolean, model?: object, grant?: { tools?: string[] }, capabilities?: string[], machineGrants?: Array<object> } | null,
  *   machineHealth?: (machineId: string) => { online?: boolean } | null,
  *   qualityFor?: (botId: string) => number | null,
- *   priceFor?: (route: { provider: string, model: string }) => number | null,
+ *   priceFor?: (route: { provider: string, model: string }, botId: string) => number | null,
  *   loadFor?: (botId: string) => number | null,
  *   busyFor?: (botId: string) => boolean,
  * }} source
@@ -110,7 +110,7 @@ export function botRoutingCandidates({ bots = [], settingsFor, machineHealth = (
     // A Bot that is off is not a candidate; it stays out rather than scoring last.
     if (!settings || settings.enabled === false || settings.status && settings.status !== 'available') continue
     const model = settings.model ?? bot.model ?? null
-    const price = model ? priceFor(model) : null
+    const price = model ? priceFor(model, bot.id) : null
     // Machine grants name the machine and the tools that machine offers this Bot. Reachability is
     // asked per machine, so a Bot with two grants reports the one the task is about.
     const machineGrants = machineGrantsOf(settings)
@@ -125,7 +125,7 @@ export function botRoutingCandidates({ bots = [], settingsFor, machineHealth = (
       // Unknown price and unknown quality stay null: the router treats them as unknown, not as
       // zero or best, and never as "free".
       pricePerMTokUsd: finite(price),
-      quality: finite(qualityFor(bot.id)),
+      quality: finite(qualityFor(bot.id), 1),
       load: finite(loadFor(bot.id)) ?? 0,
       busy: busyFor(bot.id) === true,
       tools: toolsOf(settings),

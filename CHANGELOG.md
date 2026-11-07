@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.65.0 — 2026-11-07
+
+- Add a multi-Bot task overview with state/Bot filters and search by task, plan or operation identity; loaded-record limits are explicit.
+- Show the full pending-item count and expand beyond six reminders; every reminder opens its task and approvals open the original Bot conversation.
+- Read a task's durable event timeline and attempt identities on demand through the authenticated owner channel, without dispatching work or exposing raw backend inputs and proofs.
+- Prioritize pending and active records across known Bots instead of keeping each Bot's oldest 128 tasks; ordinary funding admission is shown as in progress.
+- Add portable submission lookup codes containing only original Bot/request IDs; an owner can paste a saved code after reloading to query the original record without creating work.
+- Keep codes available while a submission is in flight or the Host is unavailable, with manual copy fallback and local rejection of malformed or unsupported codes.
+- Preserve structured lookup errors through the product page and explain sign-in, unavailable-feature, identity-mismatch and connection failures without discarding the reference.
+- Add an authenticated owner lookup for an original routed submission's durable plan and operation IDs, without another dispatch, grant or model call.
+- Retain unresolved submission references across same-Host page remounts in window memory; late acknowledgements confirm the original, and missing-record reads never imply a safe replay.
+- Keep lookup results minimal and owner-scoped. Explicit reminder dismissal after an operator checks records clears only the notice.
+- Retire edited, refreshed or replaced-Host routing previews; submit only their captured task and prevent duplicate clicks and repeated confirmed creation.
+- Show candidate comparisons, readable rejection reasons and actual plan IDs; incomplete submission acknowledgements stay unconfirmed and do not automatically replay.
+- Describe proposed computer permissions without claiming that a preview grants access or that disabled automatic grants will be applied.
+- Keep Bot names and numeric scores readable on narrow screens with horizontally scrolling routing tables.
+- Read routing prices from each Bot's own committed funding settings, including when multiple Bots share the same model.
+- Treat negative prices, invalid load values and quality outside the 0–1 range as unknown rather than rewarding them in routing scores.
+- Prefer known prices when routing scores tie, retaining deterministic Bot identity ordering and quality/cost trade-offs.
+- Compile Remote Agent artifacts before publishing complete files, preserving existing entry points during concurrent builds and compiler failures.
+
 ## 0.64.0 — 2026-11-06
 
 - Split installation into `@ljwei-stak/dsh-model-route-bot` (complete Bot workspace and routing) and `@ljwei-stak/dsh-model-router` (routing workbench only).

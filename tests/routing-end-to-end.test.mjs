@@ -99,6 +99,7 @@ async function fixture(t, { settings = {}, routing = { enabled: true, preset: 'b
   const botRouting = createBotRoutingService({
     bots, settingsFor, machineHealth, priceFor, qualityFor, routing, mainBotIds,
     submitPlan: submitPlan ?? ((subject, request, caller) => service.submitPlan(subject, request, caller)),
+    readSubmittedPlan: (originBotId, planId) => journal.getPlan(originBotId, planId),
     subjectFor,
     bindWorker: (binding, context) => { if (!context.grantAllowed) throw new Error('BOT_ROUTING_WORKER_GRANT_REQUIRED'); bound.push(binding); bindings.set(`${binding.botId}/${binding.machineId}`, binding); return { confirmed: true, applied: true } },
     newTaskId: () => `task-${++taskSeq}`,
@@ -113,6 +114,32 @@ async function fixture(t, { settings = {}, routing = { enabled: true, preset: 'b
   t.after(async () => { await service.close(); authority.dispose() })
   return { authority, directory, service, journal, dir, subjectFor, bots, settingsFor, botRouting, runs, writes, bound, bindings, settle, committed, agents }
 }
+
+test('routing end to end: checking a lost acknowledgement reads the same durable operations after restart without dispatch', async t => {
+  const f = await fixture(t)
+  const report = await f.botRouting.dispatch({ text: '原任务只执行一次', requestKey: 'original-owner-key', requesterBotId: 'main' }, { kind: 'owner' })
+  assert.equal(f.runs.length, 1)
+  const reader = openTaskJournal(Database, join(f.dir, 'tasks.sqlite'))
+  t.after(() => reader.close())
+  const restored = createBotRoutingService({ bots: () => { throw new Error('must not route again') }, settingsFor: () => null,
+    mainBotIds: ['different-main'], routing: { enabled: false }, readSubmittedPlan: (origin, id) => reader.getPlan(origin, id) })
+  const counts = () => {
+    const db = new Database(join(f.dir, 'tasks.sqlite'), { readonly: true })
+    try { return ['task_plans', 'tasks', 'attempts', 'operations', 'task_events'].map(table => db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n) }
+    finally { db.close() }
+  }
+  const before = counts()
+  for (const service of [f.botRouting, restored]) {
+    const observed = await service.submissionStatus({ requestKey: 'original-owner-key', requesterBotId: 'main' }, { kind: 'owner' })
+    assert.equal(observed.found, true); assert.equal(observed.planId, report.planId)
+    assert.equal(observed.planState, 'succeeded')
+    assert.deepEqual(observed.packages.map(item => [item.taskId, item.attemptId, item.operationId]), report.packages.map(item => [item.taskId, item.attemptId, item.operationId]))
+    assert.doesNotMatch(JSON.stringify(observed), /原任务|summary|result/)
+  }
+  assert.equal((await restored.submissionStatus({ requestKey: 'original-owner-key', requesterBotId: 'worker' }, { kind: 'owner' })).found, false)
+  assert.deepEqual(counts(), before)
+  assert.equal(f.runs.length, 1); assert.equal(f.writes.length, 0); assert.equal(f.bound.length, 0)
+})
 
 test('routing end to end: a routed task reaches the worker, runs there, and its result comes back', async t => {
   const delivered = []

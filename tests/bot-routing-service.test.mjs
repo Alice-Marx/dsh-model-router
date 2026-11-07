@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { createBotRoutingService } from '../packages/orchestration/src/bot-routing-service.mjs'
 
 const bots = () => [{ id: 'main', name: 'Chief', main: true }, { id: 'worker', name: 'Worker' }]
@@ -14,6 +15,28 @@ const make = (routing = { enabled: true, preset: 'balanced' }) => createBotRouti
 
 test('service: a preview names the winner', () => {
   assert.equal(make().decide({ text: 'write a weekly report' }).chosen.botId, 'main')
+})
+
+test('service: preview and dispatch use each Bot price for a shared model route', async () => {
+  const submitted = []
+  const service = createBotRoutingService({
+    bots: () => [{ id: 'a-expensive' }, { id: 'z-cheap' }],
+    settingsFor: () => ({ enabled: true, model: { provider: 'fixture', model: 'shared' } }),
+    priceFor: (model, botId) => botId === 'z-cheap' ? 0.5 : 5,
+    routing: { enabled: true, preset: 'economy' }, mainBotIds: ['a-expensive'],
+    subjectFor: id => ({ id }),
+    submitPlan: (subject, request) => {
+      submitted.push(request)
+      return { planId: request.plan.taskId, state: 'ready', packages: [{ id: 'p1', targetBotId: request.plan.packages[0].targetBotId,
+        taskId: 'child', attemptId: 'attempt', operationId: 'operation', state: 'ready' }] }
+    },
+  })
+  assert.deepEqual(service.inspect().candidates.map(row => row.pricePerMTokUsd), [5, 0.5])
+  const preview = service.decide({ text: 'use the cheaper configured Bot' })
+  assert.equal(preview.chosen.botId, 'z-cheap')
+  const report = await service.dispatch({ text: 'use the cheaper configured Bot' }, { kind: 'owner' })
+  assert.equal(report.botId, preview.chosen.botId)
+  assert.equal(submitted[0].plan.packages[0].targetBotId, 'z-cheap')
 })
 
 test('service: routing off refuses instead of guessing', () => {
@@ -104,4 +127,52 @@ test('service: dispatch uses the same requester preset as preview and payload ow
   const report = await service.dispatch({ text: 'quality matters', requesterBotId: 'forged', originBotId: 'forged', caller: { owner: true }, sessionId: 'forged' }, { kind: 'bot', botId: 'main', sessionId: 'live-main' })
   assert.equal(report.botId, preview.chosen.botId); assert.equal(report.preset, 'quality')
   await assert.rejects(service.dispatch({ text: 'steal', caller: { owner: true } }, { kind: 'bot', botId: 'worker', sessionId: 'live-worker' }), /BOT_ROUTING_DISPATCH_DENIED:worker/u)
+})
+
+test('service: an owner checks a durable submission without routing, binding or resubmitting', async () => {
+  let reads = 0, writes = 0
+  const planId = `route_${createHash('sha256').update('main:original-key').digest('hex').slice(0, 48)}`
+  const plan = { planId, ownerBotId: 'main', state: 'succeeded', plan: { secretTask: 'PRIVATE INPUT' },
+    packages: [{ id: 'p1', targetBotId: 'worker', taskId: 'child', attemptId: 'attempt', operationId: 'operation', state: 'succeeded', result: { text: 'PRIVATE OUTPUT' } }] }
+  const service = createBotRoutingService({ bots: () => { throw new Error('status must not read candidates') }, settingsFor: () => { throw new Error('status must not read bindings') },
+    routing: { enabled: false }, mainBotIds: ['main'], submitPlan: () => { writes++ }, bindWorker: () => { writes++ },
+    readSubmittedPlan: (origin, id) => { reads++; assert.equal(origin, 'main'); assert.equal(id, planId); return plan } })
+  const result = await service.submissionStatus({ requestKey: 'original-key', requesterBotId: 'main' }, { kind: 'owner' })
+  assert.equal(result.found, true); assert.equal(result.accepted, true)
+  assert.equal(result.planId, planId); assert.equal(result.planState, 'succeeded')
+  assert.equal(result.packages[0].operationId, 'operation')
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE|secretTask|result/)
+  assert.equal(reads, 1); assert.equal(writes, 0)
+})
+
+test('service: submission lookup distinguishes not-yet-found from storage failure and verifies identity', async () => {
+  const create = readSubmittedPlan => createBotRoutingService({ bots, settingsFor: () => null, mainBotIds: ['main'], readSubmittedPlan })
+  const missing = await create(() => { throw Object.assign(new Error('absent'), { code: 'TASK_PLAN_NOT_FOUND' }) })
+    .submissionStatus({ requestKey: 'key', requesterBotId: 'main' }, { kind: 'owner' })
+  assert.equal(missing.found, false); assert.equal(missing.accepted, undefined)
+  await assert.rejects(create(() => { throw Object.assign(new Error('database offline'), { code: 'SQLITE_BUSY' }) })
+    .submissionStatus({ requestKey: 'key', requesterBotId: 'main' }, { kind: 'owner' }), { code: 'SQLITE_BUSY' })
+  await assert.rejects(create(() => ({ planId: 'other', ownerBotId: 'main', packages: [] }))
+    .submissionStatus({ requestKey: 'key', requesterBotId: 'main' }, { kind: 'owner' }), { code: 'BOT_ROUTING_SUBMISSION_IDENTITY_MISMATCH' })
+})
+
+test('service: lookup authenticates before any read and accepts only the original submission reference', async () => {
+  let reads = 0
+  const service = createBotRoutingService({ bots, settingsFor: () => null, mainBotIds: ['main'], readSubmittedPlan: () => { reads++; throw new Error('must not read') } })
+  for (const context of [{}, { kind: 'bot', botId: 'main' }]) {
+    await assert.rejects(service.submissionStatus({ requestKey: 'key', requesterBotId: 'main', owner: true }, context), { code: 'REMOTE_OWNER_REQUIRED' })
+  }
+  for (const request of [{ requestKey: 'bad/key', requesterBotId: 'main' }, { requestKey: 'key', requesterBotId: '' },
+    { requestKey: 'key', requesterBotId: 'main', planId: 'forged' }, { requestKey: 'key', requesterBotId: 'main', text: 'another task' }]) {
+    await assert.rejects(service.submissionStatus(request, { kind: 'owner' }))
+  }
+  assert.equal(reads, 0)
+})
+
+test('service: an invalid request key is rejected before deciding, changing grants or submitting', async () => {
+  let candidates = 0, writes = 0
+  const service = createBotRoutingService({ bots: () => { candidates++; return bots() }, settingsFor: id => settings[id], mainBotIds: ['main'], routing: { enabled: true },
+    subjectFor: id => ({ id }), bindWorker: () => { writes++ }, submitPlan: () => { writes++ } })
+  await assert.rejects(service.dispatch({ text: 'invalid reference', requestKey: 'unsafe/key' }, { kind: 'owner' }), { code: 'INVALID_TASK_REFERENCE' })
+  assert.equal(candidates, 0); assert.equal(writes, 0)
 })

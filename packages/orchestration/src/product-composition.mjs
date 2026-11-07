@@ -27,6 +27,7 @@ import { openBotSettings } from './bot-settings.mjs'
 import { openFundingAccounts } from './funding-accounts.mjs'
 import { createModelAccounting } from './model-accounting.mjs'
 import { createTaskService } from './task-service.mjs'
+import { inspectProductTask, projectProductTask } from './task-product.mjs'
 import { createDesktopActions } from './desktop-actions.mjs'
 import { registerTaskTools } from './task-tools.mjs'
 import { createMrReadBackend } from './mr-read-backend.mjs'
@@ -343,19 +344,22 @@ export function startBotProduct(ctx, options = {}) {
       if (!taskService) throw new Error('TASK_SERVICE_UNAVAILABLE')
       return taskService.submitPlan(subject, request, caller)
     },
+    readSubmittedPlan: (originBotId, planId) => {
+      if (!journal) throw Object.assign(new Error('BOT_ROUTING_STATUS_UNAVAILABLE'), { code: 'BOT_ROUTING_STATUS_UNAVAILABLE' })
+      // Authenticated owner observation reads durable identities even if the Bot was paused.
+      return journal.getPlan(originBotId, planId)
+    },
     bindWorker: (binding, context) => commitWorkerBinding(binding, context),
     executionBackendFor: effect => effect === 'read' ? 'bot-turn-read' : 'bot-turn-write',
     onAccepted: report => turnBackends?.watchPlan(report),
     busyFor: botId => product?.rt.live?.get(product.rt.chatOf(botId))?.turn !== undefined,
-    priceFor: route => {
-      for (const bot of product?.lifecycle.committedBots() ?? []) {
-        const settings = routingSettingsFor(bot.id)
-        if (settings?.model?.provider === route.provider && settings.model.model === route.model) {
-          const price = settings.funding?.pricing
-          if (typeof price?.input === 'number' && typeof price.output === 'number') return (price.input + price.output) / 2
-        }
-      }
-      return null
+    priceFor: (route, botId) => {
+      // Funding prices belong to the Bot binding, even when another Bot uses the same model.
+      const settings = routingSettingsFor(botId)
+      if (settings?.model?.provider !== route.provider || settings.model.model !== route.model) return null
+      const price = settings.funding?.pricing
+      if (!Number.isFinite(price?.input) || price.input < 0 || !Number.isFinite(price?.output) || price.output < 0) return null
+      return (price.input + price.output) / 2
     },
   })
   ctx.provide('botRouting', botRouting)
@@ -729,22 +733,10 @@ export function startBotProduct(ctx, options = {}) {
           // same single authority; a section without a runner stays blocked.
           ...(taskService ? { tasks: async ({ runtime, signal }) => {
             signal?.throwIfAborted(); await runtime.load()
-            const items = []
-            for (const bot of Object.values(runtime.state?.bots ?? {})) {
-              for (const task of journal.list(bot.id)) {
-                if (items.length >= TASK_READ_LIMIT) break
-                items.push({ botId: task.ownerBotId, taskId: task.taskId, state: task.state, backend: task.input.backend,
-                  ...(task.planId?{planId:task.planId,logicalPackageId:task.logicalPackageId}:{}),
-                  location: task.input.target.location, machineId: task.input.target.machineId, workspaceId: task.input.target.workspaceId,
-                  createdAt: task.createdAt, updatedAt: task.updatedAt, deadlineAt: task.deadlineAt,
-                  attemptNumber: task.attemptNumber, operationId: task.operationId, attempts: task.attempts.length,
-                  legacyRunIds: task.legacyRunIds, result: task.result ? { code: task.result.code ?? task.result.summary?.code ?? null,
-                    ...(task.executionRef?.kind==='remote-operation'?{remote:{status:['succeeded','failed','cancelled','admitted','running','cancel_pending','unknown'].includes(task.result.summary?.status)?task.result.summary.status:'unknown',stopConfirmed:task.result.summary?.stopConfirmed===true,possiblyApplied:task.result.summary?.possiblyApplied!==false,...(/^[a-f0-9]{64}$/.test(task.result.summary?.sha256??'')?{sha256:task.result.summary.sha256}:{}),...(Number.isSafeInteger(task.result.summary?.bytes)?{bytes:task.result.summary.bytes}:{}),...(Number.isSafeInteger(task.result.summary?.exitCode)?{exitCode:task.result.summary.exitCode}:{}),...(task.result.summary?.notStarted===true?{notStarted:true}:{})}}:{}) } : null,
-                  reconciliation: task.reconciliation ? { at: task.reconciliation.at, outcome: task.reconciliation.outcome } : null })
-              }
-            }
+            const loaded = journal.productList(Object.values(runtime.state?.bots ?? {}).map(bot => bot.id), { limit: TASK_READ_LIMIT })
+            const items = loaded.items.map(projectProductTask)
             const plans=Object.values(runtime.state?.bots??{}).flatMap(bot=>journal.listPlans(bot.id))
-            return { status: 'available', items, plans, backends: taskBackends.catalog() }
+            return { status: 'available', items, total: loaded.total, truncated: loaded.truncated, plans, backends: taskBackends.catalog() }
           } } : {}),
           // N07: the usage projection reads the durable source receipts and the
           // funding totals from the single authority; an unknown amount stays
@@ -837,6 +829,7 @@ export function startBotProduct(ctx, options = {}) {
           // action. Registering it here is what makes the routing card work at runtime; the owner
           // RPC methods are a second door onto the same service.
           'botRoutingInspect': async () => ({ ...botRouting.inspect(), settingsRevision: routingSettings.get().revision }),
+          'botRouting.status': (payload, context) => botRouting.submissionStatus(payload, context),
           'botRouting.save': async (payload, context) => {
             const saved = routingSettings.save(payload, context)
             return { ...botRouting.inspect(), settingsRevision: saved.revision }
@@ -873,6 +866,7 @@ export function startBotProduct(ctx, options = {}) {
           // N09: owner task management runs on the owning Bot's own subject, so
           // the Bot's committed grant authorizes every cancel/retry/reconcile.
           ...(taskService ? {
+            'task.inspect': payload => inspectProductTask({ service: taskService, journal, subject: taskOwner(payload), taskId: payload?.taskId }),
             // Bot routing turns a preview into a real package: the decision names the Bot, the
             // worker binding is committed first, and only then is the plan submitted. A failure in
             // either step leaves no half-dispatched task behind.

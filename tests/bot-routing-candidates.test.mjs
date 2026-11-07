@@ -23,6 +23,29 @@ test('candidates: unknown price and quality stay null instead of becoming zero',
   assert.ok(['main', 'writer'].includes(routeBot({ candidates: priced, preset: 'economy', task: {} }).chosen.botId))
 })
 
+test('candidates: pricing receives the owning Bot even when both Bots use the same model', () => {
+  const calls = []
+  const rows = botRoutingCandidates({ bots: [{ id: 'expensive' }, { id: 'cheap' }],
+    settingsFor: () => ({ enabled: true, model: { provider: 'fixture', model: 'shared' } }),
+    priceFor: (model, botId) => { calls.push({ model, botId }); return botId === 'cheap' ? 0.5 : 5 },
+  })
+  assert.deepEqual(calls.map(call => call.botId), ['expensive', 'cheap'])
+  assert.deepEqual(calls.map(call => call.model), [{ provider: 'fixture', model: 'shared' }, { provider: 'fixture', model: 'shared' }])
+  assert.deepEqual(rows.map(row => row.pricePerMTokUsd), [5, 0.5])
+  assert.equal(routeBot({ candidates: rows, preset: 'economy' }).chosen.botId, 'cheap')
+})
+
+test('candidates: quality is a fraction in the closed interval from zero to one', () => {
+  for (const quality of [-1, 80, Number.NaN, Infinity, '0.9']) {
+    const [row] = botRoutingCandidates({ bots: [bots[0]], settingsFor: id => settings[id], qualityFor: () => quality })
+    assert.equal(row.quality, null, String(quality))
+  }
+  for (const quality of [0, 0.8, 1]) {
+    const [row] = botRoutingCandidates({ bots: [bots[0]], settingsFor: id => settings[id], qualityFor: () => quality })
+    assert.equal(row.quality, quality)
+  }
+})
+
 test('candidates: machine reachability comes from health, not from the grant', () => {
   const offline = botRoutingCandidates({ bots, settingsFor: id => settings[id] ?? null, machineHealth: () => ({ online: false }) })
   assert.equal(offline.find(row => row.botId === 'main').machineOnline, false)
