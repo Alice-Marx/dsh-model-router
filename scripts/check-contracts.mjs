@@ -11,7 +11,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONTRACTS = join(ROOT, 'contracts')
 const LOCK_NAME = 'LOCK.json'
 
-const hash = (text) => createHash('sha256').update(text).digest('hex')
+// Hash normalised text, not raw bytes: a checkout on a platform with
+// core.autocrlf rewrites line endings, and a lock that only matches one checkout
+// shape is a lock that fails on a fresh clone. The contract is the text.
+const normalise = (text) => String(text).replace(/\r\n/g, '\n')
+const hash = (text) => createHash('sha256').update(normalise(text)).digest('hex')
 const fail = (message) => { const error = new Error(message); error.code = 'CONTRACT_CHECK_FAILED'; throw error }
 
 async function readJson(path) {

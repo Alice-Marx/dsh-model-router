@@ -1,10 +1,10 @@
 {
   "id": "product-action/v1",
-  "schemaHash": "bb443faecb89fd2196d58db828b840e918fe28885df67e8519702b9f23114699",
+  "schemaHash": "0166b98e0de3a69e8d914795df858d121a3ec50dd9979d5e0b24c407a6074af5",
   "files": {
-    "fixtures/bot-routing-save.json": "5827d08a5de9e925fc1da7c37289ff0a9c006bf2459d442ce1f7df63075f6a17",
-    "fixtures/owner-task-inspect.json": "4c869cb354f5e783c6adf875db33675fe6bc63f5f243ec09ae3fe7907768ab66",
-    "fixtures/owner-usage-resolve.json": "a5d6f039de052ecb192165a5cb27aed0af81ade6c9e9c244dc76cd34170eb842"
+    "fixtures/bot-routing-save.json": "03ea222974a8f40b88e98ba7c55dcc819b15ed51dd13da4b08b6916d8cf25694",
+    "fixtures/owner-task-inspect.json": "d4095578d90f14435f50c127ba2a6435a14ef3446a034f58aca479e56d2de637",
+    "fixtures/owner-usage-resolve.json": "061737e627cff7d52a4929040ef3f8054126525e4a9929a0a894d7188fec9641"
   },
-  "digest": "6368b524a9e5eda018d43ea70281e49b10f4cc27ceed0b6a84ef40b659e9f91e"
+  "digest": "109754da2ebc37e9ad8d2224626fddaa8684bc99e597e9aa91abc3284ae79101"
 }

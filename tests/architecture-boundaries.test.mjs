@@ -105,10 +105,6 @@ const VENDOR_IMPORTERS_ALLOWED = [
 ]
 
 test('boundaries: the vendored runtime is imported only where it is declared', () => {
-  // The public tree is a reduced one: an importer outside this checkout cannot be
-  // checked, so its entry is not required here either. Everything present must
-  // still match exactly, and nothing new may appear.
-  const expected = VENDOR_IMPORTERS_ALLOWED.filter((entry) => sources.has(entry.file))
   const found = []
   for (const [file, text] of sources) {
     if (file.startsWith('modules/bot-runtime/vendor/')) continue
@@ -117,9 +113,9 @@ test('boundaries: the vendored runtime is imported only where it is declared', (
       found.push({file, line: entry.line, spec: entry.spec})
     }
   }
-  const unexpected = found.filter((entry) => !expected.some((allowed) => allowed.file === entry.file && allowed.spec === entry.spec))
+  const unexpected = found.filter((entry) => !VENDOR_IMPORTERS_ALLOWED.some((allowed) => allowed.file === entry.file && allowed.spec === entry.spec))
   assert.deepEqual(unexpected, [], `vendor/ is pinned and may not gain importers (edit product-overlay instead):\n${describe(unexpected)}`)
-  assert.equal(found.length, expected.length, 'the importer set is frozen; a removed importer must remove its entry')
+  assert.equal(found.length, VENDOR_IMPORTERS_ALLOWED.length, 'the importer set is frozen; a removed importer must remove its entry')
 })
 
 // ── R4: one truth for which backends owe a stop proof ───────────────────────

@@ -66,15 +66,12 @@ test('contracts: a changed fixture or schema is refused, and the message says wh
 
     // A fixture that no longer matches its schema fails with its own coordinate.
     const fixture = join(work, 'contracts', 'task-request', 'v1', 'fixtures', 'retry.json')
-    // Restore by exact bytes: re-serialising can differ by one space, and then the
-    // next step would report two changed files instead of the one it changed.
-    const originalBytes = await readFile(fixture)
-    const value = JSON.parse(originalBytes.toString('utf8'))
+    const value = JSON.parse(await readFile(fixture, 'utf8'))
     await writeFile(fixture, JSON.stringify({...value, kind: 'nonsense'}, null, 2) + '\n')
     const broken = run()
     assert.notEqual(broken.status, 0)
     assert.match(broken.stderr, /task-request\/v1.*published and must not change|task-request\/v1\.fixtures\.\d/)
-    await writeFile(fixture, originalBytes)
+    await writeFile(fixture, JSON.stringify(value, null, 2) + '\n')
 
     // A schema byte change is not a fixture problem: it is a version problem.
     const schema = join(work, 'contracts', 'task-request', 'v1', 'schema.json')

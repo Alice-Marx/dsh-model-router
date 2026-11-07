@@ -1,10 +1,10 @@
 {
   "id": "task-event/v1",
-  "schemaHash": "33e4c9fed29404e032a196183288a49f3e835e5fe1df633b53645c6212213745",
+  "schemaHash": "d7c2025fe5a5d7a9e68b0010ededb998c69f939588a0539bb07600064c1f50ac",
   "files": {
-    "fixtures/blocked.json": "93ea5ac7a4f1006f882a3c009019d91b314f131e980aba1a3474d693a8efb166",
-    "fixtures/gate.json": "ca5269be92fd33c81348135cade2de7c632cec7abf4e2da29803421f6b6542ee",
-    "fixtures/interrupted.json": "ee07e49fc3d29bae8a7d30feff450db2fe8731bfb16f15d67b8baafc8c9824bc"
+    "fixtures/blocked.json": "d43e6a8ad33521f237f261bca942ba1a5fb39f16ccd093bc2a29ac34179fd69e",
+    "fixtures/gate.json": "297116af8a05de0f838822633be8439b8cf1dad699217331c0def61c47e3b661",
+    "fixtures/interrupted.json": "fa3d2cfa42713ebe0b167732c280cb0c519b7a6330f5c66e8a26d1709f732da2"
   },
-  "digest": "1ab5a4b4fb30776f9a60e34a78fc1a9279d533012e7e36be379ade71b4897f8b"
+  "digest": "69818d9534a83437bc644138ca3dcd67b57abfd3f6fa03a864178beda24768de"
 }
