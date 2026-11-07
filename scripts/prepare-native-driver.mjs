@@ -26,14 +26,26 @@ export function prepareHint() {
   return `The verified native driver is missing (${DRIVER_MANIFEST}).\nPrepare it once with:\n  node scripts/prepare-native-driver.mjs`
 }
 
+/**
+ * npm is not a dependency of this repo, so find the one that is running this
+ * script (`npm_execpath`), and fall back to the executable on PATH. Assuming
+ * `<repo>/node_modules/npm` works only on the machine that happened to have it.
+ */
+function npmInvocation(args) {
+  const execpath = process.env.npm_execpath
+  if (execpath && existsSync(execpath)) return { file: process.execPath, args: [execpath, ...args], shell: false }
+  // A .cmd shim needs a shell on Windows, and passing args alongside `shell` is
+  // deprecated: hand the whole command over as one string instead.
+  if (process.platform === 'win32') return { file: `npm ${args.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg)).join(' ')}`, args: [], shell: true }
+  return { file: 'npm', args, shell: false }
+}
+
 export function prepareNativeDriver({ force = false } = {}) {
   const state = driverState()
   if (state.present && state.version === PINNED && !force) return { status: 'unchanged', version: state.version, entry: DRIVER_ENTRY }
   mkdirSync(DRIVER_DIR, { recursive: true })
-  execFileSync(process.execPath, [resolve(ROOT, 'node_modules/npm/bin/npm-cli.js'), 'install',
-    `better-sqlite3@${PINNED}`, '--no-save', '--no-audit', '--no-fund', '--prefix', DRIVER_DIR], {
-    cwd: DRIVER_DIR, stdio: 'inherit', windowsHide: true,
-  })
+  const npm = npmInvocation(['install', `better-sqlite3@${PINNED}`, '--no-save', '--no-audit', '--no-fund', '--prefix', DRIVER_DIR])
+  execFileSync(npm.file, npm.args, { cwd: DRIVER_DIR, stdio: 'inherit', windowsHide: true, shell: npm.shell })
   const after = driverState()
   if (!after.present || after.version !== PINNED) throw new Error(`prepared driver is ${after.version ?? 'absent'}, expected ${PINNED}`)
   return { status: 'installed', version: after.version, entry: DRIVER_ENTRY }
