@@ -3,11 +3,16 @@ import {spawnSync} from 'node:child_process'
 import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises'
 import {dirname,join,resolve} from 'node:path'
 import {fileURLToPath,pathToFileURL} from 'node:url'
+import {existsSync} from 'node:fs'
 import {openTaskJournal} from '../packages/orchestration/src/task-journal.mjs'
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..')
 export const DEFAULT_TASK_DRIVER=resolve(ROOT,'tmp/integration/probes/sqlite/node_modules/better-sqlite3/lib/index.js')
 export async function verifyTaskDriver(path) {
+  if(!existsSync(path)) {
+    const {prepareHint}=await import('./prepare-native-driver.mjs')
+    throw new Error(prepareHint())
+  }
   const manifest=JSON.parse(await readFile(resolve(dirname(path),'../package.json'),'utf8'))
   assert.equal(manifest.name,'better-sqlite3');assert.equal(manifest.version,'13.0.3')
   return (await import(pathToFileURL(path).href)).default

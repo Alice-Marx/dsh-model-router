@@ -342,7 +342,8 @@
     "check:source": "node scripts/integration-product-source.mjs",
     "pretest": "node scripts/prepare-product-tests.mjs",
     "test": "node scripts/run-tests.mjs",
-    "prepack": "node remote-computer-agent/build.mjs && node scripts/prepack.mjs"
+    "prepack": "node remote-computer-agent/build.mjs && node scripts/prepack.mjs",
+    "prepare:native": "node scripts/prepare-native-driver.mjs"
   },
   "license": "MIT",
   "engines": {

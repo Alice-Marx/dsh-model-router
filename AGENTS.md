@@ -12,6 +12,7 @@
 
 ```sh
 npm install --include=dev
+node scripts/prepare-native-driver.mjs
 npm run build:client
 npm run check:client
 npm test
