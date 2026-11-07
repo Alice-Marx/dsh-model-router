@@ -1,0 +1,73 @@
+{
+  "$schema": "memory://contract-schema/1",
+  "title": "A task request as the product channel accepts it",
+  "description": "One of submit, retry or reconcile. `backend` and `input` are the caller's; `target` is resolved by the Host and never supplied by a model.",
+  "type": "object",
+  "required": [
+    "kind"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "submit",
+        "retry",
+        "reconcile"
+      ]
+    },
+    "requestKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$",
+      "minLength": 1
+    },
+    "backend": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object"
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "effect",
+        "machineId",
+        "workspaceId"
+      ],
+      "properties": {
+        "effect": {
+          "type": "string",
+          "enum": [
+            "read",
+            "workspace-write"
+          ]
+        },
+        "machineId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "minLength": 1
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "enum": [
+            "local",
+            "remote"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

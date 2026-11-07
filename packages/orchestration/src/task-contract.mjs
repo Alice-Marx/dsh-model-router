@@ -48,10 +48,20 @@ export function parseTaskSubmit(value) {
   return {requestKey:v.requestKey,backend:v.backend,input:JSON.parse(canonicalTaskJson(v.input))}
 }
 
-const PLAN_KEYS = ['schemaVersion','taskId','origin','planRevision','packages']
+const PLAN_KEYS = ['schemaVersion','taskId','origin','initiator','planRevision','packages']
 const ORIGIN_KEYS = ['kind','botId','sessionId']
 const PACKAGE_KEYS = ['id','targetBotId','objective','dependsOn','acceptance','effectClass','execution']
-const ORIGIN_KINDS = new Set(['private','group'])
+// Where a plan came from. `handoff` is emitted by buildHandoff(bot-handoff.mjs)
+// and was missing here, so every Bot-to-Bot handoff died at the contract.
+const ORIGIN_KINDS = new Set(['private','group','handoff'])
+/**
+ * What started a run, as distinct from whose authority it carries. `origin` says
+ * which conversation a plan came from; this says whether anybody was there when
+ * it ran. A schedule or a delegation asserts a person's authority while nobody is
+ * watching, and the actor column alone can never tell those apart.
+ */
+export const INITIATOR_KINDS = new Set(['person','bot','routine','handoff','responsibility','memory'])
+const INITIATOR_KEYS = ['kind','id','origin']
 const EFFECT_CLASSES = new Set(['read','workspace-write'])
 const PLAN_PACKAGE_LIMIT = 32
 const PLAN_TEXT_LIMIT = 4_000
@@ -152,8 +162,10 @@ export function parseTaskPlan(value) {
     if (!Array.isArray(item.dependsOn) || item.dependsOn.length > PLAN_DEPENDENCY_LIMIT) throw new PolicyError('INVALID_TASK_PLAN')
     for (const dependency of item.dependsOn) taskRef(dependency)
   }
+  const initiator = planInitiator(plan)
   return { schemaVersion: 1, taskId: plan.taskId,
     origin: { kind: origin.kind, botId: origin.botId, sessionId: origin.sessionId ?? null },
+    initiator,
     planRevision: plan.planRevision,
     packages: plan.packages.map(item => ({ id: item.id, targetBotId: item.targetBotId, objective: item.objective,
       dependsOn: [...item.dependsOn], acceptance: [...item.acceptance], effectClass: item.effectClass,...(item.execution===undefined?{}:{execution:{backend:item.execution.backend,input:['bot-turn-read','bot-turn-write'].includes(item.execution.backend)?{task:item.execution.input.task,...(item.execution.input.machineId===undefined?{}:{machineId:item.execution.input.machineId}),...(item.execution.input.rootId===undefined?{}:{rootId:item.execution.input.rootId})}:item.execution.backend==='remote-write'?parseRemoteTaskWrite(item.execution.input):parseRemoteTaskCommand(item.execution.input)}}) })) }
@@ -207,6 +219,34 @@ export function validateTaskPlan(plan, { knownBots = null } = {}) {
   if (order.length !== plan.packages.length) throw new PolicyError('TASK_PLAN_CYCLE')
   return Object.freeze({ order: Object.freeze(order) })
 }
+/** Validate an explicit initiator: six kinds, an id where the kind needs one. */
+export function parseInitiator(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PolicyError('INVALID_INITIATOR')
+  if (Object.keys(value).some((key) => !INITIATOR_KEYS.includes(key))) throw new PolicyError('INVALID_INITIATOR')
+  if (!INITIATOR_KINDS.has(value.kind)) throw new PolicyError('INVALID_INITIATOR')
+  if (value.kind === 'person') {
+    if (value.id !== undefined) throw new PolicyError('INVALID_INITIATOR')
+    return {kind: 'person'}
+  }
+  taskRef(value.id)
+  if (value.origin !== undefined) taskRef(value.origin)
+  // `origin` is the root of the chain, never the previous hop: a hop that names
+  // its sender as the origin makes a deep chain unattributable.
+  return {kind: value.kind, id: value.id, ...(value.origin ? {origin: value.origin} : {})}
+}
+
+/**
+ * The initiator a plan implies when it does not carry one. A person's own
+ * conversation is the only kind a plan can be assumed to have; a delegation
+ * knows its sender, so it names the origin Bot rather than a person.
+ */
+export function planInitiator(plan) {
+  if (plan?.initiator) return parseInitiator(plan.initiator)
+  const origin = plan?.origin
+  if (origin?.kind === 'handoff') return {kind: 'handoff', id: taskRef(origin.botId), origin: taskRef(origin.botId)}
+  return {kind: 'person'}
+}
+
 export function parseTaskReference(value) {
   const v = closed(value,['taskId'])
   return {taskId:taskRef(v.taskId)}

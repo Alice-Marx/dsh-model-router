@@ -1,0 +1,10 @@
+{
+  "id": "task-request/v2",
+  "schemaHash": "d694e02f62f016a933aaae880b3bd8a6ad7ad0bf69b1359cf824b4ef5f6a4eb6",
+  "files": {
+    "fixtures/handoff-submit.json": "4094b13ce93889a76f65af91800f7c13c8f2086e50bba7519edc5c97861a0876",
+    "fixtures/person-submit.json": "9cdb56253006183039197f9b83304b686af7e8bc91dbc7f44d2d7e900baec794",
+    "fixtures/routine-submit.json": "7efc8c58dfdf1e1faa7fc1e58575f4ffdd4f1d89557431e130dfcb0e8eec69db"
+  },
+  "digest": "1c91a01566c8491eea97ec19b3059dbccb55c2383e0a18e1deba6da1ef9876b4"
+}

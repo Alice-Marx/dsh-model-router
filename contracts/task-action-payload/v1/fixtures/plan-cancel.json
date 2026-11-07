@@ -1,0 +1,5 @@
+{
+  "action": "task.plan.cancel",
+  "botId": "main",
+  "planId": "plan-3f2"
+}

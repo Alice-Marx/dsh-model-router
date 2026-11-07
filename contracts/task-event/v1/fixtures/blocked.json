@@ -1,0 +1,9 @@
+{
+  "kind": "blocked",
+  "at": 1762500000001,
+  "detail": {
+    "code": "TOOL_DENIED",
+    "gate": "backend/capability",
+    "notStarted": true
+  }
+}

@@ -2705,10 +2705,20 @@ import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../packages/capability-broker/src/authority.mjs
 var PolicyError = class extends Error {
-  constructor(code) {
+  /**
+   * `detail.gate` names the checkpoint that refused, and `detail.rule` the rule
+   * text when one matched. A refusal that only says "TOOL_DENIED" leaves the
+   * reader to guess which of several gates stopped it, and support then runs on
+   * pasted logs.
+   */
+  constructor(code, detail = {}) {
     super(`Capability refused: ${code}`);
     this.name = "PolicyError";
     this.code = code;
+    if (detail && typeof detail === "object") {
+      if (typeof detail.gate === "string" && detail.gate) this.gate = detail.gate;
+      if (typeof detail.rule === "string" && detail.rule) this.rule = detail.rule;
+    }
   }
 };
 

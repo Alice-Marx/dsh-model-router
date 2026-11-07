@@ -2,11 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { PolicyError } from '../../capability-broker/src/authority.mjs'
 import { canonicalTaskJson, taskHash, taskRef, parseTaskSubmit, parseTaskReference, parseTaskRetry, parseTaskReconcile, parseLegacyTaskRetry, parseTaskPlan, validateTaskPlan } from './task-contract.mjs'
 import {withinTaskAdmission} from './task-admission.mjs'
+import {hasExternalEffect, requiresStopProof} from './stop-proof.mjs'
 
 const fail=code=>{throw new PolicyError(code)}
 
 /** A single runner with registered effect-bound backends; disconnect never owns the task signal. */
-export function createTaskService({journal,authority,directory,backends,within=(subject,signal,work)=>work(),now=Date.now,runnerTtlMs=15_000,taskTtlMs=120_000,maxActive=4,executionLeaseMs=30_000,concurrencyFor=()=>1,planTargetsFor=subject=>[authority.describe(subject).botId]}) {
+export function createTaskService({journal,authority,directory,backends,within=(subject,signal,work)=>work(),now=Date.now,runnerTtlMs=15_000,taskTtlMs=120_000,maxActive=4,executionLeaseMs=30_000,concurrencyFor=()=>1,planTargetsFor=subject=>[authority.describe(subject).botId],onRunnerEvent=()=>{},requireStopProof=false}) {
   if(!Number.isSafeInteger(runnerTtlMs)||runnerTtlMs<500||runnerTtlMs>60_000||!Number.isSafeInteger(taskTtlMs)||taskTtlMs<1||taskTtlMs>7_200_000||!Number.isSafeInteger(maxActive)||maxActive<1||maxActive>4||!Number.isSafeInteger(executionLeaseMs)||executionLeaseMs<100||executionLeaseMs>300_000||typeof authority.renew!=='function'||typeof concurrencyFor!=='function')fail('INVALID_TASK_SERVICE_LIMIT')
   const registry=new Map()
   for(const backend of backends) {
@@ -17,6 +18,11 @@ export function createTaskService({journal,authority,directory,backends,within=(
     if(registry.has(backend.id)||!['read','workspace-write'].includes(backend.effect)||!['local','remote'].includes(backend.location)||typeof backend.parse!=='function'||typeof backend.run!=='function'||backend.targetFor!==undefined&&typeof backend.targetFor!=='function')fail('INVALID_TASK_BACKEND')
     const botTurn=backend.id==='bot-turn-write'&&backend.writeContract==='tracked-bot-turn-v1'
     if(backend.effect==='workspace-write'&&((!botTurn&&!['scoped-remote-file-v1','scoped-remote-command-v1'].includes(backend.writeContract))||!botTurn&&backend.location!=='remote'||typeof backend.targetFor!=='function'||typeof backend.canObserve!=='function'||typeof backend.reconcile!=='function'))fail('INVALID_TASK_BACKEND')
+    // A backend whose effects can land outside this process must be able to
+    // prove a stop, or a failed attempt is retried on a guess. A deployment
+    // turns this on so a new writer is refused at registration instead of
+    // discovered at the first retry; unit fixtures register synthetic ids.
+    if(requireStopProof&&hasExternalEffect(backend)&&!requiresStopProof(backend.id))fail('STOP_PROOF_BACKEND_UNREGISTERED')
     registry.set(backend.id,backend)
   }
   const target=backend=>({backend:backend.id,version:backend.version,effect:backend.effect,machineId:backend.machineId,workspaceId:backend.workspaceId,location:backend.location,capability:backend.capability,retryCapability:backend.retryCapability,model:backend.model??null,...(backend.reconcileCapability?{reconcileCapability:backend.reconcileCapability}:{})})
@@ -39,31 +45,63 @@ export function createTaskService({journal,authority,directory,backends,within=(
   const active=new Map()
   const observations=new Map()
   let identity,heartbeat,stopped=false,pumping=false,scheduled=false,closing
+  // A runner that dies silently is the worst state this service can reach: the
+  // Host keeps accepting work nobody will claim. Every stop therefore carries a
+  // reason, and the reason survives until the runner is rebuilt.
+  let stopState=null,restarts=0,lastRenewAt=null
+  const runnerEvents=[]
+  const record=(event,detail={})=>{
+    const entry=Object.freeze({at:now(),event,...detail})
+    runnerEvents.push(entry)
+    while(runnerEvents.length>32)runnerEvents.shift()
+    try{onRunnerEvent(entry)}catch{}
+    return entry
+  }
   const writable=()=>{if(stopped||!identity)fail('TASK_RUNNER_UNAVAILABLE')}
+  // A refusal has to say which check refused it. `gate` is the checkpoint name,
+  // so a blocked task's record answers "not allowed" and "not allowed by what".
+  const gate=(name,work)=>{try{return work()}catch(error){if(error instanceof PolicyError&&!error.gate)error.gate=name;throw error}}
   const admit=(subject,payload,retry=false)=>{
-    authority.assertTool(subject,'task/execute')
+    gate('task/execute',()=>authority.assertTool(subject,'task/execute'))
     const backend=registry.get(payload.backend)
     if(!backend||taskHash(resolvedTarget(backend,subject,payload.input))!==payload.targetHash)fail('TASK_BACKEND_CHANGED')
-    authority.assertTool(subject,backend.capability)
-    if(retry)authority.assertTool(subject,backend.retryCapability)
-    if(backend.model)authority.assertModel(subject,backend.model.provider,backend.model.model)
-    backend.parse(JSON.parse(canonicalTaskJson(payload.input)))
+    gate('backend/capability',()=>authority.assertTool(subject,backend.capability))
+    if(retry)gate('backend/retry-capability',()=>authority.assertTool(subject,backend.retryCapability))
+    if(backend.model)gate('backend/model-route',()=>authority.assertModel(subject,backend.model.provider,backend.model.model))
+    gate('backend/input',()=>backend.parse(JSON.parse(canonicalTaskJson(payload.input))))
     return backend
   }
-  const stopRunner=()=>{
-    stopped=true;clearInterval(heartbeat)
+  const stopRunner=(reason='TASK_RUNNER_STOPPED',detail={})=>{
+    if(stopped){stopState??=Object.freeze({code:reason,at:now(),...detail});return}
+    stopped=true;stopState=Object.freeze({code:reason,at:now(),generation:identity?.generation??null,...detail})
+    clearInterval(heartbeat);heartbeat=undefined
     for(const entry of active.values())entry.controller.abort(new PolicyError('STALE_TASK_RUNNER'))
     for(const entry of observations.values())entry.controller.abort(new PolicyError('STALE_TASK_RUNNER'))
+    record('runner.stopped',stopState)
   }
   const execute=async(subject,task,backend,controller)=>{
     const binding={taskId:task.taskId,attemptId:task.attemptId,machineId:task.input.target.machineId,workspaceId:task.input.target.workspaceId,location:task.input.target.location}
     let lease,result,outcome,observedResult,renewal,admission,executionSignal,backendStarted=false,backendClosed=false
+    // Every checkpoint writes its verdict before the work continues, so "was it
+    // allowed" and "did it run" stay two separate answers. A refusal that ends
+    // the attempt is still finished through `finish`; this only records it.
+    const gates=[]
+    const decide=(gateName,allowed,detail={})=>{
+      const verdict=Object.freeze({gate:gateName,allowed,...detail})
+      gates.push(verdict)
+      try{journal.note(identity,task.ownerBotId,task.taskId,task.attemptId,'gate',now(),verdict)}catch{}
+      return verdict
+    }
     const timer=setTimeout(()=>controller.abort(new PolicyError('TASK_DEADLINE')),Math.max(1,task.deadlineAt-now()))
     try {
       if(backend.atomicAdmission===true)admission=journal.createAdmission(identity,task.ownerBotId,task.taskId,task.attemptId,now,()=>{
         controller.signal.throwIfAborted();executionSignal?.throwIfAborted();admit(subject,task.input)
       })
-      lease=authority.issue(subject,{binding,tools:['task/execute',backend.capability],ttlMs:Math.max(1,Math.min(executionLeaseMs,task.deadlineAt-now()))})
+      decide('authorize',true,{effect:backend.effect,location:backend.location})
+      try{
+        lease=gate('execution/lease',()=>authority.issue(subject,{binding,tools:['task/execute',backend.capability],ttlMs:Math.max(1,Math.min(executionLeaseMs,task.deadlineAt-now()))}))
+      }catch(error){decide('execution/lease',false,{code:error?.code??'LEASE_FAILED'});throw error}
+      decide('execution/lease',true)
       renewal=setInterval(()=>{
         try{if(task.deadlineAt<=now())throw new PolicyError('TASK_DEADLINE');authority.renew(lease.token,binding,{ttlMs:Math.max(1,Math.min(executionLeaseMs,task.deadlineAt-now()))})}
         catch(error){controller.abort(error)}
@@ -74,7 +112,9 @@ export function createTaskService({journal,authority,directory,backends,within=(
         // A delayed within/admission callback cannot dispatch after this
         // invocation has settled or after its authority was cancelled.
         if(backendClosed||backendStarted)fail('TASK_DISPATCH_CLOSED')
-        signal.throwIfAborted();journal.beginDispatch(identity,task.ownerBotId,task.taskId,task.attemptId,now());backendStarted=true
+        signal.throwIfAborted()
+        try{journal.beginDispatch(identity,task.ownerBotId,task.taskId,task.attemptId,now())}catch(error){decide('dispatch',false,{code:error?.code??'DISPATCH_REFUSED'});throw error}
+        backendStarted=true;decide('dispatch',true)
         return backend.run({
         input:JSON.parse(canonicalTaskJson(task.input.input)),target:task.input.target,signal,binding,attemptNumber:task.attemptNumber,
         previous:task.attemptNumber>1?journal.get(task.ownerBotId,task.taskId).attempts.at(-2):null,
@@ -99,6 +139,8 @@ export function createTaskService({journal,authority,directory,backends,within=(
       const hasReference=!!journal.get(task.ownerBotId,task.taskId).executionRef
       if(observedResult?.outcome==='unknown'||!observedResult&&hasReference)outcome='unknown'
       result={code:error instanceof PolicyError?error.code:'TASK_BACKEND_FAILED',
+        ...(error?.gate?{gate:error.gate}:{}),
+        ...(error?.rule?{rule:error.rule}:{}),
         ...(!backendStarted&&!hasReference?{notStarted:true}:{}),
         ...(observedResult?.legacyRunId?{legacyRunId:observedResult.legacyRunId}:{}),
         ...(observedResult?.summary?{summary:observedResult.summary}:{})}
@@ -110,8 +152,10 @@ export function createTaskService({journal,authority,directory,backends,within=(
       else if(['unknown','succeeded'].includes(outcome))outcome=controller.signal.aborted?'cancelled':'failed'
       result={...result,admissionCommitted:false,notDispatched:proven}
     }
+    decide('settle',true,{outcome,carriedOut:backendStarted})
+    result={...result,authorization:Object.freeze({gates:Object.freeze(gates),carriedOut:backendStarted})}
     try {journal.finish(identity,task.ownerBotId,task.taskId,task.attemptId,outcome,result,now())}
-    catch(error) {if(error.code==='STALE_TASK_RUNNER')stopRunner();else{stopRunner();throw error}}
+    catch(error) {if(error.code==='STALE_TASK_RUNNER')stopRunner('STALE_TASK_RUNNER',{taskId:task.taskId,attemptId:task.attemptId});else{stopRunner(error?.code??'TASK_FINISH_FAILED',{taskId:task.taskId,attemptId:task.attemptId});throw error}}
   }
   const pump=()=>{
     if(stopped||pumping)return
@@ -131,7 +175,10 @@ export function createTaskService({journal,authority,directory,backends,within=(
           if(journal.ownerBlocked(item.owner_bot))fail('TASK_RECONCILIATION_REQUIRED')
           subject=directory.forBot(item.owner_bot)
           backend=admit(subject,item.payload)
-        }catch(error){journal.block(identity,item.owner_bot,item.id,error instanceof PolicyError?error.code:'TASK_POLICY_FAILED',now());continue}
+        }catch(error){
+          journal.block(identity,item.owner_bot,item.id,error instanceof PolicyError?error.code:'TASK_POLICY_FAILED',now(),
+            {gate:error?.gate,rule:error?.rule});continue
+        }
         const task=journal.claim(identity,item.owner_bot,item.id,now(),{atomic:backend.atomicAdmission===true})
         if(!task)continue
         const controller=new AbortController()
@@ -139,7 +186,7 @@ export function createTaskService({journal,authority,directory,backends,within=(
         active.set(task.taskId,{owner:item.owner_bot,controller,work})
         work.catch(()=>{}).finally(()=>{active.delete(task.taskId);schedule()})
       }
-    }catch(error){stopRunner()}
+    }catch(error){stopRunner(error?.code??'TASK_PUMP_FAILED')}
     finally{pumping=false}
   }
   const schedule=()=>{
@@ -149,12 +196,56 @@ export function createTaskService({journal,authority,directory,backends,within=(
   }
   const service=Object.freeze({
     start() {
-      if(identity||stopped)fail('TASK_RUNNER_UNAVAILABLE')
+      if(identity&&!stopped)fail('TASK_RUNNER_UNAVAILABLE')
+      if(stopped){
+        // A stopped runner is rebuilt, not resurrected: the previous lease is
+        // released so `claimRunner` can hand out the next generation, and the
+        // old work was already aborted by stopRunner.
+        if(identity){try{journal.release(identity,now())}catch{}}
+        identity=undefined;stopped=false
+      }
       identity=journal.claimRunner(`runner-${randomUUID()}`,runnerTtlMs,now())
       journal.recover(identity,now())
       journal.expire(identity,now())
-      heartbeat=setInterval(()=>{try{journal.renew(identity,runnerTtlMs,now());journal.expire(identity,now());schedule()}catch{stopRunner()}},Math.floor(runnerTtlMs/3))
-      heartbeat.unref();schedule()
+      lastRenewAt=now()
+      heartbeat=setInterval(()=>{try{journal.renew(identity,runnerTtlMs,now());lastRenewAt=now();journal.expire(identity,now());schedule()}catch(error){stopRunner(error?.code??'TASK_RUNNER_RENEW_FAILED')}},Math.floor(runnerTtlMs/3))
+      stopState=null
+      heartbeat.unref();record('runner.started',{generation:identity.generation});schedule()
+    },
+    /**
+     * Rebuild the runner after a stop. A lease this process cannot take — another
+     * Host holds it — is reported, never thrown: the caller retries later, and
+     * the reason the runner stopped is kept until it actually starts again.
+     */
+    restart({reason='TASK_RUNNER_RESTART_REQUESTED'}={}) {
+      if(closing)return Object.freeze({accepted:false,reason:'TASK_SERVICE_CLOSING',code:'TASK_SERVICE_CLOSING'})
+      if(!stopped)return Object.freeze({accepted:true,reason:'ALREADY_RUNNING',generation:identity?.generation??null})
+      const previous=stopState
+      try{
+        service.start()
+      }catch(error){
+        stopped=true;stopState=previous
+        return Object.freeze({accepted:false,code:error?.code??'TASK_RUNNER_UNAVAILABLE',reason,retryAfterMs:Math.max(250,Math.floor(runnerTtlMs/3))})
+      }
+      restarts++
+      record('runner.restarted',{reason,restarts,generation:identity.generation,previous:previous?.code??null})
+      return Object.freeze({accepted:true,reason,restarts,generation:identity.generation})
+    },
+    /** Read-only view for attention surfaces and the watchdog. */
+    state() {
+      return Object.freeze({
+        running:!stopped&&!!identity,
+        stopped:!!stopped,
+        closed:!!closing,
+        generation:identity?.generation??null,
+        stopReason:stopState?.code??null,
+        stoppedAt:stopState?.at??null,
+        restarts,
+        lastRenewAt,
+        active:active.size,
+        observations:observations.size,
+        events:Object.freeze([...runnerEvents]),
+      })
     },
     submit(subject,request) {
       writable();const id=owner(subject,'task/submit'),parsed=parseTaskSubmit(request)
@@ -255,10 +346,11 @@ export function createTaskService({journal,authority,directory,backends,within=(
     },
     async close() {
       if(closing)return closing
-      stopped=true;clearInterval(heartbeat)
+      stopped=true;clearInterval(heartbeat);heartbeat=undefined
+      stopState??=Object.freeze({code:'TASK_HOST_STOPPED',at:now(),generation:identity?.generation??null})
       for(const entry of active.values())entry.controller.abort(new PolicyError('TASK_HOST_STOPPED'))
       for(const entry of observations.values())entry.controller.abort(new PolicyError('TASK_HOST_STOPPED'))
-      closing=(async()=>{await Promise.allSettled([...active.values(),...observations.values()].map(entry=>entry.work));if(identity)journal.release(identity,now());journal.close()})()
+      closing=(async()=>{await Promise.allSettled([...active.values(),...observations.values()].map(entry=>entry.work));if(identity){try{journal.release(identity,now())}catch{}}journal.close()})()
       return closing
     },
   })

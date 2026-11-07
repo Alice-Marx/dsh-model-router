@@ -54,7 +54,31 @@ export async function openSqliteRouterState({Database,file,legacyFile,now=Date.n
     }
     try{const result=work();db.exec('COMMIT');return result}catch(e){db.exec('ROLLBACK');throw e}
   }
-  const write=(value,revision,fundingEpoch=epoch)=>{
+  // Rewrite only what changed. Every submit used to delete all rows and insert
+  // them again: with MAX_RUNS at 200 and synchronous=FULL that is 200 fsyncs of
+  // unchanged data on the hot path, which is also how a long write lock turns
+  // into a SQLITE_BUSY for the other Host.
+  const writeRuns=(runs,budgetReservations)=>{
+    const before=new Map(db.prepare('SELECT id,payload FROM router_runs').all().map(row=>[row.id,row.payload]))
+    const after=new Map(runs.map(run=>[run.id,serialize(run)]))
+    for(const [id,payload] of after)if(before.get(id)!==payload)db.prepare('INSERT INTO router_runs VALUES(?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(id,payload)
+    for(const id of before.keys())if(!after.has(id))db.prepare('DELETE FROM router_runs WHERE id=?').run(id)
+    const heldBefore=new Map(db.prepare('SELECT id,payload FROM router_holds').all().map(row=>[row.id,row.payload]))
+    const heldAfter=new Map(Object.entries(budgetReservations).map(([id,hold])=>[id,serialize(hold)]))
+    for(const [id,payload] of heldAfter){
+      const existing=heldBefore.get(id)
+      if(existing===payload)continue
+      if(existing===undefined)db.prepare('INSERT INTO router_holds VALUES(?,?,?)').run(id,budgetReservations[id].runId,payload)
+      else db.prepare('UPDATE router_holds SET payload=? WHERE id=?').run(payload,id)
+    }
+    for(const id of heldBefore.keys())if(!heldAfter.has(id))db.prepare('DELETE FROM router_holds WHERE id=?').run(id)
+  }
+  const writeFull=(runs,budgetReservations)=>{
+    db.prepare('DELETE FROM router_holds').run();db.prepare('DELETE FROM router_runs').run()
+    for(const run of runs)db.prepare('INSERT INTO router_runs VALUES(?,?)').run(run.id,serialize(run))
+    for(const [id,hold] of Object.entries(budgetReservations))db.prepare('INSERT INTO router_holds VALUES(?,?,?)').run(id,hold.runId,serialize(hold))
+  }
+  const write=(value,revision,fundingEpoch=epoch,{fullWrite=false}={})=>{
     // Capture each run before MAX_RUNS retention folds it into the global archive.
     // These are projections, never a second monetary writer.
     funding.project(value,fundingEpoch)
@@ -62,9 +86,8 @@ export async function openSqliteRouterState({Database,file,legacyFile,now=Date.n
     const serialized=serialize(state)
     if(new Set(runs.map(run=>run.id)).size!==runs.length)fail('ROUTER_DUPLICATE_RUN_ID')
     if(Object.entries(budgetReservations).some(([id,hold])=>id!==hold.runId||!runs.some(run=>run.id===hold.runId)))fail('ROUTER_ORPHAN_RESERVATION')
-    db.prepare('DELETE FROM router_holds').run();db.prepare('DELETE FROM router_runs').run()
-    for(const run of runs)db.prepare('INSERT INTO router_runs VALUES(?,?)').run(run.id,serialize(run))
-    for(const [id,hold] of Object.entries(budgetReservations))db.prepare('INSERT INTO router_holds VALUES(?,?,?)').run(id,hold.runId,serialize(hold))
+    if(fullWrite)writeFull(runs,budgetReservations)
+    else writeRuns(runs,budgetReservations)
     db.prepare('INSERT INTO router_meta VALUES(1,2,?,?) ON CONFLICT(singleton) DO UPDATE SET revision=excluded.revision,payload=excluded.payload').run(revision,serialize(meta))
     db.prepare('INSERT INTO router_commits VALUES(?,?,?)').run(revision,now(),hash(serialized))
   }
@@ -136,7 +159,9 @@ export async function openSqliteRouterState({Database,file,legacyFile,now=Date.n
     funding.identity({id:receipt.runId,modelCall:{botId:receipt.botId,...(receipt.fundingScopeId?{fundingScopeId:receipt.fundingScopeId}:{}),...(receipt.fundingProjectId?{fundingProjectId:receipt.fundingProjectId}:{})}},epoch)
     db.prepare('INSERT INTO router_model_calls VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(receipt.id,receipt.botId,receipt.taskId,receipt.runId,identity,serialize(receipt))
   }
-  const update=(change,{retrySafe=false,modelReceipt}={})=>{
+  // `fullWrite` is the diagnostic escape hatch: it forces the old delete-and-insert
+  // path, which the incremental writer is compared against in tests.
+  const update=(change,{retrySafe=false,modelReceipt,fullWrite=false}={})=>{
     const admission=currentTaskAdmission()
     if(modelReceipt)modelReceipt=normalizeModelReceipt(modelReceipt)
     const next=chain.then(async()=>{
@@ -151,7 +176,7 @@ export async function openSqliteRouterState({Database,file,legacyFile,now=Date.n
             if(modelReceipt&&result?.accepted!==false)applyReceipt(modelReceipt)
             const publish=prepareTaskAdmission(admission,db,candidate,result)
             if(publish)atomicStep('task-linked-before-money')
-            write(candidate,row.revision+1)
+            write(candidate,row.revision+1,undefined,{fullWrite})
             if(publish)atomicStep('money-written-before-commit')
             return publish
           })
@@ -195,9 +220,9 @@ export async function openSqliteRouterState({Database,file,legacyFile,now=Date.n
   }
   const activeAuthority=()=>{if(closed)fail('ROUTER_STORE_CLOSED');const m=migration();if(m?.phase!=='active'||m.id!==epoch)fail('ROUTER_AUTHORITY_INACTIVE')}
   return Object.freeze({...createRouterStateAPI({file,read,update,now}),kind:'sqlite-router-state',legacyFile,rollback,modelCalls,
-    openTaskJournal(){
+    openTaskJournal({leaseClock='app',writeDeadlineMs=10_000}={}){
       activeAuthority()
-      const journal=openTaskJournal(Database,file,{database:db,financialEpoch:()=>{activeAuthority();return epoch},onClose:()=>journals.delete(journal)})
+      const journal=openTaskJournal(Database,file,{database:db,leaseClock,writeDeadlineMs,financialEpoch:()=>{activeAuthority();return epoch},onClose:()=>journals.delete(journal)})
       journals.add(journal);return journal
     },
     async modelCall(botId,id){await chain;await checkMarker();const row=db.prepare('SELECT payload FROM router_model_calls WHERE bot_id=? AND id=?').get(botId,id);return row?JSON.parse(row.payload):null},

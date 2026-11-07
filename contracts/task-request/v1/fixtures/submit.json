@@ -1,0 +1,14 @@
+{
+  "kind": "submit",
+  "requestKey": "route-9f2",
+  "backend": "codex-read",
+  "input": {
+    "task": "summarize the diff"
+  },
+  "target": {
+    "effect": "read",
+    "machineId": "machine-a",
+    "workspaceId": "workspace-a",
+    "location": "local"
+  }
+}

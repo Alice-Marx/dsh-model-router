@@ -1,0 +1,127 @@
+{
+  "$schema": "memory://contract-schema/1",
+  "title": "A task action payload as the workbench sends it",
+  "description": "One of the five task actions the panels dispatch. Every key the handler reads is declared here; a handler that reads an undeclared key fails check:contracts.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "action",
+        "botId",
+        "taskId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "const": "task.inspect"
+        },
+        "botId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "action",
+        "botId",
+        "taskId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "const": "task.cancel"
+        },
+        "botId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "action",
+        "botId",
+        "taskId",
+        "requestKey"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "const": "task.retry"
+        },
+        "botId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "requestKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "action",
+        "botId",
+        "taskId",
+        "requestKey"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "const": "task.reconcile"
+        },
+        "botId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "requestKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "action",
+        "botId",
+        "planId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "const": "task.plan.cancel"
+        },
+        "botId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "planId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        }
+      }
+    }
+  ]
+}

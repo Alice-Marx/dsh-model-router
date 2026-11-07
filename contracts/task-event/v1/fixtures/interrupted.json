@@ -1,0 +1,8 @@
+{
+  "kind": "interrupted",
+  "at": 1762500000002,
+  "detail": {
+    "previousGeneration": 3,
+    "operationId": "operation-1"
+  }
+}

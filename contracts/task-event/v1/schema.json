@@ -1,0 +1,25 @@
+{
+  "$schema": "memory://contract-schema/1",
+  "title": "One durable task event",
+  "description": "What the journal records. `kind` is open on purpose: a new kind is a new observation, not a breaking change. `detail` is the fact bag a reader shows.",
+  "type": "object",
+  "required": [
+    "kind",
+    "at",
+    "detail"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,40}$"
+    },
+    "at": {
+      "type": "integer",
+      "description": "milliseconds since the epoch, in the ledger clock"
+    },
+    "detail": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

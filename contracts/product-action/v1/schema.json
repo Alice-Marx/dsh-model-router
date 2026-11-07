@@ -1,0 +1,20 @@
+{
+  "$schema": "memory://contract-schema/1",
+  "title": "A product-channel request",
+  "description": "The workbench dispatches an action by name with a payload and a caller class. The caller class is decided by the Host, never by the payload.",
+  "type": "object",
+  "required": [
+    "action",
+    "payload"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9]*(?:\\.[a-zA-Z][a-zA-Z0-9]*)+$"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

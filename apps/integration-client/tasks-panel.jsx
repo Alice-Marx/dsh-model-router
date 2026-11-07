@@ -78,7 +78,7 @@ function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, open
         <strong>第 {attempt.number} 次 · {TASK_STATES[attempt.state] ?? attempt.state}</strong><small>开始 {date(attempt.startedAt)} · 结束 {date(attempt.finishedAt)}</small><small className="bp-code">{attempt.attemptId} · {attempt.operationId}</small>
       </li>)}</ul></details>
     </>}
-    <details className="bp-technical"><summary>原任务与操作编号</summary><dl className="bp-facts"><Value label="Task">{taskIdOf(data)}</Value><Value label="Package">{data.packageId}</Value><Value label="Attempt">{data.attemptId}</Value><Value label="Operation">{data.operationId}</Value><Value label="MR 运行">{data.legacyRunIds?.join('、')}</Value></dl></details>
+    <details className="bp-technical"><summary>原任务与操作编号</summary><dl className="bp-facts"><Value label="Task">{taskIdOf(data)}</Value><Value label="Package">{data.packageId}</Value><Value label="Attempt">{data.attemptId}</Value><Value label="Operation">{data.operationId}</Value><Value label="MR 运行">{data.legacyRunIds?.join('、')}</Value>{data.attribution?.label && <Value label="执行进度">{data.attribution.label}</Value>}</dl></details>
     <details className="bp-technical"><summary>执行与收据依据</summary><pre>{JSON.stringify({ attempts: history?.attempts ?? task.attempts, executionRef: task.executionRef, remoteReceipt: data.result?.remote, reconciliation: data.reconciliation, packages: task.packages }, null, 2)}</pre></details>
   </article>
 }
@@ -124,7 +124,7 @@ export function TaskWorkspace({ snapshot, dispatch, busy, scope, inspect, openSe
       {!progress.items.length ? <p className="bp-empty">尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。</p> : rows.length === 0 ? <p className="bp-empty">没有符合当前筛选的任务。可清除筛选查看其他记录。</p> : <div className="bp-table-wrap"><table>
         <thead><tr><th>任务</th><th>Bot</th><th>状态</th><th>执行尝试</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={taskKey(row)}>
           <td><button className="bp-text-button" onClick={() => select(row)}>{taskTitle(row)}</button><small>更新 {date(row.updatedAt)}</small></td>
-          <td>{snapshot.bots?.find(bot => bot.id === row.botId)?.name ?? row.botId ?? '未取得归属'}</td><td><Tag>{TASK_STATES[row.state] ?? row.state}</Tag>{row.blockedReason && <small>{row.blockedReason}</small>}<RemoteNotice row={row} /></td>
+          <td>{snapshot.bots?.find(bot => bot.id === row.botId)?.name ?? row.botId ?? '未取得归属'}</td><td><Tag>{TASK_STATES[row.state] ?? row.state}</Tag>{row.attribution?.label && <small>{row.attribution.label}</small>}{row.blockedReason && <small>{row.blockedReason}</small>}<RemoteNotice row={row} /></td>
           <td>{Number.isSafeInteger(row.attempts) ? row.attempts : row.attempts?.length ?? row.attemptCount ?? '未知'}</td><td className="bp-actions"><TaskActions row={row} actions={actions} dispatch={dispatch} busy={busy} /></td>
         </tr>)}</tbody></table></div>}
     </section>

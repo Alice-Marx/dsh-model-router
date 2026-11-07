@@ -1,0 +1,8 @@
+{
+  "kind": "gate",
+  "at": 1762500000000,
+  "detail": {
+    "gate": "dispatch",
+    "allowed": true
+  }
+}

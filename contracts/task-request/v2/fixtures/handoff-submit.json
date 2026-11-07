@@ -1,0 +1,18 @@
+{
+  "kind": "submit",
+  "requestKey": "handoff-a1",
+  "backend": "bot-turn-read",
+  "input": {
+    "task": "continue"
+  },
+  "target": {
+    "effect": "read",
+    "machineId": "m",
+    "workspaceId": "w"
+  },
+  "initiator": {
+    "kind": "handoff",
+    "id": "bot-b",
+    "origin": "bot-a"
+  }
+}

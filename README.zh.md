@@ -14,7 +14,7 @@
 
 本项目是社区插件，复用 Harness 的模型配置和 Host 服务；各模型供应商与 CLI 使用各自的账户及访问权限。
 
-**当前正式版：0.65.0 · Windows Remote Agent：0.1.1**
+**当前正式版：0.66.1 · Windows Remote Agent：0.1.1**
 
 [选择版本](#editions) · [安装](#install) · [第一个任务](#quick-evaluation) · [Bot 分工](#bot-routing) · [远程电脑](#computers) · [问题反馈](#troubleshooting)
 
@@ -52,8 +52,8 @@
 ## 安装
 
 1. 在 Harness Desktop 打开 **插件 → 添加插件**，输入以下包名之一：
-   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.65.0`
-   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.65.0`
+   - 完整工作区：`@ljwei-stak/dsh-model-route-bot@0.66.1`
+   - 仅模型路由：`@ljwei-stak/dsh-model-router@0.66.1`
 2. 启用后，**连同托盘进程一起完全退出 Harness**，再重新启动，让 Host 加载已安装版本。
 3. 在 Harness 官方 **模型** 设置中配置 Provider 凭据和模型。完整版本进入 Bot 工作区；纯路由版本从侧栏打开 **模型路由**。
 
@@ -61,10 +61,10 @@
 
 ```powershell
 # 完整 Bot 工作区
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.65.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.66.1
 
 # 仅模型路由
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.1
 ```
 
 离线安装可从 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 导入对应 `.tgz`。本地解压安装时，选择同时包含 `package.json` 与 `.dsh-plugin` 的内层 `package` 目录。仅全局安装 npm 包不会将其注册为 Harness 插件。
@@ -140,7 +140,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
 
 ## 多 Bot 任务进度与待处理
 
-**适用于完整 Bot 版本 0.65.0。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
+**适用于完整 Bot 版本 0.66.1。** 在 **任务** 页面按 Bot 查看任务数量，通过 **全部 / 进行中 / 待处理 / 已结束** 筛选，或搜索任务名称及任务、计划、操作编号。计数和筛选针对已加载记录；资金准入检查属于进行中，等待预算属于待处理。
 
 **需要你处理** 显示完整数量，超过六项时可展开全部。每项都能打开原任务；等待审批时可进入对应 Bot 私聊查看原请求。打开任务后可查看 **任务时间线**，了解排队、资金准入、执行、停止请求及收据核对，并展开每次尝试的原编号。日志读取不会重新派发任务或调用模型；停止请求仍需等待确认。旧宿主未提供时间线时，页面保留现有收据详情。
 
