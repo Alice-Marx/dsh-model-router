@@ -14,7 +14,7 @@ Turn a task into a reviewable execution plan, select suitable configured models 
 
 This is a community plugin. It reuses Harness model configuration and Host services; each provider or CLI uses its own account and access rights.
 
-**Current stable version: 0.66.3 · Windows Remote Agent: 0.1.1**
+**Current stable version: 0.66.4 · Windows Remote Agent: 0.1.1**
 
 [Choose an edition](#editions) · [Install](#install) · [First task](#quick-evaluation) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
 
@@ -52,8 +52,8 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 ## Installation
 
 1. Open **Plugins → Add plugin** in Harness Desktop and enter **one** package:
-   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.66.3`
-   - Routing only: `@ljwei-stak/dsh-model-router@0.66.3`
+   - Full workspace: `@ljwei-stak/dsh-model-route-bot@0.66.4`
+   - Routing only: `@ljwei-stak/dsh-model-router@0.66.4`
 2. Enable it, fully quit Harness **including its tray process**, then restart so the Host loads the installed version.
 3. Configure provider credentials and models in the official Harness **Models** settings. Open the Bot workspace for the full edition, or **Model Router** in the sidebar for the routing-only edition.
 
@@ -61,10 +61,10 @@ CLI installation is also supported. Choose the command for your edition:
 
 ```powershell
 # Full Bot workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.66.3
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-route-bot@0.66.4
 
 # Routing-only workspace
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.3
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.4
 ```
 
 Alternatively, import the matching `.tgz` from [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest). For an extracted local package, select the inner `package` directory containing `package.json` and `.dsh-plugin`. A global npm installation alone does not register a Harness plugin.
@@ -140,7 +140,7 @@ Integration mode reuses Harness Sessions. An optional independent runtime has it
 
 ## Multi-Bot task progress and pending items
 
-**Available in the full Bot edition 0.66.3.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
+**Available in the full Bot edition 0.66.4.** On **Tasks**, inspect task counts per Bot, filter by **All / In progress / Needs attention / Ended**, or search task names and task, plan, or operation IDs. Counts and filters cover loaded records; funding admission is in progress, while budget waiting needs attention.
 
 **Needs your attention** reports the full count and expands beyond six items. Each reminder opens the original task; approval reminders can open the owning Bot's conversation to show its original request. Open a task's **timeline** for queue, admission, execution, stop-request, and reconciliation events, with the original identities for each attempt. Reading history does not dispatch tasks or invoke models; stop requests still require confirmation. Older Hosts without history support retain existing receipt details.
 
