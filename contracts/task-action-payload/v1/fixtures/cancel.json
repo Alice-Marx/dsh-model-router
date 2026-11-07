@@ -1,0 +1,5 @@
+{
+  "action": "task.cancel",
+  "botId": "main",
+  "taskId": "task-7c1"
+}

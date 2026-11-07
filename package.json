@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.65.0",
+  "version": "0.66.0",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -374,6 +374,8 @@
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
     "check:client": "node scripts/build-client.mjs --check",
+    "check:contracts": "node scripts/check-contracts.mjs",
+    "contracts:write": "node scripts/check-contracts.mjs --write",
     "preview:ui": "node scripts/workbench-preview.mjs",
     "eval:routing": "node scripts/evaluate-routing.mjs",
     "experiment:routing-search": "node scripts/routing-search-experiment.mjs",

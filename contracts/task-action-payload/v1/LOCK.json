@@ -1,0 +1,12 @@
+{
+  "id": "task-action-payload/v1",
+  "schemaHash": "beb2448f14294b359419eeedaeb7df4eb777f9d04efaeb6e977d726549c41db7",
+  "files": {
+    "fixtures/cancel.json": "87d7f286efb216018c779906680f2636cf285c1726c3d29f7077362b96b95386",
+    "fixtures/inspect.json": "b5a170f1d24285e35d58d9117389940fb10e76fd47308d58114e1a82cfe287c5",
+    "fixtures/plan-cancel.json": "93e1fa39fb1e6470662884e7a58c97059f0076ca526f161c7f4569a21a93c64b",
+    "fixtures/reconcile.json": "367635b25b00c93dabbf35a868cd8be0281c23d5f3c30c9896041d7a2a9a9891",
+    "fixtures/retry.json": "0feac41a70ecab90c13c5eef592bc2ff1828efa668e9f4d4f4d921b6feac2362"
+  },
+  "digest": "d2dbe4cd335348c953c7f1b73b2e6ad434a4692f6411e4674f2f6fc978e82d15"
+}

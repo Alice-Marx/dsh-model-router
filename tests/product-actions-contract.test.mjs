@@ -26,3 +26,26 @@ test('product channel: the routing actions exist on both doors', () => {
   assert.ok(source.includes("'botRouting.dispatch'"), 'dispatch action is registered')
   assert.ok(source.includes("'botRouting.status'"), 'the owner-only submission lookup is registered')
 })
+
+test('product channel: a task action declares that it belongs to the owner console', () => {
+  // These six move, stop or re-open somebody's work. Each one names its caller
+  // class at its own entry rather than inheriting whatever the authorization
+  // seam defaults to, so a change there cannot quietly widen them.
+  const actions = ['task.inspect', 'task.plan.submit', 'task.plan.cancel', 'task.cancel', 'task.retry', 'task.reconcile']
+  for (const action of actions) {
+    const registered = new RegExp(`'${action.replace('.', '\\.')}':\\s*ownerOnly\\(`)
+    assert.match(source, registered, `${action} must be wrapped in ownerOnly`)
+  }
+})
+
+test('product channel: every action that is not a Bot surface is wrapped or explicit', () => {
+  // The two other owner-only entries in the same map; if a new action appears
+  // without either wrapper or an explicit context check, this list says so.
+  const ownerGated = ['machine.desktop.view', 'machine.desktop.act', 'machine.secret', 'usage.resolve', 'task.inspect']
+  for (const action of ownerGated) {
+    assert.ok(source.includes(`'${action}'`), `${action} must be registered`)
+  }
+  // open/renew/close are built from one name list, so they carry one check.
+  assert.ok(source.includes('[`machine.desktop.${action}`]'), 'the desktop action loop must stay name-driven')
+  assert.match(source, /context\?\.kind !== 'owner'/, 'the owner check itself must stay in the composition')
+})

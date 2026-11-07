@@ -13,6 +13,14 @@ export async function verifyTaskDriver(path) {
   return (await import(pathToFileURL(path).href)).default
 }
 async function main(args) {
+  // Hold the write lock from another *process*, which is the only honest way to
+  // observe that a waiting writer really waits instead of starving the releaser.
+  if(args[0]==='--lock-child') {
+    const Database=await verifyTaskDriver(resolve(args[1])),db=new Database(resolve(args[2]))
+    try{db.pragma('journal_mode=WAL');db.exec('BEGIN IMMEDIATE');process.stdout.write('locked\n');await new Promise(resolve=>setTimeout(resolve,Number(args[3])||200));db.exec('COMMIT')}
+    finally{db.close()}
+    return
+  }
   if(args[0]==='--crash-child') {
     const Database=await verifyTaskDriver(resolve(args[1])),journal=openTaskJournal(Database,resolve(args[2]))
     const fence=journal.claimRunner('crash-child',500,1000)
@@ -28,12 +36,16 @@ async function main(args) {
   const run=await mkdtemp(join(parent,'suite-'))
   const env={DSH_TASK_DRIVER:pathToFileURL(driver).href,HOME:run,USERPROFILE:run,APPDATA:run,LOCALAPPDATA:run}
   for(const key of ['PATH','Path','SystemRoot','windir','TEMP','TMP','TMPDIR','LANG'])if(process.env[key])env[key]=process.env[key]
-  const result=spawnSync(process.execPath,['--test','tests/task-journal.native.mjs'],{cwd:ROOT,env,encoding:'utf8',timeout:90_000,windowsHide:true,maxBuffer:4*1024*1024})
+  // Every native task spec runs here, because this probe is the only place the
+  // verified plain-Node driver exists. A spec added to this list is covered by
+  // `npm test`; one left out is covered by nothing.
+  const specs=['tests/task-journal.native.mjs','tests/write-retry.native.mjs','tests/task-runner-restart.native.mjs','tests/task-views-batch.native.mjs','tests/task-plan-refresh.native.mjs','tests/task-gates.native.mjs']
+  const result=spawnSync(process.execPath,['--test',...specs],{cwd:ROOT,env,encoding:'utf8',timeout:180_000,windowsHide:true,maxBuffer:8*1024*1024})
   await writeFile(join(run,'native-tests.log'),result.stdout+'\n'+result.stderr)
   assert.equal(result.status,0,result.stdout+'\n'+result.stderr)
   const count=name=>Number(new RegExp(`(?:#|ℹ) ${name} (\\d+)`).exec(result.stdout)?.[1])
-  const summary={status:'passed',driverVersion:'13.0.3',node:process.version,platform:process.platform,tests:count('tests'),pass:count('pass'),fail:count('fail'),actualModelCalls:0,
-    limitations:['Single-package read-only task foundation; not complete Task DAG or money accounting','Fixture backends and intentional process exit; no native CLI or remote agent execution']}
+  const summary={status:'passed',driverVersion:'13.0.3',node:process.version,platform:process.platform,specs,tests:count('tests'),pass:count('pass'),fail:count('fail'),actualModelCalls:0,
+    limitations:['Single-package read-only task foundation; not complete Task DAG or money accounting','Fixture backends and intentional process exit; no native CLI or remote agent execution','Runner restart coverage simulates a lost lease; it does not block a live event loop for ten seconds']}
   await writeFile(join(run,'summary.json'),JSON.stringify(summary,null,2)+'\n')
   process.stdout.write(JSON.stringify(summary,null,2)+'\n')
 }

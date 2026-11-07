@@ -1,0 +1,103 @@
+{
+  "$schema": "memory://contract-schema/1",
+  "title": "A task request as the product channel accepts it (v2: initiator)",
+  "description": "v2 adds `initiator` — what started the run, as distinct from whose authority it carries. v1 is frozen and still valid for callers that send none.",
+  "type": "object",
+  "required": [
+    "kind"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "submit",
+        "retry",
+        "reconcile"
+      ]
+    },
+    "requestKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$",
+      "minLength": 1
+    },
+    "backend": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object"
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "effect",
+        "machineId",
+        "workspaceId"
+      ],
+      "properties": {
+        "effect": {
+          "type": "string",
+          "enum": [
+            "read",
+            "workspace-write"
+          ]
+        },
+        "machineId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "minLength": 1
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "enum": [
+            "local",
+            "remote"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "initiator": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "person",
+            "bot",
+            "routine",
+            "handoff",
+            "responsibility",
+            "memory"
+          ]
+        },
+        "id": {
+          "$comment": "required for every kind except person",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "origin": {
+          "$comment": "the chain root, never the previous hop",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

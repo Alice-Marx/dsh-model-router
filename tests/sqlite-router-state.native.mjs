@@ -166,3 +166,45 @@ test('finance/native: production lock timing recovers a genuinely dead migration
   const store=await openSqliteRouterState({Database,file:paths.file,legacyFile:paths.legacyFile});t.after(()=>store.close())
   assert.equal(store.status().phase,'active');close(total(await store.read()),0.2)
 })
+
+test('finance/native: an incremental write leaves exactly what a full rewrite would', async (t) => {
+  // The old writer deleted every run and hold and re-inserted them on each
+  // submit: with 200 runs and synchronous=FULL that is 200 fsyncs of unchanged
+  // data inside the write lock. Rowid stability is the external proof that
+  // untouched rows were not rewritten — a delete-and-insert assigns new rowids.
+  const {store, file} = await fixture(t)
+  const many = Array.from({length: 40}, (_, index) => ({
+    id: `run-${index}`, createdAt: Date.now(), finishedAt: Date.now(), packages: [],
+    ...(index === 0 ? {note: 'changed-later'} : {}),
+  }))
+  await store.update(state => { state.runs = many })
+  const afterBulk = await store.read()
+
+  const reader = new Database(file, {readonly: true})
+  t.after(() => { try { reader.close() } catch {} })
+  const rowids = () => new Map(reader.prepare('SELECT id,rowid FROM router_runs').all().map(row => [row.id, row.rowid]))
+  const before = rowids()
+  assert.equal(before.size, afterBulk.runs.length)
+
+  await store.update(state => {
+    state.runs = state.runs.map(run => run.id === 'run-0' ? {...run, note: 'edited'} : run)
+  })
+  const afterEdit = await store.read()
+  const after = rowids()
+
+  assert.deepEqual(afterEdit.runs.map(run => run.id), afterBulk.runs.map(run => run.id), 'no run disappears')
+  assert.equal(afterEdit.runs.find(run => run.id === 'run-0').note, 'edited')
+  assert.deepEqual(afterEdit.runs.filter(run => run.id !== 'run-0'), afterBulk.runs.filter(run => run.id !== 'run-0'),
+    'every untouched run is byte-identical')
+
+  // An UPDATE keeps a row's rowid; a DELETE + INSERT gives it a new one. So no
+  // moved rowid proves nothing was deleted and re-inserted.
+  assert.deepEqual([...before.entries()].filter(([id, rowid]) => after.get(id) !== rowid), [], 'no row was deleted and re-inserted')
+  assert.equal(after.size, before.size)
+
+  // The forced full rewrite is the reference for that signal: it must move them.
+  await store.update(state => { state.runs = state.runs.map(run => ({...run})) }, {fullWrite: true})
+  const afterFull = rowids()
+  const moved = [...before.entries()].filter(([id, rowid]) => afterFull.get(id) !== rowid)
+  assert.equal(moved.length, before.size, 'the reference path rewrites every row, which is what the signal measures')
+})

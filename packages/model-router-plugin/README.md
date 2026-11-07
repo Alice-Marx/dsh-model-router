@@ -8,16 +8,16 @@ English · [简体中文](README.zh.md)
 
 Describe the result you want, choose suitable configured models or native CLI tools, review the plan, then follow execution and accounting from one workbench. This edition adds a **Model Router** sidebar entry and keeps the existing Harness workspace.
 
-**Stable version: 0.65.0.** For Bot conversations, multi-Bot delegation, remote computers, private libraries, and routines, use the [full Bot edition](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.md): **`@ljwei-stak/dsh-model-route-bot`**. Select one edition per profile.
+**Stable version: 0.66.0.** For Bot conversations, multi-Bot delegation, remote computers, private libraries, and routines, use the [full Bot edition](https://github.com/Alice-Marx/dsh-model-router/blob/main/README.md): **`@ljwei-stak/dsh-model-route-bot`**. Select one edition per profile.
 
 ## Install
 
-1. In Harness **Plugins → Add plugin**, enter `@ljwei-stak/dsh-model-router@0.65.0`.
+1. In Harness **Plugins → Add plugin**, enter `@ljwei-stak/dsh-model-router@0.66.0`.
 2. Enable it, quit Harness including its tray process, and restart.
 3. Configure provider credentials/models in Harness **Models**, then open **Model Router** from the sidebar.
 
 ```powershell
-dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.65.0
+dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.0
 ```
 
 ## Run your first task

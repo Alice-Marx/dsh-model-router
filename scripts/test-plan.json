@@ -5,6 +5,9 @@
       "scripts/check-readme.mjs"
     ],
     [
+      "scripts/check-contracts.mjs"
+    ],
+    [
       "--test",
       "tests/adaptive-*.test.mjs",
       "tests/dynamic-data.test.mjs",
@@ -204,6 +207,9 @@
       "tests/cli-terminal-managed-product.native.mjs"
     ],
     [
+      "scripts/integration-task-probe.mjs"
+    ],
+    [
       "--test",
       "tests/bot-runtime-independent.test.mjs"
     ],
@@ -336,7 +342,38 @@
       "tests/schedule-compat.test.mjs",
       "tests/product-library-sequence.integration.test.mjs",
       "tests/package-editions.test.mjs",
-      "tests/workbench-navigation.test.mjs"
+      "tests/workbench-navigation.test.mjs",
+      "tests/write-retry.test.mjs",
+      "tests/contracts.test.mjs",
+      "tests/architecture-boundaries.test.mjs",
+      "tests/test-plan-coverage.test.mjs"
     ]
-  ]
+  ],
+  "excluded": {
+    "tests/collaboration.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/liangshen-compat.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/persona.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/modlens-routing.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/web-routing.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/npm-update.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/opencode-repair.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/watcher.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/remote-agent.test.mjs": "drives the remote agent image; covered by integration-probe-remote-agent",
+    "tests/session-compat.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/cli-runtime-native.test.mjs": "in test:cli-native, which needs a built native peer",
+    "tests/cli-native-peer-probe.native.mjs": "in test:cli-native",
+    "tests/integration-documents.test.mjs": "in test:integration",
+    "tests/integration-inventory.test.mjs": "in test:integration",
+    "tests/integration-progress.test.mjs": "in test:integration",
+    "tests/integration-f-difference.test.mjs": "in test:integration",
+    "tests/integration-upstream-include.test.mjs": "in test:integration",
+    "tests/integration-upstream-proposal.test.mjs": "in test:integration",
+    "tests/product-refresh-order.test.mjs": "in test:product-refresh",
+    "tests/container-task-contract.native.mjs": "needs the remote container contract fixture; runs green standalone (32 tests) but is not wired here yet",
+    "tests/cli-terminal-managed-containment.native.mjs": "needs a managed PTY host; covered by test:cli-native on a built peer",
+    "tests/migration-attestation-verifier.native.mjs": "needs a signed attestation fixture this plan does not build",
+    "tests/migration-rollback-rehearsal.native.mjs": "runs standalone (6 tests); excluded until its fixture is part of this plan",
+    "tests/migration-recovery-audit.test.mjs": "mounts router-core; needs the Host service graph",
+    "tests/remote-cli-product.native.mjs": "needs a live remote CLI machine"
+  }
 }

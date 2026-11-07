@@ -1,0 +1,10 @@
+{
+  "id": "task-request/v1",
+  "schemaHash": "aad33f89c01bcdc1f4e0064069420384ecd4f63db38a05bade3ef1d516dcc576",
+  "files": {
+    "fixtures/reconcile.json": "5b820add8707c4bfc48be3c002cfac52dc659b18885518ee838d613a539efb60",
+    "fixtures/retry.json": "d574f9fa7057eaf7e25369c33672892730538bf33e2cf1ac81fde9f2e66e498e",
+    "fixtures/submit.json": "32fcce1edf8e80a4276b751faf5891b8c4d9e9489eb60a231447b7775e1721ca"
+  },
+  "digest": "72c78add70169e346101512c18f97959107141de7e2387313fc0367a0447f195"
+}

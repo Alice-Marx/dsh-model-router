@@ -1,0 +1,17 @@
+{
+  "kind": "submit",
+  "requestKey": "routine-a1",
+  "backend": "codex-read",
+  "input": {
+    "task": "nightly"
+  },
+  "target": {
+    "effect": "read",
+    "machineId": "m",
+    "workspaceId": "w"
+  },
+  "initiator": {
+    "kind": "routine",
+    "id": "routine-7"
+  }
+}

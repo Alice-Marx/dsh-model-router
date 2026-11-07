@@ -1,18 +1,24 @@
 import { randomUUID } from 'node:crypto'
 import { PolicyError } from '../../capability-broker/src/authority.mjs'
-import { canonicalTaskJson, taskRef, taskHash, parseTaskPlan, validateTaskPlan } from './task-contract.mjs'
+import { canonicalTaskJson, taskRef, taskHash, parseTaskPlan, validateTaskPlan, planInitiator } from './task-contract.mjs'
 import {createTaskAdmission} from './task-admission.mjs'
-import {taskStage} from './task-stage.mjs'
+import {taskStage, taskAttribution} from './task-stage.mjs'
+import {readDatabaseClock, writeTransaction} from './write-retry.mjs'
+import {requiresStopProof, stopProofEvidence} from './stop-proof.mjs'
 
 const fail = code => { throw new PolicyError(code) }
 const makeId = kind => `${kind}-${randomUUID()}`
 const terminalRetry = new Set(['failed','cancelled','blocked','waiting-budget'])
 
 /** SQLite journal for managed tasks and dependency plans. */
-export function openTaskJournal(Database, path, {database=null,financialEpoch=null,onClose=()=>{}}={}) {
+export function openTaskJournal(Database, path, {database=null,financialEpoch=null,leaseClock='app',writeDeadlineMs=10_000,onClose=()=>{}}={}) {
   const db = database??new Database(path),borrowed=database!==null
   const priorTimeout=db.pragma('busy_timeout',{simple:true})
   try {
+    // Contention is the normal case, not an error: several Hosts share this
+    // file. Keep the built-in wait on for this journal's whole life and let
+    // writeTransaction bound it; restoring a borrowed handle to 0 here is what
+    // made a second Host fail at start-up instead of queueing.
     db.pragma('foreign_keys = ON');db.pragma('busy_timeout = 5000')
     if(db.pragma('journal_mode = WAL',{simple:true})!=='wal')fail('TASK_WAL_REQUIRED')
     db.pragma('synchronous = FULL')
@@ -42,17 +48,22 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
         PRAGMA user_version = 5;
       `)
     }).immediate()
-    if(borrowed)db.pragma(`busy_timeout=${priorTimeout}`)
-  } catch(error) { if(!borrowed)db.close();else db.pragma(`busy_timeout=${priorTimeout}`);throw error }
+  } catch(error) { db.pragma(`busy_timeout=${priorTimeout}`);if(!borrowed)db.close();throw error }
   let closed = false
   const stmt = sql => {if(closed)fail('TASK_JOURNAL_CLOSED');return db.prepare(sql)}
-  const transact = work => db.transaction(()=>{const result=work();refreshPlans();return result}).immediate()
+  // Every write retries a locked file within a bound; a policy refusal inside
+  // `work` still surfaces on the first attempt.
+  const transact = work => writeTransaction(db,()=>{const result=work();refreshPlans();return result},{deadlineMs:writeDeadlineMs})
+  // `leaseClock:'db'` makes lease expiry and every fence read the database's
+  // clock, so a Host whose wall clock drifted cannot hand its own lease to
+  // another runner. Fixtures keep the injected clock ('app') to simulate time.
+  const leaseNow = leaseClock==='db' ? now => {time(now);return readDatabaseClock(db)} : now => now
   const time = now => { if (!Number.isSafeInteger(now) || now < 0) fail('INVALID_TASK_TIME');return now }
   const event = (taskId,attemptId,kind,now,detail={}) => stmt('INSERT INTO task_events(task_id,attempt_id,kind,at_ms,detail) VALUES(?,?,?,?,?)').run(taskId,attemptId,kind,now,canonicalTaskJson(detail))
   const fence = (identity,now) => {
-    time(now)
+    const at=leaseNow(now)
     const current=stmt('SELECT * FROM task_runner WHERE scope=?').get('execution')
-    if (!current || current.owner!==identity?.owner || current.generation!==identity.generation || current.until_ms<=now) fail('STALE_TASK_RUNNER')
+    if (!current || current.owner!==identity?.owner || current.generation!==identity.generation || current.until_ms<=at) fail('STALE_TASK_RUNNER')
   }
   const owned = (owner,id) => {
     const task=stmt('SELECT * FROM tasks WHERE id=? AND owner_bot=?').get(taskRef(id),taskRef(owner))
@@ -62,35 +73,79 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
   const latest = taskId => stmt('SELECT a.*,p.id AS package_id,o.id AS operation_id FROM packages p JOIN attempts a ON a.id=p.current_attempt JOIN operations o ON o.attempt_id=a.id WHERE p.task_id=?').get(taskId)
   // An execution reference records intent before dispatch, not proof that
   // dispatch did or did not happen. Older rows may lack a reference entirely.
-  const needsStopProof = (task,attempt,result) => {
+  /** The three rows a stop-proof verdict reads, for one attempt. */
+  const stopProofContext = attemptId => ({
+    operation:stmt('SELECT o.*,b.delivered_ms FROM operations o JOIN task_outbox b ON b.operation_id=o.id WHERE o.attempt_id=?').get(attemptId),
+    ref:stmt('SELECT reference,reference_hash FROM task_execution_refs WHERE attempt_id=?').get(attemptId),
+    dispatch:stmt('SELECT * FROM task_dispatch_fences WHERE attempt_id=?').get(attemptId),
+  })
+  // Pure: every row it needs arrives in `context`, so a list read can supply them
+  // for a whole page at once instead of paying three queries per task.
+  const needsStopProofWith = (task,attempt,result,context) => {
     const backend=JSON.parse(task.payload).backend
-    if(!['codex-read','remote-write','bot-turn-read','bot-turn-write'].includes(backend))return false
-    const operation=stmt('SELECT o.*,b.delivered_ms FROM operations o JOIN task_outbox b ON b.operation_id=o.id WHERE o.attempt_id=?').get(attempt.id)
-    const ref=stmt('SELECT reference,reference_hash FROM task_execution_refs WHERE attempt_id=?').get(attempt.id)
-    const dispatch=stmt('SELECT * FROM task_dispatch_fences WHERE attempt_id=?').get(attempt.id)
+    if(!requiresStopProof(backend))return false
+    const {operation,ref,dispatch}=context
     const queued=attempt.started_ms===null&&operation?.started_ms===null&&operation.delivered_ms===null&&!ref
     if(queued)return false
     // Only the Host's durable closed dispatch fence (not a result flag) proves
     // a callback never entered. beginDispatch and assertDispatch reject it later.
     if(operation&&dispatch?.operation_id===operation.id&&dispatch.state==='closed'&&!ref)return false
     const proof=result?.summary?.stopProof
-    const evidence=backend.startsWith('bot-turn-')?['bot-turn-ended','bot-turn-not-sent']:backend==='codex-read'?['native-tree','cli-no-dispatch']:['agent-stop-receipt','agent-write-completed','remote-dispatch-not-sent']
+    const evidence=stopProofEvidence(backend)??[]
     if(!operation||!ref||!proof||proof.schemaVersion!==1||proof.taskId!==task.id||proof.attemptId!==attempt.id||proof.operationId!==operation.id||proof.targetHash!==JSON.parse(task.payload).targetHash||proof.referenceHash!==ref.reference_hash||!evidence.includes(proof.source)||proof.source!==result?.summary?.stopEvidence||!/^[a-f0-9]{64}$/.test(proof.evidenceHash??'')||result?.summary?.stopConfirmed!==true)return true
     try{const reference=JSON.parse(ref.reference);validateReference(task,{...attempt,operation_id:operation.id},reference);return taskHash(reference)!==proof.referenceHash}catch{return true}
   }
-  const view = (owner,id,command=null) => {
-    const task=owned(owner,id),current=latest(id)
-    const membership=stmt('SELECT plan_id,logical_id FROM task_plan_packages WHERE task_id=?').get(id)
-    return {taskId:task.id,ownerBotId:task.owner_bot,state:task.state,stage:taskStage(task),packageId:current.package_id,attemptId:current.id,operationId:current.operation_id,
-      ...(membership?{planId:membership.plan_id,logicalPackageId:membership.logical_id}:{}),
-      attemptNumber:current.number,deadlineAt:task.deadline_ms,createdAt:task.created_ms,updatedAt:task.updated_ms,
-      input:JSON.parse(task.payload),result:(()=>{const result=current.result?JSON.parse(current.result):null;if(result?.summary&&needsStopProof(task,current,result))return {...result,summary:{...result.summary,stopConfirmed:false}};return result})(),
-      executionRef:(()=>{const row=stmt('SELECT reference FROM task_execution_refs WHERE attempt_id=?').get(current.id);return row?JSON.parse(row.reference):null})(),
-      reconciliation:(()=>{const row=stmt('SELECT * FROM task_reconciliations WHERE attempt_id=? ORDER BY id DESC LIMIT 1').get(current.id);return row?{at:row.at_ms,outcome:row.outcome,evidence:JSON.parse(row.evidence)}:null})(),
-      legacyRunIds:stmt('SELECT run_id FROM legacy_task_runs WHERE task_id=? ORDER BY rowid').all(id).map(row=>row.run_id),
-      attempts:stmt('SELECT a.id,a.number,a.parent_id,a.state,a.started_ms,a.finished_ms,o.id AS operation_id FROM attempts a JOIN operations o ON o.attempt_id=a.id WHERE a.package_id=? ORDER BY a.number').all(current.package_id),
-      ...(command?{replayed:true,acceptedAttemptId:command.attempt_id}:{replayed:false})}
+  const needsStopProof = (task,attempt,result) => needsStopProofWith(task,attempt,result,stopProofContext(attempt.id))
+  // One page of task rows becomes one view object each, from a fixed number of
+  // queries rather than nine per task. A 512-row product list used to cost about
+  // 4,600 statements; that is long enough to starve the runner lease it reads for.
+  const viewsOf = (taskRows,command=null) => {
+    if(!taskRows.length)return []
+    const ids=taskRows.map(row=>row.id),json=JSON.stringify(ids)
+    const current=new Map(stmt(`SELECT p.task_id,a.*,p.id AS package_id,o.id AS operation_id,o.state AS operation_state,
+        b.delivered_ms,f.state AS dispatch_state
+      FROM packages p JOIN attempts a ON a.id=p.current_attempt JOIN operations o ON o.attempt_id=a.id
+      LEFT JOIN task_outbox b ON b.operation_id=o.id LEFT JOIN task_dispatch_fences f ON f.attempt_id=a.id
+      WHERE p.task_id IN (SELECT value FROM json_each(?))`).all(json).map(row=>[row.task_id,row]))
+    const membership=new Map(stmt('SELECT task_id,plan_id,logical_id FROM task_plan_packages WHERE task_id IN (SELECT value FROM json_each(?))').all(json).map(row=>[row.task_id,row]))
+    const refs=new Map(stmt('SELECT attempt_id,reference,reference_hash FROM task_execution_refs WHERE attempt_id IN (SELECT value FROM json_each(?))').all(JSON.stringify([...current.values()].map(row=>row.id))).map(row=>[row.attempt_id,row]))
+    const dispatches=new Map(stmt('SELECT attempt_id,operation_id,state FROM task_dispatch_fences WHERE attempt_id IN (SELECT value FROM json_each(?))').all(JSON.stringify([...current.values()].map(row=>row.id))).map(row=>[row.attempt_id,row]))
+    const reconciliations=new Map()
+    for(const row of stmt('SELECT * FROM task_reconciliations WHERE attempt_id IN (SELECT value FROM json_each(?)) ORDER BY id').all(JSON.stringify([...current.values()].map(row=>row.id))))reconciliations.set(row.attempt_id,row)
+    const legacy=new Map()
+    for(const row of stmt('SELECT task_id,run_id FROM legacy_task_runs WHERE task_id IN (SELECT value FROM json_each(?)) ORDER BY rowid').all(json)){
+      const list=legacy.get(row.task_id)??[];list.push(row.run_id);legacy.set(row.task_id,list)
+    }
+    const attemptRows=new Map()
+    for(const row of stmt(`SELECT a.package_id,a.id,a.number,a.parent_id,a.state,a.started_ms,a.finished_ms,o.id AS operation_id
+      FROM attempts a JOIN operations o ON o.attempt_id=a.id WHERE a.package_id IN (SELECT value FROM json_each(?)) ORDER BY a.number`).all(JSON.stringify([...current.values()].map(row=>row.package_id)))){
+      const list=attemptRows.get(row.package_id)??[];list.push(row);attemptRows.set(row.package_id,list)
+    }
+    return taskRows.map(task=>{
+      const currentAttempt=current.get(task.id)
+      if(!currentAttempt)fail('TASK_NOT_FOUND')
+      const membershipRow=membership.get(task.id),ref=refs.get(currentAttempt.id),reconciliation=reconciliations.get(currentAttempt.id)
+      const result=currentAttempt.result?JSON.parse(currentAttempt.result):null
+      const confirmed=result?.summary?needsStopProofWith(task,currentAttempt,result,{
+        operation:{...currentAttempt,id:currentAttempt.operation_id,state:currentAttempt.operation_state},
+        ref,dispatch:dispatches.get(currentAttempt.id),
+      }):false
+      const base={taskId:task.id,ownerBotId:task.owner_bot,state:task.state,stage:taskStage(task),packageId:currentAttempt.package_id,attemptId:currentAttempt.id,operationId:currentAttempt.operation_id,
+        ...(membershipRow?{planId:membershipRow.plan_id,logicalPackageId:membershipRow.logical_id}:{}),
+        attemptNumber:currentAttempt.number,deadlineAt:task.deadline_ms,createdAt:task.created_ms,updatedAt:task.updated_ms,
+        input:JSON.parse(task.payload),
+        result:result?.summary&&confirmed?{...result,summary:{...result.summary,stopConfirmed:false}}:result,
+        executionRef:ref?JSON.parse(ref.reference):null,
+        reconciliation:reconciliation?{at:reconciliation.at_ms,outcome:reconciliation.outcome,evidence:JSON.parse(reconciliation.evidence)}:null,
+        legacyRunIds:legacy.get(task.id)??[],
+        attempts:attemptRows.get(currentAttempt.package_id)??[],
+        ...(command?{replayed:true,acceptedAttemptId:command.attempt_id}:{replayed:false})}
+      // What the row says is not the whole answer: "failed" alone cannot tell a
+      // refusal from a run that broke, and those need different next steps.
+      return {...base,attribution:taskAttribution(base)}
+    })
   }
+  const view = (owner,id,command=null) => viewsOf([owned(owner,id)],command)[0]
   const replay = (owner,key,kind,hash) => {
     const previous=stmt('SELECT * FROM task_commands WHERE owner_bot=? AND request_key=?').get(owner,key)
     if (previous && (previous.kind!==kind || previous.request_hash!==hash)) fail('TASK_REQUEST_CONFLICT')
@@ -157,7 +212,15 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
       blocked=stmt("SELECT t.id,MAX(parent_task.updated_ms) AS updated_ms FROM tasks t JOIN packages p ON p.task_id=t.id JOIN attempts a ON a.id=p.current_attempt JOIN task_package_deps d ON d.package_id=p.id JOIN packages parent ON parent.id=d.depends_on JOIN tasks parent_task ON parent_task.id=parent.task_id WHERE t.state='ready' AND a.started_ms IS NULL AND parent.state IN ('failed','cancelled','blocked','skipped') GROUP BY t.id").all()
       for(const row of blocked){const a=latest(row.id);updateAll(row.id,a,'blocked',row.updated_ms,{code:'DEPENDENCY_FAILED',notStarted:true});event(row.id,a.id,'dependency-blocked',row.updated_ms,{code:'DEPENDENCY_FAILED'})}
     }while(blocked.length)
-    for(const plan of stmt('SELECT * FROM task_plans').all()){
+    // A plan that is at rest cannot change on this write: its state is derived
+    // from its members' states and from its own cancel flag, and every member
+    // write bumps `updated_ms`. Selecting the candidates once keeps a Host with
+    // many finished plans from paying for all of them on every journal write.
+    const candidates=stmt(`SELECT p.id,p.state,p.cancel_requested,p.updated_ms FROM task_plans p
+      WHERE p.state NOT IN ('succeeded','cancelled','failed')
+        OR (p.cancel_requested=1 AND p.state NOT IN ('cancelling','cancelled'))
+        OR EXISTS(SELECT 1 FROM task_plan_packages m JOIN tasks t ON t.id=m.task_id WHERE m.plan_id=p.id AND t.updated_ms>p.updated_ms)`).all()
+    for(const plan of candidates){
       const rows=stmt('SELECT t.state,t.updated_ms FROM task_plan_packages m JOIN tasks t ON t.id=m.task_id WHERE m.plan_id=?').all(plan.id)
       const states=rows.map(row=>row.state),pending=states.some(state=>['ready','admitting','running','cancelling','waiting-budget','needs-reconciliation'].includes(state))
       const state=plan.cancel_requested?(pending?'cancelling':'cancelled'):
@@ -173,7 +236,11 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
     const packages=rows.map(row=>{const current=latest(row.id);return{id:row.logical_id,taskId:row.id,packageId:row.package_id,targetBotId:row.owner_bot,state:row.state,attemptId:current.id,operationId:current.operation_id,attemptNumber:current.number,
         result:view(row.owner_bot,row.id).result,dependsOn:stmt('SELECT parent.logical_id FROM task_package_deps d JOIN task_plan_packages parent ON parent.package_id=d.depends_on WHERE d.package_id=? ORDER BY parent.rowid').all(row.package_id).map(value=>value.logical_id)}})
     const result={planId:plan.id,ownerBotId:plan.owner_bot,state:plan.state,cancelRequested:Boolean(plan.cancel_requested),needsReconciliation:packages.some(row=>row.state==='needs-reconciliation'),
-      createdAt:plan.created_ms,updatedAt:plan.updated_ms,deadlineAt:plan.deadline_ms,plan:JSON.parse(plan.payload),packages,replayed}
+      createdAt:plan.created_ms,updatedAt:plan.updated_ms,deadlineAt:plan.deadline_ms,plan:JSON.parse(plan.payload),
+      // What started it, beside whose authority it carries: a schedule or a
+      // delegation runs as a person while nobody is watching.
+      initiator:(()=>{try{return planInitiator(JSON.parse(plan.payload))}catch{return {kind:'person'}}})(),
+      packages,replayed}
     return{...result,stage:taskStage(result)}
   }
   const cancelledPlan=taskId=>Boolean(stmt('SELECT 1 FROM task_plan_packages m JOIN task_plans p ON p.id=m.plan_id WHERE m.task_id=? AND p.cancel_requested=1').get(taskId))
@@ -202,20 +269,20 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
       taskRef(owner);time(now)
       if (!Number.isSafeInteger(ttlMs)||ttlMs<50||ttlMs>60_000) fail('INVALID_RUNNER_TTL')
       return transact(()=>{
+        const at=leaseNow(now)
         const old=stmt('SELECT * FROM task_runner WHERE scope=?').get('execution')
-        if(old&&old.until_ms>now)fail('TASK_RUNNER_BUSY')
+        if(old&&old.until_ms>at)fail('TASK_RUNNER_BUSY')
         const generation=(old?.generation??0)+1
-        stmt('INSERT INTO task_runner VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET owner=excluded.owner,generation=excluded.generation,until_ms=excluded.until_ms').run('execution',owner,generation,now+ttlMs)
+        stmt('INSERT INTO task_runner VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET owner=excluded.owner,generation=excluded.generation,until_ms=excluded.until_ms').run('execution',owner,generation,at+ttlMs)
         return Object.freeze({owner,generation})
       })
     },
     renew(identity,ttlMs,now) {
       if (!Number.isSafeInteger(ttlMs)||ttlMs<50||ttlMs>60_000) fail('INVALID_RUNNER_TTL')
-      return transact(()=>{fence(identity,now);stmt('UPDATE task_runner SET until_ms=? WHERE scope=?').run(now+ttlMs,'execution')})
+      return transact(()=>{fence(identity,now);stmt('UPDATE task_runner SET until_ms=? WHERE scope=?').run(leaseNow(now)+ttlMs,'execution')})
     },
     release(identity,now) {
-      time(now)
-      stmt('UPDATE task_runner SET until_ms=? WHERE scope=? AND owner=? AND generation=?').run(now,'execution',identity.owner,identity.generation)
+      return transact(()=>{const at=leaseNow(now);stmt('UPDATE task_runner SET until_ms=? WHERE scope=? AND owner=? AND generation=?').run(at,'execution',identity.owner,identity.generation)})
     },
     recover(identity,now) {
       return transact(()=>{
@@ -318,6 +385,19 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
         if(task.deadline_ms<=now)fail('TASK_DEADLINE')
       })
     },
+    /**
+     * Record one decision about a running attempt. A gate row says what was
+     * checked and what it decided; it never changes the task's state, so a
+     * refusal that ends the attempt still lands through `finish`/`block`.
+     */
+    note(identity,owner,id,attemptId,kind,now,detail={}) {
+      taskRef(kind)
+      return transact(()=>{fence(identity,now);const task=owned(owner,id),current=latest(id)
+        if(current.id!==attemptId)fail('STALE_TASK_ATTEMPT')
+        event(id,attemptId,kind,now,detail)
+        return detail
+      })
+    },
     beginDispatch(identity,owner,id,attemptId,now){
       return transact(()=>{fence(identity,now);const task=owned(owner,id),current=latest(id)
         if(current.id!==attemptId||current.generation!==identity.generation||!['running','admitting'].includes(task.state))fail('STALE_TASK_ATTEMPT')
@@ -403,9 +483,12 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
         proveNotDispatched:()=>{const task=owned(owner,id),current=latest(id);return current.id===attemptId&&['admitting','cancelling'].includes(task.state)&&notDispatched(id,current)},
       })
     },
-    block(identity,owner,id,code,now) {
+    block(identity,owner,id,code,now,detail={}) {
       return transact(()=>{fence(identity,now);const task=owned(owner,id),current=latest(id);if(task.state!=='ready')return
-        updateAll(id,current,'blocked',now,{code,notStarted:true});event(id,current.id,'blocked',now,{code})})
+        // The gate and the rule travel with the state, so the record answers
+        // "which check refused this" without a second lookup.
+        const facts={code,...(typeof detail?.gate==='string'&&detail.gate?{gate:detail.gate}:{}),...(typeof detail?.rule==='string'&&detail.rule?{rule:detail.rule}:{})}
+        updateAll(id,current,'blocked',now,{...facts,notStarted:true});event(id,current.id,'blocked',now,facts)})
     },
     // A plan has a total deadline: unattended budget waiting ends at it instead of parking forever.
     expire(identity,now) {
@@ -558,14 +641,14 @@ export function openTaskJournal(Database, path, {database=null,financialEpoch=nu
       const total=stmt('SELECT owner_bot,COUNT(*) AS n FROM tasks GROUP BY owner_bot').all()
         .reduce((sum,row)=>sum+(visible.has(row.owner_bot)?row.n:0),0)
       // Filter owners before the limit, including when old/deleted Bots still have records.
-      const items=stmt(`SELECT id,owner_bot FROM tasks WHERE owner_bot IN (SELECT value FROM json_each(?))
+      const items=viewsOf(stmt(`SELECT * FROM tasks WHERE owner_bot IN (SELECT value FROM json_each(?))
         ORDER BY CASE WHEN state IN ('needs-reconciliation','waiting-approval','waiting-budget','blocked') THEN 0
           WHEN state IN ('ready','queued','running','cancelling','admitting') THEN 1 WHEN state='failed' THEN 2 ELSE 3 END,
-          updated_ms DESC,id LIMIT ?`).all(JSON.stringify(ids),limit).map(row=>view(row.owner_bot,row.id))
+          updated_ms DESC,id LIMIT ?`).all(JSON.stringify(ids),limit))
       return {items,total,truncated:total>items.length}
     },
     // One Bot's durable tasks, oldest first; the read model never invents a task.
-    list(owner) {taskRef(owner);return stmt('SELECT id FROM tasks WHERE owner_bot=? ORDER BY created_ms,id LIMIT 128').all(owner).map(row=>view(owner,row.id))},
-    close() {if(!closed){closed=true;if(!borrowed)db.close();onClose()}},
+    list(owner) {taskRef(owner);return viewsOf(stmt('SELECT * FROM tasks WHERE owner_bot=? ORDER BY created_ms,id LIMIT 128').all(owner))},
+    close() {if(!closed){closed=true;if(borrowed){try{db.pragma(`busy_timeout=${priorTimeout}`)}catch{}}else db.close();onClose()}},
   })
 }

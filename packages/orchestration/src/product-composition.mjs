@@ -64,6 +64,9 @@ const validPolicy = value => Boolean(value) && ['run', 'check', 'filterRoutes'].
 // instead of silently dropping every managed task.
 const TASK_RUNNER_TTL_MS = 10_000
 const TASK_RUNNER_CLAIM_MS = 12_000
+// Frequent enough that a stopped runner is rebuilt inside one lease period,
+// rare enough that a healthy Host only reads one row every five seconds.
+const TASK_RUNNER_WATCHDOG_MS = 5_000
 const TASK_TTL_MS = 120_000
 const TASK_BACKEND_LIMIT = 64
 const TASK_READ_LIMIT = 512
@@ -92,6 +95,17 @@ export function compileProductGrant(bot, { routes, hydrated }) {
   const model = slash > 0 ? key.slice(slash + 1) : ''
   return { tools: [...PRODUCT_TOOLS],
     modelRoutes: hydrated && provider && model && routes.has(key) ? [{ provider, model }] : [] }
+}
+
+/**
+ * An action that is only meaningful for a signed-in person says so at its own
+ * entry. The authorization seam decides who may call, but a route that forgets to
+ * declare its caller class inherits whatever the seam defaults to, and a later
+ * change there would hand a non-owner somebody's console.
+ */
+const ownerOnly = fn => (payload, context) => {
+  if (context?.kind !== 'owner') throw Object.assign(new Error('OWNER_ONLY'), { code: 'OWNER_ONLY' })
+  return fn(payload, context)
 }
 
 /** Subscription usage is not API spend; missing token evidence stays unknown. */
@@ -388,7 +402,7 @@ export function startBotProduct(ctx, options = {}) {
 
   const grants = new Map()
   let machines, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat
-  let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission
+  let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission, taskRunnerWatchdog
   const committedBots = new Map()
   let ownerCatalogStamp=''
   let routes = new Set(), hydrated = false, refreshing = false, lastRefresh = 0, timer = null
@@ -627,7 +641,7 @@ export function startBotProduct(ctx, options = {}) {
           if (typeof factory !== 'function') throw new TypeError('TASK_CLI_SESSION_FACTORY_REQUIRED')
           cliSessionFactory = factory
         }
-        journal = funding.store.openTaskJournal()
+        journal = funding.store.openTaskJournal({leaseClock:'db'})
         const modelBackends = createTaskBackends({ ctx, mr, authority, directory, store: funding.store,
           machineId, workspaceId, workspace: managedWorkspace, runtimeRoot: join(managedRoot, 'cli-runtime'),
           bindingFor: botId => botSettings.get(botId, { publishChange: false }),
@@ -652,6 +666,13 @@ export function startBotProduct(ctx, options = {}) {
             return privateCall&&['private','handoff'].includes(plan.origin.kind)&&product?.lifecycle.committedMainBotIds().includes(id)?product.lifecycle.committedBots().map(bot=>bot.id):[id]
           },
           runnerTtlMs: TASK_RUNNER_TTL_MS, taskTtlMs: TASK_TTL_MS,
+          // Lease expiry reads the ledger's clock, not this process's: a Host
+          // whose wall clock drifted must not be able to declare its own live
+          // lease expired and let a second runner take the same tasks.
+          leaseClock: 'db',
+          // The deployment refuses a writer that cannot prove a stop, so a new
+          // backend cannot be added without also teaching it how to say so.
+          requireStopProof: true,
           // The committed binding's maxConcurrentTasks is the per-Bot limit; an
           // unconfigured Bot keeps the conservative single-task default.
           concurrencyFor: botId => {
@@ -669,6 +690,19 @@ export function startBotProduct(ctx, options = {}) {
             await new Promise(resolve => { const pending = setTimeout(resolve, 250); pending.unref() })
           }
         }
+        // A runner that stops (a lease lost to a clock jump, a journal write that
+        // never settled) must come back on its own, or the Host keeps accepting
+        // work nobody will claim. The watchdog reports what it did instead of
+        // hiding a permanent stop behind a quiet 5-second tick.
+        taskRunnerWatchdog = setInterval(() => {
+          try {
+            const state = taskService.state()
+            if (state.closed || state.running) return
+            const outcome = taskService.restart({ reason: state.stopReason ?? 'TASK_RUNNER_WATCHDOG' })
+            if (!outcome.accepted) ctx.logger?.('task-runner-restart-deferred', { code: outcome.code, reason: state.stopReason })
+          } catch (error) { ctx.logger?.('task-runner-watchdog-failed', { code: error?.code ?? 'TASK_RUNNER_WATCHDOG_FAILED' }) }
+        }, TASK_RUNNER_WATCHDOG_MS)
+        taskRunnerWatchdog.unref?.()
         releaseTaskTools = registerTaskTools(ctx, defineTool, { service: taskService, directory })
       }
       const machineActions=Object.fromEntries(['pair','bind','probe','revoke','reconcile'].map(name=>[`machine.${name}`,(payload,context)=>machines[name](payload,context)]))
@@ -866,16 +900,20 @@ export function startBotProduct(ctx, options = {}) {
           // N09: owner task management runs on the owning Bot's own subject, so
           // the Bot's committed grant authorizes every cancel/retry/reconcile.
           ...(taskService ? {
-            'task.inspect': payload => inspectProductTask({ service: taskService, journal, subject: taskOwner(payload), taskId: payload?.taskId }),
+            // Task management is the person's own console, not a Bot surface. Every
+            // action here names its caller class instead of inheriting the default,
+            // so a change at the authorization seam cannot quietly hand a non-owner
+            // the ability to cancel, retry or reconcile somebody's work.
+            'task.inspect': ownerOnly(payload => inspectProductTask({ service: taskService, journal, subject: taskOwner(payload), taskId: payload?.taskId })),
             // Bot routing turns a preview into a real package: the decision names the Bot, the
             // worker binding is committed first, and only then is the plan submitted. A failure in
             // either step leaves no half-dispatched task behind.
             'botRouting.dispatch': (payload, context) => botRouting.dispatch(payload, context),
-            'task.plan.submit': payload => taskService.submitPlan(taskOwner(payload),{requestKey:payload?.requestKey,plan:payload?.plan},{owner:true}),
-            'task.plan.cancel': payload => taskService.cancelPlan(taskOwner(payload),{planId:payload?.planId}),
-            'task.cancel': payload => taskService.cancel(taskOwner(payload), { taskId: payload?.taskId }),
-            'task.retry': payload => taskService.retry(taskOwner(payload), { taskId: payload?.taskId, requestKey: payload?.requestKey }),
-            'task.reconcile': payload => taskService.reconcile(taskOwner(payload), { taskId: payload?.taskId, requestKey: payload?.requestKey }),
+            'task.plan.submit': ownerOnly(payload => taskService.submitPlan(taskOwner(payload),{requestKey:payload?.requestKey,plan:payload?.plan},{owner:true})),
+            'task.plan.cancel': ownerOnly(payload => taskService.cancelPlan(taskOwner(payload),{planId:payload?.planId})),
+            'task.cancel': ownerOnly(payload => taskService.cancel(taskOwner(payload), { taskId: payload?.taskId })),
+            'task.retry': ownerOnly(payload => taskService.retry(taskOwner(payload), { taskId: payload?.taskId, requestKey: payload?.requestKey })),
+            'task.reconcile': ownerOnly(payload => taskService.reconcile(taskOwner(payload), { taskId: payload?.taskId, requestKey: payload?.requestKey })),
           } : {}),
           // An unconfirmed receipt fail-closes its Bot until an owner resolves it:
           // attest the vendor-confirmed amount or waive it, with a required note.
@@ -906,6 +944,7 @@ export function startBotProduct(ctx, options = {}) {
       await routineExecution?.close?.()
       await machines?.closeDesktopSessions?.()
       for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close()])try{cleanup()}catch{}
+      if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
       if(taskService)await taskService.close().catch(()=>{})
       else journal?.close()
       turnBackends?.close()
@@ -936,6 +975,7 @@ export function startBotProduct(ctx, options = {}) {
         await routineExecution?.close?.()
         await machines?.closeDesktopSessions?.()
         for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close()])try{cleanup()}catch{}
+        if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
         if(taskService)await taskService.close().catch(()=>{})
         else journal?.close()
         turnBackends?.close()

@@ -1,0 +1,10 @@
+{
+  "id": "task-event/v1",
+  "schemaHash": "d7c2025fe5a5d7a9e68b0010ededb998c69f939588a0539bb07600064c1f50ac",
+  "files": {
+    "fixtures/blocked.json": "d43e6a8ad33521f237f261bca942ba1a5fb39f16ccd093bc2a29ac34179fd69e",
+    "fixtures/gate.json": "297116af8a05de0f838822633be8439b8cf1dad699217331c0def61c47e3b661",
+    "fixtures/interrupted.json": "fa3d2cfa42713ebe0b167732c280cb0c519b7a6330f5c66e8a26d1709f732da2"
+  },
+  "digest": "69818d9534a83437bc644138ca3dcd67b57abfd3f6fa03a864178beda24768de"
+}
