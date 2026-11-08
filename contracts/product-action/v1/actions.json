@@ -94,6 +94,12 @@
     "task.retry": {
       "caller": "owner"
     },
+    "team.import": {
+      "caller": "owner"
+    },
+    "team.preview": {
+      "caller": "owner"
+    },
     "templates.list": {
       "caller": "bot"
     },

@@ -11,6 +11,7 @@ import { UiIcon } from './ui-icons.jsx'
 import { BotModelRow, Pill, QuickPolicyCard, TemplateGallery, modeBadge, modelLabel } from './models-panel.jsx'
 import { Engines } from './engines-panel.jsx'
 import { Inbox } from './inbox-panel.jsx'
+import { TeamImport } from './team-import.jsx'
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 
 const NAV_EVENT = 'bot-product:navigation'
@@ -964,7 +965,8 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {snapshot && <>{section === 'inbox' && <Inbox snapshot={snapshot} panels={PRODUCT_PANELS} openPanel={openPanel} openSession={openSession} />}
       {section === 'bindings' && <><QuickPolicyCard snapshot={snapshot} dispatch={dispatch} busy={disabled} /><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />
         {snapshot.availableActions?.includes('templates.list') ? <TemplateGallery snapshot={snapshot} dispatch={dispatch} busy={disabled} openSession={openSession} />
-          : snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
+          : snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}
+        {snapshot.availableActions?.includes('team.preview') && snapshot.availableActions?.includes('team.import') && <TeamImport snapshot={snapshot} dispatch={dispatch} busy={disabled} openSession={openSession} />}</>}
       {section === 'engines' && <Engines snapshot={snapshot} dispatch={dispatch} busy={disabled} openPanel={openPanel} bindingsPanel={PRODUCT_PANELS.bindings} />}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} submissionScope={productApi} inspect={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : undefined} openSession={openSession} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}

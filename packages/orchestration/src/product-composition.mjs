@@ -8,6 +8,7 @@ import { pairMainMachine } from './pair-main-machine.mjs'
 import { assertHandoffAllowed, buildHandoff, createHandoffLedger } from './bot-handoff.mjs'
 import { listRoles } from './bot-roles.mjs'
 import { listBotTemplates, templateBotRequest } from './bot-templates.mjs'
+import { importTeamPlan, parseTeamPackage, teamPreview } from './team-package.mjs'
 import { openQuickBindingSettings, profilePrices, quickFunding } from './quick-binding.mjs'
 import { OFFICIAL_ENGINES } from './official-engines.mjs'
 import { hostname } from 'node:os'
@@ -654,6 +655,21 @@ export function startBotProduct(ctx, options = {}) {
     }
     return { botId: bot.id, name: bot.name, sessionId: product.rt.chatOf(bot.id) ?? null }
   }
+  const teamPlanOf = (payload, allowed) => {
+    if (!payload || typeof payload !== 'object' || Object.keys(payload).some(key => !allowed.includes(key)) || typeof payload.text !== 'string') {
+      throw Object.assign(new Error('团队包请求格式无效。'), { code: 'TEAM_PACKAGE_INVALID' })
+    }
+    return parseTeamPackage(payload.text)
+  }
+  const importTeam = async (payload) => {
+    const plan = teamPlanOf(payload, ['text', 'model'])
+    if (payload.model !== undefined && (typeof payload.model !== 'string' || !routes.has(payload.model))) {
+      throw Object.assign(new Error('所选模型已不在宿主目录，请刷新后重新选择。'), { code: 'TEAM_PACKAGE_MODEL_INVALID' })
+    }
+    await product.rt.bootstrap()
+    const made = await importTeamPlan(plan, { rt: product.rt, model: payload.model, freshName: (name, attempt) => `${name.slice(0, 36)} ${attempt + 1}` })
+    return { ...made, skipped: plan.skipped, routines: plan.routines }
+  }
   const boot = (async () => {
     try{
       await Promise.race([refresh(), new Promise(resolve => { const pending = setTimeout(resolve, INITIAL_ROUTE_TIMEOUT_MS); pending.unref() })])
@@ -935,6 +951,8 @@ export function startBotProduct(ctx, options = {}) {
           // The role catalog is a read-only convenience: it describes jobs, it grants nothing.
           'roles.list': async () => listRoles(),
           'templates.list': async () => listBotTemplates(),
+          'team.preview': ownerOnly(async payload => teamPreview(teamPlanOf(payload, ['text']))),
+          'team.import': ownerOnly(payload => importTeam(payload)),
           'bot.template.create': ownerOnly((payload, context) => createFromTemplate(payload, context)),
           'engines.refresh': ownerOnly(async () => { await probeEngines(true); return engineView() }),
           ...(quickSettings ? {

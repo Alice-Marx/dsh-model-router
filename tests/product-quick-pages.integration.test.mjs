@@ -153,6 +153,47 @@ test('现成 Bot: the template gallery replaces the role catalog and a created B
   } finally { await page.close() }
 })
 
+test('导入团队包: a pasted package is previewed with what it skips, then imported with the chosen model', async () => {
+  const { parseTeamPackage, teamPreview } = await import('../packages/orchestration/src/team-package.mjs')
+  const text = JSON.stringify({ format: 'dsh.team-package', version: 1, package: { name: '研究小组', team: { leader: 'a' },
+    agents: [{ key: 'a', name: '甲', title: '负责人', approval: 'full' }, { key: 'b', name: '乙', title: '研究员' }],
+    rooms: [{ key: 'r', name: '研究室', members: ['a', 'b'] }], routines: [{ name: '早报', agent: 'a', prompt: '整理早报' }] } })
+  const calls = [], opened = []
+  const api = {
+    snapshot: async () => fixture({ availableActions: ['team.preview', 'team.import'] }),
+    dispatch: async (action, payload) => {
+      calls.push([action, payload])
+      if (action === 'team.preview') return teamPreview(parseTeamPackage(payload.text))
+      return { bots: [{ key: 'a', botId: 'bot-a', name: '甲', sessionId: 's-a' }, { key: 'b', botId: 'bot-b', name: '乙', sessionId: 's-b' }],
+        rooms: [{ key: 'r', roomId: 'room-r', name: '研究室' }], skipped: [], routines: [{ name: '早报' }] }
+    },
+  }
+  const page = await mount(ProductPage, { section: 'bindings', productApi: api, openSession: id => opened.push(id) })
+  try {
+    const card = page.host.querySelector('section[aria-label="导入团队包"]')
+    assert.ok(card)
+    assert.equal(page.find('section[aria-label="导入团队包"] button', '预览').disabled, true)
+    await page.type(card.querySelector('textarea'), text)
+    await page.click(page.find('section[aria-label="导入团队包"] button', '预览'))
+    assert.deepEqual(calls.map(([action]) => action), ['team.preview'])
+    const preview = card.querySelector('.bp-team-preview')
+    assert.match(preview.textContent, /甲负责人/)
+    assert.match(preview.textContent, /研究室/)
+    assert.match(preview.textContent, /审批级别/)
+    assert.match(preview.textContent, /早报/)
+    const select = preview.querySelector('select')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(page.dom.window.HTMLSelectElement.prototype, 'value').set.call(select, 'engine-claude-code/sonnet')
+      select.dispatchEvent(new page.dom.window.Event('change', { bubbles: true }))
+    })
+    await page.click(page.find('.bp-team-preview button', '导入 2 个 Bot'))
+    assert.deepEqual(calls[1], ['team.import', { text, model: 'engine-claude-code/sonnet' }])
+    assert.match(card.textContent, /已添加 2 个 Bot、1 个群聊/)
+    await page.click(page.find('.bp-team-result button', '乙'))
+    assert.deepEqual(opened, ['s-b'])
+  } finally { await page.close() }
+})
+
 test('AI 引擎: each official tool shows its state, login command and the Bots using it', async () => {
   const calls = [], opened = []
   const api = { snapshot: async () => fixture({ availableActions: ['engines.refresh'] }), dispatch: async action => { calls.push(action); return { status: 'available' } } }

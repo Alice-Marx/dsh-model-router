@@ -19,7 +19,7 @@ const ACTIONS = new Set([
   'machine.desktop.open', 'machine.desktop.renew', 'machine.desktop.close',
   'library.list', 'library.read', 'library.write', 'library.upload', 'library.download', 'library.remove', 'library.mkdir', 'library.search',
   'routine.list', 'routine.run', 'routine.save', 'routine.remove', 'routine.history', 'routine.cancel', 'routine.resolve', 'roles.list',
-  'templates.list', 'bot.template.create', 'engines.refresh', 'quickBinding.save', 'binding.quick',
+  'templates.list', 'bot.template.create', 'engines.refresh', 'quickBinding.save', 'binding.quick', 'team.preview', 'team.import',
   'botRoutingInspect', 'botRoutingDecide', 'botRouting.dispatch', 'botRouting.save', 'botRouting.status',
   'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage',
 ])
