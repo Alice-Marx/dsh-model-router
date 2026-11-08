@@ -38,7 +38,7 @@ __export(index_exports, {
   productSlots: () => productSlots
 });
 module.exports = __toCommonJS(index_exports);
-var import_react69 = __toESM(require("react"), 1);
+var import_react70 = __toESM(require("react"), 1);
 
 // modules/bot-runtime/vendor/ds-bot/src/client/i18n.js
 var NAMESPACE = "ds-bot", ZH = {
@@ -1588,8 +1588,8 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui3, live, cards
     ui3.set((state) => ({ ...state, settings: { page, id: id2 }, menu: null, palette: null, newChat: null }));
   };
   return {
-    openNewChat: (mode) => {
-      ui3.set((state) => ({ ...state, newChat: mode, menu: null, palette: null }));
+    openNewChat: (mode2) => {
+      ui3.set((state) => ({ ...state, newChat: mode2, menu: null, palette: null }));
     },
     openPalette: (query = "") => {
       ui3.set((state) => ({ ...state, palette: { query, token: Date.now() }, newChat: null, menu: null }));
@@ -1819,25 +1819,25 @@ var THEME_KEYS = ["bg", "sidebar", "bubble", "card", "text", "user", "userText",
     dark: { bg: "#0b1020", sidebar: "#10172a", bubble: "#1a2340", card: "#141c33", text: "#e8edf7", user: "#3b6fd8", userText: "#ffffff", accent: "#4f9dff" }
   }
 }, DARK_INK = "#141414", accentInk = (accent) => (luminance(accent) + 0.05) ** 2 > 1.05 * (luminance(DARK_INK) + 0.05) ? DARK_INK : "#ffffff", rgba = (hex, alpha) => `rgba(${[1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16)).join(",")},${alpha})`;
-function themeVars(mode, dark, accent = mode.accent) {
+function themeVars(mode2, dark, accent = mode2.accent) {
   return {
-    "--bt-ink": mode.text,
-    "--bt-ink-2": rgba(mode.text, 0.6),
-    "--bt-ink-3": rgba(mode.text, 0.36),
-    "--bt-bubble": mode.bubble,
-    "--bt-sidebar": mode.sidebar,
-    "--bt-main": mode.bg,
-    "--bt-card": mode.card,
-    "--bt-line": rgba(mode.text, 0.08),
-    "--bt-line-2": rgba(mode.text, 0.15),
+    "--bt-ink": mode2.text,
+    "--bt-ink-2": rgba(mode2.text, 0.6),
+    "--bt-ink-3": rgba(mode2.text, 0.36),
+    "--bt-bubble": mode2.bubble,
+    "--bt-sidebar": mode2.sidebar,
+    "--bt-main": mode2.bg,
+    "--bt-card": mode2.card,
+    "--bt-line": rgba(mode2.text, 0.08),
+    "--bt-line-2": rgba(mode2.text, 0.15),
     "--bt-hover": dark ? "rgba(160,160,160,.12)" : "rgba(119,119,119,.09)",
     "--bt-active": dark ? "rgba(160,160,160,.2)" : "rgba(119,119,119,.17)",
     "--bt-accent": accent,
     "--bt-accent-ink": accentInk(accent),
-    "--bt-user": mode.user,
-    "--bt-user-ink": mode.userText,
-    "--bt-tag-bg": rgba(mode.text, dark ? 0.09 : 0.06),
-    "--bt-tag-ink": rgba(mode.text, 0.58)
+    "--bt-user": mode2.user,
+    "--bt-user-ink": mode2.userText,
+    "--bt-tag-bg": rgba(mode2.text, dark ? 0.09 : 0.06),
+    "--bt-tag-ink": rgba(mode2.text, 0.58)
   };
 }
 var declarations = (vars) => Object.entries(vars).map(([name, value]) => `${name}:${value}`).join(";"), darkAccent = (accent) => {
@@ -1875,8 +1875,8 @@ function registerShape(id2, shape) {
 }
 function registerTheme(id2, theme) {
   if (typeof id2 != "string" || !/^[a-z][\w-]{0,31}$/.test(id2)) throw new Error("Theme ids are lowercase words");
-  for (let mode of ["light", "dark"])
-    for (let key of THEME_KEYS) if (!isHex(theme?.[mode]?.[key])) throw new Error(`Theme ${mode}.${key} must be a #rrggbb color`);
+  for (let mode2 of ["light", "dark"])
+    for (let key of THEME_KEYS) if (!isHex(theme?.[mode2]?.[key])) throw new Error(`Theme ${mode2}.${key} must be a #rrggbb color`);
   let previous = customThemes[id2];
   return customThemes[id2] = { label: String(theme.label ?? id2), light: theme.light, dark: theme.dark, css: typeof theme.css == "string" ? theme.css : "" }, registry.set((value) => value + 1), () => {
     previous ? customThemes[id2] = previous : delete customThemes[id2], registry.set((value) => value + 1);
@@ -6437,7 +6437,7 @@ function SecretDock({ sessionId, useRoster, useCards, useHeldCards, actions }) {
   return waiting.length === 0 ? null : (0, import_react16.createElement)("div", { className: "bt-q-dock bt-secret-dock" }, waiting.map((request) => (0, import_react16.createElement)(SecretCard, { key: JSON.stringify([sessionId, request.id, request.kind]), sessionId, bot, request, roster, actions })));
 }
 function ScopeEditor({ secret, roster, onSave }) {
-  let [mode, setMode] = (0, import_react16.useState)(secret.scope === "all" ? "all" : "some"), [picked, setPicked] = (0, import_react16.useState)(secret.scope === "all" ? [] : secret.scope), toggle = (id2) => setPicked((list) => list.includes(id2) ? list.filter((item) => item !== id2) : [...list, id2]), same2 = mode === "all" ? secret.scope === "all" : secret.scope !== "all" && [...picked].sort().join() === [...secret.scope].sort().join();
+  let [mode2, setMode] = (0, import_react16.useState)(secret.scope === "all" ? "all" : "some"), [picked, setPicked] = (0, import_react16.useState)(secret.scope === "all" ? [] : secret.scope), toggle = (id2) => setPicked((list) => list.includes(id2) ? list.filter((item) => item !== id2) : [...list, id2]), same2 = mode2 === "all" ? secret.scope === "all" : secret.scope !== "all" && [...picked].sort().join() === [...secret.scope].sort().join();
   return (0, import_react16.createElement)(
     "div",
     { className: "bt-secret-edit-block" },
@@ -6448,11 +6448,11 @@ function ScopeEditor({ secret, roster, onSave }) {
       [["all", t("All Bots")], ["some", t("Chosen Bots")]].map(([id2, text7]) => (0, import_react16.createElement)(
         "label",
         { key: id2, className: "bt-secret-radio" },
-        (0, import_react16.createElement)("input", { type: "radio", name: `scope-${secret.name}`, checked: mode === id2, onChange: () => setMode(id2) }),
+        (0, import_react16.createElement)("input", { type: "radio", name: `scope-${secret.name}`, checked: mode2 === id2, onChange: () => setMode(id2) }),
         text7
       ))
     ),
-    mode === "some" ? (0, import_react16.createElement)("div", { className: "bt-secret-bots" }, roster.bots.map((bot) => (0, import_react16.createElement)("button", {
+    mode2 === "some" ? (0, import_react16.createElement)("div", { className: "bt-secret-bots" }, roster.bots.map((bot) => (0, import_react16.createElement)("button", {
       key: bot.id,
       type: "button",
       className: "bt-secret-bot",
@@ -6462,7 +6462,7 @@ function ScopeEditor({ secret, roster, onSave }) {
     (0, import_react16.createElement)(
       "div",
       { className: "bt-secret-row-actions" },
-      (0, import_react16.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", disabled: same2, onClick: () => onSave(mode === "all" ? "all" : picked) }, t("Save access"))
+      (0, import_react16.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", disabled: same2, onClick: () => onSave(mode2 === "all" ? "all" : picked) }, t("Save access"))
     )
   );
 }
@@ -8158,9 +8158,9 @@ var sidebarTrackWidth = () => typeof document > "u" ? null : document.querySelec
   if (live && room.selector) return room.rule;
   let column = document.querySelector('[class*="_centerCol"]'), selector = column ? [...column.classList].filter((name) => name.includes("_centerCol")).map((name) => `.${CSS.escape(name)}`).join(",") : "";
   if (live && !selector) return room.rule;
-  let declarations2 = room.rule?.style.cssText ?? "";
+  let declarations3 = room.rule?.style.cssText ?? "";
   room.rule?.parentStyleSheet?.ownerNode?.remove();
-  let style = installStyles(`${selector || '[class*="_centerCol"]'}{${declarations2}}`, "chat-room");
+  let style = installStyles(`${selector || '[class*="_centerCol"]'}{${declarations3}}`, "chat-room");
   return room.rule = style.sheet.cssRules[0], room.selector = selector, room.rule;
 }, margin = (side, width, style) => {
   width === null ? style.removeProperty(`margin-${side}`) : style.setProperty(`margin-${side}`, `${width}px`, "important");
@@ -8444,10 +8444,10 @@ function useListGlide(listRef, layout, key) {
     tops.current = { layout, map: next };
   }, [layout, key]);
 }
-function LeftColumn({ mode, width, onGrip, leaving, children }) {
+function LeftColumn({ mode: mode2, width, onGrip, leaving, children }) {
   return (0, import_react_dom3.createPortal)((0, import_react21.createElement)(
     "div",
-    { className: "bt-leftcol", "data-left": mode, "data-leaving": leaving || void 0, "aria-hidden": leaving || void 0, style: { width: `${width}px` } },
+    { className: "bt-leftcol", "data-left": mode2, "data-leaving": leaving || void 0, "aria-hidden": leaving || void 0, style: { width: `${width}px` } },
     children,
     (0, import_react21.createElement)("div", { className: "bt-leftcol-grip", role: "separator", "aria-orientation": "vertical", "aria-label": t("Resize sidebar"), title: t("Resize sidebar"), onPointerDown: onGrip })
   ), document.body);
@@ -8478,7 +8478,7 @@ function TeamSidebar(props) {
     pref,
     drawer: uiNow.leftDrawer === !0,
     panel: uiNow.details ? { view: uiNow.view, yielded: uiNow.panelYield === !0 } : null
-  }), [drag, setDrag] = (0, import_react21.useState)(null), mode = drag?.left ?? layout.left, [held, leaving] = useLinger(mode === "hidden" ? null : mode, SPRING_SHAPE.duration), shown = held ?? mode, wideContent = shown !== "rail", updated = useSessions((list) => {
+  }), [drag, setDrag] = (0, import_react21.useState)(null), mode2 = drag?.left ?? layout.left, [held, leaving] = useLinger(mode2 === "hidden" ? null : mode2, SPRING_SHAPE.duration), shown = held ?? mode2, wideContent = shown !== "rail", updated = useSessions((list) => {
     let stamps = {};
     for (let id2 of list.ids) stamps[id2] = list.byId[id2]?.updatedAt ?? 0;
     return JSON.stringify(stamps);
@@ -8492,7 +8492,7 @@ function TeamSidebar(props) {
     ].sort((a, b2) => +!!b2.item.pinned - +!!a.item.pinned || b2.at - a.at);
   }, [roster, updated]), main = roster.byId[roster.mainBotId];
   useListGlide(listRef, wideContent, order.map((entry) => entry.item.id).join(",")), useLandOnMainBot(roster, useSessions, actions), useReportReady(roster.ready, roster);
-  let openWidth = drag?.width ?? frameSnap.sidebarWidth, ourWidth = shown === "rail" ? RAIL_WIDTH : openWidth, pushed = mode === "open" ? openWidth : mode === "hidden" ? 0 : RAIL_WIDTH;
+  let openWidth = drag?.width ?? frameSnap.sidebarWidth, ourWidth = shown === "rail" ? RAIL_WIDTH : openWidth, pushed = mode2 === "open" ? openWidth : mode2 === "hidden" ? 0 : RAIL_WIDTH;
   (0, import_react21.useLayoutEffect)(() => {
     typeof document > "u" || chatRoom.setLeft(Math.max(0, pushed - (frameSnap.collapsedWidth ?? 0)));
   }, [pushed, frameSnap.collapsedWidth]), (0, import_react21.useEffect)(() => () => {
@@ -8505,7 +8505,7 @@ function TeamSidebar(props) {
     delete column.dataset.folding, grip.setPointerCapture?.(event.pointerId), chatRoom.hold(!0);
     let columns2 = chatRoom.columns();
     for (let col of columns2) col.style.setProperty("transition", "none", "important");
-    let offLeft = frameSnap.collapsedWidth ?? 0, last = null, liveLeft = mode, done = !1, write = (at2) => {
+    let offLeft = frameSnap.collapsedWidth ?? 0, last = null, liveLeft = mode2, done = !1, write = (at2) => {
       let width = at2.left === "rail" ? RAIL_WIDTH : at2.width;
       column.style.width = `${width}px`, column.style.setProperty("--bt-lc-w", `${width}px`);
       let push = Math.max(0, (at2.left === "open" ? width : RAIL_WIDTH) - offLeft);
@@ -8560,7 +8560,7 @@ function TeamSidebar(props) {
       requested.current = !1, quiet(!1), setLapsed((value) => value + 1);
     }, 300));
   }, [wide, frameSnap.viewport, lapsed]), (0, import_react21.useEffect)(() => {
-    if (mode !== "drawer") return;
+    if (mode2 !== "drawer") return;
     let onDown = (event) => {
       event.target instanceof Element && event.target.closest(".bt-leftcol") || actions.setLeftDrawer?.(!1);
     }, onKey = (event) => {
@@ -8569,7 +8569,7 @@ function TeamSidebar(props) {
     return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), () => {
       window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0);
     };
-  }, [mode]);
+  }, [mode2]);
   let navigate = (open, id2) => {
     let result = open(id2);
     return uiNow.leftDrawer === !0 && actions.setLeftDrawer?.(!1), result;
@@ -8625,7 +8625,7 @@ function TeamSidebar(props) {
   return (0, import_react21.createElement)(
     import_react21.Fragment,
     null,
-    (0, import_react21.createElement)(TitleToggle, { hidden: mode === "hidden", onToggle }),
+    (0, import_react21.createElement)(TitleToggle, { hidden: mode2 === "hidden", onToggle }),
     shown === "hidden" ? null : (0, import_react21.createElement)(LeftColumn, { mode: shown, width: ourWidth, onGrip: startDrag, leaving }, content)
   );
 }
@@ -8975,8 +8975,8 @@ function FooterAccount(props) {
   return props.useUi((value) => value.accountSeated === !0) ? null : (0, import_react21.createElement)("span", { className: "bt-foot-account" }, (0, import_react21.createElement)(AccountLauncher, { ...props, seat: !1 }));
 }
 function BotReturn({ wide, useSurface, useRoster, actions }) {
-  let mode = useSurface((value) => value.mode), ready = useRoster((value) => value.ready);
-  return useReportReady(mode === "agent" && ready), mode !== "agent" ? null : (0, import_react21.createElement)(
+  let mode2 = useSurface((value) => value.mode), ready = useRoster((value) => value.ready);
+  return useReportReady(mode2 === "agent" && ready), mode2 !== "agent" ? null : (0, import_react21.createElement)(
     "button",
     { type: "button", className: "bt-return", "aria-label": t("DS Bot"), title: t("DS Bot"), onClick: () => actions.setSurface("bot") },
     (0, import_react21.createElement)(BotMark, { look: MAIN_LOOK, size: 20 }),
@@ -9835,8 +9835,8 @@ function turnDetector({ loud = 0.12, quiet = 0.06, quietMs = 1200 } = {}) {
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/surface.js
-function groupsFor({ mode, plain: plain2 = !1 }) {
-  return { shell: mode === "bot", conversation: mode === "bot" && !plain2 };
+function groupsFor({ mode: mode2, plain: plain2 = !1 }) {
+  return { shell: mode2 === "bot", conversation: mode2 === "bot" && !plain2 };
 }
 var GROUPS = ["shell", "conversation"];
 function disposeAll(disposers, label) {
@@ -9898,9 +9898,9 @@ function readMode(storage = globalThis.localStorage) {
     return "bot";
   }
 }
-function writeMode(mode, storage = globalThis.localStorage) {
+function writeMode(mode2, storage = globalThis.localStorage) {
   try {
-    storage.setItem(STORAGE.surface, mode);
+    storage.setItem(STORAGE.surface, mode2);
   } catch {
   }
 }
@@ -12257,8 +12257,8 @@ function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCr
 }
 
 // modules/bot-runtime/vendor/ds-bot/src/client/new-chat.js
-function NewChat({ mode, roster, actions }) {
-  let [query, setQuery] = (0, import_react35.useState)(""), [picked, setPicked] = (0, import_react35.useState)([]), [group, setGroup] = (0, import_react35.useState)(mode === "group"), [admin, setAdmin] = (0, import_react35.useState)(null), [message2, setMessage] = (0, import_react35.useState)(""), [busy, setBusy] = (0, import_react35.useState)(!1), [error, setError] = (0, import_react35.useState)(""), [cursor, setCursor] = (0, import_react35.useState)(0), [draft2, setDraft] = (0, import_react35.useState)(mode === "create" ? { name: "", fromList: !1 } : null), inputRef = (0, import_react35.useRef)(null), close = () => actions.closeOverlay();
+function NewChat({ mode: mode2, roster, actions }) {
+  let [query, setQuery] = (0, import_react35.useState)(""), [picked, setPicked] = (0, import_react35.useState)([]), [group, setGroup] = (0, import_react35.useState)(mode2 === "group"), [admin, setAdmin] = (0, import_react35.useState)(null), [message2, setMessage] = (0, import_react35.useState)(""), [busy, setBusy] = (0, import_react35.useState)(!1), [error, setError] = (0, import_react35.useState)(""), [cursor, setCursor] = (0, import_react35.useState)(0), [draft2, setDraft] = (0, import_react35.useState)(mode2 === "create" ? { name: "", fromList: !1 } : null), inputRef = (0, import_react35.useRef)(null), close = () => actions.closeOverlay();
   useEscape(close);
   let paneLeft = usePaneLeft(), wanted = query.trim().toLowerCase(), matches = roster.bots.filter((bot) => !picked.includes(bot.id) && bot.id !== admin && (wanted === "" || bot.name.toLowerCase().includes(wanted) || (bot.role ?? "").toLowerCase().includes(wanted))), choosingAdmin = group && admin === null, exact = roster.bots.some((bot) => bot.name.toLowerCase() === wanted), pickedBots = picked.map((id2) => roster.byId[id2]).filter(Boolean), run2 = async (task) => {
     if (!busy) {
@@ -12307,14 +12307,14 @@ function NewChat({ mode, roster, actions }) {
     let room2 = await actions.createRoom(picked);
     await actions.send(room2.id, text7), actions.openSession(room2.id), close();
   }), options = [];
-  !group && picked.length === 0 && mode !== "search" && wanted === "" && (options.push({ key: "new", icon: (0, import_react35.createElement)(PlusIcon), label: t("Create new Bot"), run: createBot }), options.push({ key: "group", icon: (0, import_react35.createElement)(PeopleIcon), label: t("Create group chat"), run: () => {
+  !group && picked.length === 0 && mode2 !== "search" && wanted === "" && (options.push({ key: "new", icon: (0, import_react35.createElement)(PlusIcon), label: t("Create new Bot"), run: createBot }), options.push({ key: "group", icon: (0, import_react35.createElement)(PeopleIcon), label: t("Create group chat"), run: () => {
     setGroup(!0), setCursor(0), inputRef.current?.focus();
   } }), (roster.agents ?? []).length === 0 && actions.addAgent && options.push({ key: "agent", icon: (0, import_react35.createElement)(import_dsh_client_ui_primitives.FishLogo, { size: 16 }), label: t("Add DSH Agent"), run: () => run2(async () => {
     await actions.addAgent(), close();
   }) }));
   for (let bot of matches)
     options.push({ key: bot.id, bot, label: bot.name, hint: choosingAdmin ? t("Make admin") : group || picked.length > 0 ? t("Add to group chat") : void 0, run: () => openBot(bot) });
-  wanted !== "" && !exact && mode !== "search" && options.push({ key: "create", icon: (0, import_react35.createElement)(PlusIcon), label: t("Create new Bot “{name}”", { name: query.trim() }), run: createBot });
+  wanted !== "" && !exact && mode2 !== "search" && options.push({ key: "create", icon: (0, import_react35.createElement)(PlusIcon), label: t("Create new Bot “{name}”", { name: query.trim() }), run: createBot });
   let active2 = Math.min(cursor, Math.max(options.length - 1, 0)), listed = options.map((option) => option.key).join(`
 `), glide = useGlide(`${active2}
 ${listed}`, { axis: "y", ...QUICK_EDGES });
@@ -12344,7 +12344,7 @@ ${listed}`, { axis: "y", ...QUICK_EDGES });
     { className: "bt-pane", style: { left: paneLeft } },
     (0, import_react35.createElement)(
       "div",
-      { className: "bt-newchat", role: "dialog", "aria-label": mode === "search" ? t("Search") : t("New chat") },
+      { className: "bt-newchat", role: "dialog", "aria-label": mode2 === "search" ? t("Search") : t("New chat") },
       (0, import_react35.createElement)(
         "div",
         { className: "bt-to" },
@@ -12370,7 +12370,7 @@ ${listed}`, { axis: "y", ...QUICK_EDGES });
           autoFocus: !0,
           value: query,
           "aria-label": t("Recipient"),
-          placeholder: mode === "search" ? t("Search Bots…") : choosingAdmin ? t("Choose the group admin") : group ? t("Who to chat with…") : t("Start a chat with…"),
+          placeholder: mode2 === "search" ? t("Search Bots…") : choosingAdmin ? t("Choose the group admin") : group ? t("Who to chat with…") : t("Start a chat with…"),
           onChange: (event) => {
             setQuery(event.target.value), setCursor(0);
           },
@@ -12391,7 +12391,7 @@ ${listed}`, { axis: "y", ...QUICK_EDGES });
         "div",
         { ref: glide.box, role: "listbox", "aria-label": t("Recipients"), className: "bt-drop-list" },
         (0, import_react35.createElement)("span", { ref: glide.thumb, className: "bt-thumb", "aria-hidden": !0 }),
-        options.length === 0 ? (0, import_react35.createElement)("div", { className: "bt-hint" }, mode === "search" ? t("No Bots match") : t("Type a name to create a Bot")) : options.map((option, index) => (0, import_react35.createElement)(
+        options.length === 0 ? (0, import_react35.createElement)("div", { className: "bt-hint" }, mode2 === "search" ? t("No Bots match") : t("Type a name to create a Bot")) : options.map((option, index) => (0, import_react35.createElement)(
           "button",
           {
             key: option.key,
@@ -12821,7 +12821,7 @@ function GroupSettingsForm({ room: room2, roster, actions, run: run2, onDeleted 
     let timer = setTimeout(() => setConfirming(!1), 4e3);
     return () => clearTimeout(timer);
   }, [confirming]);
-  let members = room2.members.map((id2) => roster.byId[id2]).filter(Boolean), outside = roster.bots.filter((bot) => !room2.members.includes(bot.id)), admin = roster.byId[room2.admin], mode = shownMode(room2, roster), modeHint = ROOM_MODES.find(([id2]) => id2 === mode)?.[2] ?? "", update = (patch) => run2(actions.updateRoom(room2.id, patch)), openBot = (id2) => {
+  let members = room2.members.map((id2) => roster.byId[id2]).filter(Boolean), outside = roster.bots.filter((bot) => !room2.members.includes(bot.id)), admin = roster.byId[room2.admin], mode2 = shownMode(room2, roster), modeHint = ROOM_MODES.find(([id2]) => id2 === mode2)?.[2] ?? "", update = (patch) => run2(actions.updateRoom(room2.id, patch)), openBot = (id2) => {
     actions.closeSettings(), actions.openSession(id2);
   }, remove = () => {
     if (!confirming) {
@@ -12866,17 +12866,17 @@ function GroupSettingsForm({ room: room2, roster, actions, run: run2, onDeleted 
       (0, import_react39.createElement)(
         "div",
         { className: "bt-set-row bt-bs-row bt-bs-stack" },
-        (0, import_react39.createElement)(Segmented, { label: t("Who answers"), value: mode }, ROOM_MODES.map(([id2, label]) => (0, import_react39.createElement)("button", {
+        (0, import_react39.createElement)(Segmented, { label: t("Who answers"), value: mode2 }, ROOM_MODES.map(([id2, label]) => (0, import_react39.createElement)("button", {
           key: id2,
           type: "button",
-          "aria-pressed": mode === id2,
+          "aria-pressed": mode2 === id2,
           disabled: id2 === "admin" && !admin,
           title: id2 === "admin" && !admin ? t("Choose an admin first") : void 0,
           onClick: () => {
-            mode !== id2 && update({ mode: id2 });
+            mode2 !== id2 && update({ mode: id2 });
           }
         }, t(label)))),
-        (0, import_react39.createElement)("span", { key: mode, className: "bt-set-hint bt-veil" }, `${t(modeHint)} ${t("@mentions always pick who answers.")}`)
+        (0, import_react39.createElement)("span", { key: mode2, className: "bt-set-hint bt-veil" }, `${t(modeHint)} ${t("@mentions always pick who answers.")}`)
       )
     ),
     (0, import_react39.createElement)(
@@ -14499,24 +14499,24 @@ function KeyEditor({ provider, apply: apply4, actions }) {
   );
 }
 function AddProvider({ view, apply: apply4, actions, onDone }) {
-  let [mode, setMode] = (0, import_react46.useState)(view.addable.length > 0 ? "known" : "custom");
+  let [mode2, setMode] = (0, import_react46.useState)(view.addable.length > 0 ? "known" : "custom");
   return (0, import_react46.createElement)(
     "div",
     { className: "bt-set-row bt-set-paste bt-provider-add" },
     (0, import_react46.createElement)(
       Segmented,
-      { label: t("Kind of provider"), value: mode },
+      { label: t("Kind of provider"), value: mode2 },
       [["known", t("Known provider")], ["custom", t("Custom API")]].map(([id2, label]) => (0, import_react46.createElement)("button", {
         key: id2,
         type: "button",
-        "aria-pressed": mode === id2,
+        "aria-pressed": mode2 === id2,
         disabled: id2 === "known" && view.addable.length === 0,
         onClick: () => setMode(id2)
       }, label))
     ),
     // Both forms stay mounted, so switching keeps what is typed in the other.
-    (0, import_react46.createElement)("div", { hidden: mode !== "known" }, (0, import_react46.createElement)(KnownForm, { view, apply: apply4, actions, onDone })),
-    (0, import_react46.createElement)("div", { hidden: mode !== "custom" }, (0, import_react46.createElement)(CustomForm, { view, apply: apply4, actions, onDone }))
+    (0, import_react46.createElement)("div", { hidden: mode2 !== "known" }, (0, import_react46.createElement)(KnownForm, { view, apply: apply4, actions, onDone })),
+    (0, import_react46.createElement)("div", { hidden: mode2 !== "custom" }, (0, import_react46.createElement)(CustomForm, { view, apply: apply4, actions, onDone }))
   );
 }
 function KnownForm({ view, apply: apply4, actions, onDone }) {
@@ -18080,13 +18080,13 @@ function apply(ctx) {
     setPanelYield: (on2) => ui3.set((state) => state.panelYield === on2 ? state : { ...state, panelYield: on2 }),
     // Agent mode hands the surface back to the shell; everything open on the Bot
     // surface closes first so nothing stale reopens on the way back.
-    setSurface: (mode) => {
-      if (!(mode !== "bot" && mode !== "agent")) {
-        if (surface.getSnapshot().mode === mode) {
-          mode === "bot" && ensureBotHome();
+    setSurface: (mode2) => {
+      if (!(mode2 !== "bot" && mode2 !== "agent")) {
+        if (surface.getSnapshot().mode === mode2) {
+          mode2 === "bot" && ensureBotHome();
           return;
         }
-        mode === "agent" && ui3.set((state) => ({ ...state, details: null, view: "details", settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null })), writeMode(mode), surface.set((state) => ({ ...state, mode })), mode === "agent" && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed && ctx.layout.toggleSidebar(), mode === "bot" && ensureBotHome();
+        mode2 === "agent" && ui3.set((state) => ({ ...state, details: null, view: "details", settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null })), writeMode(mode2), surface.set((state) => ({ ...state, mode: mode2 })), mode2 === "agent" && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed && ctx.layout.toggleSidebar(), mode2 === "bot" && ensureBotHome();
       }
     },
     markUnread: (id2) => writeUnread(id2, !0),
@@ -18450,6 +18450,93 @@ function apply(ctx) {
       unsub(), clearTimeout(verifyTimer), groups.dispose();
     };
   }, "ds-bot: surface");
+}
+
+// apps/integration-client/skins.mjs
+var mode = (theme, extra) => ({ theme, extra }), SKINS = Object.freeze({
+  mausbot: {
+    label: "MausBot · 日光 / 午夜",
+    light: mode(
+      { bg: "#fcfcfc", sidebar: "#f5f5f5", bubble: "#efefef", card: "#ffffff", text: "#1c1c1c", user: "#1c1c1c", userText: "#fcfcfc", accent: "#126fd4" },
+      { success: "#007a44", warning: "#9c5b00", danger: "#cd2834", line: "#1c1c1c1f", raised: "#e4e4e4", control: "#e3e3e3", accentText: "#0b69cc" }
+    ),
+    dark: mode(
+      { bg: "#121212", sidebar: "#0e0e0e", bubble: "#1f1f1f", card: "#1f1f1f", text: "#f5f5f5", user: "#5a5a5a", userText: "#f5f5f5", accent: "#1084fe" },
+      { success: "#38d591", warning: "#ff9800", danger: "#ff5667", line: "#f5f5f50f", raised: "#202020", control: "#282828", accentText: "#7fc0ff" }
+    )
+  },
+  atelier: {
+    label: "工坊 · Atelier / Foundry",
+    light: mode(
+      { bg: "#f5f1eb", sidebar: "#fbf8f2", bubble: "#ffffff", card: "#ffffff", text: "#1a1a18", user: "#f2e9dc", userText: "#1a1a18", accent: "#a05f25" },
+      { success: "#3f6b47", warning: "#7a5f31", danger: "#a33a32", line: "#c8bda880", raised: "#f2e9dc", control: "#ece4d6", accentText: "#96551f" }
+    ),
+    dark: mode(
+      { bg: "#100e0b", sidebar: "#171410", bubble: "#1e1a14", card: "#1e1a14", text: "#f4efe4", user: "#2a2318", userText: "#f4efe4", accent: "#d99a3e" },
+      { success: "#57b078", warning: "#dfa441", danger: "#e0685e", line: "#3d3529", raised: "#262019", control: "#262019", accentText: "#e0a44c" }
+    )
+  },
+  linen: {
+    label: "亚麻 · Linen / Graphite",
+    light: mode(
+      { bg: "#eceff3", sidebar: "#f5f6f8", bubble: "#ffffff", card: "#ffffff", text: "#1d2229", user: "#e1e6ed", userText: "#1d2229", accent: "#355f8a" },
+      { success: "#2f704f", warning: "#765b2b", danger: "#a83d48", line: "#b4bbc580", raised: "#e1e6ed", control: "#e6e9ee", accentText: "#355f8a" }
+    ),
+    dark: mode(
+      { bg: "#111214", sidebar: "#181a1d", bubble: "#22252a", card: "#22252a", text: "#f2f4f7", user: "#30343a", userText: "#f2f4f7", accent: "#4f75a2" },
+      { success: "#63b58a", warning: "#d3a150", danger: "#dd6b73", line: "#3b4048", raised: "#2a2d32", control: "#2a2d32", accentText: "#8fb3dc" }
+    )
+  },
+  meadow: {
+    label: "草地 · Meadow / Aurora",
+    light: mode(
+      { bg: "#ffffff", sidebar: "#f6f8f6", bubble: "#f1f5f2", card: "#ffffff", text: "#0f1a13", user: "#e1e9e3", userText: "#0f1a13", accent: "#1a7a48" },
+      { success: "#1a7a48", warning: "#8a5a00", danger: "#c02b3a", line: "#c9d3cc", raised: "#e9eeea", control: "#e9eeea", accentText: "#1a7a48" }
+    ),
+    dark: mode(
+      { bg: "#0b0c0b", sidebar: "#131413", bubble: "#1a1c1a", card: "#1a1c1a", text: "#f2f5f2", user: "#18432c", userText: "#ecfff2", accent: "#3ccf73" },
+      { success: "#4ade80", warning: "#f5a524", danger: "#ff5f6d", line: "#343834", raised: "#1d1f1d", control: "#1d1f1d", accentText: "#3ccf73" }
+    )
+  },
+  lagoon: {
+    label: "泻湖 · Lagoon / Dusk",
+    light: mode(
+      { bg: "#dfeceb", sidebar: "#ecf4f3", bubble: "#ffffff", card: "#ffffff", text: "#14201f", user: "#cfe4e1", userText: "#14201f", accent: "#11736d" },
+      { success: "#2f6b4f", warning: "#7a5a2a", danger: "#a8382f", line: "#aebfbd80", raised: "#cfe4e1", control: "#d7e8e6", accentText: "#11736d" }
+    ),
+    dark: mode(
+      { bg: "#121014", sidebar: "#19161c", bubble: "#231f27", card: "#231f27", text: "#f4eff6", user: "#332b38", userText: "#f4eff6", accent: "#765683" },
+      { success: "#6fad83", warning: "#d0a35d", danger: "#db727a", line: "#403847", raised: "#2b2630", control: "#2b2630", accentText: "#c4a5d1" }
+    )
+  },
+  pop: {
+    label: "波普 · Pop / Halloween",
+    light: mode(
+      { bg: "#fdf5ea", sidebar: "#f6ebdb", bubble: "#ffffff", card: "#ffffff", text: "#1b1613", user: "#1b1613", userText: "#ffffff", accent: "#7f52f0" },
+      { success: "#1f7a4d", warning: "#8a5a00", danger: "#d93a2b", line: "#1b161333", raised: "#efe3d1", control: "#efe3d1", accentText: "#6a3fd9" }
+    ),
+    dark: mode(
+      { bg: "#110d16", sidebar: "#17121e", bubble: "#201a29", card: "#1e1827", text: "#f8efe2", user: "#3d2818", userText: "#fff1e2", accent: "#ff7f1f" },
+      { success: "#7cc48f", warning: "#f2b45a", danger: "#f0727c", line: "#3b3048", raised: "#262030", control: "#262030", accentText: "#ff9a4d" }
+    )
+  }
+}), declarations2 = (extra) => Object.entries(extra).map(([key, value]) => `--bp-skin-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}:${value}`).join(";");
+function skinTheme(id2) {
+  let skin = SKINS[id2];
+  if (!skin) throw new Error(`Unknown skin: ${id2}`);
+  return {
+    label: skin.label,
+    light: { ...skin.light.theme },
+    dark: { ...skin.dark.theme },
+    css: `html body{${declarations2(skin.light.extra)}}html body[data-ds-dark-theme]{${declarations2(skin.dark.extra)}}`
+  };
+}
+var SKIN_IDS = Object.freeze(Object.keys(SKINS));
+function registerSkins(registerTheme2) {
+  let releases = SKIN_IDS.map((id2) => registerTheme2(id2, skinTheme(id2)));
+  return () => {
+    for (let release of releases.reverse()) release();
+  };
 }
 
 // .dsh-plugin/client/official-harness.jsx
@@ -20273,7 +20360,7 @@ function solveAssignments({ rows: rows2, tasks, weights, text: text7, complexity
     minimumFeasibleCost: result.minimumCostLowerBound
   } : null;
 }
-function buildPlan({ text: text7 = "", available = [], mode = "collective", pricing = {}, liveBench = null, liveBenchError = "", dataVersions = null, learning = null, routingEvidence = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
+function buildPlan({ text: text7 = "", available = [], mode: mode2 = "collective", pricing = {}, liveBench = null, liveBenchError = "", dataVersions = null, learning = null, routingEvidence = null, budgetUsd = 0, cacheReadRatio = 0, cacheWriteRatio = 0, preset = DEFAULT_ROUTING_PRESET } = {}) {
   let presetId = normalizeRoutingPreset(preset), firstLine = String(text7 ?? "").split(/\r?\n/u)[0].trim(), transformOnly = /^(?:请|帮我)?(?:总结|概括|翻译|摘要|解释)(?:以下|下列|下面|这份|这些)/u.test(firstLine) && !/(?:执行|完成|实施|分配)/u.test(firstLine), assessed = assessComplexity(transformOnly ? firstLine : text7), requirements = explicitRequirements(text7), compound = shouldSplitRequirements(requirements), complexity = compound && assessed.band !== "complex" ? { value: Math.max(0.66, assessed.value), band: "complex" } : assessed, taskType = classifyTask(transformOnly ? firstLine : text7), weights = presetWeights(OBJECTIVE_WEIGHTS[complexity.band], presetId), discovered = Array.isArray(available) ? available.map((entry) => {
     let reasoningEfforts = (Array.isArray(entry.reasoningEfforts) ? entry.reasoningEfforts : []).map((effort) => String(effort?.id ?? effort ?? "")).filter(Boolean);
     return {
@@ -20434,7 +20521,7 @@ function buildPlan({ text: text7 = "", available = [], mode = "collective", pric
     return { task, strongest };
   }), baselineCost = baselineRows.every((item) => item.strongest?.pricing !== null && item.strongest !== null) ? baselineRows.reduce((sum, { task, strongest }) => sum + taskCost(strongest, task, text7, complexity.band, cacheReadRatio, cacheWriteRatio), 0) : null, knownQualitySources = ["livebench", "route", "user", "recorded-query-evidence"], qualityEvidenceComplete = assignments.length > 0 && assignments.every(({ row, task }) => knownQualitySources.includes(qualitySourceForTask(row, task.type))) && baselineRows.every(({ strongest, task }) => knownQualitySources.includes(qualitySourceForTask(strongest, task.type))), budgetExceeded = Number(budgetUsd) > 0 && totalEstimate !== null ? totalEstimate > Number(budgetUsd) : null, savings = baselineCost === null || totalEstimate === null || !qualityEvidenceComplete ? null : baselineCost <= 0 ? 0 : clamp((baselineCost - totalEstimate) / baselineCost), paretoPruned = (optimized?.candidatePools ?? []).reduce((sum, pool) => sum + pool.pruned, 0), minimumFeasibleCost = rows2.every((row) => row.pricing !== null) ? optimized?.minimumFeasibleCost ?? minimumCostPlan?.cost ?? 0 : null, reason = selected === null ? unassignableTasks.length > 0 ? `图像工作包 ${unassignableTasks.join("、")} 没有可用的图像模型，无法形成完整分配计划。` : "尚未发现可用模型，保留 Harness 原始模型选择。" : `${complexity.band === "simple" ? "低复杂度优先成本、响应速度与较低推理开销" : complexity.band === "balanced" ? "在质量、成本、推理等级、延迟与风险之间平衡" : "高复杂度执行包含推理等级的依赖感知约束分配"}；任务类型为 ${taskType}，${String(subtasks.length)} 个工作包采用${optimized?.search?.exact ? "保留候选空间内的精确搜索" : "保留候选空间内的有界近似搜索"}。质量分与门槛是未校准的估计，不是答对概率。`;
   return {
-    mode,
+    mode: mode2,
     preset: presetId,
     complexity: { value: Number(complexity.value.toFixed(3)), band: complexity.band },
     compound,
@@ -20559,7 +20646,7 @@ function annotate(channel) {
   };
 }
 function createPlanFromRoutes(task, availableRoutes, {
-  mode = "single",
+  mode: mode2 = "single",
   budgetUsd = 0,
   installedToolIds = [],
   runnableToolIds = [],
@@ -20579,7 +20666,7 @@ function createPlanFromRoutes(task, availableRoutes, {
 } = {}) {
   let taskText = clean2(task);
   if (!taskText) throw new Error("task must contain text");
-  let requestedDirect = mode === "direct" || clean2(directProvider) !== "" || clean2(directModel) !== "", selectedMode = mode === "team" ? "team" : "single", routes = Array.isArray(availableRoutes) ? availableRoutes : [], directRoute = null;
+  let requestedDirect = mode2 === "direct" || clean2(directProvider) !== "" || clean2(directModel) !== "", selectedMode = mode2 === "team" ? "team" : "single", routes = Array.isArray(availableRoutes) ? availableRoutes : [], directRoute = null;
   if (requestedDirect) {
     let provider = clean2(directProvider), model = clean2(directModel);
     if (!provider || !model) throw new Error("指定单一模型需要同时提供 provider 和 model");
@@ -21525,11 +21612,11 @@ function manualAssignmentOptions(routes = [], toolSnapshot = null, health = null
   }
   return options;
 }
-function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace: workspace2, executor = "routed", executionMode = "read-only", executionEnvironment = "harness", assignmentMode = "algorithm", packageAssignments, packagePlanKey: packagePlanKey2, dryRun = !1 } = {}) {
+function launchRequest({ task, mode: mode2, directRoute, budgetUsd, preset, workspace: workspace2, executor = "routed", executionMode = "read-only", executionEnvironment = "harness", assignmentMode = "algorithm", packageAssignments, packagePlanKey: packagePlanKey2, dryRun = !1 } = {}) {
   if (!["algorithm", "manual"].includes(assignmentMode)) throw new Error("不支持的分配方式。");
   let manual = null;
   if (assignmentMode === "manual") {
-    if (mode === "direct") throw new Error("指定单一模型模式不支持手动工作包分配。");
+    if (mode2 === "direct") throw new Error("指定单一模型模式不支持手动工作包分配。");
     if (typeof packagePlanKey2 != "string" || !packagePlanKey2.trim() || packagePlanKey2.length > 200) throw new Error("请重新生成工作包后再手动分配。");
     let assignments = parsePackageAssignments(packageAssignments);
     if (!assignments) throw new Error("请选择工作包执行目标。");
@@ -21537,7 +21624,7 @@ function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace: 
   }
   if (!["routed", "official-team"].includes(executor)) throw new Error("不支持的执行方式。");
   if (!["read-only", "workspace-write"].includes(executionMode)) throw new Error("不支持的任务权限。");
-  if (executor === "official-team" && mode !== "team") throw new Error("官方工具协作需要先在上方选择“团队分工”。");
+  if (executor === "official-team" && mode2 !== "team") throw new Error("官方工具协作需要先在上方选择“团队分工”。");
   if (executor === "routed" && executionMode !== "read-only") throw new Error("模型路由只支持只读任务；编辑文件请使用官方工具协作。");
   if (!["harness", "cli-native"].includes(executionEnvironment) || executionEnvironment === "cli-native" && (executor !== "official-team" || executionMode !== "workspace-write")) throw new Error("厂商 CLI 正常环境需要官方工具协作与编辑文件权限。");
   let budget = Number(budgetUsd);
@@ -21546,7 +21633,7 @@ function launchRequest({ task, mode, directRoute, budgetUsd, preset, workspace: 
     ...executor === "official-team" ? { executor, executionMode } : {},
     ...executionEnvironment === "cli-native" ? { executionEnvironment } : {},
     ...dryRun === !0 ? { dryRun: !0 } : {},
-    ...mode === "direct" && directRoute ? { provider: directRoute.provider, model: directRoute.model } : { planMode: mode === "team" ? "team" : "single", preset },
+    ...mode2 === "direct" && directRoute ? { provider: directRoute.provider, model: directRoute.model } : { planMode: mode2 === "team" ? "team" : "single", preset },
     ...Number.isFinite(budget) && budget >= 0 ? { budgetUsd: budget } : {},
     ...typeof workspace2 == "string" && workspace2.trim() ? { workspace: workspace2.trim() } : {},
     ...manual ?? {}
@@ -22048,12 +22135,12 @@ function notifyLaunch(event) {
 function settleLaunch(identity2, value, error) {
   pendingLaunch === identity2 && (pendingLaunch = null, isJobSnapshot(value) && LIVE_STATUSES.has(value.status) && rememberJob(value.jobId), notifyLaunch({ kind: "settled", identity: identity2, value, error }));
 }
-function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = "algorithm", packageAssignments = {}, packagePlanKey: packagePlanKey2 }) {
-  let [preset, setPreset] = import_react58.default.useState(defaultPreset || "balanced"), [dryRun, setDryRun] = import_react58.default.useState(!1), [executor, setExecutor] = import_react58.default.useState("routed"), [executionMode, setExecutionMode] = import_react58.default.useState("read-only"), [executionEnvironment, setExecutionEnvironment] = import_react58.default.useState("harness"), manual = assignmentMode === "manual" && mode !== "direct", runExecutor = manual ? "routed" : executor, runMode = manual ? "read-only" : executionMode, runEnvironment = manual ? "harness" : executionEnvironment, runPreset = manual ? defaultPreset || "balanced" : preset, lastWorkspace = [...ledger?.runs ?? []].map((run2) => run2.workspace).find(Boolean) ?? "", [workspace2, setWorkspace] = import_react58.default.useState(""), [phase, setPhase] = import_react58.default.useState({ kind: "idle" }), currentPhase = import_react58.default.useRef(phase);
+function RunLauncher({ task, mode: mode2, directRoute, budgetUsd, defaultPreset, ledger, previewRun, startRun, runStatus, cancelRun, onStarted, disabledReason, planningRevision, assignmentMode = "algorithm", packageAssignments = {}, packagePlanKey: packagePlanKey2 }) {
+  let [preset, setPreset] = import_react58.default.useState(defaultPreset || "balanced"), [dryRun, setDryRun] = import_react58.default.useState(!1), [executor, setExecutor] = import_react58.default.useState("routed"), [executionMode, setExecutionMode] = import_react58.default.useState("read-only"), [executionEnvironment, setExecutionEnvironment] = import_react58.default.useState("harness"), manual = assignmentMode === "manual" && mode2 !== "direct", runExecutor = manual ? "routed" : executor, runMode = manual ? "read-only" : executionMode, runEnvironment = manual ? "harness" : executionEnvironment, runPreset = manual ? defaultPreset || "balanced" : preset, lastWorkspace = [...ledger?.runs ?? []].map((run2) => run2.workspace).find(Boolean) ?? "", [workspace2, setWorkspace] = import_react58.default.useState(""), [phase, setPhase] = import_react58.default.useState({ kind: "idle" }), currentPhase = import_react58.default.useRef(phase);
   currentPhase.current = phase;
   let [now, setNow] = import_react58.default.useState(Date.now), mounted = import_react58.default.useRef(!0), confirmRef = import_react58.default.useRef(null), pendingRequest = import_react58.default.useRef(0), activeRun = import_react58.default.useRef(null), launchSequence = import_react58.default.useRef(0), launching = import_react58.default.useRef(!1), awaitingLaunch = import_react58.default.useRef(null), pendingRemotes = import_react58.default.useRef(/* @__PURE__ */ new Set()), onFinished = import_react58.default.useRef(onStarted);
   onFinished.current = onStarted;
-  let inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace2, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]), latestSignature = import_react58.default.useRef(inputSignature);
+  let inputSignature = JSON.stringify([task, mode2, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace2, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]), latestSignature = import_react58.default.useRef(inputSignature);
   latestSignature.current = inputSignature, import_react58.default.useEffect(() => {
     mounted.current = !0;
     let resume = (jobId, snapshot) => {
@@ -22101,8 +22188,8 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   }, []), import_react58.default.useEffect(() => {
     setPreset(defaultPreset || "balanced");
   }, [defaultPreset]), import_react58.default.useEffect(() => {
-    (mode !== "team" || manual) && (setExecutor("routed"), setExecutionMode("read-only"), setExecutionEnvironment("harness"));
-  }, [mode, manual]), import_react58.default.useEffect(() => {
+    (mode2 !== "team" || manual) && (setExecutor("routed"), setExecutionMode("read-only"), setExecutionEnvironment("harness"));
+  }, [mode2, manual]), import_react58.default.useEffect(() => {
     pendingRequest.current += 1, setPhase((previous) => ["previewing", "preview", "error"].includes(previous.kind) ? { kind: "idle" } : previous);
   }, [inputSignature]), import_react58.default.useEffect(() => {
     phase.kind === "preview" && confirmRef.current?.focus();
@@ -22169,7 +22256,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   }, [runningJobId]);
   let request = () => launchRequest({
     task,
-    mode,
+    mode: mode2,
     directRoute,
     budgetUsd,
     preset: runPreset,
@@ -22181,7 +22268,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     packageAssignments,
     packagePlanKey: packagePlanKey2,
     dryRun
-  }), blocked = disabledReason || (typeof previewRun != "function" || typeof startRun != "function" ? "工作台执行服务尚未加载，请更新插件后重试。" : text2(task) ? manual && !packagePlanKey2 ? "请重新生成工作包后再手动分配。" : runExecutor === "official-team" && mode !== "team" ? "官方工具协作需要先在上方选择“团队分工”。" : "" : "先在上方“任务规划”中描述任务。"), busy = phase.kind === "previewing" || phase.kind === "running" || phase.kind === "starting", resultStatus = (phase.kind === "done" && phase.value.runId ? (ledger?.runs ?? []).find((run2) => run2.id === phase.value.runId) : null)?.status ?? phase.value?.status, preview = async () => {
+  }), blocked = disabledReason || (typeof previewRun != "function" || typeof startRun != "function" ? "工作台执行服务尚未加载，请更新插件后重试。" : text2(task) ? manual && !packagePlanKey2 ? "请重新生成工作包后再手动分配。" : runExecutor === "official-team" && mode2 !== "team" ? "官方工具协作需要先在上方选择“团队分工”。" : "" : "先在上方“任务规划”中描述任务。"), busy = phase.kind === "previewing" || phase.kind === "running" || phase.kind === "starting", resultStatus = (phase.kind === "done" && phase.value.runId ? (ledger?.runs ?? []).find((run2) => run2.id === phase.value.runId) : null)?.status ?? phase.value?.status, preview = async () => {
     if (blocked || busy || launching.current || pendingLaunch) return;
     let current = ++pendingRequest.current, snapshot;
     try {
@@ -22250,11 +22337,11 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   };
   return /* @__PURE__ */ import_react58.default.createElement("section", { className: "mr-card", "aria-label": "在工作台执行" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("h2", { className: "mr-card-title" }, "预览与执行"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-card-copy" }, "先预览，核对模型、工作区与费用，再确认开始。预览不会调用模型；确认执行才会启动模型或 CLI。"))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group mr-launch-workspace" }, /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-launch-workspace" }, "工作区（可选）"), /* @__PURE__ */ import_react58.default.createElement("input", { className: "mr-input", id: "mr-launch-workspace", value: workspace2, disabled: busy, placeholder: lastWorkspace ? `留空沿用上次运行：${lastWorkspace}` : "可填写项目绝对路径，最终使用的目录会显示在预览中", onChange: (event) => setWorkspace(event.target.value) })), /* @__PURE__ */ import_react58.default.createElement("details", { className: "mr-form-options" }, /* @__PURE__ */ import_react58.default.createElement("summary", null, "执行选项 · ", runExecutor === "official-team" ? "官方工具协作" : manual ? "手动分配" : "模型路由", " · ", runMode === "workspace-write" ? "编辑文件" : "只读", " · ", ROUTING_PRESETS[runPreset]?.label ?? runPreset), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label", id: "mr-launch-executor" }, "执行方式"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-executor" }, /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "routed", disabled: busy, onClick: () => {
     setExecutor("routed"), setExecutionMode("read-only"), setExecutionEnvironment("harness");
-  } }, manual ? "手动分配（只读）" : "模型路由（只读）"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "official-team", disabled: busy || mode !== "team" || manual, title: manual ? "手动分配按包执行只读任务" : mode !== "team" ? "先在上方选择“团队分工”" : "由官方 CLI 协作执行工作包", onClick: () => {
-    mode === "team" && !manual && setExecutor("official-team");
+  } }, manual ? "手动分配（只读）" : "模型路由（只读）"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": runExecutor === "official-team", disabled: busy || mode2 !== "team" || manual, title: manual ? "手动分配按包执行只读任务" : mode2 !== "team" ? "先在上方选择“团队分工”" : "由官方 CLI 协作执行工作包", onClick: () => {
+    mode2 === "team" && !manual && setExecutor("official-team");
   } }, "官方工具协作"))), runExecutor === "official-team" && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label", id: "mr-launch-permission" }, "任务权限"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-permission" }, /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": executionMode === "read-only", disabled: busy, onClick: () => {
     setExecutionMode("read-only"), setExecutionEnvironment("harness");
-  } }, "只读检查"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": executionMode === "workspace-write", disabled: busy, onClick: () => setExecutionMode("workspace-write") }, "编辑文件"))), runExecutor === "official-team" && executionMode === "workspace-write" && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label", id: "mr-launch-environment" }, "执行环境"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-environment" }, /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "harness", disabled: busy, onClick: () => setExecutionEnvironment("harness") }, "Harness 受限环境"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "cli-native", disabled: busy, onClick: () => setExecutionEnvironment("cli-native") }, "厂商 CLI 正常环境"))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label", id: "mr-launch-preset" }, "路由方案"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-preset" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react58.default.createElement("button", { key: item.id, type: "button", title: manual ? "手动分配沿用当前建议的方案；更改方案后请重新生成建议。" : item.description, "aria-pressed": runPreset === item.id, disabled: busy || mode === "direct" || manual, onClick: () => setPreset(item.id) }, item.label)))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group mr-launch-dryrun" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label" }, "演练"), /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react58.default.createElement("input", { type: "checkbox", checked: dryRun, disabled: busy, onChange: (event) => setDryRun(event.target.checked) }), /* @__PURE__ */ import_react58.default.createElement("span", null, "只记录，不执行")), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "演练按当前计划列出每个工作包本应使用的模型或工具和预计费用；不调用模型、不启动 CLI、不写入文件。"))), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, manual ? "手动分配按包执行只读任务，可混合模型 API 与官方工具；工具使用默认模型。所选目标、就绪状态和费用以执行预览为准。" : executor === "official-team" ? `${executionMode === "workspace-write" ? "编辑文件：各工作包在独立 Git 工作树中使用 CLI 正常工具，完成后整合回所选工作区。" : "只读检查：各工作包使用受限工具集，不修改工作区文件；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。"}失败时不会自动替换为模型目录 API。已登录不代表当前任务权限已就绪，预览会检查可用工具。` : mode === "direct" ? `指定模型：${directRoute ? `${directRoute.provider}/${directRoute.model}` : "未选择"}（跳过路由，方案不生效）` : mode === "team" ? "团队分工：按依赖执行只读工作包，每步使用可用的官方 CLI 或模型目录 API。" : "单任务：按方案选择一条路线。"), mode !== "team" && !manual && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "使用官方工具协作前，先在上方选择“团队分工”。"), runEnvironment === "cli-native" && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "厂商 CLI 使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。独立 Git 工作树用于收集改动，不是操作系统读写边界；不会自动切换到此环境。")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button", type: "button", disabled: !!blocked || busy, onClick: () => {
+  } }, "只读检查"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": executionMode === "workspace-write", disabled: busy, onClick: () => setExecutionMode("workspace-write") }, "编辑文件"))), runExecutor === "official-team" && executionMode === "workspace-write" && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label", id: "mr-launch-environment" }, "执行环境"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-environment" }, /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "harness", disabled: busy, onClick: () => setExecutionEnvironment("harness") }, "Harness 受限环境"), /* @__PURE__ */ import_react58.default.createElement("button", { type: "button", "aria-pressed": executionEnvironment === "cli-native", disabled: busy, onClick: () => setExecutionEnvironment("cli-native") }, "厂商 CLI 正常环境"))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label", id: "mr-launch-preset" }, "路由方案"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-segment", role: "group", "aria-labelledby": "mr-launch-preset" }, Object.values(ROUTING_PRESETS).map((item) => /* @__PURE__ */ import_react58.default.createElement("button", { key: item.id, type: "button", title: manual ? "手动分配沿用当前建议的方案；更改方案后请重新生成建议。" : item.description, "aria-pressed": runPreset === item.id, disabled: busy || mode2 === "direct" || manual, onClick: () => setPreset(item.id) }, item.label)))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-control-group mr-launch-dryrun" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label" }, "演练"), /* @__PURE__ */ import_react58.default.createElement("label", { className: "mr-check" }, /* @__PURE__ */ import_react58.default.createElement("input", { type: "checkbox", checked: dryRun, disabled: busy, onChange: (event) => setDryRun(event.target.checked) }), /* @__PURE__ */ import_react58.default.createElement("span", null, "只记录，不执行")), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "演练按当前计划列出每个工作包本应使用的模型或工具和预计费用；不调用模型、不启动 CLI、不写入文件。"))), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, manual ? "手动分配按包执行只读任务，可混合模型 API 与官方工具；工具使用默认模型。所选目标、就绪状态和费用以执行预览为准。" : executor === "official-team" ? `${executionMode === "workspace-write" ? "编辑文件：各工作包在独立 Git 工作树中使用 CLI 正常工具，完成后整合回所选工作区。" : "只读检查：各工作包使用受限工具集，不修改工作区文件；Claude 禁用 shell、技能及既有 MCP，并忽略用户设置。"}失败时不会自动替换为模型目录 API。已登录不代表当前任务权限已就绪，预览会检查可用工具。` : mode2 === "direct" ? `指定模型：${directRoute ? `${directRoute.provider}/${directRoute.model}` : "未选择"}（跳过路由，方案不生效）` : mode2 === "team" ? "团队分工：按依赖执行只读工作包，每步使用可用的官方 CLI 或模型目录 API。" : "单任务：按方案选择一条路线。"), mode2 !== "team" && !manual && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "使用官方工具协作前，先在上方选择“团队分工”。"), runEnvironment === "cli-native" && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "厂商 CLI 使用原登录、配置、技能及 MCP，以当前用户权限运行，不经过 Harness 进程沙箱。独立 Git 工作树用于收集改动，不是操作系统读写边界；不会自动切换到此环境。")), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react58.default.createElement("button", { className: "mr-button", type: "button", disabled: !!blocked || busy, onClick: () => {
     preview();
   } }, phase.kind === "previewing" ? "正在生成预览…" : "预览执行计划"), blocked && /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-caption" }, blocked)), phase.kind === "previewing" && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-empty", role: "status" }, "正在按当前模型目录、登录状态和预算生成执行计划…"), phase.kind === "starting" && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-empty", role: "status" }, "正在等待已确认任务的启动结果，请稍候…"), phase.kind === "error" && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-error", role: "alert" }, phase.message), (phase.kind === "preview" && phase.signature === inputSignature || phase.kind === "running" && !phase.job) && /* @__PURE__ */ import_react58.default.createElement(
     LaunchPreview,
@@ -31004,22 +31091,22 @@ function isAbsoluteDirectoryText(value) {
 function terminalTargetLabel(target) {
   return target === TERMINAL_SHELL_ID ? "系统终端" : getOfficialTool(target)?.label ?? String(target);
 }
-function terminalCommandPreview(target, mode = "interactive", platform = "win32") {
+function terminalCommandPreview(target, mode2 = "interactive", platform = "win32") {
   if (target === TERMINAL_SHELL_ID) return platform === "win32" ? "powershell.exe -NoLogo" : "$SHELL -l";
-  let executable = getOfficialTool(target)?.probeExecutables?.[0] ?? String(target), args = mode === "login" ? TERMINAL_LOGIN_ARGS[target] ?? [] : [];
+  let executable = getOfficialTool(target)?.probeExecutables?.[0] ?? String(target), args = mode2 === "login" ? TERMINAL_LOGIN_ARGS[target] ?? [] : [];
   return [executable, ...args].join(" ");
 }
 function parseTerminalStart(value) {
   let request = plainObject(value, "terminal start request");
   if (!TERMINAL_TARGETS.includes(request.target)) throw new TypeError("target must be the shell or a fixed official CLI");
-  let mode = request.mode === void 0 ? "interactive" : request.mode;
-  if (!TERMINAL_MODES.includes(mode)) throw new TypeError("mode must be interactive or login");
-  if (mode === "login" && !terminalCanLogin(request.target)) throw new TypeError("this target has no login mode");
+  let mode2 = request.mode === void 0 ? "interactive" : request.mode;
+  if (!TERMINAL_MODES.includes(mode2)) throw new TypeError("mode must be interactive or login");
+  if (mode2 === "login" && !terminalCanLogin(request.target)) throw new TypeError("this target has no login mode");
   if (!isAbsoluteDirectoryText(request.cwd)) throw new TypeError("cwd must be an absolute directory path");
   if (request.confirmed !== !0) throw new TypeError("starting a terminal requires the user's confirmation");
   return {
     target: request.target,
-    mode,
+    mode: mode2,
     cwd: request.cwd.trim(),
     cols: boundedInteger(request.cols ?? 100, TERMINAL_LIMITS.minCols, TERMINAL_LIMITS.maxCols, "cols"),
     rows: boundedInteger(request.rows ?? 30, TERMINAL_LIMITS.minRows, TERMINAL_LIMITS.maxRows, "rows"),
@@ -31072,10 +31159,10 @@ function terminalTargets(healthTools = [], platform = "win32") {
 function startProblem({ target, cwd, targets }) {
   return targets.some((item) => item.id === target) ? text3(cwd) ? isAbsoluteDirectoryText(cwd) ? "" : "工作目录必须是绝对路径，例如 D:\\projects\\demo 或 /home/user/project。" : "请填写工作目录（绝对路径）。" : "请选择要启动的终端。";
 }
-function confirmationDetails({ target, mode = "interactive", cwd, platform = "win32" }) {
+function confirmationDetails({ target, mode: mode2 = "interactive", cwd, platform = "win32" }) {
   return {
-    title: `启动 ${target === TERMINAL_SHELL_ID ? platform === "win32" ? "PowerShell" : "系统 Shell" : terminalTargetLabel(target)}${mode === "login" ? " 登录" : ""}？`,
-    command: terminalCommandPreview(target, mode, platform),
+    title: `启动 ${target === TERMINAL_SHELL_ID ? platform === "win32" ? "PowerShell" : "系统 Shell" : terminalTargetLabel(target)}${mode2 === "login" ? " 登录" : ""}？`,
+    command: terminalCommandPreview(target, mode2, platform),
     cwd: text3(cwd),
     points: [
       "该终端不经过 Harness 进程沙箱：它和你自己打开的终端一样，能读写你账号可访问的所有文件、运行任何命令。",
@@ -31312,7 +31399,7 @@ function TerminalPane({ api, session, active: active2, onEnded, onStatus }) {
   }, [session.sessionId]), /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-term-pane", style: { display: active2 ? "block" : "none" } }, session.limitation && /* @__PURE__ */ import_react59.default.createElement("p", { className: "mr-caption mr-term-warning" }, session.limitation, session.ptyError ? `（${session.ptyError}）` : ""), error && /* @__PURE__ */ import_react59.default.createElement("p", { className: "mr-caption mr-term-warning", role: "alert" }, error), /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-term-screen", ref: host }));
 }
 function CliTerminalCard({ api, health, settingsSignature = "" }) {
-  let [info, setInfo] = import_react59.default.useState({ status: "loading", value: null, error: "" }), [target, setTarget] = import_react59.default.useState("shell"), [mode, setMode] = import_react59.default.useState("interactive"), [cwd, setCwd] = import_react59.default.useState(storedCwd), [confirming, setConfirming] = import_react59.default.useState(!1), [starting, setStarting] = import_react59.default.useState(!1), [startError, setStartError] = import_react59.default.useState(""), [sessions, setSessions] = import_react59.default.useState([]), [activeId, setActiveId] = import_react59.default.useState(""), [tools, setTools] = import_react59.default.useState(health?.tools ?? []), mounted = import_react59.default.useRef(!0), refresher = import_react59.default.useRef(null);
+  let [info, setInfo] = import_react59.default.useState({ status: "loading", value: null, error: "" }), [target, setTarget] = import_react59.default.useState("shell"), [mode2, setMode] = import_react59.default.useState("interactive"), [cwd, setCwd] = import_react59.default.useState(storedCwd), [confirming, setConfirming] = import_react59.default.useState(!1), [starting, setStarting] = import_react59.default.useState(!1), [startError, setStartError] = import_react59.default.useState(""), [sessions, setSessions] = import_react59.default.useState([]), [activeId, setActiveId] = import_react59.default.useState(""), [tools, setTools] = import_react59.default.useState(health?.tools ?? []), mounted = import_react59.default.useRef(!0), refresher = import_react59.default.useRef(null);
   refresher.current || (refresher.current = new TerminalInfoRefresher());
   let healthTools = import_react59.default.useRef(health?.tools);
   healthTools.current = health?.tools;
@@ -31329,12 +31416,12 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
   import_react59.default.useEffect(() => {
     targets.some((item) => item.id === target) || setTarget("shell");
   }, [tools, target]), import_react59.default.useEffect(() => {
-    !selected?.canLogin && mode === "login" && setMode("interactive");
+    !selected?.canLogin && mode2 === "login" && setMode("interactive");
   }, [selected?.id]);
-  let problem = startProblem({ target: selected?.id, cwd, targets }), details = confirmationDetails({ target: selected?.id, mode, cwd, platform }), live = sessions.filter((item) => !item.ended).length, maxSessions = info.value?.limits?.maxSessions ?? 4, start = async () => {
+  let problem = startProblem({ target: selected?.id, cwd, targets }), details = confirmationDetails({ target: selected?.id, mode: mode2, cwd, platform }), live = sessions.filter((item) => !item.ended).length, maxSessions = info.value?.limits?.maxSessions ?? 4, start = async () => {
     setStarting(!0), setStartError("");
     try {
-      let session = await startTerminal(api, { target: selected.id, mode, cwd: text4(cwd), cols: 100, rows: 30 });
+      let session = await startTerminal(api, { target: selected.id, mode: mode2, cwd: text4(cwd), cols: 100, rows: 30 });
       if (storeCwd(text4(cwd)), !mounted.current) {
         api.terminalStop({ sessionId: session.sessionId });
         return;
@@ -31365,9 +31452,9 @@ function CliTerminalCard({ api, health, settingsSignature = "" }) {
     loadInfo();
   } }, "刷新")), /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-card-body" }, info.status === "error" && /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-error", role: "alert" }, info.error), info.value && /* @__PURE__ */ import_react59.default.createElement("p", { className: "mr-caption" }, info.value.backend === "pty" ? "终端组件：伪终端（PTY），支持全屏界面、颜色和窗口大小同步。" : `终端组件：管道模式。${info.value.limitation ?? ""}${info.value.ptyError ? `（PTY 加载失败：${info.value.ptyError}）` : ""}`), /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react59.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-term-target" }, "启动"), /* @__PURE__ */ import_react59.default.createElement("select", { className: "mr-input", id: "mr-term-target", value: selected?.id ?? "shell", onChange: (event) => {
     setTarget(event.target.value), setConfirming(!1);
-  } }, targets.map((item) => /* @__PURE__ */ import_react59.default.createElement("option", { key: item.id, value: item.id }, item.label)))), selected?.canLogin && /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react59.default.createElement("span", { className: "mr-control-label" }, "方式"), /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "启动方式" }, /* @__PURE__ */ import_react59.default.createElement("button", { type: "button", "aria-pressed": mode === "interactive", onClick: () => {
+  } }, targets.map((item) => /* @__PURE__ */ import_react59.default.createElement("option", { key: item.id, value: item.id }, item.label)))), selected?.canLogin && /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react59.default.createElement("span", { className: "mr-control-label" }, "方式"), /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "启动方式" }, /* @__PURE__ */ import_react59.default.createElement("button", { type: "button", "aria-pressed": mode2 === "interactive", onClick: () => {
     setMode("interactive"), setConfirming(!1);
-  } }, "交互会话"), /* @__PURE__ */ import_react59.default.createElement("button", { type: "button", "aria-pressed": mode === "login", onClick: () => {
+  } }, "交互会话"), /* @__PURE__ */ import_react59.default.createElement("button", { type: "button", "aria-pressed": mode2 === "login", onClick: () => {
     setMode("login"), setConfirming(!1);
   } }, "登录"))), /* @__PURE__ */ import_react59.default.createElement("div", { className: "mr-control-group mr-term-cwd" }, /* @__PURE__ */ import_react59.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-term-cwd" }, "工作目录（绝对路径）"), /* @__PURE__ */ import_react59.default.createElement(
     "input",
@@ -32284,7 +32371,7 @@ function TuiPromptBox({ tool, tuiPrompt }) {
   } }, busy ? "运行中…" : "发送"), reply?.durationMs != null && /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-caption" }, "耗时 ", Math.round(reply.durationMs / 1e3), " 秒")), reply?.error && /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-error", role: "alert" }, reply.error), reply?.text && /* @__PURE__ */ import_react60.default.createElement("pre", { className: "mr-tui-reply", "aria-label": `${tool.label} 回复` }, reply.text));
 }
 function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOfficialInstallSettings, installOfficialTool, uninstallOfficialTool, repairOfficialTool, cancelOfficialToolInstall, officialToolInstallStatus, toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries, previewRun, startRun, runStatus, cancelRun, terminalApi, tuiPrompt }) {
-  let workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }), [catalogState, setCatalogState] = import_react60.default.useState({ status: "loading", catalog: null, error: "" }), [task, setTask] = import_react60.default.useState(() => workbenchDraft().task), [mode, setMode] = import_react60.default.useState(() => workbenchDraft().mode), [directKey, setDirectKey] = import_react60.default.useState(() => workbenchDraft().directKey), [budget, setBudget] = import_react60.default.useState(() => workbenchDraft().budget ?? String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)), [templateUndo, setTemplateUndo] = import_react60.default.useState(null), [historyRunId, setHistoryRunId] = import_react60.default.useState(null), taskInput = import_react60.default.useRef(null), executionSection = import_react60.default.useRef(null), workspaceElement = import_react60.default.useRef(null), [query, setQuery] = import_react60.default.useState(""), [plan, setPlan] = import_react60.default.useState(null), [assignmentMode, setAssignmentMode] = import_react60.default.useState("algorithm"), [packageAssignments, setPackageAssignments] = import_react60.default.useState({}), [planError, setPlanError] = import_react60.default.useState(""), [toolProbes, setToolProbes] = import_react60.default.useState(null), [routingSettings, setRoutingSettings] = import_react60.default.useState(() => {
+  let workbench = useWorkbenchData({ toolHealth, completeOnboarding, loadLedger, rateResult, rerunStep, loadBoundaries }), [catalogState, setCatalogState] = import_react60.default.useState({ status: "loading", catalog: null, error: "" }), [task, setTask] = import_react60.default.useState(() => workbenchDraft().task), [mode2, setMode] = import_react60.default.useState(() => workbenchDraft().mode), [directKey, setDirectKey] = import_react60.default.useState(() => workbenchDraft().directKey), [budget, setBudget] = import_react60.default.useState(() => workbenchDraft().budget ?? String(settingsScope.getSnapshot().value?.budgetUsd ?? 0)), [templateUndo, setTemplateUndo] = import_react60.default.useState(null), [historyRunId, setHistoryRunId] = import_react60.default.useState(null), taskInput = import_react60.default.useRef(null), executionSection = import_react60.default.useRef(null), workspaceElement = import_react60.default.useRef(null), [query, setQuery] = import_react60.default.useState(""), [plan, setPlan] = import_react60.default.useState(null), [assignmentMode, setAssignmentMode] = import_react60.default.useState("algorithm"), [packageAssignments, setPackageAssignments] = import_react60.default.useState({}), [planError, setPlanError] = import_react60.default.useState(""), [toolProbes, setToolProbes] = import_react60.default.useState(null), [routingSettings, setRoutingSettings] = import_react60.default.useState(() => {
     let value = settingsScope.getSnapshot().value ?? {};
     return routingSettingsSignature(value);
   }), [view, setView] = import_react60.default.useState(savedWorkbenchView), [attentionHidden, setAttentionHidden] = import_react60.default.useState(() => {
@@ -32294,9 +32381,9 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       return !1;
     }
   }), restoreAttentionButton = import_react60.default.useRef(null), closeAttentionButton = import_react60.default.useRef(null), attentionVisibilityChanged = import_react60.default.useRef(!1), tabRefs = import_react60.default.useRef({}), resultHeading = import_react60.default.useRef(null), budgetEdited = import_react60.default.useRef(workbenchDraft().budget !== void 0), budgetValue = import_react60.default.useRef(budget), mounted = import_react60.default.useRef(!1), catalogRequest = import_react60.default.useRef(0), generationRequest = import_react60.default.useRef(0), generationInputs = import_react60.default.useRef("");
-  generationInputs.current = JSON.stringify([task, budget, mode, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools]), import_react60.default.useEffect(() => {
-    rememberWorkbenchDraft({ task, mode, directKey, budget: budgetEdited.current ? budget : void 0 });
-  }, [task, mode, directKey, budget]), import_react60.default.useEffect(() => {
+  generationInputs.current = JSON.stringify([task, budget, mode2, directKey, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools]), import_react60.default.useEffect(() => {
+    rememberWorkbenchDraft({ task, mode: mode2, directKey, budget: budgetEdited.current ? budget : void 0 });
+  }, [task, mode2, directKey, budget]), import_react60.default.useEffect(() => {
     rememberWorkbenchView(view);
   }, [view]);
   let changeAttentionVisibility = (hidden) => {
@@ -32337,7 +32424,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
   let dataRevision = workbench.ledger.value?.dynamicData?.revision ?? "", feedbackRevision = workbench.ledger.value?.learning?.revision ?? "", evidenceRevision = workbench.ledger.value?.routingEvidence?.revision ?? "", manualAllowed = workbench.ledger.value?.settings?.allowManualReassign !== !1 && settingsScope.getSnapshot().value?.allowManualReassign !== !1;
   import_react60.default.useEffect(() => {
     setAssignmentMode("algorithm"), setPackageAssignments({});
-  }, [plan, task, mode, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools, manualAllowed]), import_react60.default.useEffect(() => {
+  }, [plan, task, mode2, routingSettings, catalogState.catalog, toolProbes, workbench.health.report?.tools, manualAllowed]), import_react60.default.useEffect(() => {
     plan && plan.workbenchRevision !== `${dataRevision}/${feedbackRevision}/${evidenceRevision}` && (setPlan(null), setPlanError(""));
   }, [dataRevision, feedbackRevision, evidenceRevision, plan]), import_react60.default.useEffect(() => {
     mounted.current = !0;
@@ -32356,7 +32443,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
     probes: toolProbes?.probes ?? [],
     health: (workbench.health.report?.tools ?? []).map((item) => ({ ...item, label: OFFICIAL_TOOLS.find((tool) => tool.id === item.id)?.label ?? item.id })),
     runs: workbench.ledger.value?.runs ?? []
-  }), [workbench.ledger.value, workbench.health.report, toolProbes]), currentPackagePlanKey = packagePlanKey(plan, task), effectiveAssignmentMode = assignmentMode === "manual" && currentPackagePlanKey && manualAllowed && mode !== "direct" ? "manual" : "algorithm", changeAssignmentMode = (next) => {
+  }), [workbench.ledger.value, workbench.health.report, toolProbes]), currentPackagePlanKey = packagePlanKey(plan, task), effectiveAssignmentMode = assignmentMode === "manual" && currentPackagePlanKey && manualAllowed && mode2 !== "direct" ? "manual" : "algorithm", changeAssignmentMode = (next) => {
     if (next === "manual") {
       if (!manualAllowed || !currentPackagePlanKey) return;
       setPackageAssignments(initialPackageAssignments(plan)), setAssignmentMode("manual");
@@ -32386,8 +32473,8 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       if (routes.length === 0) throw new Error("请先在官方“模型”页配置至少一条模型路线。");
       let parsedBudget = Number(budget);
       if (!Number.isFinite(parsedBudget) || parsedBudget < 0) throw new Error("预算必须是不小于 0 的数字。");
-      let direct = mode === "direct" ? routes.find((route2) => `${route2.provider}/${route2.model}` === directKey) ?? routes[0] : null;
-      if (mode === "direct" && !direct) throw new Error("请选择要直接使用的模型。");
+      let direct = mode2 === "direct" ? routes.find((route2) => `${route2.provider}/${route2.model}` === directKey) ?? routes[0] : null;
+      if (mode2 === "direct" && !direct) throw new Error("请选择要直接使用的模型。");
       let signature2 = routingSettingsSignature(settingsScope.getSnapshot().value ?? {}), ledger = await workbench.refreshLedger();
       if (request !== generationRequest.current || inputs !== generationInputs.current || !mounted.current) return;
       if (!ledger) throw new Error("请先恢复执行记录连接；无法核对最新数据与学习状态。");
@@ -32398,7 +32485,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
         ...ledger.routingData,
         learning: ledger.learning,
         routingEvidence: ledger.routingEvidence,
-        mode,
+        mode: mode2,
         ...direct ? { directProvider: direct.provider, directModel: direct.model } : {},
         budgetUsd: parsedBudget,
         modelProfilesJson: settingsScope.getSnapshot().value?.modelProfilesJson ?? "[]",
@@ -32416,18 +32503,18 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
   return /* @__PURE__ */ import_react60.default.createElement("main", { className: "mr-workspace", ref: workspaceElement }, /* @__PURE__ */ import_react60.default.createElement("style", null, router_main_default), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-shell" }, /* @__PURE__ */ import_react60.default.createElement("header", { className: "mr-header" }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-eyebrow" }, "Model Router · DeepSeek Harness"), /* @__PURE__ */ import_react60.default.createElement("h1", { className: "mr-title" }, "模型路由工作台"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-subtitle" }, "把任务交给合适的模型。从本地规划，到可确认的执行。")), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-header-actions" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-status" }, /* @__PURE__ */ import_react60.default.createElement("span", { className: `mr-status-dot ${catalogState.status === "loading" ? "loading" : catalogState.status === "error" ? "error" : ""}` }), catalogState.status === "ready" ? `${providerCount} 个供应商 · ${routes.length} 条路线` : catalogState.status === "loading" ? "正在读取模型目录" : "模型目录读取失败"), attentionHidden && /* @__PURE__ */ import_react60.default.createElement("button", { ref: restoreAttentionButton, className: "mr-button mr-button-secondary", type: "button", onClick: () => changeAttentionVisibility(!1) }, "显示待处理提醒", attention.length > 0 ? `（${attention.length}）` : ""))), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-overview", "aria-label": "工作台概览" }, /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("models") }, /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-overview-label" }, "模型路线"), /* @__PURE__ */ import_react60.default.createElement("strong", null, catalogState.status === "ready" ? routes.length : "—"), /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-overview-detail" }, catalogState.status === "ready" ? `${providerCount} 个供应商 · 配置价格与能力 →` : "等待目录加载")), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("tools") }, /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-overview-label" }, "官方工具"), /* @__PURE__ */ import_react60.default.createElement("strong", null, workbench.health.report ? summary.installed : "—", /* @__PURE__ */ import_react60.default.createElement("small", null, " / ", OFFICIAL_TOOLS.length)), /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-overview-detail" }, workbench.health.report ? `${summary.ready} 个已登录 · 查看体检 →` : "查看安装与登录状态 →")), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", className: "mr-overview-item", onClick: () => selectView("controls") }, /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-overview-label" }, "今日已发生 API 费用"), /* @__PURE__ */ import_react60.default.createElement("strong", null, workbench.ledger.value ? money2(workbench.ledger.value.spent?.today ?? 0) : "—"), /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-overview-detail" }, "预占 ", money2(reservationSummary(workbench.ledger.value).today), " · 查看预算 →"))), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-workspace-tabs", role: "tablist", "aria-label": "工作台功能" }, WORKSPACE_VIEWS.map((item, index) => /* @__PURE__ */ import_react60.default.createElement("button", { key: item.id, ref: (element) => {
     tabRefs.current[item.id] = element;
   }, type: "button", role: "tab", id: `mr-tab-${item.id}`, "aria-selected": view === item.id, "aria-controls": `mr-panel-${item.id}`, tabIndex: view === item.id ? 0 : -1, onKeyDown: (event) => navigateTabs(event, index), onClick: () => selectView(item.id) }, /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-tab-number", "aria-hidden": "true" }, item.number), item.label))), staleHostNotice({ hostVersion: toolProbes?.hostVersion, loaded: !!toolProbes?.probes?.length }) && /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-error", role: "alert" }, staleHostNotice({ hostVersion: toolProbes?.hostVersion })), (workbench.health.report?.notices ?? []).map((notice) => /* @__PURE__ */ import_react60.default.createElement("div", { key: `${notice.kind}-${notice.at}`, className: "mr-error", role: "alert" }, notice.message)), !attentionHidden && attention.length > 0 && /* @__PURE__ */ import_react60.default.createElement("section", { className: "mr-card mr-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("h2", { className: "mr-card-title" }, "需要你处理"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-card-copy" }, attentionSummary(attention))), /* @__PURE__ */ import_react60.default.createElement("button", { ref: closeAttentionButton, className: "mr-attention-close", type: "button", "aria-label": "关闭待处理提醒", title: "关闭待处理提醒，可在工作台顶部重新显示", onClick: () => changeAttentionVisibility(!0) }, /* @__PURE__ */ import_react60.default.createElement("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ import_react60.default.createElement("path", { d: "m6 6 12 12M18 6 6 18", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" })))), /* @__PURE__ */ import_react60.default.createElement("ul", { className: "mr-attention-list" }, attention.map((row) => /* @__PURE__ */ import_react60.default.createElement("li", { key: row.key, className: `mr-attention-row mr-attention-${row.stage}` }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-caption" }, row.detail)), /* @__PURE__ */ import_react60.default.createElement("button", { className: "mr-button mr-button-secondary", type: "button", onClick: () => openAttention(row) }, row.target === "tools" ? "查看官方工具" : row.target === "history" ? "查看执行记录" : "查看预算与用量"))))), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-view mr-stack", role: "tabpanel", id: "mr-panel-plan", "aria-labelledby": "mr-tab-plan", hidden: view !== "plan" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-grid mr-planning-grid" }, /* @__PURE__ */ import_react60.default.createElement("section", { className: "mr-card", "aria-label": "任务规划" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react60.default.createElement("div", null, /* @__PURE__ */ import_react60.default.createElement("h2", { className: "mr-card-title" }, "任务规划"), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-card-copy" }, "写清目标与验收标准，先生成本地建议，再预览执行。")), /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-pill" }, "本地规划 · 不消耗 token")), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-card-body" }, /* @__PURE__ */ import_react60.default.createElement("label", { className: "mr-label", htmlFor: "mr-task" }, "任务描述"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-template-bar", "aria-label": "任务模板" }, /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-caption" }, "快速开始"), TASK_TEMPLATES.map((template) => /* @__PURE__ */ import_react60.default.createElement("button", { key: template.id, type: "button", className: "mr-template-button", onClick: () => {
-    setTemplateUndo({ task, mode, directKey }), setTask(template.task), setMode(template.mode), invalidatePlan(), taskInput.current?.focus({ preventScroll: !0 });
+    setTemplateUndo({ task, mode: mode2, directKey }), setTask(template.task), setMode(template.mode), invalidatePlan(), taskInput.current?.focus({ preventScroll: !0 });
   } }, template.label)), templateUndo && /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", className: "mr-template-button", onClick: () => {
     setTask(templateUndo.task), setMode(templateUndo.mode), setDirectKey(templateUndo.directKey), setTemplateUndo(null), invalidatePlan(), taskInput.current?.focus({ preventScroll: !0 });
   } }, "撤销模板")), /* @__PURE__ */ import_react60.default.createElement("textarea", { ref: taskInput, className: "mr-textarea", id: "mr-task", value: task, onChange: (event) => {
     setTask(event.target.value), invalidatePlan();
-  }, placeholder: "你想完成什么？希望得到什么结果？可以先选一个模板再修改。", "aria-describedby": "mr-task-hint" }), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-caption mr-task-hint", id: "mr-task-hint" }, "切换页面会保留当前窗口的任务草稿。模板只填写描述；是否调用模型、使用哪些工具，以执行预览和你的确认为准。"), /* @__PURE__ */ import_react60.default.createElement("details", { className: "mr-form-options" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "路由与预算设置 · ", { single: "单任务", team: "团队分工", direct: "指定模型" }[mode], " · ", Number.isFinite(Number(budget)) && Number(budget) >= 0 ? Number(budget) > 0 ? `本次估算上限 ${budget} USD` : "未设本次估算上限" : "预算待修正"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-control-label" }, "规划模式"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "规划模式" }, /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", "aria-pressed": mode === "single", onClick: () => {
+  }, placeholder: "你想完成什么？希望得到什么结果？可以先选一个模板再修改。", "aria-describedby": "mr-task-hint" }), /* @__PURE__ */ import_react60.default.createElement("p", { className: "mr-caption mr-task-hint", id: "mr-task-hint" }, "切换页面会保留当前窗口的任务草稿。模板只填写描述；是否调用模型、使用哪些工具，以执行预览和你的确认为准。"), /* @__PURE__ */ import_react60.default.createElement("details", { className: "mr-form-options" }, /* @__PURE__ */ import_react60.default.createElement("summary", null, "路由与预算设置 · ", { single: "单任务", team: "团队分工", direct: "指定模型" }[mode2], " · ", Number.isFinite(Number(budget)) && Number(budget) >= 0 ? Number(budget) > 0 ? `本次估算上限 ${budget} USD` : "未设本次估算上限" : "预算待修正"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-controls" }, /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-control-group" }, /* @__PURE__ */ import_react60.default.createElement("span", { className: "mr-control-label" }, "规划模式"), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-segment", role: "group", "aria-label": "规划模式" }, /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", "aria-pressed": mode2 === "single", onClick: () => {
     setMode("single"), invalidatePlan();
-  } }, "单任务"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", "aria-pressed": mode === "team", onClick: () => {
+  } }, "单任务"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", "aria-pressed": mode2 === "team", onClick: () => {
     setMode("team"), invalidatePlan();
-  } }, "团队分工"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", "aria-pressed": mode === "direct", onClick: () => {
+  } }, "团队分工"), /* @__PURE__ */ import_react60.default.createElement("button", { type: "button", "aria-pressed": mode2 === "direct", onClick: () => {
     setMode("direct"), invalidatePlan();
-  } }, "指定模型"))), mode === "direct" && /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-control-group mr-direct" }, /* @__PURE__ */ import_react60.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-direct-model" }, "直接使用"), /* @__PURE__ */ import_react60.default.createElement("select", { className: "mr-input", id: "mr-direct-model", value: directKey || (routes[0] ? `${routes[0].provider}/${routes[0].model}` : ""), onChange: (event) => {
+  } }, "指定模型"))), mode2 === "direct" && /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-control-group mr-direct" }, /* @__PURE__ */ import_react60.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-direct-model" }, "直接使用"), /* @__PURE__ */ import_react60.default.createElement("select", { className: "mr-input", id: "mr-direct-model", value: directKey || (routes[0] ? `${routes[0].provider}/${routes[0].model}` : ""), onChange: (event) => {
     setDirectKey(event.target.value), invalidatePlan();
   } }, routes.map((route2) => /* @__PURE__ */ import_react60.default.createElement("option", { key: `${route2.provider}/${route2.model}`, value: `${route2.provider}/${route2.model}` }, route2.provider, "/", route2.model)))), /* @__PURE__ */ import_react60.default.createElement("div", { className: "mr-control-group mr-budget" }, /* @__PURE__ */ import_react60.default.createElement("label", { className: "mr-control-label", htmlFor: "mr-budget" }, "本次估算预算（USD）"), /* @__PURE__ */ import_react60.default.createElement("input", { className: "mr-input", id: "mr-budget", type: "number", min: "0", step: "0.01", value: budget, onChange: (event) => {
     budgetEdited.current = !0, budgetValue.current = event.target.value, setBudget(event.target.value), invalidatePlan();
@@ -32451,7 +32538,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
     RunLauncher,
     {
       task,
-      mode,
+      mode: mode2,
       budgetUsd: budget,
       ledger: workbench.ledger.value,
       previewRun,
@@ -32462,7 +32549,7 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
       assignmentMode: effectiveAssignmentMode,
       packageAssignments: effectiveAssignmentMode === "manual" ? packageAssignments : {},
       packagePlanKey: currentPackagePlanKey,
-      directRoute: mode === "direct" ? routes.find((route2) => `${route2.provider}/${route2.model}` === directKey) ?? routes[0] ?? null : null,
+      directRoute: mode2 === "direct" ? routes.find((route2) => `${route2.provider}/${route2.model}` === directKey) ?? routes[0] ?? null : null,
       defaultPreset: settingsScope.getSnapshot().value?.routingPreset ?? "balanced",
       disabledReason: catalogState.status === "loading" ? "正在读取模型目录…" : catalogState.status === "error" ? "模型目录读取失败，请在“模型配置”中刷新。" : routes.length === 0 ? "请先在官方“模型”页配置至少一条模型路线。" : "",
       onStarted: () => {
@@ -33277,7 +33364,7 @@ var TASK_STATES = Object.freeze({
 }), money3 = (value) => typeof value == "number" && Number.isFinite(value) ? `USD ${value.toFixed(6)}` : "未知（待收据核对）", modelName = (model) => typeof model == "string" ? model : model?.provider && (model?.model ?? model?.id) ? `${model.provider}/${model.model ?? model.id}` : "尚未选择准确模型";
 
 // apps/integration-client/panels.jsx
-var import_react68 = __toESM(require("react"), 1);
+var import_react69 = __toESM(require("react"), 1);
 
 // apps/integration-client/tasks-panel.jsx
 var import_react63 = __toESM(require("react"), 1);
@@ -33441,7 +33528,10 @@ var import_react62 = __toESM(require("react"), 1), paths = {
   expand: ["M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"],
   check: ["m5 12 4 4L19 6"],
   play: ["m8 4 12 8-12 8Z"],
-  lock: ["M5 10h14v11H5Zm3 0V7a4 4 0 0 1 8 0v3m-4 4v3"]
+  lock: ["M5 10h14v11H5Zm3 0V7a4 4 0 0 1 8 0v3m-4 4v3"],
+  caret: ["m6 9 6 6 6-6"],
+  terminal: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z", "m7 10 3 2-3 2m5 0h5"],
+  spark: ["M12 3v4m0 10v4M3 12h4m10 0h4", "m6.3 6.3 2.1 2.1m7.2 7.2 2.1 2.1m-11.4 0 2.1-2.1m7.2-7.2 2.1-2.1"]
 };
 function UiIcon({ name, size = 18, className = "", ...props }) {
   return /* @__PURE__ */ import_react62.default.createElement(
@@ -33629,11 +33719,259 @@ function framePoint({ clientX, clientY, rect, frame }) {
 }
 
 // apps/integration-client/binding-editor.jsx
+var import_react65 = __toESM(require("react"), 1);
+
+// apps/integration-client/brain-picker.jsx
 var import_react64 = __toESM(require("react"), 1);
-var route = (model) => model ? `${model.provider}/${model.model}` : "", workspace = (ref) => ref ? `${ref.machineId}/${ref.rootId}` : "";
-function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy }) {
-  let [form, setForm] = (0, import_react64.useState)(null);
+
+// apps/integration-client/brain-catalog.mjs
+var ROUTER_CAPABILITY = "mr-routing";
+var routeOf = (model) => model?.provider && model?.model ? `${model.provider}/${model.model}` : "", IDENTITY = ["#009957", "#377fe6", "#d94b52", "#e78531", "#8d69ce", "#0ea5c6", "#d84f8b", "#d8a729", "#01a492", "#e5634e"], TOOL_MARKS = Object.freeze({
+  "claude-code": "Cl",
+  codex: "Cx",
+  "kimi-code": "Ki",
+  "minimax-code": "MM",
+  "mimo-code": "Mi",
+  "grok-build": "Gk",
+  gemini: "Ge",
+  opencode: "OC",
+  stepcode: "St",
+  pi: "Pi",
+  hermes: "He",
+  zcode: "Z",
+  "dsh-tui": "DS"
+}), TOOL_LABELS = Object.freeze({
+  "claude-code": "Claude Code",
+  codex: "Codex CLI",
+  "kimi-code": "Kimi Code",
+  "minimax-code": "MiniMax Code",
+  "mimo-code": "MiMo Code",
+  "grok-build": "Grok Build",
+  gemini: "Gemini CLI",
+  opencode: "OpenCode",
+  stepcode: "Step Code",
+  pi: "Pi",
+  hermes: "Hermes Agent",
+  zcode: "ZCode CLI",
+  "dsh-tui": "dsh-TUI"
+}), toolLabel = (toolId) => TOOL_LABELS[toolId] ?? toolId;
+function engineMark(label, toolId = "") {
+  let text7 = String(label ?? "").trim(), chars = [...text7.split(/[\s·/_-]+/u).find(Boolean) ?? "?"], letters = TOOL_MARKS[toolId] ?? chars[0].toUpperCase() + (chars[1] ?? "").toLowerCase(), hash = 0;
+  for (let char of toolId || text7) hash = hash * 31 + char.codePointAt(0) >>> 0;
+  return { letters, color: IDENTITY[hash % IDENTITY.length] };
+}
+var unique = (items) => items.filter((item, index) => items.findIndex((other) => other.toolId === item.toolId && other.model === item.model) === index);
+function apiEngines(catalog) {
+  let byProvider = /* @__PURE__ */ new Map();
+  for (let model of catalog?.models ?? []) {
+    let ref = routeOf(model);
+    ref && (byProvider.has(model.provider) || byProvider.set(model.provider, []), byProvider.get(model.provider).push({
+      ref,
+      provider: model.provider,
+      model: model.model,
+      label: model.model,
+      cliTools: unique(model.cliModels ?? []).map((item) => item.toolId)
+    }));
+  }
+  return [...byProvider.entries()].map(([provider, models]) => ({ id: `api:${provider}`, kind: "api", provider, label: provider, models }));
+}
+function officialEngines(engineView, catalog) {
+  let offered = new Map((catalog?.tools ?? []).map((tool) => [tool.toolId, tool])), providers = new Set((catalog?.models ?? []).map((model) => model.provider));
+  return (engineView?.items ?? []).map((row) => {
+    let tool = offered.get(row.id), delegations = tool ? (catalog?.models ?? []).flatMap((model) => unique(model.cliModels ?? []).filter((item) => item.toolId === row.id).map((item) => ({ ref: routeOf(model), cliModel: item.model, modes: [...tool.modes ?? []] }))) : [];
+    return {
+      id: `tool:${row.id}`,
+      kind: "official",
+      toolId: row.id,
+      label: row.label,
+      vendor: row.vendor,
+      row,
+      delegations,
+      relatedProviders: row.providerHints.filter((hint) => providers.has(hint))
+    };
+  });
+}
+function engineStatus(engine) {
+  if (engine.kind === "api") return engine.models.length ? { tone: "success", text: `${engine.models.length} 个模型` } : { tone: "muted", text: "无可用模型" };
+  let { row } = engine;
+  return row.status === "unchecked" ? { tone: "muted", text: "尚未体检" } : row.status === "needs-install" ? { tone: "warning", text: "需要安装" } : row.status === "needs-login" ? { tone: "warning", text: "需要登录" } : { tone: "success", text: row.version ? `v${row.version}` : "已就绪" };
+}
+function engineSetup(engine) {
+  if (engine.kind !== "official") return null;
+  let { row } = engine;
+  return row.status === "unchecked" ? { title: "尚未体检", detail: "还没有这台电脑上的官方工具体检结果。点右上角刷新运行一次只读体检（不会安装或登录任何工具）。", command: "" } : row.status === "needs-install" ? { title: `${row.label} 尚未安装`, detail: "在高级工作台的官方工具页用插件固定来源安装后，再回到这里刷新。", command: "" } : row.status === "needs-login" ? { title: `${row.label} 尚未登录`, detail: row.login.detail || "在终端完成登录后刷新。插件不会代为登录，也不会读取凭据。", command: row.login.command } : null;
+}
+function filterModels(models, query) {
+  let needle = String(query ?? "").trim().toLowerCase();
+  return needle ? models.filter((model) => `${model.label} ${model.provider}`.toLowerCase().includes(needle)) : models;
+}
+function suggestedModels(models, selectedRef, limit = 5) {
+  let head = models.slice(0, limit);
+  if (!selectedRef || head.some((model) => model.ref === selectedRef)) return head;
+  let selected = models.find((model) => model.ref === selectedRef);
+  return selected ? [...head.slice(0, limit - 1), selected] : head;
+}
+function initialEngine(engines, selectedRef) {
+  let provider = selectedRef ? selectedRef.slice(0, selectedRef.indexOf("/")) : "";
+  return engines.find((engine) => engine.kind === "api" && engine.provider === provider)?.id ?? engines.find((engine) => engine.kind === "api")?.id ?? engines[0]?.id ?? "";
+}
+var sameTool = (a, b2) => a.toolId === b2.toolId && a.cliModel === b2.cliModel;
+function pickModel(selection, ref, catalog) {
+  let model = (catalog?.models ?? []).find((item) => routeOf(item) === ref);
+  if (!model) return selection;
+  let valid = (model.cliModels ?? []).map((item) => ({ toolId: item.toolId, cliModel: item.model }));
+  return { ...selection, model: ref, officialTools: selection.officialTools.filter((tool) => valid.some((item) => sameTool(item, tool))) };
+}
+function toggleDelegation(selection, delegation, catalog) {
+  let entry = { toolId: delegation.toolId, cliModel: delegation.cliModel, mode: delegation.mode ?? "read-only" };
+  if (selection.officialTools.some((tool) => sameTool(tool, entry)))
+    return { ...selection, officialTools: selection.officialTools.filter((tool) => !sameTool(tool, entry)) };
+  let moved = selection.model === delegation.ref ? selection : pickModel(selection, delegation.ref, catalog);
+  return moved.model !== delegation.ref ? selection : { ...moved, officialTools: [...moved.officialTools, entry] };
+}
+function routerAccess(selection) {
+  return selection.capabilities.includes(ROUTER_CAPABILITY);
+}
+function setRouterAccess(selection, enabled) {
+  let rest = selection.capabilities.filter((id2) => id2 !== ROUTER_CAPABILITY);
+  return { ...selection, capabilities: enabled ? [...rest, ROUTER_CAPABILITY] : rest };
+}
+function brainSummary(selection, catalog) {
+  let model = (catalog?.models ?? []).find((item) => routeOf(item) === selection.model) ?? null, tools = selection.officialTools.length;
+  return {
+    ref: model ? routeOf(model) : "",
+    title: model ? model.model : "选择大脑",
+    detail: [model ? model.provider : "尚未绑定 API 模型", tools ? `官方工具 ${tools} 个` : "", routerAccess(selection) ? "可调用官方工具" : ""].filter(Boolean).join(" · "),
+    mark: engineMark(model?.provider ?? "?")
+  };
+}
+
+// apps/integration-client/brain-picker.jsx
+var MODE_LABEL = { "read-only": "只读", "workspace-write": "可写" };
+function EngineMark({ mark, size = "md" }) {
+  return /* @__PURE__ */ import_react64.default.createElement("span", { className: `bp-engine-mark bp-engine-mark-${size}`, style: { "--bp-mark": mark.color }, "aria-hidden": "true" }, mark.letters);
+}
+function StatusPill({ status }) {
+  return /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-pill", "data-tone": status.tone }, status.text);
+}
+function BrainBadge({ model, officialTools = [], canCallTools = !1 }) {
+  let ref = typeof model == "string" ? model : model?.provider && model?.model ? `${model.provider}/${model.model}` : "", provider = ref ? ref.slice(0, ref.indexOf("/")) : "";
+  return /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain-badge" }, /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-badge-main" }, /* @__PURE__ */ import_react64.default.createElement(EngineMark, { mark: engineMark(provider || "?") }), /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-copy" }, /* @__PURE__ */ import_react64.default.createElement("strong", null, ref || "尚未选择准确模型"), /* @__PURE__ */ import_react64.default.createElement("small", null, ref ? "大脑 · 精确绑定，不可用时暂停并说明原因" : "在下方编辑绑定中选择大脑"))), (officialTools.length > 0 || canCallTools) && /* @__PURE__ */ import_react64.default.createElement("ul", { className: "bp-brain-tools", "aria-label": "官方工具" }, officialTools.map((tool) => /* @__PURE__ */ import_react64.default.createElement("li", { key: `${tool.toolId}/${tool.cliModel}` }, /* @__PURE__ */ import_react64.default.createElement(EngineMark, { mark: engineMark(toolLabel(tool.toolId), tool.toolId), size: "xs" }), toolLabel(tool.toolId), /* @__PURE__ */ import_react64.default.createElement("small", null, tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? tool.mode ?? "委派"))), canCallTools && /* @__PURE__ */ import_react64.default.createElement("li", null, /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "terminal", size: 14 }), "可通过模型路由调用官方工具")));
+}
+function BrainPicker({ botName, catalog, selection, onChange, readEngines, openTools, disabled = !1 }) {
+  let [open, setOpen] = (0, import_react64.useState)(!1), [engineId, setEngineId] = (0, import_react64.useState)(""), [query, setQuery] = (0, import_react64.useState)(""), [showAll, setShowAll] = (0, import_react64.useState)(!1), [view, setView] = (0, import_react64.useState)(null), [viewError, setViewError] = (0, import_react64.useState)(""), [loading, setLoading] = (0, import_react64.useState)(!1), root = (0, import_react64.useRef)(null), trigger = (0, import_react64.useRef)(null), paneId = (0, import_react64.useId)(), api = (0, import_react64.useMemo)(() => apiEngines(catalog), [catalog]), official = (0, import_react64.useMemo)(() => officialEngines(view, catalog), [view, catalog]), engines = (0, import_react64.useMemo)(() => [...api, ...official], [api, official]), engine = engines.find((item) => item.id === engineId) ?? engines.find((item) => item.id === initialEngine(engines, selection.model)) ?? null, summary = brainSummary(selection, catalog), routerOffered = (catalog?.capabilities ?? []).some((item) => item.id === ROUTER_CAPABILITY), load = (0, import_react64.useCallback)(async (fresh) => {
+    if (typeof readEngines == "function") {
+      setLoading(!0);
+      try {
+        let value = await readEngines(fresh ? { fresh: !0 } : {});
+        value?.status === "available" && Array.isArray(value.items) ? (setView(value), setViewError("")) : setViewError(value?.reason ?? "宿主没有返回官方工具状态。");
+      } catch (failure) {
+        setViewError(String(failure?.message ?? failure));
+      } finally {
+        setLoading(!1);
+      }
+    }
+  }, [readEngines]);
   (0, import_react64.useEffect)(() => {
+    open && !view && !loading && !viewError && load(!1);
+  }, [open]), (0, import_react64.useEffect)(() => {
+    if (!open) return;
+    let outside = (event) => {
+      root.current && !root.current.contains(event.target) && setOpen(!1);
+    }, escape = (event) => {
+      event.key === "Escape" && (event.stopPropagation(), setOpen(!1), trigger.current?.focus());
+    };
+    return document.addEventListener("mousedown", outside), document.addEventListener("keydown", escape, !0), () => {
+      document.removeEventListener("mousedown", outside), document.removeEventListener("keydown", escape, !0);
+    };
+  }, [open]);
+  let choose = (id2) => {
+    setEngineId(id2), setQuery(""), setShowAll(!1);
+  }, attachedCount = (item) => item.kind === "official" ? selection.officialTools.filter((tool) => tool.toolId === item.toolId).length : item.models.some((model) => model.ref === selection.model) ? 1 : 0, rail = (label, items) => items.length ? /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain-rail-group", role: "group", "aria-label": label }, /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-rail-label", "aria-hidden": "true" }, label), items.map((item) => {
+    let status = engineStatus(item);
+    return /* @__PURE__ */ import_react64.default.createElement(
+      "button",
+      {
+        key: item.id,
+        type: "button",
+        className: "bp-brain-engine",
+        role: "tab",
+        "aria-selected": item.id === engine?.id,
+        "aria-controls": paneId,
+        "aria-label": `${item.label}（${status.text}）`,
+        title: item.label,
+        onClick: () => choose(item.id),
+        "data-attention": status.tone === "warning" ? "true" : void 0,
+        "data-attached": attachedCount(item) ? "true" : void 0
+      },
+      /* @__PURE__ */ import_react64.default.createElement(EngineMark, { mark: engineMark(item.label, item.toolId), size: "sm" })
+    );
+  })) : null;
+  return /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain", ref: root }, /* @__PURE__ */ import_react64.default.createElement(
+    "button",
+    {
+      ref: trigger,
+      type: "button",
+      className: "bp-brain-trigger",
+      "aria-haspopup": "dialog",
+      "aria-expanded": open,
+      disabled,
+      "aria-label": `${botName} 的大脑与官方工具：${summary.ref || "尚未选择"}`,
+      onClick: () => setOpen((value) => !value)
+    },
+    /* @__PURE__ */ import_react64.default.createElement(EngineMark, { mark: summary.mark }),
+    /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-copy" }, /* @__PURE__ */ import_react64.default.createElement("strong", null, summary.title), /* @__PURE__ */ import_react64.default.createElement("small", null, summary.detail)),
+    /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "caret", size: 15 })
+  ), open && /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain-pop", role: "dialog", "aria-label": `${botName} 的大脑与官方工具` }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain-rail", role: "tablist", "aria-orientation": "vertical", "aria-label": "引擎" }, rail("大脑", api), rail("官方工具", official), !view && typeof readEngines == "function" && /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-rail-label", "aria-live": "polite" }, loading ? "体检中" : "官方")), /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-brain-pane", id: paneId, role: "tabpanel", "aria-label": engine?.label ?? "引擎" }, engine ? /* @__PURE__ */ import_react64.default.createElement(
+    EnginePane,
+    {
+      engine,
+      catalog,
+      selection,
+      onChange,
+      query,
+      setQuery,
+      showAll,
+      setShowAll,
+      routerOffered,
+      loading,
+      refresh: readEngines ? () => load(!0) : null,
+      openTools
+    }
+  ) : /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-brain-empty" }, "宿主目录里还没有可绑定的模型。先在 Harness 模型页配置供应商，再刷新本页。"), viewError && /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-brain-note", role: "status" }, "官方工具状态暂不可用：", viewError), /* @__PURE__ */ import_react64.default.createElement("footer", { className: "bp-brain-foot" }, openTools && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: openTools }, /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "terminal", size: 14 }), "官方工具设置"), /* @__PURE__ */ import_react64.default.createElement("span", null, "精确路由 · 保存后由宿主核验")))));
+}
+function EnginePane({ engine, catalog, selection, onChange, query, setQuery, showAll, setShowAll, routerOffered, loading, refresh, openTools }) {
+  let status = engineStatus(engine), header = /* @__PURE__ */ import_react64.default.createElement("header", { className: "bp-brain-head" }, /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-head-copy" }, /* @__PURE__ */ import_react64.default.createElement("strong", null, engine.label), /* @__PURE__ */ import_react64.default.createElement("small", null, engine.kind === "api" ? "API 模型 · 精确路由" : engine.vendor)), engine.kind === "official" && refresh && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", className: "bp-brain-icon", onClick: refresh, disabled: loading, "aria-label": "重新体检官方工具", title: "重新体检（只读）" }, /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "refresh", size: 14, className: loading ? "bp-spinning" : "" })), /* @__PURE__ */ import_react64.default.createElement(StatusPill, { status }));
+  if (engine.kind === "api") {
+    let found = filterModels(engine.models, query), list = query || showAll ? found : suggestedModels(found, selection.model);
+    return /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, header, engine.models.length > 5 && /* @__PURE__ */ import_react64.default.createElement("label", { className: "bp-brain-search" }, /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "search", size: 14 }), /* @__PURE__ */ import_react64.default.createElement("input", { type: "search", value: query, placeholder: "搜索模型", "aria-label": `搜索 ${engine.label} 的模型`, onChange: (event) => setQuery(event.target.value) })), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain-list", role: "listbox", "aria-label": `${engine.label} 的模型` }, list.map((model) => {
+      let selected = model.ref === selection.model;
+      return /* @__PURE__ */ import_react64.default.createElement("button", { key: model.ref, type: "button", role: "option", "aria-selected": selected, className: "bp-brain-model", onClick: () => onChange(pickModel(selection, model.ref, catalog)) }, /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-model-copy" }, /* @__PURE__ */ import_react64.default.createElement("strong", null, model.label), /* @__PURE__ */ import_react64.default.createElement("small", null, [model.provider, model.cliTools.length ? `可委派 ${model.cliTools.join("、")}` : ""].filter(Boolean).join(" · "))), selected && /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "check", size: 15 }));
+    }), !list.length && /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-brain-empty" }, "没有匹配“", query, "”的模型。")), !query && engine.models.length > list.length && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", className: "bp-brain-more", onClick: () => setShowAll(!0) }, "全部模型（", engine.models.length, "）"), !query && showAll && engine.models.length > 5 && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", className: "bp-brain-more", onClick: () => setShowAll(!1) }, "只看推荐"));
+  }
+  let setup = engineSetup(engine), { row } = engine, access = routerAccess(selection);
+  return /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, header, setup && /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain-setup", role: "status" }, /* @__PURE__ */ import_react64.default.createElement("strong", null, setup.title), /* @__PURE__ */ import_react64.default.createElement("p", null, setup.detail), setup.command && /* @__PURE__ */ import_react64.default.createElement("code", null, setup.command), openTools && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: openTools }, "打开官方工具页")), row.updateAvailable && row.latestVersion && /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-brain-note" }, "有新版本 v", row.latestVersion, "，可在官方工具页更新。"), /* @__PURE__ */ import_react64.default.createElement("h4", { className: "bp-brain-section" }, "托管委派"), engine.delegations.length ? /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-brain-list", role: "group", "aria-label": `${engine.label} 的托管委派` }, engine.delegations.map((delegation) => {
+    let attached = selection.officialTools.some((tool) => tool.toolId === engine.toolId && tool.cliModel === delegation.cliModel), moves = !attached && delegation.ref !== selection.model;
+    return /* @__PURE__ */ import_react64.default.createElement(
+      "button",
+      {
+        key: `${delegation.ref}/${delegation.cliModel}`,
+        type: "button",
+        className: "bp-brain-model",
+        "aria-pressed": attached,
+        onClick: () => onChange(toggleDelegation(selection, { toolId: engine.toolId, cliModel: delegation.cliModel, ref: delegation.ref, mode: delegation.modes[0] }, catalog))
+      },
+      /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-brain-model-copy" }, /* @__PURE__ */ import_react64.default.createElement("strong", null, delegation.cliModel), /* @__PURE__ */ import_react64.default.createElement("small", null, [`对应 ${delegation.ref}`, delegation.modes.map((mode2) => MODE_LABEL[mode2] ?? mode2).join("、"), moves ? "选择后大脑同时切换" : ""].filter(Boolean).join(" · "))),
+      attached && /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "check", size: 15 })
+    );
+  })) : /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-brain-empty" }, "宿主尚未为 ", engine.label, " 核验托管委派模型。目前只有在插件配置 taskCli 中登记并核验过入口的 Codex 模型可以委派为 Bot 任务。"), routerOffered && /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, /* @__PURE__ */ import_react64.default.createElement("h4", { className: "bp-brain-section" }, "通过模型路由使用"), /* @__PURE__ */ import_react64.default.createElement("label", { className: "bp-brain-switch" }, /* @__PURE__ */ import_react64.default.createElement("input", { type: "checkbox", checked: access, onChange: (event) => onChange(setRouterAccess(selection, event.target.checked)) }), /* @__PURE__ */ import_react64.default.createElement("span", null, /* @__PURE__ */ import_react64.default.createElement("strong", null, "允许此 Bot 调用官方工具"), /* @__PURE__ */ import_react64.default.createElement("small", null, "授予模型路由能力（model_router_tool_run 等），对所有已就绪的官方工具生效；写入与安装仍逐次请求批准。"))), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-brain-note" }, row.execution.supported ? `宿主可托管执行 ${row.label}：${row.execution.modes.map((mode2) => MODE_LABEL[mode2] ?? mode2).join("、") || "模式待核验"}。` : `${row.label}：${row.execution.reason}`)));
+}
+
+// apps/integration-client/binding-editor.jsx
+var route = (model) => model ? `${model.provider}/${model.model}` : "", workspace = (ref) => ref ? `${ref.machineId}/${ref.rootId}` : "";
+function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy, readEngines, openTools }) {
+  let [form, setForm] = (0, import_react65.useState)(null);
+  (0, import_react65.useEffect)(() => {
     if (!record3) {
       setForm(null);
       return;
@@ -33666,8 +34004,8 @@ function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy }) {
       }
     });
   }, [bot.id, record3?.revision]);
-  let model = (0, import_react64.useMemo)(() => record3?.catalog.models.find((item) => route(item) === form?.model) ?? null, [record3, form?.model]), account = accounts.items.find((item) => item.provider === model?.provider);
-  if (!record3 || !form) return /* @__PURE__ */ import_react64.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得绑定目录。" } });
+  let model = (0, import_react65.useMemo)(() => record3?.catalog.models.find((item) => route(item) === form?.model) ?? null, [record3, form?.model]), account = accounts.items.find((item) => item.provider === model?.provider);
+  if (!record3 || !form) return /* @__PURE__ */ import_react65.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得绑定目录。" } });
   let change = (key, value) => setForm((current) => ({ ...current, [key]: value })), selectedMachine = form.workspace.split("/")[0], selectedRoot = form.workspace.split("/").slice(1).join("/"), routing = form.routing ?? { preset: "", dailyBudgetUsd: "", monthlyBudgetUsd: "" }, enableAccount = () => dispatch("funding.account.save", {
     scopeId: account.id,
     expectedRevision: account.revision,
@@ -33702,29 +34040,24 @@ function BotBindingEditor({ bot, record: record3, accounts, dispatch, busy }) {
       }
     };
     return dispatch("binding.save", { botId: bot.id, expectedRevision: record3.revision, settings });
-  }, cliMappings = (model?.cliModels ?? []).filter((item, index, items) => items.findIndex((other) => other.toolId === item.toolId && other.model === item.model) === index);
-  return /* @__PURE__ */ import_react64.default.createElement("details", { className: "bp-card", open: record3.status !== "available" }, /* @__PURE__ */ import_react64.default.createElement("summary", null, "配置并启用此 Bot"), /* @__PURE__ */ import_react64.default.createElement("form", { className: "bp-form", onSubmit: save }, /* @__PURE__ */ import_react64.default.createElement("label", null, "准确模型", /* @__PURE__ */ import_react64.default.createElement("select", { "aria-label": `${bot.name} 的绑定模型`, value: form.model, onChange: (event) => {
-    change("model", event.target.value), change("officialTools", []);
-  }, required: !0 }, /* @__PURE__ */ import_react64.default.createElement("option", { value: "", disabled: !0 }, "请选择"), record3.catalog.models.map((item) => /* @__PURE__ */ import_react64.default.createElement("option", { key: route(item), value: route(item) }, route(item))))), model && account && !account.enabled && /* @__PURE__ */ import_react64.default.createElement("aside", { className: "bp-blocked" }, /* @__PURE__ */ import_react64.default.createElement("strong", null, "资金范围尚未启用"), /* @__PURE__ */ import_react64.default.createElement("p", null, account.provider, " 需要本地预算上限；它不是厂商余额。"), /* @__PURE__ */ import_react64.default.createElement("label", null, "账户每日上限（USD）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountDaily, onChange: (event) => change("accountDaily", event.target.value) })), /* @__PURE__ */ import_react64.default.createElement("label", null, "账户每月上限（USD）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountMonthly, onChange: (event) => change("accountMonthly", event.target.value) })), /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", disabled: busy, onClick: enableAccount }, "启用 ", account.provider, " 资金范围")), /* @__PURE__ */ import_react64.default.createElement("label", null, "工作区", /* @__PURE__ */ import_react64.default.createElement("select", { "aria-label": `${bot.name} 的绑定工作区`, value: form.workspace, onChange: (event) => change("workspace", event.target.value), required: !0 }, /* @__PURE__ */ import_react64.default.createElement("option", { value: "", disabled: !0 }, "请选择"), record3.catalog.machines.flatMap((machine) => machine.roots.map((root) => /* @__PURE__ */ import_react64.default.createElement("option", { key: `${machine.machineId}/${root.rootId}`, value: `${machine.machineId}/${root.rootId}` }, machine.label, " / ", root.label))))), /* @__PURE__ */ import_react64.default.createElement("label", null, "工作区权限", /* @__PURE__ */ import_react64.default.createElement("select", { value: form.workspaceMode, onChange: (event) => change("workspaceMode", event.target.value) }, /* @__PURE__ */ import_react64.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react64.default.createElement("option", { value: "workspace-write" }, "允许写入"))), /* @__PURE__ */ import_react64.default.createElement("fieldset", null, /* @__PURE__ */ import_react64.default.createElement("legend", null, "Bot 路由策略"), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, "这个 Bot 派活给别人时用哪套取舍；留空表示沿用全局预设。"), /* @__PURE__ */ import_react64.default.createElement("label", null, "预设", /* @__PURE__ */ import_react64.default.createElement("select", { "aria-label": `${bot.name} 的路由预设`, value: routing.preset, onChange: (event) => change("routing", { ...routing, preset: event.target.value }) }, /* @__PURE__ */ import_react64.default.createElement("option", { value: "" }, "沿用全局"), /* @__PURE__ */ import_react64.default.createElement("option", { value: "economy" }, "省钱优先"), /* @__PURE__ */ import_react64.default.createElement("option", { value: "balanced" }, "均衡"), /* @__PURE__ */ import_react64.default.createElement("option", { value: "quality" }, "效果优先"))), /* @__PURE__ */ import_react64.default.createElement("label", null, "每日预算（USD）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.01", value: routing.dailyBudgetUsd, onChange: (event) => change("routing", { ...routing, dailyBudgetUsd: event.target.value }), placeholder: "留空表示不单独限制" })), /* @__PURE__ */ import_react64.default.createElement("label", null, "每月预算（USD）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.01", value: routing.monthlyBudgetUsd, onChange: (event) => change("routing", { ...routing, monthlyBudgetUsd: event.target.value }), placeholder: "留空表示不单独限制" }))), /* @__PURE__ */ import_react64.default.createElement("fieldset", null, /* @__PURE__ */ import_react64.default.createElement("legend", null, "路由与任务能力"), record3.catalog.capabilities.map((capability) => /* @__PURE__ */ import_react64.default.createElement("label", { key: capability.id }, /* @__PURE__ */ import_react64.default.createElement("input", { type: "checkbox", checked: form.capabilities.includes(capability.id), onChange: (event) => change("capabilities", event.target.checked ? [...form.capabilities, capability.id] : form.capabilities.filter((id2) => id2 !== capability.id)) }), capability.label))), cliMappings.length > 0 && /* @__PURE__ */ import_react64.default.createElement("fieldset", null, /* @__PURE__ */ import_react64.default.createElement("legend", null, "已核验官方 CLI"), cliMappings.map((mapping) => {
-    let selected = form.officialTools.some((tool) => tool.toolId === mapping.toolId && tool.cliModel === mapping.model);
-    return /* @__PURE__ */ import_react64.default.createElement("label", { key: `${mapping.toolId}/${mapping.model}` }, /* @__PURE__ */ import_react64.default.createElement("input", { type: "checkbox", checked: selected, onChange: (event) => change("officialTools", event.target.checked ? [...form.officialTools, { toolId: mapping.toolId, cliModel: mapping.model, mode: "read-only" }] : form.officialTools.filter((tool) => !(tool.toolId === mapping.toolId && tool.cliModel === mapping.model))) }), mapping.toolId, " / ", mapping.model, "（只读）");
-  })), /* @__PURE__ */ import_react64.default.createElement("label", null, "资金渠道", /* @__PURE__ */ import_react64.default.createElement("select", { value: form.fundingMode, onChange: (event) => change("fundingMode", event.target.value) }, /* @__PURE__ */ import_react64.default.createElement("option", { value: "api" }, "API（金额）"), /* @__PURE__ */ import_react64.default.createElement("option", { value: "subscription" }, "订阅（调用次数）"))), form.fundingMode === "api" ? /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, /* @__PURE__ */ import_react64.default.createElement("label", null, "输入价格（USD / 百万 Token）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.input, onChange: (event) => change("input", event.target.value), required: !0 })), /* @__PURE__ */ import_react64.default.createElement("label", null, "输出价格（USD / 百万 Token）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.output, onChange: (event) => change("output", event.target.value), required: !0 })), /* @__PURE__ */ import_react64.default.createElement("label", null, "最大输入 Token", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxInputTokens, onChange: (event) => change("maxInputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react64.default.createElement("label", null, "最大输出 Token", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxOutputTokens, onChange: (event) => change("maxOutputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react64.default.createElement("label", null, "Bot 每日预算（USD）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.daily, onChange: (event) => change("daily", event.target.value), required: !0 })), /* @__PURE__ */ import_react64.default.createElement("label", null, "Bot 每月预算（USD）", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.monthly, onChange: (event) => change("monthly", event.target.value), required: !0 }))) : /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, /* @__PURE__ */ import_react64.default.createElement("label", null, "每日订阅调用次数", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "1", value: form.dailyCalls, onChange: (event) => change("dailyCalls", event.target.value), required: !0 })), /* @__PURE__ */ import_react64.default.createElement("label", null, "每月订阅调用次数", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "0", step: "1", value: form.monthlyCalls, onChange: (event) => change("monthlyCalls", event.target.value), required: !0 }))), /* @__PURE__ */ import_react64.default.createElement("label", null, "最大并发任务", /* @__PURE__ */ import_react64.default.createElement("input", { type: "number", min: "1", max: "32", step: "1", value: form.maxConcurrentTasks, onChange: (event) => change("maxConcurrentTasks", event.target.value), required: !0 })), /* @__PURE__ */ import_react64.default.createElement("label", null, /* @__PURE__ */ import_react64.default.createElement("input", { type: "checkbox", checked: form.enabled, onChange: (event) => change("enabled", event.target.checked) }), "启用此绑定（模型、工作区和资金范围必须完整）"), /* @__PURE__ */ import_react64.default.createElement("button", { type: "submit", disabled: busy || form.enabled && (!model || !account?.enabled || !selectedMachine || !selectedRoot) }, "保存绑定"), record3.blockedReason && /* @__PURE__ */ import_react64.default.createElement(Blocked, { value: record3 })));
+  }, selection = { model: form.model, officialTools: form.officialTools, capabilities: form.capabilities }, pick3 = (next) => setForm((current) => ({ ...current, model: next.model, officialTools: next.officialTools, capabilities: next.capabilities }));
+  return /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-card", open: record3.status !== "available" }, /* @__PURE__ */ import_react65.default.createElement("summary", null, "配置并启用此 Bot"), /* @__PURE__ */ import_react65.default.createElement("form", { className: "bp-form", onSubmit: save }, /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-form-field" }, /* @__PURE__ */ import_react65.default.createElement("span", null, "大脑与官方工具"), /* @__PURE__ */ import_react65.default.createElement(BrainPicker, { botName: bot.name, catalog: record3.catalog, selection, onChange: pick3, readEngines, openTools, disabled: busy }), /* @__PURE__ */ import_react65.default.createElement("small", null, "大脑是此 Bot 回复时使用的准确 API 路由；官方工具是它可以委派或调用的本机 CLI。")), model && account && !account.enabled && /* @__PURE__ */ import_react65.default.createElement("aside", { className: "bp-blocked" }, /* @__PURE__ */ import_react65.default.createElement("strong", null, "资金范围尚未启用"), /* @__PURE__ */ import_react65.default.createElement("p", null, account.provider, " 需要本地预算上限；它不是厂商余额。"), /* @__PURE__ */ import_react65.default.createElement("label", null, "账户每日上限（USD）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountDaily, onChange: (event) => change("accountDaily", event.target.value) })), /* @__PURE__ */ import_react65.default.createElement("label", null, "账户每月上限（USD）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.accountMonthly, onChange: (event) => change("accountMonthly", event.target.value) })), /* @__PURE__ */ import_react65.default.createElement("button", { type: "button", disabled: busy, onClick: enableAccount }, "启用 ", account.provider, " 资金范围")), /* @__PURE__ */ import_react65.default.createElement("label", null, "工作区", /* @__PURE__ */ import_react65.default.createElement("select", { "aria-label": `${bot.name} 的绑定工作区`, value: form.workspace, onChange: (event) => change("workspace", event.target.value), required: !0 }, /* @__PURE__ */ import_react65.default.createElement("option", { value: "", disabled: !0 }, "请选择"), record3.catalog.machines.flatMap((machine) => machine.roots.map((root) => /* @__PURE__ */ import_react65.default.createElement("option", { key: `${machine.machineId}/${root.rootId}`, value: `${machine.machineId}/${root.rootId}` }, machine.label, " / ", root.label))))), /* @__PURE__ */ import_react65.default.createElement("label", null, "工作区权限", /* @__PURE__ */ import_react65.default.createElement("select", { value: form.workspaceMode, onChange: (event) => change("workspaceMode", event.target.value) }, /* @__PURE__ */ import_react65.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react65.default.createElement("option", { value: "workspace-write" }, "允许写入"))), /* @__PURE__ */ import_react65.default.createElement("fieldset", null, /* @__PURE__ */ import_react65.default.createElement("legend", null, "Bot 路由策略"), /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "这个 Bot 派活给别人时用哪套取舍；留空表示沿用全局预设。"), /* @__PURE__ */ import_react65.default.createElement("label", null, "预设", /* @__PURE__ */ import_react65.default.createElement("select", { "aria-label": `${bot.name} 的路由预设`, value: routing.preset, onChange: (event) => change("routing", { ...routing, preset: event.target.value }) }, /* @__PURE__ */ import_react65.default.createElement("option", { value: "" }, "沿用全局"), /* @__PURE__ */ import_react65.default.createElement("option", { value: "economy" }, "省钱优先"), /* @__PURE__ */ import_react65.default.createElement("option", { value: "balanced" }, "均衡"), /* @__PURE__ */ import_react65.default.createElement("option", { value: "quality" }, "效果优先"))), /* @__PURE__ */ import_react65.default.createElement("label", null, "每日预算（USD）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.01", value: routing.dailyBudgetUsd, onChange: (event) => change("routing", { ...routing, dailyBudgetUsd: event.target.value }), placeholder: "留空表示不单独限制" })), /* @__PURE__ */ import_react65.default.createElement("label", null, "每月预算（USD）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.01", value: routing.monthlyBudgetUsd, onChange: (event) => change("routing", { ...routing, monthlyBudgetUsd: event.target.value }), placeholder: "留空表示不单独限制" }))), /* @__PURE__ */ import_react65.default.createElement("fieldset", null, /* @__PURE__ */ import_react65.default.createElement("legend", null, "路由与任务能力"), record3.catalog.capabilities.map((capability) => /* @__PURE__ */ import_react65.default.createElement("label", { key: capability.id }, /* @__PURE__ */ import_react65.default.createElement("input", { type: "checkbox", checked: form.capabilities.includes(capability.id), onChange: (event) => change("capabilities", event.target.checked ? [...form.capabilities, capability.id] : form.capabilities.filter((id2) => id2 !== capability.id)) }), capability.label))), /* @__PURE__ */ import_react65.default.createElement("label", null, "资金渠道", /* @__PURE__ */ import_react65.default.createElement("select", { value: form.fundingMode, onChange: (event) => change("fundingMode", event.target.value) }, /* @__PURE__ */ import_react65.default.createElement("option", { value: "api" }, "API（金额）"), /* @__PURE__ */ import_react65.default.createElement("option", { value: "subscription" }, "订阅（调用次数）"))), form.fundingMode === "api" ? /* @__PURE__ */ import_react65.default.createElement(import_react65.default.Fragment, null, /* @__PURE__ */ import_react65.default.createElement("label", null, "输入价格（USD / 百万 Token）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.input, onChange: (event) => change("input", event.target.value), required: !0 })), /* @__PURE__ */ import_react65.default.createElement("label", null, "输出价格（USD / 百万 Token）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.000001", value: form.output, onChange: (event) => change("output", event.target.value), required: !0 })), /* @__PURE__ */ import_react65.default.createElement("label", null, "最大输入 Token", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxInputTokens, onChange: (event) => change("maxInputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react65.default.createElement("label", null, "最大输出 Token", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "1", step: "1", value: form.maxOutputTokens, onChange: (event) => change("maxOutputTokens", event.target.value), required: !0 })), /* @__PURE__ */ import_react65.default.createElement("label", null, "Bot 每日预算（USD）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.daily, onChange: (event) => change("daily", event.target.value), required: !0 })), /* @__PURE__ */ import_react65.default.createElement("label", null, "Bot 每月预算（USD）", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "0.01", value: form.monthly, onChange: (event) => change("monthly", event.target.value), required: !0 }))) : /* @__PURE__ */ import_react65.default.createElement(import_react65.default.Fragment, null, /* @__PURE__ */ import_react65.default.createElement("label", null, "每日订阅调用次数", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "1", value: form.dailyCalls, onChange: (event) => change("dailyCalls", event.target.value), required: !0 })), /* @__PURE__ */ import_react65.default.createElement("label", null, "每月订阅调用次数", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "0", step: "1", value: form.monthlyCalls, onChange: (event) => change("monthlyCalls", event.target.value), required: !0 }))), /* @__PURE__ */ import_react65.default.createElement("label", null, "最大并发任务", /* @__PURE__ */ import_react65.default.createElement("input", { type: "number", min: "1", max: "32", step: "1", value: form.maxConcurrentTasks, onChange: (event) => change("maxConcurrentTasks", event.target.value), required: !0 })), /* @__PURE__ */ import_react65.default.createElement("label", null, /* @__PURE__ */ import_react65.default.createElement("input", { type: "checkbox", checked: form.enabled, onChange: (event) => change("enabled", event.target.checked) }), "启用此绑定（模型、工作区和资金范围必须完整）"), /* @__PURE__ */ import_react65.default.createElement("button", { type: "submit", disabled: busy || !model || form.enabled && (!account?.enabled || !selectedMachine || !selectedRoot) }, "保存绑定"), record3.blockedReason && /* @__PURE__ */ import_react65.default.createElement(Blocked, { value: record3 })));
 }
 
 // apps/integration-client/library-panel.jsx
-var import_react65 = __toESM(require("react"), 1);
+var import_react66 = __toESM(require("react"), 1);
 var MAX_UPLOAD_BYTES = 16 * 1024 * 1024, textFile = (name) => /\.(?:txt|md|markdown|csv|tsv|json|ya?ml|xml|html|log|m?js|ts|py)$/iu.test(name) || !name.includes("."), bytesLabel = (size) => size >= 1024 * 1024 ? `${(size / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(size / 1024)} KB`, fileBase64 = (file) => new Promise((resolve2, reject) => {
   let reader = new FileReader();
   reader.onerror = () => reject(new Error("文件读取失败。")), reader.onload = () => resolve2(String(reader.result).split(",")[1] ?? ""), reader.readAsDataURL(file);
 });
 function LibraryPanel({ snapshot, dispatch, busy }) {
-  let bots = snapshot.bots ?? [], [botId, setBotId] = (0, import_react65.useState)(bots[0]?.id ?? ""), [path, setPath] = (0, import_react65.useState)(""), [entries2, setEntries] = (0, import_react65.useState)([]), [editor, setEditor] = (0, import_react65.useState)(null), [newName, setNewName] = (0, import_react65.useState)(""), [filter, setFilter] = (0, import_react65.useState)(""), [query, setQuery] = (0, import_react65.useState)(""), [searchResults, setSearchResults] = (0, import_react65.useState)(null), [searchedQuery, setSearchedQuery] = (0, import_react65.useState)(""), [error, setError] = (0, import_react65.useState)(""), [status, setStatus] = (0, import_react65.useState)(""), [working, setWorking] = (0, import_react65.useState)(!1), [deleteName, setDeleteName] = (0, import_react65.useState)(null), sequence = (0, import_react65.useRef)(0), editorRef = (0, import_react65.useRef)(null), createMenuRef = (0, import_react65.useRef)(null), dispatchRef = (0, import_react65.useRef)(dispatch);
+  let bots = snapshot.bots ?? [], [botId, setBotId] = (0, import_react66.useState)(bots[0]?.id ?? ""), [path, setPath] = (0, import_react66.useState)(""), [entries2, setEntries] = (0, import_react66.useState)([]), [editor, setEditor] = (0, import_react66.useState)(null), [newName, setNewName] = (0, import_react66.useState)(""), [filter, setFilter] = (0, import_react66.useState)(""), [query, setQuery] = (0, import_react66.useState)(""), [searchResults, setSearchResults] = (0, import_react66.useState)(null), [searchedQuery, setSearchedQuery] = (0, import_react66.useState)(""), [error, setError] = (0, import_react66.useState)(""), [status, setStatus] = (0, import_react66.useState)(""), [working, setWorking] = (0, import_react66.useState)(!1), [deleteName, setDeleteName] = (0, import_react66.useState)(null), sequence = (0, import_react66.useRef)(0), editorRef = (0, import_react66.useRef)(null), createMenuRef = (0, import_react66.useRef)(null), dispatchRef = (0, import_react66.useRef)(dispatch);
   dispatchRef.current = dispatch;
-  let call2 = (0, import_react65.useCallback)(async (action, payload) => {
+  let call2 = (0, import_react66.useCallback)(async (action, payload) => {
     let value = await dispatchRef.current(action, payload);
     if (value === void 0 || value?.ok === !1) throw new Error(value?.error?.message ?? "宿主尚未确认这次操作，请刷新后重试。");
     return value;
-  }, []), fullPath = (name) => path ? `${path}/${name}` : name, load = (0, import_react65.useCallback)(async () => {
+  }, []), fullPath = (name) => path ? `${path}/${name}` : name, load = (0, import_react66.useCallback)(async () => {
     let generation = ++sequence.current;
     if (!(!botId || typeof dispatchRef.current != "function"))
       try {
@@ -33734,11 +34067,11 @@ function LibraryPanel({ snapshot, dispatch, busy }) {
         generation === sequence.current && setError(String(failure?.message ?? failure));
       }
   }, [botId, path, call2]);
-  (0, import_react65.useEffect)(() => (setEditor(null), setDeleteName(null), setEntries([]), setSearchResults(null), load(), () => {
+  (0, import_react66.useEffect)(() => (setEditor(null), setDeleteName(null), setEntries([]), setSearchResults(null), load(), () => {
     sequence.current++;
-  }), [load]), (0, import_react65.useEffect)(() => {
+  }), [load]), (0, import_react66.useEffect)(() => {
     !botId && bots[0] && setBotId(bots[0].id);
-  }, [botId, bots]), (0, import_react65.useEffect)(() => {
+  }, [botId, bots]), (0, import_react66.useEffect)(() => {
     if (!editor?.line || !editorRef.current) return;
     let textarea = editorRef.current, lines = textarea.value.split(`
 `), index = Math.min(lines.length - 1, Math.max(0, editor.line - 1)), start = lines.slice(0, index).reduce((sum, line) => sum + line.length + 1, 0);
@@ -33786,35 +34119,35 @@ function LibraryPanel({ snapshot, dispatch, busy }) {
     }
     openText(fullPath(entry.name), entry.name);
   }, disabled = busy || working || !botId;
-  return bots.length ? /* @__PURE__ */ import_react65.default.createElement("article", { className: "bp-card bp-library" }, /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react65.default.createElement("h2", null, "资料库"), /* @__PURE__ */ import_react65.default.createElement("select", { "aria-label": "资料库 Bot", value: botId, disabled: working, onChange: (event) => {
+  return bots.length ? /* @__PURE__ */ import_react66.default.createElement("article", { className: "bp-card bp-library" }, /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react66.default.createElement("h2", null, "资料库"), /* @__PURE__ */ import_react66.default.createElement("select", { "aria-label": "资料库 Bot", value: botId, disabled: working, onChange: (event) => {
     setBotId(event.target.value), setPath(""), setStatus("");
-  } }, bots.map((bot) => /* @__PURE__ */ import_react65.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "按 Bot 保存文档、图片和工作资料。单文件最大 16 MB，文本可直接编辑。"), /* @__PURE__ */ import_react65.default.createElement("nav", { className: "bp-actions bp-library-breadcrumb", "aria-label": "资料库目录" }, /* @__PURE__ */ import_react65.default.createElement(UiIcon, { name: "folder", size: 15 }), /* @__PURE__ */ import_react65.default.createElement("button", { disabled, onClick: () => setPath("") }, "根目录"), path && /* @__PURE__ */ import_react65.default.createElement(import_react65.default.Fragment, null, /* @__PURE__ */ import_react65.default.createElement("span", null, "/ ", path), /* @__PURE__ */ import_react65.default.createElement("button", { disabled, onClick: () => setPath(path.split("/").slice(0, -1).join("/")) }, "上一级")), /* @__PURE__ */ import_react65.default.createElement("button", { disabled, onClick: () => {
+  } }, bots.map((bot) => /* @__PURE__ */ import_react66.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-muted" }, "按 Bot 保存文档、图片和工作资料。单文件最大 16 MB，文本可直接编辑。"), /* @__PURE__ */ import_react66.default.createElement("nav", { className: "bp-actions bp-library-breadcrumb", "aria-label": "资料库目录" }, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: "folder", size: 15 }), /* @__PURE__ */ import_react66.default.createElement("button", { disabled, onClick: () => setPath("") }, "根目录"), path && /* @__PURE__ */ import_react66.default.createElement(import_react66.default.Fragment, null, /* @__PURE__ */ import_react66.default.createElement("span", null, "/ ", path), /* @__PURE__ */ import_react66.default.createElement("button", { disabled, onClick: () => setPath(path.split("/").slice(0, -1).join("/")) }, "上一级")), /* @__PURE__ */ import_react66.default.createElement("button", { disabled, onClick: () => {
     load();
-  } }, "列出目录")), /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-library-toolbar" }, /* @__PURE__ */ import_react65.default.createElement("label", { className: "bp-search-field" }, /* @__PURE__ */ import_react65.default.createElement(UiIcon, { name: "search", size: 15 }), /* @__PURE__ */ import_react65.default.createElement("input", { "aria-label": "筛选资料", placeholder: "按文件名查找…", value: filter, onChange: (event) => setFilter(event.target.value) })), /* @__PURE__ */ import_react65.default.createElement("details", { className: "bp-create-menu", ref: createMenuRef }, /* @__PURE__ */ import_react65.default.createElement("summary", null, /* @__PURE__ */ import_react65.default.createElement(UiIcon, { name: "plus", size: 15 }), "新建"), /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-create-popover" }, /* @__PURE__ */ import_react65.default.createElement("input", { "aria-label": "新建名称", value: newName, onChange: (event) => setNewName(event.target.value), placeholder: "文件或文件夹名称" }), /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react65.default.createElement("button", { disabled: disabled || !newName.trim(), onClick: () => {
+  } }, "列出目录")), /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-library-toolbar" }, /* @__PURE__ */ import_react66.default.createElement("label", { className: "bp-search-field" }, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: "search", size: 15 }), /* @__PURE__ */ import_react66.default.createElement("input", { "aria-label": "筛选资料", placeholder: "按文件名查找…", value: filter, onChange: (event) => setFilter(event.target.value) })), /* @__PURE__ */ import_react66.default.createElement("details", { className: "bp-create-menu", ref: createMenuRef }, /* @__PURE__ */ import_react66.default.createElement("summary", null, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: "plus", size: 15 }), "新建"), /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-create-popover" }, /* @__PURE__ */ import_react66.default.createElement("input", { "aria-label": "新建名称", value: newName, onChange: (event) => setNewName(event.target.value), placeholder: "文件或文件夹名称" }), /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react66.default.createElement("button", { disabled: disabled || !newName.trim(), onClick: () => {
     setEditor({ name: newName.trim(), content: "", fresh: !0 }), setNewName(""), createMenuRef.current.open = !1;
-  } }, "新建文本"), /* @__PURE__ */ import_react65.default.createElement("button", { disabled: disabled || !newName.trim(), onClick: () => {
+  } }, "新建文本"), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: disabled || !newName.trim(), onClick: () => {
     perform(async () => {
       await call2("library.mkdir", { botId, relativePath: fullPath(newName.trim()) }), setNewName(""), createMenuRef.current.open = !1, await load();
     });
-  } }, "新建文件夹")))), /* @__PURE__ */ import_react65.default.createElement("label", { className: "bp-upload" }, /* @__PURE__ */ import_react65.default.createElement(UiIcon, { name: "upload", size: 15 }), "上传文件", /* @__PURE__ */ import_react65.default.createElement("input", { "aria-label": "上传资料", type: "file", multiple: !0, disabled, onChange: upload }))), /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-library-search" }, /* @__PURE__ */ import_react65.default.createElement("input", { "aria-label": "资料库文本查询", maxLength: 256, value: query, onChange: (event) => setQuery(event.target.value), placeholder: "搜索这个 Bot 的文本内容" }), /* @__PURE__ */ import_react65.default.createElement("button", { disabled: disabled || !query.trim(), onClick: () => {
+  } }, "新建文件夹")))), /* @__PURE__ */ import_react66.default.createElement("label", { className: "bp-upload" }, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: "upload", size: 15 }), "上传文件", /* @__PURE__ */ import_react66.default.createElement("input", { "aria-label": "上传资料", type: "file", multiple: !0, disabled, onChange: upload }))), /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-library-search" }, /* @__PURE__ */ import_react66.default.createElement("input", { "aria-label": "资料库文本查询", maxLength: 256, value: query, onChange: (event) => setQuery(event.target.value), placeholder: "搜索这个 Bot 的文本内容" }), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: disabled || !query.trim(), onClick: () => {
     search();
-  } }, "搜索文本"), searchResults !== null && /* @__PURE__ */ import_react65.default.createElement("button", { disabled: working, onClick: () => setSearchResults(null) }, "清除搜索")), error && /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-error", role: "alert" }, error), status && /* @__PURE__ */ import_react65.default.createElement("p", { role: "status" }, status), searchResults !== null && /* @__PURE__ */ import_react65.default.createElement("section", { "aria-label": "资料库搜索结果" }, /* @__PURE__ */ import_react65.default.createElement("p", { role: "status" }, "“", searchedQuery, "” · ", searchResults.length, " 条结果（最多 50 条，扫描最多 500 个条目 / 8 层目录，仅限不超过 1 MiB 的文本文件）"), searchResults.length ? /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react65.default.createElement("table", null, /* @__PURE__ */ import_react65.default.createElement("thead", null, /* @__PURE__ */ import_react65.default.createElement("tr", null, /* @__PURE__ */ import_react65.default.createElement("th", null, "文件 / 行号"), /* @__PURE__ */ import_react65.default.createElement("th", null, "匹配文本"))), /* @__PURE__ */ import_react65.default.createElement("tbody", null, searchResults.map((row, index) => /* @__PURE__ */ import_react65.default.createElement("tr", { key: `${row.path}:${row.line}:${index}` }, /* @__PURE__ */ import_react65.default.createElement("td", null, /* @__PURE__ */ import_react65.default.createElement("button", { disabled, className: "bp-text-button", onClick: () => {
+  } }, "搜索文本"), searchResults !== null && /* @__PURE__ */ import_react66.default.createElement("button", { disabled: working, onClick: () => setSearchResults(null) }, "清除搜索")), error && /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-error", role: "alert" }, error), status && /* @__PURE__ */ import_react66.default.createElement("p", { role: "status" }, status), searchResults !== null && /* @__PURE__ */ import_react66.default.createElement("section", { "aria-label": "资料库搜索结果" }, /* @__PURE__ */ import_react66.default.createElement("p", { role: "status" }, "“", searchedQuery, "” · ", searchResults.length, " 条结果（最多 50 条，扫描最多 500 个条目 / 8 层目录，仅限不超过 1 MiB 的文本文件）"), searchResults.length ? /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react66.default.createElement("table", null, /* @__PURE__ */ import_react66.default.createElement("thead", null, /* @__PURE__ */ import_react66.default.createElement("tr", null, /* @__PURE__ */ import_react66.default.createElement("th", null, "文件 / 行号"), /* @__PURE__ */ import_react66.default.createElement("th", null, "匹配文本"))), /* @__PURE__ */ import_react66.default.createElement("tbody", null, searchResults.map((row, index) => /* @__PURE__ */ import_react66.default.createElement("tr", { key: `${row.path}:${row.line}:${index}` }, /* @__PURE__ */ import_react66.default.createElement("td", null, /* @__PURE__ */ import_react66.default.createElement("button", { disabled, className: "bp-text-button", onClick: () => {
     openText(row.path, row.path.split("/").at(-1), row.line);
-  } }, row.path, ":", row.line)), /* @__PURE__ */ import_react65.default.createElement("td", null, /* @__PURE__ */ import_react65.default.createElement("code", null, row.text))))))) : /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-muted" }, "没有匹配的文本内容。")), entries2.length ? /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react65.default.createElement("table", null, /* @__PURE__ */ import_react65.default.createElement("thead", null, /* @__PURE__ */ import_react65.default.createElement("tr", null, /* @__PURE__ */ import_react65.default.createElement("th", null, "名称"), /* @__PURE__ */ import_react65.default.createElement("th", null, "大小"), /* @__PURE__ */ import_react65.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react65.default.createElement("tbody", null, entries2.filter((entry) => entry.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase())).map((entry) => /* @__PURE__ */ import_react65.default.createElement("tr", { key: entry.name }, /* @__PURE__ */ import_react65.default.createElement("td", null, /* @__PURE__ */ import_react65.default.createElement("button", { className: "bp-text-button bp-file-name", disabled: disabled || entry.kind === "other", onClick: () => open(entry) }, /* @__PURE__ */ import_react65.default.createElement(UiIcon, { name: entry.kind === "directory" ? "folder" : "file", size: 18 }), entry.name)), /* @__PURE__ */ import_react65.default.createElement("td", { className: "bp-file-meta" }, entry.kind === "file" ? bytesLabel(entry.size ?? 0) : "文件夹"), /* @__PURE__ */ import_react65.default.createElement("td", null, /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-row-actions" }, entry.kind === "file" && /* @__PURE__ */ import_react65.default.createElement(import_react65.default.Fragment, null, textFile(entry.name) && /* @__PURE__ */ import_react65.default.createElement("button", { disabled, onClick: () => open(entry) }, "查看"), /* @__PURE__ */ import_react65.default.createElement("button", { disabled, onClick: () => {
+  } }, row.path, ":", row.line)), /* @__PURE__ */ import_react66.default.createElement("td", null, /* @__PURE__ */ import_react66.default.createElement("code", null, row.text))))))) : /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-muted" }, "没有匹配的文本内容。")), entries2.length ? /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react66.default.createElement("table", null, /* @__PURE__ */ import_react66.default.createElement("thead", null, /* @__PURE__ */ import_react66.default.createElement("tr", null, /* @__PURE__ */ import_react66.default.createElement("th", null, "名称"), /* @__PURE__ */ import_react66.default.createElement("th", null, "大小"), /* @__PURE__ */ import_react66.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react66.default.createElement("tbody", null, entries2.filter((entry) => entry.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase())).map((entry) => /* @__PURE__ */ import_react66.default.createElement("tr", { key: entry.name }, /* @__PURE__ */ import_react66.default.createElement("td", null, /* @__PURE__ */ import_react66.default.createElement("button", { className: "bp-text-button bp-file-name", disabled: disabled || entry.kind === "other", onClick: () => open(entry) }, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: entry.kind === "directory" ? "folder" : "file", size: 18 }), entry.name)), /* @__PURE__ */ import_react66.default.createElement("td", { className: "bp-file-meta" }, entry.kind === "file" ? bytesLabel(entry.size ?? 0) : "文件夹"), /* @__PURE__ */ import_react66.default.createElement("td", null, /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-row-actions" }, entry.kind === "file" && /* @__PURE__ */ import_react66.default.createElement(import_react66.default.Fragment, null, textFile(entry.name) && /* @__PURE__ */ import_react66.default.createElement("button", { disabled, onClick: () => open(entry) }, "查看"), /* @__PURE__ */ import_react66.default.createElement("button", { disabled, onClick: () => {
     download2(entry.name);
-  } }, "下载"), /* @__PURE__ */ import_react65.default.createElement("button", { disabled, onClick: () => setDeleteName(entry.name) }, "删除")), deleteName === entry.name && /* @__PURE__ */ import_react65.default.createElement("span", null, "删除此文件？ ", /* @__PURE__ */ import_react65.default.createElement("button", { className: "bp-button-danger", disabled, onClick: () => {
+  } }, "下载"), /* @__PURE__ */ import_react66.default.createElement("button", { disabled, onClick: () => setDeleteName(entry.name) }, "删除")), deleteName === entry.name && /* @__PURE__ */ import_react66.default.createElement("span", null, "删除此文件？ ", /* @__PURE__ */ import_react66.default.createElement("button", { className: "bp-button-danger", disabled, onClick: () => {
     perform(async () => {
       await call2("library.remove", { botId, relativePath: fullPath(entry.name) }), setDeleteName(null), editor?.name === entry.name && setEditor(null), await load();
     });
-  } }, "确认删除"), /* @__PURE__ */ import_react65.default.createElement("button", { onClick: () => setDeleteName(null) }, "取消"))))))))) : /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react65.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react65.default.createElement(UiIcon, { name: "folder", size: 28 })), /* @__PURE__ */ import_react65.default.createElement("strong", null, "给这位伙伴一份资料"), /* @__PURE__ */ import_react65.default.createElement("p", null, "这个目录是空的。上传文件或新建文本开始。")), editor && /* @__PURE__ */ import_react65.default.createElement("section", { className: "bp-form" }, /* @__PURE__ */ import_react65.default.createElement("strong", null, editor.relativePath ?? editor.name, editor.line ? `:${editor.line}` : ""), /* @__PURE__ */ import_react65.default.createElement("textarea", { ref: editorRef, autoFocus: !0, rows: 12, "aria-label": "资料内容", value: editor.content, onChange: (event) => setEditor({ ...editor, content: event.target.value }) }), /* @__PURE__ */ import_react65.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react65.default.createElement("button", { className: "bp-button-primary", disabled, onClick: () => {
+  } }, "确认删除"), /* @__PURE__ */ import_react66.default.createElement("button", { onClick: () => setDeleteName(null) }, "取消"))))))))) : /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react66.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: "folder", size: 28 })), /* @__PURE__ */ import_react66.default.createElement("strong", null, "给这位伙伴一份资料"), /* @__PURE__ */ import_react66.default.createElement("p", null, "这个目录是空的。上传文件或新建文本开始。")), editor && /* @__PURE__ */ import_react66.default.createElement("section", { className: "bp-form" }, /* @__PURE__ */ import_react66.default.createElement("strong", null, editor.relativePath ?? editor.name, editor.line ? `:${editor.line}` : ""), /* @__PURE__ */ import_react66.default.createElement("textarea", { ref: editorRef, autoFocus: !0, rows: 12, "aria-label": "资料内容", value: editor.content, onChange: (event) => setEditor({ ...editor, content: event.target.value }) }), /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react66.default.createElement("button", { className: "bp-button-primary", disabled, onClick: () => {
     perform(async () => {
       editor.fresh ? await call2("library.upload", { botId, relativePath: fullPath(editor.name), contentBase64: await fileBase64(new File([editor.content], editor.name, { type: "text/plain" })) }) : await call2("library.write", { botId, relativePath: editor.relativePath ?? fullPath(editor.name), content: editor.content }), setEditor({ ...editor, fresh: !1 }), await load(), setStatus(`已保存 ${editor.name}`);
     });
-  } }, "保存"), /* @__PURE__ */ import_react65.default.createElement("button", { disabled: working, onClick: () => setEditor(null) }, "关闭")))) : /* @__PURE__ */ import_react65.default.createElement("p", { className: "bp-empty" }, "还没有 Bot。");
+  } }, "保存"), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: working, onClick: () => setEditor(null) }, "关闭")))) : /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-empty" }, "还没有 Bot。");
 }
 
 // apps/integration-client/desktop-pane.jsx
-var import_react67 = __toESM(require("react"), 1);
+var import_react68 = __toESM(require("react"), 1);
 
 // apps/integration-client/desktop-stream.mjs
 function connectDesktopStream({
@@ -33832,8 +34165,8 @@ function connectDesktopStream({
   if (!ticket?.websocketUrl || typeof WebSocketImpl != "function") throw new Error("桌面连接不可用。");
   let socket = new WebSocketImpl(ticket.websocketUrl);
   socket.binaryType = "arraybuffer";
-  let closed2 = !1, mode = "watch", desiredMode = ticket.mode === "control" ? "control" : "watch", nextId = 0, lastError = "", reportError = (error, extra = {}) => {
-    lastError ||= error, onState?.({ status: "error", mode, error: lastError, ...extra });
+  let closed2 = !1, mode2 = "watch", desiredMode = ticket.mode === "control" ? "control" : "watch", nextId = 0, lastError = "", reportError = (error, extra = {}) => {
+    lastError ||= error, onState?.({ status: "error", mode: mode2, error: lastError, ...extra });
   }, frameMetadata, pending = /* @__PURE__ */ new Map(), send = (value) => closed2 || socket.readyState !== 1 ? !1 : (socket.send(JSON.stringify(value)), !0), failed = (row, failure) => {
     pending.delete(row.id) && (clearTimeout(row.timer), row.event && onInputFailure?.(row.event, { ...row.meta, failure }), row.reject(Object.assign(new Error(failure.code), failure)));
   }, failPending = (code) => {
@@ -33846,7 +34179,7 @@ function connectDesktopStream({
     });
     let row = { id: id2, event, meta, promise, resolve: resolve2, reject };
     row.timer = setTimeout(() => {
-      failed(row, { code: "DESKTOP_INPUT_ACK_LOST", possiblyApplied: !0 }), mode = "watch", reportError("远端未确认输入，已断开以释放控制。请检查电脑后重新连接。"), socket.close();
+      failed(row, { code: "DESKTOP_INPUT_ACK_LOST", possiblyApplied: !0 }), mode2 = "watch", reportError("远端未确认输入，已断开以释放控制。请检查电脑后重新连接。"), socket.close();
     }, ackTimeoutMs), pending.set(id2, row);
     try {
       if (event && onBeforeInput?.(event, meta), !send({ type, id: id2, ...event ? { event } : {} })) throw Object.assign(new Error("DESKTOP_DISCONNECTED"), { code: "DESKTOP_DISCONNECTED" });
@@ -33856,7 +34189,7 @@ function connectDesktopStream({
     return promise;
   };
   return socket.onopen = () => {
-    send({ type: "auth", sessionId: ticket.sessionId, token: ticket.token }), onState?.({ status: "authenticating", mode });
+    send({ type: "auth", sessionId: ticket.sessionId, token: ticket.token }), onState?.({ status: "authenticating", mode: mode2 });
   }, socket.onmessage = (event) => {
     if (closed2) return;
     if (typeof event.data != "string") {
@@ -33874,28 +34207,28 @@ function connectDesktopStream({
       let row = pending.get(value.id);
       if (!row || value.type !== (row.event ? "input" : "release-input")) return;
       if (value.ok !== !0) {
-        failed(row, { code: value.code ?? "DESKTOP_INPUT_REJECTED", possiblyApplied: value.possiblyApplied === !0 }), mode = "watch", reportError(value.code ?? "远端拒绝了输入。"), socket.close();
+        failed(row, { code: value.code ?? "DESKTOP_INPUT_REJECTED", possiblyApplied: value.possiblyApplied === !0 }), mode2 = "watch", reportError(value.code ?? "远端拒绝了输入。"), socket.close();
         return;
       }
       pending.delete(row.id), clearTimeout(row.timer), row.event && onInputAcknowledged?.(row.event, { ...row.meta, acknowledgedAt: now() }), row.resolve({ ok: !0, id: row.id });
       return;
     }
-    value.type === "ready" ? (mode = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onMetadata?.(value), onState?.({ ...value, status: "connected", mode })) : value.type === "control" || value.type === "mode" ? (mode = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onState?.({ ...value, status: value.mode === "control" && desiredMode === "watch" ? "releasing" : "connected", mode })) : value.type === "frame" || value.type === "displays" ? (value.type === "frame" && (frameMetadata = value), onMetadata?.(value)) : value.type === "error" ? reportError(value.message ?? value.code ?? "桌面操作失败。") : value.type === "status" && (value.mode && (mode = value.mode), onState?.({ ...value, mode }));
+    value.type === "ready" ? (mode2 = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onMetadata?.(value), onState?.({ ...value, status: "connected", mode: mode2 })) : value.type === "control" || value.type === "mode" ? (mode2 = value.mode === "control" && desiredMode === "control" ? "control" : "watch", onState?.({ ...value, status: value.mode === "control" && desiredMode === "watch" ? "releasing" : "connected", mode: mode2 })) : value.type === "frame" || value.type === "displays" ? (value.type === "frame" && (frameMetadata = value), onMetadata?.(value)) : value.type === "error" ? reportError(value.message ?? value.code ?? "桌面操作失败。") : value.type === "status" && (value.mode && (mode2 = value.mode), onState?.({ ...value, mode: mode2 }));
   }, socket.onerror = () => reportError("桌面传输连接失败，请检查远程 Agent 的连接地址和桌面会话。", { mode: "watch" }), socket.onclose = (event) => {
-    failPending("DESKTOP_DISCONNECTED"), mode = "watch", closed2 || onState?.({ status: lastError ? "error" : "disconnected", mode, error: lastError || event.reason || "" });
+    failPending("DESKTOP_DISCONNECTED"), mode2 = "watch", closed2 || onState?.({ status: lastError ? "error" : "disconnected", mode: mode2, error: lastError || event.reason || "" });
   }, Object.freeze({
     setMode(next) {
-      return ["watch", "control"].includes(next) ? (desiredMode = next, next === "watch" && (mode = "watch", onState?.({ status: "releasing", mode })), send({ type: "control", action: next === "control" ? "acquire" : "release" })) : !1;
+      return ["watch", "control"].includes(next) ? (desiredMode = next, next === "watch" && (mode2 = "watch", onState?.({ status: "releasing", mode: mode2 })), send({ type: "control", action: next === "control" ? "acquire" : "release" })) : !1;
     },
     input(event) {
-      return mode !== "control" || closed2 || socket.readyState !== 1 ? !1 : pending.size >= 64 ? (mode = "watch", reportError("输入确认积压，连接已停止。请检查远程电脑。"), socket.close(), !1) : enqueue("input", event) !== null;
+      return mode2 !== "control" || closed2 || socket.readyState !== 1 ? !1 : pending.size >= 64 ? (mode2 = "watch", reportError("输入确认积压，连接已停止。请检查远程电脑。"), socket.close(), !1) : enqueue("input", event) !== null;
     },
     drain: () => Promise.all([...pending.values()].map((row) => row.promise)),
     releaseInput() {
       return enqueue("release-input") ?? Promise.resolve({ ok: !1, code: "DESKTOP_DISCONNECTED" });
     },
     close() {
-      closed2 || (send({ type: "close" }), closed2 = !0, mode = "watch", failPending("DESKTOP_DISCONNECTED"), socket.close());
+      closed2 || (send({ type: "close" }), closed2 = !0, mode2 = "watch", failPending("DESKTOP_DISCONNECTED"), socket.close());
     }
   });
 }
@@ -34021,8 +34354,8 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
     subscribe(listener) {
       return listeners2.add(listener), () => listeners2.delete(listener);
     },
-    start({ sessionId: id2, mode, metadata } = {}) {
-      return (status === "recording" || pending.size) && fail4("ROUTINE_ALREADY_RECORDING"), (typeof id2 != "string" || !id2 || mode !== "control") && fail4("ROUTINE_CONTROL_REQUIRED"), display = normalizeRoutineDisplay(metadata), sessionId = id2, status = "recording", error = null, startedAt = now(), steps = [], times = [], moveGroup = null, pending.clear(), lastId = 0, inputReleased = !1, observedInputs = 0, coalescedMoves = 0, emit(), snapshot();
+    start({ sessionId: id2, mode: mode2, metadata } = {}) {
+      return (status === "recording" || pending.size) && fail4("ROUTINE_ALREADY_RECORDING"), (typeof id2 != "string" || !id2 || mode2 !== "control") && fail4("ROUTINE_CONTROL_REQUIRED"), display = normalizeRoutineDisplay(metadata), sessionId = id2, status = "recording", error = null, startedAt = now(), steps = [], times = [], moveGroup = null, pending.clear(), lastId = 0, inputReleased = !1, observedInputs = 0, coalescedMoves = 0, emit(), snapshot();
     },
     inputSent(raw, meta) {
       if (status !== "recording") return;
@@ -34105,14 +34438,14 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
 }
 
 // apps/integration-client/routines-panel.jsx
-var import_react66 = __toESM(require("react"), 1);
+var import_react67 = __toESM(require("react"), 1);
 var message = (failure) => String(failure?.message ?? failure), rootOf = (machine) => typeof machine?.roots?.[0] == "string" ? machine.roots[0] : machine?.rootId ?? machine?.roots?.[0]?.rootId ?? machine?.roots?.[0]?.id ?? "", STATUS = { running: "正在执行", succeeded: "全部动作已确认", failed: "执行失败，已停止", cancelled: "已取消", unknown: "结果未知，需要检查电脑", cancel_pending: "正在请求停止" };
-function RoutineCaptureControls({ recorder, sessionId, metadata, mode, connected, drainInputs, releaseInput, saveRoutine }) {
-  let [capture, setCapture] = (0, import_react66.useState)(recorder.snapshot), [name, setName] = (0, import_react66.useState)(""), [busy, setBusy] = (0, import_react66.useState)(!1), [error, setError] = (0, import_react66.useState)(""), [saved, setSaved] = (0, import_react66.useState)(null), [draft2, setDraft] = (0, import_react66.useState)(null);
-  (0, import_react66.useEffect)(() => (setCapture(recorder.snapshot), recorder.subscribe(setCapture)), [recorder]);
+function RoutineCaptureControls({ recorder, sessionId, metadata, mode: mode2, connected, drainInputs, releaseInput, saveRoutine }) {
+  let [capture, setCapture] = (0, import_react67.useState)(recorder.snapshot), [name, setName] = (0, import_react67.useState)(""), [busy, setBusy] = (0, import_react67.useState)(!1), [error, setError] = (0, import_react67.useState)(""), [saved, setSaved] = (0, import_react67.useState)(null), [draft2, setDraft] = (0, import_react67.useState)(null);
+  (0, import_react67.useEffect)(() => (setCapture(recorder.snapshot), recorder.subscribe(setCapture)), [recorder]);
   let start = () => {
     try {
-      setError(""), setSaved(null), setDraft(null), recorder.start({ sessionId, metadata, mode });
+      setError(""), setSaved(null), setDraft(null), recorder.start({ sessionId, metadata, mode: mode2 });
     } catch (failure) {
       setError(message(failure));
     }
@@ -34139,17 +34472,17 @@ function RoutineCaptureControls({ recorder, sessionId, metadata, mode, connected
       setBusy(!1);
     }
   };
-  return /* @__PURE__ */ import_react66.default.createElement("section", { className: "bp-card bp-routine-capture", "aria-label": "录制例行任务" }, /* @__PURE__ */ import_react66.default.createElement("h4", null, "演示并保存例行任务"), /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-muted" }, "取得控制权后开始录制，像平常一样操作这台电脑。仅保存远端已确认的鼠标、键盘和文字输入；输入文字也会保存在这个 Bot 的私有例行任务中。"), /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-muted" }, "这是固定显示器和分辨率的动作回放，最多 200 个步骤，单次停顿最多 60 秒。鼠标轨迹按 200 毫秒采样，保留点击和拖动结束位置；不适合精细绘图。开始前把应用恢复到相同界面；页面或布局改变时需要重新演示。"), /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react66.default.createElement("input", { "aria-label": "例行任务名称", maxLength: 120, value: name, onChange: (event) => setName(event.target.value), placeholder: "例如：打开日报并填写日期" }), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: busy || !connected || mode !== "control" || capture.status === "recording", onClick: start }, "开始录制"), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: busy || !name.trim() || !(draft2 || capture.status === "recording" && capture.length > 0), onClick: () => {
+  return /* @__PURE__ */ import_react67.default.createElement("section", { className: "bp-card bp-routine-capture", "aria-label": "录制例行任务" }, /* @__PURE__ */ import_react67.default.createElement("h4", null, "演示并保存例行任务"), /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-muted" }, "取得控制权后开始录制，像平常一样操作这台电脑。仅保存远端已确认的鼠标、键盘和文字输入；输入文字也会保存在这个 Bot 的私有例行任务中。"), /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-muted" }, "这是固定显示器和分辨率的动作回放，最多 200 个步骤，单次停顿最多 60 秒。鼠标轨迹按 200 毫秒采样，保留点击和拖动结束位置；不适合精细绘图。开始前把应用恢复到相同界面；页面或布局改变时需要重新演示。"), /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react67.default.createElement("input", { "aria-label": "例行任务名称", maxLength: 120, value: name, onChange: (event) => setName(event.target.value), placeholder: "例如：打开日报并填写日期" }), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: busy || !connected || mode2 !== "control" || capture.status === "recording", onClick: start }, "开始录制"), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: busy || !name.trim() || !(draft2 || capture.status === "recording" && capture.length > 0), onClick: () => {
     finish();
-  } }, draft2 ? "重试保存" : "结束并保存"), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: busy || capture.status === "idle", onClick: () => {
+  } }, draft2 ? "重试保存" : "结束并保存"), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: busy || capture.status === "idle", onClick: () => {
     recorder.reset(), setDraft(null), setError("");
-  } }, "丢弃录制")), /* @__PURE__ */ import_react66.default.createElement("p", { role: "status" }, capture.status === "recording" ? `正在录制：${capture.length} 个回放步骤，${capture.observedInputs} 个输入已确认，${capture.pending} 个等待确认` : capture.status === "invalid" ? `录制已中止：${capture.error}，请丢弃后重新演示。` : saved ? "例行任务已保存。" : "尚未录制。"), error && /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-error", role: "alert" }, error));
+  } }, "丢弃录制")), /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, capture.status === "recording" ? `正在录制：${capture.length} 个回放步骤，${capture.observedInputs} 个输入已确认，${capture.pending} 个等待确认` : capture.status === "invalid" ? `录制已中止：${capture.error}，请丢弃后重新演示。` : saved ? "例行任务已保存。" : "尚未录制。"), error && /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-error", role: "alert" }, error));
 }
 function RoutinesPanel({ snapshot, dispatch, busy = !1, onOpenMachines }) {
-  let bots = snapshot.bots ?? [], machines = (snapshot.machines?.items ?? []).filter((row) => row.status !== "revoked"), [botId, setBotId] = (0, import_react66.useState)(bots[0]?.id ?? ""), [machineId, setMachineId] = (0, import_react66.useState)(machines[0]?.id ?? machines[0]?.machineId ?? ""), [rows2, setRows] = (0, import_react66.useState)([]), [runs, setRuns] = (0, import_react66.useState)([]), [result, setResult] = (0, import_react66.useState)(null), [error, setError] = (0, import_react66.useState)(""), [running, setRunning] = (0, import_react66.useState)(!1), [notes, setNotes] = (0, import_react66.useState)({});
-  (0, import_react66.useEffect)(() => {
+  let bots = snapshot.bots ?? [], machines = (snapshot.machines?.items ?? []).filter((row) => row.status !== "revoked"), [botId, setBotId] = (0, import_react67.useState)(bots[0]?.id ?? ""), [machineId, setMachineId] = (0, import_react67.useState)(machines[0]?.id ?? machines[0]?.machineId ?? ""), [rows2, setRows] = (0, import_react67.useState)([]), [runs, setRuns] = (0, import_react67.useState)([]), [result, setResult] = (0, import_react67.useState)(null), [error, setError] = (0, import_react67.useState)(""), [running, setRunning] = (0, import_react67.useState)(!1), [notes, setNotes] = (0, import_react67.useState)({});
+  (0, import_react67.useEffect)(() => {
     !botId && bots[0] && setBotId(bots[0].id);
-  }, [botId, bots[0]?.id]), (0, import_react66.useEffect)(() => {
+  }, [botId, bots[0]?.id]), (0, import_react67.useEffect)(() => {
     !machineId && machines[0] && setMachineId(machines[0].id ?? machines[0].machineId);
   }, [machineId, machines[0]?.id, machines[0]?.machineId]);
   let call2 = async (action, payload) => {
@@ -34166,9 +34499,9 @@ function RoutinesPanel({ snapshot, dispatch, busy = !1, onOpenMachines }) {
         setError(message(failure));
       }
   };
-  (0, import_react66.useEffect)(() => {
+  (0, import_react67.useEffect)(() => {
     refresh();
-  }, [botId, dispatch]), (0, import_react66.useEffect)(() => {
+  }, [botId, dispatch]), (0, import_react67.useEffect)(() => {
     if (!running && !runs.some((row) => row.status === "running")) return;
     let timer = setInterval(() => {
       refresh();
@@ -34198,32 +34531,32 @@ function RoutinesPanel({ snapshot, dispatch, busy = !1, onOpenMachines }) {
       setError(message(failure));
     }
   };
-  return bots.length ? /* @__PURE__ */ import_react66.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react66.default.createElement("h2", null, "例行任务"), /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-muted" }, "在远程电脑中演示并保存动作，再选择电脑回放。每一步都等待确认；失败会停止，结果未知时需检查电脑后再运行。"), /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react66.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react66.default.createElement("select", { disabled: running, value: botId, onChange: (event) => {
+  return bots.length ? /* @__PURE__ */ import_react67.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react67.default.createElement("h2", null, "例行任务"), /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-muted" }, "在远程电脑中演示并保存动作，再选择电脑回放。每一步都等待确认；失败会停止，结果未知时需检查电脑后再运行。"), /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react67.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react67.default.createElement("select", { disabled: running, value: botId, onChange: (event) => {
     setBotId(event.target.value), setResult(null), setError("");
-  } }, bots.map((bot) => /* @__PURE__ */ import_react66.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react66.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react66.default.createElement("select", { disabled: running, value: machineId, onChange: (event) => setMachineId(event.target.value) }, machines.map((machine) => /* @__PURE__ */ import_react66.default.createElement("option", { key: machine.id ?? machine.machineId, value: machine.id ?? machine.machineId }, machine.name ?? machine.label ?? machine.id ?? machine.machineId)))), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: busy, onClick: () => {
+  } }, bots.map((bot) => /* @__PURE__ */ import_react67.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react67.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react67.default.createElement("select", { disabled: running, value: machineId, onChange: (event) => setMachineId(event.target.value) }, machines.map((machine) => /* @__PURE__ */ import_react67.default.createElement("option", { key: machine.id ?? machine.machineId, value: machine.id ?? machine.machineId }, machine.name ?? machine.label ?? machine.id ?? machine.machineId)))), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: busy, onClick: () => {
     refresh();
-  } }, "刷新")), error && /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-error", role: "alert" }, error), rows2.length ? /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react66.default.createElement("table", null, /* @__PURE__ */ import_react66.default.createElement("thead", null, /* @__PURE__ */ import_react66.default.createElement("tr", null, /* @__PURE__ */ import_react66.default.createElement("th", null, "名称"), /* @__PURE__ */ import_react66.default.createElement("th", null, "来源 / 步数"), /* @__PURE__ */ import_react66.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react66.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react66.default.createElement("tr", { key: row.id }, /* @__PURE__ */ import_react66.default.createElement("td", null, row.name, row.display && /* @__PURE__ */ import_react66.default.createElement("small", null, row.display.width, " × ", row.display.height, " · ", row.display.displayId)), /* @__PURE__ */ import_react66.default.createElement("td", null, row.demonstrated ? "桌面演示" : "手工步骤", " / ", row.steps), /* @__PURE__ */ import_react66.default.createElement("td", null, /* @__PURE__ */ import_react66.default.createElement("button", { disabled: busy || running || !machineId || runs.some((run3) => run3.machineId === machineId && (run3.status === "running" || run3.status === "unknown" && !run3.resolvedAt)), onClick: () => {
+  } }, "刷新")), error && /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-error", role: "alert" }, error), rows2.length ? /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react67.default.createElement("table", null, /* @__PURE__ */ import_react67.default.createElement("thead", null, /* @__PURE__ */ import_react67.default.createElement("tr", null, /* @__PURE__ */ import_react67.default.createElement("th", null, "名称"), /* @__PURE__ */ import_react67.default.createElement("th", null, "来源 / 步数"), /* @__PURE__ */ import_react67.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react67.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react67.default.createElement("tr", { key: row.id }, /* @__PURE__ */ import_react67.default.createElement("td", null, row.name, row.display && /* @__PURE__ */ import_react67.default.createElement("small", null, row.display.width, " × ", row.display.height, " · ", row.display.displayId)), /* @__PURE__ */ import_react67.default.createElement("td", null, row.demonstrated ? "桌面演示" : "手工步骤", " / ", row.steps), /* @__PURE__ */ import_react67.default.createElement("td", null, /* @__PURE__ */ import_react67.default.createElement("button", { disabled: busy || running || !machineId || runs.some((run3) => run3.machineId === machineId && (run3.status === "running" || run3.status === "unknown" && !run3.resolvedAt)), onClick: () => {
     run2(row.id);
-  } }, "在这台电脑运行"))))))) : /* @__PURE__ */ import_react66.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react66.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: "repeat", size: 27 })), /* @__PURE__ */ import_react66.default.createElement("strong", null, "把重复的事，交给 Bot"), /* @__PURE__ */ import_react66.default.createElement("p", null, "这个 Bot 还没有保存例行任务。在远程电脑中演示并保存，之后就能在这里运行。"), onOpenMachines && /* @__PURE__ */ import_react66.default.createElement("button", { className: "bp-button-primary", onClick: onOpenMachines }, /* @__PURE__ */ import_react66.default.createElement(UiIcon, { name: "computer", size: 15 }), "去电脑中演示")), result && /* @__PURE__ */ import_react66.default.createElement("p", { role: "status" }, STATUS[result.status] ?? result.status, result.stoppedAt != null ? ` · 停在第 ${result.stoppedAt + 1} 步` : "", result.error ? ` · ${result.error}` : ""), /* @__PURE__ */ import_react66.default.createElement("h3", null, "执行记录"), runs.slice().reverse().slice(0, 20).map((row) => /* @__PURE__ */ import_react66.default.createElement("section", { className: "bp-blocked", key: row.runId }, /* @__PURE__ */ import_react66.default.createElement("strong", null, STATUS[row.status] ?? row.status), /* @__PURE__ */ import_react66.default.createElement("small", null, row.runId), /* @__PURE__ */ import_react66.default.createElement("p", null, row.steps.length, " 步完成 · ", row.evidence.filter((item) => item.status === "acknowledged").length, " 个输入已确认", row.stoppedAt != null ? ` · 停在第 ${row.stoppedAt + 1} 步` : ""), row.error && /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-error" }, row.error), row.status === "running" && /* @__PURE__ */ import_react66.default.createElement("button", { onClick: () => {
+  } }, "在这台电脑运行"))))))) : /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react67.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "repeat", size: 27 })), /* @__PURE__ */ import_react67.default.createElement("strong", null, "把重复的事，交给 Bot"), /* @__PURE__ */ import_react67.default.createElement("p", null, "这个 Bot 还没有保存例行任务。在远程电脑中演示并保存，之后就能在这里运行。"), onOpenMachines && /* @__PURE__ */ import_react67.default.createElement("button", { className: "bp-button-primary", onClick: onOpenMachines }, /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "computer", size: 15 }), "去电脑中演示")), result && /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, STATUS[result.status] ?? result.status, result.stoppedAt != null ? ` · 停在第 ${result.stoppedAt + 1} 步` : "", result.error ? ` · ${result.error}` : ""), /* @__PURE__ */ import_react67.default.createElement("h3", null, "执行记录"), runs.slice().reverse().slice(0, 20).map((row) => /* @__PURE__ */ import_react67.default.createElement("section", { className: "bp-blocked", key: row.runId }, /* @__PURE__ */ import_react67.default.createElement("strong", null, STATUS[row.status] ?? row.status), /* @__PURE__ */ import_react67.default.createElement("small", null, row.runId), /* @__PURE__ */ import_react67.default.createElement("p", null, row.steps.length, " 步完成 · ", row.evidence.filter((item) => item.status === "acknowledged").length, " 个输入已确认", row.stoppedAt != null ? ` · 停在第 ${row.stoppedAt + 1} 步` : ""), row.error && /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-error" }, row.error), row.status === "running" && /* @__PURE__ */ import_react67.default.createElement("button", { onClick: () => {
     stop(row.runId);
-  } }, "请求停止"), row.status === "unknown" && !row.resolvedAt && /* @__PURE__ */ import_react66.default.createElement("div", null, /* @__PURE__ */ import_react66.default.createElement("p", null, "检查远程电脑，确认任务已经做到哪里，并手动恢复到适合下一次运行的界面。"), /* @__PURE__ */ import_react66.default.createElement("input", { "aria-label": "检查结果", value: notes[row.runId] ?? "", onChange: (event) => setNotes((before) => ({ ...before, [row.runId]: event.target.value })), placeholder: "记录你检查到的结果和恢复操作" }), /* @__PURE__ */ import_react66.default.createElement("button", { disabled: !(notes[row.runId] ?? "").trim(), onClick: () => {
+  } }, "请求停止"), row.status === "unknown" && !row.resolvedAt && /* @__PURE__ */ import_react67.default.createElement("div", null, /* @__PURE__ */ import_react67.default.createElement("p", null, "检查远程电脑，确认任务已经做到哪里，并手动恢复到适合下一次运行的界面。"), /* @__PURE__ */ import_react67.default.createElement("input", { "aria-label": "检查结果", value: notes[row.runId] ?? "", onChange: (event) => setNotes((before) => ({ ...before, [row.runId]: event.target.value })), placeholder: "记录你检查到的结果和恢复操作" }), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: !(notes[row.runId] ?? "").trim(), onClick: () => {
     resolve2(row.runId);
-  } }, "已检查实际结果，解除运行阻塞")), row.resolvedAt && /* @__PURE__ */ import_react66.default.createElement("p", null, "已由你检查：", row.resolution?.note)))) : /* @__PURE__ */ import_react66.default.createElement("p", { className: "bp-empty" }, "还没有 Bot。");
+  } }, "已检查实际结果，解除运行阻塞")), row.resolvedAt && /* @__PURE__ */ import_react67.default.createElement("p", null, "已由你检查：", row.resolution?.note)))) : /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-empty" }, "还没有 Bot。");
 }
 
 // apps/integration-client/desktop-pane.jsx
 var rootOf2 = (machine) => typeof machine?.roots?.[0] == "string" ? machine.roots[0] : machine?.rootId ?? machine?.roots?.[0]?.id ?? "", STATUS2 = { idle: "未连接", connecting: "连接中", authenticating: "验证中", connected: "已连接", releasing: "归还控制中", disconnected: "已断开", error: "连接异常" };
 function DesktopViewer({ botId, machines, openSession, renewSession, closeSession, saveRoutine }) {
-  let [machineId, setMachineId] = (0, import_react67.useState)(machines[0]?.machineId ?? machines[0]?.id ?? ""), [displayId, setDisplayId] = (0, import_react67.useState)(""), [displays, setDisplays] = (0, import_react67.useState)([]), [state, setState] = (0, import_react67.useState)({ status: "idle", mode: "watch" }), [expanded, setExpanded] = (0, import_react67.useState)(!1), [stats, setStats] = (0, import_react67.useState)({ fps: 0, width: 0, height: 0 }), [text7, setText] = (0, import_react67.useState)(""), [metadata, setMetadata] = (0, import_react67.useState)({}), recorderRef = (0, import_react67.useRef)(null);
+  let [machineId, setMachineId] = (0, import_react68.useState)(machines[0]?.machineId ?? machines[0]?.id ?? ""), [displayId, setDisplayId] = (0, import_react68.useState)(""), [displays, setDisplays] = (0, import_react68.useState)([]), [state, setState] = (0, import_react68.useState)({ status: "idle", mode: "watch" }), [expanded, setExpanded] = (0, import_react68.useState)(!1), [stats, setStats] = (0, import_react68.useState)({ fps: 0, width: 0, height: 0 }), [text7, setText] = (0, import_react68.useState)(""), [metadata, setMetadata] = (0, import_react68.useState)({}), recorderRef = (0, import_react68.useRef)(null);
   recorderRef.current || (recorderRef.current = createAcknowledgedRoutineRecorder());
-  let recorder = recorderRef.current, canvasRef = (0, import_react67.useRef)(null), largeRef = (0, import_react67.useRef)(null), streamRef = (0, import_react67.useRef)(null), ticketRef = (0, import_react67.useRef)(null), generation = (0, import_react67.useRef)(0), pendingFrame = (0, import_react67.useRef)(null), drawing = (0, import_react67.useRef)(!1), surface = (0, import_react67.useRef)(null), size = (0, import_react67.useRef)({ width: 0, height: 0 }), rate = (0, import_react67.useRef)({ at: performance.now(), count: 0 }), renewTimer = (0, import_react67.useRef)(null), moveTimer = (0, import_react67.useRef)(null), pendingMove = (0, import_react67.useRef)(null), [canControl, setCanControl] = (0, import_react67.useState)(!1), closeRef = (0, import_react67.useRef)(closeSession);
-  closeRef.current = closeSession, (0, import_react67.useEffect)(() => {
+  let recorder = recorderRef.current, canvasRef = (0, import_react68.useRef)(null), largeRef = (0, import_react68.useRef)(null), streamRef = (0, import_react68.useRef)(null), ticketRef = (0, import_react68.useRef)(null), generation = (0, import_react68.useRef)(0), pendingFrame = (0, import_react68.useRef)(null), drawing = (0, import_react68.useRef)(!1), surface = (0, import_react68.useRef)(null), size = (0, import_react68.useRef)({ width: 0, height: 0 }), rate = (0, import_react68.useRef)({ at: performance.now(), count: 0 }), renewTimer = (0, import_react68.useRef)(null), moveTimer = (0, import_react68.useRef)(null), pendingMove = (0, import_react68.useRef)(null), [canControl, setCanControl] = (0, import_react68.useState)(!1), closeRef = (0, import_react68.useRef)(closeSession);
+  closeRef.current = closeSession, (0, import_react68.useEffect)(() => {
     !machineId && machines[0] && setMachineId(machines[0].machineId ?? machines[0].id);
   }, [machines, machineId]);
-  let release = (0, import_react67.useCallback)(() => {
+  let release = (0, import_react68.useCallback)(() => {
     pendingMove.current = null, streamRef.current?.releaseInput()?.catch(() => {
     });
-  }, []), stop = (0, import_react67.useCallback)(async () => {
+  }, []), stop = (0, import_react68.useCallback)(async () => {
     recorder.invalidate("ROUTINE_DESKTOP_DISCONNECTED"), generation.current++, clearTimeout(renewTimer.current), renewTimer.current = null, moveTimer.current !== null && cancelAnimationFrame(moveTimer.current), moveTimer.current = null, pendingMove.current = null, pendingFrame.current = null, size.current = { width: 0, height: 0 }, streamRef.current?.close(), streamRef.current = null;
     let ticket = ticketRef.current;
     if (ticketRef.current = null, ticket)
@@ -34233,7 +34566,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
         return { stopConfirmed: !1 };
       }
     return { stopConfirmed: !0 };
-  }, [botId]), draw = (0, import_react67.useCallback)(async (bytes, info) => {
+  }, [botId]), draw = (0, import_react68.useCallback)(async (bytes, info) => {
     let queue = pendingFrame.current ?? [];
     if (info?.keyframe === !0 && (queue.length = 0), queue.push({ bytes, info }), pendingFrame.current = queue, queue.length > 16) {
       streamRef.current?.close(), setState({ status: "error", mode: "watch", error: "画面解码跟不上，请重新连接。" });
@@ -34275,7 +34608,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
     } finally {
       drawing.current = !1;
     }
-  }, []), connect = (0, import_react67.useCallback)(async () => {
+  }, []), connect = (0, import_react68.useCallback)(async () => {
     await stop();
     let active2 = generation.current;
     setState({ status: "connecting", mode: "watch" }), setStats({ fps: 0, width: 0, height: 0 });
@@ -34316,9 +34649,9 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
       active2 === generation.current && setState({ status: "error", mode: "watch", error: String(failure?.message ?? failure) });
     }
   }, [stop, botId, machineId, displayId, openSession, closeSession, renewSession, draw]);
-  (0, import_react67.useEffect)(() => () => {
+  (0, import_react68.useEffect)(() => () => {
     stop();
-  }, [stop]), (0, import_react67.useEffect)(() => {
+  }, [stop]), (0, import_react68.useEffect)(() => {
     let lost = () => release();
     return window.addEventListener("blur", lost), document.addEventListener("visibilitychange", lost), () => {
       window.removeEventListener("blur", lost), document.removeEventListener("visibilitychange", lost);
@@ -34345,7 +34678,7 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
     event.preventDefault(), event.stopPropagation();
     let input = desktopKeyboardInput(event, action);
     input && streamRef.current?.input(input);
-  }, screen = (ref, big = !1) => /* @__PURE__ */ import_react67.default.createElement(
+  }, screen = (ref, big = !1) => /* @__PURE__ */ import_react68.default.createElement(
     "canvas",
     {
       ref,
@@ -34370,22 +34703,22 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
         state.mode === "control" && (event.preventDefault(), streamRef.current?.input({ type: "wheel", deltaX: Math.round(event.deltaX), deltaY: Math.round(event.deltaY) }));
       }
     }
-  ), controls = /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react67.default.createElement("button", { disabled: state.status !== "connected" || state.mode === "watch", onClick: () => {
+  ), controls = /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("button", { disabled: state.status !== "connected" || state.mode === "watch", onClick: () => {
     release(), streamRef.current?.setMode("watch");
-  } }, "仅观看"), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: state.status !== "connected" || state.mode === "control" || !canControl, onClick: () => streamRef.current?.setMode("control") }, "取得控制权"), /* @__PURE__ */ import_react67.default.createElement("span", { role: "status" }, state.mode === "control" ? "你正在控制这台电脑" : "仅观看"));
-  return /* @__PURE__ */ import_react67.default.createElement("section", { className: "bp-desktop-viewer" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react67.default.createElement("h3", null, /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "computer", size: 16 }), " 远程桌面"), /* @__PURE__ */ import_react67.default.createElement("span", { className: "bp-desktop-status", "data-connected": state.status === "connected" }, STATUS2[state.status] ?? state.status)), /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react67.default.createElement("select", { "aria-label": "远程桌面电脑", value: machineId, onChange: (event) => {
+  } }, "仅观看"), /* @__PURE__ */ import_react68.default.createElement("button", { disabled: state.status !== "connected" || state.mode === "control" || !canControl, onClick: () => streamRef.current?.setMode("control") }, "取得控制权"), /* @__PURE__ */ import_react68.default.createElement("span", { role: "status" }, state.mode === "control" ? "你正在控制这台电脑" : "仅观看"));
+  return /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-desktop-viewer" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h3", null, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "computer", size: 16 }), " 远程桌面"), /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-desktop-status", "data-connected": state.status === "connected" }, STATUS2[state.status] ?? state.status)), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("select", { "aria-label": "远程桌面电脑", value: machineId, onChange: (event) => {
     stop(), setMachineId(event.target.value), setDisplayId(""), setState({ status: "idle", mode: "watch" });
-  } }, machines.map((item) => /* @__PURE__ */ import_react67.default.createElement("option", { key: item.machineId ?? item.id, value: item.machineId ?? item.id }, item.label ?? item.name ?? item.machineId ?? item.id))), displays.length > 1 && /* @__PURE__ */ import_react67.default.createElement("select", { "aria-label": "远程显示器", value: displayId, onChange: (event) => {
+  } }, machines.map((item) => /* @__PURE__ */ import_react68.default.createElement("option", { key: item.machineId ?? item.id, value: item.machineId ?? item.id }, item.label ?? item.name ?? item.machineId ?? item.id))), displays.length > 1 && /* @__PURE__ */ import_react68.default.createElement("select", { "aria-label": "远程显示器", value: displayId, onChange: (event) => {
     stop(), setDisplayId(event.target.value), setState({ status: "idle", mode: "watch" });
-  } }, /* @__PURE__ */ import_react67.default.createElement("option", { value: "" }, "主显示器"), displays.map((display) => /* @__PURE__ */ import_react67.default.createElement("option", { key: display.id ?? display.displayId, value: display.id ?? display.displayId }, display.name ?? display.id ?? display.displayId))), /* @__PURE__ */ import_react67.default.createElement("button", { className: "bp-button-primary", disabled: !machineId || !botId || ["connecting", "authenticating"].includes(state.status), onClick: () => {
+  } }, /* @__PURE__ */ import_react68.default.createElement("option", { value: "" }, "主显示器"), displays.map((display) => /* @__PURE__ */ import_react68.default.createElement("option", { key: display.id ?? display.displayId, value: display.id ?? display.displayId }, display.name ?? display.id ?? display.displayId))), /* @__PURE__ */ import_react68.default.createElement("button", { className: "bp-button-primary", disabled: !machineId || !botId || ["connecting", "authenticating"].includes(state.status), onClick: () => {
     connect();
-  } }, state.status === "connected" ? "重新连接" : "连接桌面"), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: !ticketRef.current, onClick: () => {
+  } }, state.status === "connected" ? "重新连接" : "连接桌面"), /* @__PURE__ */ import_react68.default.createElement("button", { disabled: !ticketRef.current, onClick: () => {
     stop().then((result) => setState(result?.stopConfirmed === !0 ? { status: "idle", mode: "watch" } : { status: "error", mode: "watch", error: "画面连接已关闭，但远端尚未确认释放输入，请检查远程电脑。" }));
-  } }, "断开")), state.error && /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-error", role: "alert" }, state.error), controls, /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-stream-screen", "data-connected": state.status === "connected", onDoubleClick: () => {
+  } }, "断开")), state.error && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, state.error), controls, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-stream-screen", "data-connected": state.status === "connected", onDoubleClick: () => {
     state.mode === "watch" && setExpanded(!0);
-  } }, screen(canvasRef), state.status !== "connected" && /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-desktop-idle" }, /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "computer", size: 34 }), /* @__PURE__ */ import_react67.default.createElement("strong", null, ["connecting", "authenticating"].includes(state.status) ? "正在连接你的电脑…" : "你的电脑，就在这里"), /* @__PURE__ */ import_react67.default.createElement("span", null, "连接后查看实时桌面，或取得鼠标键盘控制权"))), /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react67.default.createElement("small", null, stats.width ? `${stats.width} × ${stats.height} · ${stats.fps} 帧/秒${stats.frameWidth && stats.frameWidth !== stats.width ? ` · 传输 ${stats.frameWidth} × ${stats.frameHeight}` : ""}` : "连接后显示整台电脑的桌面。"), /* @__PURE__ */ import_react67.default.createElement("button", { onClick: () => setExpanded(!0) }, "放大")), state.mode === "control" && /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react67.default.createElement("input", { "aria-label": "发送到远程电脑的文字", value: text7, onChange: (event) => setText(event.target.value), placeholder: "中文或多行文字" }), /* @__PURE__ */ import_react67.default.createElement("button", { disabled: !text7, onClick: () => {
+  } }, screen(canvasRef), state.status !== "connected" && /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-desktop-idle" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "computer", size: 34 }), /* @__PURE__ */ import_react68.default.createElement("strong", null, ["connecting", "authenticating"].includes(state.status) ? "正在连接你的电脑…" : "你的电脑，就在这里"), /* @__PURE__ */ import_react68.default.createElement("span", null, "连接后查看实时桌面，或取得鼠标键盘控制权"))), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("small", null, stats.width ? `${stats.width} × ${stats.height} · ${stats.fps} 帧/秒${stats.frameWidth && stats.frameWidth !== stats.width ? ` · 传输 ${stats.frameWidth} × ${stats.frameHeight}` : ""}` : "连接后显示整台电脑的桌面。"), /* @__PURE__ */ import_react68.default.createElement("button", { onClick: () => setExpanded(!0) }, "放大")), state.mode === "control" && /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("input", { "aria-label": "发送到远程电脑的文字", value: text7, onChange: (event) => setText(event.target.value), placeholder: "中文或多行文字" }), /* @__PURE__ */ import_react68.default.createElement("button", { disabled: !text7, onClick: () => {
     streamRef.current?.input({ type: "text", text: text7 }) && setText("");
-  } }, "发送文字")), typeof saveRoutine == "function" && /* @__PURE__ */ import_react67.default.createElement(
+  } }, "发送文字")), typeof saveRoutine == "function" && /* @__PURE__ */ import_react68.default.createElement(
     RoutineCaptureControls,
     {
       recorder,
@@ -34397,13 +34730,13 @@ function DesktopViewer({ botId, machines, openSession, renewSession, closeSessio
       releaseInput: () => streamRef.current?.releaseInput(),
       saveRoutine: (routine) => saveRoutine(botId, routine)
     }
-  ), expanded && /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-stream-overlay", role: "dialog", "aria-modal": "true", "aria-label": "远程桌面放大" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-stream-dialog" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, controls, /* @__PURE__ */ import_react67.default.createElement("button", { onClick: () => {
+  ), expanded && /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-stream-overlay", role: "dialog", "aria-modal": "true", "aria-label": "远程桌面放大" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-stream-dialog" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, controls, /* @__PURE__ */ import_react68.default.createElement("button", { onClick: () => {
     release(), setExpanded(!1);
   } }, "关闭放大")), screen(largeRef, !0))));
 }
 function DesktopPane2({ bot }) {
-  let api = globalThis.__dshDesktop, [machines, setMachines] = (0, import_react67.useState)([]), [error, setError] = (0, import_react67.useState)("");
-  return (0, import_react67.useEffect)(() => {
+  let api = globalThis.__dshDesktop, [machines, setMachines] = (0, import_react68.useState)([]), [error, setError] = (0, import_react68.useState)("");
+  return (0, import_react68.useEffect)(() => {
     let active2 = !0;
     return Promise.resolve(api?.machines?.(bot.id)).then((rows2) => {
       active2 && setMachines(rows2 ?? []);
@@ -34412,13 +34745,13 @@ function DesktopPane2({ bot }) {
     }), () => {
       active2 = !1;
     };
-  }, [api, bot.id]), api?.open ? error ? /* @__PURE__ */ import_react67.default.createElement("p", { role: "alert" }, error) : machines.length ? /* @__PURE__ */ import_react67.default.createElement(DesktopViewer, { key: bot.id, botId: bot.id, machines, openSession: api.open, renewSession: api.renew, closeSession: api.close, saveRoutine: api.saveRoutine }) : /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-muted" }, "在“远程电脑”中配对电脑并为这个 Bot 授权。") : /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-muted" }, "桌面通道尚未就绪。");
+  }, [api, bot.id]), api?.open ? error ? /* @__PURE__ */ import_react68.default.createElement("p", { role: "alert" }, error) : machines.length ? /* @__PURE__ */ import_react68.default.createElement(DesktopViewer, { key: bot.id, botId: bot.id, machines, openSession: api.open, renewSession: api.renew, closeSession: api.close, saveRoutine: api.saveRoutine }) : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "在“远程电脑”中配对电脑并为这个 Bot 授权。") : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "桌面通道尚未就绪。");
 }
 function DesktopWorkbench({ snapshot, dispatch }) {
-  let bots = snapshot.bots ?? [], [botId, setBotId] = (0, import_react67.useState)(bots[0]?.id ?? ""), machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), current = (0, import_react67.useRef)({ dispatch, machines });
+  let bots = snapshot.bots ?? [], [botId, setBotId] = (0, import_react68.useState)(bots[0]?.id ?? ""), machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), current = (0, import_react68.useRef)({ dispatch, machines });
   current.current = { dispatch, machines };
-  let openSession = (0, import_react67.useCallback)((id2, machineId, options) => current.current.dispatch("machine.desktop.open", { botId: id2, machineId, rootId: rootOf2(current.current.machines.find((item) => item.id === machineId)), ...options }), []), renewSession = (0, import_react67.useCallback)((id2, sessionId) => current.current.dispatch("machine.desktop.renew", { botId: id2, sessionId }), []), closeSession = (0, import_react67.useCallback)((id2, sessionId) => current.current.dispatch("machine.desktop.close", { botId: id2, sessionId }), []), saveRoutine = (0, import_react67.useCallback)((id2, routine) => current.current.dispatch("routine.save", { botId: id2, routine }), []);
-  return machines.length ? /* @__PURE__ */ import_react67.default.createElement("section", { className: "bp-card" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions", style: { marginBottom: 20 } }, /* @__PURE__ */ import_react67.default.createElement("label", null, "连接身份", /* @__PURE__ */ import_react67.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((bot) => /* @__PURE__ */ import_react67.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id))))), /* @__PURE__ */ import_react67.default.createElement(DesktopViewer, { key: botId, botId, machines, openSession, renewSession, closeSession, saveRoutine })) : /* @__PURE__ */ import_react67.default.createElement("section", { className: "bp-card" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react67.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "computer", size: 29 })), /* @__PURE__ */ import_react67.default.createElement("strong", null, "连接你的第一台电脑"), /* @__PURE__ */ import_react67.default.createElement("p", null, "在自己的 Windows 或云电脑上运行 Agent，再导入配对文件，就能在这里查看和接管桌面。"), /* @__PURE__ */ import_react67.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react67.default.createElement("a", { className: "bp-download-link", href: "https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip", target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ import_react67.default.createElement(UiIcon, { name: "arrow", size: 15 }), "下载 Windows Agent"), /* @__PURE__ */ import_react67.default.createElement("button", { className: "bp-button-primary", onClick: () => {
+  let openSession = (0, import_react68.useCallback)((id2, machineId, options) => current.current.dispatch("machine.desktop.open", { botId: id2, machineId, rootId: rootOf2(current.current.machines.find((item) => item.id === machineId)), ...options }), []), renewSession = (0, import_react68.useCallback)((id2, sessionId) => current.current.dispatch("machine.desktop.renew", { botId: id2, sessionId }), []), closeSession = (0, import_react68.useCallback)((id2, sessionId) => current.current.dispatch("machine.desktop.close", { botId: id2, sessionId }), []), saveRoutine = (0, import_react68.useCallback)((id2, routine) => current.current.dispatch("routine.save", { botId: id2, routine }), []);
+  return machines.length ? /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions", style: { marginBottom: 20 } }, /* @__PURE__ */ import_react68.default.createElement("label", null, "连接身份", /* @__PURE__ */ import_react68.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((bot) => /* @__PURE__ */ import_react68.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id))))), /* @__PURE__ */ import_react68.default.createElement(DesktopViewer, { key: botId, botId, machines, openSession, renewSession, closeSession, saveRoutine })) : /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "computer", size: 29 })), /* @__PURE__ */ import_react68.default.createElement("strong", null, "连接你的第一台电脑"), /* @__PURE__ */ import_react68.default.createElement("p", null, "在自己的 Windows 或云电脑上运行 Agent，再导入配对文件，就能在这里查看和接管桌面。"), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("a", { className: "bp-download-link", href: "https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip", target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "arrow", size: 15 }), "下载 Windows Agent"), /* @__PURE__ */ import_react68.default.createElement("button", { className: "bp-button-primary", onClick: () => {
     let setup = document.querySelector(".bp-machine-setup");
     setup && (setup.open = !0, setup.scrollIntoView({ block: "start", behavior: "smooth" }));
   } }, "导入配对文件"))));
@@ -34481,11 +34814,11 @@ var NAV_EVENT = "bot-product:navigation", activePanel = null, announcePanel = (i
   clear ? activePanel === id2 && (activePanel = null) : activePanel = id2, document.dispatchEvent(new document.defaultView.CustomEvent(NAV_EVENT, { detail: { id: activePanel } }));
 };
 function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
-  let [active2, setActive] = (0, import_react68.useState)(() => activePanel);
-  return (0, import_react68.useEffect)(() => {
+  let [active2, setActive] = (0, import_react69.useState)(() => activePanel);
+  return (0, import_react69.useEffect)(() => {
     let change = (event) => setActive(event.detail.id);
     return document.addEventListener(NAV_EVENT, change), setActive(activePanel), () => document.removeEventListener(NAV_EVENT, change);
-  }, []), /* @__PURE__ */ import_react68.default.createElement("nav", { className: `bp-nav${compact2 ? " bp-nav-compact" : ""}`, "aria-label": "Bot 工作系统" }, /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-nav-label" }, "工作空间"), [
+  }, []), /* @__PURE__ */ import_react69.default.createElement("nav", { className: `bp-nav${compact2 ? " bp-nav-compact" : ""}`, "aria-label": "Bot 工作系统" }, /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-nav-label" }, "工作空间"), [
     [panels.bindings, "Bot 绑定", "team", "绑定"],
     [panels.tasks, "任务", "tasks", "任务"],
     [panels.machines, "远程电脑", "computer", "电脑"],
@@ -34493,7 +34826,7 @@ function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
     [panels.routine, "例行任务", "repeat", "例行"],
     [panels.usage, "费用与用量", "chart", "费用"],
     ["model-router-galgame", "高级工作台", "settings", "工作台"]
-  ].map(([id2, label, icon2, caption]) => /* @__PURE__ */ import_react68.default.createElement(
+  ].map(([id2, label, icon2, caption]) => /* @__PURE__ */ import_react69.default.createElement(
     "button",
     {
       key: id2,
@@ -34505,17 +34838,17 @@ function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
       title: label,
       "aria-label": label
     },
-    /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: icon2, size: 17 }),
-    /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-nav-name" }, label),
-    /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-nav-caption" }, caption)
+    /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: icon2, size: 17 }),
+    /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-nav-name" }, label),
+    /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-nav-caption" }, caption)
   )));
 }
 function Blocked({ value }) {
-  return /* @__PURE__ */ import_react68.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react68.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react68.default.createElement("p", null, value?.reason ?? "尚未取得宿主状态。"), value?.nextAction && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "下一步：", value.nextAction));
+  return /* @__PURE__ */ import_react69.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react69.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react69.default.createElement("p", null, value?.reason ?? "尚未取得宿主状态。"), value?.nextAction && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "下一步：", value.nextAction));
 }
-var Value2 = ({ label, children }) => /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react68.default.createElement("dt", null, label), /* @__PURE__ */ import_react68.default.createElement("dd", null, children ?? "未配置")), Tag3 = ({ children }) => /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-tag" }, children), subscriptionText = (value) => value && typeof value == "object" ? `今日 ${value.callsToday ?? "未知"} 次 · 本月 ${value.callsMonth ?? "未知"} 次` : value ?? "见逐来源收据";
+var Value2 = ({ label, children }) => /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react69.default.createElement("dt", null, label), /* @__PURE__ */ import_react69.default.createElement("dd", null, children ?? "未配置")), Tag3 = ({ children }) => /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-tag" }, children), subscriptionText = (value) => value && typeof value == "object" ? `今日 ${value.callsToday ?? "未知"} 次 · 本月 ${value.callsMonth ?? "未知"} 次` : value ?? "见逐来源收据";
 function BotRuntimeRow({ botId, dispatch, busy }) {
-  let [state, setState] = import_react68.default.useState(null), [error, setError] = import_react68.default.useState(""), [working, setWorking] = import_react68.default.useState(!1), load = import_react68.default.useCallback(async () => {
+  let [state, setState] = import_react69.default.useState(null), [error, setError] = import_react69.default.useState(""), [working, setWorking] = import_react69.default.useState(!1), load = import_react69.default.useCallback(async () => {
     if (typeof dispatch == "function")
       try {
         let rows2 = await dispatch("botRuntimeStatus", {}), row = Array.isArray(rows2) ? rows2.find((item) => item.botId === botId) : null;
@@ -34529,7 +34862,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       } catch (failure) {
         setState(null), setError(String(failure?.message ?? failure));
       }
-  }, [botId, dispatch]), [history, setHistory] = import_react68.default.useState([]), [historyError, setHistoryError] = import_react68.default.useState(""), loadHistory = import_react68.default.useCallback(async () => {
+  }, [botId, dispatch]), [history, setHistory] = import_react69.default.useState([]), [historyError, setHistoryError] = import_react69.default.useState(""), loadHistory = import_react69.default.useCallback(async () => {
     if (typeof dispatch == "function")
       try {
         let rows2 = await dispatch("botRuntimeHistory", { botId, limit: 20 });
@@ -34537,7 +34870,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       } catch (failure) {
         setHistory([]), setHistoryError(String(failure?.message ?? failure));
       }
-  }, [botId, dispatch]), [full2, setFull] = import_react68.default.useState(null), openFull = import_react68.default.useCallback(async (index) => {
+  }, [botId, dispatch]), [full2, setFull] = import_react69.default.useState(null), openFull = import_react69.default.useCallback(async (index) => {
     try {
       let message2 = await dispatch("botRuntimeMessage", { botId, index });
       setFull({ index, ...message2 }), setHistoryError("");
@@ -34545,7 +34878,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       setHistoryError(String(failure?.message ?? failure)), setFull(null);
     }
   }, [botId, dispatch]);
-  if (import_react68.default.useEffect(() => {
+  if (import_react69.default.useEffect(() => {
     load();
   }, [load]), !state && !error) return null;
   let target = state?.runtime === "independent" ? "integration" : "independent", move = async () => {
@@ -34558,16 +34891,16 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       setWorking(!1);
     }
   };
-  return /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react68.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("button", { disabled: busy || working, onClick: () => {
+  return /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react69.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { disabled: busy || working, onClick: () => {
     move();
-  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, error), state ? /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-log" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "最近会话（仅预览）"), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: working, onClick: () => {
+  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, error), state ? /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-log" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "最近会话（仅预览）"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: working, onClick: () => {
     loadHistory();
-  } }, "读取预览"), historyError && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, historyError), history.length === 0 ? /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "点“读取预览”加载最近 20 条。") : /* @__PURE__ */ import_react68.default.createElement("ul", { className: "bp-checklist" }, history.map((row, index) => /* @__PURE__ */ import_react68.default.createElement("li", { key: index }, /* @__PURE__ */ import_react68.default.createElement("strong", null, row.role), row.name ? ` · ${row.name}` : "", " · ", row.chars, " 字", row.at ? ` · ${new Date(row.at).toLocaleTimeString("zh-CN")}` : "", /* @__PURE__ */ import_react68.default.createElement("small", null, row.preview, String(row.preview ?? "").length < row.chars ? "…" : ""), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", onClick: () => {
+  } }, "读取预览"), historyError && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, historyError), history.length === 0 ? /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "点“读取预览”加载最近 20 条。") : /* @__PURE__ */ import_react69.default.createElement("ul", { className: "bp-checklist" }, history.map((row, index) => /* @__PURE__ */ import_react69.default.createElement("li", { key: index }, /* @__PURE__ */ import_react69.default.createElement("strong", null, row.role), row.name ? ` · ${row.name}` : "", " · ", row.chars, " 字", row.at ? ` · ${new Date(row.at).toLocaleTimeString("zh-CN")}` : "", /* @__PURE__ */ import_react69.default.createElement("small", null, row.preview, String(row.preview ?? "").length < row.chars ? "…" : ""), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", onClick: () => {
     openFull(index);
-  } }, "查看全文")))), full2 ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-fulltext" }, /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "第 ", full2.index + 1, " 条（从最新往前数）· ", full2.role, " · ", full2.chars, " 字"), /* @__PURE__ */ import_react68.default.createElement("pre", null, full2.content)) : null) : null);
+  } }, "查看全文")))), full2 ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-fulltext" }, /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "第 ", full2.index + 1, " 条（从最新往前数）· ", full2.role, " · ", full2.chars, " 字"), /* @__PURE__ */ import_react69.default.createElement("pre", null, full2.content)) : null) : null);
 }
-function BotBindings({ snapshot, openSession, dispatch, busy }) {
-  let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react68.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id), capabilities = binding?.tools ?? binding?.capabilities ?? [], permissionGroups = [
+function BotBindings({ snapshot, openSession, dispatch, busy, readEngines, openTools }) {
+  let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react69.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id), capabilities = binding?.tools ?? binding?.capabilities ?? [], permissionGroups = [
     ["模型调用", /^model\//],
     ["模型工作台", /^(?:command\/router|tool\/model_router_)/],
     ["任务管理", /^task\//],
@@ -34576,7 +34909,14 @@ function BotBindings({ snapshot, openSession, dispatch, busy }) {
     ["例行任务", /^tool\/bot_routine_/],
     ["远程工具", /^remote\//]
   ].filter(([, pattern]) => capabilities.some((value) => pattern.test(value))).map(([label]) => label);
-  return bots.length ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => /* @__PURE__ */ import_react68.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-person-avatar" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "bot", size: 23 })), /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-person-copy" }, /* @__PURE__ */ import_react68.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react68.default.createElement(Tag3, null, "Main"), /* @__PURE__ */ import_react68.default.createElement("small", null, item.role || "尚未填写职责"))))), /* @__PURE__ */ import_react68.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-person-heading" }, /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-person-avatar bp-person-avatar-large" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "bot", size: 27 })), /* @__PURE__ */ import_react68.default.createElement("div", null, /* @__PURE__ */ import_react68.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, bot.main ? "团队协调 Bot" : "团队成员"))), /* @__PURE__ */ import_react68.default.createElement("button", { className: "bp-button-primary", onClick: () => openSession(bot.sessionId) }, "打开私聊", /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "arrow", size: 15 }))), /* @__PURE__ */ import_react68.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? "尚未取得宿主绑定"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement("h3", null, "官方工具"), binding.officialTools?.length ? /* @__PURE__ */ import_react68.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react68.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知"))) : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "此 Bot 没有官方工具绑定。"), /* @__PURE__ */ import_react68.default.createElement("h3", null, "有效权限 ", /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-inline-count" }, capabilities.length, " 项")), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-permission-chips" }, permissionGroups.map((label) => /* @__PURE__ */ import_react68.default.createElement("span", { key: label }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "check", size: 13 }), label)), !capabilities.length && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "无额外能力")), binding.blockedReason && /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。"), dispatch && /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-edit-section" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "settings", size: 16 }), "编辑权限与预算"), /* @__PURE__ */ import_react68.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy })), /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "连接与运行详情"), /* @__PURE__ */ import_react68.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "预算范围" }, binding?.budgetScope)), /* @__PURE__ */ import_react68.default.createElement("h3", null, "完整权限标识"), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-code" }, capabilities.join("、") || "无额外能力"), snapshot.availableActions?.includes("botRuntimeStatus") && /* @__PURE__ */ import_react68.default.createElement(BotRuntimeRow, { botId: bot.id, dispatch, busy })))) : /* @__PURE__ */ import_react68.default.createElement("p", null, "还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。");
+  return bots.length ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => /* @__PURE__ */ import_react69.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-person-avatar" }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "bot", size: 23 })), /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-person-copy" }, /* @__PURE__ */ import_react69.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react69.default.createElement(Tag3, null, "Main"), /* @__PURE__ */ import_react69.default.createElement("small", null, item.role || "尚未填写职责"))))), /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-person-heading" }, /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-person-avatar bp-person-avatar-large" }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "bot", size: 27 })), /* @__PURE__ */ import_react69.default.createElement("div", null, /* @__PURE__ */ import_react69.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, bot.main ? "团队协调 Bot" : "团队成员"))), /* @__PURE__ */ import_react69.default.createElement("button", { className: "bp-button-primary", onClick: () => openSession(bot.sessionId) }, "打开私聊", /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "arrow", size: 15 }))), /* @__PURE__ */ import_react69.default.createElement(
+    BrainBadge,
+    {
+      model: binding?.settings?.model ?? bot.model,
+      officialTools: binding?.officialTools ?? binding?.settings?.officialTools ?? [],
+      canCallTools: capabilities.includes("tool/model_router_tool_run")
+    }
+  ), /* @__PURE__ */ import_react69.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? "尚未取得宿主绑定"), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement("h3", null, "有效权限 ", /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-inline-count" }, capabilities.length, " 项")), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-permission-chips" }, permissionGroups.map((label) => /* @__PURE__ */ import_react69.default.createElement("span", { key: label }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "check", size: 13 }), label)), !capabilities.length && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "无额外能力")), binding.blockedReason && /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。"), dispatch && /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-edit-section" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "settings", size: 16 }), "编辑大脑、权限与预算"), /* @__PURE__ */ import_react69.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy, readEngines, openTools })), /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "连接与运行详情"), /* @__PURE__ */ import_react69.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "预算范围" }, binding?.budgetScope)), /* @__PURE__ */ import_react69.default.createElement("h3", null, "完整权限标识"), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-code" }, capabilities.join("、") || "无额外能力"), snapshot.availableActions?.includes("botRuntimeStatus") && /* @__PURE__ */ import_react69.default.createElement(BotRuntimeRow, { botId: bot.id, dispatch, busy })))) : /* @__PURE__ */ import_react69.default.createElement("p", null, "还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。");
 }
 var routingPresetLabel = (preset) => ({ economy: "省钱优先", balanced: "均衡", quality: "效果优先" })[preset] ?? "当前策略", routingRefusalMessage = (reason) => {
   let code = String(reason ?? "").split(":")[0];
@@ -34596,21 +34936,21 @@ var routingPresetLabel = (preset) => ({ economy: "省钱优先", balanced: "均�
   return code === "REMOTE_OWNER_REQUIRED" ? "请重新登录宿主拥有者账号后核对原提交；请保留核对码，不要重新创建任务。" : ["BOT_ROUTING_STATUS_UNAVAILABLE", "PRODUCT_ACTION_UNAVAILABLE"].includes(code) ? "当前宿主尚不支持原提交核对，请更新宿主或在任务记录中核对；请保留核对码。" : ["BOT_ROUTING_SUBMISSION_IDENTITY_MISMATCH", "INVALID_ROUTING_SUBMISSION_STATUS"].includes(code) ? "返回记录与原提交身份不一致，尚不能确认结果。请在原宿主核对任务记录并保留核对码。" : code === "PRODUCT_READ_ONLY" ? "宿主目前处于只读状态，请恢复宿主后核对原提交；请保留核对码，不要重新创建任务。" : "原提交核对尚未完成，请恢复宿主连接后再次核对；请保留核对码，不会重新提交任务。";
 };
 function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }) {
-  let submissions = (0, import_react68.useMemo)(() => routingSubmissions(submissionScope), [submissionScope]), submission = (0, import_react68.useSyncExternalStore)(submissions.subscribe, submissions.getSnapshot, submissions.getSnapshot), [view, setView] = import_react68.default.useState(null), [error, setError] = import_react68.default.useState(""), [text7, setText] = import_react68.default.useState(""), [pin, setPin] = import_react68.default.useState(""), [machine, setMachine] = import_react68.default.useState(""), [root, setRoot] = import_react68.default.useState(""), [effect, setEffect] = import_react68.default.useState("read"), [decision, setDecision] = import_react68.default.useState(null), [working, setWorking] = import_react68.default.useState(""), [savedCode, setSavedCode] = (0, import_react68.useState)(""), [copyStatus, setCopyStatus] = (0, import_react68.useState)(""), codeInput = (0, import_react68.useRef)(null), [viewReady, setViewReady] = import_react68.default.useState(!1), control = (0, import_react68.useRef)({ live: !1, epoch: 0, draft: 0, active: null, prepared: null, ready: !1 }), form = (0, import_react68.useRef)({ text: "", pin: "", machine: "", root: "", effect: "read" }), busyRef = (0, import_react68.useRef)(busy);
+  let submissions = (0, import_react69.useMemo)(() => routingSubmissions(submissionScope), [submissionScope]), submission = (0, import_react69.useSyncExternalStore)(submissions.subscribe, submissions.getSnapshot, submissions.getSnapshot), [view, setView] = import_react69.default.useState(null), [error, setError] = import_react69.default.useState(""), [text7, setText] = import_react69.default.useState(""), [pin, setPin] = import_react69.default.useState(""), [machine, setMachine] = import_react69.default.useState(""), [root, setRoot] = import_react69.default.useState(""), [effect, setEffect] = import_react69.default.useState("read"), [decision, setDecision] = import_react69.default.useState(null), [working, setWorking] = import_react69.default.useState(""), [savedCode, setSavedCode] = (0, import_react69.useState)(""), [copyStatus, setCopyStatus] = (0, import_react69.useState)(""), codeInput = (0, import_react69.useRef)(null), [viewReady, setViewReady] = import_react69.default.useState(!1), control = (0, import_react69.useRef)({ live: !1, epoch: 0, draft: 0, active: null, prepared: null, ready: !1 }), form = (0, import_react69.useRef)({ text: "", pin: "", machine: "", root: "", effect: "read" }), busyRef = (0, import_react69.useRef)(busy);
   busyRef.current = busy;
-  let call2 = (0, import_react68.useCallback)(async (action, payload) => {
+  let call2 = (0, import_react69.useCallback)(async (action, payload) => {
     if (typeof dispatch != "function") throw new Error("宿主接口尚未就绪。");
     let value = await dispatch(action, payload, { errorResult: !0 });
     if (value === void 0 || value?.ok === !1) throw Object.assign(new Error(value?.error?.message ?? "宿主尚未确认这次请求，请刷新后重试。"), { code: value?.error?.code });
     return value;
-  }, [dispatch]), invalidate = (0, import_react68.useCallback)(() => {
+  }, [dispatch]), invalidate = (0, import_react69.useCallback)(() => {
     control.current.draft++, control.current.prepared = null, setDecision(null);
   }, []), editDraft = (changes) => {
     let next = { ...form.current, ...changes };
     form.current = next, setText(next.text), setPin(next.pin), setMachine(next.machine), setRoot(next.root), setEffect(next.effect);
     let previous = submissions.getSnapshot();
     previous?.state === "confirmed" && submissions.clear(previous), invalidate();
-  }, begin = (0, import_react68.useCallback)((kind) => {
+  }, begin = (0, import_react69.useCallback)((kind) => {
     let state = control.current;
     if (!state.live || state.active || busyRef.current) return null;
     let token = { epoch: state.epoch };
@@ -34619,7 +34959,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
     current(token) && (control.current.active = null, setWorking(""));
   }, staleView = () => {
     control.current.ready = !1, setViewReady(!1);
-  }, load = import_react68.default.useCallback(async () => {
+  }, load = import_react69.default.useCallback(async () => {
     let token = begin("inspect");
     if (token) {
       invalidate(), staleView();
@@ -34635,14 +34975,14 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
       }
     }
   }, [call2, begin, invalidate]);
-  (0, import_react68.useEffect)(() => {
+  (0, import_react69.useEffect)(() => {
     let state = control.current;
     return state.live = !0, state.epoch++, state.active = null, state.ready = !1, setView(null), setViewReady(!1), setWorking(""), setSavedCode(""), setCopyStatus(""), setError(""), invalidate(), load(), () => {
       state.live = !1, state.epoch++, state.draft++, state.active = null, state.prepared = null, state.ready = !1;
     };
-  }, [load, invalidate]), (0, import_react68.useEffect)(() => {
+  }, [load, invalidate]), (0, import_react69.useEffect)(() => {
     setCopyStatus("");
-  }, [submissions, submission?.requestKey]), (0, import_react68.useEffect)(() => {
+  }, [submissions, submission?.requestKey]), (0, import_react69.useEffect)(() => {
     !busy && !view && control.current.live && !control.current.active && load();
   }, [busy, view, load]);
   let saveSettings = async (settings) => {
@@ -34740,36 +35080,36 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
     } finally {
       finish(token);
     }
-  }, submissionNotice = submission && /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-blocked", role: "region", "aria-label": "原提交核对" }, submission.state === "confirmed" ? /* @__PURE__ */ import_react68.default.createElement("p", { role: "status" }, "已提交：", submission.planId, "。", TASK_STATES[submission.planState] ?? "请在任务记录中跟踪执行结果。") : submission.state === "not-found" ? /* @__PURE__ */ import_react68.default.createElement("p", { role: "status" }, "当前尚未查到原提交，原请求仍可能完成，请稍后再次核对。") : /* @__PURE__ */ import_react68.default.createElement("p", { role: "status" }, submission.state === "submitting" && working === "dispatch" ? "正在提交任务…" : "提交结果尚未确认，请核对原提交。"), /* @__PURE__ */ import_react68.default.createElement("p", null, "核对只读取原任务记录，不会再次提交或授予权限。"), /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "保存提交核对码"), /* @__PURE__ */ import_react68.default.createElement("p", null, "重载应用前可保存核对码，之后在原宿主粘贴查询。核对码只包含提交编号，不包含任务正文或登录凭据。"), /* @__PURE__ */ import_react68.default.createElement("label", null, "当前提交核对码", /* @__PURE__ */ import_react68.default.createElement("input", { ref: codeInput, "aria-label": "当前提交核对码", className: "bp-submission-code", readOnly: !0, value: submissionCode(submission), onFocus: (event) => event.target.select() })), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", onClick: () => {
+  }, submissionNotice = submission && /* @__PURE__ */ import_react69.default.createElement("section", { className: "bp-blocked", role: "region", "aria-label": "原提交核对" }, submission.state === "confirmed" ? /* @__PURE__ */ import_react69.default.createElement("p", { role: "status" }, "已提交：", submission.planId, "。", TASK_STATES[submission.planState] ?? "请在任务记录中跟踪执行结果。") : submission.state === "not-found" ? /* @__PURE__ */ import_react69.default.createElement("p", { role: "status" }, "当前尚未查到原提交，原请求仍可能完成，请稍后再次核对。") : /* @__PURE__ */ import_react69.default.createElement("p", { role: "status" }, submission.state === "submitting" && working === "dispatch" ? "正在提交任务…" : "提交结果尚未确认，请核对原提交。"), /* @__PURE__ */ import_react69.default.createElement("p", null, "核对只读取原任务记录，不会再次提交或授予权限。"), /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "保存提交核对码"), /* @__PURE__ */ import_react69.default.createElement("p", null, "重载应用前可保存核对码，之后在原宿主粘贴查询。核对码只包含提交编号，不包含任务正文或登录凭据。"), /* @__PURE__ */ import_react69.default.createElement("label", null, "当前提交核对码", /* @__PURE__ */ import_react69.default.createElement("input", { ref: codeInput, "aria-label": "当前提交核对码", className: "bp-submission-code", readOnly: !0, value: submissionCode(submission), onFocus: (event) => event.target.select() })), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", onClick: () => {
     copySubmission();
-  } }, "复制核对码"), copyStatus && /* @__PURE__ */ import_react68.default.createElement("small", { role: "status" }, copyStatus))), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, snapshot.availableActions?.includes("botRouting.status") ? /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  } }, "复制核对码"), copyStatus && /* @__PURE__ */ import_react69.default.createElement("small", { role: "status" }, copyStatus))), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, snapshot.availableActions?.includes("botRouting.status") ? /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     checkSubmission();
-  } }, "核对原提交") : /* @__PURE__ */ import_react68.default.createElement("small", null, "当前宿主尚未提供原提交核对，请先在任务记录中核对。"), submission.state === "confirmed" && /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  } }, "核对原提交") : /* @__PURE__ */ import_react69.default.createElement("small", null, "当前宿主尚未提供原提交核对，请先在任务记录中核对。"), submission.state === "confirmed" && /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     submissions.clear(submission), invalidate();
-  } }, "新建另一项任务")), submission.state === "not-found" && /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "已自行核对记录"), /* @__PURE__ */ import_react68.default.createElement("p", null, "原请求仍可能完成。清除提醒不会停止原任务，再次创建可能重复；只有自行核对后才清除。"), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  } }, "新建另一项任务")), submission.state === "not-found" && /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "已自行核对记录"), /* @__PURE__ */ import_react69.default.createElement("p", null, "原请求仍可能完成。清除提醒不会停止原任务，再次创建可能重复；只有自行核对后才清除。"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     submissions.dismissUnconfirmed(submission), invalidate();
-  } }, "清除本窗口提醒"))), savedSubmissionForm = !submission && snapshot.availableActions?.includes("botRouting.status") && /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "核对已保存的提交"), /* @__PURE__ */ import_react68.default.createElement("p", null, "请连接原宿主并粘贴之前保存的核对码。此操作只查询原记录，不会创建任务。"), /* @__PURE__ */ import_react68.default.createElement("form", { className: "bp-submission-restore", onSubmit: restoreSubmission }, /* @__PURE__ */ import_react68.default.createElement("label", null, "已保存的提交核对码", /* @__PURE__ */ import_react68.default.createElement("input", { "aria-label": "已保存的提交核对码", className: "bp-submission-code", value: savedCode, maxLength: 1024, autoComplete: "off", spellCheck: !1, disabled: busy || !!working, onChange: (event) => setSavedCode(event.target.value), placeholder: "dsh-route-v1:…" })), /* @__PURE__ */ import_react68.default.createElement("button", { type: "submit", disabled: busy || !!working || !savedCode.trim() }, "核对已保存的提交")));
+  } }, "清除本窗口提醒"))), savedSubmissionForm = !submission && snapshot.availableActions?.includes("botRouting.status") && /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "核对已保存的提交"), /* @__PURE__ */ import_react69.default.createElement("p", null, "请连接原宿主并粘贴之前保存的核对码。此操作只查询原记录，不会创建任务。"), /* @__PURE__ */ import_react69.default.createElement("form", { className: "bp-submission-restore", onSubmit: restoreSubmission }, /* @__PURE__ */ import_react69.default.createElement("label", null, "已保存的提交核对码", /* @__PURE__ */ import_react69.default.createElement("input", { "aria-label": "已保存的提交核对码", className: "bp-submission-code", value: savedCode, maxLength: 1024, autoComplete: "off", spellCheck: !1, disabled: busy || !!working, onChange: (event) => setSavedCode(event.target.value), placeholder: "dsh-route-v1:…" })), /* @__PURE__ */ import_react69.default.createElement("button", { type: "submit", disabled: busy || !!working || !savedCode.trim() }, "核对已保存的提交")));
   if (!view)
-    return /* @__PURE__ */ import_react68.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, "Bot 路由")), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, error || "正在读取候选…"), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || working, onClick: () => {
+    return /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, "Bot 路由")), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, error || "正在读取候选…"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || working, onClick: () => {
       load();
     } }, "读取候选"), submissionNotice, savedSubmissionForm);
   let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), inputDisabled = busy || !viewReady || working === "dispatch" || working === "settings", nameOf = (botId) => view.candidates.find((row) => row.botId === botId)?.name ?? botId;
-  return /* @__PURE__ */ import_react68.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, "Bot 路由"), /* @__PURE__ */ import_react68.default.createElement(Tag3, null, view.enabled ? `已开启 · ${routingPresetLabel(view.preset)}` : "未开启"), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  return /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, "Bot 路由"), /* @__PURE__ */ import_react69.default.createElement(Tag3, null, view.enabled ? `已开启 · ${routingPresetLabel(view.preset)}` : "未开启"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     load();
-  } }, "刷新候选")), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react68.default.createElement("input", { type: "checkbox", checked: view.enabled, disabled: busy || !!working || !viewReady, onChange: (event) => {
+  } }, "刷新候选")), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react69.default.createElement("input", { type: "checkbox", checked: view.enabled, disabled: busy || !!working || !viewReady, onChange: (event) => {
     saveSettings({ enabled: event.target.checked, preset: view.preset, autoGrant: view.autoGrant });
-  } }), "开启 Bot 路由"), /* @__PURE__ */ import_react68.default.createElement("label", null, "策略", /* @__PURE__ */ import_react68.default.createElement("select", { value: view.preset, disabled: busy || !!working || !viewReady, onChange: (event) => {
+  } }), "开启 Bot 路由"), /* @__PURE__ */ import_react69.default.createElement("label", null, "策略", /* @__PURE__ */ import_react69.default.createElement("select", { value: view.preset, disabled: busy || !!working || !viewReady, onChange: (event) => {
     saveSettings({ enabled: view.enabled, preset: event.target.value, autoGrant: view.autoGrant });
-  } }, /* @__PURE__ */ import_react68.default.createElement("option", { value: "economy" }, "省钱优先"), /* @__PURE__ */ import_react68.default.createElement("option", { value: "balanced" }, "均衡"), /* @__PURE__ */ import_react68.default.createElement("option", { value: "quality" }, "效果优先"))), /* @__PURE__ */ import_react68.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react68.default.createElement("input", { type: "checkbox", checked: view.autoGrant?.machineTools === !0, disabled: busy || !!working || !viewReady, onChange: (event) => {
+  } }, /* @__PURE__ */ import_react69.default.createElement("option", { value: "economy" }, "省钱优先"), /* @__PURE__ */ import_react69.default.createElement("option", { value: "balanced" }, "均衡"), /* @__PURE__ */ import_react69.default.createElement("option", { value: "quality" }, "效果优先"))), /* @__PURE__ */ import_react69.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react69.default.createElement("input", { type: "checkbox", checked: view.autoGrant?.machineTools === !0, disabled: busy || !!working || !viewReady, onChange: (event) => {
     saveSettings({ enabled: view.enabled, preset: view.preset, autoGrant: { ...view.autoGrant, machineTools: event.target.checked } });
-  } }), "自动授予任务所需电脑权限")), !view.enabled && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "开启后，主 Bot 可根据各 Bot 已配置的模型、工具与电脑权限分配任务。手动指定也会检查是否具备执行条件。"), error && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, error), submissionNotice, savedSubmissionForm, !viewReady && !working && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "候选尚未更新，请刷新候选后再预览。"), view.enabled ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react68.default.createElement("table", { className: "bp-routing-candidates" }, /* @__PURE__ */ import_react68.default.createElement("thead", null, /* @__PURE__ */ import_react68.default.createElement("tr", null, /* @__PURE__ */ import_react68.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react68.default.createElement("th", null, "模型"), /* @__PURE__ */ import_react68.default.createElement("th", null, "机器"), /* @__PURE__ */ import_react68.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react68.default.createElement("th", null, "质量"), /* @__PURE__ */ import_react68.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react68.default.createElement("tbody", null, view.candidates.map((row) => /* @__PURE__ */ import_react68.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react68.default.createElement("td", null, row.name, row.main ? /* @__PURE__ */ import_react68.default.createElement(Tag3, null, "Main") : null, /* @__PURE__ */ import_react68.default.createElement("small", null, row.botId)), /* @__PURE__ */ import_react68.default.createElement("td", null, row.model ? `${row.model.provider}/${row.model.model}` : /* @__PURE__ */ import_react68.default.createElement("em", null, "未绑定")), /* @__PURE__ */ import_react68.default.createElement("td", null, row.machineId ? row.machineOnline ? "在线" : "未在线" : "无"), /* @__PURE__ */ import_react68.default.createElement("td", null, row.pricePerMTokUsd === null ? "未知" : `$${row.pricePerMTokUsd}`), /* @__PURE__ */ import_react68.default.createElement("td", null, row.quality === null ? "未知" : row.quality), /* @__PURE__ */ import_react68.default.createElement("td", null, row.busy ? "正忙" : "空闲")))))) : null, view.enabled ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react68.default.createElement("label", null, "任务描述", /* @__PURE__ */ import_react68.default.createElement("textarea", { rows: 2, value: text7, disabled: inputDisabled, onChange: (event) => editDraft({ text: event.target.value }), placeholder: "例如：整理上周的发布记录" })), /* @__PURE__ */ import_react68.default.createElement("label", null, "路由方式", /* @__PURE__ */ import_react68.default.createElement("select", { value: pin, disabled: inputDisabled, onChange: (event) => editDraft({ pin: event.target.value }) }, /* @__PURE__ */ import_react68.default.createElement("option", { value: "" }, "自动路由（按预设打分）"), view.candidates.map((row) => /* @__PURE__ */ import_react68.default.createElement("option", { key: row.botId, value: row.botId }, "指定：", row.name)))), /* @__PURE__ */ import_react68.default.createElement("label", null, "需要远程电脑", /* @__PURE__ */ import_react68.default.createElement("select", { value: machine, disabled: inputDisabled, onChange: (event) => editDraft({ machine: event.target.value, root: "", effect: "read" }) }, /* @__PURE__ */ import_react68.default.createElement("option", { value: "" }, "不需要"), machines.map((item) => /* @__PURE__ */ import_react68.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), machine && /* @__PURE__ */ import_react68.default.createElement("label", null, "共享目录", /* @__PURE__ */ import_react68.default.createElement("select", { value: root || machines.find((item) => item.id === machine)?.roots?.[0] || "", disabled: inputDisabled, onChange: (event) => editDraft({ root: event.target.value }) }, (machines.find((item) => item.id === machine)?.roots ?? []).map((id2) => /* @__PURE__ */ import_react68.default.createElement("option", { key: id2, value: id2 }, id2)))), /* @__PURE__ */ import_react68.default.createElement("label", null, "任务需要的操作", /* @__PURE__ */ import_react68.default.createElement("select", { value: effect, disabled: inputDisabled, onChange: (event) => editDraft({ effect: event.target.value }) }, /* @__PURE__ */ import_react68.default.createElement("option", { value: "read" }, "只读 / 分析"), /* @__PURE__ */ import_react68.default.createElement("option", { value: "write" }, "写入文件"), machine && /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement("option", { value: "desktop" }, "操作 Windows 桌面"), /* @__PURE__ */ import_react68.default.createElement("option", { value: "browser" }, "操作远程浏览器")))), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !!working || !!submission || !viewReady || !text7.trim(), onClick: () => {
+  } }), "自动授予任务所需电脑权限")), !view.enabled && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "开启后，主 Bot 可根据各 Bot 已配置的模型、工具与电脑权限分配任务。手动指定也会检查是否具备执行条件。"), error && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, error), submissionNotice, savedSubmissionForm, !viewReady && !working && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "候选尚未更新，请刷新候选后再预览。"), view.enabled ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react69.default.createElement("table", { className: "bp-routing-candidates" }, /* @__PURE__ */ import_react69.default.createElement("thead", null, /* @__PURE__ */ import_react69.default.createElement("tr", null, /* @__PURE__ */ import_react69.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react69.default.createElement("th", null, "模型"), /* @__PURE__ */ import_react69.default.createElement("th", null, "机器"), /* @__PURE__ */ import_react69.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react69.default.createElement("th", null, "质量"), /* @__PURE__ */ import_react69.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react69.default.createElement("tbody", null, view.candidates.map((row) => /* @__PURE__ */ import_react69.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react69.default.createElement("td", null, row.name, row.main ? /* @__PURE__ */ import_react69.default.createElement(Tag3, null, "Main") : null, /* @__PURE__ */ import_react69.default.createElement("small", null, row.botId)), /* @__PURE__ */ import_react69.default.createElement("td", null, row.model ? `${row.model.provider}/${row.model.model}` : /* @__PURE__ */ import_react69.default.createElement("em", null, "未绑定")), /* @__PURE__ */ import_react69.default.createElement("td", null, row.machineId ? row.machineOnline ? "在线" : "未在线" : "无"), /* @__PURE__ */ import_react69.default.createElement("td", null, row.pricePerMTokUsd === null ? "未知" : `$${row.pricePerMTokUsd}`), /* @__PURE__ */ import_react69.default.createElement("td", null, row.quality === null ? "未知" : row.quality), /* @__PURE__ */ import_react69.default.createElement("td", null, row.busy ? "正忙" : "空闲")))))) : null, view.enabled ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react69.default.createElement("label", null, "任务描述", /* @__PURE__ */ import_react69.default.createElement("textarea", { rows: 2, value: text7, disabled: inputDisabled, onChange: (event) => editDraft({ text: event.target.value }), placeholder: "例如：整理上周的发布记录" })), /* @__PURE__ */ import_react69.default.createElement("label", null, "路由方式", /* @__PURE__ */ import_react69.default.createElement("select", { value: pin, disabled: inputDisabled, onChange: (event) => editDraft({ pin: event.target.value }) }, /* @__PURE__ */ import_react69.default.createElement("option", { value: "" }, "自动路由（按预设打分）"), view.candidates.map((row) => /* @__PURE__ */ import_react69.default.createElement("option", { key: row.botId, value: row.botId }, "指定：", row.name)))), /* @__PURE__ */ import_react69.default.createElement("label", null, "需要远程电脑", /* @__PURE__ */ import_react69.default.createElement("select", { value: machine, disabled: inputDisabled, onChange: (event) => editDraft({ machine: event.target.value, root: "", effect: "read" }) }, /* @__PURE__ */ import_react69.default.createElement("option", { value: "" }, "不需要"), machines.map((item) => /* @__PURE__ */ import_react69.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), machine && /* @__PURE__ */ import_react69.default.createElement("label", null, "共享目录", /* @__PURE__ */ import_react69.default.createElement("select", { value: root || machines.find((item) => item.id === machine)?.roots?.[0] || "", disabled: inputDisabled, onChange: (event) => editDraft({ root: event.target.value }) }, (machines.find((item) => item.id === machine)?.roots ?? []).map((id2) => /* @__PURE__ */ import_react69.default.createElement("option", { key: id2, value: id2 }, id2)))), /* @__PURE__ */ import_react69.default.createElement("label", null, "任务需要的操作", /* @__PURE__ */ import_react69.default.createElement("select", { value: effect, disabled: inputDisabled, onChange: (event) => editDraft({ effect: event.target.value }) }, /* @__PURE__ */ import_react69.default.createElement("option", { value: "read" }, "只读 / 分析"), /* @__PURE__ */ import_react69.default.createElement("option", { value: "write" }, "写入文件"), machine && /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement("option", { value: "desktop" }, "操作 Windows 桌面"), /* @__PURE__ */ import_react69.default.createElement("option", { value: "browser" }, "操作远程浏览器")))), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !!working || !!submission || !viewReady || !text7.trim(), onClick: () => {
     decide();
-  } }, working === "preview" ? "计算中…" : "预览路由")) : null, decision ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-blocked", role: "region", "aria-label": "路由预览结果" }, /* @__PURE__ */ import_react68.default.createElement("strong", null, "选中：", decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? "（手动指定）" : ""}` : "没有可用的 Bot"), /* @__PURE__ */ import_react68.default.createElement("p", null, decision.pinned ? "手动指定的 Bot 已通过本次执行条件检查，未与其他 Bot 比较评分。" : `按${routingPresetLabel(decision.preset)}策略比较，综合评分越低越靠前。`), decision.binding ? /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement("p", null, "所需电脑权限：", decision.binding.mode === "read-only" ? "只读" : "读写", " · ", decision.binding.tools.length, " 项工具。"), /* @__PURE__ */ import_react68.default.createElement("p", null, decision.grant?.autoGrant === !1 ? "自动授权已关闭，创建任务时会核对已有授权；权限不足时需先配置。" : "创建任务时才会按已保存的权限上限核对和授权。")) : null, decision.rejected?.length ? /* @__PURE__ */ import_react68.default.createElement("p", null, "未满足条件：", decision.rejected.map((row) => `${nameOf(row.botId)}（${routingRefusalMessage(row.reason)}）`).join("；")) : null, !decision.pinned && decision.ranked?.length > 0 && /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "查看比较依据"), /* @__PURE__ */ import_react68.default.createElement("p", null, "评分只用于本次候选排序，不代表成功率。未知价格按保守值计算，未知质量按中间值参与比较。"), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react68.default.createElement("table", { className: "bp-routing-comparison", "aria-label": "候选比较" }, /* @__PURE__ */ import_react68.default.createElement("thead", null, /* @__PURE__ */ import_react68.default.createElement("tr", null, /* @__PURE__ */ import_react68.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react68.default.createElement("th", null, "综合评分"), /* @__PURE__ */ import_react68.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react68.default.createElement("th", null, "参考质量"))), /* @__PURE__ */ import_react68.default.createElement("tbody", null, decision.ranked.map((row) => /* @__PURE__ */ import_react68.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react68.default.createElement("td", null, nameOf(row.botId)), /* @__PURE__ */ import_react68.default.createElement("td", null, Number.isFinite(row.score) ? row.score.toFixed(6) : "未知"), /* @__PURE__ */ import_react68.default.createElement("td", null, Number.isFinite(row.pricePerMTokUsd) ? `$${row.pricePerMTokUsd}` : "未知"), /* @__PURE__ */ import_react68.default.createElement("td", null, Number.isFinite(row.quality) ? row.quality : "未知"))))))), (decision.binding || decision.rejected?.length > 0) && /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "执行条件详情"), decision.binding && /* @__PURE__ */ import_react68.default.createElement("p", null, "所需工具：", decision.binding.tools.join("、")), decision.rejected?.map((row) => /* @__PURE__ */ import_react68.default.createElement("p", { key: row.botId }, row.botId, "：", row.reason))), decision.chosen ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !!working || !viewReady || !!submission, onClick: () => {
+  } }, working === "preview" ? "计算中…" : "预览路由")) : null, decision ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-blocked", role: "region", "aria-label": "路由预览结果" }, /* @__PURE__ */ import_react69.default.createElement("strong", null, "选中：", decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? "（手动指定）" : ""}` : "没有可用的 Bot"), /* @__PURE__ */ import_react69.default.createElement("p", null, decision.pinned ? "手动指定的 Bot 已通过本次执行条件检查，未与其他 Bot 比较评分。" : `按${routingPresetLabel(decision.preset)}策略比较，综合评分越低越靠前。`), decision.binding ? /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement("p", null, "所需电脑权限：", decision.binding.mode === "read-only" ? "只读" : "读写", " · ", decision.binding.tools.length, " 项工具。"), /* @__PURE__ */ import_react69.default.createElement("p", null, decision.grant?.autoGrant === !1 ? "自动授权已关闭，创建任务时会核对已有授权；权限不足时需先配置。" : "创建任务时才会按已保存的权限上限核对和授权。")) : null, decision.rejected?.length ? /* @__PURE__ */ import_react69.default.createElement("p", null, "未满足条件：", decision.rejected.map((row) => `${nameOf(row.botId)}（${routingRefusalMessage(row.reason)}）`).join("；")) : null, !decision.pinned && decision.ranked?.length > 0 && /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "查看比较依据"), /* @__PURE__ */ import_react69.default.createElement("p", null, "评分只用于本次候选排序，不代表成功率。未知价格按保守值计算，未知质量按中间值参与比较。"), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react69.default.createElement("table", { className: "bp-routing-comparison", "aria-label": "候选比较" }, /* @__PURE__ */ import_react69.default.createElement("thead", null, /* @__PURE__ */ import_react69.default.createElement("tr", null, /* @__PURE__ */ import_react69.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react69.default.createElement("th", null, "综合评分"), /* @__PURE__ */ import_react69.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react69.default.createElement("th", null, "参考质量"))), /* @__PURE__ */ import_react69.default.createElement("tbody", null, decision.ranked.map((row) => /* @__PURE__ */ import_react69.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react69.default.createElement("td", null, nameOf(row.botId)), /* @__PURE__ */ import_react69.default.createElement("td", null, Number.isFinite(row.score) ? row.score.toFixed(6) : "未知"), /* @__PURE__ */ import_react69.default.createElement("td", null, Number.isFinite(row.pricePerMTokUsd) ? `$${row.pricePerMTokUsd}` : "未知"), /* @__PURE__ */ import_react69.default.createElement("td", null, Number.isFinite(row.quality) ? row.quality : "未知"))))))), (decision.binding || decision.rejected?.length > 0) && /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "执行条件详情"), decision.binding && /* @__PURE__ */ import_react69.default.createElement("p", null, "所需工具：", decision.binding.tools.join("、")), decision.rejected?.map((row) => /* @__PURE__ */ import_react69.default.createElement("p", { key: row.botId }, row.botId, "：", row.reason))), decision.chosen ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !!working || !viewReady || !!submission, onClick: () => {
     submitRouted();
   } }, "按此路由创建任务")) : null) : null);
 }
 function Tasks({ snapshot, dispatch, busy, submissionScope = dispatch, inspect, openSession }) {
-  return snapshot.tasks?.status !== "available" ? /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: snapshot.tasks }) : /* @__PURE__ */ import_react68.default.createElement(
+  return snapshot.tasks?.status !== "available" ? /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: snapshot.tasks }) : /* @__PURE__ */ import_react69.default.createElement(
     TaskWorkspace,
     {
       snapshot,
@@ -34778,19 +35118,19 @@ function Tasks({ snapshot, dispatch, busy, submissionScope = dispatch, inspect, 
       scope: submissionScope,
       inspect,
       openSession,
-      routingCard: snapshot.availableActions?.includes("botRoutingInspect") ? /* @__PURE__ */ import_react68.default.createElement(BotRoutingCard, { snapshot, dispatch, busy, submissionScope }) : null
+      routingCard: snapshot.availableActions?.includes("botRoutingInspect") ? /* @__PURE__ */ import_react69.default.createElement(BotRoutingCard, { snapshot, dispatch, busy, submissionScope }) : null
     }
   );
 }
 function DesktopControl({ snapshot, dispatch, busy }) {
-  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react68.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react68.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react68.default.useState(null), [status, setStatus] = import_react68.default.useState("idle"), [error, setError] = import_react68.default.useState(""), [live, setLive] = import_react68.default.useState(!1), [text7, setText] = import_react68.default.useState(""), imageRef = import_react68.default.useRef(null), firstRoot = machines.find((item) => item.id === machineId)?.roots?.[0], rootId = typeof firstRoot == "string" ? firstRoot : firstRoot?.id ?? firstRoot?.rootId ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
+  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react69.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react69.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react69.default.useState(null), [status, setStatus] = import_react69.default.useState("idle"), [error, setError] = import_react69.default.useState(""), [live, setLive] = import_react69.default.useState(!1), [text7, setText] = import_react69.default.useState(""), imageRef = import_react69.default.useRef(null), firstRoot = machines.find((item) => item.id === machineId)?.roots?.[0], rootId = typeof firstRoot == "string" ? firstRoot : firstRoot?.id ?? firstRoot?.rootId ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
     setError("");
     try {
       return await dispatch(action, payload);
     } catch (failure) {
       return setError(String(failure?.message ?? failure)), null;
     }
-  }, capture = import_react68.default.useCallback(async () => {
+  }, capture = import_react69.default.useCallback(async () => {
     if (!canView) return;
     setStatus("capturing");
     let value = await call2("machine.desktop.view", { botId, machineId, rootId });
@@ -34804,7 +35144,7 @@ function DesktopControl({ snapshot, dispatch, busy }) {
     }
     setFrame({ ...value, takenAtMs: Date.now() }), setStatus("ready");
   }, [botId, machineId, rootId, canView]);
-  import_react68.default.useEffect(() => {
+  import_react69.default.useEffect(() => {
     if (!live || !canView) return;
     capture();
     let timer = setInterval(() => {
@@ -34829,26 +35169,26 @@ function DesktopControl({ snapshot, dispatch, busy }) {
       setError(String(failure?.message ?? failure));
     }
   }, keys = ["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
-  return /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react68.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react68.default.createElement("select", { value: machineId, onChange: (event) => {
+  return /* @__PURE__ */ import_react69.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react69.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react69.default.createElement("select", { value: machineId, onChange: (event) => {
     setMachineId(event.target.value), setFrame(null);
-  } }, machines.map((item) => /* @__PURE__ */ import_react68.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react68.default.createElement("label", null, "以哪个 Bot 执行", /* @__PURE__ */ import_react68.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((item) => /* @__PURE__ */ import_react68.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("button", { disabled: busy || !canView || status === "capturing", onClick: () => {
+  } }, machines.map((item) => /* @__PURE__ */ import_react69.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react69.default.createElement("label", null, "以哪个 Bot 执行", /* @__PURE__ */ import_react69.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((item) => /* @__PURE__ */ import_react69.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { disabled: busy || !canView || status === "capturing", onClick: () => {
     capture();
-  } }, status === "capturing" ? "截取中…" : "截取当前画面"), /* @__PURE__ */ import_react68.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react68.default.createElement("input", { type: "checkbox", checked: live, disabled: !canView, onChange: (event) => setLive(event.target.checked) }), "实时（1.5 秒）"))), error && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, error), frame?.base64 ? /* @__PURE__ */ import_react68.default.createElement("img", { ref: imageRef, className: "bp-desktop-frame", alt: "远程桌面画面", src: `data:${frame.mediaType};base64,${frame.base64}`, onClick: clickImage }) : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-empty" }, canView ? "还没有画面。点“截取当前画面”。" : "先配对一台电脑，并选择一个 Bot。"), frame?.base64 && /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions bp-desktop-keys" }, keys.map((key) => /* @__PURE__ */ import_react68.default.createElement("button", { key, disabled: busy, onClick: () => {
+  } }, status === "capturing" ? "截取中…" : "截取当前画面"), /* @__PURE__ */ import_react69.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react69.default.createElement("input", { type: "checkbox", checked: live, disabled: !canView, onChange: (event) => setLive(event.target.checked) }), "实时（1.5 秒）"))), error && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, error), frame?.base64 ? /* @__PURE__ */ import_react69.default.createElement("img", { ref: imageRef, className: "bp-desktop-frame", alt: "远程桌面画面", src: `data:${frame.mediaType};base64,${frame.base64}`, onClick: clickImage }) : /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-empty" }, canView ? "还没有画面。点“截取当前画面”。" : "先配对一台电脑，并选择一个 Bot。"), frame?.base64 && /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions bp-desktop-keys" }, keys.map((key) => /* @__PURE__ */ import_react69.default.createElement("button", { key, disabled: busy, onClick: () => {
     act({ tool: "key", key });
-  } }, key)), /* @__PURE__ */ import_react68.default.createElement("button", { disabled: busy, onClick: () => {
+  } }, key)), /* @__PURE__ */ import_react69.default.createElement("button", { disabled: busy, onClick: () => {
     act({ tool: "scroll", delta: 120 });
-  } }, "滚轮上"), /* @__PURE__ */ import_react68.default.createElement("button", { disabled: busy, onClick: () => {
+  } }, "滚轮上"), /* @__PURE__ */ import_react69.default.createElement("button", { disabled: busy, onClick: () => {
     act({ tool: "scroll", delta: -120 });
-  } }, "滚轮下")), frame?.base64 && /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("input", { className: "bp-desktop-text", "aria-label": "要输入的文本", value: text7, placeholder: "输入文字后发送（发送的是按键，不是剪贴板）", onChange: (event) => setText(event.target.value) }), /* @__PURE__ */ import_react68.default.createElement("button", { disabled: busy || !text7, onClick: () => {
+  } }, "滚轮下")), frame?.base64 && /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("input", { className: "bp-desktop-text", "aria-label": "要输入的文本", value: text7, placeholder: "输入文字后发送（发送的是按键，不是剪贴板）", onChange: (event) => setText(event.target.value) }), /* @__PURE__ */ import_react69.default.createElement("button", { disabled: busy || !text7, onClick: () => {
     act({ type: "type", tool: "type", text: text7 });
   } }, "发送文本")));
 }
 function MachineSetup({ snapshot, dispatch, busy }) {
-  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react68.default.useState(""), [address, setAddress] = import_react68.default.useState(""), [tunnel, setTunnel] = import_react68.default.useState(!1), [status, setStatus] = import_react68.default.useState(""), [error, setError] = import_react68.default.useState(""), [working, setWorking] = import_react68.default.useState(!1), parsed = import_react68.default.useMemo(() => parsePairingPaste(paste), [paste]);
-  import_react68.default.useEffect(() => {
+  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react69.default.useState(""), [address, setAddress] = import_react69.default.useState(""), [tunnel, setTunnel] = import_react69.default.useState(!1), [status, setStatus] = import_react69.default.useState(""), [error, setError] = import_react69.default.useState(""), [working, setWorking] = import_react69.default.useState(!1), parsed = import_react69.default.useMemo(() => parsePairingPaste(paste), [paste]);
+  import_react69.default.useEffect(() => {
     parsed.endpoint && setAddress(parsed.endpoint), typeof parsed.protectedTunnel == "boolean" && setTunnel(parsed.protectedTunnel);
   }, [parsed.endpoint, parsed.protectedTunnel]);
-  let endpoint = import_react68.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react68.default.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed]), importFile = async (event) => {
+  let endpoint = import_react69.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react69.default.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed]), importFile = async (event) => {
     let file = event.target.files?.[0];
     if (file)
       try {
@@ -34884,11 +35224,11 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       }
     }
   };
-  return /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-card bp-machine-setup" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "添加电脑（导入配对文件）"), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 ", /* @__PURE__ */ import_react68.default.createElement("code", null, "start.cmd"), "，按向导选共享文件夹和连接地址。回到这里导入向导生成的 ", /* @__PURE__ */ import_react68.default.createElement("code", null, "pairing.private.json"), "，地址、目录和权限会自动填好。"), available.includes("machine.secret") && available.includes("machine.pair") ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react68.default.createElement("label", null, "配对文件", /* @__PURE__ */ import_react68.default.createElement("input", { type: "file", accept: ".json,application/json", onChange: (event) => {
+  return /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-card bp-machine-setup" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "添加电脑（导入配对文件）"), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 ", /* @__PURE__ */ import_react69.default.createElement("code", null, "start.cmd"), "，按向导选共享文件夹和连接地址。回到这里导入向导生成的 ", /* @__PURE__ */ import_react69.default.createElement("code", null, "pairing.private.json"), "，地址、目录和权限会自动填好。"), available.includes("machine.secret") && available.includes("machine.pair") ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react69.default.createElement("label", null, "配对文件", /* @__PURE__ */ import_react69.default.createElement("input", { type: "file", accept: ".json,application/json", onChange: (event) => {
     importFile(event);
-  } })), /* @__PURE__ */ import_react68.default.createElement("label", null, "或粘贴文件内容", /* @__PURE__ */ import_react68.default.createElement("textarea", { rows: 3, value: paste, onChange: (event) => setPaste(event.target.value), placeholder: '{"clientId":"host-office","token":"...","machineId":"machine-..."}' })), /* @__PURE__ */ import_react68.default.createElement("label", null, "Agent 地址", /* @__PURE__ */ import_react68.default.createElement("input", { value: address, onChange: (event) => setAddress(event.target.value), placeholder: "10.0.0.2 或 http://10.0.0.2:9701", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react68.default.createElement("label", null, /* @__PURE__ */ import_react68.default.createElement("input", { type: "checkbox", checked: tunnel, onChange: (event) => setTunnel(event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), paste !== "" && parsed.problems.length > 0 && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, parsed.problems.join(" ")), address !== "" && endpoint.problem !== "" && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, endpoint.problem), ready && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "将保存凭据 ", /* @__PURE__ */ import_react68.default.createElement("code", null, "ds-secret/", secretName), " 并配对 ", parsed.machineId, "。"), ready && parsed.rootIds.length > 0 && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "共享目录：", parsed.rootIds.join("、"), "。", parsed.hostManagedBots === !0 ? "此电脑允许本宿主管理团队 Bot，后续分配无需重新复制 Bot ID。" : parsed.botIds.length > 0 ? `此电脑只允许这些 Bot：${parsed.botIds.join("、")}。` : ""), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: !ready || busy || working, onClick: () => {
+  } })), /* @__PURE__ */ import_react69.default.createElement("label", null, "或粘贴文件内容", /* @__PURE__ */ import_react69.default.createElement("textarea", { rows: 3, value: paste, onChange: (event) => setPaste(event.target.value), placeholder: '{"clientId":"host-office","token":"...","machineId":"machine-..."}' })), /* @__PURE__ */ import_react69.default.createElement("label", null, "Agent 地址", /* @__PURE__ */ import_react69.default.createElement("input", { value: address, onChange: (event) => setAddress(event.target.value), placeholder: "10.0.0.2 或 http://10.0.0.2:9701", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react69.default.createElement("label", null, /* @__PURE__ */ import_react69.default.createElement("input", { type: "checkbox", checked: tunnel, onChange: (event) => setTunnel(event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), paste !== "" && parsed.problems.length > 0 && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, parsed.problems.join(" ")), address !== "" && endpoint.problem !== "" && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, endpoint.problem), ready && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "将保存凭据 ", /* @__PURE__ */ import_react69.default.createElement("code", null, "ds-secret/", secretName), " 并配对 ", parsed.machineId, "。"), ready && parsed.rootIds.length > 0 && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "共享目录：", parsed.rootIds.join("、"), "。", parsed.hostManagedBots === !0 ? "此电脑允许本宿主管理团队 Bot，后续分配无需重新复制 Bot ID。" : parsed.botIds.length > 0 ? `此电脑只允许这些 Bot：${parsed.botIds.join("、")}。` : ""), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: !ready || busy || working, onClick: () => {
     submit();
-  } }, working ? "添加中…" : "导入并添加"), status !== "" && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted", role: "status" }, status), error !== "" && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供配对操作。"));
+  } }, working ? "添加中…" : "导入并添加"), status !== "" && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted", role: "status" }, status), error !== "" && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供配对操作。"));
 }
 function MachineControls({ machine, snapshot, dispatch, busy }) {
   let groups = [
@@ -34898,38 +35238,38 @@ function MachineControls({ machine, snapshot, dispatch, busy }) {
     ["browser", "远程浏览器", ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_script", "browser_upload", "browser_download", "browser_close"]],
     ["desktop", "Windows 桌面", ["desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"]],
     ["cli", "远程 Codex", ["cli_probe_v1", "cli_task_v1"]]
-  ], [botId, setBotId] = (0, import_react68.useState)(snapshot.bots?.[0]?.id ?? ""), [rootId, setRootId] = (0, import_react68.useState)(machine.roots?.[0] ?? ""), [relativePath, setRelativePath] = (0, import_react68.useState)(""), [mode, setMode] = (0, import_react68.useState)("read-only"), [selected, setSelected] = (0, import_react68.useState)(["read"]), available = snapshot.availableActions ?? [], savedBinding = machine.bindings?.find((item) => item.botId === botId), binding = savedBinding && !savedBinding.revoked ? savedBinding : null;
-  (0, import_react68.useEffect)(() => {
+  ], [botId, setBotId] = (0, import_react69.useState)(snapshot.bots?.[0]?.id ?? ""), [rootId, setRootId] = (0, import_react69.useState)(machine.roots?.[0] ?? ""), [relativePath, setRelativePath] = (0, import_react69.useState)(""), [mode2, setMode] = (0, import_react69.useState)("read-only"), [selected, setSelected] = (0, import_react69.useState)(["read"]), available = snapshot.availableActions ?? [], savedBinding = machine.bindings?.find((item) => item.botId === botId), binding = savedBinding && !savedBinding.revoked ? savedBinding : null;
+  (0, import_react69.useEffect)(() => {
     let tools = savedBinding?.tools ?? [];
     setMode(savedBinding?.mode ?? "read-only"), setSelected(groups.filter(([, , names]) => names.some((name) => tools.includes(name))).map(([id2]) => id2));
   }, [botId, savedBinding?.revision]);
   let run2 = (action, payload) => dispatch(action, { machineId: machine.id, ...payload }), save = () => {
     let tools = /* @__PURE__ */ new Set(["machine_ping", "fs_list", "fs_read", "operation_status", "operation_cancel", "artifact_stat", "artifact_read"]);
     for (let [id2, , names] of groups) if (selected.includes(id2)) for (let name of names) tools.add(name);
-    run2("machine.bind", { botId, roots: [rootId], tools: [...tools].filter((tool) => machine.tools.includes(tool)), mode, expectedRevision: savedBinding?.revision ?? 0 });
+    run2("machine.bind", { botId, roots: [rootId], tools: [...tools].filter((tool) => machine.tools.includes(tool)), mode: mode2, expectedRevision: savedBinding?.revision ?? 0 });
   };
-  return /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react68.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react68.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 Bot`, value: botId, onChange: (event) => setBotId(event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react68.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react68.default.createElement("label", null, "根目录", /* @__PURE__ */ import_react68.default.createElement("select", { "aria-label": `机器 ${machine.id} 的根目录`, value: rootId, onChange: (event) => setRootId(event.target.value) }, (machine.roots ?? []).map((id2) => /* @__PURE__ */ import_react68.default.createElement("option", { key: id2 }, id2)))), /* @__PURE__ */ import_react68.default.createElement("fieldset", null, /* @__PURE__ */ import_react68.default.createElement("legend", null, "授予此 Bot 的能力"), groups.map(([id2, label, names]) => /* @__PURE__ */ import_react68.default.createElement("label", { key: id2 }, /* @__PURE__ */ import_react68.default.createElement("input", { type: "checkbox", disabled: !names.some((name) => machine.tools.includes(name)), checked: selected.includes(id2), onChange: (event) => {
+  return /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react69.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react69.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 Bot`, value: botId, onChange: (event) => setBotId(event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react69.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react69.default.createElement("label", null, "根目录", /* @__PURE__ */ import_react69.default.createElement("select", { "aria-label": `机器 ${machine.id} 的根目录`, value: rootId, onChange: (event) => setRootId(event.target.value) }, (machine.roots ?? []).map((id2) => /* @__PURE__ */ import_react69.default.createElement("option", { key: id2 }, id2)))), /* @__PURE__ */ import_react69.default.createElement("fieldset", null, /* @__PURE__ */ import_react69.default.createElement("legend", null, "授予此 Bot 的能力"), groups.map(([id2, label, names]) => /* @__PURE__ */ import_react69.default.createElement("label", { key: id2 }, /* @__PURE__ */ import_react69.default.createElement("input", { type: "checkbox", disabled: !names.some((name) => machine.tools.includes(name)), checked: selected.includes(id2), onChange: (event) => {
     let next = event.target.checked ? [...selected, id2] : selected.filter((value) => value !== id2);
     setSelected(next), id2 !== "read" && event.target.checked && setMode("workspace-write");
-  } }), label, /* @__PURE__ */ import_react68.default.createElement("small", null, names.filter((name) => machine.tools.includes(name)).join("、") || "此 Agent 未提供")))), /* @__PURE__ */ import_react68.default.createElement("label", null, "权限模式", /* @__PURE__ */ import_react68.default.createElement("select", { value: mode, onChange: (event) => setMode(event.target.value) }, /* @__PURE__ */ import_react68.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react68.default.createElement("option", { value: "workspace-write" }, "允许写入及已勾选的控制操作"))), available.includes("machine.bind") && /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !botId || !rootId || selected.length === 0, onClick: save }, "保存此 Bot 的机器授权"), available.includes("machine.probe") && /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.probe", { botId, rootId }) }, "检查 Agent 在线状态"), /* @__PURE__ */ import_react68.default.createElement("label", null, "受控读测试的相对路径", /* @__PURE__ */ import_react68.default.createElement("input", { "aria-label": `机器 ${machine.id} 的测试路径`, value: relativePath, onChange: (event) => setRelativePath(event.target.value), placeholder: "README.md" })), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !binding || !relativePath, onClick: () => run2("machine.probe", { botId, rootId, relativePath }) }, "验证可读（不显示文件内容）")), available.includes("machine.revoke") && /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.revoke", { botId, expectedRevision: binding.revision }) }, "撤销此 Bot 的机器访问"), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy, onClick: () => run2("machine.revoke", { expectedRevision: machine.revision }) }, "撤销电脑配对")), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "每次保存都会先撤销旧票据再按新范围授权。桌面截图也需要 artifact 权限；撤销离线时会保留“停止未确认”。"));
+  } }), label, /* @__PURE__ */ import_react69.default.createElement("small", null, names.filter((name) => machine.tools.includes(name)).join("、") || "此 Agent 未提供")))), /* @__PURE__ */ import_react69.default.createElement("label", null, "权限模式", /* @__PURE__ */ import_react69.default.createElement("select", { value: mode2, onChange: (event) => setMode(event.target.value) }, /* @__PURE__ */ import_react69.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react69.default.createElement("option", { value: "workspace-write" }, "允许写入及已勾选的控制操作"))), available.includes("machine.bind") && /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !botId || !rootId || selected.length === 0, onClick: save }, "保存此 Bot 的机器授权"), available.includes("machine.probe") && /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.probe", { botId, rootId }) }, "检查 Agent 在线状态"), /* @__PURE__ */ import_react69.default.createElement("label", null, "受控读测试的相对路径", /* @__PURE__ */ import_react69.default.createElement("input", { "aria-label": `机器 ${machine.id} 的测试路径`, value: relativePath, onChange: (event) => setRelativePath(event.target.value), placeholder: "README.md" })), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !binding || !relativePath, onClick: () => run2("machine.probe", { botId, rootId, relativePath }) }, "验证可读（不显示文件内容）")), available.includes("machine.revoke") && /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.revoke", { botId, expectedRevision: binding.revision }) }, "撤销此 Bot 的机器访问"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy, onClick: () => run2("machine.revoke", { expectedRevision: machine.revision }) }, "撤销电脑配对")), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "每次保存都会先撤销旧票据再按新范围授权。桌面截图也需要 artifact 权限；撤销离线时会保留“停止未确认”。"));
 }
 function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
-  let [form, setForm] = (0, import_react68.useState)({ botId: snapshot.bots?.[0]?.id ?? "", taskId: "", attemptId: "", operationId: "", artifactId: "" }), [result, setResult] = (0, import_react68.useState)(null), [error, setError] = (0, import_react68.useState)(null), change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  return /* @__PURE__ */ import_react68.default.createElement("details", { className: "bp-form" }, /* @__PURE__ */ import_react68.default.createElement("summary", null, "下载 artifact"), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "仅下载原任务已授权的 artifact；先核对元数据，再校验完整字节和 SHA-256。内容不会显示在页面中。"), /* @__PURE__ */ import_react68.default.createElement("form", { onSubmit: async (event) => {
+  let [form, setForm] = (0, import_react69.useState)({ botId: snapshot.bots?.[0]?.id ?? "", taskId: "", attemptId: "", operationId: "", artifactId: "" }), [result, setResult] = (0, import_react69.useState)(null), [error, setError] = (0, import_react69.useState)(null), change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  return /* @__PURE__ */ import_react69.default.createElement("details", { className: "bp-form" }, /* @__PURE__ */ import_react69.default.createElement("summary", null, "下载 artifact"), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "仅下载原任务已授权的 artifact；先核对元数据，再校验完整字节和 SHA-256。内容不会显示在页面中。"), /* @__PURE__ */ import_react69.default.createElement("form", { onSubmit: async (event) => {
     event.preventDefault(), setError(null), setResult(null);
     try {
       setResult(await dispatch("machine.artifact", { machineId: machine.id, ...form }));
     } catch (error2) {
       setError(error2);
     }
-  } }, /* @__PURE__ */ import_react68.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react68.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 artifact Bot`, value: form.botId, onChange: (event) => change("botId", event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react68.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), [["taskId", "Task"], ["attemptId", "Attempt"], ["operationId", "Operation"], ["artifactId", "Artifact"]].map(([key, label]) => /* @__PURE__ */ import_react68.default.createElement("label", { key }, label, /* @__PURE__ */ import_react68.default.createElement("input", { "aria-label": `机器 ${machine.id} 的 artifact ${label}`, value: form[key], onInput: (event) => change(key, event.target.value), required: !0, autoComplete: "off" }))), /* @__PURE__ */ import_react68.default.createElement("button", { type: "submit", disabled: busy || Object.values(form).some((value) => !value) }, "核验并下载")), error && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-blocked", role: "status" }, "下载失败：", error.code ?? "ARTIFACT_DOWNLOAD_FAILED", "。artifact 不存在、已过期或未获授权。"), result && /* @__PURE__ */ import_react68.default.createElement("a", { download: `${form.artifactId}.bin`, href: `data:${result.mediaType ?? "application/octet-stream"};base64,${result.content}` }, "下载已核验 artifact（", result.size, " 字节，SHA-256 已匹配）"));
+  } }, /* @__PURE__ */ import_react69.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react69.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 artifact Bot`, value: form.botId, onChange: (event) => change("botId", event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react69.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), [["taskId", "Task"], ["attemptId", "Attempt"], ["operationId", "Operation"], ["artifactId", "Artifact"]].map(([key, label]) => /* @__PURE__ */ import_react69.default.createElement("label", { key }, label, /* @__PURE__ */ import_react69.default.createElement("input", { "aria-label": `机器 ${machine.id} 的 artifact ${label}`, value: form[key], onInput: (event) => change(key, event.target.value), required: !0, autoComplete: "off" }))), /* @__PURE__ */ import_react69.default.createElement("button", { type: "submit", disabled: busy || Object.values(form).some((value) => !value) }, "核验并下载")), error && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-blocked", role: "status" }, "下载失败：", error.code ?? "ARTIFACT_DOWNLOAD_FAILED", "。artifact 不存在、已过期或未获授权。"), result && /* @__PURE__ */ import_react69.default.createElement("a", { download: `${form.artifactId}.bin`, href: `data:${result.mediaType ?? "application/octet-stream"};base64,${result.content}` }, "下载已核验 artifact（", result.size, " 字节，SHA-256 已匹配）"));
 }
 function Machines({ snapshot, dispatch, busy }) {
   let section = snapshot.machines;
-  return section?.status !== "available" ? /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, dispatch && /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement(DesktopWorkbench, { snapshot, dispatch }), /* @__PURE__ */ import_react68.default.createElement("details", null, /* @__PURE__ */ import_react68.default.createElement("summary", null, "兼容截图操作"), /* @__PURE__ */ import_react68.default.createElement(DesktopControl, { snapshot, dispatch, busy })), /* @__PURE__ */ import_react68.default.createElement(MachineSetup, { snapshot, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react68.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react68.default.createElement(Tag3, null, machine.status ?? "未知")), /* @__PURE__ */ import_react68.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react68.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react68.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react68.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react68.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : !dispatch && /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
+  return section?.status !== "available" ? /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, dispatch && /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement(DesktopWorkbench, { snapshot, dispatch }), /* @__PURE__ */ import_react69.default.createElement("details", null, /* @__PURE__ */ import_react69.default.createElement("summary", null, "兼容截图操作"), /* @__PURE__ */ import_react69.default.createElement(DesktopControl, { snapshot, dispatch, busy })), /* @__PURE__ */ import_react69.default.createElement(MachineSetup, { snapshot, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react69.default.createElement(Tag3, null, machine.status ?? "未知")), /* @__PURE__ */ import_react69.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react69.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react69.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react69.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react69.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : !dispatch && /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
 }
 function UnknownReview({ item, dispatch, busy }) {
-  let [note, setNote] = (0, import_react68.useState)(""), [amount, setAmount] = (0, import_react68.useState)(""), attestable = note.trim().length > 0 && amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0, submit = (kind) => dispatch("usage.resolve", {
+  let [note, setNote] = (0, import_react69.useState)(""), [amount, setAmount] = (0, import_react69.useState)(""), attestable = note.trim().length > 0 && amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0, submit = (kind) => dispatch("usage.resolve", {
     botId: item.botId,
     runId: item.runId,
     packageId: item.packageId,
@@ -34937,18 +35277,18 @@ function UnknownReview({ item, dispatch, busy }) {
     ...kind === "attest" ? { costUsd: Number(amount) } : {},
     note: note.trim()
   });
-  return /* @__PURE__ */ import_react68.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, item.botId), /* @__PURE__ */ import_react68.default.createElement(Tag3, null, item.billing === "subscription" ? "订阅" : "API")), /* @__PURE__ */ import_react68.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "运行" }, item.runId), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "工作包" }, item.packageId), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "模型" }, modelName(item.model ?? (item.provider ? { provider: item.provider, model: item.model } : null))), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "用量" }, item.usage ? `${item.usage.inputTokens ?? "未报告"} / ${item.usage.outputTokens ?? "未报告"}` : "未报告"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "结束于" }, item.finishedAt ? new Date(item.finishedAt).toLocaleString("zh-CN") : "未取得")), /* @__PURE__ */ import_react68.default.createElement("label", null, "核对说明（必填，留痕于运行记录）", /* @__PURE__ */ import_react68.default.createElement("input", { "aria-label": `核对说明 ${item.runId}`, value: note, onChange: (event) => setNote(event.target.value), maxLength: 2e3, required: !0, autoComplete: "off" })), /* @__PURE__ */ import_react68.default.createElement("label", null, "厂商确认金额（美元；留空并按零费用放行）", /* @__PURE__ */ import_react68.default.createElement("input", { "aria-label": `核对金额 ${item.runId}`, value: amount, onChange: (event) => setAmount(event.target.value), inputMode: "decimal", placeholder: "0.00", autoComplete: "off" })), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !attestable, onClick: () => submit("attest") }, "按厂商账单确认"), /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy || !note.trim(), onClick: () => submit("waive") }, "按零费用放行")));
+  return /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, item.botId), /* @__PURE__ */ import_react69.default.createElement(Tag3, null, item.billing === "subscription" ? "订阅" : "API")), /* @__PURE__ */ import_react69.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "运行" }, item.runId), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "工作包" }, item.packageId), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "模型" }, modelName(item.model ?? (item.provider ? { provider: item.provider, model: item.model } : null))), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "用量" }, item.usage ? `${item.usage.inputTokens ?? "未报告"} / ${item.usage.outputTokens ?? "未报告"}` : "未报告"), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "结束于" }, item.finishedAt ? new Date(item.finishedAt).toLocaleString("zh-CN") : "未取得")), /* @__PURE__ */ import_react69.default.createElement("label", null, "核对说明（必填，留痕于运行记录）", /* @__PURE__ */ import_react69.default.createElement("input", { "aria-label": `核对说明 ${item.runId}`, value: note, onChange: (event) => setNote(event.target.value), maxLength: 2e3, required: !0, autoComplete: "off" })), /* @__PURE__ */ import_react69.default.createElement("label", null, "厂商确认金额（美元；留空并按零费用放行）", /* @__PURE__ */ import_react69.default.createElement("input", { "aria-label": `核对金额 ${item.runId}`, value: amount, onChange: (event) => setAmount(event.target.value), inputMode: "decimal", placeholder: "0.00", autoComplete: "off" })), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !attestable, onClick: () => submit("attest") }, "按厂商账单确认"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !note.trim(), onClick: () => submit("waive") }, "按零费用放行")));
 }
 function Usage({ snapshot, dispatch, busy, openAdvanced }) {
   let section = snapshot.usage;
-  if (section?.status !== "available") return /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: section }), /* @__PURE__ */ import_react68.default.createElement("button", { onClick: openAdvanced }, "打开已有 MR 费用与订阅面板"));
+  if (section?.status !== "available") return /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: section }), /* @__PURE__ */ import_react69.default.createElement("button", { onClick: openAdvanced }, "打开已有 MR 费用与订阅面板"));
   let unresolved = section.unresolved ?? [];
-  return /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。"), section.summary && /* @__PURE__ */ import_react68.default.createElement("dl", { className: "bp-facts bp-card" }, /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "已知 API 费用" }, money3(section.summary.apiUsd)), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "当前预占" }, money3(section.summary.reservedUsd)), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "未知费用记录" }, section.summary.unknownCount ?? "未报告"), /* @__PURE__ */ import_react68.default.createElement(Value2, { label: "订阅用量" }, subscriptionText(section.summary.subscriptionSummary))), unresolved.length ? /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-card", "aria-label": "待人工核对的未确认费用" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, "待人工核对的未确认费用"), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。"), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-grid" }, unresolved.map((item) => /* @__PURE__ */ import_react68.default.createElement(UnknownReview, { key: `${item.runId}/${item.packageId}`, item, dispatch, busy })))) : null, section.items.length ? /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react68.default.createElement("table", null, /* @__PURE__ */ import_react68.default.createElement("thead", null, /* @__PURE__ */ import_react68.default.createElement("tr", null, /* @__PURE__ */ import_react68.default.createElement("th", null, "Bot / 任务"), /* @__PURE__ */ import_react68.default.createElement("th", null, "来源"), /* @__PURE__ */ import_react68.default.createElement("th", null, "准确模型"), /* @__PURE__ */ import_react68.default.createElement("th", null, "金额"), /* @__PURE__ */ import_react68.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react68.default.createElement("tbody", null, section.items.map((row, i) => /* @__PURE__ */ import_react68.default.createElement("tr", { key: row.id ?? row.receiptId ?? i }, /* @__PURE__ */ import_react68.default.createElement("td", null, row.botName ?? row.botId ?? "未归属", /* @__PURE__ */ import_react68.default.createElement("small", null, row.taskId ?? row.runId)), /* @__PURE__ */ import_react68.default.createElement("td", null, { bot: "Bot 对话", aux: "Bot 辅助调用", "mr-api": "MR API", cli: "官方 CLI", review: "评审" }[row.source] ?? row.source ?? "未报告"), /* @__PURE__ */ import_react68.default.createElement("td", null, modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))), /* @__PURE__ */ import_react68.default.createElement("td", null, row.billing === "subscription" ? "订阅" : money3(row.amountUsd ?? row.costUsd)), /* @__PURE__ */ import_react68.default.createElement("td", null, row.status ?? "未知", row.resolution && /* @__PURE__ */ import_react68.default.createElement(Tag3, null, row.resolution.kind === "waive" ? "已按零费用放行" : `已确认 ${money3(row.resolution.costUsd)}`))))))) : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-empty" }, "尚无费用收据。"), /* @__PURE__ */ import_react68.default.createElement("button", { onClick: openAdvanced }, "打开高级费用、订阅与历史能力"));
+  return /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。"), section.summary && /* @__PURE__ */ import_react69.default.createElement("dl", { className: "bp-facts bp-card" }, /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "已知 API 费用" }, money3(section.summary.apiUsd)), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "当前预占" }, money3(section.summary.reservedUsd)), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "未知费用记录" }, section.summary.unknownCount ?? "未报告"), /* @__PURE__ */ import_react69.default.createElement(Value2, { label: "订阅用量" }, subscriptionText(section.summary.subscriptionSummary))), unresolved.length ? /* @__PURE__ */ import_react69.default.createElement("section", { className: "bp-card", "aria-label": "待人工核对的未确认费用" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, "待人工核对的未确认费用"), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。"), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-grid" }, unresolved.map((item) => /* @__PURE__ */ import_react69.default.createElement(UnknownReview, { key: `${item.runId}/${item.packageId}`, item, dispatch, busy })))) : null, section.items.length ? /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react69.default.createElement("table", null, /* @__PURE__ */ import_react69.default.createElement("thead", null, /* @__PURE__ */ import_react69.default.createElement("tr", null, /* @__PURE__ */ import_react69.default.createElement("th", null, "Bot / 任务"), /* @__PURE__ */ import_react69.default.createElement("th", null, "来源"), /* @__PURE__ */ import_react69.default.createElement("th", null, "准确模型"), /* @__PURE__ */ import_react69.default.createElement("th", null, "金额"), /* @__PURE__ */ import_react69.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react69.default.createElement("tbody", null, section.items.map((row, i) => /* @__PURE__ */ import_react69.default.createElement("tr", { key: row.id ?? row.receiptId ?? i }, /* @__PURE__ */ import_react69.default.createElement("td", null, row.botName ?? row.botId ?? "未归属", /* @__PURE__ */ import_react69.default.createElement("small", null, row.taskId ?? row.runId)), /* @__PURE__ */ import_react69.default.createElement("td", null, { bot: "Bot 对话", aux: "Bot 辅助调用", "mr-api": "MR API", cli: "官方 CLI", review: "评审" }[row.source] ?? row.source ?? "未报告"), /* @__PURE__ */ import_react69.default.createElement("td", null, modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))), /* @__PURE__ */ import_react69.default.createElement("td", null, row.billing === "subscription" ? "订阅" : money3(row.amountUsd ?? row.costUsd)), /* @__PURE__ */ import_react69.default.createElement("td", null, row.status ?? "未知", row.resolution && /* @__PURE__ */ import_react69.default.createElement(Tag3, null, row.resolution.kind === "waive" ? "已按零费用放行" : `已确认 ${money3(row.resolution.costUsd)}`))))))) : /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-empty" }, "尚无费用收据。"), /* @__PURE__ */ import_react69.default.createElement("button", { onClick: openAdvanced }, "打开高级费用、订阅与历史能力"));
 }
 var Library = LibraryPanel;
 function RoleCatalog({ dispatch, busy }) {
-  let [roles, setRoles] = import_react68.default.useState(null), [copied, setCopied] = import_react68.default.useState(""), [error, setError] = import_react68.default.useState("");
-  import_react68.default.useEffect(() => {
+  let [roles, setRoles] = import_react69.default.useState(null), [copied, setCopied] = import_react69.default.useState(""), [error, setError] = import_react69.default.useState("");
+  import_react69.default.useEffect(() => {
     let live = !0;
     if (typeof dispatch == "function")
       return dispatch("roles.list", {}).then((value) => {
@@ -34966,18 +35306,18 @@ function RoleCatalog({ dispatch, busy }) {
       setError(String(failure?.message ?? failure));
     }
   };
-  return error ? /* @__PURE__ */ import_react68.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, "岗位")), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : roles ? /* @__PURE__ */ import_react68.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react68.default.createElement("h2", null, "岗位"), /* @__PURE__ */ import_react68.default.createElement(Tag3, null, roles.length)), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "这些是给 Bot 的岗位简述。新建 Bot 时把简述粘进描述即可；岗位文本不会授予任何工具或机器权限。"), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react68.default.createElement("table", null, /* @__PURE__ */ import_react68.default.createElement("thead", null, /* @__PURE__ */ import_react68.default.createElement("tr", null, /* @__PURE__ */ import_react68.default.createElement("th", null, "岗位"), /* @__PURE__ */ import_react68.default.createElement("th", null, "简述"), /* @__PURE__ */ import_react68.default.createElement("th", null, "需要的能力"), /* @__PURE__ */ import_react68.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react68.default.createElement("tbody", null, roles.map((role) => /* @__PURE__ */ import_react68.default.createElement("tr", { key: role.id }, /* @__PURE__ */ import_react68.default.createElement("td", null, role.name, /* @__PURE__ */ import_react68.default.createElement("small", null, role.id)), /* @__PURE__ */ import_react68.default.createElement("td", null, role.brief), /* @__PURE__ */ import_react68.default.createElement("td", { className: "bp-code" }, role.tools.join("、")), /* @__PURE__ */ import_react68.default.createElement("td", null, /* @__PURE__ */ import_react68.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
+  return error ? /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, "岗位")), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : roles ? /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, "岗位"), /* @__PURE__ */ import_react69.default.createElement(Tag3, null, roles.length)), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "这些是给 Bot 的岗位简述。新建 Bot 时把简述粘进描述即可；岗位文本不会授予任何工具或机器权限。"), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react69.default.createElement("table", null, /* @__PURE__ */ import_react69.default.createElement("thead", null, /* @__PURE__ */ import_react69.default.createElement("tr", null, /* @__PURE__ */ import_react69.default.createElement("th", null, "岗位"), /* @__PURE__ */ import_react69.default.createElement("th", null, "简述"), /* @__PURE__ */ import_react69.default.createElement("th", null, "需要的能力"), /* @__PURE__ */ import_react69.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react69.default.createElement("tbody", null, roles.map((role) => /* @__PURE__ */ import_react69.default.createElement("tr", { key: role.id }, /* @__PURE__ */ import_react69.default.createElement("td", null, role.name, /* @__PURE__ */ import_react69.default.createElement("small", null, role.id)), /* @__PURE__ */ import_react69.default.createElement("td", null, role.brief), /* @__PURE__ */ import_react69.default.createElement("td", { className: "bp-code" }, role.tools.join("、")), /* @__PURE__ */ import_react69.default.createElement("td", null, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
     copy2(role);
   } }, copied === role.id ? "已复制" : "复制简述")))))))) : null;
 }
 function ProductPage({ section, productApi, openSession, openPanel }) {
-  (0, import_react68.useEffect)(() => {
+  (0, import_react69.useEffect)(() => {
     let id2 = PRODUCT_PANELS[section];
     return announcePanel(id2), () => announcePanel(id2, !0);
   }, [section]);
-  let [snapshot, setSnapshot] = (0, import_react68.useState)(null), [error, setError] = (0, import_react68.useState)(""), [busy, setBusy] = (0, import_react68.useState)(!1), [snapshotStale, setSnapshotStale] = (0, import_react68.useState)(!1), pendingActions = (0, import_react68.useRef)(0), lifecycle = (0, import_react68.useRef)({ live: !1, epoch: 0, request: 0 }), snapshotApi = (0, import_react68.useRef)(null), dispatchState = (0, import_react68.useRef)(null);
+  let [snapshot, setSnapshot] = (0, import_react69.useState)(null), [error, setError] = (0, import_react69.useState)(""), [busy, setBusy] = (0, import_react69.useState)(!1), [snapshotStale, setSnapshotStale] = (0, import_react69.useState)(!1), pendingActions = (0, import_react69.useRef)(0), lifecycle = (0, import_react69.useRef)({ live: !1, epoch: 0, request: 0 }), snapshotApi = (0, import_react69.useRef)(null), dispatchState = (0, import_react69.useRef)(null);
   dispatchState.current = { snapshotStale, readOnly: snapshot?.readOnly };
-  let refresh = (0, import_react68.useCallback)(async (signal) => {
+  let refresh = (0, import_react69.useCallback)(async (signal) => {
     let state = lifecycle.current;
     if (!state.live) return;
     let epoch = state.epoch, request = ++state.request, current = () => state.live && state.epoch === epoch && state.request === request && !signal?.aborted;
@@ -34990,7 +35330,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
       current() && (setSnapshotStale(!0), setError(cause.message));
     }
   }, [productApi]);
-  (0, import_react68.useEffect)(() => {
+  (0, import_react69.useEffect)(() => {
     let controller = new AbortController(), state = lifecycle.current;
     state.live = !0, state.epoch++, setSnapshotStale(!0), pendingActions.current = 0, setBusy(!1);
     let timer, stopped = !1, loop = async () => {
@@ -35000,7 +35340,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
       stopped = !0, state.live = !1, state.epoch++, state.request++, controller.abort(), clearTimeout(timer);
     };
   }, [refresh]);
-  let dispatch = (0, import_react68.useCallback)(async (action, payload, { errorResult = !1 } = {}) => {
+  let dispatch = (0, import_react69.useCallback)(async (action, payload, { errorResult = !1 } = {}) => {
     if (dispatchState.current.snapshotStale || dispatchState.current.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return;
     let state = lifecycle.current, epoch = state.epoch, current = () => state.live && state.epoch === epoch;
     pendingActions.current++, setBusy(!0);
@@ -35012,7 +35352,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
     } finally {
       current() && (pendingActions.current = Math.max(0, pendingActions.current - 1), setBusy(pendingActions.current > 0));
     }
-  }, [productApi, refresh]), inspectTask = (0, import_react68.useCallback)((payload, signal) => productApi.dispatch("task.inspect", payload, signal), [productApi]), disabled = busy || snapshotStale || snapshotApi.current !== productApi || !!snapshot?.readOnly, title = { bindings: "Bot 绑定与权限", tasks: "任务", machines: "远程电脑", library: "资料库", routine: "例行任务", usage: "费用与用量" }[section], meta = {
+  }, [productApi, refresh]), inspectTask = (0, import_react69.useCallback)((payload, signal) => productApi.dispatch("task.inspect", payload, signal), [productApi]), readEngines = (0, import_react69.useCallback)((payload) => productApi.dispatch("engines.catalog", payload), [productApi]), disabled = busy || snapshotStale || snapshotApi.current !== productApi || !!snapshot?.readOnly, title = { bindings: "Bot 绑定与权限", tasks: "任务", machines: "远程电脑", library: "资料库", routine: "例行任务", usage: "费用与用量" }[section], meta = {
     bindings: ["team", "让每位伙伴各司其职。管理模型、工具和工作空间。"],
     tasks: ["tasks", "把工作交给合适的 Bot，在这里关注进展与结果。"],
     machines: ["computer", "连接你自己的电脑，随时查看桌面或接过控制权。"],
@@ -35020,60 +35360,55 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
     routine: ["repeat", "演示一次，保存步骤，把重复的工作交给 Bot。"],
     usage: ["chart", "查看真实使用记录，清楚掌握每一笔费用。"]
   }[section] ?? ["bot", ""];
-  return /* @__PURE__ */ import_react68.default.createElement("main", { className: "bp-page", "data-section": section }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-page-inner" }, /* @__PURE__ */ import_react68.default.createElement("header", { className: "bp-page-header" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-page-heading" }, /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-eyebrow" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: meta[0], size: 14 }), "工作空间", /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "chevron", size: 12 }), /* @__PURE__ */ import_react68.default.createElement("span", null, title)), /* @__PURE__ */ import_react68.default.createElement("h1", null, title), /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-page-description" }, meta[1])), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-page-tools" }, /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-sync", "data-state": snapshotStale ? "stale" : snapshot ? "ready" : "loading" }, snapshotStale ? "等待同步" : snapshot ? "已同步" : "正在连接"), /* @__PURE__ */ import_react68.default.createElement("button", { className: "bp-refresh", disabled: busy, onClick: () => refresh(), title: "刷新当前页面" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "refresh", size: 16, className: busy ? "bp-spinning" : "" }), /* @__PURE__ */ import_react68.default.createElement("span", null, "刷新")))), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-page-body" }, error && /* @__PURE__ */ import_react68.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react68.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react68.default.createElement("p", null, error), snapshot && /* @__PURE__ */ import_react68.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot?.readOnly && /* @__PURE__ */ import_react68.default.createElement(Blocked, { value: { reason: snapshot.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot && !error && /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-loading", role: "status" }, /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react68.default.createElement("p", null, "正在读取宿主状态…")), snapshot && /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, section === "bindings" && /* @__PURE__ */ import_react68.default.createElement(import_react68.default.Fragment, null, /* @__PURE__ */ import_react68.default.createElement(BotBindings, { snapshot, openSession, dispatch, busy: disabled }), snapshot.availableActions?.includes("roles.list") && /* @__PURE__ */ import_react68.default.createElement(RoleCatalog, { dispatch, busy: disabled })), section === "tasks" && /* @__PURE__ */ import_react68.default.createElement(Tasks, { snapshot, dispatch, busy: disabled, submissionScope: productApi, inspect: !snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : void 0, openSession }), section === "machines" && /* @__PURE__ */ import_react68.default.createElement(Machines, { snapshot, dispatch, busy: disabled }), section === "routine" && /* @__PURE__ */ import_react68.default.createElement(RoutinesPanel, { snapshot, dispatch, busy: disabled, onOpenMachines: () => openPanel(PRODUCT_PANELS.machines) }), section === "library" && /* @__PURE__ */ import_react68.default.createElement(Library, { snapshot, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react68.default.createElement(Usage, { snapshot, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react68.default.createElement("footer", { className: "bp-page-footer bp-muted" }, "上次同步 ", new Date(snapshot.observedAt).toLocaleString("zh-CN"))))));
+  return /* @__PURE__ */ import_react69.default.createElement("main", { className: "bp-page", "data-section": section }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-page-inner" }, /* @__PURE__ */ import_react69.default.createElement("header", { className: "bp-page-header" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-page-heading" }, /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-eyebrow" }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: meta[0], size: 14 }), "工作空间", /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "chevron", size: 12 }), /* @__PURE__ */ import_react69.default.createElement("span", null, title)), /* @__PURE__ */ import_react69.default.createElement("h1", null, title), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-page-description" }, meta[1])), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-page-tools" }, /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-sync", "data-state": snapshotStale ? "stale" : snapshot ? "ready" : "loading" }, snapshotStale ? "等待同步" : snapshot ? "已同步" : "正在连接"), /* @__PURE__ */ import_react69.default.createElement("button", { className: "bp-refresh", disabled: busy, onClick: () => refresh(), title: "刷新当前页面" }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "refresh", size: 16, className: busy ? "bp-spinning" : "" }), /* @__PURE__ */ import_react69.default.createElement("span", null, "刷新")))), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-page-body" }, error && /* @__PURE__ */ import_react69.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react69.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react69.default.createElement("p", null, error), snapshot && /* @__PURE__ */ import_react69.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot?.readOnly && /* @__PURE__ */ import_react69.default.createElement(Blocked, { value: { reason: snapshot.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot && !error && /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-loading", role: "status" }, /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react69.default.createElement("p", null, "正在读取宿主状态…")), snapshot && /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, section === "bindings" && /* @__PURE__ */ import_react69.default.createElement(import_react69.default.Fragment, null, /* @__PURE__ */ import_react69.default.createElement(
+    BotBindings,
+    {
+      snapshot,
+      openSession,
+      dispatch,
+      busy: disabled,
+      readEngines: snapshot.availableActions?.includes("engines.catalog") ? readEngines : void 0,
+      openTools: () => openPanel("model-router-galgame")
+    }
+  ), snapshot.availableActions?.includes("roles.list") && /* @__PURE__ */ import_react69.default.createElement(RoleCatalog, { dispatch, busy: disabled })), section === "tasks" && /* @__PURE__ */ import_react69.default.createElement(Tasks, { snapshot, dispatch, busy: disabled, submissionScope: productApi, inspect: !snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : void 0, openSession }), section === "machines" && /* @__PURE__ */ import_react69.default.createElement(Machines, { snapshot, dispatch, busy: disabled }), section === "routine" && /* @__PURE__ */ import_react69.default.createElement(RoutinesPanel, { snapshot, dispatch, busy: disabled, onOpenMachines: () => openPanel(PRODUCT_PANELS.machines) }), section === "library" && /* @__PURE__ */ import_react69.default.createElement(Library, { snapshot, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react69.default.createElement(Usage, { snapshot, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react69.default.createElement("footer", { className: "bp-page-footer bp-muted" }, "上次同步 ", new Date(snapshot.observedAt).toLocaleString("zh-CN"))))));
 }
 
 // apps/integration-client/product.css
-var product_default = `/* Quiet workspace surfaces shared by the product panels and the Bot conversation. */
-html body[data-bot-product-ui], html body[data-bot-product-ui][data-ds-dark-theme] {
-  --bp-bg: #fcfcfd;
-  --bp-surface: #fff;
-  --bp-sidebar: #f4f4f5;
-  --bp-subtle: #f6f6f7;
-  --bp-hover: #ededf0;
-  --bp-border: #e6e6e9;
-  --bp-ink: #242427;
-  --bp-muted: #76767e;
-  --bp-quiet: #a1a1a9;
-  --bp-solid: #242427;
-  --bp-on-solid: #fff;
-  --bp-focus: #617b9f;
-  --bp-warning: #8b6526;
-  --bp-warning-bg: #fbf8f0;
-  --bp-danger: #b33c42;
-  --bp-danger-bg: #fcf2f2;
-  --bp-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --bt-sidebar: var(--bp-sidebar);
-  --bt-main: var(--bp-bg);
-  --bt-card: var(--bp-surface);
-  --bt-ink: var(--bp-ink);
-  --bt-ink-2: var(--bp-muted);
-  --bt-line: var(--bp-border);
-  --bt-accent: var(--bp-solid);
-  --bt-accent-ink: var(--bp-on-solid);
-  --bt-user: #202023;
-  --bt-user-ink: #fff;
+var product_default = `/* Product surfaces follow the active DS Bot theme (including the OpenMausBot skins), so the
+   Theme setting recolours the panels and the conversation together. Skins add \`--bp-skin-*\`
+   for what the eight theme colours cannot carry; every use keeps a neutral fallback. */
+html body[data-bot-product-ui] {
+  --bp-bg: var(--bt-main, #fcfcfd);
+  --bp-surface: var(--bt-card, #fff);
+  --bp-sidebar: var(--bt-sidebar, #f4f4f5);
+  --bp-subtle: color-mix(in srgb, var(--bp-ink) 4%, var(--bp-bg));
+  --bp-hover: color-mix(in srgb, var(--bp-ink) 7%, var(--bp-bg));
+  --bp-raised: var(--bp-skin-raised, color-mix(in srgb, var(--bp-ink) 8%, var(--bp-bg)));
+  --bp-control: var(--bp-skin-control, color-mix(in srgb, var(--bp-ink) 6%, var(--bp-surface)));
+  --bp-border: var(--bp-skin-line, color-mix(in srgb, var(--bp-ink) 11%, transparent));
+  --bp-ink: var(--bt-ink, #242427);
+  --bp-muted: color-mix(in srgb, var(--bp-ink) 64%, transparent);
+  --bp-quiet: color-mix(in srgb, var(--bp-ink) 44%, transparent);
+  --bp-solid: var(--bp-ink);
+  --bp-on-solid: var(--bp-bg);
+  --bp-accent: var(--bt-accent, #4d6bfe);
+  --bp-accent-ink: var(--bt-accent-ink, #fff);
+  --bp-accent-text: var(--bp-skin-accent-text, var(--bp-accent));
+  --bp-focus: color-mix(in srgb, var(--bp-accent) 72%, var(--bp-ink));
+  --bp-success: var(--bp-skin-success, #2f7d55);
+  --bp-warning: var(--bp-skin-warning, #8b6526);
+  --bp-warning-bg: color-mix(in srgb, var(--bp-warning) 9%, var(--bp-surface));
+  --bp-danger: var(--bp-skin-danger, #b33c42);
+  --bp-danger-bg: color-mix(in srgb, var(--bp-danger) 8%, var(--bp-surface));
+  --bp-shadow-float: 0 10px 28px -12px rgb(0 0 0 / .24), 0 2px 6px -2px rgb(0 0 0 / .08);
+  --bp-font: "Geist Variable", Geist, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --bt-font: var(--bp-font);
 }
 html body[data-bot-product-ui][data-ds-dark-theme] {
-  --bp-bg: #151517;
-  --bp-surface: #1c1c1f;
-  --bp-sidebar: #19191c;
-  --bp-subtle: #232326;
-  --bp-hover: #2b2b30;
-  --bp-border: #303035;
-  --bp-ink: #ededf0;
-  --bp-muted: #a0a0a9;
-  --bp-quiet: #72727c;
-  --bp-solid: #ededf0;
-  --bp-on-solid: #1b1b1e;
-  --bp-focus: #95b0d6;
-  --bp-warning: #d9b574;
-  --bp-warning-bg: #2b261d;
-  --bp-danger: #f09b9e;
-  --bp-danger-bg: #332024;
-  --bt-user: #e9e9ec;
-  --bt-user-ink: #19191c;
+  --bp-success: var(--bp-skin-success, #69b98a);
+  --bp-warning: var(--bp-skin-warning, #d9b574);
+  --bp-danger: var(--bp-skin-danger, #f09b9e);
+  --bp-shadow-float: 0 16px 40px -16px rgb(0 0 0 / .6), 0 4px 10px -4px rgb(0 0 0 / .3);
 }
 .bp-page, .bp-desktop-viewer, .bp-nav { color: var(--bp-ink, #242427); font-family: var(--bp-font, system-ui, sans-serif); }
 .bp-page { box-sizing: border-box; height: 100%; overflow: auto; padding: 30px 38px 24px; background: var(--bp-bg, #fcfcfd); font-size: 14px; line-height: 1.65; container-type: inline-size; }
@@ -35090,7 +35425,7 @@ html body[data-bot-product-ui][data-ds-dark-theme] {
 .bp-page-tools { display: flex; align-items: center; gap: 14px; padding-top: 2px; flex-shrink: 0; }
 .bp-sync { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--bp-muted); white-space: nowrap; }
 .bp-sync::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--bp-quiet); }
-.bp-sync[data-state=ready]::before { background: #69a17d; }
+.bp-sync[data-state=ready]::before { background: var(--bp-success); }
 .bp-sync[data-state=stale]::before { background: #c49752; }
 .bp-icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 .bp-muted, .bp-page small { color: var(--bp-muted, #76767e); }
@@ -35233,7 +35568,7 @@ html body[data-bot-product-ui][data-ds-dark-theme] {
 .bp-desktop-viewer h3 { margin: 0; font-size: 13px; font-weight: 550; }
 .bp-desktop-status { display: inline-flex; align-items: center; gap: 6px; color: var(--bp-muted); font-size: 11px; }
 .bp-desktop-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--bp-quiet); }
-.bp-desktop-status[data-connected=true]::before { background: #69a17d; }
+.bp-desktop-status[data-connected=true]::before { background: var(--bp-success); }
 .bp-stream-screen { position: relative; background: #202023; border: 1px solid var(--bp-border); border-radius: 10px; overflow: hidden; min-height: 140px; display: flex; align-items: center; justify-content: center; }
 .bp-stream-canvas { display: block; width: 100%; height: auto; max-height: 65vh; object-fit: contain; touch-action: none; outline: none; background: #111; }
 .bp-stream-screen[data-connected=false] .bp-stream-canvas { min-height: 255px; max-height: 255px; opacity: 0; }
@@ -35286,7 +35621,7 @@ html body[data-bot-product-ui][data-ds-dark-theme] {
 .bt-desktop-modal-bar { display: flex; align-items: center; gap: 8px; color: #ededf0; }
 /* Keep conversation colours independent of the Harness message defaults. */
 body[data-bot-product-ui] .bt-urow, body[data-bot-product-ui] .bt-bubble { color: var(--bt-ink); }
-body[data-bot-product-ui] .bt-ububble { background: var(--bt-user); color: var(--bt-user-ink); border: 0; border-radius: 18px 18px 5px 18px; padding: 10px 14px; }
+body[data-bot-product-ui] .bt-ububble { background: var(--bt-user); color: var(--bt-user-ink); border: 0; border-radius: 18px; padding: 8px 14px; }
 body[data-bot-product-ui] .bt-ububble a { color: inherit; }
 body[data-bot-product-ui] .bt-side { background: var(--bp-sidebar); }
 body[data-bot-product-ui] .bt-row { border-radius: 9px; }
@@ -35350,6 +35685,81 @@ body[data-bot-product-ui] .bt-side { container-name: bot-sidebar; container-type
   body[data-bot-product-ui] .bt-tile > .bt-mark { grid-column: 1; }
   body[data-bot-product-ui] .bt-list > .bt-row { padding: 11px 10px; }
 }
+/* Brain picker: OpenMausBot's model picker anatomy (56px engine rail, 420px popover, 8px rows,
+   12px menu radius, 10% tinted status pills), drawn with this product's tokens. */
+.bp-form-field { display: grid; gap: 6px; font-size: 12px; color: var(--bp-muted); }
+.bp-form-field > small { margin: 0; }
+.bp-brain { position: relative; min-width: 0; }
+.bp-page .bp-brain-trigger { justify-content: flex-start; width: 100%; max-width: 460px; gap: 10px; min-height: 48px; padding: 7px 12px 7px 8px; border-radius: 12px; background: var(--bp-surface); text-align: left; }
+.bp-page .bp-brain-trigger[aria-expanded=true] { border-color: var(--bp-focus); background: var(--bp-subtle); }
+.bp-brain-trigger > .bp-icon:last-child { margin-left: auto; color: var(--bp-muted); }
+.bp-brain-copy { display: grid; min-width: 0; line-height: 1.35; }
+.bp-brain-copy strong { overflow: hidden; color: var(--bp-ink); font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.bp-page .bp-brain-copy small { margin: 0; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.bp-engine-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; border-radius: 8px; color: #fff; background: var(--bp-mark, #7a7a82); font-size: 12px; font-weight: 650; letter-spacing: -.02em; line-height: 1; }
+.bp-engine-mark-sm { width: 26px; height: 26px; border-radius: 7px; font-size: 11px; }
+.bp-engine-mark-xs { width: 18px; height: 18px; border-radius: 5px; font-size: 9px; }
+.bp-brain-pop { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; display: grid; grid-template-columns: 56px minmax(0, 1fr); width: min(420px, calc(100vw - 32px)); max-height: min(600px, 72vh); overflow: hidden; border: 1px solid var(--bp-border); border-radius: 12px; background: var(--bp-surface); box-shadow: var(--bp-shadow-float); animation: bp-pop-in .2s cubic-bezier(.22, 1, .36, 1); }
+@keyframes bp-pop-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.bp-brain-rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; overflow-y: auto; border-right: 1px solid var(--bp-border); background: var(--bp-subtle); }
+.bp-brain-rail-group { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; }
+.bp-brain-rail-group + .bp-brain-rail-group { padding-top: 8px; border-top: 1px solid var(--bp-border); }
+.bp-brain-rail-label { color: var(--bp-quiet); font-size: 9px; letter-spacing: .02em; white-space: nowrap; }
+.bp-page .bp-brain-engine { position: relative; width: 36px; height: 36px; min-height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent; }
+.bp-page .bp-brain-engine:hover { background: var(--bp-hover); border: 0; }
+.bp-page .bp-brain-engine[aria-selected=true] { background: var(--bp-raised); }
+.bp-brain-engine[data-attention=true] .bp-engine-mark { opacity: .62; }
+.bp-brain-engine[data-attention=true]::after, .bp-brain-engine[data-attached=true]::after { content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border: 1.5px solid var(--bp-subtle); border-radius: 50%; background: var(--bp-warning); }
+.bp-brain-engine[data-attached=true]::after { background: var(--bp-accent); }
+.bp-brain-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; padding: 10px 10px 0; }
+.bp-brain-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 10px; }
+.bp-brain-head-copy { display: grid; flex: 1; min-width: 0; line-height: 1.35; }
+.bp-brain-head-copy strong { overflow: hidden; color: var(--bp-ink); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.bp-page .bp-brain-head-copy small { margin: 0; font-size: 11px; }
+.bp-page .bp-brain-icon { width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--bp-muted); }
+.bp-page .bp-brain-icon:hover { background: var(--bp-hover); border: 0; }
+.bp-pill { display: inline-flex; align-items: center; flex: none; height: 22px; padding: 0 8px; border-radius: 999px; color: var(--bp-muted); background: var(--bp-hover); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.bp-pill[data-tone=success] { color: var(--bp-success); background: color-mix(in srgb, var(--bp-success) 11%, transparent); }
+.bp-pill[data-tone=warning] { color: var(--bp-warning); background: color-mix(in srgb, var(--bp-warning) 11%, transparent); }
+.bp-pill[data-tone=danger] { color: var(--bp-danger); background: color-mix(in srgb, var(--bp-danger) 11%, transparent); }
+.bp-brain-search { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; padding: 0 9px; min-height: 32px; border-radius: 8px; color: var(--bp-muted); background: var(--bp-control); }
+.bp-page .bp-brain-search input { flex: 1; min-height: 30px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.bp-page .bp-brain-search input:focus-visible { outline: none; }
+.bp-brain-search:focus-within { outline: 2px solid var(--bp-focus); outline-offset: 1px; }
+.bp-brain-list { display: grid; gap: 1px; }
+.bp-page .bp-brain-model { justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
+.bp-page .bp-brain-model:hover { background: var(--bp-hover); border: 0; }
+.bp-page .bp-brain-model:is([aria-selected=true], [aria-pressed=true]) { background: var(--bp-raised); }
+.bp-brain-model > .bp-icon { color: var(--bp-accent-text); }
+.bp-brain-model-copy { display: grid; min-width: 0; line-height: 1.35; }
+.bp-brain-model-copy strong { overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.bp-page .bp-brain-model-copy small { margin: 1px 0 0; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.bp-page .bp-brain-more { justify-content: flex-start; width: 100%; min-height: 32px; margin-top: 2px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--bp-muted); font-size: 12px; }
+.bp-page .bp-brain-more:hover { background: var(--bp-hover); border: 0; color: var(--bp-ink); }
+.bp-brain-section { margin: 12px 4px 6px; color: var(--bp-quiet); font-size: 11px; font-weight: 500; }
+.bp-brain-setup { display: grid; gap: 6px; margin: 0 2px 6px; padding: 12px; border-radius: 10px; color: var(--bp-ink); background: color-mix(in srgb, var(--bp-warning) 8%, var(--bp-surface)); font-size: 12px; }
+.bp-brain-setup strong { font-size: 13px; font-weight: 550; }
+.bp-brain-setup p { margin: 0; color: var(--bp-muted); }
+.bp-brain-setup code { justify-self: start; padding: 3px 7px; border-radius: 6px; background: var(--bp-control); font: 11px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.bp-page .bp-brain-setup button { justify-self: start; min-height: 28px; padding: 4px 10px; font-size: 12px; }
+.bp-brain-switch { display: flex; align-items: flex-start; gap: 9px; margin: 0 2px; padding: 9px 10px; border-radius: 8px; color: var(--bp-ink); font-size: 13px; cursor: pointer; }
+.bp-brain-switch:hover { background: var(--bp-hover); }
+.bp-brain-switch input { margin-top: 3px; }
+.bp-brain-switch > span { display: grid; gap: 2px; }
+.bp-brain-switch strong { font-weight: 500; }
+.bp-page .bp-brain-switch small { margin: 0; }
+.bp-brain-note, .bp-brain-empty { margin: 6px 6px 4px; color: var(--bp-muted); font-size: 11px; line-height: 1.6; }
+.bp-brain-foot { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px -10px 0; padding: 8px 10px; border-top: 1px solid var(--bp-border); background: var(--bp-surface); color: var(--bp-quiet); font-size: 11px; }
+.bp-page .bp-brain-foot button { min-height: 28px; padding: 4px 9px; border: 0; background: transparent; color: var(--bp-muted); font-size: 12px; }
+.bp-page .bp-brain-foot button:hover { background: var(--bp-hover); border: 0; color: var(--bp-ink); }
+.bp-brain-badge { display: grid; gap: 10px; margin: 4px 0 6px; padding: 12px 14px; border: 1px solid var(--bp-border); border-radius: 12px; background: var(--bp-subtle); }
+.bp-brain-badge-main { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.bp-brain-tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.bp-brain-tools li { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px 4px 5px; border: 1px solid var(--bp-border); border-radius: 999px; background: var(--bp-surface); font-size: 12px; }
+.bp-page .bp-brain-tools small { display: inline; margin: 0; font-size: 11px; }
+@media (max-width: 520px) {
+  .bp-brain-pop { position: fixed; top: auto; right: 8px; bottom: 8px; left: 8px; width: auto; max-height: 78vh; border-radius: 16px; }
+}
 `;
 
 // apps/integration-client/desktop-bridge.mjs
@@ -35380,8 +35790,8 @@ function productSlots(slots, openPanel) {
     if (key === "register") return (options, component) => {
       if (component !== TeamSidebar) return target.register(options, component);
       let Sidebar = (props) => {
-        let sidebarAddon = () => /* @__PURE__ */ import_react69.default.createElement(ProductNavigation, { panels: PRODUCT_PANELS, openPanel, compact: !props.wide });
-        return /* @__PURE__ */ import_react69.default.createElement(TeamSidebar, { ...props, actions: { ...props.actions, sidebarAddon } });
+        let sidebarAddon = () => /* @__PURE__ */ import_react70.default.createElement(ProductNavigation, { panels: PRODUCT_PANELS, openPanel, compact: !props.wide });
+        return /* @__PURE__ */ import_react70.default.createElement(TeamSidebar, { ...props, actions: { ...props.actions, sidebarAddon } });
       };
       return Sidebar.dsBotTeamSidebar = TeamSidebar, target.register(options, Sidebar);
     };
@@ -35391,7 +35801,7 @@ function productSlots(slots, openPanel) {
 }
 async function apply3(ctx) {
   let api = createProductApi();
-  ctx.effect(() => installDesktopBridge(api, (props) => /* @__PURE__ */ import_react69.default.createElement(DesktopPane2, { ...props })), "bot-product: desktop bridge");
+  ctx.effect(() => installDesktopBridge(api, (props) => /* @__PURE__ */ import_react70.default.createElement(DesktopPane2, { ...props })), "bot-product: desktop bridge");
   let openPanel = (id2) => ctx.layout.selectPanel(id2), slots = productSlots(ctx.slots, openPanel), dsContext = new Proxy(ctx, { get: (target, key) => key === "slots" ? slots : Reflect.get(target, key, target) });
   ctx.effect(() => {
     let previous = document.body.getAttribute("data-bot-product-ui");
@@ -35400,7 +35810,7 @@ async function apply3(ctx) {
     return style.dataset.botProduct = "1", style.textContent = product_default, document.head.append(style), () => {
       style.remove(), previous === null ? document.body.removeAttribute("data-bot-product-ui") : document.body.setAttribute("data-bot-product-ui", previous);
     };
-  }, "bot-product: styles"), apply(dsContext);
+  }, "bot-product: styles"), ctx.effect(() => registerSkins(registerTheme), "bot-product: skins"), apply(dsContext);
   let disposeMr = await apply2(ctx);
   for (let [section, key] of Object.entries(PRODUCT_PANELS))
     ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({

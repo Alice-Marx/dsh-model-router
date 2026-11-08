@@ -92,6 +92,7 @@
     "README.zh.md",
     "README.i18n.yaml",
     "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     ".dsh-plugin/shared/reasoning-execution.mjs",
     ".dsh-plugin/shared/routing-evidence.mjs",
     ".dsh-plugin/shared/quality-gates.mjs",

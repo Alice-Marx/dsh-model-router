@@ -1,6 +1,8 @@
 import React from 'react'
 import { apply as applyDs, inject as dsInject } from '../../modules/bot-runtime/vendor/ds-bot/src/client/index.js'
 import { TeamSidebar } from '../../modules/bot-runtime/vendor/ds-bot/src/client/sidebar.js'
+import { registerTheme } from '../../modules/bot-runtime/vendor/ds-bot/src/client/themes.js'
+import { registerSkins } from './skins.mjs'
 import { apply as applyMr } from '../../.dsh-plugin/client/official-harness.jsx'
 import { createProductApi, PRODUCT_PANELS } from './api.mjs'
 import { ProductNavigation, ProductPage } from './panels.jsx'
@@ -43,6 +45,8 @@ export async function apply(ctx) {
       else document.body.setAttribute('data-bot-product-ui', previous)
     }
   }, 'bot-product: styles')
+  // Registered before DS applies the saved theme, so a saved skin never flashes the default.
+  ctx.effect(() => registerSkins(registerTheme), 'bot-product: skins')
   applyDs(dsContext)
   const disposeMr = await applyMr(ctx)
   for (const [section, key] of Object.entries(PRODUCT_PANELS)) {

@@ -49,6 +49,9 @@
     [
       "--test",
       "tests/product-channel-dispatch.test.mjs",
+      "tests/official-engines.test.mjs",
+      "tests/brain-catalog.test.mjs",
+      "tests/product-skins.test.mjs",
       "tests/task-progress.test.mjs",
       "tests/task-workspace.integration.test.mjs",
       "tests/bot-library-files.test.mjs",
