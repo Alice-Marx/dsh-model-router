@@ -16,7 +16,7 @@ This is a community plugin. It reuses Harness model configuration and Host servi
 
 **Current stable version: 0.66.4 · Windows Remote Agent: 0.1.1**
 
-[Choose an edition](#editions) · [Install](#install) · [First task](#quick-evaluation) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
+[Choose an edition](#editions) · [Install](#install) · [First task](#quick-evaluation) · [Bots and models](#bots-and-models) · [Bot delegation](#bot-routing) · [Remote computers](#computers) · [Support](#troubleshooting)
 
 <a id="editions"></a>
 
@@ -46,6 +46,8 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 | Bot-to-Bot routing | Let a Main Bot select an eligible execution Bot from committed model, tool, computer, and funding settings, then dispatch real tasks. | Full Bot |
 | Windows computers and routines | Pair your own computer, watch or control its desktop, record confirmed input, and replay saved routines. | Full Bot |
 | Private file libraries | Organize files per Bot, upload/download binary files, edit text, and search private text with line-level results. | Full Bot |
+| Bots, models, and AI engines | Put a Bot to work by picking its model in chat; use Claude Code, Codex, or Gemini CLI with their own subscription logins as a Bot's model; choose from a model menu grouped by provider. | Full Bot · next release |
+| Inbox, ready-made Bots, and team packages | See everything that needs you on one page; create a Bot from 16 ready-made ones; preview and import team packages; use keyboard shortcuts. | Full Bot · next release |
 
 <a id="install"></a>
 
@@ -123,7 +125,7 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 
 ## Build a persistent Bot workspace
 
-**Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings**, commit its allowed tools, computer/workspace access, and funding settings. Mark a coordinating Bot as **Main** when you want it to delegate work.
+**Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings** (**Bots and models → Advanced binding** in the next release), commit its allowed tools, computer/workspace access, and funding settings. Mark a coordinating Bot as **Main** when you want it to delegate work. From the next release, a Bot that only needs conversation and its library works through [quick binding](#bots-and-models) once its model is picked.
 
 | To do this | Use this workflow |
 | --- | --- |
@@ -135,6 +137,29 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 | Customize the workspace | Manage avatars and team appearance independently of the private file library. |
 
 Integration mode reuses Harness Sessions. An optional independent runtime has its own session store; switch ownership explicitly so a Bot is served by one runtime at a time.
+
+<a id="bots-and-models"></a>
+
+## Bots and models, AI engines, and the inbox
+
+**For the next release of the full Bot edition; not included in stable 0.66.4.** The interaction design follows [OpenMausBot](https://github.com/milind-soni/OpenMausBot) (Apache-2.0), while authority still comes from committed Host state. See the [OpenMausBot study notes](docs/integration/openmausbot-study.md) (Chinese) for the feature comparison and deliberate differences.
+
+| Page or place | How to use it |
+| --- | --- |
+| **Inbox / 收件箱** | The workspace's first page. **Needs you / 待你处理** collects tasks needing attention, costs to reconcile, models without a price, Bots without a model, broken bindings, and official tools that need a login or are not installed; each item links to its fix. Running and finished tasks follow. |
+| **Bots and models / Bot 与模型** | Each Bot shows its model, billing, and state. Pick a model in the menu at the top of the Bot's chat and the Bot works through **quick binding**; enter a missing API price in place. Expand **Advanced binding / 高级绑定** for computers, extra tools, or separate funding; an enabled advanced binding takes precedence. |
+| **Ready-made Bots / 现成 Bot** | On **Bots and models**, pick one of 16 categorized templates, rename it if you like, create it, and open its chat. A template only provides identity and instructions, never a model, folder, funding, or permissions. |
+| **Import a team package / 导入团队包** | Paste or choose a team package JSON file, click **Preview / 预览** to see the Bots, group chats, and skipped items, choose one model for all or pick later per Bot, then click **Import N Bots / 导入 N 个 Bot**. |
+| **AI engines / AI 引擎** | Check installation, login, version, and the Bots using Claude Code, Codex, or Gemini CLI. Copy the login command when needed, then click **Check again / 重新检测**. |
+| **Model menu** | Providers on the left, grouped as official tools, API, and local; models on the right, with search, suggestions, thinking effort, and arrow-key selection. |
+
+A quick-bound Bot can talk, use its own library and routines, and ask the model router for advice. Running other models, installing tools, or starting model-router execution still needs an advanced binding. Official tools run on their own subscription logins. API routes need a known price and stay within daily and monthly caps per Bot and across all quick-bound Bots; defaults are USD 5 per day and USD 50 per month per Bot, and USD 20 per day and USD 200 per month in total. Change them on **Bots and models**.
+
+When an official tool is the model, each reply runs that CLI read-only in an empty Host-owned folder with your signed-in subscription. API-key environment variables are removed, and a failure is reported as an error rather than retried on an API. To modify files, use the workbench's **Team → Native-tool collaboration → Edit files**.
+
+Team package import only adds: Bots with clashing names are numbered, and group chats keep only members present in the package. Models, permissions, computers, connectors, skills, and schedules in a package are never adopted; schedules appear only as suggestions. A package containing a credential-shaped value is refused as a whole, naming where it was found but never its content, and a failure partway removes the group chats and Bots created by that import. Supported formats are `dsh.team-package` version 1 and OpenMausBot team packages version 2, up to 1 MB and 12 Bots per file.
+
+Press <kbd>Ctrl</kbd>+<kbd>/</kbd> (<kbd>⌘</kbd>+<kbd>/</kbd> on macOS) or the keyboard button in the navigation to show the shortcuts. With no text field focused, press <kbd>G</kbd> and then a letter to open a page: <kbd>I</kbd> inbox, <kbd>B</kbd> Bots and models, <kbd>E</kbd> AI engines, <kbd>T</kbd> tasks, <kbd>C</kbd> remote computers, <kbd>L</kbd> library, <kbd>R</kbd> routines, <kbd>U</kbd> costs and usage, <kbd>W</kbd> advanced workbench.
 
 <a id="task-progress"></a>
 
@@ -197,7 +222,7 @@ The Main Bot can also call `bot_route_task` or its alias `bot_dispatch`. Both di
 **In Harness:**
 
 3. Open **Remote computers → Add computer** and import `private/pairing.private.json`. Check the populated endpoint and grants, select the allowed Bots, then pair/probe the computer. Keep this pairing file private.
-4. In **Bot bindings**, save the Bot's computer and tool grants. Open **Computer operations** or the computer page, select a display, and choose **Connect desktop** to watch first.
+4. In **Bot bindings** (**Bots and models → Advanced binding** in the next release), save the Bot's computer and tool grants. Open **Computer operations** or the computer page, select a display, and choose **Connect desktop** to watch first.
 5. Choose **Take control** and wait for confirmation before sending keyboard, mouse, wheel, or text input. **Watch only** returns control and releases held input. Use **Expand** or double-click while watching for a larger view; disconnect when finished.
 
 Desktop viewing uses adaptive JPEG streaming with native input acknowledgements and a visible measured frame rate. Human control prevents conflicting Bot desktop automation. The current desktop implementation targets an available, signed-in Windows interactive session; performance depends on resolution and network conditions. Secure/UAC desktops are outside this capture scope. Computer pairing configures access; it does not provision a cloud machine or establish network connectivity.
@@ -266,12 +291,14 @@ Provider credentials and authenticated sessions are managed by Harness. Routing 
 | Routine reports a display change | Restore the original display, resolution, DPI, and application layout, or record again. |
 | Library upload/edit refused | Check file size and same-name collisions; binary transfer and text-edit limits differ. |
 | Cost or usage unknown | Check actual model identity, configured prices, and reported usage. Missing data is not zero. |
+| Bot has a model but does not reply | Open **Inbox** or **Bots and models** and check for a missing price, a switched-off quick binding, or a broken advanced binding. |
+| Official-tool model reports an error | Check installation and login on **AI engines**, sign in from a terminal as shown, then click **Check again**. |
 
 Use [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) for reproducible problems and [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) for installation files. Include the edition, plugin/Host versions, platform, steps, and a sanitized screenshot or error. Remove credentials, pairing files, and private task content.
 
 ## License and acknowledgements
 
-Project extensions are [MIT licensed](LICENSE). The bundled DS Bot source retains its **Apache-2.0** license and notices; provenance is recorded in [SOURCE.json](modules/bot-runtime/SOURCE.json). Thanks to [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [DS Bot](https://github.com/Fei2411/DS-Bot) for the Host and Bot foundations.
+Project extensions are [MIT licensed](LICENSE). The bundled DS Bot source retains its **Apache-2.0** license and notices; provenance is recorded in [SOURCE.json](modules/bot-runtime/SOURCE.json). Thanks to [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [DS Bot](https://github.com/Fei2411/DS-Bot) for the Host and Bot foundations. Some ready-made Bot text, the team package format, and credential-detection rules are adapted from [OpenMausBot](https://github.com/milind-soni/OpenMausBot) (**Apache-2.0**); see [THIRD_PARTY_NOTICES](packages/orchestration/THIRD_PARTY_NOTICES.md). The OpenMausBot name and mascot are trademarks of their owner and are not used in this product's interface.
 
 ## Technical reference: accounting and routing
 

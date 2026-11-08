@@ -16,7 +16,7 @@
 
 **当前正式版：0.66.4 · Windows Remote Agent：0.1.1**
 
-[选择版本](#editions) · [安装](#install) · [第一个任务](#quick-evaluation) · [Bot 分工](#bot-routing) · [远程电脑](#computers) · [问题反馈](#troubleshooting)
+[选择版本](#editions) · [安装](#install) · [第一个任务](#quick-evaluation) · [Bot 与模型](#bots-and-models) · [Bot 分工](#bot-routing) · [远程电脑](#computers) · [问题反馈](#troubleshooting)
 
 <a id="editions"></a>
 
@@ -46,6 +46,8 @@
 | Bot 之间的任务路由 | Main Bot 根据已提交的模型、工具、电脑与资金配置选择符合条件的执行 Bot，真实派发任务。 | 完整 Bot |
 | Windows 电脑与例行任务 | 配对自有电脑、观看或接管桌面、录制已确认输入，并回放保存的例行任务。 | 完整 Bot |
 | 私有文件资料库 | 按 Bot 管理文件夹、二进制上传下载、文本编辑及返回行号的私有文本检索。 | 完整 Bot |
+| Bot 与模型、AI 引擎 | 在私聊选好模型即可工作；Claude Code、Codex、Gemini CLI 可凭各自订阅登录充当 Bot 的模型；按提供方分组的模型菜单。 | 完整 Bot · 下一版本 |
+| 收件箱、现成 Bot 与团队包 | 一页汇总需要你处理的事项；从 16 个现成 Bot 创建；预览后导入团队包；键盘快捷键。 | 完整 Bot · 下一版本 |
 
 <a id="install"></a>
 
@@ -123,7 +125,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.4
 
 ## 建立持久化 Bot 工作区
 
-**适用于完整 Bot 版本。** 新建 Bot，选择准确的已配置模型，设置角色和工作目录；在 **Bot 绑定** 中提交允许的工具、电脑/工作区权限和资金配置。需要委派时，将协调 Bot 标记为 **Main**。
+**适用于完整 Bot 版本。** 新建 Bot，选择准确的已配置模型，设置角色和工作目录；在 **Bot 绑定**（下一版本为 **Bot 与模型 → 高级绑定**）中提交允许的工具、电脑/工作区权限和资金配置。需要委派时，将协调 Bot 标记为 **Main**。下一版本起，只需对话与资料库的 Bot 选好模型即可通过[快速绑定](#bots-and-models)工作。
 
 | 要做的事 | 操作方式 |
 | --- | --- |
@@ -135,6 +137,29 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.4
 | 工作区外观 | 独立管理头像与团队外观；头像库与私有文件资料库分别使用。 |
 
 集成模式复用 Harness Sessions；可选独立运行时拥有自己的会话存储。切换时需显式转移运行时所有权，同一 Bot 同时由一个运行时服务。
+
+<a id="bots-and-models"></a>
+
+## Bot 与模型、AI 引擎与收件箱
+
+**适用于完整 Bot 版本的下一版本，尚未包含在 0.66.4 正式版中。** 交互参照 [OpenMausBot](https://github.com/milind-soni/OpenMausBot)（Apache-2.0）重新整理，授权仍以 Host 已提交的状态为准；功能对照与差异见 [OpenMausBot 研究说明](docs/integration/openmausbot-study.md)。
+
+| 页面或位置 | 用法 |
+| --- | --- |
+| **收件箱** | 工作区首页。**待你处理** 汇总需要关注的任务、待核对费用、缺价格的模型、未选模型的 Bot、失效的绑定，以及需要登录或尚未安装的官方工具，每项都有直达按钮；下方显示进行中和已完成的任务。 |
+| **Bot 与模型** | 每个 Bot 显示当前模型、计费方式和状态。在私聊顶部的模型菜单选好模型，Bot 即以**快速绑定**工作；API 模型缺价格时可在此就地填写。需要电脑、额外工具或单独资金时，展开 **高级绑定**；已启用的高级绑定优先。 |
+| **现成 Bot** | 在 **Bot 与模型** 页从 16 个分类模板中选择，可改名后创建并直接打开私聊。模板只提供身份与说明，不包含模型、文件夹、资金或权限。 |
+| **导入团队包** | 粘贴或选择团队包 JSON，点击 **预览** 查看将创建的 Bot、群聊和被跳过的内容，选择统一模型或稍后逐个选择，再点击 **导入 N 个 Bot**。 |
+| **AI 引擎** | 查看 Claude Code、Codex、Gemini CLI 的安装、登录、版本及正在使用它的 Bot；需要登录时复制登录命令，完成后点击 **重新检测**。 |
+| **模型菜单** | 左侧按官方工具、API、本机分组，右侧列出模型；支持搜索、推荐、思考强度和方向键选择。 |
+
+快速绑定的 Bot 可以对话、使用自己的资料库与例行任务，并向模型路由询问建议；运行其他模型、安装工具或发起模型路由执行仍需高级绑定。官方工具按各自的订阅登录使用；API 路线必须有已知价格，并受每个 Bot 及全部快速绑定合计的日/月上限约束，默认每个 Bot 每日 5 美元、每月 50 美元，合计每日 20 美元、每月 200 美元，可在 **Bot 与模型** 修改。
+
+选择官方工具作为模型时，每次回复由该 CLI 在 Host 专用的空文件夹中以只读方式运行，使用你已登录的订阅账户；API Key 环境变量会被移除，失败时直接报错，不会改用 API。需要修改文件时，使用工作台的 **团队分工 → 官方工具协作 → 编辑文件**。
+
+团队包导入只追加：同名 Bot 自动编号，群聊只保留包内存在的成员。包中的模型、权限、电脑、连接器、技能和定时任务都不会被采用，定时任务只作为建议显示。含疑似凭据的团队包会被整体拒绝，提示只指出位置而不显示内容；导入中途失败会删除本次已创建的群聊和 Bot。支持 `dsh.team-package` 第 1 版和 OpenMausBot 团队包第 2 版，单个文件最多 1 MB、12 个 Bot。
+
+按 <kbd>Ctrl</kbd>+<kbd>/</kbd>（macOS 为 <kbd>⌘</kbd>+<kbd>/</kbd>）或导航栏的键盘按钮查看快捷键。焦点不在输入框时，先按 <kbd>G</kbd> 再按字母打开页面：<kbd>I</kbd> 收件箱、<kbd>B</kbd> Bot 与模型、<kbd>E</kbd> AI 引擎、<kbd>T</kbd> 任务、<kbd>C</kbd> 远程电脑、<kbd>L</kbd> 资料库、<kbd>R</kbd> 例行任务、<kbd>U</kbd> 费用与用量、<kbd>W</kbd> 高级工作台。
 
 <a id="task-progress"></a>
 
@@ -197,7 +222,7 @@ Main Bot 也可调用 `bot_route_task` 或同义工具 `bot_dispatch`；两者�
 **在 Harness 中：**
 
 3. 打开 **远程电脑 → 添加电脑**，导入 `private/pairing.private.json`，核对自动填写的地址与授权，选择允许的 Bot 后配对/探测。该配对文件需私下保管。
-4. 在 **Bot 绑定** 保存该 Bot 的电脑与工具权限，打开 **电脑操作** 或电脑页面，选择显示器并点击 **连接桌面**，先观看画面。
+4. 在 **Bot 绑定**（下一版本为 **Bot 与模型 → 高级绑定**）保存该 Bot 的电脑与工具权限，打开 **电脑操作** 或电脑页面，选择显示器并点击 **连接桌面**，先观看画面。
 5. 点击 **取得控制权**，等待确认后发送键盘、鼠标、滚轮或文字输入。**仅观看** 会归还控制并释放按住的输入；通过 **放大** 或观看时双击查看大画面，结束后断开连接。
 
 桌面采用自适应 JPEG 传输和原生输入确认，界面显示实测帧率；真人接管会阻止冲突的 Bot 桌面自动化。当前支持已登录且可用的 Windows 交互桌面，性能取决于分辨率和网络；安全/UAC 桌面不在采集范围内。电脑配对用于配置访问权限，云主机开通和网络连通由用户自行准备。
@@ -266,12 +291,14 @@ Provider 凭据和认证会话由 Harness 管理。路由状态、收据、Bot �
 | 例行任务提示显示器变化 | 恢复原显示器、分辨率、DPI 和应用布局，或重新录制。 |
 | 资料库拒绝上传或编辑 | 检查文件大小及同名冲突；二进制传输与文本编辑的限额不同。 |
 | 金额或用量未知 | 检查实际模型身份、配置价格和已报告用量，缺失数据不是零。 |
+| Bot 已选模型但不回复 | 打开 **收件箱** 或 **Bot 与模型**，检查是否缺少价格、是否关闭了快速绑定、高级绑定是否失效。 |
+| 官方工具模型报错 | 在 **AI 引擎** 检查安装与登录状态，按提示在终端登录后点击 **重新检测**。 |
 
 通过 [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) 提交可复现问题，通过 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 获取安装文件。反馈时附上安装版本、插件/Host 版本、平台、复现步骤和脱敏截图或错误；移除凭据、配对文件和私有任务内容。
 
 ## 许可与致谢
 
-本项目扩展采用 [MIT 许可证](LICENSE)。内置 DS Bot 源码保留 **Apache-2.0** 许可证及声明，来源记录见 [SOURCE.json](modules/bot-runtime/SOURCE.json)。感谢 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供宿主基础，以及 [DS Bot](https://github.com/Fei2411/DS-Bot) 提供 Bot 基础。
+本项目扩展采用 [MIT 许可证](LICENSE)。内置 DS Bot 源码保留 **Apache-2.0** 许可证及声明，来源记录见 [SOURCE.json](modules/bot-runtime/SOURCE.json)。感谢 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供宿主基础，以及 [DS Bot](https://github.com/Fei2411/DS-Bot) 提供 Bot 基础。部分现成 Bot 文案、团队包格式与凭据识别规则改编自 [OpenMausBot](https://github.com/milind-soni/OpenMausBot)（**Apache-2.0**），归属声明见 [THIRD_PARTY_NOTICES](packages/orchestration/THIRD_PARTY_NOTICES.md)；OpenMausBot 名称与吉祥物为其所有者的商标，本项目界面不使用。
 
 ## 技术参考：费用核算与路由算法
 
