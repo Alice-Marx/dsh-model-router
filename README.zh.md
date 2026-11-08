@@ -39,9 +39,10 @@
 | 可审查的执行 | 确认前检查模型、工具、工作区、权限与估算；集中跟踪进度、结果、取消状态和受支持的重试。 | 两种版本 |
 | 原生 CLI 工具 | 检测与安装已登记工具，检查登录及执行模式就绪状态，打开交互终端。 | 两种版本 |
 | 预算与反馈 | 设置 API 限额，核对预占和收据，独立查看订阅调用/token，并使用可选复核与显式评分。 | 两种版本 |
-| 持久化 Bot 对话 | 每个 Bot 独立配置模型、角色、工作目录、私有对话与权限；支持侧聊、提问和审批卡片。 | 完整 Bot |
+| 持久化 Bot 对话 | 每个 Bot 用大脑选择器绑定准确模型并附加官方工具，独立配置角色、工作目录、私有对话与权限；支持侧聊、提问和审批卡片。 | 完整 Bot |
 | 群聊与共享上下文 | 使用提及、分阶段群目标、交接、对话搜索/检查点，以及带变更历史的 Bot/群/团队记忆。 | 完整 Bot |
 | 浏览器与文档工作 | 每 Bot 浏览器分区、支持的 Office 读取/预览、连接器、密钥卡片、头像与团队外观设置。 | 完整 Bot |
+| 皮肤 | 六套改编自 OpenMausBot 的皮肤，各含明暗两种；聊天、侧栏与产品页面随主题一起换色。 | 完整 Bot |
 | 定时工作 | 通过 Host 的 Automation tasks 服务为目标 Bot 或群设置定时任务。 | 完整 Bot |
 | Bot 之间的任务路由 | Main Bot 根据已提交的模型、工具、电脑与资金配置选择符合条件的执行 Bot，真实派发任务。 | 完整 Bot |
 | Windows 电脑与例行任务 | 配对自有电脑、观看或接管桌面、录制已确认输入，并回放保存的例行任务。 | 完整 Bot |
@@ -123,7 +124,7 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.4
 
 ## 建立持久化 Bot 工作区
 
-**适用于完整 Bot 版本。** 新建 Bot，选择准确的已配置模型，设置角色和工作目录；在 **Bot 绑定** 中提交允许的工具、电脑/工作区权限和资金配置。需要委派时，将协调 Bot 标记为 **Main**。
+**适用于完整 Bot 版本。** 新建 Bot，设置角色和工作目录；在 **Bot 绑定** 中用大脑选择器选择准确模型和官方工具，并提交电脑/工作区权限和资金配置。需要委派时，将协调 Bot 标记为 **Main**。
 
 | 要做的事 | 操作方式 |
 | --- | --- |
@@ -132,9 +133,20 @@ dsh plugin --profile desktop add @ljwei-stak/dsh-model-router@0.66.4
 | 长期上下文 | 搜索对话，使用检查点/分段，编辑 Bot、群或团队记忆；审核后接受技能/项目规则学习提议。 |
 | 网页与文档 | 打开当前 Bot 浏览器面板管理页面；附加支持的 Office 文档读取/预览；按需配置连接器并通过密钥卡片输入凭据。 |
 | 定时执行 | 开启 Host 的 Automation tasks 服务，选择目标 Bot/群、任务和时间规则，保存后检查下次执行状态。Host 与相关 Agent 需保持运行。 |
-| 工作区外观 | 独立管理头像与团队外观；头像库与私有文件资料库分别使用。 |
+| 工作区外观 | 在 **设置 → 主题** 选择 MausBot、Atelier、Linen、Meadow、Lagoon 或 Pop 皮肤，各含明暗两种；独立管理头像与团队外观，头像库与私有文件资料库分别使用。 |
 
 集成模式复用 Harness Sessions；可选独立运行时拥有自己的会话存储。切换时需显式转移运行时所有权，同一 Bot 同时由一个运行时服务。
+
+<a id="bot-brain"></a>
+
+### 为 Bot 选择大脑与官方工具
+
+在 **Bot 绑定** 中展开 **编辑大脑、权限与预算**，点击 **大脑与官方工具** 打开选择器。左侧导轨分为两组：
+
+- **大脑**：按 Provider 列出 Harness 中已配置的准确路线。模型较多时可搜索，默认显示推荐项，也可展开 **全部模型**。选中的路线就是回答这个 Bot 对话的模型。
+- **官方工具**：列出工具注册表中的全部 CLI，标出 **尚未体检**、**需要安装**、**需要登录** 或当前版本。需要安装或登录时，面板给出登录命令并可直接打开 **官方工具** 页。刷新按钮只重跑固定的只读体检，不安装、不登录、不启动工具。
+
+官方工具是 Bot 的执行手段，不替代大脑。宿主为某条路线核验过 CLI 模型映射时，可在该工具下选择 **托管委派**；选择另一条路线的委派会同时把大脑切换到那条路线。**允许此 Bot 调用官方工具** 授予模型路由能力，写入与安装仍逐次请求批准。保存后，宿主按已提交的目录重新核验全部选择。
 
 <a id="task-progress"></a>
 
@@ -266,12 +278,13 @@ Provider 凭据和认证会话由 Harness 管理。路由状态、收据、Bot �
 | 例行任务提示显示器变化 | 恢复原显示器、分辨率、DPI 和应用布局，或重新录制。 |
 | 资料库拒绝上传或编辑 | 检查文件大小及同名冲突；二进制传输与文本编辑的限额不同。 |
 | 金额或用量未知 | 检查实际模型身份、配置价格和已报告用量，缺失数据不是零。 |
+| 大脑选择器显示“尚未体检” | 在 **官方工具** 页完成一次体检，或点击选择器中的刷新按钮。 |
 
 通过 [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) 提交可复现问题，通过 [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) 获取安装文件。反馈时附上安装版本、插件/Host 版本、平台、复现步骤和脱敏截图或错误；移除凭据、配对文件和私有任务内容。
 
 ## 许可与致谢
 
-本项目扩展采用 [MIT 许可证](LICENSE)。内置 DS Bot 源码保留 **Apache-2.0** 许可证及声明，来源记录见 [SOURCE.json](modules/bot-runtime/SOURCE.json)。感谢 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供宿主基础，以及 [DS Bot](https://github.com/Fei2411/DS-Bot) 提供 Bot 基础。
+本项目扩展采用 [MIT 许可证](LICENSE)。内置 DS Bot 源码保留 **Apache-2.0** 许可证及声明，来源记录见 [SOURCE.json](modules/bot-runtime/SOURCE.json)。感谢 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供宿主基础，以及 [DS Bot](https://github.com/Fei2411/DS-Bot) 提供 Bot 基础。皮肤配色和大脑选择器的布局改编自 [OpenMausBot](https://github.com/milind-soni/OpenMausBot)（**Apache-2.0**），详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 技术参考：费用核算与路由算法
 

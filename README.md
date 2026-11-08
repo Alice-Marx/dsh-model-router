@@ -39,9 +39,10 @@ Use **one edition per Harness profile**. Both editions share the routing configu
 | Reviewable execution | Inspect models, tools, workspace, permissions, and estimates before confirming; track progress, results, cancellation, and supported retries. | Both |
 | Native CLI tools | Detect and install registered tools, check login and mode readiness, and open an interactive terminal. | Both |
 | Budgets and feedback | Set API limits, track reservations and receipts, inspect subscription calls/tokens separately, and use optional reviews and explicit ratings. | Both |
-| Persistent Bot conversations | Give each Bot its own model, role, work directory, private chat, and permissions; handle side chats, questions, and approval cards. | Full Bot |
+| Persistent Bot conversations | Bind each Bot to an exact model with the brain picker and attach official tools; give it its own role, work directory, private chat, and permissions; handle side chats, questions, and approval cards. | Full Bot |
 | Groups and shared context | Use mentions, staged group goals, handoffs, conversation search/checkpoints, and Bot/group/team memory with revision history. | Full Bot |
 | Browser and document work | Use per-Bot browser partitions, supported Office reading/previews, connectors, credential cards, avatars, and team appearance settings. | Full Bot |
+| Skins | Six skins adapted from OpenMausBot, each with a light and a dark mode; chat, sidebar, and product pages change color with the theme. | Full Bot |
 | Scheduled work | Schedule a target Bot or group through the Host's Automation tasks service. | Full Bot |
 | Bot-to-Bot routing | Let a Main Bot select an eligible execution Bot from committed model, tool, computer, and funding settings, then dispatch real tasks. | Full Bot |
 | Windows computers and routines | Pair your own computer, watch or control its desktop, record confirmed input, and replay saved routines. | Full Bot |
@@ -123,7 +124,7 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 
 ## Build a persistent Bot workspace
 
-**Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings**, commit its allowed tools, computer/workspace access, and funding settings. Mark a coordinating Bot as **Main** when you want it to delegate work.
+**Full Bot edition.** Create a Bot and set its role and work directory. In **Bot bindings**, choose its exact model and official tools with the brain picker, then commit its computer/workspace access and funding settings. Mark a coordinating Bot as **Main** when you want it to delegate work.
 
 | To do this | Use this workflow |
 | --- | --- |
@@ -132,9 +133,20 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 | Manage long-term context | Search conversations, use checkpoints/segments, and edit Bot, group, or team memories. Review proposed skill/project-rule learning before accepting it. |
 | Work with pages and documents | Open the current Bot's browser panel, manage pages, and attach supported Office documents for reading/preview. Configure connectors and enter secrets through credential cards when needed. |
 | Schedule recurring work | Enable the Host's Automation tasks service, choose the target Bot/group, task, and schedule, then check the next-run state. The Host and relevant Agent must remain running. |
-| Customize the workspace | Manage avatars and team appearance independently of the private file library. |
+| Customize the workspace | Choose the MausBot, Atelier, Linen, Meadow, Lagoon, or Pop skin, each with a light and a dark mode, in **Settings → Theme**. Manage avatars and team appearance independently of the private file library. |
 
 Integration mode reuses Harness Sessions. An optional independent runtime has its own session store; switch ownership explicitly so a Bot is served by one runtime at a time.
+
+<a id="bot-brain"></a>
+
+### Choose a Bot's brain and official tools
+
+In **Bot bindings**, expand **编辑大脑、权限与预算** (edit brain, permissions, and budget) and click **大脑与官方工具** (brain and official tools) to open the picker. Its rail has two groups:
+
+- **大脑** (brain): the exact routes configured in Harness, grouped by provider. Long lists can be searched; suggested models show first, and **全部模型** (all models) expands the list. The selected route is the model that answers this Bot's conversations.
+- **官方工具** (official tools): every CLI in the tool registry, marked **尚未体检** (not checked), **需要安装** (needs install), **需要登录** (needs login), or with its current version. When a tool needs installing or a login, the pane shows the login command and opens the **Native tools / 官方工具** page. The refresh button only reruns the fixed read-only checks; it never installs, logs in, or starts a tool.
+
+Official tools are how a Bot acts, not a replacement for its brain. When the Host has verified a CLI model mapping for a route, you can select it under **托管委派** (managed delegation); selecting a delegation for another route also moves the brain to that route. **允许此 Bot 调用官方工具** (allow this Bot to call official tools) grants the model-router capability; writes and installs still ask for approval each time. On save, the Host verifies every choice against the committed catalog again.
 
 <a id="task-progress"></a>
 
@@ -266,12 +278,13 @@ Provider credentials and authenticated sessions are managed by Harness. Routing 
 | Routine reports a display change | Restore the original display, resolution, DPI, and application layout, or record again. |
 | Library upload/edit refused | Check file size and same-name collisions; binary transfer and text-edit limits differ. |
 | Cost or usage unknown | Check actual model identity, configured prices, and reported usage. Missing data is not zero. |
+| Brain picker shows 尚未体检 (not checked) | Run a check on the **Native tools / 官方工具** page, or click the picker's refresh button. |
 
 Use [GitHub Issues](https://github.com/Alice-Marx/dsh-model-router/issues) for reproducible problems and [GitHub Releases](https://github.com/Alice-Marx/dsh-model-router/releases/latest) for installation files. Include the edition, plugin/Host versions, platform, steps, and a sanitized screenshot or error. Remove credentials, pairing files, and private task content.
 
 ## License and acknowledgements
 
-Project extensions are [MIT licensed](LICENSE). The bundled DS Bot source retains its **Apache-2.0** license and notices; provenance is recorded in [SOURCE.json](modules/bot-runtime/SOURCE.json). Thanks to [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [DS Bot](https://github.com/Fei2411/DS-Bot) for the Host and Bot foundations.
+Project extensions are [MIT licensed](LICENSE). The bundled DS Bot source retains its **Apache-2.0** license and notices; provenance is recorded in [SOURCE.json](modules/bot-runtime/SOURCE.json). Thanks to [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and [DS Bot](https://github.com/Fei2411/DS-Bot) for the Host and Bot foundations. The skin palettes and the brain picker's layout are adapted from [OpenMausBot](https://github.com/milind-soni/OpenMausBot) (**Apache-2.0**); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Technical reference: accounting and routing
 
