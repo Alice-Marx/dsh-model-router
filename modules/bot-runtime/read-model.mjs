@@ -18,7 +18,7 @@ const ACTIONS = new Set([
   'library.list', 'library.read', 'library.write', 'library.upload', 'library.download', 'library.remove', 'library.mkdir', 'library.search',
   'routine.list', 'routine.run', 'routine.save', 'routine.remove', 'routine.history', 'routine.cancel', 'routine.resolve', 'roles.list',
   'botRoutingInspect', 'botRoutingDecide', 'botRouting.dispatch', 'botRouting.save', 'botRouting.status',
-  'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage',
+  'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage', 'engines.catalog',
 ])
 const plain = value => value && typeof value === 'object' && !Array.isArray(value)
 const error = (code, message) => Object.assign(new Error(message), { code })

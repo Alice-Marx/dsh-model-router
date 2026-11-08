@@ -13,6 +13,9 @@
     "botRouting.status": {
       "caller": "bot"
     },
+    "engines.catalog": {
+      "caller": "owner"
+    },
     "funding.account.save": {
       "caller": "bot"
     },

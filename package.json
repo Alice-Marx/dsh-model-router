@@ -79,6 +79,7 @@
     ".dsh-plugin/shared/zcode-npm.mjs",
     ".dsh-plugin/shared/official-team-runtime.mjs",
     ".dsh-plugin/shared/tool-health.mjs",
+    ".dsh-plugin/shared/official-engines.mjs",
     ".dsh-plugin/shared/router-state.mjs",
     ".dsh-plugin/shared/run-ledger.mjs",
     ".dsh-plugin/shared/routing-presets.mjs",

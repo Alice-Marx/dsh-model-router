@@ -39,6 +39,7 @@ import { canonicalTaskJson, parseRemoteTaskCli, taskHash } from './task-contract
 import { acquireMigrationShared } from './migration-fence.mjs'
 import { assertMigrationStartupAllowed } from './migration-startup-gate.mjs'
 import { registerRemoteComputerTools } from './remote-computer-tools.mjs'
+import { projectOfficialEngines } from '../../../.dsh-plugin/shared/official-engines.mjs'
 
 // The default Bot grant exposes the complete router through the same policy.
 // Exact model routes and side-effect approvals remain independently enforced.
@@ -859,6 +860,14 @@ export function startBotProduct(ctx, options = {}) {
               return botRuntimeAdapter.readMessage(payload?.botId, payload?.index)
             },
           } : {}),
+          // The binding picker's official-tool rail: readiness from the router's fixed probes.
+          // `fresh` re-runs those probes; it never installs, logs in or starts a tool.
+          'engines.catalog': ownerOnly(async payload => {
+            const health = (() => { try { return ctx.get?.('officialToolHealth') ?? null } catch { return null } })()
+            if (!health) return { status: 'blocked', reason: '官方工具体检服务尚未接入。', nextAction: '在高级工作台的官方工具页完成一次开箱体检后刷新。', items: [] }
+            const report = payload?.fresh === true ? await health.refresh() : await health.current()
+            return projectOfficialEngines({ report, capabilities: health.capabilities(), now: now() })
+          }),
           // The workbench reads Bot routing through the same product channel as every other panel
           // action. Registering it here is what makes the routing card work at runtime; the owner
           // RPC methods are a second door onto the same service.
