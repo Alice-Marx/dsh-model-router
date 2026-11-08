@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 // not through model tools. A UI test with a stub dispatch cannot see the difference, so this reads
 // the composition source and checks that every action the panels call is registered there.
 const source = readFileSync(new URL('../packages/orchestration/src/product-composition.mjs', import.meta.url), 'utf8')
-const panel = ['panels.jsx', 'tasks-panel.jsx'].map(name => readFileSync(new URL(`../apps/integration-client/${name}`, import.meta.url), 'utf8')).join('\n')
+const panel = ['panels.jsx', 'tasks-panel.jsx', 'binding-editor.jsx', 'brain-picker.jsx'].map(name => readFileSync(new URL(`../apps/integration-client/${name}`, import.meta.url), 'utf8')).join('\n')
 
 /** Action names the panels dispatch, in call order, de-duplicated. */
 const dispatched = [...new Set([...panel.matchAll(/dispatch\('([a-zA-Z][\w.]*)'/g)].map(match => match[1]))]

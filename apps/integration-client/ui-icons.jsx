@@ -21,6 +21,9 @@ const paths = {
   check: ['m5 12 4 4L19 6'],
   play: ['m8 4 12 8-12 8Z'],
   lock: ['M5 10h14v11H5Zm3 0V7a4 4 0 0 1 8 0v3m-4 4v3'],
+  caret: ['m6 9 6 6 6-6'],
+  terminal: ['M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z', 'm7 10 3 2-3 2m5 0h5'],
+  spark: ['M12 3v4m0 10v4M3 12h4m10 0h4', 'm6.3 6.3 2.1 2.1m7.2 7.2 2.1 2.1m-11.4 0 2.1-2.1m7.2-7.2 2.1-2.1'],
 }
 
 export function UiIcon({ name, size = 18, className = '', ...props }) {

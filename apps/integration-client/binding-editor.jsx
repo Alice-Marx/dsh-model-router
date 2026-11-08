@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Blocked } from './panels.jsx'
+import { BrainPicker } from './brain-picker.jsx'
 
 const route = model => model ? `${model.provider}/${model.model}` : ''
 const workspace = ref => ref ? `${ref.machineId}/${ref.rootId}` : ''
 
-export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
+export function BotBindingEditor({ bot, record, accounts, dispatch, busy, readEngines, openTools }) {
   const [form, setForm] = useState(null)
   useEffect(() => {
     if (!record) { setForm(null); return }
@@ -67,13 +68,14 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
     }
     return dispatch('binding.save', { botId: bot.id, expectedRevision: record.revision, settings })
   }
-  const cliMappings = (model?.cliModels ?? []).filter((item, index, items) => items.findIndex(other => other.toolId === item.toolId && other.model === item.model) === index)
+  const selection = { model: form.model, officialTools: form.officialTools, capabilities: form.capabilities }
+  const pick = next => setForm(current => ({ ...current, model: next.model, officialTools: next.officialTools, capabilities: next.capabilities }))
   return <details className="bp-card" open={record.status !== 'available'}>
     <summary>配置并启用此 Bot</summary>
     <form className="bp-form" onSubmit={save}>
-      <label>准确模型<select aria-label={`${bot.name} 的绑定模型`} value={form.model} onChange={event => { change('model', event.target.value); change('officialTools', []) }} required>
-        <option value="" disabled>请选择</option>{record.catalog.models.map(item => <option key={route(item)} value={route(item)}>{route(item)}</option>)}
-      </select></label>
+      <div className="bp-form-field"><span>大脑与官方工具</span>
+        <BrainPicker botName={bot.name} catalog={record.catalog} selection={selection} onChange={pick} readEngines={readEngines} openTools={openTools} disabled={busy} />
+        <small>大脑是此 Bot 回复时使用的准确 API 路由；官方工具是它可以委派或调用的本机 CLI。</small></div>
       {model && account && !account.enabled && <aside className="bp-blocked"><strong>资金范围尚未启用</strong><p>{account.provider} 需要本地预算上限；它不是厂商余额。</p>
         <label>账户每日上限（USD）<input type="number" min="0" step="0.01" value={form.accountDaily} onChange={event => change('accountDaily', event.target.value)} /></label>
         <label>账户每月上限（USD）<input type="number" min="0" step="0.01" value={form.accountMonthly} onChange={event => change('accountMonthly', event.target.value)} /></label>
@@ -91,12 +93,6 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
         <label>每月预算（USD）<input type="number" min="0" step="0.01" value={routing.monthlyBudgetUsd} onChange={event => change('routing', { ...routing, monthlyBudgetUsd: event.target.value })} placeholder="留空表示不单独限制" /></label>
       </fieldset>
       <fieldset><legend>路由与任务能力</legend>{record.catalog.capabilities.map(capability => <label key={capability.id}><input type="checkbox" checked={form.capabilities.includes(capability.id)} onChange={event => change('capabilities', event.target.checked ? [...form.capabilities, capability.id] : form.capabilities.filter(id => id !== capability.id))} />{capability.label}</label>)}</fieldset>
-      {cliMappings.length > 0 && <fieldset><legend>已核验官方 CLI</legend>{cliMappings.map(mapping => {
-        const selected = form.officialTools.some(tool => tool.toolId === mapping.toolId && tool.cliModel === mapping.model)
-        return <label key={`${mapping.toolId}/${mapping.model}`}><input type="checkbox" checked={selected} onChange={event => change('officialTools', event.target.checked
-          ? [...form.officialTools, { toolId: mapping.toolId, cliModel: mapping.model, mode: 'read-only' }]
-          : form.officialTools.filter(tool => !(tool.toolId === mapping.toolId && tool.cliModel === mapping.model)))} />{mapping.toolId} / {mapping.model}（只读）</label>
-      })}</fieldset>}
       <label>资金渠道<select value={form.fundingMode} onChange={event => change('fundingMode', event.target.value)}><option value="api">API（金额）</option><option value="subscription">订阅（调用次数）</option></select></label>
       {form.fundingMode === 'api' ? <>
         <label>输入价格（USD / 百万 Token）<input type="number" min="0" step="0.000001" value={form.input} onChange={event => change('input', event.target.value)} required /></label>
@@ -111,7 +107,7 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
       </>}
       <label>最大并发任务<input type="number" min="1" max="32" step="1" value={form.maxConcurrentTasks} onChange={event => change('maxConcurrentTasks', event.target.value)} required /></label>
       <label><input type="checkbox" checked={form.enabled} onChange={event => change('enabled', event.target.checked)} />启用此绑定（模型、工作区和资金范围必须完整）</label>
-      <button type="submit" disabled={busy || form.enabled && (!model || !account?.enabled || !selectedMachine || !selectedRoot)}>保存绑定</button>
+      <button type="submit" disabled={busy || !model || form.enabled && (!account?.enabled || !selectedMachine || !selectedRoot)}>保存绑定</button>
       {record.blockedReason && <Blocked value={record} />}
     </form>
   </details>

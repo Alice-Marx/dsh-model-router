@@ -9,6 +9,7 @@ import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
 import { UiIcon } from './ui-icons.jsx'
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
+import { BrainBadge } from './brain-picker.jsx'
 
 const NAV_EVENT = 'bot-product:navigation'
 let activePanel = null
@@ -130,7 +131,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
   </div>
 }
 
-export function BotBindings({ snapshot, openSession, dispatch, busy }) {
+export function BotBindings({ snapshot, openSession, dispatch, busy, readEngines, openTools }) {
   const bots = snapshot.bots ?? []
   const [selected, setSelected] = useState(bots[0]?.id ?? '')
   const bot = bots.find(row => row.id === selected) ?? bots[0]
@@ -147,18 +148,18 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
     <div className="bp-bot-list" aria-label="Bot 列表">{bots.map(item => <button key={item.id} aria-current={item.id === bot?.id ? 'true' : undefined} onClick={() => setSelected(item.id)}>
       <span className="bp-person-avatar"><UiIcon name="bot" size={23} /></span><span className="bp-person-copy"><strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}<small>{item.role || '尚未填写职责'}</small></span></button>)}</div>
     <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.main ? '团队协调 Bot' : '团队成员'}</p></div></div><button className="bp-button-primary" onClick={() => openSession(bot.sessionId)}>打开私聊<UiIcon name="arrow" size={15} /></button></div>
+      <BrainBadge model={binding?.settings?.model ?? bot.model} officialTools={binding?.officialTools ?? binding?.settings?.officialTools ?? []}
+        canCallTools={capabilities.includes('tool/model_router_tool_run')} />
       <dl className="bp-facts"><Value label="职责">{bot.role || '未填写'}</Value>
-        <Value label="准确模型">{modelName(bot.model)}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value>
         <Value label="工作区">{binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? '未指定，请在 Bot 详情选择文件夹'}</Value>
         <Value label="执行位置">{binding?.machineId ?? binding?.workspaceRef?.machineId ?? '尚未取得宿主绑定'}</Value>
         <Value label="最大并发">{binding?.maxConcurrentTasks}</Value></dl>
       {section?.status === 'blocked' ? <Blocked value={section} /> : binding ? <>
-        <h3>官方工具</h3>{binding.officialTools?.length ? <ul>{binding.officialTools.map(tool => <li key={tool.toolId}>{tool.toolId} · {tool.cliModel ?? '未核验模型'} · {tool.identityStatus ?? tool.identityPolicy ?? '未知'}</li>)}</ul> : <p className="bp-muted">此 Bot 没有官方工具绑定。</p>}
         <h3>有效权限 <span className="bp-inline-count">{capabilities.length} 项</span></h3><div className="bp-permission-chips">{permissionGroups.map(label => <span key={label}><UiIcon name="check" size={13} />{label}</span>)}{!capabilities.length && <p className="bp-muted">无额外能力</p>}</div>
         {binding.blockedReason && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
       </> : <Blocked value={{ reason: '此 Bot 尚未取得有效绑定。', nextAction: '在宿主 Bot 绑定配置中授予明确工具、机器与工作区。' }} />}
       <p className="bp-muted">角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。</p>
-      {dispatch && <details className="bp-edit-section"><summary><UiIcon name="settings" size={16} />编辑权限与预算</summary><BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} /></details>}
+      {dispatch && <details className="bp-edit-section"><summary><UiIcon name="settings" size={16} />编辑大脑、权限与预算</summary><BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} readEngines={readEngines} openTools={openTools} /></details>}
       <details className="bp-technical"><summary>连接与运行详情</summary><dl className="bp-facts"><Value label="稳定 Bot ID">{bot.id}</Value><Value label="预算范围">{binding?.budgetScope}</Value></dl><h3>完整权限标识</h3><p className="bp-code">{capabilities.join('、') || '无额外能力'}</p>{snapshot.availableActions?.includes('botRuntimeStatus') && <BotRuntimeRow botId={bot.id} dispatch={dispatch} busy={busy} />}</details>
     </article>
   </div>
@@ -925,6 +926,8 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     }
   }, [productApi, refresh])
   const inspectTask = useCallback((payload, signal) => productApi.dispatch('task.inspect', payload, signal), [productApi])
+  // Readiness only: reading it must not mark the page busy or re-pull the snapshot.
+  const readEngines = useCallback(payload => productApi.dispatch('engines.catalog', payload), [productApi])
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
   const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
   const meta = {
@@ -943,7 +946,8 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <div className="bp-loading" role="status"><span className="bp-loading-line" aria-hidden="true" /><span className="bp-loading-line" aria-hidden="true" /><p>正在读取宿主状态…</p></div>}
-    {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />{snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
+    {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled}
+        readEngines={snapshot.availableActions?.includes('engines.catalog') ? readEngines : undefined} openTools={() => openPanel('model-router-galgame')} />{snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} submissionScope={productApi} inspect={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : undefined} openSession={openSession} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'routine' && <RoutinesPanel snapshot={snapshot} dispatch={dispatch} busy={disabled} onOpenMachines={() => openPanel(PRODUCT_PANELS.machines)} />}

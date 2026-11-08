@@ -281,3 +281,83 @@ test('bot product UI: artifact download verifies before linking and reports expi
     assert.equal(container.querySelector('a[download]'),null)
   })
 })
+
+const { projectOfficialEngines } = await import('../.dsh-plugin/shared/official-engines.mjs')
+const bindingRecord = () => ({ botId: 'bot-main', revision: 2, status: 'available', model: { provider: 'openai', model: 'gpt-exact' }, officialTools: [], tools: ['model/infer'],
+  settings: { schemaVersion: 1, enabled: false, model: { provider: 'openai', model: 'gpt-exact' }, officialTools: [], machineGrants: [], capabilities: ['model-inference'], workspaceRef: null, routing: null,
+    funding: { mode: 'api', scopeId: null, pricing: { input: 1, output: 2 }, request: { maxInputTokens: 1000, maxOutputTokens: 100 }, dailyBudgetUsd: 1, monthlyBudgetUsd: 10, subscription: null }, maxConcurrentTasks: 1 },
+  catalog: { models: [{ provider: 'openai', model: 'gpt-exact', label: 'openai/gpt-exact', cliModels: [{ toolId: 'codex', model: 'gpt-exact' }] },
+    { provider: 'deepseek', model: 'deepseek-chat', label: 'deepseek/deepseek-chat', cliModels: [] }],
+  tools: [{ toolId: 'codex', modes: ['read-only'], grantTools: ['cli/codex'] }],
+  machines: [{ machineId: 'local', label: '本机', location: 'local', roots: [{ rootId: 'default', label: '默认工作区', modes: ['read-only'] }] }],
+  capabilities: [{ id: 'model-inference', label: '模型推理' }, { id: 'mr-routing', label: '模型路由' }], fundingScopes: [] } })
+const engineView = () => projectOfficialEngines({ now: 2_000, report: { checkedAt: 1_000, tools: [
+  { id: 'codex', installed: true, version: '0.80.0', login: { state: 'logged-in', command: 'codex login' } },
+  { id: 'claude-code', installed: true, version: '2.1.300', login: { state: 'logged-out', command: 'claude auth login', detail: '未登录 Anthropic 账号' } },
+] }, capabilities: [{ id: 'codex', supported: true, modes: ['read-only'] }] })
+
+test('bot product UI: the brain picker binds an exact route and official tools in the saved binding shape', async () => {
+  await withDom(async ({ root, container, click }) => {
+    const view = container.ownerDocument.defaultView
+    const snapshot = sample()
+    snapshot.botBindings = { status: 'available', items: [bindingRecord()] }
+    snapshot.fundingAccounts = { status: 'available', items: [] }
+    const reads = [], calls = []
+    const readEngines = async payload => { reads.push(payload); return engineView() }
+    await act(async () => root.render(React.createElement(BotBindings, { snapshot, openSession: () => {}, readEngines, openTools: () => calls.push({ action: 'open-tools' }),
+      dispatch: async (action, payload) => { calls.push({ action, payload }) } })))
+    assert.match(container.querySelector('.bp-brain-badge').textContent, /openai\/gpt-exact/)
+    const trigger = container.querySelector('.bp-brain-trigger')
+    assert.match(trigger.getAttribute('aria-label'), /openai\/gpt-exact/)
+    await click(trigger)
+    assert.deepEqual(reads, [{}], 'opening reads cached readiness once, without re-probing')
+    const tab = label => [...container.querySelectorAll('[role=tab]')].find(button => button.getAttribute('title') === label)
+    assert.ok(tab('openai') && tab('deepseek') && tab('Codex CLI') && tab('Claude Code'), 'API providers and official tools share one rail')
+    assert.equal(tab('Claude Code').dataset.attention, 'true')
+
+    await click(tab('deepseek'))
+    await click([...container.querySelectorAll('[role=option]')].find(button => button.textContent.includes('deepseek-chat')))
+    assert.match(trigger.textContent, /deepseek-chat/)
+
+    await click(tab('Codex CLI'))
+    assert.match(container.querySelector('.bp-brain-pane').textContent, /v0\.80\.0/)
+    const delegation = [...container.querySelectorAll('.bp-brain-pane button[aria-pressed]')].find(button => button.textContent.includes('gpt-exact'))
+    assert.match(delegation.textContent, /选择后大脑同时切换/)
+    await click(delegation)
+    assert.match(trigger.textContent, /gpt-exact/)
+    assert.equal(tab('Codex CLI').dataset.attached, 'true')
+    await click(container.querySelector('.bp-brain-switch input'))
+
+    await click(tab('Claude Code'))
+    assert.match(container.querySelector('.bp-brain-setup').textContent, /claude auth login/)
+    await click(container.querySelector('button[aria-label="重新体检官方工具"]'))
+    assert.deepEqual(reads.at(-1), { fresh: true })
+
+    await act(async () => container.ownerDocument.dispatchEvent(new view.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    assert.equal(container.querySelector('.bp-brain-pop'), null)
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false')
+
+    const workspace = container.querySelector('select[aria-label="Main 的绑定工作区"]')
+    Object.getOwnPropertyDescriptor(view.HTMLSelectElement.prototype, 'value').set.call(workspace, 'local/default')
+    await act(async () => workspace.dispatchEvent(new view.Event('change', { bubbles: true })))
+    await click([...container.querySelectorAll('button[type=submit]')].find(button => button.textContent === '保存绑定'))
+    const save = calls.find(call => call.action === 'binding.save')
+    assert.equal(save.payload.expectedRevision, 2)
+    assert.deepEqual(save.payload.settings.model, { provider: 'openai', model: 'gpt-exact' })
+    assert.deepEqual(save.payload.settings.officialTools, [{ toolId: 'codex', cliModel: 'gpt-exact', mode: 'read-only' }])
+    assert.deepEqual(save.payload.settings.capabilities, ['model-inference', 'mr-routing'])
+  })
+})
+
+test('bot product UI: without the readiness action the picker still binds API routes', async () => {
+  await withDom(async ({ root, container, click }) => {
+    const snapshot = sample()
+    snapshot.botBindings = { status: 'available', items: [bindingRecord()] }
+    snapshot.fundingAccounts = { status: 'available', items: [] }
+    await act(async () => root.render(React.createElement(BotBindings, { snapshot, openSession: () => {}, dispatch: async () => {} })))
+    await click(container.querySelector('.bp-brain-trigger'))
+    const titles = [...container.querySelectorAll('[role=tab]')].map(button => button.getAttribute('title'))
+    assert.deepEqual(titles, ['openai', 'deepseek'])
+    assert.equal(container.querySelector('.bp-brain-foot button'), null, 'no settings link without a place to open')
+  })
+})
