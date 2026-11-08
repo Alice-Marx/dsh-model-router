@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {mkdir, mkdtemp} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
+import {fileURLToPath} from 'node:url'
 import {openTaskJournal} from '../packages/orchestration/src/task-journal.mjs'
 import {readDatabaseClock, sleepSync, writeTransaction} from '../packages/orchestration/src/write-retry.mjs'
 
@@ -38,7 +39,7 @@ test('write-retry/native: a second host waits out a lock held by another process
 
   // Another process takes the write lock for 400ms. A journal that inherited a
   // non-blocking handle would fail here on the first attempt.
-  const driver = resolve(process.env.DSH_TASK_DRIVER.replace('file:///', '').replace(/^file:\/\//, ''))
+  const driver = process.env.DSH_TASK_DRIVER.startsWith('file:') ? fileURLToPath(process.env.DSH_TASK_DRIVER) : resolve(process.env.DSH_TASK_DRIVER)
   const child = spawn(process.execPath, [resolve('scripts/integration-task-probe.mjs'), '--lock-child', driver, path, '400'], {stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true})
   // Wait until the other process really holds the lock, so the measurement is
   // of this writer waiting, not of node starting up.
