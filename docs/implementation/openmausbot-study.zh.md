@@ -10,7 +10,7 @@ OpenMausBot 与本插件的产品形态相同：侧栏里是一组 Bot，每个 
 2. **外观。** OpenMausBot 有十二套皮肤和统一的圆角、字体、状态色体系；本插件的产品页面原来把 DS Bot 的主题变量固定死，切换主题对产品页无效。这一处已在本次移植。
 3. **“大脑”的来源。** OpenMausBot 的 Bot 直接由本机 `claude`、`codex`、`grok` 等 CLI 回答，用户的订阅额度就是大脑。本插件的大脑是 Harness 里配置的准确 API 路线，官方 CLI 作为执行手段。本次保留了这个分工，原因和后续方案见下文“为什么不直接把 CLI 换成大脑”。
 
-DS Bot 0.2.7 已经覆盖了 OpenMausBot 的很多对话功能（群聊、记忆、审批卡片、提问卡片、侧聊、定时任务、浏览器、连接器、头像），本插件又补上了 Main Bot 派发、Windows 电脑配对、例行任务录制回放和私有资料库。剩余差距集中在团队导入/分享、快速决策模型、语音、MCP 控制面和 CLI 大脑。
+DS Bot 0.2.7 已经覆盖了 OpenMausBot 的很多对话功能（群聊、记忆、审批卡片、提问卡片、侧聊、定时任务、浏览器、连接器、头像），本插件又补上了 Main Bot 派发、Windows 电脑配对、例行任务录制回放和私有资料库。剩余差距集中在 CLI 大脑、线程级模型切换、团队包导入/分享、Webhook 与应用事件触发、快速决策模型、语音和 MCP 控制面。
 
 ## OpenMausBot 的结构
 
@@ -32,13 +32,13 @@ DS Bot 0.2.7 已经覆盖了 OpenMausBot 的很多对话功能（群聊、记忆
 
 | 子系统 | 位置 | 要点 |
 | --- | --- | --- |
-| 驱动 | `server/drivers/`（298 个文件） | 每个引擎一个驱动：Claude（stream-JSON）、Codex（app-server JSON-RPC）、Grok Build 与 Antigravity（ACP）、Pi（RPC），以及 OpenRouter、Groq、Cerebras、Mistral、MiniMax、Ollama 等 OpenAI 兼容端点。每个驱动自带模型目录（`claude-catalog`、`codex-catalog`）、登录与计费检测、错误归一化。未知驱动降级为“不可用”，不会拖垮整个 Bot 集合。 |
+| 驱动 | `server/drivers/`（298 个文件） | `builtIn.ts` 登记 28 个驱动。订阅类 CLI：Claude（stream-JSON）、Codex（app-server JSON-RPC）、Pi（RPC），以及走 ACP 的 Grok Build、Gemini、Kimi、Droid、Cursor、OpenCode、Qwen、Hermes、Cline、Copilot、Command Code、Kiro、DeepSeek、Antigravity、Muse Code 和自定义 ACP。API 类：OpenAI 兼容、Grok、MiniMax、Mistral、Cerebras、Groq、Greenference、Meta。每个驱动自带模型目录、登录与计费检测、错误归一化；未知驱动或初始化失败的驱动降级为“不可用”，不会拖垮整个 Bot 集合。 |
 | harness | `server/harness/` | `registry`（配置 → 运行实例）、`bus`（事件扇入 → SSE）、进度闸门、未请求停止检测。 |
 | 运行时 | `server/runtime/` | 能力声明、提问、状态回复、不变量检查、会话树。 |
 | 权限 | `permission-command`、`chat-tool-approval`、`auto-approve` | 所有有风险的动作变成对话里的审批卡片；可按 Bot 设置审批模式和白名单。 |
 | 模型目录 | `server/model-catalog/` | models.dev 快照、预设、裁剪；选择器的“推荐”来自这里。 |
 | 电脑 | `bot-box/`、`browser/`、`saved-steps/` | bubblewrap 隔离盒、带出站网关的浏览器、电脑步骤的录制与回放。 |
-| 决策模型 | `server/decider/` | 用 Workers AI、Jev 或 OpenRouter 的小模型在几百毫秒内为“自动”房间挑选回答的 Bot，失败时回落到房间负责人；也做收件箱分拣。 |
+| 决策模型 | `server/decider/` | 用 Workers AI、Jev 或 OpenRouter 的小模型为“自动”房间挑选回答的 Bot：某个成员概率不低于 0.6 才由它回答，否则回落到房间负责人；文档要求响应在 1.5 秒内。有 `@` 提及、目标模式或非自动房间时不调用。也做收件箱分拣。 |
 | 哨兵 | `server/sentinel/` | 扫描运行日志，检测费用异常、排队过久、重试循环、工具错误、意外停止。 |
 | 语音 | `server/tts/` | ElevenLabs、Fish Audio、Grok、macOS 语音、本地 Chatterbox；朗读前把 Markdown 改写成适合听的文本；通话模式。 |
 | 其它 | `email/`、`meetings/`、`phones/`、`pages/`、`headless/` | 邮件、会议、手机中继、页面发布、无界面 CLI（`openmausbot team apply`、`openmausbot run`）。 |
@@ -46,6 +46,17 @@ DS Bot 0.2.7 已经覆盖了 OpenMausBot 的很多对话功能（群聊、记忆
 ### 应用层
 
 `src/components/` 按功能分组：`bot-settings`（50）、`bot-panel`（28）、`onboarding`（23）、`widget`（19）、`inbox`（16）、`routines`（13）、`keys`（12）、`automations`（12）、`bot-access`（10）等；`cloud-buy`（14）与 `cloud-welcome`（10）属于云订阅，不移植。状态由服务端驱动，客户端只有一个 reducer，没有自己的传输层。
+
+### Bot 与模型的绑定方式
+
+- **绑定值**是 `ModelSelection`（`shared/wire.ts`）：`instanceId`（引擎实例）+ `model`，可选 `effort`（推理强度，`none` 到 `max`）和 `variant`（模型变体）。
+- **两级**：Bot 有默认模型；每个对话线程可以有自己的选择，线上格式用 `followsBotModel` 标明线程是否跟随 Bot 默认。对话中途切换时可以选“只改这个线程”或“改 Bot 默认”。
+- **切换引擎时降级审批**：新引擎不支持当前审批级别时，切换前确认，并把级别降到 Ask。
+- **可用性**来自每个驱动的 `snapshot()`：CLI 缺失是“不可用”，CLI 在但未登录是“可用但未登录”，两者在界面上分开处理（安装引导 vs 登录引导）。
+- **导轨分组**按实例的访问方式：订阅、API 密钥、本地。需要安装、登录或有更新的引擎带提示点；被组织策略管理的引擎变暗。
+- **预设与模板从不携带模型**，新 Bot 的模型取工作区默认。
+
+本插件对应的是 Bot 绑定记录里的准确路线（`provider/model`）和附加的官方工具委派，由 `binding.save` 提交、宿主按目录核验。线程级覆盖与推理强度目前没有，列在路线图第二项。
 
 ### 设计语言
 
@@ -63,14 +74,17 @@ DS Bot 0.2.7 已经覆盖了 OpenMausBot 的很多对话功能（群聊、记忆
 | 十二套皮肤、统一设计语言 | 产品页固定配色 | **本次已移植**：六组明暗皮肤，产品页随主题换色 |
 | 每 Bot 独立模型、角色、记忆 | DS Bot 已有 | 保持 |
 | 审批卡片、提问卡片 | DS Bot 已有 | 保持 |
+| 审批级别（Ask、自动接受编辑、代为批准、完全访问、自定义），默认完全访问 | 已提交授权 + 写入与安装逐次批准 | 只借鉴分级的界面表达；不照搬默认“完全访问”，任何级别都不能越过已提交授权 |
 | 频道/群聊、回答规则、负责人 | DS Bot 群聊已有 | 保持；快速决策模型见路线图 |
-| 例行任务、自动化 | Host Automation tasks + 例行任务录制回放 | 保持 |
-| 电脑：本机控制、录制回放 | Windows 电脑配对、观看/接管、例行任务 | 保持；本地虚拟机见路线图 |
+| 定时触发（一次、每天、间隔、cron） | Host Automation tasks + 例行任务录制回放 | 保持 |
+| Webhook 触发、应用事件触发、对话内可撤销的触发卡片 | 无 | 路线图 |
+| 电脑：本机控制、录制回放 | Windows 电脑配对、观看/接管、例行任务 | 保持；OpenMausBot 的本地虚拟机和 Cua 本机控制与已有 Windows 电脑重复，不移植 |
 | 电脑：Boat 云桌面订阅 | 无 | **不移植**（订阅功能） |
 | 浏览器 | DS Bot 每 Bot 浏览器分区 | 保持 |
 | 连接的应用（Composio） | DS Bot 连接器 + 密钥卡片 | 路线图：可选 Composio 连接器 |
 | CLI 作为大脑 | 准确 API 路线作为大脑，CLI 作为执行手段 | 路线图第一项 |
-| 团队 Markdown 导入、部门分享、预设 Bot | 无 | 路线图 |
+| 团队包导入与部门分享、预设 Bot | 无 | 路线图 |
+| 小组件（`show_widget`、`show_html`）、图片生成 | 无 | 路线图（可选） |
 | 语音朗读与通话 | 无 | 路线图 |
 | MCP 控制面、无界面 CLI | 无 | 路线图 |
 | 哨兵异常检测 | 预算与收据核对 | 路线图：在执行记录上做检测 |
@@ -107,13 +121,15 @@ OpenMausBot 让 CLI 直接回答对话，因为它的 harness 就是 CLI 的宿�
 按依赖顺序排列，每项写明要改的组件和风险。
 
 1. **CLI 作为大脑。** 在 `modules/bot-runtime/index.mjs` 的 `llm/stream` 接缝处，为绑定了 CLI 大脑的 Bot 走官方工具执行器，而不是 `modelAccounting.stream`。需要：新的收据来源（订阅调用）、每个 Bot 独立的 CLI 会话与工作目录、CLI 工具调用到已提交授权的映射、中断后的核对流程。选择器里官方工具组会多出“作为大脑”的模型列表。风险最高的一项，涉及资金和权限两条主线。
-2. **对话头部的模型切换。** OpenMausBot 可以在对话中途切换模型。DS Bot 的 `model-menu.js` 属于锁定 vendor 代码，需要在 `product-overlay/` 中登记补丁，把大脑选择器接到对话头部，切换仍走 `binding.save` 由宿主核验。
-3. **团队导入与分享。** 读取 OpenMausBot 团队 Markdown（YAML frontmatter + 正文手册），预览后创建 Bot、群聊、共享说明和暂停状态的例行任务；导出时剔除对话、凭据、模型选择和电脑。需要新的产品动作和导入预览页，导入的 Bot 默认没有任何授权。
-4. **快速决策模型。** 为“自动”群聊配置一条低价准确路线，按消息挑选回答的 Bot，失败时回落到群负责人。走现有路由与预算核算。
-5. **哨兵检测。** 在执行记录与收据上检测费用异常、重试循环、工具连续失败、意外停止，在“需要你处理”面板提示。只读，不自动处置。
-6. **语音。** 朗读回复和通话。语音服务的密钥放在 Harness 设置里，不进入插件状态。
-7. **MCP 控制面与无界面 CLI。** 以产品动作契约为边界，开放查看 Bot/群、读取对话、发送任务、等待完成；不开放审批、删除、凭据和电脑生命周期。
-8. **可选连接器。** 在 DS Bot 连接器之外提供 Composio 连接器，需要用户自己的 Composio 密钥。
+2. **对话头部的模型切换与线程级覆盖。** OpenMausBot 可以在对话中途切换模型，并区分“只改这个线程”和“改 Bot 默认”。DS Bot 的 `model-menu.js` 属于锁定 vendor 代码，需要在 `product-overlay/` 中登记补丁，把大脑选择器接到对话头部；Bot 默认仍走 `binding.save`，线程覆盖需要新的绑定字段（类似 `followsBotModel`）和宿主核验。推理强度可在同一处加入，前提是路线目录声明了支持的级别。
+3. **团队导入与分享。** OpenMausBot 的团队包是 `openmaus.package` v2 JSON 文件（`.openmaus.json`，最大 4 MB），也能读 v1 JSON 和 BotMRR Markdown。包里有 Bot（说明、外观、技能文本）、群聊（成员、共享说明、回答规则）、例行任务和连接位；不含对话、凭据、模型选择、电脑。导入时技能默认关闭、例行任务暂停、失败整体回滚。移植需要新的产品动作和导入预览页，导入的 Bot 默认没有任何授权，模型取工作区默认。
+4. **Webhook 触发。** 只监听回环地址的接收端，每个触发器一个只显示一次、可轮换的密钥（存在 Harness 设置里），收到请求后以持久任务身份派发给目标 Bot，并在对话里留下可暂停、可撤销的触发卡片。应用事件触发依赖 Composio，随第九项一起考虑。
+5. **快速决策模型。** 为“自动”群聊配置一条低价准确路线，按消息挑选回答的 Bot；沿用 OpenMausBot 的规则（概率不低于 0.6 才采用、超时或失败回落到群负责人、有提及时不调用）。走现有路由与预算核算。
+6. **哨兵检测。** 在执行记录与收据上检测费用异常、重试循环、工具连续失败、意外停止，在“需要你处理”面板提示。只读，不自动处置。
+7. **语音。** 朗读回复和通话。语音服务的密钥放在 Harness 设置里，不进入插件状态。
+8. **MCP 控制面与无界面 CLI。** 以产品动作契约为边界，开放查看 Bot/群、读取对话、发送任务、等待完成；不开放审批、删除、凭据和电脑生命周期。
+9. **可选连接器与应用事件。** 在 DS Bot 连接器之外提供 Composio 连接器（需要用户自己的 Composio 密钥），按 Bot 设置关闭、只读、读写三档；应用事件触发也建立在它上面。
+10. **小组件与图片生成（可选）。** 让 Bot 在对话里展示受限的 HTML 小组件，以及按 Bot 授权生成图片；需要新的渲染沙箱和额度控制。
 
 不在范围内：Boat 云桌面与云订阅（`cloud-buy`、`cloud-welcome`、Cloud Pro、Team Cloud 引擎目录）、`enterprise/` 下的全部功能。
 
