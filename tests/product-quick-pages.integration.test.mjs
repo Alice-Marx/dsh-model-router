@@ -11,13 +11,13 @@ import { defaultQuickBinding } from '../packages/orchestration/src/quick-binding
 
 const parent = resolve('tmp/integration/product-quick-pages'); fs.mkdirSync(parent, { recursive: true })
 const dir = fs.mkdtempSync(join(parent, 'run-')), compiled = join(dir, 'page.mjs')
-await build({ entryPoints: ['apps/integration-client/panels.jsx'], outfile: compiled, bundle: true, platform: 'node', format: 'esm', external: ['react'] })
-const { ProductPage, ProductNavigation } = await import(pathToFileURL(compiled))
-const { PRODUCT_PANELS } = await import('../apps/integration-client/api.mjs')
+await build({ entryPoints: ['apps/integration-client/panels.jsx'], outfile: compiled, bundle: true, platform: 'node', format: 'esm', external: ['react', 'react-dom'] })
 // React decides at load time whether native input events exist, so it must load after a window does.
 const boot = new JSDOM('<div></div>', { url: 'http://localhost/' })
 Object.assign(globalThis, { window: boot.window, document: boot.window.document })
 const { createRoot } = await import('react-dom/client')
+const { ProductPage, ProductNavigation } = await import(pathToFileURL(compiled))
+const { PRODUCT_PANELS } = await import('../apps/integration-client/api.mjs')
 
 const claude = {
   provider: 'engine-claude-code', toolId: 'claude-code', name: 'Claude Code（官方工具）', vendor: 'Anthropic', state: 'ready', registered: true,
@@ -247,6 +247,39 @@ test('收件箱: only committed blockers are listed and each one leads to its fi
   calm.bots = calm.bots.filter(bot => bot.id !== 'coder')
   const quiet = await mount(ProductPage, { section: 'inbox', productApi: { snapshot: async () => calm, dispatch: async () => ({}) } })
   try { assert.match(quiet.host.textContent, /一切就绪/) } finally { await quiet.close() }
+})
+
+test('keyboard: Ctrl+/ shows the shortcut sheet and g-letter jumps work only outside text fields', async () => {
+  const opened = []
+  const page = await mount(ProductNavigation, { panels: PRODUCT_PANELS, openPanel: id => opened.push(id) })
+  const key = async (init, target = page.dom.window.document.body) => {
+    await act(async () => { target.dispatchEvent(new page.dom.window.KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })) })
+  }
+  try {
+    const body = page.dom.window.document.body
+    await key({ key: '/', code: 'Slash', ctrlKey: true })
+    const sheet = body.querySelector('[role=dialog][aria-label="键盘快捷键"]')
+    assert.ok(sheet, 'the sheet opens')
+    assert.match(sheet.textContent, /打开AI 引擎GE/)
+    assert.equal(body.querySelectorAll('[role=dialog]').length, 1)
+    await key({ key: 'Escape' })
+    assert.equal(body.querySelector('[role=dialog]'), null)
+
+    await key({ key: 'g' }); await key({ key: 'e' })
+    assert.deepEqual(opened, [PRODUCT_PANELS.engines])
+    await key({ key: 'g' }); await key({ key: 'w' })
+    assert.deepEqual(opened, [PRODUCT_PANELS.engines, 'model-router-galgame'])
+
+    const input = page.dom.window.document.createElement('input')
+    body.append(input)
+    await key({ key: 'g' }, input); await key({ key: 'i' }, input)
+    assert.equal(opened.length, 2, 'typing in a field never jumps')
+
+    await page.click(page.host.querySelector('button[aria-label="键盘快捷键"]'))
+    assert.ok(body.querySelector('[role=dialog][aria-label="键盘快捷键"]'))
+    await page.click(body.querySelector('[role=dialog] button[aria-label="关闭"]'))
+    assert.equal(body.querySelector('[role=dialog]'), null)
+  } finally { await page.close() }
 })
 
 test('workspace navigation puts the inbox, Bots and engines first', async () => {

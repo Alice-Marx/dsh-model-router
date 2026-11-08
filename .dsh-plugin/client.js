@@ -38,7 +38,7 @@ __export(index_exports, {
   productSlots: () => productSlots
 });
 module.exports = __toCommonJS(index_exports);
-var import_react74 = __toESM(require("react"), 1);
+var import_react75 = __toESM(require("react"), 1);
 
 // modules/bot-runtime/vendor/ds-bot/src/client/i18n.js
 var NAMESPACE = "ds-bot", ZH = {
@@ -1500,11 +1500,11 @@ function lookOf(bot) {
 }
 var SHAPES = {};
 for (let [id2, character] of Object.entries(CHARACTERS)) {
-  let layers = [
+  let layers2 = [
     ...(character.paints ?? []).map(([d, fill2, opacity]) => `<path d="${d}" fill="${fill2}" fill-opacity="${opacity}"/>`),
     `<path d="${character.shade}" fill="#000" fill-opacity=".07"/>`
   ].join("");
-  SHAPES[id2] = { label: character.label ?? id2[0].toUpperCase() + id2.slice(1), size: 100, path: character.body, layers, eyes: character.eyes };
+  SHAPES[id2] = { label: character.label ?? id2[0].toUpperCase() + id2.slice(1), size: 100, path: character.body, layers: layers2, eyes: character.eyes };
 }
 var hasShape = (id2) => typeof id2 == "string" && Object.hasOwn(SHAPES, id2), shapeId = (id2) => hasShape(id2) ? id2 : FALLBACK_SHAPE, shapeOf = (id2) => SHAPES[shapeId(id2)];
 function bodyOf(def, paint, flat = !1) {
@@ -4211,13 +4211,13 @@ function useOptionKeys(count, onPick, ownRef) {
   return (0, import_react8.useEffect)(() => {
     if (count === 0) return;
     optionKeyCards.set((value) => value + 1);
-    let onKey = (event) => {
+    let onKey2 = (event) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.length !== 1 || isTypingTarget(event.target) || isTypingTarget(document.activeElement) || document.querySelector('[role="dialog"], [aria-modal="true"]') !== null || optionKeyCards.getSnapshot() !== 1) return;
       let index = event.key.toUpperCase().charCodeAt(0) - 65;
       index >= 0 && index < count ? (event.preventDefault(), pick3.current(index)) : index === count && ownRef.current && (event.preventDefault(), ownRef.current.focus());
     };
-    return document.addEventListener("keydown", onKey, !0), () => {
-      document.removeEventListener("keydown", onKey, !0), optionKeyCards.set((value) => value - 1);
+    return document.addEventListener("keydown", onKey2, !0), () => {
+      document.removeEventListener("keydown", onKey2, !0), optionKeyCards.set((value) => value - 1);
     };
   }, [count, ownRef]), count > 0 && listening <= 1;
 }
@@ -4538,13 +4538,13 @@ function useOptionKeys2(count, onPick, ownRef) {
   return (0, import_react10.useEffect)(() => {
     if (count === 0) return;
     keyCards.set((value) => value + 1);
-    let onKey = (event) => {
+    let onKey2 = (event) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.length !== 1 || isTypingTarget2(event.target) || isTypingTarget2(document.activeElement) || document.querySelector('[role="dialog"], [aria-modal="true"]') !== null || keyCards.getSnapshot() !== 1) return;
       let index = event.key.toUpperCase().charCodeAt(0) - 65;
       index >= 0 && index < count ? (event.preventDefault(), pick3.current(index)) : index === count && ownRef.current && (event.preventDefault(), ownRef.current.focus());
     };
-    return document.addEventListener("keydown", onKey, !0), () => {
-      document.removeEventListener("keydown", onKey, !0), keyCards.set((value) => value - 1);
+    return document.addEventListener("keydown", onKey2, !0), () => {
+      document.removeEventListener("keydown", onKey2, !0), keyCards.set((value) => value - 1);
     };
   }, [count, ownRef]), count > 0 && listening <= 1;
 }
@@ -7155,11 +7155,11 @@ function useDismiss(open, close, refs) {
     if (!open) return;
     let onDown = (event) => {
       refs.some((ref) => ref.current?.contains(event.target)) || close();
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), close());
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("touchstart", onDown), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("touchstart", onDown), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("touchstart", onDown), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("touchstart", onDown), window.removeEventListener("keydown", onKey2, !0);
     };
   }, [open]);
 }
@@ -8002,7 +8002,7 @@ function useRowEntrances(replacing) {
 function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, useSession, useWork, actions }) {
   let roster = useRoster((value) => value), running = useSessionStatus((map) => map.get(sessionId)?.running === !0), turnAt = useWork?.((work) => work.turns?.[sessionId]), runAt = (0, import_react20.useRef)(0);
   running ? runAt.current === 0 && (runAt.current = Date.now()) : runAt.current = 0;
-  let liveKey = useLive((state) => JSON.stringify(state[sessionId] ?? {})), steeredAt = useWork?.((work) => work.steered?.[sessionId]), pendingInput = useSession((snapshot) => freshInputAt(snapshot?.pendingSubmissions, steeredAt)), bot = roster.byId[sessionId], room2 = roster.roomsById[sessionId], moveAt = useWork?.((work) => {
+  let liveKey = useLive((state) => JSON.stringify(state[sessionId] ?? {})), steeredAt = useWork?.((work) => work.steered?.[sessionId]), pendingInput = useSession((snapshot2) => freshInputAt(snapshot2?.pendingSubmissions, steeredAt)), bot = roster.byId[sessionId], room2 = roster.roomsById[sessionId], moveAt = useWork?.((work) => {
     let entry = bot !== void 0 ? work.bots?.[bot.id] : room2 !== void 0 ? work.rooms?.[room2.id]?.find((item) => item.self === !0) : void 0;
     return entry?.switching === !0 && entry.folder === !0 && entry.roomId === void 0 ? entry.since : 0;
   }) ?? 0, entries2 = (0, import_react20.useMemo)(() => Object.values(JSON.parse(liveKey)), [liveKey]), streaming = entries2.some((entry) => entry.text), tools = entries2.filter((entry) => !entry.text).sort((a, b2) => a.at - b2.at), relaying = tools.some((entry) => entry.relay), visible = moveAt !== 0 || rowVisible({ running, streaming, tools, relaying, bot, room: room2 }), tool = tools.at(-1), inputRef = (0, import_react20.useRef)(0), inputAt = Math.max(inputRef.current, pendingInput);
@@ -8563,11 +8563,11 @@ function TeamSidebar(props) {
     if (mode !== "drawer") return;
     let onDown = (event) => {
       event.target instanceof Element && event.target.closest(".bt-leftcol") || actions.setLeftDrawer?.(!1);
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), actions.setLeftDrawer?.(!1));
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey2, !0);
     };
   }, [mode]);
   let navigate = (open, id2) => {
@@ -8583,10 +8583,10 @@ function TeamSidebar(props) {
     event.defaultPrevented || event.key.length !== 1 || event.key === " " || event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing || event.target instanceof Element && event.target.closest("input,textarea,[contenteditable]") || (event.preventDefault(), actions.openPalette(event.key));
   }, onToggle = () => actions.toggleLeftHidden?.(), toggleRef = (0, import_react21.useRef)(onToggle);
   toggleRef.current = onToggle, (0, import_react21.useEffect)(() => {
-    let onKey = (event) => {
+    let onKey2 = (event) => {
       event.defaultPrevented || event.isComposing || !pressesShellShortcut(event, "sidebar.left.toggle") || event.target instanceof Element && event.target.closest(".xterm") || document.querySelector('[aria-modal="true"]') || (event.preventDefault(), event.stopPropagation(), toggleRef.current());
     };
-    return document.addEventListener("keydown", onKey, !0), () => document.removeEventListener("keydown", onKey, !0);
+    return document.addEventListener("keydown", onKey2, !0), () => document.removeEventListener("keydown", onKey2, !0);
   }, []);
   let top = wideContent ? (0, import_react21.createElement)(
     "div",
@@ -8635,11 +8635,11 @@ function UpdateButton({ useUpdate, actions }) {
     if (!open) return;
     let onDown = (event) => {
       event.target instanceof Element && (event.target.closest(".bt-update-pop") || button.current?.contains(event.target)) || setOpen(!1);
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), setOpen(!1), button.current?.focus());
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey2, !0);
     };
   }, [open]);
   let phase = update?.phase ?? "idle", dsh = update?.dsh, dshPhase = dsh?.phase ?? "idle", dshRow = showsDshRow(dsh, update?.app), tick = useViewport();
@@ -8801,11 +8801,11 @@ function AccountLauncher({ seat = !0, settingsOpen, openSettings, openOnboarding
     if (!open) return;
     let onDown = (event) => {
       event.target instanceof Element && (event.target.closest(".bt-account-menu") || button.current?.contains(event.target)) || setOpen(!1);
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), setOpen(!1), button.current?.focus());
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey2, !0);
     };
   }, [open]);
   let signIn = actions.signInEntry?.() ?? null, ops = (0, import_react21.useMemo)(() => signIn?.inject?.() ?? {}, [signIn]), accountSource = ops.hooks?.account, account = (0, import_react21.useSyncExternalStore)(accountSource?.subscribe ?? NO_SUBSCRIBE, accountSource ? () => accountSource.getSnapshot() : NO_SNAPSHOT), signedIn = signIn !== null && typeof ops.signOut == "function" && account?.view?.status === "credential-stored", signedOut = signIn !== null && typeof actions.signIn == "function" && account?.view?.status === "signed-out", accountT = actions.accountT?.() ?? ((key) => key), [confirm2, setConfirm] = (0, import_react21.useState)(null), [busy, setBusy] = (0, import_react21.useState)(!1), [signOutError, setSignOutError] = (0, import_react21.useState)(""), askSignOut = async () => {
@@ -9283,8 +9283,8 @@ function ComposerVoice({ sessionId, inputActions, actions, useUi, useRoster }) {
   (0, import_react23.useEffect)(() => {
     let root = composerRoot.current?.closest("[data-composer-card]");
     if (enterToSend || !inputActions || !root) return;
-    let onKey = (event) => insertComposerNewline(event, inputActions);
-    return root.addEventListener("keydown", onKey, !0), () => root.removeEventListener("keydown", onKey, !0);
+    let onKey2 = (event) => insertComposerNewline(event, inputActions);
+    return root.addEventListener("keydown", onKey2, !0), () => root.removeEventListener("keydown", onKey2, !0);
   }, [enterToSend, inputActions]);
   let dictation = useDictation((text7, final) => {
     final && inputActions && inputActions.insertText(text7, inputActions.captureInsertion());
@@ -9342,18 +9342,18 @@ function ComposerPlus({ sessionId, inputActions, useInput, useRoster, actions })
     if (!open) return;
     let onDown = (event) => {
       [button.current, menu.current].some((node) => node?.contains(event.target)) || setOpen(null);
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), setOpen(null));
     };
-    return window.addEventListener("mousedown", onDown, !0), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown, !0), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown, !0), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown, !0), window.removeEventListener("keydown", onKey2, !0);
     };
   }, [open]), (0, import_react23.useEffect)(() => {
     let card = button.current?.closest("[data-composer-card]");
     if (!(!ready || card === null || card === void 0))
       return card.style.setProperty("--bt-placeholder", JSON.stringify(t("Press Enter to steer queued messages"))), () => card.style.removeProperty("--bt-placeholder");
   }), (0, import_react23.useEffect)(() => {
-    let steering = !1, onKey = (event) => {
+    let steering = !1, onKey2 = (event) => {
       if (steering || event.defaultPrevented || open) return;
       let target2 = event.target;
       if (typeof target2?.closest != "function") return;
@@ -9362,7 +9362,7 @@ function ComposerPlus({ sessionId, inputActions, useInput, useRoster, actions })
         steering = !1;
       })));
     };
-    return window.addEventListener("keydown", onKey, !0), () => window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("keydown", onKey2, !0), () => window.removeEventListener("keydown", onKey2, !0);
   }, [open, sessionId]);
   let place = (0, import_react23.useMemo)(() => {
     if (!shown || !button.current) return null;
@@ -10204,13 +10204,13 @@ function useAnchoredMenu(minWidth = 240) {
     if (place === null) return;
     let onDown = (event) => {
       menu.current?.contains(event.target) || button.current?.contains(event.target) || close();
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), close(), button.current?.focus());
     }, onScroll = (event) => {
       menu.current?.contains(event.target) || close();
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), window.addEventListener("scroll", onScroll, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0), window.removeEventListener("scroll", onScroll, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey2, !0), window.addEventListener("scroll", onScroll, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey2, !0), window.removeEventListener("scroll", onScroll, !0);
     };
   }, [place]);
   let open = () => setAnchor({});
@@ -11831,11 +11831,11 @@ function MemoryDialog({ owner, actions, leaving = !1 }) {
     if (!menu) return;
     let onDown = (event) => {
       menuRef.current?.contains(event.target) || dotsRef.current?.contains(event.target) || setMenu(!1);
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), setMenu(!1), dotsRef.current?.focus());
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey2, !0);
     };
   }, [menu]);
   let regenerate = () => {
@@ -12040,11 +12040,11 @@ function AvatarEditor({ bot, actions, run: run2, onClose }) {
   (0, import_react34.useEffect)(() => {
     let onDown = (event) => {
       !(event.target instanceof Element) || ref.current?.contains(event.target) || event.target.closest(".bt-avatar-trigger") || onClose();
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), onClose());
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey2, !0);
     };
   }, [onClose]), (0, import_react34.useEffect)(() => {
     if (tab !== "upload") return;
@@ -13584,11 +13584,11 @@ function SpanPicker({ span, today, oldest, active: active2, near, onPick, onClos
   (0, import_react42.useEffect)(() => {
     let onDown = (event) => {
       [box, near].some((ref) => ref.current?.contains(event.target)) || onClose();
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), onClose());
     };
-    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey, !0), () => {
-      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey, !0);
+    return window.addEventListener("mousedown", onDown), window.addEventListener("keydown", onKey2, !0), () => {
+      window.removeEventListener("mousedown", onDown), window.removeEventListener("keydown", onKey2, !0);
     };
   }, []);
   let [low, high] = anchor ? [anchor, hover ?? anchor].sort() : span ? [span.from, span.to] : [null, null], press = (key) => {
@@ -16009,11 +16009,11 @@ function PanelMenu({ items, className, "aria-label": label }) {
     if (!open) return;
     let onDown = (event) => {
       wrap.current && !wrap.current.contains(event.target) && setOpen(!1);
-    }, onKey = (event) => {
+    }, onKey2 = (event) => {
       event.key === "Escape" && (event.stopPropagation(), setOpen(!1));
     };
-    return window.addEventListener("pointerdown", onDown), window.addEventListener("keydown", onKey), () => {
-      window.removeEventListener("pointerdown", onDown), window.removeEventListener("keydown", onKey);
+    return window.addEventListener("pointerdown", onDown), window.addEventListener("keydown", onKey2), () => {
+      window.removeEventListener("pointerdown", onDown), window.removeEventListener("keydown", onKey2);
     };
   }, [open]), items.length === 0 ? null : (0, import_react53.createElement)(
     "span",
@@ -17211,28 +17211,28 @@ function browserAddress(input) {
   return !/\s/.test(text7) && (local || /^[^\s.]+(\.[^\s.]+)+(:\d+)?$/.test(host)) && URL.canParse(`http://${text7}`) ? new URL(`${local ? "http" : "https"}://${text7}`).href : `${SEARCH_URL}${encodeURIComponent(text7)}`;
 }
 function createBotBrowsers({ bridge: bridge2, createSource: createSource2, storage = globalThis.localStorage, document: doc = globalThis.document, guestFactory }) {
-  let views = /* @__PURE__ */ new Map(), owner = /* @__PURE__ */ new Map(), tabs = createSource2({}), pages = createSource2({}), holds = createSource2({}), store = sharedMap(STORE_KEY, storage), saved = store.read(), seen = /* @__PURE__ */ new Set(), layer, shown = null, rect = null, visible = !1, resizeLater = 0, disposed = !1, serial = 0, makeGuest = guestFactory ?? (bridge2.views ? ({ botId, tabId }) => ({ element: createAppViewProxy(bridge2, botId, tabId), appView: !0 }) : ({ document: document2 }) => ({ element: document2.createElement("webview"), appView: !1 })), appViewEvents = bridge2.views?.subscribe?.((change) => {
+  let views = /* @__PURE__ */ new Map(), owner = /* @__PURE__ */ new Map(), tabs = createSource2({}), pages = createSource2({}), holds = createSource2({}), store2 = sharedMap(STORE_KEY, storage), saved = store2.read(), seen = /* @__PURE__ */ new Set(), layer, shown = null, rect = null, visible = !1, resizeLater = 0, disposed = !1, serial = 0, makeGuest = guestFactory ?? (bridge2.views ? ({ botId, tabId }) => ({ element: createAppViewProxy(bridge2, botId, tabId), appView: !0 }) : ({ document: document2 }) => ({ element: document2.createElement("webview"), appView: !1 })), appViewEvents = bridge2.views?.subscribe?.((change) => {
     let { botId, tabId } = change ?? {};
     if (!botId || !tabId) return;
     if (change.type === "closed") {
-      views.get(tabId)?.stop(), views.delete(tabId), owner.delete(tabId), tabs.set((snapshot) => {
-        let current = snapshot[botId];
-        if (!current) return snapshot;
+      views.get(tabId)?.stop(), views.delete(tabId), owner.delete(tabId), tabs.set((snapshot2) => {
+        let current = snapshot2[botId];
+        if (!current) return snapshot2;
         let ids = current.ids.filter((id2) => id2 !== tabId);
         if (ids.length === 0) {
-          let next = { ...snapshot };
+          let next = { ...snapshot2 };
           return delete next[botId], next;
         }
-        return { ...snapshot, [botId]: { ids, active: current.active === tabId ? ids.at(-1) : current.active } };
-      }), pages.set((snapshot) => {
-        let { [tabId]: _2, ...rest } = snapshot;
+        return { ...snapshot2, [botId]: { ids, active: current.active === tabId ? ids.at(-1) : current.active } };
+      }), pages.set((snapshot2) => {
+        let { [tabId]: _2, ...rest } = snapshot2;
         return rest;
       }), persist(botId);
       return;
     }
-    owner.has(tabId) || owner.set(tabId, botId), change.type === "created" && (ensureTabs(botId), tabs.set((snapshot) => {
-      let own = snapshot[botId] ?? { ids: [], active: null };
-      return own.ids.includes(tabId) ? snapshot : { ...snapshot, [botId]: { ids: [...own.ids, tabId], active: tabId } };
+    owner.has(tabId) || owner.set(tabId, botId), change.type === "created" && (ensureTabs(botId), tabs.set((snapshot2) => {
+      let own = snapshot2[botId] ?? { ids: [], active: null };
+      return own.ids.includes(tabId) ? snapshot2 : { ...snapshot2, [botId]: { ids: [...own.ids, tabId], active: tabId } };
     }), publish2(tabId, { url: change.url ?? "", title: change.title ?? "", live: !0 }), persist(botId), open(tabId));
     let entry = views.get(tabId);
     entry?.appView && (entry.botAttached = change.botAttached === !0, entry.ready = change.loading !== !0, entry.element.update(change), entry.ready && (observe(entry), preview(tabId))), publish2(tabId, change);
@@ -17240,11 +17240,11 @@ function createBotBrowsers({ bridge: bridge2, createSource: createSource2, stora
     let botId = owner.get(tabId);
     return { ...state, [tabId]: { ...EMPTY, ...savedTab(botId, tabId), ...state[tabId], ...patch } };
   }), save = (botId, entry) => {
-    saved = store.update((stored) => setEntry(stored, botId, entry), saved);
+    saved = store2.update((stored) => setEntry(stored, botId, entry), saved);
   }, persist = (botId) => {
-    let state = tabs.getSnapshot()[botId], snapshot = pages.getSnapshot();
+    let state = tabs.getSnapshot()[botId], snapshot2 = pages.getSnapshot();
     save(botId, state && {
-      tabs: state.ids.map((id2) => ({ id: id2, url: snapshot[id2]?.url ?? "", title: snapshot[id2]?.title ?? "" })),
+      tabs: state.ids.map((id2) => ({ id: id2, url: snapshot2[id2]?.url ?? "", title: snapshot2[id2]?.title ?? "" })),
       active: state.active
     });
   }, ensureTabs = (botId) => {
@@ -17377,21 +17377,21 @@ function createBotBrowsers({ bridge: bridge2, createSource: createSource2, stora
   async function closeTab(botId, tabId) {
     let state = tabs.getSnapshot()[botId];
     state === void 0 || !state.ids.includes(tabId) || (await opening.get(tabId)?.catch(() => {
-    }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge2.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), tabs.set((snapshot) => {
-      let current = snapshot[botId];
-      if (current === void 0 || !current.ids.includes(tabId)) return snapshot;
-      let at2 = current.ids.indexOf(tabId), ids = current.ids.filter((id2) => id2 !== tabId), active2 = current.active === tabId ? ids[Math.min(at2, ids.length - 1)] ?? null : current.active, next = { ...snapshot };
+    }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge2.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), tabs.set((snapshot2) => {
+      let current = snapshot2[botId];
+      if (current === void 0 || !current.ids.includes(tabId)) return snapshot2;
+      let at2 = current.ids.indexOf(tabId), ids = current.ids.filter((id2) => id2 !== tabId), active2 = current.active === tabId ? ids[Math.min(at2, ids.length - 1)] ?? null : current.active, next = { ...snapshot2 };
       return ids.length === 0 ? delete next[botId] : next[botId] = { ids, active: active2 }, next;
-    }), owner.delete(tabId), pages.set((snapshot) => {
-      if (snapshot[tabId] === void 0) return snapshot;
-      let { [tabId]: _2, ...rest } = snapshot;
+    }), owner.delete(tabId), pages.set((snapshot2) => {
+      if (snapshot2[tabId] === void 0) return snapshot2;
+      let { [tabId]: _2, ...rest } = snapshot2;
       return rest;
     }), persist(botId));
   }
   function activate(botId, tabId) {
     ensureTabs(botId);
     let state = tabs.getSnapshot()[botId];
-    state === void 0 || !state.ids.includes(tabId) || state.active === tabId || (tabs.set((snapshot) => ({ ...snapshot, [botId]: { ...state, active: tabId } })), persist(botId));
+    state === void 0 || !state.ids.includes(tabId) || state.active === tabId || (tabs.set((snapshot2) => ({ ...snapshot2, [botId]: { ...state, active: tabId } })), persist(botId));
   }
   let activeTab = (botId) => tabs.getSnapshot()[botId]?.active ?? null;
   async function show2(tabId, box = null) {
@@ -17421,14 +17421,14 @@ function createBotBrowsers({ bridge: bridge2, createSource: createSource2, stora
     ensureTabs(botId);
     for (let tabId of tabs.getSnapshot()[botId]?.ids ?? [])
       await opening.get(tabId)?.catch(() => {
-      }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge2.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), owner.delete(tabId), pages.set((snapshot) => {
-        if (snapshot[tabId] === void 0) return snapshot;
-        let { [tabId]: _2, ...rest } = snapshot;
+      }), shown === tabId && await show2(null), views.get(tabId)?.appView ? (await bridge2.views.close(botId, tabId), views.get(tabId)?.stop(), views.delete(tabId)) : await release(tabId), owner.delete(tabId), pages.set((snapshot2) => {
+        if (snapshot2[tabId] === void 0) return snapshot2;
+        let { [tabId]: _2, ...rest } = snapshot2;
         return rest;
       });
-    tabs.set((snapshot) => {
-      if (snapshot[botId] === void 0) return snapshot;
-      let { [botId]: _2, ...rest } = snapshot;
+    tabs.set((snapshot2) => {
+      if (snapshot2[botId] === void 0) return snapshot2;
+      let { [botId]: _2, ...rest } = snapshot2;
       return rest;
     }), save(botId, void 0), seen.delete(botId), await bridge2.forget?.(`bot:${botId}`)?.catch((error) => console.warn("[ds-bot] browser forget", error));
   }
@@ -17456,9 +17456,9 @@ function createBotBrowsers({ bridge: bridge2, createSource: createSource2, stora
     },
     /** Pages a read can reach: each Bot's active tab, live and showing a document. */
     openPages() {
-      let open2 = {}, snapshot = pages.getSnapshot();
+      let open2 = {}, snapshot2 = pages.getSnapshot();
       for (let [botId, state] of Object.entries(tabs.getSnapshot())) {
-        let tabId = state.active, entry = tabId ? views.get(tabId) : void 0, page = tabId ? snapshot[tabId] : void 0;
+        let tabId = state.active, entry = tabId ? views.get(tabId) : void 0, page = tabId ? snapshot2[tabId] : void 0;
         entry?.ready && page?.url && (open2[botId] = { url: page.url, title: page.title });
       }
       return open2;
@@ -18079,10 +18079,10 @@ function apply(ctx) {
   let bridge2 = (window.dshDesktop?.protocolVersion === 1 ? window.dshDesktop.browser : globalThis.dsBotApp?.browser) ?? null, browsers = bridge2 ? createBotBrowsers({ bridge: bridge2, createSource }) : null;
   browsers && ctx.effect(() => {
     let stopReads = null, sync = () => {
-      let snapshot = roster.getSnapshot();
-      if (!snapshot.ready) return;
-      let on2 = snapshot.browser === !0;
-      on2 && !stopReads && (stopReads = serveBrowserReads({ browsers, post: call })), !on2 && stopReads && (stopReads(), stopReads = null), browsers.retain(snapshot.bots.map((bot) => bot.id)), ui3.set((state) => state.details && state.view === "browser" && (!on2 || !snapshot.byId[state.details]) ? { ...state, view: "details" } : state);
+      let snapshot2 = roster.getSnapshot();
+      if (!snapshot2.ready) return;
+      let on2 = snapshot2.browser === !0;
+      on2 && !stopReads && (stopReads = serveBrowserReads({ browsers, post: call })), !on2 && stopReads && (stopReads(), stopReads = null), browsers.retain(snapshot2.bots.map((bot) => bot.id)), ui3.set((state) => state.details && state.view === "browser" && (!on2 || !snapshot2.byId[state.details]) ? { ...state, view: "details" } : state);
     };
     sync();
     let offRoster = roster.subscribe(sync);
@@ -18108,13 +18108,13 @@ function apply(ctx) {
     };
   }, installTheme = () => {
     let style = installStyles("", "theme"), key = "", releaseTokens = null, render = () => {
-      let snapshot = roster.getSnapshot(), prefs = snapshot.ready ? snapshot.prefs ?? {} : savedPrefs, themes = allThemes(), id2 = themes[prefs.theme] ? prefs.theme : "deepseek", accent = isHex(prefs.accent) ? prefs.accent : void 0, motion = prefs.motion === "quiet" || prefs.motion === "lively" ? prefs.motion : "normal", layout = layoutOf(prefs), width = widthOf(prefs), flatWidth = flatWidthOf(prefs);
+      let snapshot2 = roster.getSnapshot(), prefs = snapshot2.ready ? snapshot2.prefs ?? {} : savedPrefs, themes = allThemes(), id2 = themes[prefs.theme] ? prefs.theme : "deepseek", accent = isHex(prefs.accent) ? prefs.accent : void 0, motion = prefs.motion === "quiet" || prefs.motion === "lively" ? prefs.motion : "normal", layout = layoutOf(prefs), width = widthOf(prefs), flatWidth = flatWidthOf(prefs);
       document.body.dataset.btMotion = motion, document.body.dataset.btLayout = layout, document.body.style.setProperty("--bt-msg-w", String(width / 100)), document.body.style.setProperty("--bt-flat-w", String(flatWidth / 100));
       let next = `${id2}|${accent ?? ""}|${motion}|${layout}|${width}|${flatWidth}|${registry.getSnapshot()}`;
       if (next === key) return;
       key = next, style.textContent = themeCss(themes[id2], accent);
       let release = releaseTokens;
-      if (releaseTokens = ctx.theme.overrideTokens("ds-bot", shellTokens(themes[id2])), typeof release == "function" && release(), snapshot.ready)
+      if (releaseTokens = ctx.theme.overrideTokens("ds-bot", shellTokens(themes[id2])), typeof release == "function" && release(), snapshot2.ready)
         try {
           localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion, layout: prefs.layout, width: prefs.width, flatWidth: prefs.flatWidth, thinking: prefs.thinking, defaultBotModel: prefs.defaultBotModel, enterToSend: prefs.enterToSend }));
         } catch {
@@ -18149,9 +18149,9 @@ function apply(ctx) {
   });
   let after = (promise) => promise.then(async (value) => (await pull().catch(() => {
   }), value)), partFor = (id2) => {
-    let snapshot = roster.getSnapshot(), bot = snapshot.byId[id2];
+    let snapshot2 = roster.getSnapshot(), bot = snapshot2.byId[id2];
     if (bot !== void 0) return currentPart(bot);
-    let room2 = snapshot.roomsById[id2];
+    let room2 = snapshot2.roomsById[id2];
     return room2 === void 0 ? id2 : room2.sessionId ?? room2.id;
   }, agentSessions = (agentId) => {
     let ids = [...roster.getSnapshot().agentsById[agentId]?.sessions ?? []];
@@ -18165,10 +18165,10 @@ function apply(ctx) {
     let f = frame.getSnapshot();
     return frameLayout({ viewport: f.viewport, sidebarWidth: f.sidebarWidth, pref: sidebarPref.getSnapshot(), drawer: state.leftDrawer, panel: { view: view ?? state.view, yielded: state.panelYield === !0 } }).panel === "folded";
   }, yieldBrowser = (state) => state.panelYield === !0 || panelFolded("browser"), homeToMainBot = () => {
-    let snapshot = roster.getSnapshot();
-    if (!snapshot.ready || !snapshot.mainBotId) return;
+    let snapshot2 = roster.getSnapshot();
+    if (!snapshot2.ready || !snapshot2.mainBotId) return;
     let main = mainView();
-    main !== void 0 && snapshot.byId[main] === void 0 && snapshot.roomsById[main] === void 0 && actions.openSession(snapshot.mainBotId);
+    main !== void 0 && snapshot2.byId[main] === void 0 && snapshot2.roomsById[main] === void 0 && actions.openSession(snapshot2.mainBotId);
   }, ensureBotHome = () => {
     if (roster.getSnapshot().ready) homeToMainBot();
     else {
@@ -18379,14 +18379,14 @@ function apply(ctx) {
     let chat = ctx.uiConversation.binding(binding).target("chat");
     return { ...face(), keyedHooks: {
       turnSteps: (turn) => {
-        let snapshot = chat.getSnapshot();
-        if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
-        return snapshot.nodes.turnDataSource(Number(turn), "assistant-step");
+        let snapshot2 = chat.getSnapshot();
+        if (snapshot2 === void 0) throw new Error("ds-bot: Chat target is unavailable");
+        return snapshot2.nodes.turnDataSource(Number(turn), "assistant-step");
       },
       turnContext: (turn) => {
-        let snapshot = chat.getSnapshot();
-        if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
-        return snapshot.nodes.turnDataSource(Number(turn), "context");
+        let snapshot2 = chat.getSnapshot();
+        if (snapshot2 === void 0) throw new Error("ds-bot: Chat target is unavailable");
+        return snapshot2.nodes.turnDataSource(Number(turn), "context");
       }
     } };
   };
@@ -18585,8 +18585,8 @@ function apply(ctx) {
       if (expected2 = null, ours || main === void 0 || surface.getSnapshot().mode !== "bot") return;
       let agentId = before !== void 0 ? agentOfSession(before) : void 0;
       if (agentId === void 0) return;
-      let snapshot = roster.getSnapshot();
-      if (snapshot.byId[main] !== void 0 || snapshot.roomsById[main] !== void 0 || agentOfSession(main) !== void 0) return;
+      let snapshot2 = roster.getSnapshot();
+      if (snapshot2.byId[main] !== void 0 || snapshot2.roomsById[main] !== void 0 || agentOfSession(main) !== void 0) return;
       let row = list.byId[main];
       if (row?.origin === "subagent") return;
       let parent = row?.parentId ?? row?.parentSessionId, forkedFromAgent = parent !== void 0 && agentOfSession(parent) === agentId;
@@ -19602,9 +19602,9 @@ var TASK_ALIASES = Object.freeze({
 function normalized(value) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
-function liveBenchRow(snapshot, model) {
-  let row = snapshot?.models?.[normalized(model)] ?? null;
-  return snapshot?.exactModelMatch === !0 && row?.model !== model ? null : row;
+function liveBenchRow(snapshot2, model) {
+  let row = snapshot2?.models?.[normalized(model)] ?? null;
+  return snapshot2?.exactModelMatch === !0 && row?.model !== model ? null : row;
 }
 
 // .dsh-plugin/shared/assignment-solver.mjs
@@ -21076,10 +21076,10 @@ function applyFeedbackProfile(routes, profile) {
 
 // .dsh-plugin/shared/dynamic-data-view.mjs
 var exactRouteKey = (route2) => `${String(route2?.provider ?? "")}\0${String(route2?.model ?? "")}`;
-function applyPricingSnapshot(routes, snapshot) {
-  return snapshot?.kind !== "pricing" || !snapshot.prices || typeof snapshot.prices != "object" ? routes : (Array.isArray(routes) ? routes : []).map((route2) => {
+function applyPricingSnapshot(routes, snapshot2) {
+  return snapshot2?.kind !== "pricing" || !snapshot2.prices || typeof snapshot2.prices != "object" ? routes : (Array.isArray(routes) ? routes : []).map((route2) => {
     if (route2?.pricingSource === "user") return route2;
-    let entry = snapshot.prices[exactRouteKey(route2)];
+    let entry = snapshot2.prices[exactRouteKey(route2)];
     return entry ? {
       ...route2,
       pricing: {
@@ -21090,7 +21090,7 @@ function applyPricingSnapshot(routes, snapshot) {
         ...entry.cacheWrite === void 0 ? {} : { cacheWrite: entry.cacheWrite }
       },
       pricingSource: "dynamic",
-      pricingVersion: snapshot.version,
+      pricingVersion: snapshot2.version,
       snapshotAsOf: entry.asOf
     } : route2;
   });
@@ -21212,23 +21212,23 @@ function updateProfileJson(rawJson, route2, draft2) {
 // .dsh-plugin/client/model-profile-editor.jsx
 var messageOf = (error) => typeof error?.message == "string" ? error.message : "模型配置保存失败。";
 function ModelProfileEditor({ routes, settingsScope, onSaved }) {
-  let [snapshot, setSnapshot] = import_react57.default.useState(() => settingsScope.getSnapshot()), [selected, setSelected] = import_react57.default.useState(""), [drafts, setDrafts] = import_react57.default.useState({}), [saving, setSaving] = import_react57.default.useState(!1), [notice, setNotice] = import_react57.default.useState(null);
+  let [snapshot2, setSnapshot] = import_react57.default.useState(() => settingsScope.getSnapshot()), [selected, setSelected] = import_react57.default.useState(""), [drafts, setDrafts] = import_react57.default.useState({}), [saving, setSaving] = import_react57.default.useState(!1), [notice, setNotice] = import_react57.default.useState(null);
   import_react57.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
-  let route2 = routes.find((item) => profileRouteKey(item) === selected) ?? routes[0], routeKey6 = route2 ? profileRouteKey(route2) : "", rawJson = snapshot.value?.modelProfilesJson ?? "[]", profiles = [], loadError = "";
+  let route2 = routes.find((item) => profileRouteKey(item) === selected) ?? routes[0], routeKey6 = route2 ? profileRouteKey(route2) : "", rawJson = snapshot2.value?.modelProfilesJson ?? "[]", profiles = [], loadError = "";
   try {
     profiles = parseModelProfilesJson(rawJson);
   } catch (error) {
     loadError = messageOf(error);
   }
-  let saved = profiles.find((item) => profileRouteKey(item) === routeKey6), pending = drafts[routeKey6], draft2 = pending?.fields ?? profileDraft(saved), writable = snapshot.status === "ready" && snapshot.writable === !0 && !saving && !loadError, unmatched = profiles.filter((item) => !routes.some((route3) => profileRouteKey(route3) === profileRouteKey(item))).length, edit = (name, value) => {
+  let saved = profiles.find((item) => profileRouteKey(item) === routeKey6), pending = drafts[routeKey6], draft2 = pending?.fields ?? profileDraft(saved), writable = snapshot2.status === "ready" && snapshot2.writable === !0 && !saving && !loadError, unmatched = profiles.filter((item) => !routes.some((route3) => profileRouteKey(route3) === profileRouteKey(item))).length, edit = (name, value) => {
     !route2 || !writable || (setDrafts((previous) => {
-      let previousEntry = previous[routeKey6] ?? { fields: profileDraft(saved), baseRevision: snapshot.revision };
+      let previousEntry = previous[routeKey6] ?? { fields: profileDraft(saved), baseRevision: snapshot2.revision };
       return { ...previous, [routeKey6]: { ...previousEntry, fields: { ...previousEntry.fields, [name]: value } } };
     }), setNotice(null));
   }, write = async (remove) => {
     if (!route2 || !writable) return;
-    let revision = pending?.baseRevision ?? snapshot.revision;
-    if (revision !== snapshot.revision) {
+    let revision = pending?.baseRevision ?? snapshot2.revision;
+    if (revision !== snapshot2.revision) {
       setNotice({ tone: "error", text: "设置已在其他页面更新。当前输入仍在；请核对最新内容，再选择“重新加载此路线”后编辑。" });
       return;
     }
@@ -21257,7 +21257,7 @@ function ModelProfileEditor({ routes, settingsScope, onSaved }) {
       return delete next[routeKey6], next;
     }), setNotice(null);
   };
-  return /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "逐模型价格与能力配置" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "逐模型价格与能力"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "选择官方模型目录中的准确路线，填写你掌握的质量评分与单价。配置由你提供，插件不会读取账号密钥。"))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, "已有配置无法解析：", loadError, "。请先在插件设置页修正 JSON。"), snapshot.status !== "ready" && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "设置状态：", snapshot.status === "loading" ? "正在加载" : "当前不可用"), snapshot.status === "ready" && !snapshot.writable && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "status" }, "当前设置为只读，请在可写的本机环境配置。"), routes.length === 0 ? /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-empty" }, "请先在 DeepSeek Harness 的“模型”页添加模型，再返回这里填写价格与能力。") : /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "模型路线"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey6, onChange: (event) => {
+  return /* @__PURE__ */ import_react57.default.createElement("section", { className: "mr-card mr-profile-card", "aria-label": "逐模型价格与能力配置" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", { className: "mr-card-title" }, "逐模型价格与能力"), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-card-copy" }, "选择官方模型目录中的准确路线，填写你掌握的质量评分与单价。配置由你提供，插件不会读取账号密钥。"))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-card-body" }, loadError && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "alert" }, "已有配置无法解析：", loadError, "。请先在插件设置页修正 JSON。"), snapshot2.status !== "ready" && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption" }, "设置状态：", snapshot2.status === "loading" ? "正在加载" : "当前不可用"), snapshot2.status === "ready" && !snapshot2.writable && /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-error", role: "status" }, "当前设置为只读，请在可写的本机环境配置。"), routes.length === 0 ? /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-empty" }, "请先在 DeepSeek Harness 的“模型”页添加模型，再返回这里填写价格与能力。") : /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-label", htmlFor: "mr-profile-route" }, "模型路线"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", id: "mr-profile-route", value: routeKey6, onChange: (event) => {
     setSelected(event.target.value), setNotice(null);
   } }, routes.map((item) => /* @__PURE__ */ import_react57.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))), /* @__PURE__ */ import_react57.default.createElement("p", { className: "mr-caption mr-profile-state" }, saved ? `已配置${saved.pricing ? "单价" : "能力，价格未知"}` : "未配置，价格与质量来源未知", pending ? " · 当前有未保存输入" : "", unmatched > 0 ? ` · 另有 ${unmatched} 条配置不在当前模型目录中，保存时会保留` : ""), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "质量评分（0–100，自报）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "number", min: "0", max: "100", step: "any", value: draft2.quality, disabled: !writable, onChange: (event) => edit("quality", event.target.value), placeholder: "例如 85；留空表示未知" })), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "输入单价（USD / 百万 token）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft2.input, disabled: !writable, onChange: (event) => edit("input", event.target.value), placeholder: "留空表示未知" })), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "输出单价（USD / 百万 token）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft2.output, disabled: !writable, onChange: (event) => edit("output", event.target.value), placeholder: "留空表示未知" })), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "擅长方向（英文标签，逗号分隔）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "text", value: draft2.specialties, disabled: !writable, onChange: (event) => edit("specialties", event.target.value), placeholder: PROFILE_SPECIALTY_HINT })), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "官方 CLI 模型名（可选）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "text", value: draft2.cliModel, disabled: !writable, onChange: (event) => edit("cliModel", event.target.value), placeholder: "仅在厂商 CLI 支持该准确名称时填写" })), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "LiveBench 准确模型名称（可选）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "text", value: draft2.benchmarkModel ?? "", disabled: !writable, onChange: (event) => edit("benchmarkModel", event.target.value), placeholder: "确认版本与推理档位一致；不自动猜测别名" })), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "执行方式"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", value: draft2.execution || "auto", disabled: !writable, onChange: (event) => edit("execution", event.target.value) }, /* @__PURE__ */ import_react57.default.createElement("option", { value: "auto" }, "自动：优先尝试支持当前模式的官方工具"), /* @__PURE__ */ import_react57.default.createElement("option", { value: "official" }, "优先官方工具：API 回退依计费与失败设置"), /* @__PURE__ */ import_react57.default.createElement("option", { value: "api" }, "仅模型目录 API"))), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "计费方式"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", value: draft2.billing, disabled: !writable, onChange: (event) => edit("billing", event.target.value) }, /* @__PURE__ */ import_react57.default.createElement("option", { value: "subscription-first" }, "订阅优先：额度用尽或限流时切换 API Key"), /* @__PURE__ */ import_react57.default.createElement("option", { value: "api-only" }, "只用 API Key"), /* @__PURE__ */ import_react57.default.createElement("option", { value: "subscription-only" }, "只用订阅：额度用尽时不切换"))), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "订阅来源"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", value: draft2.subscription, disabled: !writable, onChange: (event) => edit("subscription", event.target.value) }, /* @__PURE__ */ import_react57.default.createElement("option", { value: "auto" }, "自动：有官方 CLI 时用 CLI 账号登录"), /* @__PURE__ */ import_react57.default.createElement("option", { value: "plan-key" }, "编程套餐 Key：该路线本身是套餐端点"), /* @__PURE__ */ import_react57.default.createElement("option", { value: "cli-login" }, "官方 CLI 账号登录"), /* @__PURE__ */ import_react57.default.createElement("option", { value: "none" }, "无订阅：始终按 API 计费"))), draft2.subscription === "plan-key" && /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "额度用尽时回退的 API 路线"), /* @__PURE__ */ import_react57.default.createElement("select", { className: "mr-input", value: draft2.apiRoute, disabled: !writable, onChange: (event) => edit("apiRoute", event.target.value) }, /* @__PURE__ */ import_react57.default.createElement("option", { value: "" }, "不回退（未配置 API 路线）"), routes.filter((item) => profileRouteKey(item) !== routeKey6).map((item) => /* @__PURE__ */ import_react57.default.createElement("option", { key: profileRouteKey(item), value: profileRouteKey(item) }, item.provider, "/", item.model))))), /* @__PURE__ */ import_react57.default.createElement("details", { className: "mr-profile-advanced" }, /* @__PURE__ */ import_react57.default.createElement("summary", null, "缓存单价（可选）"), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-profile-grid" }, /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "缓存读取（USD / 百万 token）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft2.cacheRead, disabled: !writable, onChange: (event) => edit("cacheRead", event.target.value), placeholder: "留空按普通输入价格估算" })), /* @__PURE__ */ import_react57.default.createElement("label", { className: "mr-profile-field" }, /* @__PURE__ */ import_react57.default.createElement("span", null, "缓存写入（USD / 百万 token）"), /* @__PURE__ */ import_react57.default.createElement("input", { className: "mr-input", type: "number", min: "0", step: "any", value: draft2.cacheWrite, disabled: !writable, onChange: (event) => edit("cacheWrite", event.target.value), placeholder: "留空按普通输入价格估算" })))), /* @__PURE__ */ import_react57.default.createElement("div", { className: "mr-actions" }, /* @__PURE__ */ import_react57.default.createElement("button", { className: "mr-button", type: "button", disabled: !writable || !pending, onClick: () => {
     write(!1);
@@ -21522,12 +21522,12 @@ function dagLayers(packages) {
     return depth.set(id2, Math.max(0, value)), depth.get(id2);
   };
   list.forEach((item) => visit(item.id));
-  let layers = [];
+  let layers2 = [];
   for (let item of list) {
     let level = depth.get(item.id) ?? 0;
-    (layers[level] ??= []).push(item);
+    (layers2[level] ??= []).push(item);
   }
-  return layers.filter(Boolean);
+  return layers2.filter(Boolean);
 }
 var LOGIN_LABEL = Object.freeze({ "logged-in": "已登录", "logged-out": "未登录", unknown: "登录状态未知" }), VERSION_LABEL = Object.freeze({ latest: "已是最新版", "update-available": "有新版本", unknown: "最新版本未知" }), UNTESTED_VERSION_NOTE = "插件不再固定官方工具版本，安装和更新都取各厂商的最新版；新版本未经插件测试，输出格式变化时插件会尽量兼容，遇到问题请反馈。";
 function versionLine(entry) {
@@ -21637,13 +21637,13 @@ function rerunSupport(run2, ledger = null) {
     };
   }
   if (run2?.kind === "tool") {
-    let editable = run2.executionMode === "workspace-write";
+    let editable2 = run2.executionMode === "workspace-write";
     return {
       supported: !0,
-      writes: editable,
+      writes: editable2,
       reassign: !1,
       reason: "",
-      confirm: editable ? "重跑会在新的独立 Git 工作树中再次执行这次可编辑调用，成功后把改动整合回工作区（工作区须为干净的 Git 仓库）。" : ""
+      confirm: editable2 ? "重跑会在新的独立 Git 工作树中再次执行这次可编辑调用，成功后把改动整合回工作区（工作区须为干净的 Git 仓库）。" : ""
     };
   }
   return run2?.kind === "team" && run2.executionMode === "workspace-write" ? ["incomplete", "cancelled"].includes(run2.status) ? !run2.isolatedWorkspace || !run2.baseCommit ? { supported: !1, writes: !0, reassign: !1, reason: "旧版本记录缺少独立工作区或 Git 基线，无法安全续跑；请在会话中重新调用 model_router_team_execute。" } : {
@@ -21909,11 +21909,11 @@ function Meter({ label, meter }) {
   return /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-meter" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-meter-top" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-control-label" }, label), /* @__PURE__ */ import_react58.default.createElement("span", { className: meter.over ? "mr-meter-over" : "" }, meter.text)), meter.limited && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-meter-track", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(meter.share * 100) }, /* @__PURE__ */ import_react58.default.createElement("div", { className: `mr-meter-fill ${meter.over ? "over" : meter.share > 0.8 ? "near" : ""}`, style: { width: `${Math.round(meter.share * 100)}%` } })));
 }
 function useSettingsWriter(settingsScope) {
-  let [snapshot, setSnapshot] = import_react58.default.useState(() => settingsScope.getSnapshot()), [notice, setNotice] = import_react58.default.useState(""), [busy, setBusy] = import_react58.default.useState(!1), pending = import_react58.default.useRef(!1), mounted = import_react58.default.useRef(!0);
+  let [snapshot2, setSnapshot] = import_react58.default.useState(() => settingsScope.getSnapshot()), [notice, setNotice] = import_react58.default.useState(""), [busy, setBusy] = import_react58.default.useState(!1), pending = import_react58.default.useRef(!1), mounted = import_react58.default.useRef(!0);
   import_react58.default.useEffect(() => (mounted.current = !0, () => {
     mounted.current = !1;
   }), []), import_react58.default.useEffect(() => settingsScope.subscribe(() => setSnapshot(settingsScope.getSnapshot())), [settingsScope]);
-  let writable = snapshot.status === "ready" && snapshot.writable === !0 && !busy, write = async (key, value) => {
+  let writable = snapshot2.status === "ready" && snapshot2.writable === !0 && !busy, write = async (key, value) => {
     let current = settingsScope.getSnapshot();
     if (pending.current || current.status !== "ready" || current.writable !== !0) return !1;
     pending.current = !0, setBusy(!0), setNotice("");
@@ -21926,7 +21926,7 @@ function useSettingsWriter(settingsScope) {
       pending.current = !1, mounted.current && setBusy(!1);
     }
   };
-  return { value: snapshot.value ?? {}, writable, busy, write, notice };
+  return { value: snapshot2.value ?? {}, writable, busy, write, notice };
 }
 var ADAPTIVE_FIELD_LABEL = {
   feedbackHalfLifeDays: "反馈半衰期（天）",
@@ -22107,10 +22107,10 @@ function SubscriptionUsageCard({ ledger }) {
   return /* @__PURE__ */ import_react58.default.createElement("section", { className: "mr-card mr-results", "aria-label": "订阅用量" }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-head" }, /* @__PURE__ */ import_react58.default.createElement("div", null, /* @__PURE__ */ import_react58.default.createElement("h2", { className: "mr-card-title" }, "订阅用量"), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-card-copy" }, "订阅只统计调用次数与厂商已报告的 token 用量，和 API 金额分开计算。未报告的用量保持未知，不按 API 价格折算。"))), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-card-body" }, !usage.available && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-empty" }, "订阅用量摘要不可用。旧版 Host 或历史记录可能只保存参考金额；不能从该金额还原 token 用量，请更新 Host 后刷新。"), usage.available && /* @__PURE__ */ import_react58.default.createElement(import_react58.default.Fragment, null, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-result-grid" }, /* @__PURE__ */ import_react58.default.createElement(UsagePeriod, { label: "今日订阅用量", period: usage.today }), /* @__PURE__ */ import_react58.default.createElement(UsagePeriod, { label: "本月订阅用量", period: usage.month })), usage.byRoute.length > 0 && /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-table-wrap" }, /* @__PURE__ */ import_react58.default.createElement("table", { className: "mr-table" }, /* @__PURE__ */ import_react58.default.createElement("thead", null, /* @__PURE__ */ import_react58.default.createElement("tr", null, /* @__PURE__ */ import_react58.default.createElement("th", null, "订阅供应商 / 工具"), /* @__PURE__ */ import_react58.default.createElement("th", null, "今日已观察用量"), /* @__PURE__ */ import_react58.default.createElement("th", null, "本月已观察用量"))), /* @__PURE__ */ import_react58.default.createElement("tbody", null, usage.byRoute.map((item) => /* @__PURE__ */ import_react58.default.createElement("tr", { key: `${item.provider}\0${item.toolId ?? ""}\0${item.model ?? ""}` }, /* @__PURE__ */ import_react58.default.createElement("td", null, /* @__PURE__ */ import_react58.default.createElement("strong", null, item.provider || "未记录供应商"), /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-caption" }, [item.toolId, item.model].filter(Boolean).join(" · ") || "未记录工具或模型")), /* @__PURE__ */ import_react58.default.createElement("td", null, subscriptionUsageText(item.today)), /* @__PURE__ */ import_react58.default.createElement("td", null, subscriptionUsageText(item.month))))))), usage.month.calls === 0 && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "本月没有已记录的订阅调用。")), /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-caption" }, "这些数值是本机已记录用量，不代表订阅总额度或剩余额度。不同厂商的计量方式、窗口及缓存口径可能不同；未获得厂商配额时，不显示已用百分比。")));
 }
 function DagView({ packages, renderNode, label = "子任务依赖图" }) {
-  let layers = dagLayers(packages);
-  if (layers.length === 0) return null;
+  let layers2 = dagLayers(packages);
+  if (layers2.length === 0) return null;
   let names = new Map((packages ?? []).map((item) => [item.id, item.name]));
-  return /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-dag", role: "list", "aria-label": label }, layers.map((layer, index) => /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-dag-column", key: index }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-dag-step" }, "第 ", index + 1, " 步"), layer.map((item) => {
+  return /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-dag", role: "list", "aria-label": label }, layers2.map((layer, index) => /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-dag-column", key: index }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-dag-step" }, "第 ", index + 1, " 步"), layer.map((item) => {
     let status = packageStatus(item);
     return /* @__PURE__ */ import_react58.default.createElement("article", { className: `mr-dag-node ${status.tone}`, role: "listitem", key: item.id }, /* @__PURE__ */ import_react58.default.createElement("div", { className: "mr-dag-node-top" }, /* @__PURE__ */ import_react58.default.createElement("span", { className: "mr-package-name" }, item.name), /* @__PURE__ */ import_react58.default.createElement("span", { className: `mr-pill mr-status-${status.tone}` }, status.label)), (item.dependsOn ?? []).length > 0 && /* @__PURE__ */ import_react58.default.createElement("p", { className: "mr-package-copy" }, "依赖：", item.dependsOn.map((id2) => names.get(id2) ?? id2).join("、")), renderNode?.(item));
   }))));
@@ -22239,7 +22239,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
   let inputSignature = JSON.stringify([task, mode, directRoute?.provider, directRoute?.model, budgetUsd, runPreset, workspace2, lastWorkspace, planningRevision, disabledReason, runExecutor, runMode, runEnvironment, assignmentMode, packagePlanKey2, packageAssignments]), latestSignature = import_react59.default.useRef(inputSignature);
   latestSignature.current = inputSignature, import_react59.default.useEffect(() => {
     mounted.current = !0;
-    let resume = (jobId, snapshot) => {
+    let resume = (jobId, snapshot2) => {
       activeRun.current = {
         token: ++launchSequence.current,
         jobId,
@@ -22249,7 +22249,7 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
         requestSequence: 0,
         appliedSequence: 0,
         restoring: !0
-      }, launching.current = !0, setPhase({ kind: "running", job: snapshot ?? { jobId, status: "running" }, restoring: !snapshot });
+      }, launching.current = !0, setPhase({ kind: "running", job: snapshot2 ?? { jobId, status: "running" }, restoring: !snapshot2 });
     }, receiveLaunch = (event) => {
       if (!mounted.current) return;
       if (event.kind === "pending") {
@@ -22366,9 +22366,9 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     dryRun
   }), blocked = disabledReason || (typeof previewRun != "function" || typeof startRun != "function" ? "工作台执行服务尚未加载，请更新插件后重试。" : text2(task) ? manual && !packagePlanKey2 ? "请重新生成工作包后再手动分配。" : runExecutor === "official-team" && mode !== "team" ? "官方工具协作需要先在上方选择“团队分工”。" : "" : "先在上方“任务规划”中描述任务。"), busy = phase.kind === "previewing" || phase.kind === "running" || phase.kind === "starting", resultStatus = (phase.kind === "done" && phase.value.runId ? (ledger?.runs ?? []).find((run2) => run2.id === phase.value.runId) : null)?.status ?? phase.value?.status, preview = async () => {
     if (blocked || busy || launching.current || pendingLaunch) return;
-    let current = ++pendingRequest.current, snapshot;
+    let current = ++pendingRequest.current, snapshot2;
     try {
-      snapshot = request();
+      snapshot2 = request();
     } catch (error) {
       setPhase({ kind: "error", message: text2(error?.message) || "分配设置无效。" });
       return;
@@ -22376,14 +22376,14 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
     let signature2 = inputSignature;
     setPhase({ kind: "previewing" });
     try {
-      let value = unwrapRemote(await waitForRemote((signal) => previewRun(snapshot, signal), pendingRemotes.current), "执行预览失败。");
-      mounted.current && current === pendingRequest.current && signature2 === latestSignature.current && setPhase({ kind: "preview", value, request: snapshot, signature: signature2 });
+      let value = unwrapRemote(await waitForRemote((signal) => previewRun(snapshot2, signal), pendingRemotes.current), "执行预览失败。");
+      mounted.current && current === pendingRequest.current && signature2 === latestSignature.current && setPhase({ kind: "preview", value, request: snapshot2, signature: signature2 });
     } catch (error) {
       mounted.current && current === pendingRequest.current && signature2 === latestSignature.current && setPhase({ kind: "error", message: text2(error?.message) || "执行预览失败。" });
     }
   }, confirm2 = async () => {
     if (launching.current || pendingLaunch || currentPhase.current !== phase || blocked || phase.kind !== "preview" || phase.signature !== latestSignature.current || phase.value.status === "blocked") return;
-    let shown = phase.value, snapshot = phase.request, signature2 = phase.signature;
+    let shown = phase.value, snapshot2 = phase.request, signature2 = phase.signature;
     launching.current = !0;
     let identity2 = /* @__PURE__ */ Symbol("launch"), active2 = {
       token: ++launchSequence.current,
@@ -22395,16 +22395,16 @@ function RunLauncher({ task, mode, directRoute, budgetUsd, defaultPreset, ledger
       requestSequence: 0,
       appliedSequence: 0
     };
-    activeRun.current = active2, pendingLaunch = identity2, notifyLaunch({ kind: "pending", identity: identity2 }), setPhase({ kind: "running", value: shown, request: snapshot, signature: signature2 });
+    activeRun.current = active2, pendingLaunch = identity2, notifyLaunch({ kind: "pending", identity: identity2 }), setPhase({ kind: "running", value: shown, request: snapshot2, signature: signature2 });
     try {
-      let value = unwrapRemote(await startRun({ ...snapshot, confirmedReasons: (shown.reasons ?? []).map((item) => item.code) }), "执行失败。");
+      let value = unwrapRemote(await startRun({ ...snapshot2, confirmedReasons: (shown.reasons ?? []).map((item) => item.code) }), "执行失败。");
       if (settleLaunch(identity2, value), !mounted.current || activeRun.current !== active2) return;
       if (isJobSnapshot(value)) {
         active2.jobId = value.jobId, acceptSnapshot(value, active2.token, ++active2.requestSequence);
         return;
       }
       if (active2.terminal = !0, launching.current = !1, value.status === "needs-confirmation") {
-        setPhase(signature2 === latestSignature.current ? { kind: "preview", value, request: snapshot, signature: signature2, changed: !0 } : { kind: "idle" });
+        setPhase(signature2 === latestSignature.current ? { kind: "preview", value, request: snapshot2, signature: signature2, changed: !0 } : { kind: "idle" });
         return;
       }
       setPhase({ kind: "done", value }), onStarted?.(value.runId);
@@ -32029,7 +32029,7 @@ var INSTALL_SETTING_FIELDS = [
   }
 ];
 function InstallSettings({ settingsScope, install, onPendingChange, onMutationStart }) {
-  let [snapshot, setSnapshot] = import_react61.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [drafts, setDrafts] = import_react61.default.useState({}), [saving, setSaving] = import_react61.default.useState(!1), [notice, setNotice] = import_react61.default.useState("");
+  let [snapshot2, setSnapshot] = import_react61.default.useState(() => settingsScope?.getSnapshot?.() ?? { value: {}, writable: !1 }), [drafts, setDrafts] = import_react61.default.useState({}), [saving, setSaving] = import_react61.default.useState(!1), [notice, setNotice] = import_react61.default.useState("");
   import_react61.default.useEffect(() => {
     if (typeof settingsScope?.subscribe != "function") return;
     let unsubscribe = settingsScope.subscribe(() => {
@@ -32042,8 +32042,8 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
   if (import_react61.default.useEffect(() => {
     onPendingChange?.(saving || dirty);
   }, [saving, dirty, onPendingChange]), !settingsScope) return null;
-  let writable = snapshot.writable === !0 && !saving, shown = (field2) => drafts[field2.key] ?? String(snapshot.value?.[field2.key] ?? field2.fallback), fields = INSTALL_SETTING_FIELDS, errors = Object.fromEntries(fields.map((field2) => [field2.key, validateToolInstallSetting(field2.key, shown(field2))])), invalid = Object.values(errors).some(Boolean), edit = (key, value) => {
-    let next = retainToolInstallDrafts({ ...drafts, [key]: value }, snapshot.value);
+  let writable = snapshot2.writable === !0 && !saving, shown = (field2) => drafts[field2.key] ?? String(snapshot2.value?.[field2.key] ?? field2.fallback), fields = INSTALL_SETTING_FIELDS, errors = Object.fromEntries(fields.map((field2) => [field2.key, validateToolInstallSetting(field2.key, shown(field2))])), invalid = Object.values(errors).some(Boolean), edit = (key, value) => {
+    let next = retainToolInstallDrafts({ ...drafts, [key]: value }, snapshot2.value);
     onPendingChange?.(saving || Object.keys(next).length > 0), setNotice(""), setDrafts(next);
   }, apply4 = async () => {
     if (!(!writable || !dirty || invalid)) {
@@ -32052,7 +32052,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
         let entries2 = Object.entries(drafts).map(([key, value]) => ({ op: "set", path: [key], value })), finishMutation = onMutationStart?.(entries2), onSettled = (outcome) => {
           finishMutation?.(outcome) && outcome.accepted && setNotice("安装设置已保存。");
         };
-        if (!await mutateToolInstallSettings(settingsScope, entries2, snapshot.revision, { onSettled })) throw new Error("设置未被保存，可能被其他页面修改；输入已保留，请重新核对。");
+        if (!await mutateToolInstallSettings(settingsScope, entries2, snapshot2.revision, { onSettled })) throw new Error("设置未被保存，可能被其他页面修改；输入已保留，请重新核对。");
         let next = settingsScope.getSnapshot();
         setSnapshot(next), setDrafts((previous) => retainToolInstallDrafts(previous, next.value)), setNotice("安装设置已保存。");
       } catch (error) {
@@ -32076,7 +32076,7 @@ function InstallSettings({ settingsScope, install, onPendingChange, onMutationSt
     "input",
     {
       type: "checkbox",
-      checked: (drafts.toolAllowScriptInstall ?? snapshot.value?.toolAllowScriptInstall) !== !1,
+      checked: (drafts.toolAllowScriptInstall ?? snapshot2.value?.toolAllowScriptInstall) !== !1,
       disabled: !writable,
       onChange: (event) => {
         edit("toolAllowScriptInstall", event.target.checked);
@@ -32132,7 +32132,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       setProbeState((previous) => previous.probes.length > 0 || previous.install ? (kept = !0, { ...previous, status: "ready", error: message2 }) : { status: "error", probes: [], capabilities: [], readiness: [], install: null, error: message2 }), kept || onProbes({ probes: [], capabilities: [], readiness: [] });
     }
   }, refreshInstallSettings = async () => {
-    let current = ++previewRequest.current, snapshot = settingsScope?.getSnapshot?.(), signature2 = toolInstallSettingsSignature(snapshot?.value);
+    let current = ++previewRequest.current, snapshot2 = settingsScope?.getSnapshot?.(), signature2 = toolInstallSettingsSignature(snapshot2?.value);
     previewPendingRef.current = !0, setPreviewPending(!0), setPreviewError("");
     try {
       if (typeof loadOfficialInstallSettings != "function") throw new Error("安装设置桥尚未加载，请更新 Host 后重新打开工作台。");
@@ -32178,11 +32178,11 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
   }, []);
   import_react61.default.useEffect(() => {
     if (typeof settingsScope?.subscribe != "function") return;
-    let signature2 = (snapshot) => toolInstallSettingsSignature(snapshot?.value), previous = signature2(settingsScope.getSnapshot());
+    let signature2 = (snapshot2) => toolInstallSettingsSignature(snapshot2?.value), previous = signature2(settingsScope.getSnapshot());
     return settingsScope.subscribe(() => {
-      let snapshot = settingsScope.getSnapshot();
-      setSettingsSnapshot(snapshot);
-      let next = signature2(snapshot);
+      let snapshot2 = settingsScope.getSnapshot();
+      setSettingsSnapshot(snapshot2);
+      let next = signature2(snapshot2);
       next !== previous && (previous = next, request.current += 1, setProbeSettingsStale(!0), setProbeState((previous2) => ({ ...previous2, status: "ready", probes: [], readiness: [], error: "" })), onProbes({ probes: [], capabilities: [], readiness: [] }), previewPendingRef.current = !0, setPreviewPending(!0), refreshInstallSettingsRef.current());
     });
   }, [settingsScope]), import_react61.default.useEffect(() => {
@@ -32264,12 +32264,12 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       submitting.current.delete(id2);
     }
   }, install = (id2) => run2(id2, "install"), repair = (id2) => run2(id2, "repair"), uninstall = (id2) => run2(id2, "uninstall"), setInstallMethod = async (toolId, methodId) => {
-    let snapshot = settingsScope?.getSnapshot?.();
-    if (!snapshot?.writable || methodSavingRef.current || settingsPendingRef.current) return;
+    let snapshot2 = settingsScope?.getSnapshot?.();
+    if (!snapshot2?.writable || methodSavingRef.current || settingsPendingRef.current) return;
     methodSavingRef.current = toolId, setMethodSaving(toolId), setRowErrors((previous) => ({ ...previous, [toolId]: "" }));
     let map = {};
     try {
-      map = JSON.parse(String(snapshot.value?.toolInstallMethodsJson ?? "{}")) || {};
+      map = JSON.parse(String(snapshot2.value?.toolInstallMethodsJson ?? "{}")) || {};
     } catch {
       map = {};
     }
@@ -32278,7 +32278,7 @@ function OfficialToolsCard({ listOfficialTools, loadOfficialInstallSettings, ins
       let operations = [{ op: "set", path: ["toolInstallMethodsJson"], value: JSON.stringify(map) }], finishMutation = beginSettingsMutation(operations), onSettled = (outcome) => {
         finishMutation(outcome) && outcome.accepted && setRowErrors((previous) => ({ ...previous, [toolId]: "" }));
       };
-      if (!await mutateToolInstallSettings(settingsScope, operations, snapshot.revision, { onSettled })) throw new Error("安装方式未被保存，可能被其他页面修改。");
+      if (!await mutateToolInstallSettings(settingsScope, operations, snapshot2.revision, { onSettled })) throw new Error("安装方式未被保存，可能被其他页面修改。");
       setSettingsSnapshot(settingsScope.getSnapshot());
     } catch (error) {
       mounted.current && setRowErrors((previous) => ({ ...previous, [toolId]: text5(error?.message) || "安装方式保存失败。" }));
@@ -32559,8 +32559,8 @@ function RouterMainPage({ loadCatalog, settingsScope, listOfficialTools, loadOff
     }
   }, invalidatePlan = () => {
     generationRequest.current += 1, setPlan(null), setPlanError("");
-  }, handleToolProbes = import_react61.default.useCallback((snapshot) => {
-    generationRequest.current += 1, setToolProbes(snapshot), setPlan(null), setPlanError("");
+  }, handleToolProbes = import_react61.default.useCallback((snapshot2) => {
+    generationRequest.current += 1, setToolProbes(snapshot2), setPlan(null), setPlanError("");
   }, []), generate = async () => {
     let request = ++generationRequest.current, inputs = generationInputs.current;
     setPlanError("");
@@ -33145,7 +33145,7 @@ var RouterSettingsCardController = class {
   }
 };
 function RouterSettingsCard(props) {
-  let state = props.useModelRouterSettings((snapshot) => snapshot);
+  let state = props.useModelRouterSettings((snapshot2) => snapshot2);
   if (props.view === "summary")
     return "为官方已配置的模型生成路由计划，并提供跨模型咨询工具。";
   let disabled = !state.writable || state.saving;
@@ -33469,7 +33469,7 @@ var TASK_STATES = Object.freeze({
 }), money3 = (value) => typeof value == "number" && Number.isFinite(value) ? `USD ${value.toFixed(6)}` : "未知（待收据核对）", modelName = (model) => typeof model == "string" ? model : model?.provider && (model?.model ?? model?.id) ? `${model.provider}/${model.model ?? model.id}` : "尚未选择准确模型";
 
 // apps/integration-client/panels.jsx
-var import_react73 = __toESM(require("react"), 1);
+var import_react74 = __toESM(require("react"), 1);
 
 // apps/integration-client/tasks-panel.jsx
 var import_react64 = __toESM(require("react"), 1);
@@ -33483,8 +33483,8 @@ function remoteUncertain(row) {
   let remote = row?.result?.remote;
   return !remote || typeof remote != "object" || remote.notStarted === !0 && remote.possiblyApplied !== !0 || remote.stopConfirmed === !0 ? !1 : TERMINAL.has(row.state);
 }
-function deriveBotAttention(snapshot, { limit = 6 } = {}) {
-  let tasks = Array.isArray(snapshot?.tasks?.items) ? snapshot.tasks.items : [], bots = Array.isArray(snapshot?.bots) ? snapshot.bots : [], nameOf = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId ?? "未取得归属", rows2 = [], add = (stage, key, title, detail, action, extra = {}) => {
+function deriveBotAttention(snapshot2, { limit = 6 } = {}) {
+  let tasks = Array.isArray(snapshot2?.tasks?.items) ? snapshot2.tasks.items : [], bots = Array.isArray(snapshot2?.bots) ? snapshot2.bots : [], nameOf = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId ?? "未取得归属", rows2 = [], add = (stage, key, title, detail, action, extra = {}) => {
     rows2.push({ key, stage, title, detail: short2(detail, 160), action, ...extra });
   };
   for (let task of tasks) {
@@ -33571,8 +33571,8 @@ function progressNote(row, stateLabel = "") {
   return label && label !== String(stateLabel ?? "").trim() ? label : "";
 }
 var TASK_FILTERS = Object.freeze([["all", "全部"], ["active", "进行中"], ["attention", "待处理"], ["finished", "已结束"]]), active = /* @__PURE__ */ new Set(["queued", "ready", "running", "admitting", "cancelling"]), ended = /* @__PURE__ */ new Set(["succeeded", "cancelled", "skipped"]);
-function taskProgress(snapshot) {
-  let items = snapshot?.tasks?.status === "available" && Array.isArray(snapshot.tasks.items) ? snapshot.tasks.items : [], attention = deriveBotAttention({ ...snapshot, tasks: { items } }, { limit: 1 / 0 }), attentionKeys = new Set(attention.map((row) => taskKey(row))), category = (row) => attentionKeys.has(taskKey(row)) ? "attention" : active.has(row.state) ? "active" : ended.has(row.state) ? "finished" : "other", bots = new Map((snapshot?.bots ?? []).map((bot) => [bot.id, { botId: bot.id, name: bot.name, all: 0, active: 0, attention: 0, finished: 0, other: 0 }])), counts2 = { all: items.length, active: 0, attention: 0, finished: 0, other: 0 };
+function taskProgress(snapshot2) {
+  let items = snapshot2?.tasks?.status === "available" && Array.isArray(snapshot2.tasks.items) ? snapshot2.tasks.items : [], attention = deriveBotAttention({ ...snapshot2, tasks: { items } }, { limit: 1 / 0 }), attentionKeys = new Set(attention.map((row) => taskKey(row))), category = (row) => attentionKeys.has(taskKey(row)) ? "attention" : active.has(row.state) ? "active" : ended.has(row.state) ? "finished" : "other", bots = new Map((snapshot2?.bots ?? []).map((bot) => [bot.id, { botId: bot.id, name: bot.name, all: 0, active: 0, attention: 0, finished: 0, other: 0 }])), counts2 = { all: items.length, active: 0, attention: 0, finished: 0, other: 0 };
   for (let row of items) {
     let kind = category(row);
     counts2[kind]++, bots.has(row.botId) || bots.set(row.botId, { botId: row.botId, name: row.botId || "未取得归属", all: 0, active: 0, attention: 0, finished: 0, other: 0 });
@@ -33638,7 +33638,8 @@ var import_react63 = __toESM(require("react"), 1), paths = {
   chip: ["M7 7h10v10H7Z", "M10 3v4m4-4v4m-4 10v4m4-4v4M3 10h4m-4 4h4m10-4h4m-4 4h4"],
   inbox: ["M3 13h5l1.5 3h5L16 13h5", "M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Z"],
   copy: ["M9 9h11v11H9Z", "M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"],
-  keyboard: ["M3 6h18v12H3Z", "M7 10h.01M11 10h.01M15 10h.01M7 14h10"]
+  keyboard: ["M3 6h18v12H3Z", "M7 10h.01M11 10h.01M15 10h.01M7 14h10"],
+  close: ["M6 6l12 12M18 6 6 18"]
 };
 function UiIcon({ name, size = 18, className = "", ...props }) {
   return /* @__PURE__ */ import_react63.default.createElement(
@@ -33708,20 +33709,20 @@ function TaskDetail({ task, inspect, busy, actions, dispatch, onClose, bot, open
   let data = history?.task ?? task;
   return /* @__PURE__ */ import_react64.default.createElement("article", { className: "bp-card bp-task-detail", "aria-label": "任务详情", ref, tabIndex: -1 }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("h2", null, "任务详情"), /* @__PURE__ */ import_react64.default.createElement("p", null, taskTitle(task))), /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: onClose }, "关闭")), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react64.default.createElement(Tag2, null, TASK_STATES[data.state] ?? data.state), /* @__PURE__ */ import_react64.default.createElement("span", null, bot?.name ?? task.botId ?? "未取得归属"), bot?.sessionId && openSession && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: () => openSession(bot.sessionId) }, "打开 Bot 私聊"), /* @__PURE__ */ import_react64.default.createElement(TaskActions, { row: data, actions, dispatch, busy })), /* @__PURE__ */ import_react64.default.createElement(RemoteNotice, { row: data }), /* @__PURE__ */ import_react64.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react64.default.createElement(Value, { label: "创建" }, date(data.createdAt)), /* @__PURE__ */ import_react64.default.createElement(Value, { label: "最近更新" }, date(data.updatedAt)), /* @__PURE__ */ import_react64.default.createElement(Value, { label: "期限" }, date(data.deadlineAt)), data.attribution?.label && /* @__PURE__ */ import_react64.default.createElement(Value, { label: "执行进度" }, data.attribution.label)), /* @__PURE__ */ import_react64.default.createElement("h3", null, "任务时间线"), loading && /* @__PURE__ */ import_react64.default.createElement("p", { role: "status", className: "bp-muted" }, "正在读取原任务日志…"), failure && /* @__PURE__ */ import_react64.default.createElement("p", { role: "alert", className: "bp-error" }, failure), inspect && actions.includes("task.inspect") && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", disabled: loading, onClick: () => setReload((value) => value + 1) }, "重新读取时间线"), !actions.includes("task.inspect") && /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, "此宿主尚未提供任务时间线，可在下方查看现有收据依据。"), history && /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, history.attempts.length, " 次执行尝试 · ", history.timeline.total, " 条日志", history.timeline.truncated ? `，显示最近 ${history.timeline.items.length} 条` : "", "。停止请求需等待原操作确认。"), /* @__PURE__ */ import_react64.default.createElement("ol", { className: "bp-task-timeline" }, history.timeline.items.map((event) => /* @__PURE__ */ import_react64.default.createElement("li", { key: event.seq }, /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-timeline-dot", "aria-hidden": "true" }), /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("strong", null, TASK_EVENTS[event.kind] ?? "任务状态更新"), /* @__PURE__ */ import_react64.default.createElement("small", null, /* @__PURE__ */ import_react64.default.createElement("time", null, date(event.at)), event.attemptNumber != null ? ` · 第 ${event.attemptNumber} 次尝试` : "", event.outcome ? ` · ${TASK_STATES[event.outcome] ?? (event.outcome === "unknown" ? "结果未知" : event.outcome)}` : ""), event.code && /* @__PURE__ */ import_react64.default.createElement("small", { className: "bp-code" }, event.code))))), history.timeline.items.length === 0 && /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, "原日志中暂无事件。"), /* @__PURE__ */ import_react64.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react64.default.createElement("summary", null, "每次尝试的身份与时间"), /* @__PURE__ */ import_react64.default.createElement("ul", { className: "bp-checklist" }, history.attempts.map((attempt) => /* @__PURE__ */ import_react64.default.createElement("li", { key: attempt.attemptId }, /* @__PURE__ */ import_react64.default.createElement("strong", null, "第 ", attempt.number, " 次 · ", TASK_STATES[attempt.state] ?? attempt.state), /* @__PURE__ */ import_react64.default.createElement("small", null, "开始 ", date(attempt.startedAt), " · 结束 ", date(attempt.finishedAt)), /* @__PURE__ */ import_react64.default.createElement("small", { className: "bp-code" }, attempt.attemptId, " · ", attempt.operationId)))))), /* @__PURE__ */ import_react64.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react64.default.createElement("summary", null, "原任务与操作编号"), /* @__PURE__ */ import_react64.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react64.default.createElement(Value, { label: "Task" }, taskIdOf(data)), /* @__PURE__ */ import_react64.default.createElement(Value, { label: "Package" }, data.packageId), /* @__PURE__ */ import_react64.default.createElement(Value, { label: "Attempt" }, data.attemptId), /* @__PURE__ */ import_react64.default.createElement(Value, { label: "Operation" }, data.operationId), /* @__PURE__ */ import_react64.default.createElement(Value, { label: "MR 运行" }, data.legacyRunIds?.join("、")))), /* @__PURE__ */ import_react64.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react64.default.createElement("summary", null, "执行与收据依据"), /* @__PURE__ */ import_react64.default.createElement("pre", null, JSON.stringify({ attempts: history?.attempts ?? task.attempts, executionRef: task.executionRef, remoteReceipt: data.result?.remote, reconciliation: data.reconciliation, packages: task.packages }, null, 2))));
 }
-function TaskWorkspace({ snapshot, dispatch, busy, scope, inspect, openSession, routingCard }) {
-  let progress = (0, import_react64.useMemo)(() => taskProgress(snapshot), [snapshot]), [botId, setBotId] = (0, import_react64.useState)(""), [status, setStatus] = (0, import_react64.useState)("all"), [query, setQuery] = (0, import_react64.useState)(""), [expanded, setExpanded] = (0, import_react64.useState)(!1), [selection, setSelection] = (0, import_react64.useState)(null);
+function TaskWorkspace({ snapshot: snapshot2, dispatch, busy, scope, inspect, openSession, routingCard }) {
+  let progress = (0, import_react64.useMemo)(() => taskProgress(snapshot2), [snapshot2]), [botId, setBotId] = (0, import_react64.useState)(""), [status, setStatus] = (0, import_react64.useState)("all"), [query, setQuery] = (0, import_react64.useState)(""), [expanded, setExpanded] = (0, import_react64.useState)(!1), [selection, setSelection] = (0, import_react64.useState)(null);
   (0, import_react64.useEffect)(() => {
     setBotId(""), setStatus("all"), setQuery(""), setExpanded(!1), setSelection(null);
   }, [scope]);
-  let rows2 = filterTasks(progress, { botId, status, query }), task = selection && selection.scope === scope ? progress.items.find((row) => taskKey(row) === selection.key) : null, actions = snapshot.availableActions ?? [], select = (row) => setSelection({ scope, key: taskKey(row) }), attention = expanded ? progress.attention : progress.attention.slice(0, 6), [showPlans, setShowPlans] = (0, import_react64.useState)(!1);
-  return /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-card bp-task-overview", "aria-label": "多 Bot 任务总览" }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("h2", null, "团队任务"), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, "按 Bot 查看进展，优先处理需要你介入的任务。")), /* @__PURE__ */ import_react64.default.createElement(Tag2, null, progress.items.length, " 条已加载")), snapshot.tasks.truncated && /* @__PURE__ */ import_react64.default.createElement("p", { role: "status", className: "bp-blocked" }, "已加载 ", progress.items.length, " / ", snapshot.tasks.total, " 条任务，优先显示待处理与进行中的记录。下方数量与筛选仅针对已加载任务。"), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-task-counts", "aria-label": "按状态筛选任务" }, TASK_FILTERS.map(([value, label]) => /* @__PURE__ */ import_react64.default.createElement("button", { key: value, type: "button", "aria-pressed": status === value, onClick: () => setStatus(value) }, /* @__PURE__ */ import_react64.default.createElement("strong", null, progress.counts[value]), /* @__PURE__ */ import_react64.default.createElement("span", null, label)))), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-task-bots", "aria-label": "按 Bot 筛选任务" }, /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", "aria-pressed": !botId, onClick: () => setBotId("") }, "全部 Bot"), progress.bots.map((bot) => /* @__PURE__ */ import_react64.default.createElement("button", { key: bot.botId ?? "", type: "button", "aria-pressed": botId === bot.botId, onClick: () => setBotId(bot.botId ?? "") }, /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "bot", size: 16 }), /* @__PURE__ */ import_react64.default.createElement("span", null, bot.name, /* @__PURE__ */ import_react64.default.createElement("small", null, bot.active, " 进行中 · ", bot.attention, " 待处理 · ", bot.all, " 条任务")))))), progress.attention.length > 0 && /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-card bp-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("h2", null, "需要你处理"), /* @__PURE__ */ import_react64.default.createElement(Tag2, null, botAttentionSummary(progress.attention))), /* @__PURE__ */ import_react64.default.createElement("ul", { className: "bp-attention-list" }, attention.map((row) => {
+  let rows2 = filterTasks(progress, { botId, status, query }), task = selection && selection.scope === scope ? progress.items.find((row) => taskKey(row) === selection.key) : null, actions = snapshot2.availableActions ?? [], select = (row) => setSelection({ scope, key: taskKey(row) }), attention = expanded ? progress.attention : progress.attention.slice(0, 6), [showPlans, setShowPlans] = (0, import_react64.useState)(!1);
+  return /* @__PURE__ */ import_react64.default.createElement(import_react64.default.Fragment, null, /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-card bp-task-overview", "aria-label": "多 Bot 任务总览" }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("h2", null, "团队任务"), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, "按 Bot 查看进展，优先处理需要你介入的任务。")), /* @__PURE__ */ import_react64.default.createElement(Tag2, null, progress.items.length, " 条已加载")), snapshot2.tasks.truncated && /* @__PURE__ */ import_react64.default.createElement("p", { role: "status", className: "bp-blocked" }, "已加载 ", progress.items.length, " / ", snapshot2.tasks.total, " 条任务，优先显示待处理与进行中的记录。下方数量与筛选仅针对已加载任务。"), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-task-counts", "aria-label": "按状态筛选任务" }, TASK_FILTERS.map(([value, label]) => /* @__PURE__ */ import_react64.default.createElement("button", { key: value, type: "button", "aria-pressed": status === value, onClick: () => setStatus(value) }, /* @__PURE__ */ import_react64.default.createElement("strong", null, progress.counts[value]), /* @__PURE__ */ import_react64.default.createElement("span", null, label)))), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-task-bots", "aria-label": "按 Bot 筛选任务" }, /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", "aria-pressed": !botId, onClick: () => setBotId("") }, "全部 Bot"), progress.bots.map((bot) => /* @__PURE__ */ import_react64.default.createElement("button", { key: bot.botId ?? "", type: "button", "aria-pressed": botId === bot.botId, onClick: () => setBotId(bot.botId ?? "") }, /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "bot", size: 16 }), /* @__PURE__ */ import_react64.default.createElement("span", null, bot.name, /* @__PURE__ */ import_react64.default.createElement("small", null, bot.active, " 进行中 · ", bot.attention, " 待处理 · ", bot.all, " 条任务")))))), progress.attention.length > 0 && /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-card bp-attention", "aria-label": "需要你处理" }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("h2", null, "需要你处理"), /* @__PURE__ */ import_react64.default.createElement(Tag2, null, botAttentionSummary(progress.attention))), /* @__PURE__ */ import_react64.default.createElement("ul", { className: "bp-attention-list" }, attention.map((row) => {
     let original = progress.items.find((task2) => taskKey(task2) === taskKey(row));
-    return /* @__PURE__ */ import_react64.default.createElement("li", { key: taskKey(row), className: `bp-attention-row bp-attention-${row.stage}` }, /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, row.detail), row.stage === "approve" && /* @__PURE__ */ import_react64.default.createElement("small", null, "打开 Bot 私聊查看原审批请求。"), remoteUncertain(original) && /* @__PURE__ */ import_react64.default.createElement("small", null, "原操作仍待核对，请查看任务详情。")), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: () => select(original) }, "打开任务"), row.stage === "approve" && openSession && snapshot.bots?.find((bot) => bot.id === row.botId)?.sessionId && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: () => openSession(snapshot.bots.find((bot) => bot.id === row.botId).sessionId) }, "打开审批会话"), row.stage === "reconcile" && actions.includes("task.reconcile") && /* @__PURE__ */ import_react64.default.createElement(TaskActions, { row: original, actions: ["task.reconcile"], dispatch, busy }), row.stage === "failed" && actions.includes("task.retry") && /* @__PURE__ */ import_react64.default.createElement(TaskActions, { row: original, actions: ["task.retry"], dispatch, busy })));
-  })), progress.attention.length > 6 && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", "aria-expanded": expanded, onClick: () => setExpanded((value) => !value) }, expanded ? "收起待处理事项" : `查看全部 ${progress.attention.length} 项待处理`)), task && /* @__PURE__ */ import_react64.default.createElement(TaskDetail, { key: taskKey(task), task, inspect, busy, actions, dispatch, onClose: () => setSelection(null), bot: snapshot.bots?.find((bot) => bot.id === task.botId), openSession }), /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-card", "aria-label": "任务记录" }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("h2", null, "任务记录"), /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-muted", role: "status" }, "显示 ", rows2.length, " / ", progress.items.length, " 条")), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-task-search" }, /* @__PURE__ */ import_react64.default.createElement("label", null, "搜索任务", /* @__PURE__ */ import_react64.default.createElement("input", { type: "search", value: query, placeholder: "任务名称、Bot 或任务 / 计划 / 操作编号", onChange: (event) => setQuery(event.target.value) })), (query || botId || status !== "all") && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: () => {
+    return /* @__PURE__ */ import_react64.default.createElement("li", { key: taskKey(row), className: `bp-attention-row bp-attention-${row.stage}` }, /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, row.detail), row.stage === "approve" && /* @__PURE__ */ import_react64.default.createElement("small", null, "打开 Bot 私聊查看原审批请求。"), remoteUncertain(original) && /* @__PURE__ */ import_react64.default.createElement("small", null, "原操作仍待核对，请查看任务详情。")), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: () => select(original) }, "打开任务"), row.stage === "approve" && openSession && snapshot2.bots?.find((bot) => bot.id === row.botId)?.sessionId && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: () => openSession(snapshot2.bots.find((bot) => bot.id === row.botId).sessionId) }, "打开审批会话"), row.stage === "reconcile" && actions.includes("task.reconcile") && /* @__PURE__ */ import_react64.default.createElement(TaskActions, { row: original, actions: ["task.reconcile"], dispatch, busy }), row.stage === "failed" && actions.includes("task.retry") && /* @__PURE__ */ import_react64.default.createElement(TaskActions, { row: original, actions: ["task.retry"], dispatch, busy })));
+  })), progress.attention.length > 6 && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", "aria-expanded": expanded, onClick: () => setExpanded((value) => !value) }, expanded ? "收起待处理事项" : `查看全部 ${progress.attention.length} 项待处理`)), task && /* @__PURE__ */ import_react64.default.createElement(TaskDetail, { key: taskKey(task), task, inspect, busy, actions, dispatch, onClose: () => setSelection(null), bot: snapshot2.bots?.find((bot) => bot.id === task.botId), openSession }), /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-card", "aria-label": "任务记录" }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("h2", null, "任务记录"), /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-muted", role: "status" }, "显示 ", rows2.length, " / ", progress.items.length, " 条")), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-task-search" }, /* @__PURE__ */ import_react64.default.createElement("label", null, "搜索任务", /* @__PURE__ */ import_react64.default.createElement("input", { type: "search", value: query, placeholder: "任务名称、Bot 或任务 / 计划 / 操作编号", onChange: (event) => setQuery(event.target.value) })), (query || botId || status !== "all") && /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", onClick: () => {
     setQuery(""), setBotId(""), setStatus("all");
-  } }, "清除筛选")), progress.items.length ? rows2.length === 0 ? /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-empty" }, "没有符合当前筛选的任务。可清除筛选查看其他记录。") : /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react64.default.createElement("table", null, /* @__PURE__ */ import_react64.default.createElement("thead", null, /* @__PURE__ */ import_react64.default.createElement("tr", null, /* @__PURE__ */ import_react64.default.createElement("th", null, "任务"), /* @__PURE__ */ import_react64.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react64.default.createElement("th", null, "状态"), /* @__PURE__ */ import_react64.default.createElement("th", null, "执行尝试"), /* @__PURE__ */ import_react64.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react64.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react64.default.createElement("tr", { key: taskKey(row) }, /* @__PURE__ */ import_react64.default.createElement("td", null, /* @__PURE__ */ import_react64.default.createElement("button", { className: "bp-text-button", onClick: () => select(row) }, taskTitle(row)), /* @__PURE__ */ import_react64.default.createElement("small", null, "更新 ", date(row.updatedAt))), /* @__PURE__ */ import_react64.default.createElement("td", null, snapshot.bots?.find((bot) => bot.id === row.botId)?.name ?? row.botId ?? "未取得归属"), /* @__PURE__ */ import_react64.default.createElement("td", null, /* @__PURE__ */ import_react64.default.createElement(Tag2, null, TASK_STATES[row.state] ?? row.state), progressNote(row, TASK_STATES[row.state] ?? row.state) && /* @__PURE__ */ import_react64.default.createElement("small", null, progressNote(row, TASK_STATES[row.state] ?? row.state)), row.blockedReason && /* @__PURE__ */ import_react64.default.createElement("small", null, row.blockedReason), /* @__PURE__ */ import_react64.default.createElement(RemoteNotice, { row })), /* @__PURE__ */ import_react64.default.createElement("td", null, Number.isSafeInteger(row.attempts) ? row.attempts : row.attempts?.length ?? row.attemptCount ?? "未知"), /* @__PURE__ */ import_react64.default.createElement("td", { className: "bp-actions" }, /* @__PURE__ */ import_react64.default.createElement(TaskActions, { row, actions, dispatch, busy }))))))) : /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-empty" }, "尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。")), snapshot.tasks.plans?.length > 0 && /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-task-plans" }, /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", "aria-expanded": showPlans, onClick: () => setShowPlans((value) => !value) }, showPlans ? "收起协作计划" : `查看 ${snapshot.tasks.plans.length} 个协作计划`), snapshot.tasks.plans.filter((plan) => showPlans || plan.needsReconciliation || !["succeeded", "cancelled", "failed"].includes(plan.state)).map((plan, index) => /* @__PURE__ */ import_react64.default.createElement("article", { className: "bp-card", key: plan.planId }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("h2", null, "协作计划 ", index + 1), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, plan.packages.length, " 个工作包 · ", plan.packages.filter((item) => item.state === "succeeded").length, " 个已完成")), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react64.default.createElement(Tag2, null, TASK_STATES[plan.state] ?? plan.state), actions.includes("task.plan.cancel") && !["succeeded", "cancelled"].includes(plan.state) && /* @__PURE__ */ import_react64.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.plan.cancel", { botId: plan.ownerBotId, planId: plan.planId }) }, "停止整个计划"))), plan.needsReconciliation && /* @__PURE__ */ import_react64.default.createElement("p", { role: "status" }, "有工作包停止尚未确认，请核对原收据；计划尚未完成停止。"), /* @__PURE__ */ import_react64.default.createElement("ul", { className: "bp-plan-list" }, plan.packages.map((item, step) => {
+  } }, "清除筛选")), progress.items.length ? rows2.length === 0 ? /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-empty" }, "没有符合当前筛选的任务。可清除筛选查看其他记录。") : /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react64.default.createElement("table", null, /* @__PURE__ */ import_react64.default.createElement("thead", null, /* @__PURE__ */ import_react64.default.createElement("tr", null, /* @__PURE__ */ import_react64.default.createElement("th", null, "任务"), /* @__PURE__ */ import_react64.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react64.default.createElement("th", null, "状态"), /* @__PURE__ */ import_react64.default.createElement("th", null, "执行尝试"), /* @__PURE__ */ import_react64.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react64.default.createElement("tbody", null, rows2.map((row) => /* @__PURE__ */ import_react64.default.createElement("tr", { key: taskKey(row) }, /* @__PURE__ */ import_react64.default.createElement("td", null, /* @__PURE__ */ import_react64.default.createElement("button", { className: "bp-text-button", onClick: () => select(row) }, taskTitle(row)), /* @__PURE__ */ import_react64.default.createElement("small", null, "更新 ", date(row.updatedAt))), /* @__PURE__ */ import_react64.default.createElement("td", null, snapshot2.bots?.find((bot) => bot.id === row.botId)?.name ?? row.botId ?? "未取得归属"), /* @__PURE__ */ import_react64.default.createElement("td", null, /* @__PURE__ */ import_react64.default.createElement(Tag2, null, TASK_STATES[row.state] ?? row.state), progressNote(row, TASK_STATES[row.state] ?? row.state) && /* @__PURE__ */ import_react64.default.createElement("small", null, progressNote(row, TASK_STATES[row.state] ?? row.state)), row.blockedReason && /* @__PURE__ */ import_react64.default.createElement("small", null, row.blockedReason), /* @__PURE__ */ import_react64.default.createElement(RemoteNotice, { row })), /* @__PURE__ */ import_react64.default.createElement("td", null, Number.isSafeInteger(row.attempts) ? row.attempts : row.attempts?.length ?? row.attemptCount ?? "未知"), /* @__PURE__ */ import_react64.default.createElement("td", { className: "bp-actions" }, /* @__PURE__ */ import_react64.default.createElement(TaskActions, { row, actions, dispatch, busy }))))))) : /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-empty" }, "尚无持久任务。在 Main 私聊中提出目标后，可在这里查看工作包、执行尝试与收据。")), snapshot2.tasks.plans?.length > 0 && /* @__PURE__ */ import_react64.default.createElement("section", { className: "bp-task-plans" }, /* @__PURE__ */ import_react64.default.createElement("button", { type: "button", "aria-expanded": showPlans, onClick: () => setShowPlans((value) => !value) }, showPlans ? "收起协作计划" : `查看 ${snapshot2.tasks.plans.length} 个协作计划`), snapshot2.tasks.plans.filter((plan) => showPlans || plan.needsReconciliation || !["succeeded", "cancelled", "failed"].includes(plan.state)).map((plan, index) => /* @__PURE__ */ import_react64.default.createElement("article", { className: "bp-card", key: plan.planId }, /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react64.default.createElement("div", null, /* @__PURE__ */ import_react64.default.createElement("h2", null, "协作计划 ", index + 1), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-muted" }, plan.packages.length, " 个工作包 · ", plan.packages.filter((item) => item.state === "succeeded").length, " 个已完成")), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react64.default.createElement(Tag2, null, TASK_STATES[plan.state] ?? plan.state), actions.includes("task.plan.cancel") && !["succeeded", "cancelled"].includes(plan.state) && /* @__PURE__ */ import_react64.default.createElement("button", { disabled: busy, onClick: () => dispatch("task.plan.cancel", { botId: plan.ownerBotId, planId: plan.planId }) }, "停止整个计划"))), plan.needsReconciliation && /* @__PURE__ */ import_react64.default.createElement("p", { role: "status" }, "有工作包停止尚未确认，请核对原收据；计划尚未完成停止。"), /* @__PURE__ */ import_react64.default.createElement("ul", { className: "bp-plan-list" }, plan.packages.map((item, step) => {
     let linked = progress.items.find((row) => taskIdOf(row) === item.taskId && row.botId === item.targetBotId);
-    return /* @__PURE__ */ import_react64.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-plan-step" }, item.state === "succeeded" ? /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "check", size: 13 }) : step + 1), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-plan-copy" }, linked ? /* @__PURE__ */ import_react64.default.createElement("button", { className: "bp-text-button", onClick: () => select(linked) }, taskTitle(linked)) : /* @__PURE__ */ import_react64.default.createElement("strong", null, plan.plan?.packages?.find((pkg) => pkg.id === item.id)?.objective ?? `工作包 ${step + 1}`), /* @__PURE__ */ import_react64.default.createElement("small", null, snapshot.bots?.find((bot) => bot.id === item.targetBotId)?.name ?? item.targetBotId, item.dependsOn.length > 0 && ` · 前置：${item.dependsOn.join("、")}`, item.result?.code === "DEPENDENCY_FAILED" && " · 前置包失败，尚未执行")), /* @__PURE__ */ import_react64.default.createElement(Tag2, null, TASK_STATES[item.state] ?? item.state));
+    return /* @__PURE__ */ import_react64.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react64.default.createElement("span", { className: "bp-plan-step" }, item.state === "succeeded" ? /* @__PURE__ */ import_react64.default.createElement(UiIcon, { name: "check", size: 13 }) : step + 1), /* @__PURE__ */ import_react64.default.createElement("div", { className: "bp-plan-copy" }, linked ? /* @__PURE__ */ import_react64.default.createElement("button", { className: "bp-text-button", onClick: () => select(linked) }, taskTitle(linked)) : /* @__PURE__ */ import_react64.default.createElement("strong", null, plan.plan?.packages?.find((pkg) => pkg.id === item.id)?.objective ?? `工作包 ${step + 1}`), /* @__PURE__ */ import_react64.default.createElement("small", null, snapshot2.bots?.find((bot) => bot.id === item.targetBotId)?.name ?? item.targetBotId, item.dependsOn.length > 0 && ` · 前置：${item.dependsOn.join("、")}`, item.result?.code === "DEPENDENCY_FAILED" && " · 前置包失败，尚未执行")), /* @__PURE__ */ import_react64.default.createElement(Tag2, null, TASK_STATES[item.state] ?? item.state));
   })), /* @__PURE__ */ import_react64.default.createElement("details", { className: "bp-technical bp-plan-id" }, /* @__PURE__ */ import_react64.default.createElement("summary", null, "计划编号"), /* @__PURE__ */ import_react64.default.createElement("p", { className: "bp-code" }, plan.planId))))), routingCard);
 }
 
@@ -33915,8 +33916,8 @@ var MAX_UPLOAD_BYTES = 16 * 1024 * 1024, textFile = (name) => /\.(?:txt|md|markd
   let reader = new FileReader();
   reader.onerror = () => reject(new Error("文件读取失败。")), reader.onload = () => resolve2(String(reader.result).split(",")[1] ?? ""), reader.readAsDataURL(file);
 });
-function LibraryPanel({ snapshot, dispatch, busy }) {
-  let bots = snapshot.bots ?? [], [botId, setBotId] = (0, import_react66.useState)(bots[0]?.id ?? ""), [path, setPath] = (0, import_react66.useState)(""), [entries2, setEntries] = (0, import_react66.useState)([]), [editor, setEditor] = (0, import_react66.useState)(null), [newName, setNewName] = (0, import_react66.useState)(""), [filter, setFilter] = (0, import_react66.useState)(""), [query, setQuery] = (0, import_react66.useState)(""), [searchResults, setSearchResults] = (0, import_react66.useState)(null), [searchedQuery, setSearchedQuery] = (0, import_react66.useState)(""), [error, setError] = (0, import_react66.useState)(""), [status, setStatus] = (0, import_react66.useState)(""), [working, setWorking] = (0, import_react66.useState)(!1), [deleteName, setDeleteName] = (0, import_react66.useState)(null), sequence = (0, import_react66.useRef)(0), editorRef = (0, import_react66.useRef)(null), createMenuRef = (0, import_react66.useRef)(null), dispatchRef = (0, import_react66.useRef)(dispatch);
+function LibraryPanel({ snapshot: snapshot2, dispatch, busy }) {
+  let bots = snapshot2.bots ?? [], [botId, setBotId] = (0, import_react66.useState)(bots[0]?.id ?? ""), [path, setPath] = (0, import_react66.useState)(""), [entries2, setEntries] = (0, import_react66.useState)([]), [editor, setEditor] = (0, import_react66.useState)(null), [newName, setNewName] = (0, import_react66.useState)(""), [filter, setFilter] = (0, import_react66.useState)(""), [query, setQuery] = (0, import_react66.useState)(""), [searchResults, setSearchResults] = (0, import_react66.useState)(null), [searchedQuery, setSearchedQuery] = (0, import_react66.useState)(""), [error, setError] = (0, import_react66.useState)(""), [status, setStatus] = (0, import_react66.useState)(""), [working, setWorking] = (0, import_react66.useState)(!1), [deleteName, setDeleteName] = (0, import_react66.useState)(null), sequence = (0, import_react66.useRef)(0), editorRef = (0, import_react66.useRef)(null), createMenuRef = (0, import_react66.useRef)(null), dispatchRef = (0, import_react66.useRef)(dispatch);
   dispatchRef.current = dispatch;
   let call2 = (0, import_react66.useCallback)(async (action, payload) => {
     let value = await dispatchRef.current(action, payload);
@@ -34178,7 +34179,7 @@ var clone = (value) => JSON.parse(JSON.stringify(value)), fail4 = (code) => {
   throw Object.assign(new Error(code), { code });
 }, ROUTINE_POINTER_SAMPLE_MS = 200, MAX_PENDING_INPUTS = 1024;
 function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
-  let listeners2 = /* @__PURE__ */ new Set(), pending = /* @__PURE__ */ new Map(), status = "idle", error = null, sessionId = null, display = null, startedAt = 0, steps = [], times = [], moveGroup = null, lastId = 0, inputReleased = !1, observedInputs = 0, coalescedMoves = 0, snapshot = () => ({
+  let listeners2 = /* @__PURE__ */ new Set(), pending = /* @__PURE__ */ new Map(), status = "idle", error = null, sessionId = null, display = null, startedAt = 0, steps = [], times = [], moveGroup = null, lastId = 0, inputReleased = !1, observedInputs = 0, coalescedMoves = 0, snapshot2 = () => ({
     status,
     error,
     sessionId,
@@ -34189,12 +34190,12 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
     inputReleased,
     observedInputs,
     coalescedMoves
-  }), emit = () => {
-    let value = snapshot();
+  }), emit2 = () => {
+    let value = snapshot2();
     onChange?.(value);
     for (let listener of listeners2) listener(value);
   }, invalidate = (code) => {
-    status === "recording" && (status = "invalid", error = code, emit());
+    status === "recording" && (status = "invalid", error = code, emit2());
   }, sameSession = (meta) => meta?.sessionId === sessionId, flush = () => {
     for (; pending.size; ) {
       let [id2, item] = pending.entries().next().value;
@@ -34214,13 +34215,13 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
   };
   return Object.freeze({
     get snapshot() {
-      return snapshot();
+      return snapshot2();
     },
     subscribe(listener) {
       return listeners2.add(listener), () => listeners2.delete(listener);
     },
     start({ sessionId: id2, mode, metadata } = {}) {
-      return (status === "recording" || pending.size) && fail4("ROUTINE_ALREADY_RECORDING"), (typeof id2 != "string" || !id2 || mode !== "control") && fail4("ROUTINE_CONTROL_REQUIRED"), display = normalizeRoutineDisplay(metadata), sessionId = id2, status = "recording", error = null, startedAt = now(), steps = [], times = [], moveGroup = null, pending.clear(), lastId = 0, inputReleased = !1, observedInputs = 0, coalescedMoves = 0, emit(), snapshot();
+      return (status === "recording" || pending.size) && fail4("ROUTINE_ALREADY_RECORDING"), (typeof id2 != "string" || !id2 || mode !== "control") && fail4("ROUTINE_CONTROL_REQUIRED"), display = normalizeRoutineDisplay(metadata), sessionId = id2, status = "recording", error = null, startedAt = now(), steps = [], times = [], moveGroup = null, pending.clear(), lastId = 0, inputReleased = !1, observedInputs = 0, coalescedMoves = 0, emit2(), snapshot2();
     },
     inputSent(raw, meta) {
       if (status !== "recording") return;
@@ -34243,7 +34244,7 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
         invalidate("ROUTINE_POINT_OUTSIDE_DISPLAY");
         return;
       }
-      pending.set(meta.id, { event, sentAt: meta.sentAt, acknowledged: !1 }), lastId = meta.id, inputReleased = !1, emit();
+      pending.set(meta.id, { event, sentAt: meta.sentAt, acknowledged: !1 }), lastId = meta.id, inputReleased = !1, emit2();
     },
     inputAcknowledged(raw, meta) {
       if (status !== "recording") return;
@@ -34258,7 +34259,7 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
         invalidate("ROUTINE_ACK_MISMATCH");
         return;
       }
-      item.acknowledged = !0, flush(), emit();
+      item.acknowledged = !0, flush(), emit2();
     },
     inputFailed(_event, meta) {
       status === "recording" && invalidate(meta?.failure?.status === "unknown" || meta?.failure?.possiblyApplied !== !1 ? "ROUTINE_ACK_LOST" : "ROUTINE_DEMONSTRATION_FAILED");
@@ -34280,7 +34281,7 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
           invalidate("ROUTINE_RELEASE_UNCONFIRMED");
           return;
         }
-        inputReleased = !0, emit();
+        inputReleased = !0, emit2();
       }
     },
     invalidate,
@@ -34294,10 +34295,10 @@ function createAcknowledgedRoutineRecorder({ now = Date.now, onChange } = {}) {
         acknowledgedInputs: steps.length,
         ...coalescedMoves ? { observedInputs, pointerSampleMs: ROUTINE_POINTER_SAMPLE_MS } : {}
       } });
-      return status = "finished", emit(), clone(value);
+      return status = "finished", emit2(), clone(value);
     },
     reset() {
-      status = "idle", error = null, pending.clear(), steps = [], times = [], moveGroup = null, sessionId = null, display = null, observedInputs = 0, coalescedMoves = 0, emit();
+      status = "idle", error = null, pending.clear(), steps = [], times = [], moveGroup = null, sessionId = null, display = null, observedInputs = 0, coalescedMoves = 0, emit2();
     }
   });
 }
@@ -34343,8 +34344,8 @@ function RoutineCaptureControls({ recorder, sessionId, metadata, mode, connected
     recorder.reset(), setDraft(null), setError("");
   } }, "丢弃录制")), /* @__PURE__ */ import_react67.default.createElement("p", { role: "status" }, capture.status === "recording" ? `正在录制：${capture.length} 个回放步骤，${capture.observedInputs} 个输入已确认，${capture.pending} 个等待确认` : capture.status === "invalid" ? `录制已中止：${capture.error}，请丢弃后重新演示。` : saved ? "例行任务已保存。" : "尚未录制。"), error && /* @__PURE__ */ import_react67.default.createElement("p", { className: "bp-error", role: "alert" }, error));
 }
-function RoutinesPanel({ snapshot, dispatch, busy = !1, onOpenMachines }) {
-  let bots = snapshot.bots ?? [], machines = (snapshot.machines?.items ?? []).filter((row) => row.status !== "revoked"), [botId, setBotId] = (0, import_react67.useState)(bots[0]?.id ?? ""), [machineId, setMachineId] = (0, import_react67.useState)(machines[0]?.id ?? machines[0]?.machineId ?? ""), [rows2, setRows] = (0, import_react67.useState)([]), [runs, setRuns] = (0, import_react67.useState)([]), [result, setResult] = (0, import_react67.useState)(null), [error, setError] = (0, import_react67.useState)(""), [running, setRunning] = (0, import_react67.useState)(!1), [notes, setNotes] = (0, import_react67.useState)({});
+function RoutinesPanel({ snapshot: snapshot2, dispatch, busy = !1, onOpenMachines }) {
+  let bots = snapshot2.bots ?? [], machines = (snapshot2.machines?.items ?? []).filter((row) => row.status !== "revoked"), [botId, setBotId] = (0, import_react67.useState)(bots[0]?.id ?? ""), [machineId, setMachineId] = (0, import_react67.useState)(machines[0]?.id ?? machines[0]?.machineId ?? ""), [rows2, setRows] = (0, import_react67.useState)([]), [runs, setRuns] = (0, import_react67.useState)([]), [result, setResult] = (0, import_react67.useState)(null), [error, setError] = (0, import_react67.useState)(""), [running, setRunning] = (0, import_react67.useState)(!1), [notes, setNotes] = (0, import_react67.useState)({});
   (0, import_react67.useEffect)(() => {
     !botId && bots[0] && setBotId(bots[0].id);
   }, [botId, bots[0]?.id]), (0, import_react67.useEffect)(() => {
@@ -34612,8 +34613,8 @@ function DesktopPane2({ bot }) {
     };
   }, [api, bot.id]), api?.open ? error ? /* @__PURE__ */ import_react68.default.createElement("p", { role: "alert" }, error) : machines.length ? /* @__PURE__ */ import_react68.default.createElement(DesktopViewer, { key: bot.id, botId: bot.id, machines, openSession: api.open, renewSession: api.renew, closeSession: api.close, saveRoutine: api.saveRoutine }) : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "在“远程电脑”中配对电脑并为这个 Bot 授权。") : /* @__PURE__ */ import_react68.default.createElement("p", { className: "bp-muted" }, "桌面通道尚未就绪。");
 }
-function DesktopWorkbench({ snapshot, dispatch }) {
-  let bots = snapshot.bots ?? [], [botId, setBotId] = (0, import_react68.useState)(bots[0]?.id ?? ""), machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), current = (0, import_react68.useRef)({ dispatch, machines });
+function DesktopWorkbench({ snapshot: snapshot2, dispatch }) {
+  let bots = snapshot2.bots ?? [], [botId, setBotId] = (0, import_react68.useState)(bots[0]?.id ?? ""), machines = (snapshot2.machines?.items ?? []).filter((item) => item.status !== "revoked"), current = (0, import_react68.useRef)({ dispatch, machines });
   current.current = { dispatch, machines };
   let openSession = (0, import_react68.useCallback)((id2, machineId, options) => current.current.dispatch("machine.desktop.open", { botId: id2, machineId, rootId: rootOf2(current.current.machines.find((item) => item.id === machineId)), ...options }), []), renewSession = (0, import_react68.useCallback)((id2, sessionId) => current.current.dispatch("machine.desktop.renew", { botId: id2, sessionId }), []), closeSession = (0, import_react68.useCallback)((id2, sessionId) => current.current.dispatch("machine.desktop.close", { botId: id2, sessionId }), []), saveRoutine = (0, import_react68.useCallback)((id2, routine) => current.current.dispatch("routine.save", { botId: id2, routine }), []);
   return machines.length ? /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions", style: { marginBottom: 20 } }, /* @__PURE__ */ import_react68.default.createElement("label", null, "连接身份", /* @__PURE__ */ import_react68.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((bot) => /* @__PURE__ */ import_react68.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id))))), /* @__PURE__ */ import_react68.default.createElement(DesktopViewer, { key: botId, botId, machines, openSession, renewSession, closeSession, saveRoutine })) : /* @__PURE__ */ import_react68.default.createElement("section", { className: "bp-card" }, /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react68.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "computer", size: 29 })), /* @__PURE__ */ import_react68.default.createElement("strong", null, "连接你的第一台电脑"), /* @__PURE__ */ import_react68.default.createElement("p", null, "在自己的 Windows 或云电脑上运行 Agent，再导入配对文件，就能在这里查看和接管桌面。"), /* @__PURE__ */ import_react68.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react68.default.createElement("a", { className: "bp-download-link", href: "https://github.com/Alice-Marx/dsh-model-router/releases/download/v0.63.0/dsh-remote-agent-0.1.0-windows-x64.zip", target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ import_react68.default.createElement(UiIcon, { name: "arrow", size: 15 }), "下载 Windows Agent"), /* @__PURE__ */ import_react68.default.createElement("button", { className: "bp-button-primary", onClick: () => {
@@ -34663,8 +34664,8 @@ function savePrice(section, dispatch, route2, input, output) {
   let settings = structuredClone(section.settings);
   return settings.prices = [...settings.prices.filter((row) => routeKey4(row) !== routeKey4(route2)), { provider: route2.provider, model: route2.model, input, output }], dispatch("quickBinding.save", { expectedRevision: section.revision, settings });
 }
-function QuickPolicyCard({ snapshot, dispatch, busy }) {
-  let section = snapshot.quickBinding, [form, setForm] = (0, import_react69.useState)(null), [filter, setFilter] = (0, import_react69.useState)("");
+function QuickPolicyCard({ snapshot: snapshot2, dispatch, busy }) {
+  let section = snapshot2.quickBinding, [form, setForm] = (0, import_react69.useState)(null), [filter, setFilter] = (0, import_react69.useState)("");
   if ((0, import_react69.useEffect)(() => {
     section?.status === "available" && setForm(policyForm(section.settings));
   }, [section?.revision, section?.status]), section?.status !== "available" || !form) return null;
@@ -34693,7 +34694,7 @@ function BotModelRow({ bot, item, record: record3, section, engines, dispatch, b
     toggle(event.target.checked);
   } }), "允许此 Bot 使用快速模式")));
 }
-function TemplateGallery({ snapshot, dispatch, busy, openSession }) {
+function TemplateGallery({ snapshot: snapshot2, dispatch, busy, openSession }) {
   let [catalog, setCatalog] = (0, import_react69.useState)(null), [category, setCategory] = (0, import_react69.useState)("all"), [query, setQuery] = (0, import_react69.useState)(""), [creating, setCreating] = (0, import_react69.useState)(null), [error, setError] = (0, import_react69.useState)("");
   (0, import_react69.useEffect)(() => {
     let live = !0;
@@ -34707,9 +34708,9 @@ function TemplateGallery({ snapshot, dispatch, busy, openSession }) {
       };
   }, [dispatch]);
   let routes = (0, import_react69.useMemo)(() => {
-    let rows2 = snapshot.quickBinding?.routes ?? [];
+    let rows2 = snapshot2.quickBinding?.routes ?? [];
     return [...rows2.filter((route2) => route2.engine), ...rows2.filter((route2) => !route2.engine)];
-  }, [snapshot.quickBinding?.routes]);
+  }, [snapshot2.quickBinding?.routes]);
   if (error) return /* @__PURE__ */ import_react69.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("h2", null, "现成 Bot")), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-error", role: "alert" }, error));
   if (!catalog) return null;
   let needle = query.trim().toLowerCase(), items = catalog.items.filter((item) => (category === "all" || item.category === category) && (!needle || [item.name, item.title, item.description].some((text7) => text7.toLowerCase().includes(needle)))), create = async (event) => {
@@ -34717,7 +34718,7 @@ function TemplateGallery({ snapshot, dispatch, busy, openSession }) {
     let result = await dispatch("bot.template.create", { templateId: creating.id, name: creating.name, ...creating.model ? { model: creating.model } : {} });
     result?.botId && (setCreating(null), result.sessionId && openSession?.(result.sessionId));
   };
-  return /* @__PURE__ */ import_react69.default.createElement("section", { className: "bp-card", "aria-label": "现成 Bot" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("div", null, /* @__PURE__ */ import_react69.default.createElement("h2", null, "现成 Bot ", /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-inline-count" }, catalog.items.length, " 个")), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "挑一个现成角色马上开始。模板只决定 Bot 是谁；模型、文件夹、资金和权限仍由你决定。"))), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-gallery-tools" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-segmented", role: "group", "aria-label": "分类" }, [{ id: "all", label: "全部" }, ...catalog.categories].map((item) => /* @__PURE__ */ import_react69.default.createElement("button", { key: item.id, type: "button", "aria-pressed": category === item.id, onClick: () => setCategory(item.id) }, item.label))), /* @__PURE__ */ import_react69.default.createElement("label", { className: "bp-search-field" }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "search", size: 15 }), /* @__PURE__ */ import_react69.default.createElement("input", { "aria-label": "搜索现成 Bot", placeholder: "搜索", value: query, onChange: (event) => setQuery(event.target.value) }))), items.length === 0 ? /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-empty" }, "没有匹配的现成 Bot。") : /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-template-grid" }, items.map((item) => /* @__PURE__ */ import_react69.default.createElement("article", { key: item.id, className: "bp-template", "data-color": item.color }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-template-head" }, /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-template-avatar", "data-color": item.color }, item.name.slice(0, 1)), /* @__PURE__ */ import_react69.default.createElement("div", null, /* @__PURE__ */ import_react69.default.createElement("strong", null, item.name), /* @__PURE__ */ import_react69.default.createElement("small", null, item.title))), /* @__PURE__ */ import_react69.default.createElement("p", null, item.description), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-template-try" }, /* @__PURE__ */ import_react69.default.createElement("span", null, "试试问"), item.tryAsking[0]), creating?.id === item.id ? /* @__PURE__ */ import_react69.default.createElement("form", { className: "bp-form bp-template-form", onSubmit: create }, /* @__PURE__ */ import_react69.default.createElement("label", null, "名称", /* @__PURE__ */ import_react69.default.createElement("input", { value: creating.name, maxLength: 40, required: !0, onChange: (event) => setCreating((current) => ({ ...current, name: event.target.value })) })), /* @__PURE__ */ import_react69.default.createElement("label", null, "模型", /* @__PURE__ */ import_react69.default.createElement("select", { value: creating.model, onChange: (event) => setCreating((current) => ({ ...current, model: event.target.value })) }, /* @__PURE__ */ import_react69.default.createElement("option", { value: "" }, "DSH 默认模型"), routes.map((route2) => /* @__PURE__ */ import_react69.default.createElement("option", { key: routeKey4(route2), value: routeKey4(route2) }, route2.engine ? modelLabel(routeKey4(route2), snapshot.engines) : routeKey4(route2))))), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { type: "submit", className: "bp-button-primary", disabled: busy }, "创建并打开私聊"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", onClick: () => setCreating(null) }, "取消"))) : /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !snapshot.availableActions?.includes("bot.template.create"), onClick: () => setCreating({ id: item.id, name: item.name, model: "" }) }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "plus", size: 15 }), "用这个模板创建"))))));
+  return /* @__PURE__ */ import_react69.default.createElement("section", { className: "bp-card", "aria-label": "现成 Bot" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react69.default.createElement("div", null, /* @__PURE__ */ import_react69.default.createElement("h2", null, "现成 Bot ", /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-inline-count" }, catalog.items.length, " 个")), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-muted" }, "挑一个现成角色马上开始。模板只决定 Bot 是谁；模型、文件夹、资金和权限仍由你决定。"))), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-gallery-tools" }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-segmented", role: "group", "aria-label": "分类" }, [{ id: "all", label: "全部" }, ...catalog.categories].map((item) => /* @__PURE__ */ import_react69.default.createElement("button", { key: item.id, type: "button", "aria-pressed": category === item.id, onClick: () => setCategory(item.id) }, item.label))), /* @__PURE__ */ import_react69.default.createElement("label", { className: "bp-search-field" }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "search", size: 15 }), /* @__PURE__ */ import_react69.default.createElement("input", { "aria-label": "搜索现成 Bot", placeholder: "搜索", value: query, onChange: (event) => setQuery(event.target.value) }))), items.length === 0 ? /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-empty" }, "没有匹配的现成 Bot。") : /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-template-grid" }, items.map((item) => /* @__PURE__ */ import_react69.default.createElement("article", { key: item.id, className: "bp-template", "data-color": item.color }, /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-template-head" }, /* @__PURE__ */ import_react69.default.createElement("span", { className: "bp-template-avatar", "data-color": item.color }, item.name.slice(0, 1)), /* @__PURE__ */ import_react69.default.createElement("div", null, /* @__PURE__ */ import_react69.default.createElement("strong", null, item.name), /* @__PURE__ */ import_react69.default.createElement("small", null, item.title))), /* @__PURE__ */ import_react69.default.createElement("p", null, item.description), /* @__PURE__ */ import_react69.default.createElement("p", { className: "bp-template-try" }, /* @__PURE__ */ import_react69.default.createElement("span", null, "试试问"), item.tryAsking[0]), creating?.id === item.id ? /* @__PURE__ */ import_react69.default.createElement("form", { className: "bp-form bp-template-form", onSubmit: create }, /* @__PURE__ */ import_react69.default.createElement("label", null, "名称", /* @__PURE__ */ import_react69.default.createElement("input", { value: creating.name, maxLength: 40, required: !0, onChange: (event) => setCreating((current) => ({ ...current, name: event.target.value })) })), /* @__PURE__ */ import_react69.default.createElement("label", null, "模型", /* @__PURE__ */ import_react69.default.createElement("select", { value: creating.model, onChange: (event) => setCreating((current) => ({ ...current, model: event.target.value })) }, /* @__PURE__ */ import_react69.default.createElement("option", { value: "" }, "DSH 默认模型"), routes.map((route2) => /* @__PURE__ */ import_react69.default.createElement("option", { key: routeKey4(route2), value: routeKey4(route2) }, route2.engine ? modelLabel(routeKey4(route2), snapshot2.engines) : routeKey4(route2))))), /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { type: "submit", className: "bp-button-primary", disabled: busy }, "创建并打开私聊"), /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", onClick: () => setCreating(null) }, "取消"))) : /* @__PURE__ */ import_react69.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react69.default.createElement("button", { type: "button", disabled: busy || !snapshot2.availableActions?.includes("bot.template.create"), onClick: () => setCreating({ id: item.id, name: item.name, model: "" }) }, /* @__PURE__ */ import_react69.default.createElement(UiIcon, { name: "plus", size: 15 }), "用这个模板创建"))))));
 }
 
 // apps/integration-client/engines-panel.jsx
@@ -34739,15 +34740,15 @@ function CopyCommand({ command }) {
     }
   } }, /* @__PURE__ */ import_react70.default.createElement(UiIcon, { name: copied ? "check" : "copy", size: 14 })));
 }
-function Engines({ snapshot, dispatch, busy, openPanel, workbenchPanel = "model-router-galgame", bindingsPanel }) {
-  let section = snapshot.engines;
+function Engines({ snapshot: snapshot2, dispatch, busy, openPanel, workbenchPanel = "model-router-galgame", bindingsPanel }) {
+  let section = snapshot2.engines;
   if (section?.status !== "available")
     return /* @__PURE__ */ import_react70.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react70.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react70.default.createElement("p", null, section?.reason ?? "尚未取得官方工具引擎状态。"), section?.nextAction && /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted" }, "下一步：", section.nextAction));
-  let bots = snapshot.bots ?? [], usedBy = (provider) => bots.filter((bot) => String(bot.model ?? "").startsWith(`${provider}/`)), apiRoutes = (snapshot.quickBinding?.routes ?? []).filter((route2) => !route2.engine), providers = [...new Set(apiRoutes.map((route2) => route2.provider))].map((provider) => {
-    let rows2 = apiRoutes.filter((route2) => route2.provider === provider), prices = snapshot.quickBinding?.settings?.prices ?? [], priced = rows2.filter((route2) => route2.profilePrice || prices.some((row) => row.provider === route2.provider && row.model === route2.model)).length;
+  let bots = snapshot2.bots ?? [], usedBy = (provider) => bots.filter((bot) => String(bot.model ?? "").startsWith(`${provider}/`)), apiRoutes = (snapshot2.quickBinding?.routes ?? []).filter((route2) => !route2.engine), providers = [...new Set(apiRoutes.map((route2) => route2.provider))].map((provider) => {
+    let rows2 = apiRoutes.filter((route2) => route2.provider === provider), prices = snapshot2.quickBinding?.settings?.prices ?? [], priced = rows2.filter((route2) => route2.profilePrice || prices.some((row) => row.provider === route2.provider && row.model === route2.model)).length;
     return { provider, count: rows2.length, priced };
   });
-  return /* @__PURE__ */ import_react70.default.createElement(import_react70.default.Fragment, null, /* @__PURE__ */ import_react70.default.createElement("section", { className: "bp-card bp-hero" }, /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-hero-copy" }, /* @__PURE__ */ import_react70.default.createElement("h2", null, "用你已经登录的官方工具当 Bot 的大脑"), /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted" }, "在私聊的模型菜单里选「官方工具」分组即可。每次回复都交给官方 CLI 在宿主专用的空文件夹里只读运行，使用你自己的订阅登录，不读取 API Key，也不会修改你的文件。")), /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react70.default.createElement("button", { type: "button", disabled: busy || !snapshot.availableActions?.includes("engines.refresh"), onClick: () => dispatch("engines.refresh", {}) }, /* @__PURE__ */ import_react70.default.createElement(UiIcon, { name: "refresh", size: 15, className: section.checking ? "bp-spinning" : "" }), "重新检测"), /* @__PURE__ */ import_react70.default.createElement("button", { type: "button", onClick: () => openPanel?.(workbenchPanel) }, "安装与登录…")), /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted bp-hero-meta" }, section.checking ? "正在检测…" : section.checkedAt ? `上次检测 ${new Date(section.checkedAt).toLocaleString("zh-CN")}` : "尚未检测")), /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-engine-grid" }, section.items.map((engine) => {
+  return /* @__PURE__ */ import_react70.default.createElement(import_react70.default.Fragment, null, /* @__PURE__ */ import_react70.default.createElement("section", { className: "bp-card bp-hero" }, /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-hero-copy" }, /* @__PURE__ */ import_react70.default.createElement("h2", null, "用你已经登录的官方工具当 Bot 的大脑"), /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted" }, "在私聊的模型菜单里选「官方工具」分组即可。每次回复都交给官方 CLI 在宿主专用的空文件夹里只读运行，使用你自己的订阅登录，不读取 API Key，也不会修改你的文件。")), /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react70.default.createElement("button", { type: "button", disabled: busy || !snapshot2.availableActions?.includes("engines.refresh"), onClick: () => dispatch("engines.refresh", {}) }, /* @__PURE__ */ import_react70.default.createElement(UiIcon, { name: "refresh", size: 15, className: section.checking ? "bp-spinning" : "" }), "重新检测"), /* @__PURE__ */ import_react70.default.createElement("button", { type: "button", onClick: () => openPanel?.(workbenchPanel) }, "安装与登录…")), /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted bp-hero-meta" }, section.checking ? "正在检测…" : section.checkedAt ? `上次检测 ${new Date(section.checkedAt).toLocaleString("zh-CN")}` : "尚未检测")), /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-engine-grid" }, section.items.map((engine) => {
     let state = STATE[engine.state] ?? STATE.unknown, users = usedBy(engine.provider);
     return /* @__PURE__ */ import_react70.default.createElement("article", { key: engine.provider, className: "bp-card bp-engine", "data-state": engine.state }, /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-person-heading" }, /* @__PURE__ */ import_react70.default.createElement("span", { className: "bp-engine-mark", "data-tool": engine.toolId }, shortName(engine.name).slice(0, 1)), /* @__PURE__ */ import_react70.default.createElement("div", null, /* @__PURE__ */ import_react70.default.createElement("h2", null, shortName(engine.name)), /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted" }, engine.vendor, " · 官方工具"))), /* @__PURE__ */ import_react70.default.createElement(Pill, { tone: state.tone }, state.label)), /* @__PURE__ */ import_react70.default.createElement("dl", { className: "bp-facts bp-facts-compact" }, /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react70.default.createElement("dt", null, "版本"), /* @__PURE__ */ import_react70.default.createElement("dd", null, engine.version ?? (engine.installed === !1 ? "未安装" : "未知"), engine.updateAvailable && engine.latestVersion ? /* @__PURE__ */ import_react70.default.createElement(Pill, { tone: "accent" }, "可更新到 ", engine.latestVersion) : null)), /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react70.default.createElement("dt", null, "使用中的 Bot"), /* @__PURE__ */ import_react70.default.createElement("dd", null, users.length ? users.map((bot) => bot.name).join("、") : "暂无"))), engine.state === "login" && /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-engine-hint" }, "在终端运行 ", /* @__PURE__ */ import_react70.default.createElement(CopyCommand, { command: engine.login.command }), " 登录后点「重新检测」。"), engine.state === "missing" && /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-engine-hint" }, "还没有安装。打开「安装与登录…」，在官方工具页一键安装。"), engine.login.detail && engine.state !== "missing" && /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted bp-engine-detail" }, engine.login.detail), !engine.registered && /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted" }, "此宿主未注册该引擎；请确认插件设置中的「官方工具引擎」已开启。"), /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-chip-row" }, engine.models.map((model) => /* @__PURE__ */ import_react70.default.createElement("span", { key: model.id, className: "bp-chip" }, model.name))));
   })), /* @__PURE__ */ import_react70.default.createElement("section", { className: "bp-card" }, /* @__PURE__ */ import_react70.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react70.default.createElement("div", null, /* @__PURE__ */ import_react70.default.createElement("h2", null, "API 模型"), /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted" }, "按调用计费的模型。快速模式需要知道价格；没有价格的模型会被拒绝，而不是按猜测计费。")), bindingsPanel && /* @__PURE__ */ import_react70.default.createElement("button", { type: "button", onClick: () => openPanel?.(bindingsPanel) }, "设置价格")), providers.length === 0 ? /* @__PURE__ */ import_react70.default.createElement("p", { className: "bp-muted" }, "宿主目录里还没有 API 模型。在 DSH 设置中添加模型供应商后会出现在这里。") : /* @__PURE__ */ import_react70.default.createElement("ul", { className: "bp-provider-list" }, providers.map((row) => /* @__PURE__ */ import_react70.default.createElement("li", { key: row.provider }, /* @__PURE__ */ import_react70.default.createElement("span", { className: "bp-model-glyph" }, /* @__PURE__ */ import_react70.default.createElement(UiIcon, { name: "chip", size: 15 })), /* @__PURE__ */ import_react70.default.createElement("strong", null, row.provider), /* @__PURE__ */ import_react70.default.createElement("span", { className: "bp-muted" }, row.count, " 个模型"), /* @__PURE__ */ import_react70.default.createElement(Pill, { tone: row.priced === row.count ? "success" : row.priced ? "accent" : "warning" }, row.priced === row.count ? "价格齐全" : `${row.priced}/${row.count} 已定价`))))));
@@ -34762,9 +34763,9 @@ var short3 = (value, limit = 90) => {
   let time = typeof value == "number" ? value : Date.parse(value ?? "");
   return Number.isFinite(time) ? new Date(time).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 };
-function inboxRows(snapshot, panels) {
-  let bots = snapshot?.bots ?? [], nameOf = (id2) => bots.find((bot) => bot.id === id2)?.name ?? id2, rows2 = deriveBotAttention(snapshot, { limit: 50 }).map((row) => ({ ...row, target: panels.tasks, button: "打开任务" }));
-  for (let item of snapshot?.usage?.unresolved ?? [])
+function inboxRows(snapshot2, panels) {
+  let bots = snapshot2?.bots ?? [], nameOf = (id2) => bots.find((bot) => bot.id === id2)?.name ?? id2, rows2 = deriveBotAttention(snapshot2, { limit: 50 }).map((row) => ({ ...row, target: panels.tasks, button: "打开任务" }));
+  for (let item of snapshot2?.usage?.unresolved ?? [])
     rows2.push({
       key: `usage:${item.runId}/${item.packageId}`,
       stage: "reconcile",
@@ -34773,13 +34774,13 @@ function inboxRows(snapshot, panels) {
       target: panels.usage,
       button: "去核对"
     });
-  for (let item of snapshot?.quickBinding?.items ?? []) {
+  for (let item of snapshot2?.quickBinding?.items ?? []) {
     let bot = bots.find((row) => row.id === item.botId);
     item.mode === "quick" && item.funding === "api" && !item.priced ? rows2.push({
       key: `price:${item.botId}`,
       stage: "budget",
       title: `${bot?.name ?? item.botId} 的模型还没有价格`,
-      detail: `${modelLabel(item.model, snapshot.engines)} 按 API 计费，需要先填写价格才能调用。`,
+      detail: `${modelLabel(item.model, snapshot2.engines)} 按 API 计费，需要先填写价格才能调用。`,
       target: panels.bindings,
       button: "填写价格"
     }) : item.mode === "no-model" ? rows2.push({
@@ -34798,7 +34799,7 @@ function inboxRows(snapshot, panels) {
       button: "查看绑定"
     });
   }
-  for (let engine of snapshot?.engines?.items ?? []) {
+  for (let engine of snapshot2?.engines?.items ?? []) {
     let users = bots.filter((bot) => String(bot.model ?? "").startsWith(`${engine.provider}/`));
     if (!users.length || !["login", "missing"].includes(engine.state)) continue;
     let name = String(engine.name).replace(/（官方工具）$/, "");
@@ -34813,19 +34814,19 @@ function inboxRows(snapshot, panels) {
   }
   return rows2;
 }
-function Inbox({ snapshot, panels, openPanel, openSession }) {
-  let rows2 = inboxRows(snapshot, panels), tasks = Array.isArray(snapshot?.tasks?.items) ? snapshot.tasks.items : [], stamp = (task) => {
+function Inbox({ snapshot: snapshot2, panels, openPanel, openSession }) {
+  let rows2 = inboxRows(snapshot2, panels), tasks = Array.isArray(snapshot2?.tasks?.items) ? snapshot2.tasks.items : [], stamp = (task) => {
     let value = task.updatedAt ?? task.createdAt;
     return typeof value == "number" ? value : Date.parse(value ?? "") || 0;
-  }, running = tasks.filter((task) => ["running", "queued", "ready", "admitting", "cancelling"].includes(task.state)).sort((a, b2) => stamp(b2) - stamp(a)).slice(0, 6), done = tasks.filter((task) => task.state === "succeeded").sort((a, b2) => stamp(b2) - stamp(a)).slice(0, 8), nameOf = (id2) => (snapshot?.bots ?? []).find((bot) => bot.id === id2)?.name ?? id2 ?? "未归属", go2 = (row) => row.session ? openSession?.(row.session) : openPanel?.(row.target);
+  }, running = tasks.filter((task) => ["running", "queued", "ready", "admitting", "cancelling"].includes(task.state)).sort((a, b2) => stamp(b2) - stamp(a)).slice(0, 6), done = tasks.filter((task) => task.state === "succeeded").sort((a, b2) => stamp(b2) - stamp(a)).slice(0, 8), nameOf = (id2) => (snapshot2?.bots ?? []).find((bot) => bot.id === id2)?.name ?? id2 ?? "未归属", go2 = (row) => row.session ? openSession?.(row.session) : openPanel?.(row.target);
   return /* @__PURE__ */ import_react71.default.createElement(import_react71.default.Fragment, null, /* @__PURE__ */ import_react71.default.createElement("section", { className: "bp-card", "aria-label": "待你处理" }, /* @__PURE__ */ import_react71.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react71.default.createElement("div", null, /* @__PURE__ */ import_react71.default.createElement("h2", null, "待你处理 ", /* @__PURE__ */ import_react71.default.createElement("span", { className: "bp-inline-count" }, rows2.length, " 项")), /* @__PURE__ */ import_react71.default.createElement("p", { className: "bp-muted" }, "只列出宿主已记录、确实卡在你这里的事项。Bot 自己说「卡住了」不会出现在这里。"))), rows2.length === 0 ? /* @__PURE__ */ import_react71.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react71.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react71.default.createElement(UiIcon, { name: "check", size: 24 })), /* @__PURE__ */ import_react71.default.createElement("strong", null, "一切就绪"), /* @__PURE__ */ import_react71.default.createElement("p", null, "没有需要你决定或修复的事项。")) : /* @__PURE__ */ import_react71.default.createElement("ul", { className: "bp-inbox-list" }, rows2.map((row) => /* @__PURE__ */ import_react71.default.createElement("li", { key: row.key, className: "bp-inbox-row", "data-stage": row.stage }, /* @__PURE__ */ import_react71.default.createElement("span", { className: "bp-inbox-dot", "aria-hidden": "true" }), /* @__PURE__ */ import_react71.default.createElement("div", { className: "bp-inbox-copy" }, /* @__PURE__ */ import_react71.default.createElement("strong", null, row.title), /* @__PURE__ */ import_react71.default.createElement("p", { className: "bp-muted" }, row.detail)), /* @__PURE__ */ import_react71.default.createElement("button", { type: "button", onClick: () => go2(row) }, row.button, /* @__PURE__ */ import_react71.default.createElement(UiIcon, { name: "chevron", size: 13 })))))), running.length > 0 && /* @__PURE__ */ import_react71.default.createElement("section", { className: "bp-card", "aria-label": "进行中" }, /* @__PURE__ */ import_react71.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react71.default.createElement("h2", null, "进行中 ", /* @__PURE__ */ import_react71.default.createElement("span", { className: "bp-inline-count" }, running.length)), /* @__PURE__ */ import_react71.default.createElement("button", { type: "button", onClick: () => openPanel?.(panels.tasks) }, "全部任务")), /* @__PURE__ */ import_react71.default.createElement("ul", { className: "bp-inbox-list" }, running.map((task) => /* @__PURE__ */ import_react71.default.createElement("li", { key: task.taskId ?? task.id, className: "bp-inbox-row", "data-stage": "running" }, /* @__PURE__ */ import_react71.default.createElement("span", { className: "bp-inbox-dot", "aria-hidden": "true" }), /* @__PURE__ */ import_react71.default.createElement("div", { className: "bp-inbox-copy" }, /* @__PURE__ */ import_react71.default.createElement("strong", null, short3(task.title ?? task.input?.task ?? task.taskId)), /* @__PURE__ */ import_react71.default.createElement("p", { className: "bp-muted" }, nameOf(task.botId), when3(stamp(task)) ? ` · ${when3(stamp(task))}` : "")))))), /* @__PURE__ */ import_react71.default.createElement("section", { className: "bp-card", "aria-label": "已完成" }, /* @__PURE__ */ import_react71.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react71.default.createElement("h2", null, "最近完成"), done.length > 0 && /* @__PURE__ */ import_react71.default.createElement("button", { type: "button", onClick: () => openPanel?.(panels.tasks) }, "全部任务")), done.length === 0 ? /* @__PURE__ */ import_react71.default.createElement("p", { className: "bp-muted" }, "还没有完成的任务。") : /* @__PURE__ */ import_react71.default.createElement("ul", { className: "bp-inbox-list" }, done.map((task) => /* @__PURE__ */ import_react71.default.createElement("li", { key: task.taskId ?? task.id, className: "bp-inbox-row", "data-stage": "done" }, /* @__PURE__ */ import_react71.default.createElement("span", { className: "bp-inbox-dot", "aria-hidden": "true" }), /* @__PURE__ */ import_react71.default.createElement("div", { className: "bp-inbox-copy" }, /* @__PURE__ */ import_react71.default.createElement("strong", null, short3(task.title ?? task.input?.task ?? task.taskId)), /* @__PURE__ */ import_react71.default.createElement("p", { className: "bp-muted" }, nameOf(task.botId), when3(stamp(task)) ? ` · ${when3(stamp(task))}` : "")))))));
 }
 
 // apps/integration-client/team-import.jsx
 var import_react72 = __toESM(require("react"), 1);
 var routeKey5 = (route2) => `${route2.provider}/${route2.model}`;
-function TeamImport({ snapshot, dispatch, busy, openSession }) {
-  let [text7, setText] = (0, import_react72.useState)(""), [preview, setPreview] = (0, import_react72.useState)(null), [model, setModel] = (0, import_react72.useState)(""), [error, setError] = (0, import_react72.useState)(""), [result, setResult] = (0, import_react72.useState)(null), file = (0, import_react72.useRef)(null), routes = snapshot.quickBinding?.routes ?? [], ordered = [...routes.filter((route2) => route2.engine), ...routes.filter((route2) => !route2.engine)], change = (value) => {
+function TeamImport({ snapshot: snapshot2, dispatch, busy, openSession }) {
+  let [text7, setText] = (0, import_react72.useState)(""), [preview, setPreview] = (0, import_react72.useState)(null), [model, setModel] = (0, import_react72.useState)(""), [error, setError] = (0, import_react72.useState)(""), [result, setResult] = (0, import_react72.useState)(null), file = (0, import_react72.useRef)(null), routes = snapshot2.quickBinding?.routes ?? [], ordered = [...routes.filter((route2) => route2.engine), ...routes.filter((route2) => !route2.engine)], change = (value) => {
     setText(value), setPreview(null), setResult(null), setError("");
   }, read = (event) => {
     let chosen = event.target.files?.[0];
@@ -34851,9 +34852,79 @@ function TeamImport({ snapshot, dispatch, busy, openSession }) {
   }, nameOf = (key) => preview?.bots.find((bot) => bot.key === key)?.name ?? key;
   return /* @__PURE__ */ import_react72.default.createElement("section", { className: "bp-card bp-team-import", "aria-label": "导入团队包" }, /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react72.default.createElement("div", null, /* @__PURE__ */ import_react72.default.createElement("h2", null, "导入团队包"), /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-muted" }, "一次添加一整个 Bot 团队和它们的群聊。只导入「Bot 是谁」，不导入模型、审批级别、密钥、电脑或聊天记录。"))), result ? /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-team-result", role: "status" }, /* @__PURE__ */ import_react72.default.createElement("p", null, /* @__PURE__ */ import_react72.default.createElement(UiIcon, { name: "check", size: 16 }), " 已添加 ", result.bots.length, " 个 Bot", result.rooms.length ? `、${result.rooms.length} 个群聊` : "", "。"), /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-chip-row" }, result.bots.map((bot) => /* @__PURE__ */ import_react72.default.createElement("button", { key: bot.botId, type: "button", className: "bp-chip-button", disabled: !bot.sessionId, onClick: () => openSession?.(bot.sessionId) }, bot.name))), result.routines?.length ? /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-muted" }, "团队包建议的例行任务没有自动创建：", result.routines.map((item) => item.name).join("、"), "。") : null, /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react72.default.createElement("button", { type: "button", onClick: () => setResult(null) }, "再导入一个"))) : /* @__PURE__ */ import_react72.default.createElement(import_react72.default.Fragment, null, /* @__PURE__ */ import_react72.default.createElement("label", { className: "bp-team-source" }, "团队包 JSON", /* @__PURE__ */ import_react72.default.createElement("textarea", { rows: preview ? 3 : 6, spellCheck: !1, value: text7, placeholder: '{"format": "dsh.team-package", "version": 1, "package": { … }}', onChange: (event) => change(event.target.value) })), /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react72.default.createElement("input", { ref: file, type: "file", accept: ".json,application/json", hidden: !0, onChange: read }), /* @__PURE__ */ import_react72.default.createElement("button", { type: "button", onClick: () => file.current?.click() }, /* @__PURE__ */ import_react72.default.createElement(UiIcon, { name: "folder", size: 15 }), "选择文件…"), /* @__PURE__ */ import_react72.default.createElement("button", { type: "button", className: preview ? void 0 : "bp-button-primary", disabled: busy || !text7.trim(), onClick: () => {
     review();
-  } }, "预览")), error && /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-error", role: "alert" }, error), preview && /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-team-preview" }, /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-team-head" }, /* @__PURE__ */ import_react72.default.createElement("strong", null, preview.package.name), preview.package.release && /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-muted" }, " · ", preview.package.release), preview.package.tagline && /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-muted" }, preview.package.tagline)), /* @__PURE__ */ import_react72.default.createElement("h3", null, "将添加的 Bot ", /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-inline-count" }, preview.bots.length, " 个")), /* @__PURE__ */ import_react72.default.createElement("ul", { className: "bp-team-bots" }, preview.bots.map((bot) => /* @__PURE__ */ import_react72.default.createElement("li", { key: bot.key }, /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-template-avatar", "data-color": bot.color }, bot.name.slice(0, 1)), /* @__PURE__ */ import_react72.default.createElement("div", null, /* @__PURE__ */ import_react72.default.createElement("strong", null, bot.name, preview.team.leader === bot.key ? /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-tag-inline" }, "负责人") : null), /* @__PURE__ */ import_react72.default.createElement("small", null, [bot.role, bot.description].filter(Boolean).join(" · ") || "未写职责"))))), preview.rooms.length > 0 && /* @__PURE__ */ import_react72.default.createElement(import_react72.default.Fragment, null, /* @__PURE__ */ import_react72.default.createElement("h3", null, "将创建的群聊 ", /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-inline-count" }, preview.rooms.length, " 个")), /* @__PURE__ */ import_react72.default.createElement("ul", { className: "bp-team-rooms" }, preview.rooms.map((room2) => /* @__PURE__ */ import_react72.default.createElement("li", { key: room2.key }, /* @__PURE__ */ import_react72.default.createElement("strong", null, room2.name), /* @__PURE__ */ import_react72.default.createElement("small", null, room2.members.map(nameOf).join("、"), " · ", room2.mode === "everyone" ? "每个人都回复" : `${room2.admin ? nameOf(room2.admin) : "负责人"}先回复`))))), preview.routines.length > 0 && /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-muted" }, "建议的例行任务（不会自动创建）：", preview.routines.map((item) => item.name).join("、")), preview.skipped.length > 0 && /* @__PURE__ */ import_react72.default.createElement(import_react72.default.Fragment, null, /* @__PURE__ */ import_react72.default.createElement("h3", null, "不会导入"), /* @__PURE__ */ import_react72.default.createElement("ul", { className: "bp-team-skipped" }, preview.skipped.map((item) => /* @__PURE__ */ import_react72.default.createElement("li", { key: item }, item)))), /* @__PURE__ */ import_react72.default.createElement("label", { className: "bp-team-model" }, "导入后的模型", /* @__PURE__ */ import_react72.default.createElement("select", { value: model, onChange: (event) => setModel(event.target.value) }, /* @__PURE__ */ import_react72.default.createElement("option", { value: "" }, "稍后在每个 Bot 的私聊中选择"), ordered.map((route2) => /* @__PURE__ */ import_react72.default.createElement("option", { key: routeKey5(route2), value: routeKey5(route2) }, route2.engine ? modelLabel(routeKey5(route2), snapshot.engines) : routeKey5(route2))))), /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react72.default.createElement("button", { type: "button", className: "bp-button-primary", disabled: busy, onClick: () => {
+  } }, "预览")), error && /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-error", role: "alert" }, error), preview && /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-team-preview" }, /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-team-head" }, /* @__PURE__ */ import_react72.default.createElement("strong", null, preview.package.name), preview.package.release && /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-muted" }, " · ", preview.package.release), preview.package.tagline && /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-muted" }, preview.package.tagline)), /* @__PURE__ */ import_react72.default.createElement("h3", null, "将添加的 Bot ", /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-inline-count" }, preview.bots.length, " 个")), /* @__PURE__ */ import_react72.default.createElement("ul", { className: "bp-team-bots" }, preview.bots.map((bot) => /* @__PURE__ */ import_react72.default.createElement("li", { key: bot.key }, /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-template-avatar", "data-color": bot.color }, bot.name.slice(0, 1)), /* @__PURE__ */ import_react72.default.createElement("div", null, /* @__PURE__ */ import_react72.default.createElement("strong", null, bot.name, preview.team.leader === bot.key ? /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-tag-inline" }, "负责人") : null), /* @__PURE__ */ import_react72.default.createElement("small", null, [bot.role, bot.description].filter(Boolean).join(" · ") || "未写职责"))))), preview.rooms.length > 0 && /* @__PURE__ */ import_react72.default.createElement(import_react72.default.Fragment, null, /* @__PURE__ */ import_react72.default.createElement("h3", null, "将创建的群聊 ", /* @__PURE__ */ import_react72.default.createElement("span", { className: "bp-inline-count" }, preview.rooms.length, " 个")), /* @__PURE__ */ import_react72.default.createElement("ul", { className: "bp-team-rooms" }, preview.rooms.map((room2) => /* @__PURE__ */ import_react72.default.createElement("li", { key: room2.key }, /* @__PURE__ */ import_react72.default.createElement("strong", null, room2.name), /* @__PURE__ */ import_react72.default.createElement("small", null, room2.members.map(nameOf).join("、"), " · ", room2.mode === "everyone" ? "每个人都回复" : `${room2.admin ? nameOf(room2.admin) : "负责人"}先回复`))))), preview.routines.length > 0 && /* @__PURE__ */ import_react72.default.createElement("p", { className: "bp-muted" }, "建议的例行任务（不会自动创建）：", preview.routines.map((item) => item.name).join("、")), preview.skipped.length > 0 && /* @__PURE__ */ import_react72.default.createElement(import_react72.default.Fragment, null, /* @__PURE__ */ import_react72.default.createElement("h3", null, "不会导入"), /* @__PURE__ */ import_react72.default.createElement("ul", { className: "bp-team-skipped" }, preview.skipped.map((item) => /* @__PURE__ */ import_react72.default.createElement("li", { key: item }, item)))), /* @__PURE__ */ import_react72.default.createElement("label", { className: "bp-team-model" }, "导入后的模型", /* @__PURE__ */ import_react72.default.createElement("select", { value: model, onChange: (event) => setModel(event.target.value) }, /* @__PURE__ */ import_react72.default.createElement("option", { value: "" }, "稍后在每个 Bot 的私聊中选择"), ordered.map((route2) => /* @__PURE__ */ import_react72.default.createElement("option", { key: routeKey5(route2), value: routeKey5(route2) }, route2.engine ? modelLabel(routeKey5(route2), snapshot2.engines) : routeKey5(route2))))), /* @__PURE__ */ import_react72.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react72.default.createElement("button", { type: "button", className: "bp-button-primary", disabled: busy, onClick: () => {
     install();
   } }, "导入 ", preview.bots.length, " 个 Bot"), /* @__PURE__ */ import_react72.default.createElement("button", { type: "button", onClick: () => setPreview(null) }, "取消")))));
+}
+
+// apps/integration-client/shortcuts.jsx
+var import_react73 = __toESM(require("react"), 1), import_react_dom10 = require("react-dom");
+var JUMPS = [
+  ["i", "inbox", "收件箱"],
+  ["b", "bindings", "Bot 与模型"],
+  ["e", "engines", "AI 引擎"],
+  ["t", "tasks", "任务"],
+  ["c", "machines", "远程电脑"],
+  ["l", "library", "资料库"],
+  ["r", "routine", "例行任务"],
+  ["u", "usage", "费用与用量"]
+], WORKBENCH = ["w", "model-router-galgame", "高级工作台"], SEQUENCE_MS = 1200, editable = (target) => typeof target?.closest == "function" && !!target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"], [role="combobox"]'), isMac = () => /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? "");
+function shortcutHandler(config, now = () => Date.now()) {
+  let lead = 0;
+  return (event) => {
+    if (event.defaultPrevented || event.isComposing) return;
+    let { panels, go: go2, toggle } = config() ?? {};
+    if (!go2) return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && (event.key === "/" || event.code === "Slash")) {
+      event.preventDefault(), toggle();
+      return;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) {
+      lead = 0;
+      return;
+    }
+    let key = String(event.key ?? "").toLowerCase();
+    if (lead && now() - lead <= SEQUENCE_MS) {
+      lead = 0;
+      let jump = [...JUMPS, WORKBENCH].find(([letter]) => letter === key), id2 = jump === WORKBENCH ? WORKBENCH[1] : jump && panels?.[jump[1]];
+      id2 && (event.preventDefault(), go2(id2));
+      return;
+    }
+    lead = key === "g" && !event.shiftKey ? now() : 0;
+  };
+}
+var store = { open: !1, version: 0, subscribers: /* @__PURE__ */ new Set(), window: null }, emit = () => {
+  store.version++;
+  for (let notify of store.subscribers) notify();
+}, subscribe = (notify) => (store.subscribers.add(notify), () => store.subscribers.delete(notify)), snapshot = () => `${store.open}:${store.version}`, setShortcutSheet = (open) => {
+  store.open = open, emit();
+}, closeSheet = () => setShortcutSheet(!1), layers = /* @__PURE__ */ new Set(), firstLayer = () => layers.values().next().value, onKey = shortcutHandler(() => firstLayer()?.config);
+function ShortcutSheet({ onClose }) {
+  let close = (0, import_react73.useRef)(null);
+  (0, import_react73.useEffect)(() => {
+    close.current?.focus();
+    let win = close.current?.ownerDocument.defaultView ?? window, escape = (event) => {
+      event.key === "Escape" && (event.stopPropagation(), onClose());
+    };
+    return win.addEventListener("keydown", escape, !0), () => win.removeEventListener("keydown", escape, !0);
+  }, [onClose]);
+  let mod = isMac() ? "⌘" : "Ctrl";
+  return /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-shortcuts", role: "presentation", onMouseDown: (event) => {
+    event.target === event.currentTarget && onClose();
+  } }, /* @__PURE__ */ import_react73.default.createElement("section", { className: "bp-shortcuts-card", role: "dialog", "aria-modal": "true", "aria-label": "键盘快捷键" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, "键盘快捷键"), /* @__PURE__ */ import_react73.default.createElement("button", { ref: close, type: "button", className: "bp-icon-button", "aria-label": "关闭", onClick: onClose }, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "close", size: 16 }))), /* @__PURE__ */ import_react73.default.createElement("dl", null, /* @__PURE__ */ import_react73.default.createElement("dt", null, "显示或关闭本面板"), /* @__PURE__ */ import_react73.default.createElement("dd", null, /* @__PURE__ */ import_react73.default.createElement("kbd", null, mod), /* @__PURE__ */ import_react73.default.createElement("kbd", null, "/")), [...JUMPS, WORKBENCH].map(([letter, , label]) => /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, { key: letter }, /* @__PURE__ */ import_react73.default.createElement("dt", null, "打开", label), /* @__PURE__ */ import_react73.default.createElement("dd", null, /* @__PURE__ */ import_react73.default.createElement("kbd", null, "G"), /* @__PURE__ */ import_react73.default.createElement("kbd", null, letter.toUpperCase())))), /* @__PURE__ */ import_react73.default.createElement("dt", null, "关闭菜单或面板"), /* @__PURE__ */ import_react73.default.createElement("dd", null, /* @__PURE__ */ import_react73.default.createElement("kbd", null, "Esc")), /* @__PURE__ */ import_react73.default.createElement("dt", null, "在模型菜单中上下移动"), /* @__PURE__ */ import_react73.default.createElement("dd", null, /* @__PURE__ */ import_react73.default.createElement("kbd", null, "↑"), /* @__PURE__ */ import_react73.default.createElement("kbd", null, "↓"))), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "字母快捷键只在没有输入框获得焦点时生效，打字不会被拦截。")));
+}
+function ShortcutLayer({ panels, go: go2 }) {
+  let self = (0, import_react73.useRef)(null);
+  self.current === null && (self.current = {}), (0, import_react73.useSyncExternalStore)(subscribe, snapshot, snapshot), (0, import_react73.useEffect)(() => {
+    let layer = self.current, win = window;
+    return layers.add(layer), layers.size === 1 && (store.window = win, win.addEventListener("keydown", onKey)), emit(), () => {
+      layers.delete(layer), layers.size === 0 && (store.window?.removeEventListener("keydown", onKey), store.window = null, store.open = !1), emit();
+    };
+  }, []), (0, import_react73.useEffect)(() => {
+    self.current.config = { panels, go: go2, toggle: () => setShortcutSheet(!store.open) };
+  }, [panels, go2]);
+  let owner = firstLayer() === self.current;
+  return !store.open || !owner ? null : (0, import_react_dom10.createPortal)(/* @__PURE__ */ import_react73.default.createElement(ShortcutSheet, { onClose: closeSheet }), document.body);
 }
 
 // apps/integration-client/routing-submissions.mjs
@@ -34878,7 +34949,7 @@ function routingSubmissions(scope) {
   let value = null, listeners2 = /* @__PURE__ */ new Set(), publish2 = (next) => {
     value = next === null ? null : Object.freeze(next);
     for (let listener of [...listeners2]) listener();
-  }, store = Object.freeze({
+  }, store2 = Object.freeze({
     getSnapshot: () => value,
     subscribe: (listener) => (listeners2.add(listener), () => listeners2.delete(listener)),
     start(input) {
@@ -34905,7 +34976,7 @@ function routingSubmissions(scope) {
       return !same(value, input) || value.state !== "not-found" ? !1 : (publish2(null), !0);
     }
   });
-  return scopes.set(scope, store), store;
+  return scopes.set(scope, store2), store2;
 }
 
 // apps/integration-client/panels.jsx
@@ -34913,11 +34984,15 @@ var NAV_EVENT = "bot-product:navigation", activePanel = null, announcePanel = (i
   clear ? activePanel === id2 && (activePanel = null) : activePanel = id2, document.dispatchEvent(new document.defaultView.CustomEvent(NAV_EVENT, { detail: { id: activePanel } }));
 };
 function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
-  let [active2, setActive] = (0, import_react73.useState)(() => activePanel);
-  return (0, import_react73.useEffect)(() => {
+  let [active2, setActive] = (0, import_react74.useState)(() => activePanel);
+  (0, import_react74.useEffect)(() => {
     let change = (event) => setActive(event.detail.id);
     return document.addEventListener(NAV_EVENT, change), setActive(activePanel), () => document.removeEventListener(NAV_EVENT, change);
-  }, []), /* @__PURE__ */ import_react73.default.createElement("nav", { className: `bp-nav${compact2 ? " bp-nav-compact" : ""}`, "aria-label": "Bot 工作系统" }, /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-nav-label" }, "工作空间"), [
+  }, []);
+  let go2 = (0, import_react74.useCallback)((id2) => {
+    announcePanel(id2), openPanel(id2);
+  }, [openPanel]);
+  return /* @__PURE__ */ import_react74.default.createElement("nav", { className: `bp-nav${compact2 ? " bp-nav-compact" : ""}`, "aria-label": "Bot 工作系统" }, /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-nav-label" }, "工作空间"), [
     [panels.inbox, "收件箱", "inbox", "收件"],
     [panels.bindings, "Bot 与模型", "team", "Bot"],
     [panels.engines, "AI 引擎", "spark", "引擎"],
@@ -34927,7 +35002,7 @@ function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
     [panels.routine, "例行任务", "repeat", "例行"],
     [panels.usage, "费用与用量", "chart", "费用"],
     ["model-router-galgame", "高级工作台", "settings", "工作台"]
-  ].filter(([id2]) => id2).map(([id2, label, icon2, caption]) => /* @__PURE__ */ import_react73.default.createElement(
+  ].filter(([id2]) => id2).map(([id2, label, icon2, caption]) => /* @__PURE__ */ import_react74.default.createElement(
     "button",
     {
       key: id2,
@@ -34939,17 +35014,17 @@ function ProductNavigation({ openPanel, panels, compact: compact2 = !1 }) {
       title: label,
       "aria-label": label
     },
-    /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: icon2, size: 17 }),
-    /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-nav-name" }, label),
-    /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-nav-caption" }, caption)
-  )));
+    /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: icon2, size: 17 }),
+    /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-nav-name" }, label),
+    /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-nav-caption" }, caption)
+  )), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", className: "bp-nav-quiet", onClick: () => setShortcutSheet(!0), title: "键盘快捷键（Ctrl/⌘ + /）", "aria-label": "键盘快捷键" }, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "keyboard", size: 17 }), /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-nav-name" }, "键盘快捷键"), /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-nav-caption" }, "快捷键")), /* @__PURE__ */ import_react74.default.createElement(ShortcutLayer, { panels, go: go2 }));
 }
 function Blocked({ value }) {
-  return /* @__PURE__ */ import_react73.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react73.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react73.default.createElement("p", null, value?.reason ?? "尚未取得宿主状态。"), value?.nextAction && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "下一步：", value.nextAction));
+  return /* @__PURE__ */ import_react74.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react74.default.createElement("strong", null, "暂不可用"), /* @__PURE__ */ import_react74.default.createElement("p", null, value?.reason ?? "尚未取得宿主状态。"), value?.nextAction && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "下一步：", value.nextAction));
 }
-var Value2 = ({ label, children }) => /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react73.default.createElement("dt", null, label), /* @__PURE__ */ import_react73.default.createElement("dd", null, children ?? "未配置")), Tag3 = ({ children }) => /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-tag" }, children), subscriptionText = (value) => value && typeof value == "object" ? `今日 ${value.callsToday ?? "未知"} 次 · 本月 ${value.callsMonth ?? "未知"} 次` : value ?? "见逐来源收据";
+var Value2 = ({ label, children }) => /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-value" }, /* @__PURE__ */ import_react74.default.createElement("dt", null, label), /* @__PURE__ */ import_react74.default.createElement("dd", null, children ?? "未配置")), Tag3 = ({ children }) => /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-tag" }, children), subscriptionText = (value) => value && typeof value == "object" ? `今日 ${value.callsToday ?? "未知"} 次 · 本月 ${value.callsMonth ?? "未知"} 次` : value ?? "见逐来源收据";
 function BotRuntimeRow({ botId, dispatch, busy }) {
-  let [state, setState] = import_react73.default.useState(null), [error, setError] = import_react73.default.useState(""), [working, setWorking] = import_react73.default.useState(!1), load = import_react73.default.useCallback(async () => {
+  let [state, setState] = import_react74.default.useState(null), [error, setError] = import_react74.default.useState(""), [working, setWorking] = import_react74.default.useState(!1), load = import_react74.default.useCallback(async () => {
     if (typeof dispatch == "function")
       try {
         let rows2 = await dispatch("botRuntimeStatus", {}), row = Array.isArray(rows2) ? rows2.find((item) => item.botId === botId) : null;
@@ -34963,7 +35038,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       } catch (failure) {
         setState(null), setError(String(failure?.message ?? failure));
       }
-  }, [botId, dispatch]), [history, setHistory] = import_react73.default.useState([]), [historyError, setHistoryError] = import_react73.default.useState(""), loadHistory = import_react73.default.useCallback(async () => {
+  }, [botId, dispatch]), [history, setHistory] = import_react74.default.useState([]), [historyError, setHistoryError] = import_react74.default.useState(""), loadHistory = import_react74.default.useCallback(async () => {
     if (typeof dispatch == "function")
       try {
         let rows2 = await dispatch("botRuntimeHistory", { botId, limit: 20 });
@@ -34971,7 +35046,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       } catch (failure) {
         setHistory([]), setHistoryError(String(failure?.message ?? failure));
       }
-  }, [botId, dispatch]), [full2, setFull] = import_react73.default.useState(null), openFull = import_react73.default.useCallback(async (index) => {
+  }, [botId, dispatch]), [full2, setFull] = import_react74.default.useState(null), openFull = import_react74.default.useCallback(async (index) => {
     try {
       let message2 = await dispatch("botRuntimeMessage", { botId, index });
       setFull({ index, ...message2 }), setHistoryError("");
@@ -34979,7 +35054,7 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       setHistoryError(String(failure?.message ?? failure)), setFull(null);
     }
   }, [botId, dispatch]);
-  if (import_react73.default.useEffect(() => {
+  if (import_react74.default.useEffect(() => {
     load();
   }, [load]), !state && !error) return null;
   let target = state?.runtime === "independent" ? "integration" : "independent", move = async () => {
@@ -34992,16 +35067,16 @@ function BotRuntimeRow({ botId, dispatch, busy }) {
       setWorking(!1);
     }
   };
-  return /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react73.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react73.default.createElement("button", { disabled: busy || working, onClick: () => {
+  return /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-runtime" }, /* @__PURE__ */ import_react74.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "运行时" }, state?.runtime === "independent" ? "独立循环 + 独立会话库" : "Harness 会话集成"), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "切换时间" }, state?.changedAt ? new Date(state.changedAt).toLocaleString("zh-CN") : "从未切换")), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("button", { disabled: busy || working, onClick: () => {
     move();
-  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, error), state ? /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-log" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "最近会话（仅预览）"), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: working, onClick: () => {
+  } }, working ? "切换中…" : target === "independent" ? "迁移到独立运行时" : "迁回 Harness 会话")), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "迁移是原子的：Bot 正在对话时会被拒绝。搬过去后该 Bot 的会话写进独立会话库，界面与工具沿用现有授权。"), error && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, error), state ? /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-log" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "最近会话（仅预览）"), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: working, onClick: () => {
     loadHistory();
-  } }, "读取预览"), historyError && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, historyError), history.length === 0 ? /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "点“读取预览”加载最近 20 条。") : /* @__PURE__ */ import_react73.default.createElement("ul", { className: "bp-checklist" }, history.map((row, index) => /* @__PURE__ */ import_react73.default.createElement("li", { key: index }, /* @__PURE__ */ import_react73.default.createElement("strong", null, row.role), row.name ? ` · ${row.name}` : "", " · ", row.chars, " 字", row.at ? ` · ${new Date(row.at).toLocaleTimeString("zh-CN")}` : "", /* @__PURE__ */ import_react73.default.createElement("small", null, row.preview, String(row.preview ?? "").length < row.chars ? "…" : ""), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", onClick: () => {
+  } }, "读取预览"), historyError && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, historyError), history.length === 0 ? /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "点“读取预览”加载最近 20 条。") : /* @__PURE__ */ import_react74.default.createElement("ul", { className: "bp-checklist" }, history.map((row, index) => /* @__PURE__ */ import_react74.default.createElement("li", { key: index }, /* @__PURE__ */ import_react74.default.createElement("strong", null, row.role), row.name ? ` · ${row.name}` : "", " · ", row.chars, " 字", row.at ? ` · ${new Date(row.at).toLocaleTimeString("zh-CN")}` : "", /* @__PURE__ */ import_react74.default.createElement("small", null, row.preview, String(row.preview ?? "").length < row.chars ? "…" : ""), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", onClick: () => {
     openFull(index);
-  } }, "查看全文")))), full2 ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-fulltext" }, /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "第 ", full2.index + 1, " 条（从最新往前数）· ", full2.role, " · ", full2.chars, " 字"), /* @__PURE__ */ import_react73.default.createElement("pre", null, full2.content)) : null) : null);
+  } }, "查看全文")))), full2 ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-fulltext" }, /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "第 ", full2.index + 1, " 条（从最新往前数）· ", full2.role, " · ", full2.chars, " 字"), /* @__PURE__ */ import_react74.default.createElement("pre", null, full2.content)) : null) : null);
 }
-function BotBindings({ snapshot, openSession, dispatch, busy }) {
-  let bots = snapshot.bots ?? [], [selected, setSelected] = (0, import_react73.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot.botBindings ?? snapshot.bindings, binding = section?.items?.find((row) => row.botId === bot?.id), quick = snapshot.quickBinding?.status === "available" ? snapshot.quickBinding : null, quickOf = (id2) => quick?.items?.find((row) => row.botId === id2) ?? null, quickItem = bot ? quickOf(bot.id) : null, capabilities = binding?.tools ?? binding?.capabilities ?? [], permissionGroups = [
+function BotBindings({ snapshot: snapshot2, openSession, dispatch, busy }) {
+  let bots = snapshot2.bots ?? [], [selected, setSelected] = (0, import_react74.useState)(bots[0]?.id ?? ""), bot = bots.find((row) => row.id === selected) ?? bots[0], section = snapshot2.botBindings ?? snapshot2.bindings, binding = section?.items?.find((row) => row.botId === bot?.id), quick = snapshot2.quickBinding?.status === "available" ? snapshot2.quickBinding : null, quickOf = (id2) => quick?.items?.find((row) => row.botId === id2) ?? null, quickItem = bot ? quickOf(bot.id) : null, capabilities = binding?.tools ?? binding?.capabilities ?? [], permissionGroups = [
     ["模型调用", /^model\//],
     ["模型工作台", /^(?:command\/router|tool\/model_router_)/],
     ["任务管理", /^task\//],
@@ -35010,12 +35085,12 @@ function BotBindings({ snapshot, openSession, dispatch, busy }) {
     ["例行任务", /^tool\/bot_routine_/],
     ["远程工具", /^remote\//]
   ].filter(([, pattern]) => capabilities.some((value) => pattern.test(value))).map(([label]) => label);
-  if (!bots.length) return /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "bot", size: 24 })), /* @__PURE__ */ import_react73.default.createElement("strong", null, "还没有 Bot"), /* @__PURE__ */ import_react73.default.createElement("p", null, "返回 Main 完成首次设置，或从下面的现成 Bot 里挑一个开始。"));
+  if (!bots.length) return /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-empty-state" }, /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-empty-icon" }, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "bot", size: 24 })), /* @__PURE__ */ import_react74.default.createElement("strong", null, "还没有 Bot"), /* @__PURE__ */ import_react74.default.createElement("p", null, "返回 Main 完成首次设置，或从下面的现成 Bot 里挑一个开始。"));
   let quietAdvanced = quickItem?.mode === "quick";
-  return /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => {
+  return /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-columns" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-bot-list", "aria-label": "Bot 列表" }, bots.map((item) => {
     let badge = modeBadge(quickOf(item.id));
-    return /* @__PURE__ */ import_react73.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-person-avatar" }, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "bot", size: 21 })), /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-person-copy" }, /* @__PURE__ */ import_react73.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react73.default.createElement(Tag3, null, "Main"), /* @__PURE__ */ import_react73.default.createElement("small", null, quick ? modelLabel(item.model, snapshot.engines) : item.role || "尚未填写职责"), quick && /* @__PURE__ */ import_react73.default.createElement(Pill, { tone: badge.tone }, badge.label)));
-  })), /* @__PURE__ */ import_react73.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-person-heading" }, /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-person-avatar bp-person-avatar-large" }, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "bot", size: 27 })), /* @__PURE__ */ import_react73.default.createElement("div", null, /* @__PURE__ */ import_react73.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, bot.role || (bot.main ? "团队协调 Bot" : "团队成员")))), /* @__PURE__ */ import_react73.default.createElement("button", { className: "bp-button-primary", onClick: () => openSession(bot.sessionId) }, "打开私聊", /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "arrow", size: 15 }))), quick ? /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("h3", null, "模型"), /* @__PURE__ */ import_react73.default.createElement(BotModelRow, { bot, item: quickItem, record: binding, section: quick, engines: snapshot.engines, dispatch, busy, openSession })) : /* @__PURE__ */ import_react73.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因")), /* @__PURE__ */ import_react73.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? (quietAdvanced ? "本机（快速模式）" : "尚未取得宿主绑定")), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("h3", null, "有效权限 ", /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-inline-count" }, capabilities.length, " 项")), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-permission-chips" }, permissionGroups.map((label) => /* @__PURE__ */ import_react73.default.createElement("span", { key: label }, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "check", size: 13 }), label)), !capabilities.length && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "无额外能力")), binding.officialTools?.length ? /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("h3", null, "官方 CLI 任务"), /* @__PURE__ */ import_react73.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react73.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知")))) : null, binding.blockedReason && !quietAdvanced && /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、记忆及会话设置沿用私聊右侧的 Bot 详情。"), dispatch && /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-edit-section" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "settings", size: 16 }), "高级绑定：精确资金、工具、电脑与工作区"), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "启用后，这个 Bot 只按这里的准确模型、资金范围和权限运行，快速模式不再适用。"), /* @__PURE__ */ import_react73.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot.fundingAccounts, dispatch, busy })), /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "连接与运行详情"), /* @__PURE__ */ import_react73.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "预算范围" }, binding?.budgetScope)), /* @__PURE__ */ import_react73.default.createElement("h3", null, "完整权限标识"), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-code" }, capabilities.join("、") || "无额外能力"), snapshot.availableActions?.includes("botRuntimeStatus") && /* @__PURE__ */ import_react73.default.createElement(BotRuntimeRow, { botId: bot.id, dispatch, busy }))));
+    return /* @__PURE__ */ import_react74.default.createElement("button", { key: item.id, "aria-current": item.id === bot?.id ? "true" : void 0, onClick: () => setSelected(item.id) }, /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-person-avatar" }, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "bot", size: 21 })), /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-person-copy" }, /* @__PURE__ */ import_react74.default.createElement("strong", null, item.name), item.main && /* @__PURE__ */ import_react74.default.createElement(Tag3, null, "Main"), /* @__PURE__ */ import_react74.default.createElement("small", null, quick ? modelLabel(item.model, snapshot2.engines) : item.role || "尚未填写职责"), quick && /* @__PURE__ */ import_react74.default.createElement(Pill, { tone: badge.tone }, badge.label)));
+  })), /* @__PURE__ */ import_react74.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-person-heading" }, /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-person-avatar bp-person-avatar-large" }, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "bot", size: 27 })), /* @__PURE__ */ import_react74.default.createElement("div", null, /* @__PURE__ */ import_react74.default.createElement("h2", null, bot.name), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, bot.role || (bot.main ? "团队协调 Bot" : "团队成员")))), /* @__PURE__ */ import_react74.default.createElement("button", { className: "bp-button-primary", onClick: () => openSession(bot.sessionId) }, "打开私聊", /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "arrow", size: 15 }))), quick ? /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("h3", null, "模型"), /* @__PURE__ */ import_react74.default.createElement(BotModelRow, { bot, item: quickItem, record: binding, section: quick, engines: snapshot2.engines, dispatch, busy, openSession })) : /* @__PURE__ */ import_react74.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "准确模型" }, modelName(bot.model)), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "模型策略" }, "精确绑定；不可用时暂停并说明原因")), /* @__PURE__ */ import_react74.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "职责" }, bot.role || "未填写"), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "工作区" }, binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? "未指定，请在 Bot 详情选择文件夹"), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "执行位置" }, binding?.machineId ?? binding?.workspaceRef?.machineId ?? (quietAdvanced ? "本机（快速模式）" : "尚未取得宿主绑定")), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "最大并发" }, binding?.maxConcurrentTasks)), section?.status === "blocked" ? /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: section }) : binding ? /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("h3", null, "有效权限 ", /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-inline-count" }, capabilities.length, " 项")), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-permission-chips" }, permissionGroups.map((label) => /* @__PURE__ */ import_react74.default.createElement("span", { key: label }, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "check", size: 13 }), label)), !capabilities.length && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "无额外能力")), binding.officialTools?.length ? /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("h3", null, "官方 CLI 任务"), /* @__PURE__ */ import_react74.default.createElement("ul", null, binding.officialTools.map((tool) => /* @__PURE__ */ import_react74.default.createElement("li", { key: tool.toolId }, tool.toolId, " · ", tool.cliModel ?? "未核验模型", " · ", tool.identityStatus ?? tool.identityPolicy ?? "未知")))) : null, binding.blockedReason && !quietAdvanced && /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: { reason: binding.blockedReason, nextAction: binding.nextAction } })) : /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: { reason: "此 Bot 尚未取得有效绑定。", nextAction: "在宿主 Bot 绑定配置中授予明确工具、机器与工作区。" } }), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "角色文本不会授予工具或机器权限。职责、记忆及会话设置沿用私聊右侧的 Bot 详情。"), dispatch && /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-edit-section" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "settings", size: 16 }), "高级绑定：精确资金、工具、电脑与工作区"), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "启用后，这个 Bot 只按这里的准确模型、资金范围和权限运行，快速模式不再适用。"), /* @__PURE__ */ import_react74.default.createElement(BotBindingEditor, { bot, record: binding, accounts: snapshot2.fundingAccounts, dispatch, busy })), /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "连接与运行详情"), /* @__PURE__ */ import_react74.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "稳定 Bot ID" }, bot.id), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "预算范围" }, binding?.budgetScope)), /* @__PURE__ */ import_react74.default.createElement("h3", null, "完整权限标识"), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-code" }, capabilities.join("、") || "无额外能力"), snapshot2.availableActions?.includes("botRuntimeStatus") && /* @__PURE__ */ import_react74.default.createElement(BotRuntimeRow, { botId: bot.id, dispatch, busy }))));
 }
 var routingPresetLabel = (preset) => ({ economy: "省钱优先", balanced: "均衡", quality: "效果优先" })[preset] ?? "当前策略", routingRefusalMessage = (reason) => {
   let code = String(reason ?? "").split(":")[0];
@@ -35034,22 +35109,22 @@ var routingPresetLabel = (preset) => ({ economy: "省钱优先", balanced: "均�
   let code = failure?.code;
   return code === "REMOTE_OWNER_REQUIRED" ? "请重新登录宿主拥有者账号后核对原提交；请保留核对码，不要重新创建任务。" : ["BOT_ROUTING_STATUS_UNAVAILABLE", "PRODUCT_ACTION_UNAVAILABLE"].includes(code) ? "当前宿主尚不支持原提交核对，请更新宿主或在任务记录中核对；请保留核对码。" : ["BOT_ROUTING_SUBMISSION_IDENTITY_MISMATCH", "INVALID_ROUTING_SUBMISSION_STATUS"].includes(code) ? "返回记录与原提交身份不一致，尚不能确认结果。请在原宿主核对任务记录并保留核对码。" : code === "PRODUCT_READ_ONLY" ? "宿主目前处于只读状态，请恢复宿主后核对原提交；请保留核对码，不要重新创建任务。" : "原提交核对尚未完成，请恢复宿主连接后再次核对；请保留核对码，不会重新提交任务。";
 };
-function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }) {
-  let submissions = (0, import_react73.useMemo)(() => routingSubmissions(submissionScope), [submissionScope]), submission = (0, import_react73.useSyncExternalStore)(submissions.subscribe, submissions.getSnapshot, submissions.getSnapshot), [view, setView] = import_react73.default.useState(null), [error, setError] = import_react73.default.useState(""), [text7, setText] = import_react73.default.useState(""), [pin, setPin] = import_react73.default.useState(""), [machine, setMachine] = import_react73.default.useState(""), [root, setRoot] = import_react73.default.useState(""), [effect, setEffect] = import_react73.default.useState("read"), [decision, setDecision] = import_react73.default.useState(null), [working, setWorking] = import_react73.default.useState(""), [savedCode, setSavedCode] = (0, import_react73.useState)(""), [copyStatus, setCopyStatus] = (0, import_react73.useState)(""), codeInput = (0, import_react73.useRef)(null), [viewReady, setViewReady] = import_react73.default.useState(!1), control = (0, import_react73.useRef)({ live: !1, epoch: 0, draft: 0, active: null, prepared: null, ready: !1 }), form = (0, import_react73.useRef)({ text: "", pin: "", machine: "", root: "", effect: "read" }), busyRef = (0, import_react73.useRef)(busy);
+function BotRoutingCard({ snapshot: snapshot2, dispatch, busy, submissionScope = dispatch }) {
+  let submissions = (0, import_react74.useMemo)(() => routingSubmissions(submissionScope), [submissionScope]), submission = (0, import_react74.useSyncExternalStore)(submissions.subscribe, submissions.getSnapshot, submissions.getSnapshot), [view, setView] = import_react74.default.useState(null), [error, setError] = import_react74.default.useState(""), [text7, setText] = import_react74.default.useState(""), [pin, setPin] = import_react74.default.useState(""), [machine, setMachine] = import_react74.default.useState(""), [root, setRoot] = import_react74.default.useState(""), [effect, setEffect] = import_react74.default.useState("read"), [decision, setDecision] = import_react74.default.useState(null), [working, setWorking] = import_react74.default.useState(""), [savedCode, setSavedCode] = (0, import_react74.useState)(""), [copyStatus, setCopyStatus] = (0, import_react74.useState)(""), codeInput = (0, import_react74.useRef)(null), [viewReady, setViewReady] = import_react74.default.useState(!1), control = (0, import_react74.useRef)({ live: !1, epoch: 0, draft: 0, active: null, prepared: null, ready: !1 }), form = (0, import_react74.useRef)({ text: "", pin: "", machine: "", root: "", effect: "read" }), busyRef = (0, import_react74.useRef)(busy);
   busyRef.current = busy;
-  let call2 = (0, import_react73.useCallback)(async (action, payload) => {
+  let call2 = (0, import_react74.useCallback)(async (action, payload) => {
     if (typeof dispatch != "function") throw new Error("宿主接口尚未就绪。");
     let value = await dispatch(action, payload, { errorResult: !0 });
     if (value === void 0 || value?.ok === !1) throw Object.assign(new Error(value?.error?.message ?? "宿主尚未确认这次请求，请刷新后重试。"), { code: value?.error?.code });
     return value;
-  }, [dispatch]), invalidate = (0, import_react73.useCallback)(() => {
+  }, [dispatch]), invalidate = (0, import_react74.useCallback)(() => {
     control.current.draft++, control.current.prepared = null, setDecision(null);
   }, []), editDraft = (changes) => {
     let next = { ...form.current, ...changes };
     form.current = next, setText(next.text), setPin(next.pin), setMachine(next.machine), setRoot(next.root), setEffect(next.effect);
     let previous = submissions.getSnapshot();
     previous?.state === "confirmed" && submissions.clear(previous), invalidate();
-  }, begin = (0, import_react73.useCallback)((kind) => {
+  }, begin = (0, import_react74.useCallback)((kind) => {
     let state = control.current;
     if (!state.live || state.active || busyRef.current) return null;
     let token = { epoch: state.epoch };
@@ -35058,7 +35133,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
     current(token) && (control.current.active = null, setWorking(""));
   }, staleView = () => {
     control.current.ready = !1, setViewReady(!1);
-  }, load = import_react73.default.useCallback(async () => {
+  }, load = import_react74.default.useCallback(async () => {
     let token = begin("inspect");
     if (token) {
       invalidate(), staleView();
@@ -35074,14 +35149,14 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
       }
     }
   }, [call2, begin, invalidate]);
-  (0, import_react73.useEffect)(() => {
+  (0, import_react74.useEffect)(() => {
     let state = control.current;
     return state.live = !0, state.epoch++, state.active = null, state.ready = !1, setView(null), setViewReady(!1), setWorking(""), setSavedCode(""), setCopyStatus(""), setError(""), invalidate(), load(), () => {
       state.live = !1, state.epoch++, state.draft++, state.active = null, state.prepared = null, state.ready = !1;
     };
-  }, [load, invalidate]), (0, import_react73.useEffect)(() => {
+  }, [load, invalidate]), (0, import_react74.useEffect)(() => {
     setCopyStatus("");
-  }, [submissions, submission?.requestKey]), (0, import_react73.useEffect)(() => {
+  }, [submissions, submission?.requestKey]), (0, import_react74.useEffect)(() => {
     !busy && !view && control.current.live && !control.current.active && load();
   }, [busy, view, load]);
   let saveSettings = async (settings) => {
@@ -35105,9 +35180,9 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
     return {
       text: input.text.trim(),
       requiresMachine: input.machine !== "",
-      requesterBotId: view.requesterBotId ?? snapshot.mainBotId ?? snapshot.bots?.find((bot) => bot.main)?.id ?? "",
+      requesterBotId: view.requesterBotId ?? snapshot2.mainBotId ?? snapshot2.bots?.find((bot) => bot.main)?.id ?? "",
       ...input.pin ? { pinnedBotId: input.pin } : {},
-      ...input.machine ? { machineId: input.machine, rootId: input.root || snapshot.machines?.items?.find((item) => item.id === input.machine)?.roots?.[0] || "" } : {},
+      ...input.machine ? { machineId: input.machine, rootId: input.root || snapshot2.machines?.items?.find((item) => item.id === input.machine)?.roots?.[0] || "" } : {},
       needs: { write: input.effect === "write", desktop: input.effect === "desktop", browser: input.effect === "browser" }
     };
   }, submitRouted = async () => {
@@ -35131,7 +35206,7 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
     }
   }, checkSubmission = async () => {
     let reference2 = submissions.getSnapshot();
-    if (!reference2 || !snapshot.availableActions?.includes("botRouting.status")) return;
+    if (!reference2 || !snapshot2.availableActions?.includes("botRouting.status")) return;
     let token = begin("status");
     if (token)
       try {
@@ -35179,57 +35254,57 @@ function BotRoutingCard({ snapshot, dispatch, busy, submissionScope = dispatch }
     } finally {
       finish(token);
     }
-  }, submissionNotice = submission && /* @__PURE__ */ import_react73.default.createElement("section", { className: "bp-blocked", role: "region", "aria-label": "原提交核对" }, submission.state === "confirmed" ? /* @__PURE__ */ import_react73.default.createElement("p", { role: "status" }, "已提交：", submission.planId, "。", TASK_STATES[submission.planState] ?? "请在任务记录中跟踪执行结果。") : submission.state === "not-found" ? /* @__PURE__ */ import_react73.default.createElement("p", { role: "status" }, "当前尚未查到原提交，原请求仍可能完成，请稍后再次核对。") : /* @__PURE__ */ import_react73.default.createElement("p", { role: "status" }, submission.state === "submitting" && working === "dispatch" ? "正在提交任务…" : "提交结果尚未确认，请核对原提交。"), /* @__PURE__ */ import_react73.default.createElement("p", null, "核对只读取原任务记录，不会再次提交或授予权限。"), /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "保存提交核对码"), /* @__PURE__ */ import_react73.default.createElement("p", null, "重载应用前可保存核对码，之后在原宿主粘贴查询。核对码只包含提交编号，不包含任务正文或登录凭据。"), /* @__PURE__ */ import_react73.default.createElement("label", null, "当前提交核对码", /* @__PURE__ */ import_react73.default.createElement("input", { ref: codeInput, "aria-label": "当前提交核对码", className: "bp-submission-code", readOnly: !0, value: submissionCode(submission), onFocus: (event) => event.target.select() })), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", onClick: () => {
+  }, submissionNotice = submission && /* @__PURE__ */ import_react74.default.createElement("section", { className: "bp-blocked", role: "region", "aria-label": "原提交核对" }, submission.state === "confirmed" ? /* @__PURE__ */ import_react74.default.createElement("p", { role: "status" }, "已提交：", submission.planId, "。", TASK_STATES[submission.planState] ?? "请在任务记录中跟踪执行结果。") : submission.state === "not-found" ? /* @__PURE__ */ import_react74.default.createElement("p", { role: "status" }, "当前尚未查到原提交，原请求仍可能完成，请稍后再次核对。") : /* @__PURE__ */ import_react74.default.createElement("p", { role: "status" }, submission.state === "submitting" && working === "dispatch" ? "正在提交任务…" : "提交结果尚未确认，请核对原提交。"), /* @__PURE__ */ import_react74.default.createElement("p", null, "核对只读取原任务记录，不会再次提交或授予权限。"), /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "保存提交核对码"), /* @__PURE__ */ import_react74.default.createElement("p", null, "重载应用前可保存核对码，之后在原宿主粘贴查询。核对码只包含提交编号，不包含任务正文或登录凭据。"), /* @__PURE__ */ import_react74.default.createElement("label", null, "当前提交核对码", /* @__PURE__ */ import_react74.default.createElement("input", { ref: codeInput, "aria-label": "当前提交核对码", className: "bp-submission-code", readOnly: !0, value: submissionCode(submission), onFocus: (event) => event.target.select() })), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", onClick: () => {
     copySubmission();
-  } }, "复制核对码"), copyStatus && /* @__PURE__ */ import_react73.default.createElement("small", { role: "status" }, copyStatus))), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, snapshot.availableActions?.includes("botRouting.status") ? /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  } }, "复制核对码"), copyStatus && /* @__PURE__ */ import_react74.default.createElement("small", { role: "status" }, copyStatus))), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, snapshot2.availableActions?.includes("botRouting.status") ? /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     checkSubmission();
-  } }, "核对原提交") : /* @__PURE__ */ import_react73.default.createElement("small", null, "当前宿主尚未提供原提交核对，请先在任务记录中核对。"), submission.state === "confirmed" && /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  } }, "核对原提交") : /* @__PURE__ */ import_react74.default.createElement("small", null, "当前宿主尚未提供原提交核对，请先在任务记录中核对。"), submission.state === "confirmed" && /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     submissions.clear(submission), invalidate();
-  } }, "新建另一项任务")), submission.state === "not-found" && /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "已自行核对记录"), /* @__PURE__ */ import_react73.default.createElement("p", null, "原请求仍可能完成。清除提醒不会停止原任务，再次创建可能重复；只有自行核对后才清除。"), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  } }, "新建另一项任务")), submission.state === "not-found" && /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "已自行核对记录"), /* @__PURE__ */ import_react74.default.createElement("p", null, "原请求仍可能完成。清除提醒不会停止原任务，再次创建可能重复；只有自行核对后才清除。"), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     submissions.dismissUnconfirmed(submission), invalidate();
-  } }, "清除本窗口提醒"))), savedSubmissionForm = !submission && snapshot.availableActions?.includes("botRouting.status") && /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "核对已保存的提交"), /* @__PURE__ */ import_react73.default.createElement("p", null, "请连接原宿主并粘贴之前保存的核对码。此操作只查询原记录，不会创建任务。"), /* @__PURE__ */ import_react73.default.createElement("form", { className: "bp-submission-restore", onSubmit: restoreSubmission }, /* @__PURE__ */ import_react73.default.createElement("label", null, "已保存的提交核对码", /* @__PURE__ */ import_react73.default.createElement("input", { "aria-label": "已保存的提交核对码", className: "bp-submission-code", value: savedCode, maxLength: 1024, autoComplete: "off", spellCheck: !1, disabled: busy || !!working, onChange: (event) => setSavedCode(event.target.value), placeholder: "dsh-route-v1:…" })), /* @__PURE__ */ import_react73.default.createElement("button", { type: "submit", disabled: busy || !!working || !savedCode.trim() }, "核对已保存的提交")));
+  } }, "清除本窗口提醒"))), savedSubmissionForm = !submission && snapshot2.availableActions?.includes("botRouting.status") && /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "核对已保存的提交"), /* @__PURE__ */ import_react74.default.createElement("p", null, "请连接原宿主并粘贴之前保存的核对码。此操作只查询原记录，不会创建任务。"), /* @__PURE__ */ import_react74.default.createElement("form", { className: "bp-submission-restore", onSubmit: restoreSubmission }, /* @__PURE__ */ import_react74.default.createElement("label", null, "已保存的提交核对码", /* @__PURE__ */ import_react74.default.createElement("input", { "aria-label": "已保存的提交核对码", className: "bp-submission-code", value: savedCode, maxLength: 1024, autoComplete: "off", spellCheck: !1, disabled: busy || !!working, onChange: (event) => setSavedCode(event.target.value), placeholder: "dsh-route-v1:…" })), /* @__PURE__ */ import_react74.default.createElement("button", { type: "submit", disabled: busy || !!working || !savedCode.trim() }, "核对已保存的提交")));
   if (!view)
-    return /* @__PURE__ */ import_react73.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, "Bot 路由")), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, error || "正在读取候选…"), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || working, onClick: () => {
+    return /* @__PURE__ */ import_react74.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, "Bot 路由")), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, error || "正在读取候选…"), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || working, onClick: () => {
       load();
     } }, "读取候选"), submissionNotice, savedSubmissionForm);
-  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), inputDisabled = busy || !viewReady || working === "dispatch" || working === "settings", nameOf = (botId) => view.candidates.find((row) => row.botId === botId)?.name ?? botId;
-  return /* @__PURE__ */ import_react73.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, "Bot 路由"), /* @__PURE__ */ import_react73.default.createElement(Tag3, null, view.enabled ? `已开启 · ${routingPresetLabel(view.preset)}` : "未开启"), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
+  let machines = (snapshot2.machines?.items ?? []).filter((item) => item.status !== "revoked"), inputDisabled = busy || !viewReady || working === "dispatch" || working === "settings", nameOf = (botId) => view.candidates.find((row) => row.botId === botId)?.name ?? botId;
+  return /* @__PURE__ */ import_react74.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, "Bot 路由"), /* @__PURE__ */ import_react74.default.createElement(Tag3, null, view.enabled ? `已开启 · ${routingPresetLabel(view.preset)}` : "未开启"), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !!working, onClick: () => {
     load();
-  } }, "刷新候选")), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react73.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react73.default.createElement("input", { type: "checkbox", checked: view.enabled, disabled: busy || !!working || !viewReady, onChange: (event) => {
+  } }, "刷新候选")), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react74.default.createElement("input", { type: "checkbox", checked: view.enabled, disabled: busy || !!working || !viewReady, onChange: (event) => {
     saveSettings({ enabled: event.target.checked, preset: view.preset, autoGrant: view.autoGrant });
-  } }), "开启 Bot 路由"), /* @__PURE__ */ import_react73.default.createElement("label", null, "策略", /* @__PURE__ */ import_react73.default.createElement("select", { value: view.preset, disabled: busy || !!working || !viewReady, onChange: (event) => {
+  } }), "开启 Bot 路由"), /* @__PURE__ */ import_react74.default.createElement("label", null, "策略", /* @__PURE__ */ import_react74.default.createElement("select", { value: view.preset, disabled: busy || !!working || !viewReady, onChange: (event) => {
     saveSettings({ enabled: view.enabled, preset: event.target.value, autoGrant: view.autoGrant });
-  } }, /* @__PURE__ */ import_react73.default.createElement("option", { value: "economy" }, "省钱优先"), /* @__PURE__ */ import_react73.default.createElement("option", { value: "balanced" }, "均衡"), /* @__PURE__ */ import_react73.default.createElement("option", { value: "quality" }, "效果优先"))), /* @__PURE__ */ import_react73.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react73.default.createElement("input", { type: "checkbox", checked: view.autoGrant?.machineTools === !0, disabled: busy || !!working || !viewReady, onChange: (event) => {
+  } }, /* @__PURE__ */ import_react74.default.createElement("option", { value: "economy" }, "省钱优先"), /* @__PURE__ */ import_react74.default.createElement("option", { value: "balanced" }, "均衡"), /* @__PURE__ */ import_react74.default.createElement("option", { value: "quality" }, "效果优先"))), /* @__PURE__ */ import_react74.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react74.default.createElement("input", { type: "checkbox", checked: view.autoGrant?.machineTools === !0, disabled: busy || !!working || !viewReady, onChange: (event) => {
     saveSettings({ enabled: view.enabled, preset: view.preset, autoGrant: { ...view.autoGrant, machineTools: event.target.checked } });
-  } }), "自动授予任务所需电脑权限")), !view.enabled && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "开启后，主 Bot 可根据各 Bot 已配置的模型、工具与电脑权限分配任务。手动指定也会检查是否具备执行条件。"), error && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, error), submissionNotice, savedSubmissionForm, !viewReady && !working && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "候选尚未更新，请刷新候选后再预览。"), view.enabled ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react73.default.createElement("table", { className: "bp-routing-candidates" }, /* @__PURE__ */ import_react73.default.createElement("thead", null, /* @__PURE__ */ import_react73.default.createElement("tr", null, /* @__PURE__ */ import_react73.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react73.default.createElement("th", null, "模型"), /* @__PURE__ */ import_react73.default.createElement("th", null, "机器"), /* @__PURE__ */ import_react73.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react73.default.createElement("th", null, "质量"), /* @__PURE__ */ import_react73.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react73.default.createElement("tbody", null, view.candidates.map((row) => /* @__PURE__ */ import_react73.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react73.default.createElement("td", null, row.name, row.main ? /* @__PURE__ */ import_react73.default.createElement(Tag3, null, "Main") : null, /* @__PURE__ */ import_react73.default.createElement("small", null, row.botId)), /* @__PURE__ */ import_react73.default.createElement("td", null, row.model ? `${row.model.provider}/${row.model.model}` : /* @__PURE__ */ import_react73.default.createElement("em", null, "未绑定")), /* @__PURE__ */ import_react73.default.createElement("td", null, row.machineId ? row.machineOnline ? "在线" : "未在线" : "无"), /* @__PURE__ */ import_react73.default.createElement("td", null, row.pricePerMTokUsd === null ? "未知" : `$${row.pricePerMTokUsd}`), /* @__PURE__ */ import_react73.default.createElement("td", null, row.quality === null ? "未知" : row.quality), /* @__PURE__ */ import_react73.default.createElement("td", null, row.busy ? "正忙" : "空闲")))))) : null, view.enabled ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react73.default.createElement("label", null, "任务描述", /* @__PURE__ */ import_react73.default.createElement("textarea", { rows: 2, value: text7, disabled: inputDisabled, onChange: (event) => editDraft({ text: event.target.value }), placeholder: "例如：整理上周的发布记录" })), /* @__PURE__ */ import_react73.default.createElement("label", null, "路由方式", /* @__PURE__ */ import_react73.default.createElement("select", { value: pin, disabled: inputDisabled, onChange: (event) => editDraft({ pin: event.target.value }) }, /* @__PURE__ */ import_react73.default.createElement("option", { value: "" }, "自动路由（按预设打分）"), view.candidates.map((row) => /* @__PURE__ */ import_react73.default.createElement("option", { key: row.botId, value: row.botId }, "指定：", row.name)))), /* @__PURE__ */ import_react73.default.createElement("label", null, "需要远程电脑", /* @__PURE__ */ import_react73.default.createElement("select", { value: machine, disabled: inputDisabled, onChange: (event) => editDraft({ machine: event.target.value, root: "", effect: "read" }) }, /* @__PURE__ */ import_react73.default.createElement("option", { value: "" }, "不需要"), machines.map((item) => /* @__PURE__ */ import_react73.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), machine && /* @__PURE__ */ import_react73.default.createElement("label", null, "共享目录", /* @__PURE__ */ import_react73.default.createElement("select", { value: root || machines.find((item) => item.id === machine)?.roots?.[0] || "", disabled: inputDisabled, onChange: (event) => editDraft({ root: event.target.value }) }, (machines.find((item) => item.id === machine)?.roots ?? []).map((id2) => /* @__PURE__ */ import_react73.default.createElement("option", { key: id2, value: id2 }, id2)))), /* @__PURE__ */ import_react73.default.createElement("label", null, "任务需要的操作", /* @__PURE__ */ import_react73.default.createElement("select", { value: effect, disabled: inputDisabled, onChange: (event) => editDraft({ effect: event.target.value }) }, /* @__PURE__ */ import_react73.default.createElement("option", { value: "read" }, "只读 / 分析"), /* @__PURE__ */ import_react73.default.createElement("option", { value: "write" }, "写入文件"), machine && /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("option", { value: "desktop" }, "操作 Windows 桌面"), /* @__PURE__ */ import_react73.default.createElement("option", { value: "browser" }, "操作远程浏览器")))), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !!working || !!submission || !viewReady || !text7.trim(), onClick: () => {
+  } }), "自动授予任务所需电脑权限")), !view.enabled && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "开启后，主 Bot 可根据各 Bot 已配置的模型、工具与电脑权限分配任务。手动指定也会检查是否具备执行条件。"), error && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, error), submissionNotice, savedSubmissionForm, !viewReady && !working && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "候选尚未更新，请刷新候选后再预览。"), view.enabled ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react74.default.createElement("table", { className: "bp-routing-candidates" }, /* @__PURE__ */ import_react74.default.createElement("thead", null, /* @__PURE__ */ import_react74.default.createElement("tr", null, /* @__PURE__ */ import_react74.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react74.default.createElement("th", null, "模型"), /* @__PURE__ */ import_react74.default.createElement("th", null, "机器"), /* @__PURE__ */ import_react74.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react74.default.createElement("th", null, "质量"), /* @__PURE__ */ import_react74.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react74.default.createElement("tbody", null, view.candidates.map((row) => /* @__PURE__ */ import_react74.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react74.default.createElement("td", null, row.name, row.main ? /* @__PURE__ */ import_react74.default.createElement(Tag3, null, "Main") : null, /* @__PURE__ */ import_react74.default.createElement("small", null, row.botId)), /* @__PURE__ */ import_react74.default.createElement("td", null, row.model ? `${row.model.provider}/${row.model.model}` : /* @__PURE__ */ import_react74.default.createElement("em", null, "未绑定")), /* @__PURE__ */ import_react74.default.createElement("td", null, row.machineId ? row.machineOnline ? "在线" : "未在线" : "无"), /* @__PURE__ */ import_react74.default.createElement("td", null, row.pricePerMTokUsd === null ? "未知" : `$${row.pricePerMTokUsd}`), /* @__PURE__ */ import_react74.default.createElement("td", null, row.quality === null ? "未知" : row.quality), /* @__PURE__ */ import_react74.default.createElement("td", null, row.busy ? "正忙" : "空闲")))))) : null, view.enabled ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react74.default.createElement("label", null, "任务描述", /* @__PURE__ */ import_react74.default.createElement("textarea", { rows: 2, value: text7, disabled: inputDisabled, onChange: (event) => editDraft({ text: event.target.value }), placeholder: "例如：整理上周的发布记录" })), /* @__PURE__ */ import_react74.default.createElement("label", null, "路由方式", /* @__PURE__ */ import_react74.default.createElement("select", { value: pin, disabled: inputDisabled, onChange: (event) => editDraft({ pin: event.target.value }) }, /* @__PURE__ */ import_react74.default.createElement("option", { value: "" }, "自动路由（按预设打分）"), view.candidates.map((row) => /* @__PURE__ */ import_react74.default.createElement("option", { key: row.botId, value: row.botId }, "指定：", row.name)))), /* @__PURE__ */ import_react74.default.createElement("label", null, "需要远程电脑", /* @__PURE__ */ import_react74.default.createElement("select", { value: machine, disabled: inputDisabled, onChange: (event) => editDraft({ machine: event.target.value, root: "", effect: "read" }) }, /* @__PURE__ */ import_react74.default.createElement("option", { value: "" }, "不需要"), machines.map((item) => /* @__PURE__ */ import_react74.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), machine && /* @__PURE__ */ import_react74.default.createElement("label", null, "共享目录", /* @__PURE__ */ import_react74.default.createElement("select", { value: root || machines.find((item) => item.id === machine)?.roots?.[0] || "", disabled: inputDisabled, onChange: (event) => editDraft({ root: event.target.value }) }, (machines.find((item) => item.id === machine)?.roots ?? []).map((id2) => /* @__PURE__ */ import_react74.default.createElement("option", { key: id2, value: id2 }, id2)))), /* @__PURE__ */ import_react74.default.createElement("label", null, "任务需要的操作", /* @__PURE__ */ import_react74.default.createElement("select", { value: effect, disabled: inputDisabled, onChange: (event) => editDraft({ effect: event.target.value }) }, /* @__PURE__ */ import_react74.default.createElement("option", { value: "read" }, "只读 / 分析"), /* @__PURE__ */ import_react74.default.createElement("option", { value: "write" }, "写入文件"), machine && /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("option", { value: "desktop" }, "操作 Windows 桌面"), /* @__PURE__ */ import_react74.default.createElement("option", { value: "browser" }, "操作远程浏览器")))), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !!working || !!submission || !viewReady || !text7.trim(), onClick: () => {
     decide();
-  } }, working === "preview" ? "计算中…" : "预览路由")) : null, decision ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-blocked", role: "region", "aria-label": "路由预览结果" }, /* @__PURE__ */ import_react73.default.createElement("strong", null, "选中：", decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? "（手动指定）" : ""}` : "没有可用的 Bot"), /* @__PURE__ */ import_react73.default.createElement("p", null, decision.pinned ? "手动指定的 Bot 已通过本次执行条件检查，未与其他 Bot 比较评分。" : `按${routingPresetLabel(decision.preset)}策略比较，综合评分越低越靠前。`), decision.binding ? /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("p", null, "所需电脑权限：", decision.binding.mode === "read-only" ? "只读" : "读写", " · ", decision.binding.tools.length, " 项工具。"), /* @__PURE__ */ import_react73.default.createElement("p", null, decision.grant?.autoGrant === !1 ? "自动授权已关闭，创建任务时会核对已有授权；权限不足时需先配置。" : "创建任务时才会按已保存的权限上限核对和授权。")) : null, decision.rejected?.length ? /* @__PURE__ */ import_react73.default.createElement("p", null, "未满足条件：", decision.rejected.map((row) => `${nameOf(row.botId)}（${routingRefusalMessage(row.reason)}）`).join("；")) : null, !decision.pinned && decision.ranked?.length > 0 && /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "查看比较依据"), /* @__PURE__ */ import_react73.default.createElement("p", null, "评分只用于本次候选排序，不代表成功率。未知价格按保守值计算，未知质量按中间值参与比较。"), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react73.default.createElement("table", { className: "bp-routing-comparison", "aria-label": "候选比较" }, /* @__PURE__ */ import_react73.default.createElement("thead", null, /* @__PURE__ */ import_react73.default.createElement("tr", null, /* @__PURE__ */ import_react73.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react73.default.createElement("th", null, "综合评分"), /* @__PURE__ */ import_react73.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react73.default.createElement("th", null, "参考质量"))), /* @__PURE__ */ import_react73.default.createElement("tbody", null, decision.ranked.map((row) => /* @__PURE__ */ import_react73.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react73.default.createElement("td", null, nameOf(row.botId)), /* @__PURE__ */ import_react73.default.createElement("td", null, Number.isFinite(row.score) ? row.score.toFixed(6) : "未知"), /* @__PURE__ */ import_react73.default.createElement("td", null, Number.isFinite(row.pricePerMTokUsd) ? `$${row.pricePerMTokUsd}` : "未知"), /* @__PURE__ */ import_react73.default.createElement("td", null, Number.isFinite(row.quality) ? row.quality : "未知"))))))), (decision.binding || decision.rejected?.length > 0) && /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "执行条件详情"), decision.binding && /* @__PURE__ */ import_react73.default.createElement("p", null, "所需工具：", decision.binding.tools.join("、")), decision.rejected?.map((row) => /* @__PURE__ */ import_react73.default.createElement("p", { key: row.botId }, row.botId, "：", row.reason))), decision.chosen ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !!working || !viewReady || !!submission, onClick: () => {
+  } }, working === "preview" ? "计算中…" : "预览路由")) : null, decision ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-blocked", role: "region", "aria-label": "路由预览结果" }, /* @__PURE__ */ import_react74.default.createElement("strong", null, "选中：", decision.chosen ? `${decision.chosen.name ?? decision.chosen.botId}${decision.pinned ? "（手动指定）" : ""}` : "没有可用的 Bot"), /* @__PURE__ */ import_react74.default.createElement("p", null, decision.pinned ? "手动指定的 Bot 已通过本次执行条件检查，未与其他 Bot 比较评分。" : `按${routingPresetLabel(decision.preset)}策略比较，综合评分越低越靠前。`), decision.binding ? /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("p", null, "所需电脑权限：", decision.binding.mode === "read-only" ? "只读" : "读写", " · ", decision.binding.tools.length, " 项工具。"), /* @__PURE__ */ import_react74.default.createElement("p", null, decision.grant?.autoGrant === !1 ? "自动授权已关闭，创建任务时会核对已有授权；权限不足时需先配置。" : "创建任务时才会按已保存的权限上限核对和授权。")) : null, decision.rejected?.length ? /* @__PURE__ */ import_react74.default.createElement("p", null, "未满足条件：", decision.rejected.map((row) => `${nameOf(row.botId)}（${routingRefusalMessage(row.reason)}）`).join("；")) : null, !decision.pinned && decision.ranked?.length > 0 && /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "查看比较依据"), /* @__PURE__ */ import_react74.default.createElement("p", null, "评分只用于本次候选排序，不代表成功率。未知价格按保守值计算，未知质量按中间值参与比较。"), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react74.default.createElement("table", { className: "bp-routing-comparison", "aria-label": "候选比较" }, /* @__PURE__ */ import_react74.default.createElement("thead", null, /* @__PURE__ */ import_react74.default.createElement("tr", null, /* @__PURE__ */ import_react74.default.createElement("th", null, "Bot"), /* @__PURE__ */ import_react74.default.createElement("th", null, "综合评分"), /* @__PURE__ */ import_react74.default.createElement("th", null, "价格/百万"), /* @__PURE__ */ import_react74.default.createElement("th", null, "参考质量"))), /* @__PURE__ */ import_react74.default.createElement("tbody", null, decision.ranked.map((row) => /* @__PURE__ */ import_react74.default.createElement("tr", { key: row.botId }, /* @__PURE__ */ import_react74.default.createElement("td", null, nameOf(row.botId)), /* @__PURE__ */ import_react74.default.createElement("td", null, Number.isFinite(row.score) ? row.score.toFixed(6) : "未知"), /* @__PURE__ */ import_react74.default.createElement("td", null, Number.isFinite(row.pricePerMTokUsd) ? `$${row.pricePerMTokUsd}` : "未知"), /* @__PURE__ */ import_react74.default.createElement("td", null, Number.isFinite(row.quality) ? row.quality : "未知"))))))), (decision.binding || decision.rejected?.length > 0) && /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-technical" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "执行条件详情"), decision.binding && /* @__PURE__ */ import_react74.default.createElement("p", null, "所需工具：", decision.binding.tools.join("、")), decision.rejected?.map((row) => /* @__PURE__ */ import_react74.default.createElement("p", { key: row.botId }, row.botId, "：", row.reason))), decision.chosen ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !!working || !viewReady || !!submission, onClick: () => {
     submitRouted();
   } }, "按此路由创建任务")) : null) : null);
 }
-function Tasks({ snapshot, dispatch, busy, submissionScope = dispatch, inspect, openSession }) {
-  return snapshot.tasks?.status !== "available" ? /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: snapshot.tasks }) : /* @__PURE__ */ import_react73.default.createElement(
+function Tasks({ snapshot: snapshot2, dispatch, busy, submissionScope = dispatch, inspect, openSession }) {
+  return snapshot2.tasks?.status !== "available" ? /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: snapshot2.tasks }) : /* @__PURE__ */ import_react74.default.createElement(
     TaskWorkspace,
     {
-      snapshot,
+      snapshot: snapshot2,
       dispatch,
       busy,
       scope: submissionScope,
       inspect,
       openSession,
-      routingCard: snapshot.availableActions?.includes("botRoutingInspect") ? /* @__PURE__ */ import_react73.default.createElement(BotRoutingCard, { snapshot, dispatch, busy, submissionScope }) : null
+      routingCard: snapshot2.availableActions?.includes("botRoutingInspect") ? /* @__PURE__ */ import_react74.default.createElement(BotRoutingCard, { snapshot: snapshot2, dispatch, busy, submissionScope }) : null
     }
   );
 }
-function DesktopControl({ snapshot, dispatch, busy }) {
-  let machines = (snapshot.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot.bots ?? [], [machineId, setMachineId] = import_react73.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react73.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react73.default.useState(null), [status, setStatus] = import_react73.default.useState("idle"), [error, setError] = import_react73.default.useState(""), [live, setLive] = import_react73.default.useState(!1), [text7, setText] = import_react73.default.useState(""), imageRef = import_react73.default.useRef(null), firstRoot = machines.find((item) => item.id === machineId)?.roots?.[0], rootId = typeof firstRoot == "string" ? firstRoot : firstRoot?.id ?? firstRoot?.rootId ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
+function DesktopControl({ snapshot: snapshot2, dispatch, busy }) {
+  let machines = (snapshot2.machines?.items ?? []).filter((item) => item.status !== "revoked"), bots = snapshot2.bots ?? [], [machineId, setMachineId] = import_react74.default.useState(machines[0]?.id ?? ""), [botId, setBotId] = import_react74.default.useState(bots[0]?.id ?? ""), [frame, setFrame] = import_react74.default.useState(null), [status, setStatus] = import_react74.default.useState("idle"), [error, setError] = import_react74.default.useState(""), [live, setLive] = import_react74.default.useState(!1), [text7, setText] = import_react74.default.useState(""), imageRef = import_react74.default.useRef(null), firstRoot = machines.find((item) => item.id === machineId)?.roots?.[0], rootId = typeof firstRoot == "string" ? firstRoot : firstRoot?.id ?? firstRoot?.rootId ?? "", canView = typeof dispatch == "function" && !!(machineId && rootId && botId), call2 = async (action, payload) => {
     setError("");
     try {
       return await dispatch(action, payload);
     } catch (failure) {
       return setError(String(failure?.message ?? failure)), null;
     }
-  }, capture = import_react73.default.useCallback(async () => {
+  }, capture = import_react74.default.useCallback(async () => {
     if (!canView) return;
     setStatus("capturing");
     let value = await call2("machine.desktop.view", { botId, machineId, rootId });
@@ -35243,7 +35318,7 @@ function DesktopControl({ snapshot, dispatch, busy }) {
     }
     setFrame({ ...value, takenAtMs: Date.now() }), setStatus("ready");
   }, [botId, machineId, rootId, canView]);
-  import_react73.default.useEffect(() => {
+  import_react74.default.useEffect(() => {
     if (!live || !canView) return;
     capture();
     let timer = setInterval(() => {
@@ -35268,26 +35343,26 @@ function DesktopControl({ snapshot, dispatch, busy }) {
       setError(String(failure?.message ?? failure));
     }
   }, keys = ["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
-  return /* @__PURE__ */ import_react73.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react73.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react73.default.createElement("select", { value: machineId, onChange: (event) => {
+  return /* @__PURE__ */ import_react74.default.createElement("section", { className: "bp-card", "aria-label": "电脑操作" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, "电脑操作"), /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-tag" }, `${status}${frame?.screenshotId ? " · 帧 " + frame.screenshotId.slice(-6) : ""}`)), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "画面来自已配对电脑的桌面；每个操作只对它下面那一帧生效，帧过期请重新截取。"), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react74.default.createElement("label", null, "电脑", /* @__PURE__ */ import_react74.default.createElement("select", { value: machineId, onChange: (event) => {
     setMachineId(event.target.value), setFrame(null);
-  } }, machines.map((item) => /* @__PURE__ */ import_react73.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react73.default.createElement("label", null, "以哪个 Bot 执行", /* @__PURE__ */ import_react73.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((item) => /* @__PURE__ */ import_react73.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react73.default.createElement("button", { disabled: busy || !canView || status === "capturing", onClick: () => {
+  } }, machines.map((item) => /* @__PURE__ */ import_react74.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react74.default.createElement("label", null, "以哪个 Bot 执行", /* @__PURE__ */ import_react74.default.createElement("select", { value: botId, onChange: (event) => setBotId(event.target.value) }, bots.map((item) => /* @__PURE__ */ import_react74.default.createElement("option", { key: item.id, value: item.id }, item.name ?? item.id)))), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("button", { disabled: busy || !canView || status === "capturing", onClick: () => {
     capture();
-  } }, status === "capturing" ? "截取中…" : "截取当前画面"), /* @__PURE__ */ import_react73.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react73.default.createElement("input", { type: "checkbox", checked: live, disabled: !canView, onChange: (event) => setLive(event.target.checked) }), "实时（1.5 秒）"))), error && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, error), frame?.base64 ? /* @__PURE__ */ import_react73.default.createElement("img", { ref: imageRef, className: "bp-desktop-frame", alt: "远程桌面画面", src: `data:${frame.mediaType};base64,${frame.base64}`, onClick: clickImage }) : /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-empty" }, canView ? "还没有画面。点“截取当前画面”。" : "先配对一台电脑，并选择一个 Bot。"), frame?.base64 && /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions bp-desktop-keys" }, keys.map((key) => /* @__PURE__ */ import_react73.default.createElement("button", { key, disabled: busy, onClick: () => {
+  } }, status === "capturing" ? "截取中…" : "截取当前画面"), /* @__PURE__ */ import_react74.default.createElement("label", { className: "bp-check" }, /* @__PURE__ */ import_react74.default.createElement("input", { type: "checkbox", checked: live, disabled: !canView, onChange: (event) => setLive(event.target.checked) }), "实时（1.5 秒）"))), error && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, error), frame?.base64 ? /* @__PURE__ */ import_react74.default.createElement("img", { ref: imageRef, className: "bp-desktop-frame", alt: "远程桌面画面", src: `data:${frame.mediaType};base64,${frame.base64}`, onClick: clickImage }) : /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-empty" }, canView ? "还没有画面。点“截取当前画面”。" : "先配对一台电脑，并选择一个 Bot。"), frame?.base64 && /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions bp-desktop-keys" }, keys.map((key) => /* @__PURE__ */ import_react74.default.createElement("button", { key, disabled: busy, onClick: () => {
     act({ tool: "key", key });
-  } }, key)), /* @__PURE__ */ import_react73.default.createElement("button", { disabled: busy, onClick: () => {
+  } }, key)), /* @__PURE__ */ import_react74.default.createElement("button", { disabled: busy, onClick: () => {
     act({ tool: "scroll", delta: 120 });
-  } }, "滚轮上"), /* @__PURE__ */ import_react73.default.createElement("button", { disabled: busy, onClick: () => {
+  } }, "滚轮上"), /* @__PURE__ */ import_react74.default.createElement("button", { disabled: busy, onClick: () => {
     act({ tool: "scroll", delta: -120 });
-  } }, "滚轮下")), frame?.base64 && /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react73.default.createElement("input", { className: "bp-desktop-text", "aria-label": "要输入的文本", value: text7, placeholder: "输入文字后发送（发送的是按键，不是剪贴板）", onChange: (event) => setText(event.target.value) }), /* @__PURE__ */ import_react73.default.createElement("button", { disabled: busy || !text7, onClick: () => {
+  } }, "滚轮下")), frame?.base64 && /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("input", { className: "bp-desktop-text", "aria-label": "要输入的文本", value: text7, placeholder: "输入文字后发送（发送的是按键，不是剪贴板）", onChange: (event) => setText(event.target.value) }), /* @__PURE__ */ import_react74.default.createElement("button", { disabled: busy || !text7, onClick: () => {
     act({ type: "type", tool: "type", text: text7 });
   } }, "发送文本")));
 }
-function MachineSetup({ snapshot, dispatch, busy }) {
-  let available = snapshot.availableActions ?? [], [paste, setPaste] = import_react73.default.useState(""), [address, setAddress] = import_react73.default.useState(""), [tunnel, setTunnel] = import_react73.default.useState(!1), [status, setStatus] = import_react73.default.useState(""), [error, setError] = import_react73.default.useState(""), [working, setWorking] = import_react73.default.useState(!1), parsed = import_react73.default.useMemo(() => parsePairingPaste(paste), [paste]);
-  import_react73.default.useEffect(() => {
+function MachineSetup({ snapshot: snapshot2, dispatch, busy }) {
+  let available = snapshot2.availableActions ?? [], [paste, setPaste] = import_react74.default.useState(""), [address, setAddress] = import_react74.default.useState(""), [tunnel, setTunnel] = import_react74.default.useState(!1), [status, setStatus] = import_react74.default.useState(""), [error, setError] = import_react74.default.useState(""), [working, setWorking] = import_react74.default.useState(!1), parsed = import_react74.default.useMemo(() => parsePairingPaste(paste), [paste]);
+  import_react74.default.useEffect(() => {
     parsed.endpoint && setAddress(parsed.endpoint), typeof parsed.protectedTunnel == "boolean" && setTunnel(parsed.protectedTunnel);
   }, [parsed.endpoint, parsed.protectedTunnel]);
-  let endpoint = import_react73.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react73.default.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed]), importFile = async (event) => {
+  let endpoint = import_react74.default.useMemo(() => normalizeEndpoint(address, {}), [address]), ready = parsed.problems.length === 0 && endpoint.problem === "", secretName = import_react74.default.useMemo(() => secretNameFor({ clientId: parsed.clientId, machineId: parsed.machineId }), [parsed]), importFile = async (event) => {
     let file = event.target.files?.[0];
     if (file)
       try {
@@ -35304,13 +35379,13 @@ function MachineSetup({ snapshot, dispatch, busy }) {
           return response;
         };
         await unwrap2(await dispatch("machine.secret", { name: secretName, value: parsed.token }));
-        let existing = (snapshot.machines?.items ?? []).find((item) => item.id === parsed.machineId), paired = await unwrap2(await dispatch("machine.pair", {
+        let existing = (snapshot2.machines?.items ?? []).find((item) => item.id === parsed.machineId), paired = await unwrap2(await dispatch("machine.pair", {
           name: parsed.clientId || parsed.machineId,
           machineId: parsed.machineId,
           endpoint: endpoint.endpoint,
           secretRef: "ds-secret/" + secretName,
           roots: parsed.rootIds.length ? parsed.rootIds : ["project"],
-          probeBotId: snapshot.mainBotId ?? snapshot.bots?.[0]?.id ?? "",
+          probeBotId: snapshot2.mainBotId ?? snapshot2.bots?.[0]?.id ?? "",
           protectedTunnel: tunnel,
           tools: parsed.tools.length ? parsed.tools : ["machine_ping", "fs_list", "fs_read", "fs_write", "operation_status", "operation_cancel", "artifact_stat", "artifact_read", "desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"],
           expectedRevision: existing?.revision ?? 0
@@ -35323,13 +35398,13 @@ function MachineSetup({ snapshot, dispatch, busy }) {
       }
     }
   };
-  return /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-card bp-machine-setup" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "添加电脑（导入配对文件）"), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 ", /* @__PURE__ */ import_react73.default.createElement("code", null, "start.cmd"), "，按向导选共享文件夹和连接地址。回到这里导入向导生成的 ", /* @__PURE__ */ import_react73.default.createElement("code", null, "pairing.private.json"), "，地址、目录和权限会自动填好。"), available.includes("machine.secret") && available.includes("machine.pair") ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react73.default.createElement("label", null, "配对文件", /* @__PURE__ */ import_react73.default.createElement("input", { type: "file", accept: ".json,application/json", onChange: (event) => {
+  return /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-card bp-machine-setup" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "添加电脑（导入配对文件）"), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "在你自己的 Windows 电脑或云电脑上解压 Agent 包，双击 ", /* @__PURE__ */ import_react74.default.createElement("code", null, "start.cmd"), "，按向导选共享文件夹和连接地址。回到这里导入向导生成的 ", /* @__PURE__ */ import_react74.default.createElement("code", null, "pairing.private.json"), "，地址、目录和权限会自动填好。"), available.includes("machine.secret") && available.includes("machine.pair") ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react74.default.createElement("label", null, "配对文件", /* @__PURE__ */ import_react74.default.createElement("input", { type: "file", accept: ".json,application/json", onChange: (event) => {
     importFile(event);
-  } })), /* @__PURE__ */ import_react73.default.createElement("label", null, "或粘贴文件内容", /* @__PURE__ */ import_react73.default.createElement("textarea", { rows: 3, value: paste, onChange: (event) => setPaste(event.target.value), placeholder: '{"clientId":"host-office","token":"...","machineId":"machine-..."}' })), /* @__PURE__ */ import_react73.default.createElement("label", null, "Agent 地址", /* @__PURE__ */ import_react73.default.createElement("input", { value: address, onChange: (event) => setAddress(event.target.value), placeholder: "10.0.0.2 或 http://10.0.0.2:9701", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react73.default.createElement("label", null, /* @__PURE__ */ import_react73.default.createElement("input", { type: "checkbox", checked: tunnel, onChange: (event) => setTunnel(event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), paste !== "" && parsed.problems.length > 0 && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, parsed.problems.join(" ")), address !== "" && endpoint.problem !== "" && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, endpoint.problem), ready && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "将保存凭据 ", /* @__PURE__ */ import_react73.default.createElement("code", null, "ds-secret/", secretName), " 并配对 ", parsed.machineId, "。"), ready && parsed.rootIds.length > 0 && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "共享目录：", parsed.rootIds.join("、"), "。", parsed.hostManagedBots === !0 ? "此电脑允许本宿主管理团队 Bot，后续分配无需重新复制 Bot ID。" : parsed.botIds.length > 0 ? `此电脑只允许这些 Bot：${parsed.botIds.join("、")}。` : ""), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: !ready || busy || working, onClick: () => {
+  } })), /* @__PURE__ */ import_react74.default.createElement("label", null, "或粘贴文件内容", /* @__PURE__ */ import_react74.default.createElement("textarea", { rows: 3, value: paste, onChange: (event) => setPaste(event.target.value), placeholder: '{"clientId":"host-office","token":"...","machineId":"machine-..."}' })), /* @__PURE__ */ import_react74.default.createElement("label", null, "Agent 地址", /* @__PURE__ */ import_react74.default.createElement("input", { value: address, onChange: (event) => setAddress(event.target.value), placeholder: "10.0.0.2 或 http://10.0.0.2:9701", autoComplete: "off", spellCheck: !1 })), /* @__PURE__ */ import_react74.default.createElement("label", null, /* @__PURE__ */ import_react74.default.createElement("input", { type: "checkbox", checked: tunnel, onChange: (event) => setTunnel(event.target.checked) }), "地址位于已配置的 WireGuard / Tailscale 受保护隧道"), paste !== "" && parsed.problems.length > 0 && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, parsed.problems.join(" ")), address !== "" && endpoint.problem !== "" && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, endpoint.problem), ready && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "将保存凭据 ", /* @__PURE__ */ import_react74.default.createElement("code", null, "ds-secret/", secretName), " 并配对 ", parsed.machineId, "。"), ready && parsed.rootIds.length > 0 && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "共享目录：", parsed.rootIds.join("、"), "。", parsed.hostManagedBots === !0 ? "此电脑允许本宿主管理团队 Bot，后续分配无需重新复制 Bot ID。" : parsed.botIds.length > 0 ? `此电脑只允许这些 Bot：${parsed.botIds.join("、")}。` : ""), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: !ready || busy || working, onClick: () => {
     submit();
-  } }, working ? "添加中…" : "导入并添加"), status !== "" && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted", role: "status" }, status), error !== "" && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供配对操作。"));
+  } }, working ? "添加中…" : "导入并添加"), status !== "" && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted", role: "status" }, status), error !== "" && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "宿主尚未提供配对操作。"));
 }
-function MachineControls({ machine, snapshot, dispatch, busy }) {
+function MachineControls({ machine, snapshot: snapshot2, dispatch, busy }) {
   let groups = [
     ["read", "文件读取", ["machine_ping", "fs_list", "fs_read"]],
     ["write", "文件写入", ["fs_write"]],
@@ -35337,8 +35412,8 @@ function MachineControls({ machine, snapshot, dispatch, busy }) {
     ["browser", "远程浏览器", ["browser_open", "browser_snapshot", "browser_click", "browser_type", "browser_script", "browser_upload", "browser_download", "browser_close"]],
     ["desktop", "Windows 桌面", ["desktop_screenshot", "desktop_click", "desktop_type", "desktop_key", "desktop_scroll"]],
     ["cli", "远程 Codex", ["cli_probe_v1", "cli_task_v1"]]
-  ], [botId, setBotId] = (0, import_react73.useState)(snapshot.bots?.[0]?.id ?? ""), [rootId, setRootId] = (0, import_react73.useState)(machine.roots?.[0] ?? ""), [relativePath, setRelativePath] = (0, import_react73.useState)(""), [mode, setMode] = (0, import_react73.useState)("read-only"), [selected, setSelected] = (0, import_react73.useState)(["read"]), available = snapshot.availableActions ?? [], savedBinding = machine.bindings?.find((item) => item.botId === botId), binding = savedBinding && !savedBinding.revoked ? savedBinding : null;
-  (0, import_react73.useEffect)(() => {
+  ], [botId, setBotId] = (0, import_react74.useState)(snapshot2.bots?.[0]?.id ?? ""), [rootId, setRootId] = (0, import_react74.useState)(machine.roots?.[0] ?? ""), [relativePath, setRelativePath] = (0, import_react74.useState)(""), [mode, setMode] = (0, import_react74.useState)("read-only"), [selected, setSelected] = (0, import_react74.useState)(["read"]), available = snapshot2.availableActions ?? [], savedBinding = machine.bindings?.find((item) => item.botId === botId), binding = savedBinding && !savedBinding.revoked ? savedBinding : null;
+  (0, import_react74.useEffect)(() => {
     let tools = savedBinding?.tools ?? [];
     setMode(savedBinding?.mode ?? "read-only"), setSelected(groups.filter(([, , names]) => names.some((name) => tools.includes(name))).map(([id2]) => id2));
   }, [botId, savedBinding?.revision]);
@@ -35347,28 +35422,28 @@ function MachineControls({ machine, snapshot, dispatch, busy }) {
     for (let [id2, , names] of groups) if (selected.includes(id2)) for (let name of names) tools.add(name);
     run2("machine.bind", { botId, roots: [rootId], tools: [...tools].filter((tool) => machine.tools.includes(tool)), mode, expectedRevision: savedBinding?.revision ?? 0 });
   };
-  return /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react73.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react73.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 Bot`, value: botId, onChange: (event) => setBotId(event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react73.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react73.default.createElement("label", null, "根目录", /* @__PURE__ */ import_react73.default.createElement("select", { "aria-label": `机器 ${machine.id} 的根目录`, value: rootId, onChange: (event) => setRootId(event.target.value) }, (machine.roots ?? []).map((id2) => /* @__PURE__ */ import_react73.default.createElement("option", { key: id2 }, id2)))), /* @__PURE__ */ import_react73.default.createElement("fieldset", null, /* @__PURE__ */ import_react73.default.createElement("legend", null, "授予此 Bot 的能力"), groups.map(([id2, label, names]) => /* @__PURE__ */ import_react73.default.createElement("label", { key: id2 }, /* @__PURE__ */ import_react73.default.createElement("input", { type: "checkbox", disabled: !names.some((name) => machine.tools.includes(name)), checked: selected.includes(id2), onChange: (event) => {
+  return /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-form" }, /* @__PURE__ */ import_react74.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react74.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 Bot`, value: botId, onChange: (event) => setBotId(event.target.value) }, snapshot2.bots.map((bot) => /* @__PURE__ */ import_react74.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), /* @__PURE__ */ import_react74.default.createElement("label", null, "根目录", /* @__PURE__ */ import_react74.default.createElement("select", { "aria-label": `机器 ${machine.id} 的根目录`, value: rootId, onChange: (event) => setRootId(event.target.value) }, (machine.roots ?? []).map((id2) => /* @__PURE__ */ import_react74.default.createElement("option", { key: id2 }, id2)))), /* @__PURE__ */ import_react74.default.createElement("fieldset", null, /* @__PURE__ */ import_react74.default.createElement("legend", null, "授予此 Bot 的能力"), groups.map(([id2, label, names]) => /* @__PURE__ */ import_react74.default.createElement("label", { key: id2 }, /* @__PURE__ */ import_react74.default.createElement("input", { type: "checkbox", disabled: !names.some((name) => machine.tools.includes(name)), checked: selected.includes(id2), onChange: (event) => {
     let next = event.target.checked ? [...selected, id2] : selected.filter((value) => value !== id2);
     setSelected(next), id2 !== "read" && event.target.checked && setMode("workspace-write");
-  } }), label, /* @__PURE__ */ import_react73.default.createElement("small", null, names.filter((name) => machine.tools.includes(name)).join("、") || "此 Agent 未提供")))), /* @__PURE__ */ import_react73.default.createElement("label", null, "权限模式", /* @__PURE__ */ import_react73.default.createElement("select", { value: mode, onChange: (event) => setMode(event.target.value) }, /* @__PURE__ */ import_react73.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react73.default.createElement("option", { value: "workspace-write" }, "允许写入及已勾选的控制操作"))), available.includes("machine.bind") && /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !botId || !rootId || selected.length === 0, onClick: save }, "保存此 Bot 的机器授权"), available.includes("machine.probe") && /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.probe", { botId, rootId }) }, "检查 Agent 在线状态"), /* @__PURE__ */ import_react73.default.createElement("label", null, "受控读测试的相对路径", /* @__PURE__ */ import_react73.default.createElement("input", { "aria-label": `机器 ${machine.id} 的测试路径`, value: relativePath, onChange: (event) => setRelativePath(event.target.value), placeholder: "README.md" })), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !binding || !relativePath, onClick: () => run2("machine.probe", { botId, rootId, relativePath }) }, "验证可读（不显示文件内容）")), available.includes("machine.revoke") && /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.revoke", { botId, expectedRevision: binding.revision }) }, "撤销此 Bot 的机器访问"), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy, onClick: () => run2("machine.revoke", { expectedRevision: machine.revision }) }, "撤销电脑配对")), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "每次保存都会先撤销旧票据再按新范围授权。桌面截图也需要 artifact 权限；撤销离线时会保留“停止未确认”。"));
+  } }), label, /* @__PURE__ */ import_react74.default.createElement("small", null, names.filter((name) => machine.tools.includes(name)).join("、") || "此 Agent 未提供")))), /* @__PURE__ */ import_react74.default.createElement("label", null, "权限模式", /* @__PURE__ */ import_react74.default.createElement("select", { value: mode, onChange: (event) => setMode(event.target.value) }, /* @__PURE__ */ import_react74.default.createElement("option", { value: "read-only" }, "只读"), /* @__PURE__ */ import_react74.default.createElement("option", { value: "workspace-write" }, "允许写入及已勾选的控制操作"))), available.includes("machine.bind") && /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !botId || !rootId || selected.length === 0, onClick: save }, "保存此 Bot 的机器授权"), available.includes("machine.probe") && /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.probe", { botId, rootId }) }, "检查 Agent 在线状态"), /* @__PURE__ */ import_react74.default.createElement("label", null, "受控读测试的相对路径", /* @__PURE__ */ import_react74.default.createElement("input", { "aria-label": `机器 ${machine.id} 的测试路径`, value: relativePath, onChange: (event) => setRelativePath(event.target.value), placeholder: "README.md" })), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !binding || !relativePath, onClick: () => run2("machine.probe", { botId, rootId, relativePath }) }, "验证可读（不显示文件内容）")), available.includes("machine.revoke") && /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !binding, onClick: () => run2("machine.revoke", { botId, expectedRevision: binding.revision }) }, "撤销此 Bot 的机器访问"), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy, onClick: () => run2("machine.revoke", { expectedRevision: machine.revision }) }, "撤销电脑配对")), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "每次保存都会先撤销旧票据再按新范围授权。桌面截图也需要 artifact 权限；撤销离线时会保留“停止未确认”。"));
 }
-function ArtifactDownload({ machine, snapshot, dispatch, busy }) {
-  let [form, setForm] = (0, import_react73.useState)({ botId: snapshot.bots?.[0]?.id ?? "", taskId: "", attemptId: "", operationId: "", artifactId: "" }), [result, setResult] = (0, import_react73.useState)(null), [error, setError] = (0, import_react73.useState)(null), change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  return /* @__PURE__ */ import_react73.default.createElement("details", { className: "bp-form" }, /* @__PURE__ */ import_react73.default.createElement("summary", null, "下载 artifact"), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "仅下载原任务已授权的 artifact；先核对元数据，再校验完整字节和 SHA-256。内容不会显示在页面中。"), /* @__PURE__ */ import_react73.default.createElement("form", { onSubmit: async (event) => {
+function ArtifactDownload({ machine, snapshot: snapshot2, dispatch, busy }) {
+  let [form, setForm] = (0, import_react74.useState)({ botId: snapshot2.bots?.[0]?.id ?? "", taskId: "", attemptId: "", operationId: "", artifactId: "" }), [result, setResult] = (0, import_react74.useState)(null), [error, setError] = (0, import_react74.useState)(null), change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  return /* @__PURE__ */ import_react74.default.createElement("details", { className: "bp-form" }, /* @__PURE__ */ import_react74.default.createElement("summary", null, "下载 artifact"), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "仅下载原任务已授权的 artifact；先核对元数据，再校验完整字节和 SHA-256。内容不会显示在页面中。"), /* @__PURE__ */ import_react74.default.createElement("form", { onSubmit: async (event) => {
     event.preventDefault(), setError(null), setResult(null);
     try {
       setResult(await dispatch("machine.artifact", { machineId: machine.id, ...form }));
     } catch (error2) {
       setError(error2);
     }
-  } }, /* @__PURE__ */ import_react73.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react73.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 artifact Bot`, value: form.botId, onChange: (event) => change("botId", event.target.value) }, snapshot.bots.map((bot) => /* @__PURE__ */ import_react73.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), [["taskId", "Task"], ["attemptId", "Attempt"], ["operationId", "Operation"], ["artifactId", "Artifact"]].map(([key, label]) => /* @__PURE__ */ import_react73.default.createElement("label", { key }, label, /* @__PURE__ */ import_react73.default.createElement("input", { "aria-label": `机器 ${machine.id} 的 artifact ${label}`, value: form[key], onInput: (event) => change(key, event.target.value), required: !0, autoComplete: "off" }))), /* @__PURE__ */ import_react73.default.createElement("button", { type: "submit", disabled: busy || Object.values(form).some((value) => !value) }, "核验并下载")), error && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-blocked", role: "status" }, "下载失败：", error.code ?? "ARTIFACT_DOWNLOAD_FAILED", "。artifact 不存在、已过期或未获授权。"), result && /* @__PURE__ */ import_react73.default.createElement("a", { download: `${form.artifactId}.bin`, href: `data:${result.mediaType ?? "application/octet-stream"};base64,${result.content}` }, "下载已核验 artifact（", result.size, " 字节，SHA-256 已匹配）"));
+  } }, /* @__PURE__ */ import_react74.default.createElement("label", null, "Bot", /* @__PURE__ */ import_react74.default.createElement("select", { "aria-label": `机器 ${machine.id} 的 artifact Bot`, value: form.botId, onChange: (event) => change("botId", event.target.value) }, snapshot2.bots.map((bot) => /* @__PURE__ */ import_react74.default.createElement("option", { key: bot.id, value: bot.id }, bot.name ?? bot.id)))), [["taskId", "Task"], ["attemptId", "Attempt"], ["operationId", "Operation"], ["artifactId", "Artifact"]].map(([key, label]) => /* @__PURE__ */ import_react74.default.createElement("label", { key }, label, /* @__PURE__ */ import_react74.default.createElement("input", { "aria-label": `机器 ${machine.id} 的 artifact ${label}`, value: form[key], onInput: (event) => change(key, event.target.value), required: !0, autoComplete: "off" }))), /* @__PURE__ */ import_react74.default.createElement("button", { type: "submit", disabled: busy || Object.values(form).some((value) => !value) }, "核验并下载")), error && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-blocked", role: "status" }, "下载失败：", error.code ?? "ARTIFACT_DOWNLOAD_FAILED", "。artifact 不存在、已过期或未获授权。"), result && /* @__PURE__ */ import_react74.default.createElement("a", { download: `${form.artifactId}.bin`, href: `data:${result.mediaType ?? "application/octet-stream"};base64,${result.content}` }, "下载已核验 artifact（", result.size, " 字节，SHA-256 已匹配）"));
 }
-function Machines({ snapshot, dispatch, busy }) {
-  let section = snapshot.machines;
-  return section?.status !== "available" ? /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, dispatch && /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement(DesktopWorkbench, { snapshot, dispatch }), /* @__PURE__ */ import_react73.default.createElement("details", null, /* @__PURE__ */ import_react73.default.createElement("summary", null, "兼容截图操作"), /* @__PURE__ */ import_react73.default.createElement(DesktopControl, { snapshot, dispatch, busy })), /* @__PURE__ */ import_react73.default.createElement(MachineSetup, { snapshot, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react73.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react73.default.createElement(Tag3, null, machine.status ?? "未知")), /* @__PURE__ */ import_react73.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react73.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react73.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react73.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement(MachineControls, { machine, snapshot, dispatch, busy }), /* @__PURE__ */ import_react73.default.createElement(ArtifactDownload, { machine, snapshot, dispatch, busy }))))) : !dispatch && /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
+function Machines({ snapshot: snapshot2, dispatch, busy }) {
+  let section = snapshot2.machines;
+  return section?.status !== "available" ? /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: section }) : /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, dispatch && /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement(DesktopWorkbench, { snapshot: snapshot2, dispatch }), /* @__PURE__ */ import_react74.default.createElement("details", null, /* @__PURE__ */ import_react74.default.createElement("summary", null, "兼容截图操作"), /* @__PURE__ */ import_react74.default.createElement(DesktopControl, { snapshot: snapshot2, dispatch, busy })), /* @__PURE__ */ import_react74.default.createElement(MachineSetup, { snapshot: snapshot2, dispatch, busy })), section.items.length ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-grid" }, section.items.map((machine) => /* @__PURE__ */ import_react74.default.createElement("article", { className: "bp-card", key: machine.id ?? machine.machineId }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, machine.name ?? machine.id ?? machine.machineId), /* @__PURE__ */ import_react74.default.createElement(Tag3, null, machine.status ?? "未知")), /* @__PURE__ */ import_react74.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "平台" }, machine.platform), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "Agent 版本" }, machine.version), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "最后在线" }, machine.lastSeenAt ? new Date(machine.lastSeenAt).toLocaleString("zh-CN") : "从未取得心跳"), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "能力" }, machine.capabilities?.join("、")), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "桌面会话" }, machine.desktop?.status ?? "未报告")), (machine.blockedReason || machine.status !== "online") && /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: { reason: machine.blockedReason ?? "机器未在线，任务不会派到此机器。", nextAction: machine.nextAction ?? "启动 Agent 并检查配对、网络及登录桌面。" } }), machine.revocations?.some((item) => item.status !== "revoked") && /* @__PURE__ */ import_react74.default.createElement("aside", { className: "bp-blocked", role: "status" }, /* @__PURE__ */ import_react74.default.createElement("strong", null, "远程停止尚未确认"), /* @__PURE__ */ import_react74.default.createElement("p", null, "本机授权已经撤销。目标电脑恢复连接后，可重新确认远程票据撤销；此操作不会恢复任何权限。"), dispatch && snapshot2.availableActions?.includes("machine.reconcile") && /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy, onClick: () => dispatch("machine.reconcile", { machineId: machine.id }) }, "重试确认远程撤销")), dispatch && machine.status !== "revoked" && /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement(MachineControls, { machine, snapshot: snapshot2, dispatch, busy }), /* @__PURE__ */ import_react74.default.createElement(ArtifactDownload, { machine, snapshot: snapshot2, dispatch, busy }))))) : !dispatch && /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-empty" }, "尚未配对远程电脑。安装 Agent，核验指纹并授予所需根目录后，机器会显示在这里。"));
 }
 function UnknownReview({ item, dispatch, busy }) {
-  let [note, setNote] = (0, import_react73.useState)(""), [amount, setAmount] = (0, import_react73.useState)(""), attestable = note.trim().length > 0 && amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0, submit = (kind) => dispatch("usage.resolve", {
+  let [note, setNote] = (0, import_react74.useState)(""), [amount, setAmount] = (0, import_react74.useState)(""), attestable = note.trim().length > 0 && amount.trim() !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0, submit = (kind) => dispatch("usage.resolve", {
     botId: item.botId,
     runId: item.runId,
     packageId: item.packageId,
@@ -35376,18 +35451,18 @@ function UnknownReview({ item, dispatch, busy }) {
     ...kind === "attest" ? { costUsd: Number(amount) } : {},
     note: note.trim()
   });
-  return /* @__PURE__ */ import_react73.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, item.botId), /* @__PURE__ */ import_react73.default.createElement(Tag3, null, item.billing === "subscription" ? "订阅" : "API")), /* @__PURE__ */ import_react73.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "运行" }, item.runId), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "工作包" }, item.packageId), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "模型" }, modelName(item.model ?? (item.provider ? { provider: item.provider, model: item.model } : null))), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "用量" }, item.usage ? `${item.usage.inputTokens ?? "未报告"} / ${item.usage.outputTokens ?? "未报告"}` : "未报告"), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "结束于" }, item.finishedAt ? new Date(item.finishedAt).toLocaleString("zh-CN") : "未取得")), /* @__PURE__ */ import_react73.default.createElement("label", null, "核对说明（必填，留痕于运行记录）", /* @__PURE__ */ import_react73.default.createElement("input", { "aria-label": `核对说明 ${item.runId}`, value: note, onChange: (event) => setNote(event.target.value), maxLength: 2e3, required: !0, autoComplete: "off" })), /* @__PURE__ */ import_react73.default.createElement("label", null, "厂商确认金额（美元；留空并按零费用放行）", /* @__PURE__ */ import_react73.default.createElement("input", { "aria-label": `核对金额 ${item.runId}`, value: amount, onChange: (event) => setAmount(event.target.value), inputMode: "decimal", placeholder: "0.00", autoComplete: "off" })), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !attestable, onClick: () => submit("attest") }, "按厂商账单确认"), /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy || !note.trim(), onClick: () => submit("waive") }, "按零费用放行")));
+  return /* @__PURE__ */ import_react74.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, item.botId), /* @__PURE__ */ import_react74.default.createElement(Tag3, null, item.billing === "subscription" ? "订阅" : "API")), /* @__PURE__ */ import_react74.default.createElement("dl", { className: "bp-facts" }, /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "运行" }, item.runId), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "工作包" }, item.packageId), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "模型" }, modelName(item.model ?? (item.provider ? { provider: item.provider, model: item.model } : null))), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "用量" }, item.usage ? `${item.usage.inputTokens ?? "未报告"} / ${item.usage.outputTokens ?? "未报告"}` : "未报告"), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "结束于" }, item.finishedAt ? new Date(item.finishedAt).toLocaleString("zh-CN") : "未取得")), /* @__PURE__ */ import_react74.default.createElement("label", null, "核对说明（必填，留痕于运行记录）", /* @__PURE__ */ import_react74.default.createElement("input", { "aria-label": `核对说明 ${item.runId}`, value: note, onChange: (event) => setNote(event.target.value), maxLength: 2e3, required: !0, autoComplete: "off" })), /* @__PURE__ */ import_react74.default.createElement("label", null, "厂商确认金额（美元；留空并按零费用放行）", /* @__PURE__ */ import_react74.default.createElement("input", { "aria-label": `核对金额 ${item.runId}`, value: amount, onChange: (event) => setAmount(event.target.value), inputMode: "decimal", placeholder: "0.00", autoComplete: "off" })), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-actions" }, /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !attestable, onClick: () => submit("attest") }, "按厂商账单确认"), /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy || !note.trim(), onClick: () => submit("waive") }, "按零费用放行")));
 }
-function Usage({ snapshot, dispatch, busy, openAdvanced }) {
-  let section = snapshot.usage;
-  if (section?.status !== "available") return /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: section }), /* @__PURE__ */ import_react73.default.createElement("button", { onClick: openAdvanced }, "打开已有 MR 费用与订阅面板"));
+function Usage({ snapshot: snapshot2, dispatch, busy, openAdvanced }) {
+  let section = snapshot2.usage;
+  if (section?.status !== "available") return /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: section }), /* @__PURE__ */ import_react74.default.createElement("button", { onClick: openAdvanced }, "打开已有 MR 费用与订阅面板"));
   let unresolved = section.unresolved ?? [];
-  return /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。"), section.summary && /* @__PURE__ */ import_react73.default.createElement("dl", { className: "bp-facts bp-card" }, /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "已知 API 费用" }, money3(section.summary.apiUsd)), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "当前预占" }, money3(section.summary.reservedUsd)), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "未知费用记录" }, section.summary.unknownCount ?? "未报告"), /* @__PURE__ */ import_react73.default.createElement(Value2, { label: "订阅用量" }, subscriptionText(section.summary.subscriptionSummary))), unresolved.length ? /* @__PURE__ */ import_react73.default.createElement("section", { className: "bp-card", "aria-label": "待人工核对的未确认费用" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, "待人工核对的未确认费用"), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。"), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-grid" }, unresolved.map((item) => /* @__PURE__ */ import_react73.default.createElement(UnknownReview, { key: `${item.runId}/${item.packageId}`, item, dispatch, busy })))) : null, section.items.length ? /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react73.default.createElement("table", null, /* @__PURE__ */ import_react73.default.createElement("thead", null, /* @__PURE__ */ import_react73.default.createElement("tr", null, /* @__PURE__ */ import_react73.default.createElement("th", null, "Bot / 任务"), /* @__PURE__ */ import_react73.default.createElement("th", null, "来源"), /* @__PURE__ */ import_react73.default.createElement("th", null, "准确模型"), /* @__PURE__ */ import_react73.default.createElement("th", null, "金额"), /* @__PURE__ */ import_react73.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react73.default.createElement("tbody", null, section.items.map((row, i) => /* @__PURE__ */ import_react73.default.createElement("tr", { key: row.id ?? row.receiptId ?? i }, /* @__PURE__ */ import_react73.default.createElement("td", null, row.botName ?? row.botId ?? "未归属", /* @__PURE__ */ import_react73.default.createElement("small", null, row.taskId ?? row.runId)), /* @__PURE__ */ import_react73.default.createElement("td", null, { bot: "Bot 对话", aux: "Bot 辅助调用", "mr-api": "MR API", cli: "官方 CLI", review: "评审" }[row.source] ?? row.source ?? "未报告"), /* @__PURE__ */ import_react73.default.createElement("td", null, modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))), /* @__PURE__ */ import_react73.default.createElement("td", null, row.billing === "subscription" ? "订阅" : money3(row.amountUsd ?? row.costUsd)), /* @__PURE__ */ import_react73.default.createElement("td", null, row.status ?? "未知", row.resolution && /* @__PURE__ */ import_react73.default.createElement(Tag3, null, row.resolution.kind === "waive" ? "已按零费用放行" : `已确认 ${money3(row.resolution.costUsd)}`))))))) : /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-empty" }, "尚无费用收据。"), /* @__PURE__ */ import_react73.default.createElement("button", { onClick: openAdvanced }, "打开高级费用、订阅与历史能力"));
+  return /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "以宿主唯一资金库的收据和预占为准。未知费用保留未知；Token 统计与实际计费分开呈现。"), section.summary && /* @__PURE__ */ import_react74.default.createElement("dl", { className: "bp-facts bp-card" }, /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "已知 API 费用" }, money3(section.summary.apiUsd)), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "当前预占" }, money3(section.summary.reservedUsd)), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "未知费用记录" }, section.summary.unknownCount ?? "未报告"), /* @__PURE__ */ import_react74.default.createElement(Value2, { label: "订阅用量" }, subscriptionText(section.summary.subscriptionSummary))), unresolved.length ? /* @__PURE__ */ import_react74.default.createElement("section", { className: "bp-card", "aria-label": "待人工核对的未确认费用" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, "待人工核对的未确认费用"), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "以下执行已经分派，但没有取得可核验的厂商账单；在核对完成前，其 Bot 与资金范围不会放行新的付费调用。核对说明会记录在运行记录中。"), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-grid" }, unresolved.map((item) => /* @__PURE__ */ import_react74.default.createElement(UnknownReview, { key: `${item.runId}/${item.packageId}`, item, dispatch, busy })))) : null, section.items.length ? /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react74.default.createElement("table", null, /* @__PURE__ */ import_react74.default.createElement("thead", null, /* @__PURE__ */ import_react74.default.createElement("tr", null, /* @__PURE__ */ import_react74.default.createElement("th", null, "Bot / 任务"), /* @__PURE__ */ import_react74.default.createElement("th", null, "来源"), /* @__PURE__ */ import_react74.default.createElement("th", null, "准确模型"), /* @__PURE__ */ import_react74.default.createElement("th", null, "金额"), /* @__PURE__ */ import_react74.default.createElement("th", null, "状态"))), /* @__PURE__ */ import_react74.default.createElement("tbody", null, section.items.map((row, i) => /* @__PURE__ */ import_react74.default.createElement("tr", { key: row.id ?? row.receiptId ?? i }, /* @__PURE__ */ import_react74.default.createElement("td", null, row.botName ?? row.botId ?? "未归属", /* @__PURE__ */ import_react74.default.createElement("small", null, row.taskId ?? row.runId)), /* @__PURE__ */ import_react74.default.createElement("td", null, { bot: "Bot 对话", aux: "Bot 辅助调用", "mr-api": "MR API", cli: "官方 CLI", review: "评审" }[row.source] ?? row.source ?? "未报告"), /* @__PURE__ */ import_react74.default.createElement("td", null, modelName(row.model ?? (row.provider ? { provider: row.provider, model: row.modelId } : null))), /* @__PURE__ */ import_react74.default.createElement("td", null, row.billing === "subscription" ? "订阅" : money3(row.amountUsd ?? row.costUsd)), /* @__PURE__ */ import_react74.default.createElement("td", null, row.status ?? "未知", row.resolution && /* @__PURE__ */ import_react74.default.createElement(Tag3, null, row.resolution.kind === "waive" ? "已按零费用放行" : `已确认 ${money3(row.resolution.costUsd)}`))))))) : /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-empty" }, "尚无费用收据。"), /* @__PURE__ */ import_react74.default.createElement("button", { onClick: openAdvanced }, "打开高级费用、订阅与历史能力"));
 }
 var Library = LibraryPanel;
 function RoleCatalog({ dispatch, busy }) {
-  let [roles, setRoles] = import_react73.default.useState(null), [copied, setCopied] = import_react73.default.useState(""), [error, setError] = import_react73.default.useState("");
-  import_react73.default.useEffect(() => {
+  let [roles, setRoles] = import_react74.default.useState(null), [copied, setCopied] = import_react74.default.useState(""), [error, setError] = import_react74.default.useState("");
+  import_react74.default.useEffect(() => {
     let live = !0;
     if (typeof dispatch == "function")
       return dispatch("roles.list", {}).then((value) => {
@@ -35405,18 +35480,18 @@ function RoleCatalog({ dispatch, busy }) {
       setError(String(failure?.message ?? failure));
     }
   };
-  return error ? /* @__PURE__ */ import_react73.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, "岗位")), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : roles ? /* @__PURE__ */ import_react73.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react73.default.createElement("h2", null, "岗位"), /* @__PURE__ */ import_react73.default.createElement(Tag3, null, roles.length)), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-muted" }, "这些是给 Bot 的岗位简述。新建 Bot 时把简述粘进描述即可；岗位文本不会授予任何工具或机器权限。"), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react73.default.createElement("table", null, /* @__PURE__ */ import_react73.default.createElement("thead", null, /* @__PURE__ */ import_react73.default.createElement("tr", null, /* @__PURE__ */ import_react73.default.createElement("th", null, "岗位"), /* @__PURE__ */ import_react73.default.createElement("th", null, "简述"), /* @__PURE__ */ import_react73.default.createElement("th", null, "需要的能力"), /* @__PURE__ */ import_react73.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react73.default.createElement("tbody", null, roles.map((role) => /* @__PURE__ */ import_react73.default.createElement("tr", { key: role.id }, /* @__PURE__ */ import_react73.default.createElement("td", null, role.name, /* @__PURE__ */ import_react73.default.createElement("small", null, role.id)), /* @__PURE__ */ import_react73.default.createElement("td", null, role.brief), /* @__PURE__ */ import_react73.default.createElement("td", { className: "bp-code" }, role.tools.join("、")), /* @__PURE__ */ import_react73.default.createElement("td", null, /* @__PURE__ */ import_react73.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
+  return error ? /* @__PURE__ */ import_react74.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, "岗位")), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-error", role: "alert" }, error)) : roles ? /* @__PURE__ */ import_react74.default.createElement("article", { className: "bp-card" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-card-title" }, /* @__PURE__ */ import_react74.default.createElement("h2", null, "岗位"), /* @__PURE__ */ import_react74.default.createElement(Tag3, null, roles.length)), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-muted" }, "这些是给 Bot 的岗位简述。新建 Bot 时把简述粘进描述即可；岗位文本不会授予任何工具或机器权限。"), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-table-wrap" }, /* @__PURE__ */ import_react74.default.createElement("table", null, /* @__PURE__ */ import_react74.default.createElement("thead", null, /* @__PURE__ */ import_react74.default.createElement("tr", null, /* @__PURE__ */ import_react74.default.createElement("th", null, "岗位"), /* @__PURE__ */ import_react74.default.createElement("th", null, "简述"), /* @__PURE__ */ import_react74.default.createElement("th", null, "需要的能力"), /* @__PURE__ */ import_react74.default.createElement("th", null, "操作"))), /* @__PURE__ */ import_react74.default.createElement("tbody", null, roles.map((role) => /* @__PURE__ */ import_react74.default.createElement("tr", { key: role.id }, /* @__PURE__ */ import_react74.default.createElement("td", null, role.name, /* @__PURE__ */ import_react74.default.createElement("small", null, role.id)), /* @__PURE__ */ import_react74.default.createElement("td", null, role.brief), /* @__PURE__ */ import_react74.default.createElement("td", { className: "bp-code" }, role.tools.join("、")), /* @__PURE__ */ import_react74.default.createElement("td", null, /* @__PURE__ */ import_react74.default.createElement("button", { type: "button", disabled: busy, onClick: () => {
     copy2(role);
   } }, copied === role.id ? "已复制" : "复制简述")))))))) : null;
 }
 function ProductPage({ section, productApi, openSession, openPanel }) {
-  (0, import_react73.useEffect)(() => {
+  (0, import_react74.useEffect)(() => {
     let id2 = PRODUCT_PANELS[section];
     return announcePanel(id2), () => announcePanel(id2, !0);
   }, [section]);
-  let [snapshot, setSnapshot] = (0, import_react73.useState)(null), [error, setError] = (0, import_react73.useState)(""), [busy, setBusy] = (0, import_react73.useState)(!1), [snapshotStale, setSnapshotStale] = (0, import_react73.useState)(!1), pendingActions = (0, import_react73.useRef)(0), lifecycle = (0, import_react73.useRef)({ live: !1, epoch: 0, request: 0 }), snapshotApi = (0, import_react73.useRef)(null), dispatchState = (0, import_react73.useRef)(null);
-  dispatchState.current = { snapshotStale, readOnly: snapshot?.readOnly };
-  let refresh = (0, import_react73.useCallback)(async (signal) => {
+  let [snapshot2, setSnapshot] = (0, import_react74.useState)(null), [error, setError] = (0, import_react74.useState)(""), [busy, setBusy] = (0, import_react74.useState)(!1), [snapshotStale, setSnapshotStale] = (0, import_react74.useState)(!1), pendingActions = (0, import_react74.useRef)(0), lifecycle = (0, import_react74.useRef)({ live: !1, epoch: 0, request: 0 }), snapshotApi = (0, import_react74.useRef)(null), dispatchState = (0, import_react74.useRef)(null);
+  dispatchState.current = { snapshotStale, readOnly: snapshot2?.readOnly };
+  let refresh = (0, import_react74.useCallback)(async (signal) => {
     let state = lifecycle.current;
     if (!state.live) return;
     let epoch = state.epoch, request = ++state.request, current = () => state.live && state.epoch === epoch && state.request === request && !signal?.aborted;
@@ -35429,7 +35504,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
       current() && (setSnapshotStale(!0), setError(cause.message));
     }
   }, [productApi]);
-  (0, import_react73.useEffect)(() => {
+  (0, import_react74.useEffect)(() => {
     let controller = new AbortController(), state = lifecycle.current;
     state.live = !0, state.epoch++, setSnapshotStale(!0), pendingActions.current = 0, setBusy(!1);
     let timer, stopped = !1, loop = async () => {
@@ -35439,7 +35514,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
       stopped = !0, state.live = !1, state.epoch++, state.request++, controller.abort(), clearTimeout(timer);
     };
   }, [refresh]);
-  let dispatch = (0, import_react73.useCallback)(async (action, payload, { errorResult = !1 } = {}) => {
+  let dispatch = (0, import_react74.useCallback)(async (action, payload, { errorResult = !1 } = {}) => {
     if (dispatchState.current.snapshotStale || dispatchState.current.readOnly || snapshotApi.current !== productApi || !lifecycle.current.live) return;
     let state = lifecycle.current, epoch = state.epoch, current = () => state.live && state.epoch === epoch;
     pendingActions.current++, setBusy(!0);
@@ -35451,7 +35526,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
     } finally {
       current() && (pendingActions.current = Math.max(0, pendingActions.current - 1), setBusy(pendingActions.current > 0));
     }
-  }, [productApi, refresh]), inspectTask = (0, import_react73.useCallback)((payload, signal) => productApi.dispatch("task.inspect", payload, signal), [productApi]), disabled = busy || snapshotStale || snapshotApi.current !== productApi || !!snapshot?.readOnly, title = { inbox: "收件箱", bindings: "Bot 与模型", engines: "AI 引擎", tasks: "任务", machines: "远程电脑", library: "资料库", routine: "例行任务", usage: "费用与用量" }[section], meta = {
+  }, [productApi, refresh]), inspectTask = (0, import_react74.useCallback)((payload, signal) => productApi.dispatch("task.inspect", payload, signal), [productApi]), disabled = busy || snapshotStale || snapshotApi.current !== productApi || !!snapshot2?.readOnly, title = { inbox: "收件箱", bindings: "Bot 与模型", engines: "AI 引擎", tasks: "任务", machines: "远程电脑", library: "资料库", routine: "例行任务", usage: "费用与用量" }[section], meta = {
     inbox: ["inbox", "需要你决定或修复的事项都在这里，处理完就清空。"],
     bindings: ["team", "给每个 Bot 选好模型就能开始；需要精确资金、工具或电脑授权时再打开高级绑定。"],
     engines: ["spark", "把已经登录的 Claude Code、Codex、Gemini CLI 当作 Bot 的模型使用。"],
@@ -35461,7 +35536,7 @@ function ProductPage({ section, productApi, openSession, openPanel }) {
     routine: ["repeat", "演示一次，保存步骤，把重复的工作交给 Bot。"],
     usage: ["chart", "查看真实使用记录，清楚掌握每一笔费用。"]
   }[section] ?? ["bot", ""];
-  return /* @__PURE__ */ import_react73.default.createElement("main", { className: "bp-page", "data-section": section }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-page-inner" }, /* @__PURE__ */ import_react73.default.createElement("header", { className: "bp-page-header" }, /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-page-heading" }, /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-eyebrow" }, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: meta[0], size: 14 }), "工作空间", /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "chevron", size: 12 }), /* @__PURE__ */ import_react73.default.createElement("span", null, title)), /* @__PURE__ */ import_react73.default.createElement("h1", null, title), /* @__PURE__ */ import_react73.default.createElement("p", { className: "bp-page-description" }, meta[1])), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-page-tools" }, /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-sync", "data-state": snapshotStale ? "stale" : snapshot ? "ready" : "loading" }, snapshotStale ? "等待同步" : snapshot ? "已同步" : "正在连接"), /* @__PURE__ */ import_react73.default.createElement("button", { className: "bp-refresh", disabled: busy, onClick: () => refresh(), title: "刷新当前页面" }, /* @__PURE__ */ import_react73.default.createElement(UiIcon, { name: "refresh", size: 16, className: busy ? "bp-spinning" : "" }), /* @__PURE__ */ import_react73.default.createElement("span", null, "刷新")))), /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-page-body" }, error && /* @__PURE__ */ import_react73.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react73.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react73.default.createElement("p", null, error), snapshot && /* @__PURE__ */ import_react73.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot?.readOnly && /* @__PURE__ */ import_react73.default.createElement(Blocked, { value: { reason: snapshot.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot && !error && /* @__PURE__ */ import_react73.default.createElement("div", { className: "bp-loading", role: "status" }, /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react73.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react73.default.createElement("p", null, "正在读取宿主状态…")), snapshot && /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, section === "inbox" && /* @__PURE__ */ import_react73.default.createElement(Inbox, { snapshot, panels: PRODUCT_PANELS, openPanel, openSession }), section === "bindings" && /* @__PURE__ */ import_react73.default.createElement(import_react73.default.Fragment, null, /* @__PURE__ */ import_react73.default.createElement(QuickPolicyCard, { snapshot, dispatch, busy: disabled }), /* @__PURE__ */ import_react73.default.createElement(BotBindings, { snapshot, openSession, dispatch, busy: disabled }), snapshot.availableActions?.includes("templates.list") ? /* @__PURE__ */ import_react73.default.createElement(TemplateGallery, { snapshot, dispatch, busy: disabled, openSession }) : snapshot.availableActions?.includes("roles.list") && /* @__PURE__ */ import_react73.default.createElement(RoleCatalog, { dispatch, busy: disabled }), snapshot.availableActions?.includes("team.preview") && snapshot.availableActions?.includes("team.import") && /* @__PURE__ */ import_react73.default.createElement(TeamImport, { snapshot, dispatch, busy: disabled, openSession })), section === "engines" && /* @__PURE__ */ import_react73.default.createElement(Engines, { snapshot, dispatch, busy: disabled, openPanel, bindingsPanel: PRODUCT_PANELS.bindings }), section === "tasks" && /* @__PURE__ */ import_react73.default.createElement(Tasks, { snapshot, dispatch, busy: disabled, submissionScope: productApi, inspect: !snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : void 0, openSession }), section === "machines" && /* @__PURE__ */ import_react73.default.createElement(Machines, { snapshot, dispatch, busy: disabled }), section === "routine" && /* @__PURE__ */ import_react73.default.createElement(RoutinesPanel, { snapshot, dispatch, busy: disabled, onOpenMachines: () => openPanel(PRODUCT_PANELS.machines) }), section === "library" && /* @__PURE__ */ import_react73.default.createElement(Library, { snapshot, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react73.default.createElement(Usage, { snapshot, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react73.default.createElement("footer", { className: "bp-page-footer bp-muted" }, "上次同步 ", new Date(snapshot.observedAt).toLocaleString("zh-CN"))))));
+  return /* @__PURE__ */ import_react74.default.createElement("main", { className: "bp-page", "data-section": section }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-page-inner" }, /* @__PURE__ */ import_react74.default.createElement("header", { className: "bp-page-header" }, /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-page-heading" }, /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-eyebrow" }, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: meta[0], size: 14 }), "工作空间", /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "chevron", size: 12 }), /* @__PURE__ */ import_react74.default.createElement("span", null, title)), /* @__PURE__ */ import_react74.default.createElement("h1", null, title), /* @__PURE__ */ import_react74.default.createElement("p", { className: "bp-page-description" }, meta[1])), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-page-tools" }, /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-sync", "data-state": snapshotStale ? "stale" : snapshot2 ? "ready" : "loading" }, snapshotStale ? "等待同步" : snapshot2 ? "已同步" : "正在连接"), /* @__PURE__ */ import_react74.default.createElement("button", { className: "bp-refresh", disabled: busy, onClick: () => refresh(), title: "刷新当前页面" }, /* @__PURE__ */ import_react74.default.createElement(UiIcon, { name: "refresh", size: 16, className: busy ? "bp-spinning" : "" }), /* @__PURE__ */ import_react74.default.createElement("span", null, "刷新")))), /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-page-body" }, error && /* @__PURE__ */ import_react74.default.createElement("div", { role: "alert", className: "bp-blocked" }, /* @__PURE__ */ import_react74.default.createElement("strong", null, "无法取得最新宿主状态"), /* @__PURE__ */ import_react74.default.createElement("p", null, error), snapshot2 && /* @__PURE__ */ import_react74.default.createElement("p", null, snapshotStale ? "下面保留上次读取结果；状态未更新时，操作暂不可用。" : "下面保留上次读取结果，操作以宿主当前授权为准。")), snapshot2?.readOnly && /* @__PURE__ */ import_react74.default.createElement(Blocked, { value: { reason: snapshot2.readOnly, nextAction: "关闭持有写锁的另一宿主后重新加载。" } }), !snapshot2 && !error && /* @__PURE__ */ import_react74.default.createElement("div", { className: "bp-loading", role: "status" }, /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react74.default.createElement("span", { className: "bp-loading-line", "aria-hidden": "true" }), /* @__PURE__ */ import_react74.default.createElement("p", null, "正在读取宿主状态…")), snapshot2 && /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, section === "inbox" && /* @__PURE__ */ import_react74.default.createElement(Inbox, { snapshot: snapshot2, panels: PRODUCT_PANELS, openPanel, openSession }), section === "bindings" && /* @__PURE__ */ import_react74.default.createElement(import_react74.default.Fragment, null, /* @__PURE__ */ import_react74.default.createElement(QuickPolicyCard, { snapshot: snapshot2, dispatch, busy: disabled }), /* @__PURE__ */ import_react74.default.createElement(BotBindings, { snapshot: snapshot2, openSession, dispatch, busy: disabled }), snapshot2.availableActions?.includes("templates.list") ? /* @__PURE__ */ import_react74.default.createElement(TemplateGallery, { snapshot: snapshot2, dispatch, busy: disabled, openSession }) : snapshot2.availableActions?.includes("roles.list") && /* @__PURE__ */ import_react74.default.createElement(RoleCatalog, { dispatch, busy: disabled }), snapshot2.availableActions?.includes("team.preview") && snapshot2.availableActions?.includes("team.import") && /* @__PURE__ */ import_react74.default.createElement(TeamImport, { snapshot: snapshot2, dispatch, busy: disabled, openSession })), section === "engines" && /* @__PURE__ */ import_react74.default.createElement(Engines, { snapshot: snapshot2, dispatch, busy: disabled, openPanel, bindingsPanel: PRODUCT_PANELS.bindings }), section === "tasks" && /* @__PURE__ */ import_react74.default.createElement(Tasks, { snapshot: snapshot2, dispatch, busy: disabled, submissionScope: productApi, inspect: !snapshotStale && snapshotApi.current === productApi && !snapshot2.readOnly ? inspectTask : void 0, openSession }), section === "machines" && /* @__PURE__ */ import_react74.default.createElement(Machines, { snapshot: snapshot2, dispatch, busy: disabled }), section === "routine" && /* @__PURE__ */ import_react74.default.createElement(RoutinesPanel, { snapshot: snapshot2, dispatch, busy: disabled, onOpenMachines: () => openPanel(PRODUCT_PANELS.machines) }), section === "library" && /* @__PURE__ */ import_react74.default.createElement(Library, { snapshot: snapshot2, dispatch, busy: disabled }), section === "usage" && /* @__PURE__ */ import_react74.default.createElement(Usage, { snapshot: snapshot2, dispatch, busy: disabled, openAdvanced: () => openPanel("model-router-galgame") }), /* @__PURE__ */ import_react74.default.createElement("footer", { className: "bp-page-footer bp-muted" }, "上次同步 ", new Date(snapshot2.observedAt).toLocaleString("zh-CN"))))));
 }
 
 // apps/integration-client/product.css
@@ -35939,6 +36014,15 @@ body[data-bot-product-ui] .bt-side { container-name: bot-sidebar; container-type
 .bp-team-model { display: grid; gap: 4px; max-width: 360px; font-size: 12px; color: var(--bp-muted); }
 .bp-team-result p { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; }
 .bp-page .bp-chip-button { min-height: 28px; padding: 3px 11px; border-radius: 9999px; font-size: 12px; }
+.bp-nav .bp-nav-quiet { margin-top: 6px; opacity: .78; }
+.bp-nav .bp-nav-quiet:hover { opacity: 1; }
+.bp-shortcuts-card .bp-card-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.bp-shortcuts-card .bp-card-title h2 { margin: 0; }
+.bp-shortcuts-card .bp-icon-button { display: inline-flex; padding: 4px; border: 0; border-radius: 7px; color: var(--bp-muted); background: transparent; cursor: pointer; }
+.bp-shortcuts-card .bp-icon-button:hover { color: var(--bp-ink); background: var(--bp-hover); }
+.bp-shortcuts-card .bp-icon-button:focus-visible { outline: 2px solid var(--bp-focus); outline-offset: 2px; }
+.bp-shortcuts-card dd { margin: 0; white-space: nowrap; }
+.bp-shortcuts-card p { margin: 14px 0 0; font-size: 12px; }
 `;
 
 // apps/integration-client/desktop-bridge.mjs
@@ -35969,8 +36053,8 @@ function productSlots(slots, openPanel) {
     if (key === "register") return (options, component) => {
       if (component !== TeamSidebar) return target.register(options, component);
       let Sidebar = (props) => {
-        let sidebarAddon = () => /* @__PURE__ */ import_react74.default.createElement(ProductNavigation, { panels: PRODUCT_PANELS, openPanel, compact: !props.wide });
-        return /* @__PURE__ */ import_react74.default.createElement(TeamSidebar, { ...props, actions: { ...props.actions, sidebarAddon } });
+        let sidebarAddon = () => /* @__PURE__ */ import_react75.default.createElement(ProductNavigation, { panels: PRODUCT_PANELS, openPanel, compact: !props.wide });
+        return /* @__PURE__ */ import_react75.default.createElement(TeamSidebar, { ...props, actions: { ...props.actions, sidebarAddon } });
       };
       return Sidebar.dsBotTeamSidebar = TeamSidebar, target.register(options, Sidebar);
     };
@@ -35980,7 +36064,7 @@ function productSlots(slots, openPanel) {
 }
 async function apply3(ctx) {
   let api = createProductApi();
-  ctx.effect(() => installDesktopBridge(api, (props) => /* @__PURE__ */ import_react74.default.createElement(DesktopPane2, { ...props })), "bot-product: desktop bridge");
+  ctx.effect(() => installDesktopBridge(api, (props) => /* @__PURE__ */ import_react75.default.createElement(DesktopPane2, { ...props })), "bot-product: desktop bridge");
   let openPanel = (id2) => ctx.layout.selectPanel(id2), slots = productSlots(ctx.slots, openPanel), dsContext = new Proxy(ctx, { get: (target, key) => key === "slots" ? slots : Reflect.get(target, key, target) });
   ctx.effect(() => {
     let previous = document.body.getAttribute("data-bot-product-ui");

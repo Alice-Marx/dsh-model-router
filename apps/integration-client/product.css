@@ -472,3 +472,12 @@ body[data-bot-product-ui] .bt-side { container-name: bot-sidebar; container-type
 .bp-team-model { display: grid; gap: 4px; max-width: 360px; font-size: 12px; color: var(--bp-muted); }
 .bp-team-result p { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; }
 .bp-page .bp-chip-button { min-height: 28px; padding: 3px 11px; border-radius: 9999px; font-size: 12px; }
+.bp-nav .bp-nav-quiet { margin-top: 6px; opacity: .78; }
+.bp-nav .bp-nav-quiet:hover { opacity: 1; }
+.bp-shortcuts-card .bp-card-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.bp-shortcuts-card .bp-card-title h2 { margin: 0; }
+.bp-shortcuts-card .bp-icon-button { display: inline-flex; padding: 4px; border: 0; border-radius: 7px; color: var(--bp-muted); background: transparent; cursor: pointer; }
+.bp-shortcuts-card .bp-icon-button:hover { color: var(--bp-ink); background: var(--bp-hover); }
+.bp-shortcuts-card .bp-icon-button:focus-visible { outline: 2px solid var(--bp-focus); outline-offset: 2px; }
+.bp-shortcuts-card dd { margin: 0; white-space: nowrap; }
+.bp-shortcuts-card p { margin: 14px 0 0; font-size: 12px; }

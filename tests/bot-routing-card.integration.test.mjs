@@ -12,7 +12,11 @@ const directory = await mkdtemp(join(parent, 'components-')), file = join(direct
 const bundle = await build({ entryPoints: ['apps/integration-client/panels.jsx'], bundle: true, platform: 'node', format: 'esm',
   external: ['react', 'react-dom', 'react-dom/*'], write: false })
 await writeFile(file, bundle.outputFiles[0].contents)
+// The bundle loads react-dom, which decides at load time whether native input events exist.
+const boot = new JSDOM('<div></div>', { url: 'http://localhost/' })
+Object.assign(globalThis, { window: boot.window, document: boot.window.document })
 const { Tasks, ProductPage } = await import(pathToFileURL(file))
+delete globalThis.window; delete globalThis.document
 
 const candidate = { botId: 'worker', name: '写作 Bot', model: { provider: 'fixture', model: 'shared' },
   pricePerMTokUsd: 1, quality: null, machineId: null, machineOnline: false, busy: false }

@@ -12,7 +12,7 @@ import { createProductReadModel } from '../modules/bot-runtime/read-model.mjs'
 
 const parent = resolve('tmp/integration/product-library-sequence'); fs.mkdirSync(parent, { recursive: true })
 const dir = fs.mkdtempSync(join(parent, 'run-')), compiled = join(dir, 'page.mjs')
-await build({ entryPoints: ['apps/integration-client/panels.jsx'], outfile: compiled, bundle: true, platform: 'node', format: 'esm', external: ['react'] })
+await build({ entryPoints: ['apps/integration-client/panels.jsx'], outfile: compiled, bundle: true, platform: 'node', format: 'esm', external: ['react', 'react-dom'] })
 const { ProductPage, ProductNavigation } = await import(pathToFileURL(compiled))
 const { PRODUCT_PANELS } = await import('../apps/integration-client/api.mjs')
 

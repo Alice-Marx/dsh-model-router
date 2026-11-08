@@ -12,6 +12,7 @@ import { BotModelRow, Pill, QuickPolicyCard, TemplateGallery, modeBadge, modelLa
 import { Engines } from './engines-panel.jsx'
 import { Inbox } from './inbox-panel.jsx'
 import { TeamImport } from './team-import.jsx'
+import { ShortcutLayer, setShortcutSheet } from './shortcuts.jsx'
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 
 const NAV_EVENT = 'bot-product:navigation'
@@ -30,6 +31,7 @@ export function ProductNavigation({ openPanel, panels, compact = false }) {
     setActive(activePanel)
     return () => document.removeEventListener(NAV_EVENT, change)
   }, [])
+  const go = useCallback(id => { announcePanel(id); openPanel(id) }, [openPanel])
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
     <p className="bp-nav-label">工作空间</p>
     {[
@@ -41,6 +43,9 @@ export function ProductNavigation({ openPanel, panels, compact = false }) {
       {/* A narrow column still says what each icon opens, so the row is readable without hovering. */}
       <UiIcon name={icon} size={17} /><span className="bp-nav-name">{label}</span><span className="bp-nav-caption">{caption}</span>
     </button>)}
+    <button type="button" className="bp-nav-quiet" onClick={() => setShortcutSheet(true)} title="键盘快捷键（Ctrl/⌘ + /）" aria-label="键盘快捷键">
+      <UiIcon name="keyboard" size={17} /><span className="bp-nav-name">键盘快捷键</span><span className="bp-nav-caption">快捷键</span></button>
+    <ShortcutLayer panels={panels} go={go} />
   </nav>
 }
 

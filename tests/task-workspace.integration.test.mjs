@@ -11,7 +11,11 @@ const parent = resolve('tmp/integration/task-workspace'); await mkdir(parent, { 
 const dir = await mkdtemp(join(parent, 'ui-')), file = join(dir, 'panels.mjs')
 const compiled = await build({ entryPoints: ['apps/integration-client/panels.jsx'], bundle: true, format: 'esm', platform: 'node', external: ['react', 'react-dom', 'react-dom/*'], write: false })
 await writeFile(file, compiled.outputFiles[0].contents)
+// The bundle loads react-dom, which decides at load time whether native input events exist.
+const boot = new JSDOM('<div></div>', { url: 'http://localhost/' })
+Object.assign(globalThis, { window: boot.window, document: boot.window.document })
 const { Tasks, ProductPage } = await import(pathToFileURL(file))
+delete globalThis.window; delete globalThis.document
 const snapshot = items => ({ schemaVersion: 1, observedAt: '2026-11-07T00:00:00Z', readOnly: null,
   bots: [{ id: 'a', name: '研究 Bot', sessionId: 'session-a' }, { id: 'b', name: '执行 Bot', sessionId: 'session-b' }],
   availableActions: [], tasks: { status: 'available', items } })
