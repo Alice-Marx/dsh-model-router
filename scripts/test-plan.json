@@ -16,7 +16,8 @@
       "tests/bot-attention.test.mjs",
       "tests/readme-math.test.mjs",
       "tests/remote-agent-build.test.mjs",
-      "tests/bot-runtime-ui.test.mjs"
+      "tests/bot-runtime-ui.test.mjs",
+      "tests/bot-model-selection.test.mjs"
     ],
     [
       "--test",

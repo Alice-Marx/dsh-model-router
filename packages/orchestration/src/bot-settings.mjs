@@ -5,6 +5,9 @@ import { OFFICIAL_TOOLS } from '../../../.dsh-plugin/shared/official-tool-regist
 
 export const BOT_SETTINGS_SCHEMA = 1
 export const BOT_EXECUTION_MODES = Object.freeze(['read-only', 'workspace-write', 'cli-native'])
+/** Same closed set as OpenMausBot's EffortLevel. Null means the engine keeps its own default. */
+export const MODEL_EFFORTS = Object.freeze(['none', 'low', 'medium', 'high', 'xhigh', 'max'])
+const ENGINE_ID = /^(?:api|tool):[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,200}$/
 const EMPTY_GRANT = Object.freeze({ tools: Object.freeze([]), modelRoutes: Object.freeze([]) })
 const registry = new Map(OFFICIAL_TOOLS.map(tool => [tool.id, tool]))
 const plain = value => value && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value))
@@ -27,16 +30,81 @@ const sync = (value, name) => { if (value && typeof value.then === 'function') f
 const hash = text => createHash('sha256').update(text).digest('hex')
 const json = value => { const text = JSON.stringify(value); if (Buffer.byteLength(text) > 64 * 1024) fail('BOT_SETTINGS_LIMIT', '单个 Bot 绑定不能超过 64 KiB。'); return text }
 const routeRef = value => `${value.provider}/${value.model}`
+const variantToken = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}$/.test(value)
+const selectionKey = value => `${value.instanceId}\0${value.model}`
+
+function normalizeSelection(value) {
+  if (value == null) return null
+  keys(value, ['instanceId', 'model', 'effort', 'variant'], 'selection')
+  if (typeof value.instanceId !== 'string' || !ENGINE_ID.test(value.instanceId) || !token(value.model)) fail('BOT_SETTINGS_INVALID', '引擎实例和模型必须来自宿主目录中的固定标识。', { field: 'selection' })
+  const effort = value.effort ?? null
+  const variant = value.variant ?? null
+  if (effort !== null && !MODEL_EFFORTS.includes(effort)) fail('BOT_SETTINGS_INVALID', '推理力度必须是 none、low、medium、high、xhigh、max，或留空交给引擎默认。', { field: 'selection.effort' })
+  if (variant !== null && !variantToken(variant)) fail('BOT_SETTINGS_INVALID', '模型变体必须是短标识，不能是路径或地址。', { field: 'selection.variant' })
+  return { instanceId: value.instanceId, model: value.model, effort, variant }
+}
+
+function normalizeFallback(value) {
+  const items = list(value ?? [], 5, 'fallback').map((entry, index) => {
+    keys(entry, ['instanceId', 'model'], `fallback[${index}]`)
+    if (typeof entry.instanceId !== 'string' || !ENGINE_ID.test(entry.instanceId) || !token(entry.model)) fail('BOT_SETTINGS_INVALID', '备用引擎和模型必须来自宿主目录中的固定标识。', { field: 'fallback' })
+    return { instanceId: entry.instanceId, model: entry.model }
+  })
+  unique(items.map(selectionKey), 'fallback')
+  return items
+}
+
+function engineOption(catalog, selection) {
+  if (!selection || !Array.isArray(catalog?.engines)) return null
+  const engine = catalog.engines.find(item => item.instanceId === selection.instanceId)
+  return engine?.models.find(item => item.id === selection.model) ?? null
+}
+
+function enginesFor(models, tools) {
+  const providers = [...new Set(models.map(model => model.provider))].sort()
+  const api = providers.map(provider => ({
+    instanceId: `api:${provider}`, label: provider, kind: 'api', toolId: null, access: 'api',
+    models: models.filter(model => model.provider === provider).map(model => ({
+      id: model.model, label: model.label, provider: model.provider, model: model.model, cliModel: null,
+    })).sort((left, right) => left.id.localeCompare(right.id)),
+  }))
+  const official = []
+  for (const tool of tools) {
+    const raw = [], seen = new Set()
+    for (const model of models) for (const mapping of model.cliModels) {
+      const key = `${mapping.model}\0${model.provider}\0${model.model}`
+      if (mapping.toolId !== tool.toolId || seen.has(key)) continue
+      seen.add(key)
+      raw.push({ cliModel: mapping.model, provider: model.provider, model: model.model, label: model.label })
+    }
+    if (!raw.length) continue
+    const counts = new Map()
+    for (const item of raw) counts.set(item.cliModel, (counts.get(item.cliModel) ?? 0) + 1)
+    official.push({
+      instanceId: `tool:${tool.toolId}`, label: tool.label, kind: 'official-tool', toolId: tool.toolId, access: 'cli',
+      models: raw.map(item => {
+        const shared = counts.get(item.cliModel) > 1
+        return {
+          id: shared ? `${item.cliModel}@${item.provider}/${item.model}` : item.cliModel,
+          label: shared ? `${item.label} · ${item.cliModel}` : item.cliModel,
+          provider: item.provider, model: item.model, cliModel: item.cliModel,
+        }
+      }).sort((left, right) => left.id.localeCompare(right.id)),
+    })
+  }
+  return [...api, ...official]
+}
 
 export function defaultBotSettings() {
   // `routing` is this Bot's own policy for work it hands out: null inherits the global one.
-  return { schemaVersion: 1, enabled: false, model: null, officialTools: [], machineGrants: [], capabilities: [], workspaceRef: null, routing: null,
+  // `selection` is the OpenMausBot-shaped engine binding. `model` remains the committed route.
+  return { schemaVersion: 1, enabled: false, model: null, selection: null, fallback: [], officialTools: [], machineGrants: [], capabilities: [], workspaceRef: null, routing: null,
     funding: { mode: 'api', scopeId: null, pricing: null, request: null, dailyBudgetUsd: null, monthlyBudgetUsd: null, subscription: null }, maxConcurrentTasks: 1 }
 }
 
 /** Closed stored schema. No executable paths, installer URLs, credentials or arbitrary roots. */
 export function normalizeBotSettings(input) {
-  keys(input, ['schemaVersion', 'enabled', 'model', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks', 'routing'], 'settings')
+  keys(input, ['schemaVersion', 'enabled', 'model', 'selection', 'fallback', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks', 'routing'], 'settings')
   const value = { ...defaultBotSettings(), ...input }
   if (value.schemaVersion !== 1) fail('BOT_SETTINGS_VERSION_UNSUPPORTED', 'Bot 绑定版本不受支持，请升级宿主。')
   if (typeof value.enabled !== 'boolean') fail('BOT_SETTINGS_INVALID', 'enabled 必须是布尔值。', { field: 'enabled' })
@@ -45,6 +113,9 @@ export function normalizeBotSettings(input) {
     if (!token(value.model.provider) || !token(value.model.model)) fail('BOT_SETTINGS_INVALID', '请选择目录中的准确 provider/model。', { field: 'model' })
     value.model = { provider: value.model.provider, model: value.model.model }
   }
+  value.selection = normalizeSelection(value.selection)
+  value.fallback = normalizeFallback(value.fallback)
+  if (value.selection && value.fallback.some(entry => selectionKey(entry) === selectionKey(value.selection))) fail('BOT_SETTINGS_DUPLICATE', '备用模型不能与主引擎上的同一模型重复。', { field: 'fallback' })
   value.officialTools = list(value.officialTools, 12, 'officialTools').map(tool => {
     keys(tool, ['toolId', 'cliModel', 'mode'], 'officialTools')
     if (!registry.has(tool.toolId)) fail('BOT_SETTINGS_UNKNOWN_TOOL', '官方工具必须来自 MR 固定注册表。', { field: 'officialTools' })
@@ -143,7 +214,7 @@ function catalogOf(input) {
       ...(scope.models ? { models: scope.models.map(model => ({ provider: model.provider, model: model.model })) } : {}) }
   })
   unique(fundingScopes.map(scope => scope.id), 'catalog.fundingScopes')
-  return { models, tools, machines, capabilities, fundingScopes }
+  return { models, tools, machines, capabilities, fundingScopes, engines: enginesFor(models, tools) }
 }
 
 /** Validate scope against host-owned exact catalog entries; never infer vendor from a name. */
@@ -152,6 +223,20 @@ export function validateBotSettings(input, catalogInput) {
   const denied = (message, field) => fail('BOT_SETTINGS_SCOPE_DENIED', message, { field })
   const model = settings.model && catalog.models.find(item => routeRef(item) === routeRef(settings.model))
   if (settings.model && !model) denied('此准确模型已不在宿主目录，请刷新后重新选择。', 'model')
+  const selected = engineOption(catalog, settings.selection)
+  if (settings.selection && !selected) denied('所选引擎或模型已不在宿主目录，请刷新后重新选择。', 'selection')
+  if (settings.selection && (!settings.model || routeRef(settings.model) !== routeRef(selected))) denied('引擎选择必须与已提交的准确 provider/model 一致。', 'selection')
+  if (selected?.cliModel) {
+    const engine = catalog.engines.find(item => item.instanceId === settings.selection.instanceId)
+    if (engine?.kind === 'official-tool' && !settings.officialTools.some(tool => tool.toolId === engine.toolId && tool.cliModel === selected.cliModel)) denied('使用官方工具作为引擎时，必须同时授予该工具及其已核验的 CLI 模型。', 'officialTools')
+  }
+  const seen = new Set(settings.selection ? [selectionKey(settings.selection)] : [])
+  for (const entry of settings.fallback) {
+    const key = selectionKey(entry)
+    if (seen.has(key)) denied('备用模型不能与主模型或其他备用项重复。', 'fallback')
+    seen.add(key)
+    if (!engineOption(catalog, entry)) denied('备用引擎或模型已不在宿主目录。', 'fallback')
+  }
   for (const tool of settings.officialTools) {
     const entry = catalog.tools.find(item => item.toolId === tool.toolId)
     if (!entry?.modes.includes(tool.mode)) denied(`${tool.toolId} 尚未获准使用该执行模式。`, 'officialTools')
@@ -184,7 +269,15 @@ function compiledGrant(settings, catalog) {
   const selected = new Set([...settings.capabilities, ...settings.machineGrants.flatMap(grant => grant.capabilities)])
   const tools = [...catalog.capabilities.filter(item => selected.has(item.id)).flatMap(item => item.tools),
     ...settings.officialTools.flatMap(tool => catalog.tools.find(item => item.toolId === tool.toolId)?.grantTools ?? [])]
+  // Fallback engines are recorded for a later host recovery step. They are not model authority.
   return { tools: [...new Set(tools)].sort(), modelRoutes: [{ ...settings.model }] }
+}
+
+function recoveryRoutes(settings, catalog) {
+  return settings.fallback.flatMap(entry => {
+    const option = engineOption(catalog, entry)
+    return option ? [{ instanceId: entry.instanceId, model: entry.model, provider: option.provider, routeModel: option.model }] : []
+  })
 }
 
 /** Isolated component tables, safe to colocate with other SQLite components. */
@@ -223,14 +316,14 @@ export function openBotSettings({ Database, file, catalogFor = () => ({}), botEx
       if (suspended.has(record.botId)) fail('BOT_SETTINGS_SUSPENDED', '授权同步失败，此 Bot 已暂停。请修复宿主授权回调后刷新。')
       let settings=normalizeBotSettings(record.settings),catalog
       if(settings.enabled)({settings,catalog}=validateBotSettings(settings,sync(catalogFor(record.botId),'catalogFor')))
-      else{try{catalog=catalogOf(sync(catalogFor(record.botId),'catalogFor'))}catch{catalog={models:[],tools:[],machines:[],capabilities:[],fundingScopes:[]}}}
+      else{try{catalog=catalogOf(sync(catalogFor(record.botId),'catalogFor'))}catch{catalog={models:[],tools:[],machines:[],capabilities:[],fundingScopes:[],engines:[]}}}
       const grant = compiledGrant(settings, catalog)
-      return { ...record, settings, catalog, grant, status: settings.enabled ? 'available' : 'blocked',
+      return { ...record, settings, catalog, grant, recoveryRoutes: recoveryRoutes(settings, catalog), status: settings.enabled ? 'available' : 'blocked',
         ...(!settings.enabled ? { blockedReason: record.revision ? '此 Bot 的执行绑定已停用。' : '此 Bot 尚未配置执行绑定。', nextAction: '选择目录中的模型、工作区及资金范围，确认后启用。' } : {}) }
     } catch (error) {
       let catalog
-      try { catalog = catalogOf(sync(catalogFor(record.botId), 'catalogFor')) } catch { catalog = { models: [], tools: [], machines: [], capabilities: [], fundingScopes: [] } }
-      return { ...record, catalog, grant: clone(EMPTY_GRANT), status: 'blocked', blockedReason: error.message, errorCode: error.code ?? 'BOT_SETTINGS_CORRUPT', nextAction: '刷新目录、修复配置或保持停用；未恢复前不会授予执行权限。' }
+      try { catalog = catalogOf(sync(catalogFor(record.botId), 'catalogFor')) } catch { catalog = { models: [], tools: [], machines: [], capabilities: [], fundingScopes: [], engines: [] } }
+      return { ...record, catalog, grant: clone(EMPTY_GRANT), recoveryRoutes: [], status: 'blocked', blockedReason: error.message, errorCode: error.code ?? 'BOT_SETTINGS_CORRUPT', nextAction: '刷新目录、修复配置或保持停用；未恢复前不会授予执行权限。' }
     }
   }
   const publish = (value, kind) => {
@@ -297,7 +390,7 @@ export function openBotSettings({ Database, file, catalogFor = () => ({}), botEx
       return ids.map(botId => { suspended.delete(botId); return get(botId) })
     },
     readModel(bots) {
-      alive(); const items = bots.map(bot => { const value = get(bot.id); return { ...value, model: value.settings.model, officialTools: value.settings.officialTools,
+      alive(); const items = bots.map(bot => { const value = get(bot.id); return { ...value, model: value.settings.model, selection: value.settings.selection, fallback: value.settings.fallback, officialTools: value.settings.officialTools,
         machineGrants: value.settings.machineGrants, workspaceRef: value.settings.workspaceRef, capabilities: value.settings.capabilities,
         tools: value.grant.tools, budgetScope: value.settings.funding.scopeId, maxConcurrentTasks: value.settings.maxConcurrentTasks } })
       return { status: 'available', items }

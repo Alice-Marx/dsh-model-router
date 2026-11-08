@@ -281,3 +281,31 @@ test('bot product UI: artifact download verifies before linking and reports expi
     assert.equal(container.querySelector('a[download]'),null)
   })
 })
+
+test('bot product UI: the binding rail offers an official tool engine beside API routes', async () => {
+  await withDom(async ({ root, container, click }) => {
+    const snapshot = sample()
+    snapshot.fundingAccounts = { status: 'available', items: [] }
+    snapshot.botBindings = { status: 'available', items: [{
+      botId: 'bot-main', revision: 3, status: 'blocked', blockedReason: '尚未启用',
+      settings: { enabled: false, model: null, selection: null, fallback: [], officialTools: [], capabilities: [], machineGrants: [], workspaceRef: null, funding: { mode: 'api' }, maxConcurrentTasks: 1, routing: null },
+      catalog: {
+        models: [{ provider: 'openai', model: 'gpt-exact', label: 'gpt-exact', cliModels: [{ toolId: 'codex', model: 'gpt-5.4' }] }],
+        tools: [{ toolId: 'codex', label: 'Codex CLI', modes: ['read-only'] }],
+        machines: [{ machineId: 'local-host', label: '本机', location: 'local', roots: [{ rootId: 'default', label: '默认', modes: ['read-only'] }] }],
+        capabilities: [], fundingScopes: [],
+        engines: [
+          { instanceId: 'api:openai', label: 'openai', kind: 'api', toolId: null, models: [{ id: 'gpt-exact', label: 'gpt-exact', provider: 'openai', model: 'gpt-exact', cliModel: null }] },
+          { instanceId: 'tool:codex', label: 'Codex CLI', kind: 'official-tool', toolId: 'codex', models: [{ id: 'gpt-5.4', label: 'gpt-5.4', provider: 'openai', model: 'gpt-exact', cliModel: 'gpt-5.4' }] },
+        ],
+      },
+    }] }
+    await act(async () => root.render(React.createElement(BotBindings, { snapshot, openSession: () => {}, dispatch: () => {}, busy: false })))
+    assert.match(container.textContent, /官方工具/)
+    assert.match(container.textContent, /API 路线/)
+    await click([...container.querySelectorAll('button')].find(button => button.textContent === 'Codex CLI'))
+    assert.match(container.textContent, /gpt-5.4/)
+    assert.match(container.textContent, /当前引擎/)
+    assert.match(container.textContent, /备用模型只作记录/)
+  })
+})

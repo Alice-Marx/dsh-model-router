@@ -148,7 +148,10 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
       <span className="bp-person-avatar"><UiIcon name="bot" size={23} /></span><span className="bp-person-copy"><strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}<small>{item.role || '尚未填写职责'}</small></span></button>)}</div>
     <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.main ? '团队协调 Bot' : '团队成员'}</p></div></div><button className="bp-button-primary" onClick={() => openSession(bot.sessionId)}>打开私聊<UiIcon name="arrow" size={15} /></button></div>
       <dl className="bp-facts"><Value label="职责">{bot.role || '未填写'}</Value>
-        <Value label="准确模型">{modelName(bot.model)}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value>
+        <Value label="准确模型">{modelName(bot.model)}</Value>
+        <Value label="引擎">{binding?.selection ? `${binding.selection.instanceId} / ${binding.selection.model}${binding.selection.effort ? ` · ${binding.selection.effort}` : ''}` : '沿用准确模型'}</Value>
+        <Value label="备用模型">{binding?.fallback?.length ? binding.fallback.map(item => `${item.instanceId}/${item.model}`).join('，') : '未记录'}</Value>
+        <Value label="模型策略">精确绑定；备用模型不授予额外路线</Value>
         <Value label="工作区">{binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? '未指定，请在 Bot 详情选择文件夹'}</Value>
         <Value label="执行位置">{binding?.machineId ?? binding?.workspaceRef?.machineId ?? '尚未取得宿主绑定'}</Value>
         <Value label="最大并发">{binding?.maxConcurrentTasks}</Value></dl>

@@ -123,7 +123,7 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 
 ## Build a persistent Bot workspace
 
-**Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings**, commit its allowed tools, computer/workspace access, and funding settings. Mark a coordinating Bot as **Main** when you want it to delegate work.
+**Full Bot edition.** Create a Bot and set its role and work directory. In **Bot bindings**, pick an engine on the provider rail: a configured API route, or a verified official tool such as Claude Code or Codex. Choose that engine's exact model and an optional reasoning effort, then commit tools, computer/workspace access, and funding. An ordered fallback list can be saved for a later host recovery step; those backups do not grant extra model routes. An official-tool engine also grants that tool in a host-verified execution mode. Mark a coordinating Bot as **Main** when you want it to delegate work.
 
 | To do this | Use this workflow |
 | --- | --- |

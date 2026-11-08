@@ -88,7 +88,7 @@ factory 提供 `ctx.botProductReadModel`，`version: 1`：
   返回 `{kind:'owner',...可信上下文}`；不要信任 JSON、任意 cookie 是否存在或 `botId`。
   未接入认证器时保留进程内服务，HTTP 入口不开放。
 
-UI 字段：bindings.items 每项以 botId 关联工具/权限/workspace/budgetScope；tasks.items
+UI 字段：bindings.items 每项以 botId 关联工具/权限/workspace/budgetScope，并带有引擎选择 `selection`（`instanceId`、`model`、可选 `effort`/`variant`）和有序 `fallback`。`fallback` 只记录备用引擎，不进入 `modelRoutes`。tasks.items
 沿用 taskId/botId/state/attempts/operationId/executionRef/reconciliation；machines.items
 使用 id/name/platform/version/status/lastSeenAt/capabilities/desktop/blockedReason；usage.items
 使用 Bot/Task 归属、source、准确 model、amountUsd、billing、status。未知金额使用 null，
