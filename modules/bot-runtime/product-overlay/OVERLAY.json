@@ -19,6 +19,20 @@
       }
     },
     {
+      "path": "src/client/engine-picker.js",
+      "kind": "product-file",
+      "summary": "Rail-and-list model picker: official tools, API and local providers, search across every model, a suggested short list, default badge and thinking-level pills."
+    },
+    {
+      "path": "src/client/model-menu.js",
+      "kind": "patched",
+      "summary": "The Bot model menu opens the rail-and-list EnginePicker in a wider popover; the anchored menu accepts a minimum width.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "78c28d9459e78ce4ffa9b3edc64d7d2218b02112eaf3b0ae204cf2700321b7a5"
+      }
+    },
+    {
       "path": "src/client/sidebar.js",
       "kind": "patched",
       "summary": "Renders the product's sidebarAddon (the router panel navigation) under the team list.",

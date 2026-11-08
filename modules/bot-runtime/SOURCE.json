@@ -23,6 +23,20 @@
       }
     },
     {
+      "path": "src/client/engine-picker.js",
+      "kind": "product-file",
+      "summary": "Rail-and-list model picker: official tools, API and local providers, search across every model, a suggested short list, default badge and thinking-level pills."
+    },
+    {
+      "path": "src/client/model-menu.js",
+      "kind": "patched",
+      "summary": "The Bot model menu opens the rail-and-list EnginePicker in a wider popover; the anchored menu accepts a minimum width.",
+      "base": {
+        "commit": "71d344bf193f3f18185f25de3d8e5c483046910a",
+        "sha256": "78c28d9459e78ce4ffa9b3edc64d7d2218b02112eaf3b0ae204cf2700321b7a5"
+      }
+    },
+    {
       "path": "src/client/sidebar.js",
       "kind": "patched",
       "summary": "Renders the product's sidebarAddon (the router panel navigation) under the team list.",
@@ -112,8 +126,8 @@
     {
       "path": "vendor/ds-bot/client.js",
       "sourcePath": "ds-bot/client.js",
-      "sha256": "0001edd74a091d3f523d99b0cdaf855dacaffe476d7e07e87dd016025e23318a",
-      "gitBlob": "f8a98ff50f3ce121471744ae7a2a7a326d5dc3fb",
+      "sha256": "d27271c74be8167105d4a1162314f7a7d84421c08229562438c3e519399a3df0",
+      "gitBlob": "246c3dcf87c65503d71a182bd5711186179778e3",
       "origin": "generated"
     },
     {
@@ -621,6 +635,13 @@
       "origin": "upstream"
     },
     {
+      "path": "vendor/ds-bot/src/client/engine-picker.js",
+      "sourcePath": "ds-bot/src/client/engine-picker.js",
+      "sha256": "9f50f35185fce5437641ea864a0cb2b1c167c753255609709dea8f811c34c871",
+      "gitBlob": "745c095bec6731d63ec7335e83e90da5b0d79ae8",
+      "origin": "overlay"
+    },
+    {
       "path": "vendor/ds-bot/src/client/enter-key.js",
       "sourcePath": "ds-bot/src/client/enter-key.js",
       "sha256": "3a737196e9de5fb510a26c61e7e4c584f86170694b5532e1ea19fb0683045119",
@@ -784,9 +805,9 @@
     {
       "path": "vendor/ds-bot/src/client/model-menu.js",
       "sourcePath": "ds-bot/src/client/model-menu.js",
-      "sha256": "78c28d9459e78ce4ffa9b3edc64d7d2218b02112eaf3b0ae204cf2700321b7a5",
-      "gitBlob": "6a6d477ee1b478396bc5b6002ce161a70c45839a",
-      "origin": "upstream"
+      "sha256": "2771171cbf307eb94bb0da2676a8b5dfc9d1ac4548d601d83fffc71ab7b624dd",
+      "gitBlob": "c01924180604d56dda73c5c27ff2a8e15b2badbd",
+      "origin": "overlay"
     },
     {
       "path": "vendor/ds-bot/src/client/motion.js",

@@ -79,6 +79,7 @@
       "tests/official-engines.test.mjs",
       "tests/quick-binding.native.mjs",
       "tests/product-quick-pages.integration.test.mjs",
+      "tests/engine-picker.integration.test.mjs",
       "tests/contracts.test.mjs",
       "tests/architecture-boundaries.test.mjs",
       "tests/test-plan-coverage.test.mjs"

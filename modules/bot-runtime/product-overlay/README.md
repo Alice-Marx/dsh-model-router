@@ -47,6 +47,8 @@ node scripts/check-upstream-parity.mjs [--source ../DS-Bot-upstream] [--diff]
 | --- | --- |
 | `src/client/desktop-pane.js` | Grok Bot 式远程桌面页：仅观看 / 取得控制权、小卡与放大窗。本身不持有任何权限，全部通过产品客户端注册在 `globalThis.__dshDesktop` 上的桥调用。桥上有 `renderPane` 时交给产品自己的桌面前端，否则回退到本页。 |
 | `src/client/details-drawer.js` | 1:1 Bot 的抽屉增加「电脑操作」页签并渲染 `DesktopPane`。 |
+| `src/client/engine-picker.js` | 左侧供应商栏 + 右侧模型列表的模型选择器：官方工具 / API / 本地三组，跨供应商搜索，「推荐」前 5 个与「显示全部」，默认标记，思考强度胶囊。只负责选出路由，资金与权限仍以宿主已提交的绑定为准。颜色只用 `--bt-*` 变量。 |
+| `src/client/model-menu.js` | Bot 的模型菜单改为在更宽的弹层中打开 `EnginePicker`；`useAnchoredMenu` 接受最小宽度。 |
 | `src/client/sidebar.js` | 在团队列表下渲染 `actions.sidebarAddon`（MR 面板导航）。 |
 | `src/client/index.js` | `sidebar.workspaces` 槽位探测接受被产品包装过的 `TeamSidebar`（`dsBotTeamSidebar`）。 |
 
