@@ -86,7 +86,7 @@ export function BrainPicker({ botName, catalog, selection, onChange, readEngines
     {items.map(item => {
       const status = engineStatus(item)
       return <button key={item.id} type="button" className="bp-brain-engine" role="tab" aria-selected={item.id === engine?.id} aria-controls={paneId}
-        aria-label={`${item.label}（${status.text}）`} title={item.label} onClick={() => choose(item.id)}
+        aria-label={`${item.label}（${status.text}）`} title={`${item.label} · ${status.text}`} onClick={() => choose(item.id)}
         data-attention={status.tone === 'warning' ? 'true' : undefined} data-attached={attachedCount(item) ? 'true' : undefined}>
         <EngineMark mark={engineMark(item.label, item.toolId)} size="sm" />
       </button>

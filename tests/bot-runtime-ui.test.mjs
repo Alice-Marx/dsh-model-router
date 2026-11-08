@@ -311,9 +311,10 @@ test('bot product UI: the brain picker binds an exact route and official tools i
     assert.match(trigger.getAttribute('aria-label'), /openai\/gpt-exact/)
     await click(trigger)
     assert.deepEqual(reads, [{}], 'opening reads cached readiness once, without re-probing')
-    const tab = label => [...container.querySelectorAll('[role=tab]')].find(button => button.getAttribute('title') === label)
+    const tab = label => [...container.querySelectorAll('[role=tab]')].find(button => button.getAttribute('aria-label').startsWith(`${label}（`))
     assert.ok(tab('openai') && tab('deepseek') && tab('Codex CLI') && tab('Claude Code'), 'API providers and official tools share one rail')
     assert.equal(tab('Claude Code').dataset.attention, 'true')
+    assert.equal(tab('Claude Code').getAttribute('title'), 'Claude Code · 需要登录', 'the tooltip carries the status, as in OpenMausBot')
 
     await click(tab('deepseek'))
     await click([...container.querySelectorAll('[role=option]')].find(button => button.textContent.includes('deepseek-chat')))
@@ -356,8 +357,8 @@ test('bot product UI: without the readiness action the picker still binds API ro
     snapshot.fundingAccounts = { status: 'available', items: [] }
     await act(async () => root.render(React.createElement(BotBindings, { snapshot, openSession: () => {}, dispatch: async () => {} })))
     await click(container.querySelector('.bp-brain-trigger'))
-    const titles = [...container.querySelectorAll('[role=tab]')].map(button => button.getAttribute('title'))
-    assert.deepEqual(titles, ['openai', 'deepseek'])
+    const names = [...container.querySelectorAll('[role=tab]')].map(button => button.getAttribute('aria-label').replace(/（.*$/, ''))
+    assert.deepEqual(names, ['openai', 'deepseek'])
     assert.equal(container.querySelector('.bp-brain-foot button'), null, 'no settings link without a place to open')
   })
 })

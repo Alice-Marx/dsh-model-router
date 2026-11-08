@@ -33911,7 +33911,7 @@ function BrainPicker({ botName, catalog, selection, onChange, readEngines, openT
         "aria-selected": item.id === engine?.id,
         "aria-controls": paneId,
         "aria-label": `${item.label}（${status.text}）`,
-        title: item.label,
+        title: `${item.label} · ${status.text}`,
         onClick: () => choose(item.id),
         "data-attention": status.tone === "warning" ? "true" : void 0,
         "data-attached": attachedCount(item) ? "true" : void 0
