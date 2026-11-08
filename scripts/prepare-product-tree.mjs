@@ -16,7 +16,7 @@ const tracked = [...new Set(execFileSync('git', ['ls-files', '-c', '-o', '--excl
 }).split('\0').filter(Boolean))]
 const top = new Set(['.gitignore', '.gitattributes', 'AGENTS.md', 'LICENSE', 'README.md', 'README.zh.md',
   'README.i18n.yaml', 'package.json', 'package-lock.json', 'cordis.patch.yml',
-  'docs/integration/agents-anywhere-tasks.md', 'docs/releases/0.65.0-validation.md'])
+  'docs/integration/agents-anywhere-tasks.md', 'docs/integration/openmausbot-study.md', 'docs/releases/0.65.0-validation.md'])
 const prefixes = ['.github/assets/', '.dsh-plugin/', 'apps/integration-client/', 'apps/desktop-client/', 'packages/',
   'modules/bot-runtime/', 'modules/independent-runtime/', 'native/', 'remote-computer-agent/', 'deploy/']
 const scripts = ['build-client.mjs', 'build-router-package.mjs', 'sync-ds-bot.mjs', 'prepack.mjs', 'check-readme.mjs',
