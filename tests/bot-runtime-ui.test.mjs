@@ -146,6 +146,44 @@ test('bot product UI: a plan with unconfirmed stop retains dependency states and
   })
 })
 
+test('bot product UI: the brain rail grants only a host-verified official tool', async () => {
+  await withDom(async ({ root, container, click }) => {
+    const snapshot = sample()
+    snapshot.fundingAccounts = { items: [] }
+    snapshot.botBindings = { status: 'available', items: [{
+      botId: 'bot-main', revision: 3, status: 'blocked', blockedReason: '此 Bot 尚未配置执行绑定。', nextAction: '选择目录中的模型。',
+      settings: { enabled: false, model: null, officialTools: [], machineGrants: [], capabilities: ['model-inference'], workspaceRef: null, routing: null, maxConcurrentTasks: 1,
+        funding: { mode: 'api', scopeId: null, pricing: null, request: null, dailyBudgetUsd: null, monthlyBudgetUsd: null, subscription: null } },
+      catalog: {
+        models: [
+          { provider: 'anthropic', model: 'claude-sonnet', label: 'Claude Sonnet', cliModels: [{ toolId: 'claude-code', model: 'claude-sonnet' }] },
+          { provider: 'openai', model: 'gpt-exact', label: 'GPT', cliModels: [] },
+        ],
+        tools: [
+          { toolId: 'claude-code', label: 'Claude Code', vendor: 'Anthropic', source: '厂商官方 CLI', modes: ['read-only'] },
+          { toolId: 'kimi-code', label: 'Kimi Code', vendor: 'Moonshot', source: '厂商官方 CLI', modes: [] },
+        ],
+        machines: [{ machineId: 'local', label: '本机', location: 'local', roots: [{ rootId: 'default', label: '默认工作区', modes: ['read-only', 'workspace-write'] }] }],
+        capabilities: [{ id: 'model-inference', label: '模型推理' }],
+      },
+      officialTools: [], tools: [],
+    }] }
+    await act(async () => root.render(React.createElement(BotBindings, { snapshot, openSession: () => {}, dispatch: async () => {}, busy: false })))
+    assert.match(container.textContent, /大脑/)
+    assert.match(container.textContent, /对话与执行授权使用同一条已配置路线/)
+    const claude = container.querySelector('input[aria-label="Main 的 Claude Code"]')
+    const kimi = container.querySelector('input[aria-label="Main 的 Kimi Code"]')
+    assert.equal(claude.disabled, true)
+    assert.equal(kimi.disabled, true)
+    assert.match(container.textContent, /先选定这个 Bot 的大脑/)
+    await click([...container.querySelectorAll('button')].find(button => button.textContent.includes('Claude Sonnet')))
+    assert.equal(container.querySelector('input[aria-label="Main 的 Claude Code"]').disabled, false)
+    assert.equal(container.querySelector('input[aria-label="Main 的 Kimi Code"]').disabled, true)
+    assert.match(container.textContent, /宿主尚未开放此工具的执行模式/)
+    assert.match(container.textContent, /当前大脑/)
+  })
+})
+
 test('bot product UI: Bot identity, exact model and permission blocker remain separate', async () => {
   await withDom(async ({ root, container, click }) => {
     const snapshot = sample()

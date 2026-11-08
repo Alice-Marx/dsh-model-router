@@ -269,6 +269,9 @@ body[data-bot-product-ui] .mr-workspace { background: var(--bp-bg); color: var(-
 .bp-spinning { animation: bp-spin 1s linear infinite; }
 @keyframes bp-spin { to { transform: rotate(360deg); } }
 @container (max-width: 720px) {
+  .bp-engine { grid-template-columns: 1fr; }
+  .bp-engine-rail { flex-direction: row; overflow: auto; border-right: 0; border-bottom: 1px solid var(--bp-border); }
+  .bp-engine-rail button { width: auto; flex: none; }
   .bp-columns { grid-template-columns: 1fr; }
   .bp-bot-list { display: flex; overflow: auto; }
   .bp-bot-list button { flex-shrink: 0; min-width: 170px; }
@@ -295,6 +298,39 @@ body[data-bot-product-ui] .mr-workspace { background: var(--bp-bg); color: var(-
 @media (prefers-reduced-motion: reduce) {
   .bp-page *, .bp-nav *, .bp-desktop-viewer * { animation: none !important; transition: none !important; }
 }
+.bp-brain-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 2px; padding: 12px 14px; border: 1px solid var(--bp-border); border-radius: 10px; background: var(--bp-subtle); }
+.bp-brain-line > span { color: var(--bp-muted); font-size: 11px; }
+.bp-brain-line strong { font-size: 14px; font-weight: 600; letter-spacing: -.02em; }
+.bp-brain-line small { margin: 0; font-size: 11px; }
+.bp-brain-field { display: grid; gap: 8px; position: relative; }
+.bp-brain-field > span { color: var(--bp-ink); font-size: 13px; font-weight: 600; }
+.bp-required-proxy { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+.bp-engine { display: grid; grid-template-columns: 168px minmax(0, 1fr); min-height: 240px; border: 1px solid var(--bp-border); border-radius: 12px; overflow: hidden; background: var(--bp-surface); }
+.bp-engine-rail { display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--bp-subtle); border-right: 1px solid var(--bp-border); }
+.bp-engine-rail button { justify-content: space-between; width: 100%; border-color: transparent; background: transparent; text-align: left; }
+.bp-engine-rail button[aria-pressed=true] { background: var(--bp-surface); border-color: var(--bp-border); }
+.bp-engine-rail small, .bp-engine-models small { margin: 0; color: var(--bp-muted); font-size: 11px; }
+.bp-engine-main { display: flex; flex-direction: column; min-width: 0; }
+.bp-engine-search { display: grid; gap: 6px; margin: 10px 10px 0; color: var(--bp-muted); font-size: 12px; }
+.bp-engine-models { display: grid; align-content: start; gap: 6px; padding: 10px; max-height: 320px; overflow: auto; }
+.bp-engine-models button { justify-content: space-between; width: 100%; text-align: left; gap: 12px; }
+.bp-engine-models button span { display: grid; min-width: 0; }
+.bp-engine-models button strong { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.bp-engine-models button[aria-checked=true] { border-color: var(--bp-ink); background: var(--bp-subtle); }
+.bp-engine-models em { font-style: normal; font-size: 11px; color: var(--bp-muted); white-space: nowrap; }
+.bp-tool-module { margin: 0; padding: 0; border: 0; min-width: 0; }
+.bp-tool-module > legend { color: var(--bp-ink); font-size: 13px; font-weight: 600; }
+.bp-tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.bp-tool-card { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--bp-border); border-radius: 10px; background: var(--bp-subtle); }
+.bp-tool-card[data-status=closed], .bp-tool-card[data-status=unverified], .bp-tool-card[data-status=needs-brain] { background: var(--bp-surface); }
+.bp-tool-card header label { display: flex; align-items: flex-start; gap: 8px; color: var(--bp-ink); }
+.bp-tool-card header span { display: grid; min-width: 0; }
+.bp-tool-card header strong { font-size: 13px; font-weight: 550; }
+.bp-tool-card header small, .bp-tool-card p { margin: 0; color: var(--bp-muted); font-size: 12px; }
+.bp-tool-card[data-status=on] { border-color: var(--bp-ink); background: var(--bp-surface); }
+.bp-tool-summary { list-style: none; display: grid; gap: 6px; margin: 8px 0 0; padding: 0; }
+.bp-tool-summary li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--bp-border); border-radius: 8px; background: var(--bp-subtle); }
+.bp-tool-summary span { color: var(--bp-muted); font-size: 12px; }
 .bp-submission-code { width: 100%; min-width: 0; box-sizing: border-box; font-family: var(--bp-mono, monospace); }
 .bp-submission-restore { display: grid; gap: 10px; margin-top: 10px; }
 .bp-submission-restore > button { justify-self: start; }

@@ -125,6 +125,8 @@ An interactive terminal exposes the installed tool's own workflow and capabiliti
 
 **Full Bot edition.** Create a Bot, select an exact configured model, and set its role and work directory. In **Bot bindings**, commit its allowed tools, computer/workspace access, and funding settings. Mark a coordinating Bot as **Main** when you want it to delegate work.
 
+Each Bot's brain is chosen in **Bot bindings**. Configured providers stay on the left, and the exact models for the selected provider stay on the right. After you save, the private conversation and the execution grant use that same route. A model absent from the host catalog cannot be enabled. Native tools sit in a separate module beside the brain. A tool can be granted only after the host has opened an execution mode and verified that tool's CLI identity for the current brain. Computers remain the Windows machines you pair yourself.
+
 | To do this | Use this workflow |
 | --- | --- |
 | Hold a private conversation | Select a Bot in the sidebar, send a message, and respond to questions or approval cards as they appear. |

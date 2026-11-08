@@ -147,13 +147,17 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
     <div className="bp-bot-list" aria-label="Bot 列表">{bots.map(item => <button key={item.id} aria-current={item.id === bot?.id ? 'true' : undefined} onClick={() => setSelected(item.id)}>
       <span className="bp-person-avatar"><UiIcon name="bot" size={23} /></span><span className="bp-person-copy"><strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}<small>{item.role || '尚未填写职责'}</small></span></button>)}</div>
     <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.main ? '团队协调 Bot' : '团队成员'}</p></div></div><button className="bp-button-primary" onClick={() => openSession(bot.sessionId)}>打开私聊<UiIcon name="arrow" size={15} /></button></div>
+      <div className="bp-brain-line"><span>大脑</span><strong>{modelName(bot.model)}</strong><small>对话与执行授权使用同一条已配置路线</small></div>
       <dl className="bp-facts"><Value label="职责">{bot.role || '未填写'}</Value>
         <Value label="准确模型">{modelName(bot.model)}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value>
         <Value label="工作区">{binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? '未指定，请在 Bot 详情选择文件夹'}</Value>
         <Value label="执行位置">{binding?.machineId ?? binding?.workspaceRef?.machineId ?? '尚未取得宿主绑定'}</Value>
         <Value label="最大并发">{binding?.maxConcurrentTasks}</Value></dl>
       {section?.status === 'blocked' ? <Blocked value={section} /> : binding ? <>
-        <h3>官方工具</h3>{binding.officialTools?.length ? <ul>{binding.officialTools.map(tool => <li key={tool.toolId}>{tool.toolId} · {tool.cliModel ?? '未核验模型'} · {tool.identityStatus ?? tool.identityPolicy ?? '未知'}</li>)}</ul> : <p className="bp-muted">此 Bot 没有官方工具绑定。</p>}
+        <h3>官方工具</h3>{binding.officialTools?.length ? <ul className="bp-tool-summary">{binding.officialTools.map(tool => {
+          const known = binding.catalog?.tools?.find(item => item.toolId === tool.toolId)
+          return <li key={tool.toolId}><strong>{known?.label ?? tool.toolId}</strong><span>{tool.cliModel ?? '未核验模型'} · {tool.mode ?? tool.identityStatus ?? tool.identityPolicy ?? '未知'}</span></li>
+        })}</ul> : <p className="bp-muted">尚未授予官方工具。这个 Bot 的大脑仍然可以对话。</p>}
         <h3>有效权限 <span className="bp-inline-count">{capabilities.length} 项</span></h3><div className="bp-permission-chips">{permissionGroups.map(label => <span key={label}><UiIcon name="check" size={13} />{label}</span>)}{!capabilities.length && <p className="bp-muted">无额外能力</p>}</div>
         {binding.blockedReason && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
       </> : <Blocked value={{ reason: '此 Bot 尚未取得有效绑定。', nextAction: '在宿主 Bot 绑定配置中授予明确工具、机器与工作区。' }} />}
@@ -928,7 +932,7 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
   const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
   const meta = {
-    bindings: ['team', '让每位伙伴各司其职。管理模型、工具和工作空间。'],
+    bindings: ['team', '为每个 Bot 选定一个大脑，并单独授予宿主已核验的官方工具。'],
     tasks: ['tasks', '把工作交给合适的 Bot，在这里关注进展与结果。'],
     machines: ['computer', '连接你自己的电脑，随时查看桌面或接过控制权。'],
     library: ['folder', '给 Bot 一份有序的资料，让每次协作都有据可循。'],
