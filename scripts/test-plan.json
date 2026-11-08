@@ -76,6 +76,7 @@
       "tests/package-editions.test.mjs",
       "tests/workbench-navigation.test.mjs",
       "tests/write-retry.test.mjs",
+      "tests/official-engines.test.mjs",
       "tests/contracts.test.mjs",
       "tests/architecture-boundaries.test.mjs",
       "tests/test-plan-coverage.test.mjs"

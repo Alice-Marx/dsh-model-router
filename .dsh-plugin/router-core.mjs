@@ -52,6 +52,7 @@ import {
   installCommandLineFor,
   installMethodFor,
   installMethodsFor,
+  isEngineProvider,
   toolForProvider,
 } from './shared/official-tool-registry.mjs'
 import { parseInstallPreferences, resolveInstallPlan } from './shared/tool-install-preferences.mjs'
@@ -177,7 +178,7 @@ export async function discoverConfiguredRoutes(ctx, signal) {
   const routes = new Map()
   for (const entry of Array.isArray(providers) ? providers : []) {
     const provider = text(typeof entry === 'string' ? entry : entry?.id)
-    if (!provider) continue
+    if (!provider || isEngineProvider(provider)) continue
     throwIfAborted(signal)
     let models
     try { models = await ctx.llm.listModels(provider) } catch {

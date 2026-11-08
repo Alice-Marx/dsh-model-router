@@ -509,6 +509,21 @@ export function toolForProvider(provider) {
   return null
 }
 
+/**
+ * Model providers the Bot product registers for official CLIs used as engines.
+ * They are subscription CLIs, not priced API routes, so the router's own
+ * automatic routing never offers them as API candidates.
+ */
+export const ENGINE_PROVIDER_TOOLS = Object.freeze({
+  'engine-claude-code': 'claude-code',
+  'engine-codex': 'codex',
+  'engine-gemini': 'gemini',
+})
+
+export function isEngineProvider(provider) {
+  return typeof provider === 'string' && Object.hasOwn(ENGINE_PROVIDER_TOOLS, provider)
+}
+
 /** Every installation method declared by a tool. */
 export function installMethodsFor(tool) {
   return Array.isArray(tool?.installMethods) ? tool.installMethods : []

@@ -12,6 +12,7 @@ import { createDiagnosticAccountStream, startBotProduct } from '../packages/orch
 import { createDeferredRouterState } from '../packages/orchestration/src/deferred-router-state.mjs'
 import { BotRuntimeConfig, normalizeBotRuntimeConfig } from '../packages/orchestration/src/bot-runtime-config.mjs'
 import { assertMigrationStartupAllowed } from '../packages/orchestration/src/migration-startup-gate.mjs'
+import { registerOfficialEngines } from '../packages/orchestration/src/official-engines.mjs'
 
 export const inject = botRuntimeInject
 export const configFields = {
@@ -28,6 +29,12 @@ export const configFields = {
       .default({ machineTools: true, cliTools: false }),
   }).default({ enabled: false, preset: 'balanced', autoGrant: { machineTools: true, cliTools: false } }),
   operatorPassthrough: z.object({ enabled: z.boolean().default(true) }).default({ enabled: true }),
+  // Official CLIs (Claude Code, Codex, Gemini CLI) offered as Bot model engines.
+  // They run read-only with the CLI's own subscription login, never an API key.
+  officialEngines: z.object({
+    enabled: z.boolean().default(true),
+    timeoutSeconds: z.number().step(1).min(30).max(1800).default(600),
+  }).default({ enabled: true, timeoutSeconds: 600 }),
   independentRuntime: z.object({
     enabled: z.boolean().default(false), provider: z.string().default(''), model: z.string().default(''),
     dir: z.string().max(4096).default(''), workspaceRoot: z.string().max(4096).default(''),
@@ -65,6 +72,12 @@ export function start(ctx, config, { installRouterStateStore, executeConfiguredA
     const storageFile = join(resolveStateHome(), 'model-router', 'orchestration.sqlite')
     deferredRouterState = createDeferredRouterState({ file: storageFile })
     installRouterStateStore(deferredRouterState.state)
+  }
+  const engines = (() => { const value = config?.officialEngines; return (typeof value === 'function' ? value() : value) ?? {} })()
+  if (productHost && engines.enabled !== false) {
+    const timeoutSeconds = Number.isSafeInteger(engines.timeoutSeconds) ? engines.timeoutSeconds : 600
+    ctx.effect(() => registerOfficialEngines(ctx, { stateDir: join(resolveStateHome(), 'model-router'), timeoutMs: timeoutSeconds * 1000 }),
+      'model-router-galgame: official engines')
   }
   let botProduct
   const taskCli = (() => { const value = config?.taskCli; return (typeof value === 'function' ? value() : value) ?? null })()
