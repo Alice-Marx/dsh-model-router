@@ -30,16 +30,19 @@ const routeRef = value => `${value.provider}/${value.model}`
 
 export function defaultBotSettings() {
   // `routing` is this Bot's own policy for work it hands out: null inherits the global one.
-  return { schemaVersion: 1, enabled: false, model: null, officialTools: [], machineGrants: [], capabilities: [], workspaceRef: null, routing: null,
+  // `quickBinding` lets a Bot without an enabled advanced binding run on the model picked in
+  // its chat under the owner's quick policy; false stops its model calls entirely.
+  return { schemaVersion: 1, enabled: false, quickBinding: true, model: null, officialTools: [], machineGrants: [], capabilities: [], workspaceRef: null, routing: null,
     funding: { mode: 'api', scopeId: null, pricing: null, request: null, dailyBudgetUsd: null, monthlyBudgetUsd: null, subscription: null }, maxConcurrentTasks: 1 }
 }
 
 /** Closed stored schema. No executable paths, installer URLs, credentials or arbitrary roots. */
 export function normalizeBotSettings(input) {
-  keys(input, ['schemaVersion', 'enabled', 'model', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks', 'routing'], 'settings')
+  keys(input, ['schemaVersion', 'enabled', 'quickBinding', 'model', 'officialTools', 'machineGrants', 'capabilities', 'workspaceRef', 'funding', 'maxConcurrentTasks', 'routing'], 'settings')
   const value = { ...defaultBotSettings(), ...input }
   if (value.schemaVersion !== 1) fail('BOT_SETTINGS_VERSION_UNSUPPORTED', 'Bot 绑定版本不受支持，请升级宿主。')
   if (typeof value.enabled !== 'boolean') fail('BOT_SETTINGS_INVALID', 'enabled 必须是布尔值。', { field: 'enabled' })
+  if (typeof value.quickBinding !== 'boolean') fail('BOT_SETTINGS_INVALID', 'quickBinding 必须是布尔值。', { field: 'quickBinding' })
   if (value.model !== null) {
     keys(value.model, ['provider', 'model'], 'model')
     if (!token(value.model.provider) || !token(value.model.model)) fail('BOT_SETTINGS_INVALID', '请选择目录中的准确 provider/model。', { field: 'model' })
@@ -226,7 +229,8 @@ export function openBotSettings({ Database, file, catalogFor = () => ({}), botEx
       else{try{catalog=catalogOf(sync(catalogFor(record.botId),'catalogFor'))}catch{catalog={models:[],tools:[],machines:[],capabilities:[],fundingScopes:[]}}}
       const grant = compiledGrant(settings, catalog)
       return { ...record, settings, catalog, grant, status: settings.enabled ? 'available' : 'blocked',
-        ...(!settings.enabled ? { blockedReason: record.revision ? '此 Bot 的执行绑定已停用。' : '此 Bot 尚未配置执行绑定。', nextAction: '选择目录中的模型、工作区及资金范围，确认后启用。' } : {}) }
+        ...(!settings.enabled ? { blockedReason: !settings.quickBinding ? '此 Bot 的模型调用已停用。' : record.revision ? '此 Bot 的高级绑定未启用。' : '此 Bot 尚未配置高级绑定。',
+          nextAction: settings.quickBinding ? '快速模式会按聊天里选择的模型运行；需要精确资金、工具或机器授权时再启用高级绑定。' : '重新打开快速模式，或选择目录中的模型、工作区及资金范围后启用高级绑定。' } : {}) }
     } catch (error) {
       let catalog
       try { catalog = catalogOf(sync(catalogFor(record.botId), 'catalogFor')) } catch { catalog = { models: [], tools: [], machines: [], capabilities: [], fundingScopes: [] } }

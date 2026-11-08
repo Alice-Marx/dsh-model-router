@@ -5,7 +5,16 @@ import {managedModelRequest,taskModelRequest} from './model-receipt.mjs'
 import {assessFundingAdmission} from './funding-admission.mjs'
 import {taskHash} from './task-contract.mjs'
 
-const fail=code=>{throw Object.assign(new Error(code),{code})}
+// The code stays the message prefix: callers and logs match on it.
+const HINTS=Object.freeze({
+  MODEL_FUNDING_REQUIRED:'此 Bot 没有可用的资金来源。请在「Bot 与模型」打开快速模式，或启用高级绑定。',
+  MODEL_PRICE_REQUIRED:'此模型还没有价格，按 API 计费前必须知道价格。请在「Bot 与模型 › 快速模式」填写每百万 Token 价格，或改用官方工具引擎。',
+  MODEL_WAITING_BUDGET:'预算已用完，或有尚未核对的费用。请在「费用与用量」核对收据，或调高预算后再试。',
+  MODEL_SUBSCRIPTION_LIMIT:'订阅调用次数已达上限。请等到下一个周期，或调高次数限制。',
+  MODEL_ESTIMATE_REQUIRED:'缺少请求上界，无法预估费用。请填写最大输入与输出 Token。',
+  MODEL_INPUT_BOUNDARY_REQUIRED:'缺少输入 Token 上界，无法预估费用。',
+})
+const fail=code=>{throw Object.assign(new Error(HINTS[code]?`${code}：${HINTS[code]}`:code),{code})}
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r});return {promise,resolve}}
 const uuid=prefix=>`${prefix}-${randomUUID()}`
 function requestHash(options){

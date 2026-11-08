@@ -2287,7 +2287,8 @@ export function routerRemoteServices(ctx, config, { terminals = null, assertPref
 
 /** Register model-facing tools and the human /router command. */
 export function apply(ctx, config = {}, product = null) {
-  product?.start?.(ctx, config, { installRouterStateStore, executeConfiguredAssignment, rerunRecordedStep, routerStateStore })
+  product?.start?.(ctx, config, { installRouterStateStore, executeConfiguredAssignment, rerunRecordedStep, routerStateStore,
+    toolHealth: fresh => fresh === true ? toolHealthReport({ fresh: true }) : currentHealth() })
   guardLegacyTools(ctx, config)
   // Install addresses (directory, npm source, per-tool method and script source)
   // are volatile refs: Loader changes them without re-applying the plugin.

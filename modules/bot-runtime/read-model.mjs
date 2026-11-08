@@ -9,6 +9,8 @@ const missing = {
   tasks: blocked('宿主尚未提供统一任务服务的只读投影。', '接入 Task Service 后，可在这里跟踪、取消或核对任务。'),
   machines: blocked('尚未接入远程电脑目录。', '安装并配对同版本 remote-computer-agent，然后在机器目录中登记。'),
   usage: blocked('宿主尚未提供统一费用与预占投影。', '接入唯一 MR 资金库的只读投影；已有 Token 用量仍可在 DS 用量页查看。'),
+  engines: blocked('宿主尚未提供官方工具引擎状态。', '在完整 Bot 产品宿主中启用官方工具引擎后刷新。'),
+  quickBinding: blocked('宿主尚未提供快速模式设置。', '接入 Bot 设置服务后，可在这里设置快速模式的预算与价格。'),
 }
 const ACTIONS = new Set([
   'task.inspect', 'task.cancel', 'task.retry', 'task.reconcile', 'task.plan.submit', 'task.plan.cancel', 'usage.resolve',
@@ -17,6 +19,7 @@ const ACTIONS = new Set([
   'machine.desktop.open', 'machine.desktop.renew', 'machine.desktop.close',
   'library.list', 'library.read', 'library.write', 'library.upload', 'library.download', 'library.remove', 'library.mkdir', 'library.search',
   'routine.list', 'routine.run', 'routine.save', 'routine.remove', 'routine.history', 'routine.cancel', 'routine.resolve', 'roles.list',
+  'templates.list', 'bot.template.create', 'engines.refresh', 'quickBinding.save', 'binding.quick',
   'botRoutingInspect', 'botRoutingDecide', 'botRouting.dispatch', 'botRouting.save', 'botRouting.status',
   'botRuntimeStatus', 'botRuntimeMove', 'botRuntimeHistory', 'botRuntimeMessage',
 ])

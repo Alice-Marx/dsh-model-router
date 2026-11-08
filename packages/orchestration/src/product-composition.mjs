@@ -7,6 +7,9 @@ import { createMachineHeartbeat } from './machine-heartbeat.mjs'
 import { pairMainMachine } from './pair-main-machine.mjs'
 import { assertHandoffAllowed, buildHandoff, createHandoffLedger } from './bot-handoff.mjs'
 import { listRoles } from './bot-roles.mjs'
+import { listBotTemplates, templateBotRequest } from './bot-templates.mjs'
+import { openQuickBindingSettings, profilePrices, quickFunding } from './quick-binding.mjs'
+import { OFFICIAL_ENGINES } from './official-engines.mjs'
 import { hostname } from 'node:os'
 import { join, dirname, isAbsolute } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -48,6 +51,13 @@ export const PRODUCT_TOOLS = Object.freeze(['model/infer',
   'tool/model_router_tool_install', 'tool/model_router_tool_repair', 'tool/model_router_tool_uninstall', 'tool/model_router_rate',
   'command/router', 'tool/bot_library_list', 'tool/bot_library_read', 'tool/bot_library_write', 'tool/bot_library_search', 'tool/bot_route_task',
   'tool/bot_routine_list', 'tool/bot_routine_save', 'tool/bot_routine_run'])
+// A quick-bound Bot talks, keeps its library and routines, and asks the router
+// for advice. Running other models, installing tools or MR execution stays with
+// an advanced binding, where the owner names the funding for those calls.
+export const QUICK_TOOLS = Object.freeze(['model/infer',
+  'tool/model_router_routes', 'tool/model_router_health', 'tool/model_router_tools',
+  'tool/bot_library_list', 'tool/bot_library_read', 'tool/bot_library_write', 'tool/bot_library_search', 'tool/bot_route_task',
+  'tool/bot_routine_list', 'tool/bot_routine_save', 'tool/bot_routine_run'])
 export const PRODUCT_OWNER_READ_METHODS = Object.freeze(['list','installSettings','status','health','ledger','boundaries','previewRun','runStatus','terminalInfo','terminalRead'])
 export const PRODUCT_OWNER_WRITE_METHODS = Object.freeze(['completeOnboarding','rateResult','rerunStep','startRun','cancelRun','installTool','uninstallTool','repairTool','cancel','terminalStart','terminalWrite','terminalResize','terminalStop'])
 // The Bot runtime reports descriptive call origins; the durable receipt schema
@@ -57,6 +67,7 @@ const RECEIPT_SOURCE = Object.freeze({ 'bot-session': 'bot', 'bot-auxiliary': 'a
 const ROUTE_REFRESH_MS = 30_000
 const ROUTE_REFRESH_DEBOUNCE_MS = 2_000
 const INITIAL_ROUTE_TIMEOUT_MS = 5_000
+const ENGINE_HEALTH_MS = 60_000
 const OBSERVATION_LIMIT = 256
 const validPolicy = value => Boolean(value) && ['run', 'check', 'filterRoutes'].every(key => typeof value[key] === 'function')
 // N09: one managed Task runner over the same SQLite authority. A crashed Host
@@ -401,7 +412,7 @@ export function startBotProduct(ctx, options = {}) {
   }
 
   const grants = new Map()
-  let machines, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat
+  let machines, product, releaseMachineSecrets, funding, botSettings, fundingAccounts, modelAccounting, routingSettings, turnBackends, routineExecution, machineHeartbeat, quickSettings
   let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission, taskRunnerWatchdog
   const committedBots = new Map()
   let ownerCatalogStamp=''
@@ -423,12 +434,45 @@ export function startBotProduct(ctx, options = {}) {
     if (refreshing || now() - lastRefresh < ROUTE_REFRESH_DEBOUNCE_MS) return
     void refresh()
   }
+  const configValue = (key, fallback) => {
+    const value = config?.[key]
+    return (typeof value === 'function' ? value() : value) ?? fallback
+  }
+  // Quick binding covers a Bot without an enabled advanced binding. An advanced
+  // binding that is enabled but no longer valid, a retired or unknown Bot, and a
+  // Bot whose owner switched quick mode off all get nothing.
+  const quickPolicyFor = botId => {
+    if (!botSettings || !quickSettings) return null
+    let value, policy
+    try { value = botSettings.get(botId, { publishChange: false }) } catch { return null }
+    if (value.status === 'available' || value.retired || value.errorCode || value.settings?.quickBinding === false) return null
+    try { policy = quickSettings.get().settings } catch { return null }
+    return policy.enabled ? policy : null
+  }
+  const routeOf = ref => {
+    const text = typeof ref === 'string' ? ref : ''
+    const at = text.indexOf('/')
+    return at > 0 && at < text.length - 1 ? { provider: text.slice(0, at), model: text.slice(at + 1) } : null
+  }
+  const quickBindingFunding = ({ botId, provider, model }) => {
+    const policy = quickPolicyFor(botId)
+    if (!policy) return null
+    const committed = product?.lifecycle.committedBot?.(botId) ?? committedBots.get(botId)
+    const route = provider !== undefined && model !== undefined ? { provider, model } : routeOf(committed?.model)
+    if (!route) return null
+    // The committed grant is the authority: a route the Bot was never granted gets no money.
+    if (!(grants.get(botId)?.modelRoutes ?? []).some(item => item.provider === route.provider && item.model === route.model)) return null
+    return quickFunding(policy, route, { profiles: profilePrices(configValue('modelProfilesJson', '[]')) })
+  }
   const grantFor = bot => {
     // The DS lifecycle compiles grants from committed state; recording here keeps
     // bot-settings' botExists honest during that same synchronous compilation.
     committedBots.set(bot.id, bot)
     scheduleRefresh()
     let grant = botSettings ? botSettings.grantFor(bot) : compileProductGrant(bot, { routes, hydrated })
+    if (botSettings && grant.modelRoutes.length === 0 && quickPolicyFor(bot.id)) {
+      grant = { tools: [...QUICK_TOOLS], modelRoutes: compileProductGrant(bot, { routes, hydrated }).modelRoutes }
+    }
     // The Main Bot is the operator's own assistant: it may switch model in its panel at any time,
     // so its grant carries every hydrated route instead of only the one saved at that moment.
     if ((product?.rt.state?.mainBotIds ?? []).includes(bot.id) && hydrated && routes.size > 0) {
@@ -531,7 +575,7 @@ export function startBotProduct(ctx, options = {}) {
   const bindingFunding = async ({ botId, provider, model }) => {
     if (!botSettings) return null
     const value = botSettings.get(botId, { publishChange: false })
-    if (value.status !== 'available') return null
+    if (value.status !== 'available') return quickBindingFunding({ botId, provider, model })
     const s = value.settings
     const route = s.model
     if (!route?.provider || !route?.model) return null
@@ -549,6 +593,66 @@ export function startBotProduct(ctx, options = {}) {
       maxInputTokens: s.funding.request.maxInputTokens, maxOutputTokens: s.funding.request.maxOutputTokens,
       botDailyLimitUsd: s.funding.dailyBudgetUsd, botMonthlyLimitUsd: s.funding.monthlyBudgetUsd,
       ...(account ? { accountDailyLimitUsd: account.dailyLimitUsd, accountMonthlyLimitUsd: account.monthlyLimitUsd } : {}) }
+  }
+  // Engine status reads the router's own tool health. A snapshot never waits for
+  // a probe: a stale report starts one refresh and a later poll shows its result.
+  let engineHealth = null, engineProbe = null
+  const probeEngines = (fresh = false) => {
+    if (typeof mr?.toolHealth !== 'function') return Promise.resolve(null)
+    engineProbe ??= Promise.resolve().then(() => mr.toolHealth(fresh))
+      .then(report => { engineHealth = { at: now(), report: report ?? null } }, () => { engineHealth = { at: now(), report: engineHealth?.report ?? null } })
+      .then(() => engineHealth.report)
+      .finally(() => { engineProbe = null })
+    return engineProbe
+  }
+  const engineView = () => {
+    if (!engineHealth || now() - engineHealth.at > ENGINE_HEALTH_MS) void probeEngines()
+    const tools = new Map((engineHealth?.report?.tools ?? []).map(tool => [tool.id, tool]))
+    const items = OFFICIAL_ENGINES.map(engine => {
+      const tool = tools.get(engine.toolId), login = tool?.login ?? null
+      const state = !tool ? 'checking' : !tool.installed ? 'missing' : login?.state === 'logged-out' ? 'login' : tool.ready ? 'ready' : 'unknown'
+      return { provider: engine.provider, toolId: engine.toolId, name: engine.name, vendor: engine.vendor, state,
+        registered: engine.models.some(item => routes.has(`${engine.provider}/${item.id}`)),
+        installed: tool?.installed ?? null, version: tool?.version ?? null, latestVersion: tool?.latestVersion ?? null, updateAvailable: tool?.updateAvailable === true,
+        login: { state: login?.state ?? 'unknown', detail: String(login?.detail ?? '').slice(0, 300), command: String(login?.command ?? engine.login).slice(0, 200) },
+        models: engine.models.map(item => ({ id: item.id, name: item.name, ref: `${engine.provider}/${item.id}` })) }
+    })
+    return { status: 'available', checkedAt: engineHealth?.report?.checkedAt ?? null, checking: engineProbe !== null, items }
+  }
+  const quickView = runtime => {
+    const current = quickSettings.get(), profiles = profilePrices(configValue('modelProfilesJson', '[]'))
+    const items = Object.values(runtime.state?.bots ?? {}).map(bot => {
+      let value = null
+      try { value = botSettings.get(bot.id, { publishChange: false }) } catch { value = null }
+      if (value?.status === 'available') return { botId: bot.id, model: bot.model ?? null, mode: 'advanced', funding: value.settings.funding.mode }
+      const route = routeOf(bot.model)
+      const policy = quickPolicyFor(bot.id)
+      if (!policy || !route) {
+        const mode = value?.settings?.quickBinding === false ? 'off' : value?.errorCode ? 'blocked' : !current.settings.enabled ? 'disabled' : 'no-model'
+        return { botId: bot.id, model: bot.model ?? null, mode, ...(value?.errorCode ? { reason: value.blockedReason ?? null } : {}) }
+      }
+      const priced = quickFunding(policy, route, { profiles })
+      return { botId: bot.id, model: bot.model, mode: 'quick', funding: priced.funding, granted: routes.has(bot.model),
+        priced: priced.funding === 'subscription' || Boolean(priced.pricing), pricingSource: priced.pricingSource ?? null, pricing: priced.pricing ?? null }
+    })
+    const catalogRoutes = [...routes].sort().map(routeOf).filter(Boolean).map(route => ({ ...route,
+      engine: OFFICIAL_ENGINES.some(engine => engine.provider === route.provider), profilePrice: profiles.get(`${route.provider}/${route.model}`) ?? null }))
+    return { status: 'available', revision: current.revision, settings: current.settings, updatedAt: current.updatedAt, items, routes: catalogRoutes }
+  }
+  const createFromTemplate = async (payload, context) => {
+    if (!payload || typeof payload !== 'object' || Object.keys(payload).some(key => !['templateId', 'name', 'model'].includes(key))) {
+      throw Object.assign(new Error('模板创建请求格式无效。'), { code: 'BOT_TEMPLATE_INVALID' })
+    }
+    const request = templateBotRequest(payload)
+    if (request.model && !routes.has(request.model)) throw Object.assign(new Error('所选模型已不在宿主目录，请刷新后重新选择。'), { code: 'BOT_TEMPLATE_MODEL_INVALID' })
+    await product.rt.bootstrap()
+    let bot, attempt = 0
+    for (;;) {
+      const name = attempt === 0 ? request.name : `${request.name.slice(0, 36)} ${attempt + 1}`
+      try { bot = await product.rt.createBot({ ...request, name, createdBy: null }); break }
+      catch (error) { if (!/already exists/.test(String(error?.message)) || ++attempt >= 9) throw error }
+    }
+    return { botId: bot.id, name: bot.name, sessionId: product.rt.chatOf(bot.id) ?? null }
   }
   const boot = (async () => {
     try{
@@ -618,6 +722,7 @@ export function startBotProduct(ctx, options = {}) {
             try { directory.replaceGrant(value.botId, { tools: [], modelRoutes: [] }) } catch { /* the lifecycle recompiles */ }
             if (product) void product.lifecycle.refreshGrants()
           }, now })
+        quickSettings = openQuickBindingSettings({ Database, file: storageFile, now })
         modelAccounting = createModelAccounting({ store: funding.store, authority,
           pricingFor: bindingFunding,
           // The configured request allowance is the Host-declared trusted bound;
@@ -763,6 +868,8 @@ export function startBotProduct(ctx, options = {}) {
               fundingScopes: catalog.fundingScopes }
           },
           fundingAccounts: async () => ({ status: 'available', items: fundingAccounts.catalog() }),
+          engines: async () => engineView(),
+          ...(quickSettings ? { quickBinding: async ({ runtime, signal }) => { signal?.throwIfAborted(); await runtime.load(); return quickView(runtime) } } : {}),
           // N09: the managed Task projection reads the durable journal through the
           // same single authority; a section without a runner stays blocked.
           ...(taskService ? { tasks: async ({ runtime, signal }) => {
@@ -827,6 +934,26 @@ export function startBotProduct(ctx, options = {}) {
           // Saved routines: list what a Bot has, and run one on a machine the caller may use.
           // The role catalog is a read-only convenience: it describes jobs, it grants nothing.
           'roles.list': async () => listRoles(),
+          'templates.list': async () => listBotTemplates(),
+          'bot.template.create': ownerOnly((payload, context) => createFromTemplate(payload, context)),
+          'engines.refresh': ownerOnly(async () => { await probeEngines(true); return engineView() }),
+          ...(quickSettings ? {
+            'quickBinding.save': ownerOnly(async (payload, context) => {
+              const saved = quickSettings.save(payload, context)
+              await product.lifecycle.refreshGrants()
+              return saved
+            }),
+            // One switch per Bot, saved through the same binding store and CAS revision.
+            'binding.quick': ownerOnly(async (payload, context) => {
+              if (!payload || typeof payload !== 'object' || Object.keys(payload).some(key => !['botId', 'expectedRevision', 'quickBinding'].includes(key))
+                || typeof payload.quickBinding !== 'boolean') throw Object.assign(new Error('快速模式开关请求格式无效。'), { code: 'BOT_SETTINGS_INVALID' })
+              const current = botSettings.get(payload.botId, { publishChange: false })
+              const result = await botSettings.save({ botId: payload.botId, expectedRevision: payload.expectedRevision,
+                settings: { ...current.settings, quickBinding: payload.quickBinding } }, context)
+              await product.lifecycle.refreshGrants()
+              return result
+            }),
+          } : {}),
           ...(routineStore ? {
             'routine.list': async payload => routineStore.inspect(payload?.botId),
             'routine.save': async payload => routineStore.save(payload?.botId, payload?.routine),
@@ -943,7 +1070,7 @@ export function startBotProduct(ctx, options = {}) {
       await machineHeartbeat?.close?.()
       await routineExecution?.close?.()
       await machines?.closeDesktopSessions?.()
-      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close()])try{cleanup()}catch{}
+      for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>quickSettings?.close()])try{cleanup()}catch{}
       if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
       if(taskService)await taskService.close().catch(()=>{})
       else journal?.close()
@@ -974,7 +1101,7 @@ export function startBotProduct(ctx, options = {}) {
         await machineHeartbeat?.close?.()
         await routineExecution?.close?.()
         await machines?.closeDesktopSessions?.()
-        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close()])try{cleanup()}catch{}
+        for(const cleanup of [()=>product?.dispose(),()=>releaseMachineSecrets?.(),()=>releaseTaskTools?.(),()=>machines?.close(),()=>botSettings?.close(),()=>fundingAccounts?.close(),()=>modelAccounting?.close(),()=>routingSettings?.close(),()=>quickSettings?.close()])try{cleanup()}catch{}
         if(taskRunnerWatchdog)clearInterval(taskRunnerWatchdog)
         if(taskService)await taskService.close().catch(()=>{})
         else journal?.close()

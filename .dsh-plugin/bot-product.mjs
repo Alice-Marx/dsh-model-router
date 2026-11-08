@@ -57,7 +57,7 @@ export const configFields = {
   }).default(null),
 }
 
-export function start(ctx, config, { installRouterStateStore, executeConfiguredAssignment, rerunRecordedStep, routerStateStore }) {
+export function start(ctx, config, { installRouterStateStore, executeConfiguredAssignment, rerunRecordedStep, routerStateStore, toolHealth }) {
   // The unified Bot product composes the frozen DS Bot runtime with this plugin
   // body inside one Host. Lightweight direct apply() callers (plain-object test
   // contexts) have no Cordis surface or DS services and keep the legacy MR
@@ -86,7 +86,7 @@ export function start(ctx, config, { installRouterStateStore, executeConfiguredA
       deferredRouterState, storageFile: deferredRouterState?.state.file, legacyFile: defaultStatePath(),
       // N09: the managed Task runner reuses this plugin's own execution entries,
       // so the composition never needs a second copy of the MR runtime.
-      mr: { executeConfiguredAssignment, rerunRecordedStep, routerStateStore }, taskCli,
+      mr: { executeConfiguredAssignment, rerunRecordedStep, routerStateStore, toolHealth }, taskCli,
       runtimeConfig: normalizeBotRuntimeConfig(config?.botRuntime) }) : null
   } catch (error) {
     deferredRouterState?.reject(error)
