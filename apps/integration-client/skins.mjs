@@ -1,7 +1,7 @@
 /**
  * OpenMausBot's skins as DS Bot themes. OpenMausBot ships each skin as one mode; a DS Bot theme
  * needs a light and a dark mode, so the skins are paired by family. Colours are taken from
- * OpenMausBot's `src/styles.css` (Apache-2.0, see NOTICE): app → bg, panel → sidebar, card →
+ * OpenMausBot's `src/styles.css` (Apache-2.0, see THIRD_PARTY_NOTICES.md): app → bg, panel → sidebar, card →
  * bot bubble, menu → card, ink → text, bubble-user → user, accent → accent. The status colours
  * and hairline the eight theme keys cannot carry ride along as `--bp-skin-*` variables.
  */
@@ -74,4 +74,24 @@ export const SKIN_IDS = Object.freeze(Object.keys(SKINS))
 export function registerSkins(registerTheme) {
   const releases = SKIN_IDS.map(id => registerTheme(id, skinTheme(id)))
   return () => { for (const release of releases.reverse()) release() }
+}
+
+/**
+ * Register the skins through DS Bot's public `dshBotQueue`: an array until DS Bot installs its
+ * hub, then a queue that runs each task at once. The pinned vendor tree is never imported.
+ */
+export function installSkins(host = globalThis) {
+  let release = null
+  let disposed = false
+  const task = hub => { if (!disposed) release = registerSkins(hub.registerTheme) }
+  if (!host.dshBotQueue) host.dshBotQueue = []
+  host.dshBotQueue.push(task)
+  return () => {
+    disposed = true
+    if (Array.isArray(host.dshBotQueue)) {
+      const index = host.dshBotQueue.indexOf(task)
+      if (index >= 0) host.dshBotQueue.splice(index, 1)
+    }
+    release?.()
+  }
 }

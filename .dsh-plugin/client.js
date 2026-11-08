@@ -18538,6 +18538,18 @@ function registerSkins(registerTheme2) {
     for (let release of releases.reverse()) release();
   };
 }
+function installSkins(host = globalThis) {
+  let release = null, disposed = !1, task = (hub) => {
+    disposed || (release = registerSkins(hub.registerTheme));
+  };
+  return host.dshBotQueue || (host.dshBotQueue = []), host.dshBotQueue.push(task), () => {
+    if (disposed = !0, Array.isArray(host.dshBotQueue)) {
+      let index = host.dshBotQueue.indexOf(task);
+      index >= 0 && host.dshBotQueue.splice(index, 1);
+    }
+    release?.();
+  };
+}
 
 // .dsh-plugin/client/official-harness.jsx
 var import_react61 = __toESM(require("react"), 1);
@@ -35810,7 +35822,7 @@ async function apply3(ctx) {
     return style.dataset.botProduct = "1", style.textContent = product_default, document.head.append(style), () => {
       style.remove(), previous === null ? document.body.removeAttribute("data-bot-product-ui") : document.body.setAttribute("data-bot-product-ui", previous);
     };
-  }, "bot-product: styles"), ctx.effect(() => registerSkins(registerTheme), "bot-product: skins"), apply(dsContext);
+  }, "bot-product: styles"), ctx.effect(() => installSkins(window), "bot-product: skins"), apply(dsContext);
   let disposeMr = await apply2(ctx);
   for (let [section, key] of Object.entries(PRODUCT_PANELS))
     ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({

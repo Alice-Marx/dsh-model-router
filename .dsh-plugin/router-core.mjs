@@ -2376,14 +2376,17 @@ export function apply(ctx, config = {}, product = null) {
   // A Bot's own library: same policy gate as every other owner tool, its own directory per Bot.
   product?.provideLibraries?.(ctx, config, { stateFile: routerStateStore().file, defineTool, registerPolicyTool, JSON_OUTPUT, jsonValue })
   // The Bot binding picker reads tool readiness through the product channel. Read-only: it can
-  // re-run the fixed probes, never install, log in or start a tool.
-  try {
-    ctx.provide?.('officialToolHealth', Object.freeze({
-      current: () => currentHealth(),
-      refresh: () => toolHealthReport({ fresh: true }),
-      capabilities: () => officialToolExecutionCapabilities(),
-    }))
-  } catch { /* provided once per Host */ }
+  // re-run the fixed probes, never install, log in or start a tool. The router-only edition
+  // has no Bot product and provides no services.
+  if (product) {
+    try {
+      ctx.provide?.('officialToolHealth', Object.freeze({
+        current: () => currentHealth(),
+        refresh: () => toolHealthReport({ fresh: true }),
+        capabilities: () => officialToolExecutionCapabilities(),
+      }))
+    } catch { /* provided once per Host */ }
+  }
   registerOfficialToolModels(ctx, config, assertInstallPreferences)
   registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_routes',
