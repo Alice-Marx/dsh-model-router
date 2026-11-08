@@ -41,7 +41,7 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
   const save = event => {
     event.preventDefault()
     const settings = {
-      schemaVersion: 1, enabled: form.enabled,
+      schemaVersion: 1, enabled: form.enabled, quickBinding: record.settings.quickBinding !== false,
       model: model ? { provider: model.provider, model: model.model } : null,
       officialTools: form.officialTools,
       machineGrants: selectedMachine && selectedRoot ? [{ machineId: selectedMachine, rootId: selectedRoot, mode: form.workspaceMode, capabilities: [] }] : [],
@@ -68,8 +68,8 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy }) {
     return dispatch('binding.save', { botId: bot.id, expectedRevision: record.revision, settings })
   }
   const cliMappings = (model?.cliModels ?? []).filter((item, index, items) => items.findIndex(other => other.toolId === item.toolId && other.model === item.model) === index)
-  return <details className="bp-card" open={record.status !== 'available'}>
-    <summary>配置并启用此 Bot</summary>
+  return <details className="bp-card" open={Boolean(record.errorCode)}>
+    <summary>{record.status === 'available' ? '修改高级绑定' : '配置并启用高级绑定'}</summary>
     <form className="bp-form" onSubmit={save}>
       <label>准确模型<select aria-label={`${bot.name} 的绑定模型`} value={form.model} onChange={event => { change('model', event.target.value); change('officialTools', []) }} required>
         <option value="" disabled>请选择</option>{record.catalog.models.map(item => <option key={route(item)} value={route(item)}>{route(item)}</option>)}

@@ -1,4 +1,5 @@
-export const PRODUCT_PANELS = Object.freeze({ bindings: 'bot-product-bindings', tasks: 'bot-product-tasks', machines: 'bot-product-machines', library: 'bot-product-library', routine: 'bot-product-routine', usage: 'bot-product-usage' })
+export const PRODUCT_PANELS = Object.freeze({ inbox: 'bot-product-inbox', bindings: 'bot-product-bindings', engines: 'bot-product-engines', tasks: 'bot-product-tasks',
+  machines: 'bot-product-machines', library: 'bot-product-library', routine: 'bot-product-routine', usage: 'bot-product-usage' })
 
 export function createProductApi(fetcher = globalThis.fetch, clientLocation = globalThis.location) {
   const call = async (action, payload, signal) => {

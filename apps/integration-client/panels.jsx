@@ -8,6 +8,9 @@ import { LibraryPanel } from './library-panel.jsx'
 import { DesktopWorkbench } from './desktop-pane.jsx'
 import { RoutinesPanel } from './routines-panel.jsx'
 import { UiIcon } from './ui-icons.jsx'
+import { BotModelRow, Pill, QuickPolicyCard, TemplateGallery, modeBadge, modelLabel } from './models-panel.jsx'
+import { Engines } from './engines-panel.jsx'
+import { Inbox } from './inbox-panel.jsx'
 import { routingSubmissions, submissionCode } from './routing-submissions.mjs'
 
 const NAV_EVENT = 'bot-product:navigation'
@@ -29,9 +32,10 @@ export function ProductNavigation({ openPanel, panels, compact = false }) {
   return <nav className={`bp-nav${compact ? ' bp-nav-compact' : ''}`} aria-label="Bot 工作系统">
     <p className="bp-nav-label">工作空间</p>
     {[
-      [panels.bindings, 'Bot 绑定', 'team', '绑定'], [panels.tasks, '任务', 'tasks', '任务'], [panels.machines, '远程电脑', 'computer', '电脑'],
+      [panels.inbox, '收件箱', 'inbox', '收件'], [panels.bindings, 'Bot 与模型', 'team', 'Bot'], [panels.engines, 'AI 引擎', 'spark', '引擎'],
+      [panels.tasks, '任务', 'tasks', '任务'], [panels.machines, '远程电脑', 'computer', '电脑'],
       [panels.library, '资料库', 'folder', '资料'], [panels.routine, '例行任务', 'repeat', '例行'], [panels.usage, '费用与用量', 'chart', '费用'], ['model-router-galgame', '高级工作台', 'settings', '工作台'],
-    ].map(([id, label, icon, caption]) => <button key={id} type="button" aria-current={active === id ? 'page' : undefined}
+    ].filter(([id]) => id).map(([id, label, icon, caption]) => <button key={id} type="button" aria-current={active === id ? 'page' : undefined}
       onClick={() => { announcePanel(id); openPanel(id) }} title={label} aria-label={label}>
       {/* A narrow column still says what each icon opens, so the row is readable without hovering. */}
       <UiIcon name={icon} size={17} /><span className="bp-nav-name">{label}</span><span className="bp-nav-caption">{caption}</span>
@@ -136,29 +140,41 @@ export function BotBindings({ snapshot, openSession, dispatch, busy }) {
   const bot = bots.find(row => row.id === selected) ?? bots[0]
   const section = snapshot.botBindings ?? snapshot.bindings
   const binding = section?.items?.find(row => row.botId === bot?.id)
+  const quick = snapshot.quickBinding?.status === 'available' ? snapshot.quickBinding : null
+  const quickOf = id => quick?.items?.find(row => row.botId === id) ?? null
+  const quickItem = bot ? quickOf(bot.id) : null
   const capabilities = binding?.tools ?? binding?.capabilities ?? []
   const permissionGroups = [
     ['模型调用', /^model\//], ['模型工作台', /^(?:command\/router|tool\/model_router_)/],
     ['任务管理', /^task\//], ['Bot 协作', /^(?:execution\/bot-turn|tool\/bot_route_task)/],
     ['资料库', /^tool\/bot_library_/], ['例行任务', /^tool\/bot_routine_/], ['远程工具', /^remote\//],
   ].filter(([, pattern]) => capabilities.some(value => pattern.test(value))).map(([label]) => label)
-  if (!bots.length) return <p>还没有 Bot。返回 Main 完成首次设置，或从侧栏新建 Bot。</p>
+  if (!bots.length) return <div className="bp-empty-state"><span className="bp-empty-icon"><UiIcon name="bot" size={24} /></span><strong>还没有 Bot</strong><p>返回 Main 完成首次设置，或从下面的现成 Bot 里挑一个开始。</p></div>
+  // In quick mode the advanced binding is optional, so its "not enabled" notice is not a problem.
+  const quietAdvanced = quickItem?.mode === 'quick'
   return <div className="bp-columns">
-    <div className="bp-bot-list" aria-label="Bot 列表">{bots.map(item => <button key={item.id} aria-current={item.id === bot?.id ? 'true' : undefined} onClick={() => setSelected(item.id)}>
-      <span className="bp-person-avatar"><UiIcon name="bot" size={23} /></span><span className="bp-person-copy"><strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}<small>{item.role || '尚未填写职责'}</small></span></button>)}</div>
-    <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.main ? '团队协调 Bot' : '团队成员'}</p></div></div><button className="bp-button-primary" onClick={() => openSession(bot.sessionId)}>打开私聊<UiIcon name="arrow" size={15} /></button></div>
+    <div className="bp-bot-list" aria-label="Bot 列表">{bots.map(item => {
+      const badge = modeBadge(quickOf(item.id))
+      return <button key={item.id} aria-current={item.id === bot?.id ? 'true' : undefined} onClick={() => setSelected(item.id)}>
+        <span className="bp-person-avatar"><UiIcon name="bot" size={21} /></span><span className="bp-person-copy"><strong>{item.name}</strong>{item.main && <Tag>Main</Tag>}
+          <small>{quick ? modelLabel(item.model, snapshot.engines) : item.role || '尚未填写职责'}</small>{quick && <Pill tone={badge.tone}>{badge.label}</Pill>}</span></button>
+    })}</div>
+    <article className="bp-card"><div className="bp-card-title"><div className="bp-person-heading"><span className="bp-person-avatar bp-person-avatar-large"><UiIcon name="bot" size={27} /></span><div><h2>{bot.name}</h2><p className="bp-muted">{bot.role || (bot.main ? '团队协调 Bot' : '团队成员')}</p></div></div><button className="bp-button-primary" onClick={() => openSession(bot.sessionId)}>打开私聊<UiIcon name="arrow" size={15} /></button></div>
+      {quick ? <><h3>模型</h3><BotModelRow bot={bot} item={quickItem} record={binding} section={quick} engines={snapshot.engines} dispatch={dispatch} busy={busy} openSession={openSession} /></>
+        : <dl className="bp-facts"><Value label="准确模型">{modelName(bot.model)}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value></dl>}
       <dl className="bp-facts"><Value label="职责">{bot.role || '未填写'}</Value>
-        <Value label="准确模型">{modelName(bot.model)}</Value><Value label="模型策略">精确绑定；不可用时暂停并说明原因</Value>
         <Value label="工作区">{binding?.workspace?.root ?? binding?.workspaceRef?.rootId ?? bot.workDir ?? '未指定，请在 Bot 详情选择文件夹'}</Value>
-        <Value label="执行位置">{binding?.machineId ?? binding?.workspaceRef?.machineId ?? '尚未取得宿主绑定'}</Value>
+        <Value label="执行位置">{binding?.machineId ?? binding?.workspaceRef?.machineId ?? (quietAdvanced ? '本机（快速模式）' : '尚未取得宿主绑定')}</Value>
         <Value label="最大并发">{binding?.maxConcurrentTasks}</Value></dl>
       {section?.status === 'blocked' ? <Blocked value={section} /> : binding ? <>
-        <h3>官方工具</h3>{binding.officialTools?.length ? <ul>{binding.officialTools.map(tool => <li key={tool.toolId}>{tool.toolId} · {tool.cliModel ?? '未核验模型'} · {tool.identityStatus ?? tool.identityPolicy ?? '未知'}</li>)}</ul> : <p className="bp-muted">此 Bot 没有官方工具绑定。</p>}
         <h3>有效权限 <span className="bp-inline-count">{capabilities.length} 项</span></h3><div className="bp-permission-chips">{permissionGroups.map(label => <span key={label}><UiIcon name="check" size={13} />{label}</span>)}{!capabilities.length && <p className="bp-muted">无额外能力</p>}</div>
-        {binding.blockedReason && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
+        {binding.officialTools?.length ? <><h3>官方 CLI 任务</h3><ul>{binding.officialTools.map(tool => <li key={tool.toolId}>{tool.toolId} · {tool.cliModel ?? '未核验模型'} · {tool.identityStatus ?? tool.identityPolicy ?? '未知'}</li>)}</ul></> : null}
+        {binding.blockedReason && !quietAdvanced && <Blocked value={{ reason: binding.blockedReason, nextAction: binding.nextAction }} />}
       </> : <Blocked value={{ reason: '此 Bot 尚未取得有效绑定。', nextAction: '在宿主 Bot 绑定配置中授予明确工具、机器与工作区。' }} />}
-      <p className="bp-muted">角色文本不会授予工具或机器权限。职责、模型、记忆及会话设置沿用私聊右侧的 Bot 详情。</p>
-      {dispatch && <details className="bp-edit-section"><summary><UiIcon name="settings" size={16} />编辑权限与预算</summary><BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} /></details>}
+      <p className="bp-muted">角色文本不会授予工具或机器权限。职责、记忆及会话设置沿用私聊右侧的 Bot 详情。</p>
+      {dispatch && <details className="bp-edit-section"><summary><UiIcon name="settings" size={16} />高级绑定：精确资金、工具、电脑与工作区</summary>
+        <p className="bp-muted">启用后，这个 Bot 只按这里的准确模型、资金范围和权限运行，快速模式不再适用。</p>
+        <BotBindingEditor bot={bot} record={binding} accounts={snapshot.fundingAccounts} dispatch={dispatch} busy={busy} /></details>}
       <details className="bp-technical"><summary>连接与运行详情</summary><dl className="bp-facts"><Value label="稳定 Bot ID">{bot.id}</Value><Value label="预算范围">{binding?.budgetScope}</Value></dl><h3>完整权限标识</h3><p className="bp-code">{capabilities.join('、') || '无额外能力'}</p>{snapshot.availableActions?.includes('botRuntimeStatus') && <BotRuntimeRow botId={bot.id} dispatch={dispatch} busy={busy} />}</details>
     </article>
   </div>
@@ -926,9 +942,11 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
   }, [productApi, refresh])
   const inspectTask = useCallback((payload, signal) => productApi.dispatch('task.inspect', payload, signal), [productApi])
   const disabled = busy || snapshotStale || snapshotApi.current !== productApi || Boolean(snapshot?.readOnly)
-  const title = { bindings: 'Bot 绑定与权限', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
+  const title = { inbox: '收件箱', bindings: 'Bot 与模型', engines: 'AI 引擎', tasks: '任务', machines: '远程电脑', library: '资料库', routine: '例行任务', usage: '费用与用量' }[section]
   const meta = {
-    bindings: ['team', '让每位伙伴各司其职。管理模型、工具和工作空间。'],
+    inbox: ['inbox', '需要你决定或修复的事项都在这里，处理完就清空。'],
+    bindings: ['team', '给每个 Bot 选好模型就能开始；需要精确资金、工具或电脑授权时再打开高级绑定。'],
+    engines: ['spark', '把已经登录的 Claude Code、Codex、Gemini CLI 当作 Bot 的模型使用。'],
     tasks: ['tasks', '把工作交给合适的 Bot，在这里关注进展与结果。'],
     machines: ['computer', '连接你自己的电脑，随时查看桌面或接过控制权。'],
     library: ['folder', '给 Bot 一份有序的资料，让每次协作都有据可循。'],
@@ -943,7 +961,11 @@ export function ProductPage({ section, productApi, openSession, openPanel }) {
     {error && <div role="alert" className="bp-blocked"><strong>无法取得最新宿主状态</strong><p>{error}</p>{snapshot && <p>{snapshotStale ? '下面保留上次读取结果；状态未更新时，操作暂不可用。' : '下面保留上次读取结果，操作以宿主当前授权为准。'}</p>}</div>}
     {snapshot?.readOnly && <Blocked value={{ reason: snapshot.readOnly, nextAction: '关闭持有写锁的另一宿主后重新加载。' }} />}
     {!snapshot && !error && <div className="bp-loading" role="status"><span className="bp-loading-line" aria-hidden="true" /><span className="bp-loading-line" aria-hidden="true" /><p>正在读取宿主状态…</p></div>}
-    {snapshot && <>{section === 'bindings' && <><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />{snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
+    {snapshot && <>{section === 'inbox' && <Inbox snapshot={snapshot} panels={PRODUCT_PANELS} openPanel={openPanel} openSession={openSession} />}
+      {section === 'bindings' && <><QuickPolicyCard snapshot={snapshot} dispatch={dispatch} busy={disabled} /><BotBindings snapshot={snapshot} openSession={openSession} dispatch={dispatch} busy={disabled} />
+        {snapshot.availableActions?.includes('templates.list') ? <TemplateGallery snapshot={snapshot} dispatch={dispatch} busy={disabled} openSession={openSession} />
+          : snapshot.availableActions?.includes('roles.list') && <RoleCatalog dispatch={dispatch} busy={disabled} />}</>}
+      {section === 'engines' && <Engines snapshot={snapshot} dispatch={dispatch} busy={disabled} openPanel={openPanel} bindingsPanel={PRODUCT_PANELS.bindings} />}
       {section === 'tasks' && <Tasks snapshot={snapshot} dispatch={dispatch} busy={disabled} submissionScope={productApi} inspect={!snapshotStale && snapshotApi.current === productApi && !snapshot.readOnly ? inspectTask : undefined} openSession={openSession} />}
       {section === 'machines' && <Machines snapshot={snapshot} dispatch={dispatch} busy={disabled} />}
       {section === 'routine' && <RoutinesPanel snapshot={snapshot} dispatch={dispatch} busy={disabled} onOpenMachines={() => openPanel(PRODUCT_PANELS.machines)} />}
