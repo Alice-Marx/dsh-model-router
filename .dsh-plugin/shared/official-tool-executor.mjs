@@ -30,6 +30,7 @@ import { compareReleaseVersions, isReleaseVersion } from './latest-versions.mjs'
 import { resolveMiMoGrokLaunch, createMiMoGrokParser, installedModuleRoots } from './vendor-mimo-grok-adapter.mjs'
 import { emptyOutputError, outputIsEmpty, redactDiagnostic, usageFromEvents, usageFromOutput } from './task-executors.mjs'
 import { cliProfile } from './cli-profiles.mjs'
+import { officialModelId } from './bot-official-execution.mjs'
 
 const IS_WINDOWS = process.platform === 'win32'
 const MAX_TASK_BYTES = 64_000
@@ -134,6 +135,7 @@ function checkedTask(task) {
 }
 
 function checkedModel(modelId) {
+  modelId = officialModelId(modelId)
   if (modelId === undefined || modelId === null || modelId === '') return null
   if (typeof modelId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(modelId)) {
     throw new TypeError('modelId must be a bounded model identifier')

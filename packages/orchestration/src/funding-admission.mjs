@@ -22,6 +22,7 @@ export function assessFundingAdmission({store,state,botId,scopeId=null,projectId
     const holds=Object.fromEntries(Object.entries(state.budgetReservations??{}).filter(([id,hold])=>{
       if(id===excludeRunId)return false
       const run=state.runs.find(value=>value.id===hold.runId)
+      if(run?.fundingExecution?.source==='official-cli')return false
       return !run||entry.match(store.fundingIdentity(run))
     }))
     const reserved=reservationSpending({budgetReservations:holds})

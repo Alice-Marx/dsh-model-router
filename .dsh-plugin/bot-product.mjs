@@ -15,6 +15,7 @@ import { createDeferredRouterState } from '../packages/orchestration/src/deferre
 import { BotRuntimeConfig, normalizeBotRuntimeConfig } from '../packages/orchestration/src/bot-runtime-config.mjs'
 import { assertMigrationStartupAllowed } from '../packages/orchestration/src/migration-startup-gate.mjs'
 import { createIndependentConversationReader } from '../packages/orchestration/src/independent-chat-page.mjs'
+import { officialToolExecutionCapabilities, officialToolReadiness } from './shared/official-tool-executor.mjs'
 
 export const inject = botRuntimeInject
 // Which runtime serves a Bot is committed state: the switch file the independent runtime owns.
@@ -120,6 +121,12 @@ export function start(ctx, config, { installRouterStateStore, executeConfiguredA
       // N09: the managed Task runner reuses this plugin's own execution entries,
       // so the composition never needs a second copy of the MR runtime.
       mr: { executeConfiguredAssignment, rerunRecordedStep, routerStateStore }, taskCli, conversationEngines,
+      officialTools: {
+        probeHealth: async ({ fresh }) => (await import('./router-core.mjs')).toolHealthReport({ fresh, latest: { lookupAll: async () => ({}) } }),
+        probeCapabilities: () => officialToolExecutionCapabilities(),
+        probeReadiness: toolId => officialToolReadiness(toolId),
+        invoke: async (args, execution) => (await import('./router-core.mjs')).executeBotOfficialTool(ctx, config, args, execution),
+      },
       runtimeConfig: normalizeBotRuntimeConfig(config?.botRuntime) }) : null
   } catch (error) {
     deferredRouterState?.reject(error)

@@ -5,10 +5,10 @@ import { createBudgetReservations } from './budget-reservations.mjs'
 const receiptTimestamp = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
   && Number.isFinite(new Date(value).getTime())
 
-export async function beginExecutionLifecycle({ state, buildRun, packageEstimates, settings = {}, confirmOverBudget = false, managedExecution }) {
+export async function beginExecutionLifecycle({ state, buildRun, packageEstimates, settings = {}, confirmOverBudget = false, managedExecution, officialExecution }) {
   // Host-only seam. Wire commands never accept this binding or callback.
   const managed=prepareManagedExecution(managedExecution)
-  const funding=await state.prepareExecutionFunding?.({packageEstimates,managedExecution})
+  const funding=await state.prepareExecutionFunding?.({packageEstimates,managedExecution,officialExecution})
   if(funding){state=funding.state;packageEstimates=funding.packageEstimates}
   const ownerToken = randomUUID()
   const manager = createBudgetReservations({ state })

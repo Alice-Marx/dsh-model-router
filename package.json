@@ -1,6 +1,6 @@
 {
   "name": "@ljwei-stak/dsh-model-route-bot",
-  "version": "0.67.1",
+  "version": "0.68.0",
   "type": "module",
   "description": "DSH Bot workspace with integrated model routing, official tools and remote computers",
   "repository": {
@@ -68,6 +68,7 @@
     ".dsh-plugin/shared/official-tools-runtime.mjs",
     ".dsh-plugin/shared/official-tools-remote.mjs",
     ".dsh-plugin/shared/official-tool-executor.mjs",
+    ".dsh-plugin/shared/bot-official-execution.mjs",
     ".dsh-plugin/shared/task-executors.mjs",
     ".dsh-plugin/shared/tool-install-preferences.mjs",
     ".dsh-plugin/shared/vendor-minimax-adapter.mjs",

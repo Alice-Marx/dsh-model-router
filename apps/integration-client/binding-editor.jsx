@@ -9,7 +9,7 @@ import { mainDefaultFields, mainRoutePayload, mainRouteProblems, startMainRoutes
 import {
   accountFor, bindingProblems, buildBinding, defaultMode, EXECUTION_MODES, failureText, findModel, FUNDING_MODES,
   MODE_HELP, MODE_LABEL, numberOrNull, routeOf, ROUTING_PRESETS, scopeAllows, seedForm,
-  toolCards, workspaceKey, workspaceLabel, workspaceOptions,
+  toolCards, TOOL_STATUS_LABEL, workspaceKey, workspaceLabel, workspaceOptions,
 } from './binding-model.mjs'
 
 /**
@@ -28,11 +28,14 @@ import {
 export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostScope, onOpenTools }) {
   const connection = hostScope ?? dispatch
   const draftConnection = useRef(connection)
-  const catalog = record?.catalog
+  const [inspectedCatalog, setInspectedCatalog] = useState(null)
+  const catalog = inspectedCatalog?.connection === connection && inspectedCatalog?.botId === bot?.id && inspectedCatalog?.record === record
+    ? inspectedCatalog.catalog : record?.catalog
   const [form, setForm] = useState(null)
   const [dirty, setDirty] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [working, setWorking] = useState('')
+  const [toolFeedback, setToolFeedback] = useState(null)
   const seedKey = useRef('')
   const seedRevision = useRef(null)
   const saveToken = useRef(0)
@@ -50,7 +53,7 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
 
   useEffect(() => {
     if (draftConnection.current !== connection) {
-      draftConnection.current = connection; seedKey.current = ''; saveToken.current++; workingRef.current = ''; setWorking(''); setFeedback(null)
+      draftConnection.current = connection; seedKey.current = ''; saveToken.current++; workingRef.current = ''; setWorking(''); setFeedback(null); setToolFeedback(null); setInspectedCatalog(null)
     }
     if (!record) { saveToken.current++; seedKey.current = ''; seedRevision.current = null; setForm(null); return }
     const botId = bot?.id ?? ''
@@ -59,7 +62,7 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
     const sameBot = seedKey.current.split('#')[0] === botId
     seedKey.current = key
     // A late Host or Bot switch invalidates the in-flight save of the previous Bot.
-    if (!sameBot) { saveToken.current += 1; workingRef.current = ''; setWorking('') }
+    if (!sameBot) { saveToken.current += 1; workingRef.current = ''; setWorking(''); setToolFeedback(null); setInspectedCatalog(null) }
     // A revision bump from another window must not silently drop unsaved work.
     if (sameBot && dirty) {
       setFeedback({ kind: 'notice', text: `宿主中的绑定已更新到修订号 ${record.revision ?? 0}；你在此处未保存的修改仍然保留，保存时会按旧修订号提交，宿主可能拒绝。` })
@@ -98,13 +101,31 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
   const accountLimitsReady = numberOrNull(form.accountDaily) !== null && numberOrNull(form.accountMonthly) !== null
 
   const setToolGrant = (tool, cliModel, checked) => {
+    if (checked && (!tool.available || !tool.identities.some(identity => identity.model === cliModel))) return
     const others = form.officialTools.filter(item => item.toolId !== tool.toolId)
     edit({ officialTools: checked
       ? [...others, { toolId: tool.toolId, cliModel, mode: tool.grant?.mode ?? defaultMode(tool.modes) }]
       : others })
   }
-  const setToolMode = (toolId, mode) => edit({ officialTools: form.officialTools.map(item => (item.toolId === toolId ? { ...item, mode } : item)) })
+  const setToolMode = (toolId, mode) => {
+    if (!tools.some(tool => tool.toolId === toolId && tool.available && tool.modes.includes(mode))) return
+    edit({ officialTools: form.officialTools.map(item => (item.toolId === toolId ? { ...item, mode } : item)) })
+  }
   const dropStaleTools = () => edit({ officialTools: form.officialTools.filter(item => !staleTools.some(tool => tool.toolId === item.toolId)) })
+  const refreshTools = async () => {
+    if (workingRef.current || busy) return
+    const token = saveToken.current
+    workingRef.current = 'tools'; setWorking('tools'); setToolFeedback({ kind: 'saving', text: '检测安装、登录与执行能力…' })
+    try {
+      const value = await dispatch('binding.inspect', { botId: bot.id, refreshOfficialTools: true })
+      if (saveToken.current !== token) return
+      if (value?.schemaVersion !== 1 || value.bot?.id !== bot.id || value.record?.botId !== bot.id || !Array.isArray(value.record.catalog?.tools)) throw new Error('未收到当前 Bot 的工具检测结果。')
+      setInspectedCatalog({ connection, botId: bot.id, record, catalog: value.record.catalog })
+      setToolFeedback({ kind: 'saved', text: '工具状态已更新，未保存的修改仍然保留。' })
+    } catch (error) {
+      if (saveToken.current === token) setToolFeedback({ kind: 'error', text: '暂时无法重新检测工具，请稍后重试。未保存的修改仍然保留。' })
+    } finally { if (saveToken.current === token) { workingRef.current = ''; setWorking('') } }
+  }
 
   const enableAccount = async (target, dailyLimitUsd, monthlyLimitUsd) => {
     if (!target || workingRef.current) return
@@ -264,34 +285,39 @@ export function BotBindingEditor({ bot, record, accounts, dispatch, busy, hostSc
       <section className="bb-tools" aria-label={bot?.main ? '官方工具（默认执行配置）' : '官方工具（额外执行授权）'}>
         <div className="bb-tools-head">
           <strong><UiIcon name="settings" size={15} />官方工具</strong>
+          <button type="button" className="bb-link" disabled={Boolean(busy || working)} onClick={() => void refreshTools()}>{working === 'tools' ? '检测中…' : '重新检测'}</button>
           {typeof onOpenTools === 'function' && <button type="button" className="bb-link" onClick={() => {
             const token = saveToken.current
             Promise.resolve().then(onOpenTools).catch(() => { if (saveToken.current === token) setFeedback({ kind: 'error', text: '暂时无法打开官方工具设置，请重试。' }) })
           }}>安装与登录<UiIcon name="arrow" size={13}/></button>}
-          <p>{bot?.main ? 'Main 已有全部工具权限；下方配置已核验的 CLI 模型与执行方式。' : '为这个 Bot 添加官方工具，选择允许使用的模型与执行方式。'}</p>
+          <p>{bot?.main ? 'Main 已有全部工具权限；下方配置就绪 CLI 的默认模型与执行方式。' : '为这个 Bot 添加官方工具。CLI 模型与聊天模型分别配置，授权保存后生效。'}</p>
         </div>
+        {toolFeedback && <p className="bb-feedback bb-tools-feedback" data-kind={toolFeedback.kind} role="status">{toolFeedback.text}</p>}
         {tools.length === 0 ? <p className="bb-tool-empty">宿主目录里没有可授予的官方 CLI 工具。安装与登录状态在官方工具面板查看；未核验的身份不会在这里显示为可用。</p> : (
-          <ul className="bb-tool-list">{tools.map(tool => <li key={tool.toolId} className="bb-tool" data-granted={Boolean(tool.grant)} data-stale={tool.stale}>
+          <ul className="bb-tool-list">{tools.map(tool => <li key={tool.toolId} className="bb-tool" data-tool-id={tool.toolId} data-granted={Boolean(tool.grant)} data-stale={tool.stale}>
             <div className="bb-tool-head"><div className="bb-tool-title">
               <strong>{tool.label}</strong>
               <p>{tool.vendor ? `${tool.vendor} · ` : ''}{tool.source || '厂商官方 CLI'}</p></div>
               <span className="bb-pill" data-tone={tool.grant ? (tool.stale ? 'warn' : 'ok') : 'muted'}>{bot?.main ? (tool.stale ? '配置待核验' : tool.grant ? '执行已配置' : '全权限 · 待配置') : tool.grant ? (tool.stale ? '授权已失效' : '已授予') : '未授予'}</span></div>
             <div className="bb-tool-body">
+              <p className="bb-tool-readiness" data-state={tool.status}><strong>{TOOL_STATUS_LABEL[tool.status] ?? '暂不可用'}</strong>{tool.reason && <span>{tool.reason}</span>}</p>
               {tool.grantTools.length > 0 && <details className="bb-tool-permissions"><summary>工具权限明细</summary><p className="bb-note">{tool.grantTools.join('、')}</p></details>}
-              {tool.identities.length === 0 ? <p className="bb-note">当前模型没有已核验的 {tool.toolId} CLI 身份，{bot?.main ? '需要先完成执行配置' : '宿主不会接受授予'}。请改选模型，或先在官方工具面板安装并核验该 CLI。</p> : (
+              {tool.identities.length > 0 && (
                 <div className="bb-list">{tool.identities.map(identity => {
                   const checked = tool.grant?.cliModel === identity.model
-                  return <label key={`${identity.toolId}/${identity.model}`} className="bb-check">
-                    <input type="checkbox" checked={checked} onChange={event => setToolGrant(tool, identity.model, event.target.checked)} />
-                    <span>{identity.toolId} / {identity.model}<small>宿主已核验的 CLI 模型名</small></span></label>
+                  return <label key={`${tool.toolId}/${identity.model}`} className="bb-check">
+                    <input type="checkbox" aria-label={`${tool.label}：${identity.label ?? identity.model}`} checked={checked} disabled={Boolean(busy || working)} onChange={event => setToolGrant(tool, identity.model, event.target.checked)} />
+                    <span>{identity.label ?? `${tool.toolId} / ${identity.model}`}<small>{identity.model === 'vendor-default' ? '使用 CLI 当前配置的模型，不改变 Bot 的聊天模型。' : '宿主提供的 CLI 模型配置'}</small></span></label>
                 })}</div>)}
               {tool.grant && <label className="bb-field bb-field-wide"><span>执行模式</span>
-                <select aria-label={`${tool.label} 的执行模式`} value={tool.grant.mode} onChange={event => setToolMode(tool.toolId, event.target.value)}>
+                <select aria-label={`${tool.label} 的执行模式`} value={tool.grant.mode} disabled={Boolean(busy || working || !tool.available)} onChange={event => setToolMode(tool.toolId, event.target.value)}>
+                  {!tool.modes.includes(tool.grant.mode) && <option value={tool.grant.mode}>{MODE_LABEL[tool.grant.mode] ?? tool.grant.mode}（已不可用）</option>}
                   {EXECUTION_MODES.filter(mode => tool.modes.includes(mode)).map(mode => <option key={mode} value={mode}>{MODE_LABEL[mode]}</option>)}</select>
                 <small>{MODE_HELP[tool.grant.mode] ?? ''}</small></label>}
-              {tool.grant && tool.stale && <p className="bb-warn">这个授权指向的 CLI 模型与当前模型尚未核验，宿主会拒绝保存。请移除，或改选已核验的身份。</p>}
+              {tool.grant && tool.stale && <p className="bb-warn">已保存：{tool.toolId}/{tool.grant.cliModel} · {MODE_LABEL[tool.grant.mode] ?? tool.grant.mode}。当前 CLI 身份或执行模式尚未核验，宿主会拒绝保存。请移除，或改选就绪身份。</p>}
             </div></li>)}</ul>)}
-        <p className="bb-tools-foot">{bot?.main ? 'Main 的全权限不受普通 Bot 能力勾选限制。工具仍需安装、登录并核验 CLI 身份；这里保存默认执行配置。' : '每个工具只能保留一个已核验 CLI 身份；换模型不会自动移除或改指向旧授权。写入与 CLI 自身权限会扩大这个 Bot 的执行范围，请按需要选择。'}</p>
+        <p className="bb-tools-foot">{bot?.main ? 'Main 的全权限不受普通 Bot 能力勾选限制。工具仍需安装、登录并通过执行入口检测；这里保存默认执行配置。' : '每个工具选择一个执行身份；切换聊天模型不改变 CLI 配置。可写执行还需要工作区明确允许写入。仅终端交互的工具可在安装与登录面板中使用。'}</p>
+        <p className="bb-tools-foot">官方工具使用 CLI 自身的账号、模型与额度，调用单独记账；不会占用或切换 Bot 聊天模型的资金配置。</p>
         {staleTools.length > 0 && <div className="bb-row"><button type="button" className="bb-link" onClick={dropStaleTools}>移除 {staleTools.length} 项未核验授权</button></div>}
       </section>
 

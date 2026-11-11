@@ -20,7 +20,42 @@ export function createFundedRouterState({store,policy,authority,pricingFor,now=D
     authority.assertModel(identity.subject,config.route.provider,config.route.model);authority.assertTool(identity.subject,'model/infer')
     return{identity,config,hash:taskHash(config)}
   }
-  const prepareExecutionFunding=async({packageEstimates,managedExecution})=>{
+  const prepareOfficialFunding=async({packageEstimates,managedExecution,officialExecution})=>{
+    // This descriptor is constructed by Host runner code, never parsed from
+    // model arguments. Its admission callback cannot cross a JSON/RPC boundary.
+    if(typeof officialExecution?.authorize!=='function'||!Array.isArray(officialExecution.requests)||!officialExecution.requests.length)fail('OFFICIAL_FUNDING_ADMISSION_REQUIRED')
+    const identity=policy.activeIdentity()
+    if(!identity?.subject||!identity.botId)fail('OFFICIAL_CALL_CONTEXT_REQUIRED')
+    const requests=structuredClone(officialExecution.requests)
+    const packageIds=new Set(requests.map(request=>request.packageId))
+    if(packageIds.size!==requests.length||packageEstimates.some(item=>!packageIds.has(item.id)))fail('OFFICIAL_FUNDING_PACKAGES_INVALID')
+    for(const request of requests){
+      const {packageId,...selection}=request
+      if(typeof packageId!=='string'||!packageId||typeof selection.toolId!=='string'||!selection.toolId)fail('OFFICIAL_FUNDING_PACKAGES_INVALID')
+      await officialExecution.authorize(selection)
+    }
+    const latest=policy.activeIdentity()
+    if(latest?.subject!==identity.subject||latest.botId!==identity.botId||latest.owner!==identity.owner)fail('OFFICIAL_SUBJECT_CHANGED')
+    const toolIds=[...new Set(requests.map(request=>request.toolId))].sort()
+    const task=managedExecution?.binding
+    const marker={schemaVersion:1,source:'official-cli',botId:identity.botId,
+      attemptId:task?.attemptId??`official-${randomUUID()}`,operationId:task?.operationId??`operation-${randomUUID()}`,
+      fundingScopeId:`official-cli-${toolIds.length===1?toolIds[0]:'team'}`,toolIds,policyHash:taskHash(requests)}
+    const assert=()=>authority.assertTool(identity.subject,identity.owner?'remote/startRun':'tool/model_router_tool_run')
+    assert()
+    const adapted={...store,checkExecutionFunding:({run,packages})=>{
+      assert()
+      if(taskHash(run?.fundingExecution??null)!==taskHash(marker))fail('FUNDING_RUN_IDENTITY_CONFLICT')
+      if(packages.some(item=>!packageIds.has(item.id))||run.packages.some(item=>item.ran&&item.channel!=='official-cli'))fail('OFFICIAL_FUNDING_PACKAGES_INVALID')
+      // Original global budget checks still run in the reservation manager.
+      // There is no chat provider invoice, price substitution or subscription
+      // call charge here: each CLI uses its own account and observed receipt.
+      return {accepted:true,scopes:['official-cli']}
+    }}
+    return {state:adapted,packageEstimates,stamp(run){run.fundingExecution={...marker};return run},bind(){}}
+  }
+  const prepareExecutionFunding=async({packageEstimates,managedExecution,officialExecution})=>{
+    if(officialExecution)return prepareOfficialFunding({packageEstimates,managedExecution,officialExecution})
     const prepared=await configuration()
     if(!prepared)return null
     if(policy.financialRunActive())fail('FINANCIAL_CALL_ALREADY_ACTIVE')

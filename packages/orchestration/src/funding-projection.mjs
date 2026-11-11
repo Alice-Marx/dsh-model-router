@@ -64,7 +64,8 @@ export function createFundingProjection(db){
       // resets a quota or counts one instrumented package twice.
       const covered=new Set(db.prepare("SELECT json_extract(payload,'$.packageId') AS id FROM router_model_calls WHERE run_id=? AND json_extract(payload,'$.funding')='subscription'").all(run.id).map(row=>row.id))
       const untracked=quantities(archiveSubscriptionUsage([{...run,packages:(run.packages??[]).filter(item=>!covered.has(item.id)),reviews:(run.reviews??[]).filter(item=>!covered.has(item.id))}]))
-      const wrapped=encode({botId,scopeId,projectId,spending:JSON.parse(payload),execution,untrackedSubscription:untracked})
+      const wrapped=encode({botId,scopeId,projectId,spending:JSON.parse(payload),execution,untrackedSubscription:untracked,
+        ...(run.fundingExecution?.source==='official-cli'?{source:'official-cli'}:{})})
       db.prepare('INSERT INTO router_funding_runs(epoch,run_id,bot_id,scope_id,project_id,payload,digest) VALUES(?,?,?,?,?,?,?) ON CONFLICT(epoch,run_id) DO UPDATE SET bot_id=excluded.bot_id,scope_id=excluded.scope_id,project_id=excluded.project_id,payload=excluded.payload,digest=excluded.digest')
         .run(epoch,run.id,botId,scopeId,projectId,wrapped,digest(wrapped))
     }
@@ -88,6 +89,7 @@ export function createFundingProjection(db){
     for(const row of rows){
       const value=checked(row)
       if(value.botId!==row.bot_id||value.scopeId!==row.scope_id||(value.projectId??null)!==row.project_id)fail('FUNDING_PROJECTION_CORRUPT')
+      if(botId!==null&&scopeId===null&&(value.source==='official-cli'||row.scope_id?.startsWith('official-cli-')))continue
       add(merged,value.spending)
       if(row.bot_id===null||row.scope_id===null||projectId!==null&&row.project_id===null)add(unassigned,value.spending)
     }
@@ -113,7 +115,7 @@ export function createFundingProjection(db){
     for(const [period,[from,to]] of Object.entries(windows)){
       const key=keys[period],fallback=value=>value[period]?.[key]?.subscriptionRuns??0
       let legacy=baseline.legacySubscription?(baseline.legacySubscription[period]?.[key]??0):fallback(baseline)
-      for(const row of rows){const value=checked(row);legacy+=value.untrackedSubscription?(value.untrackedSubscription[period]?.[key]??0):fallback(value.spending)}
+      for(const row of rows){const value=checked(row);if(botId!==null&&scopeId===null&&(value.source==='official-cli'||row.scope_id?.startsWith('official-cli-')))continue;legacy+=value.untrackedSubscription?(value.untrackedSubscription[period]?.[key]??0):fallback(value.spending)}
       const sourced=db.prepare("SELECT count(*) AS n FROM router_model_calls WHERE (? IS NULL OR bot_id=?) AND (? IS NULL OR json_extract(payload,'$.fundingScopeId')=? OR json_extract(payload,'$.fundingScopeId') IS NULL) AND (? IS NULL OR json_extract(payload,'$.fundingProjectId')=? OR json_extract(payload,'$.fundingProjectId') IS NULL) AND json_extract(payload,'$.funding')='subscription' AND json_extract(payload,'$.createdAt')>=? AND json_extract(payload,'$.createdAt')<? AND (json_extract(payload,'$.state')!='settled' OR json_extract(payload,'$.finishKind') IS NOT NULL)").get(botId,botId,scopeId,scopeId,projectId,projectId,from,to).n
       if(!Number.isSafeInteger(legacy)||legacy<0||!Number.isSafeInteger(legacy+sourced))fail('FUNDING_PROJECTION_CORRUPT')
       result[period==='days'?'today':'month']={calls:legacy+sourced,sourceCalls:sourced,legacyCalls:legacy}

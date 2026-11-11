@@ -45,6 +45,7 @@ test('chat settings read only the selected Bot, keep a model choice as a draft, 
   await f.render({ productApi: source })
   assert.match(f.q('[role="dialog"]').getAttribute('aria-label'), /研究伙伴/)
   assert.deepEqual(source.calls.map(call => call.action), ['binding.inspect'])
+  assert.deepEqual(source.calls[0].payload, { botId: 'bot-a', refreshOfficialTools: true })
   await f.click('.bp-model-picker-trigger'); await f.click('[data-model-choice="fixture/two"]')
   assert.equal(source.calls.length, 1, 'choosing a model does not save or execute')
   await f.click('button[type="submit"]')
@@ -166,4 +167,29 @@ test('a malformed identity projection cannot become an editable profile', async 
   assert.equal(f.q('.bp-profile-save'), null)
   assert.match(f.q('.bp-profile-error').textContent, /暂时无法读取/)
   assert.doesNotMatch(document.body.textContent, /privateDiagnostic|do not display/)
+})
+
+test('the settings dialog rechecks trusted CLI identities while retaining its unsaved model and authorization draft', async t => {
+  const f = await fixture(t), value = data(), calls = []
+  const tool = { toolId: 'codex', label: 'Codex CLI', modes: ['read-only'], identities: [{ model: 'vendor-default', label: '厂商默认模型（由 CLI 配置决定）' }], status: 'ready', installed: true, loginState: 'logged-in' }
+  value.record.catalog.tools = [tool]
+  const source = api(value)
+  const connection = { dispatch: async (action, payload, signal) => {
+    calls.push({ action, payload })
+    return source.dispatch(action, payload, signal)
+  } }
+  await f.render({ productApi: connection })
+  await f.click('.bp-model-picker-trigger'); await f.click('[data-model-choice="fixture/two"]')
+  await f.click('[data-tool-id="codex"] input[type=checkbox]')
+  value.record.catalog.tools[0].reason = '刚刚核验完成。'
+  await f.settle(() => [...document.querySelectorAll('button')].find(button => button.textContent === '重新检测').click())
+  assert.deepEqual(calls.map(call => call.action), ['binding.inspect', 'binding.inspect'])
+  assert.deepEqual(calls[1].payload, { botId: 'bot-a', refreshOfficialTools: true })
+  assert.match(f.q('.bp-model-picker-trigger').textContent, /two/)
+  assert.equal(f.q('[data-tool-id="codex"] input[type=checkbox]').checked, true)
+  assert.match(f.q('.bb-tool-readiness').textContent, /刚刚核验完成/)
+  await f.click('button[type="submit"]')
+  const saved = calls.find(call => call.action === 'binding.save').payload.settings
+  assert.deepEqual(saved.model, { provider: 'fixture', model: 'two' })
+  assert.deepEqual(saved.officialTools, [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }])
 })

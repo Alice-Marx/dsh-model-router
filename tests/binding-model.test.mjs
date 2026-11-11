@@ -128,7 +128,7 @@ test('binding state: a disabled funding scope or a withdrawn mode blocks the sav
   const stale = bindingProblems({ ...base, account: accounts.items[0], scope: catalog.fundingScopes[0], form: { ...base.form, officialTools: [{ toolId: 'codex', cliModel: 'gpt-5-codex', mode: 'read-only' }] } })
   assert.equal(stale.length, 0)
   const unverified = bindingProblems({ ...base, account: accounts.items[0], scope: catalog.fundingScopes[0], form: { ...base.form, officialTools: [{ toolId: 'codex', cliModel: 'other-codex', mode: 'read-only' }] } })
-  assert.deepEqual(unverified, ['codex / other-codex 与当前模型的 CLI 身份尚未核验，请移除后重新授予。'])
+  assert.deepEqual(unverified, ['codex / other-codex 的 CLI 执行身份尚未核验，请移除后重新授予。'])
   const wide = bindingProblems({ ...base, account: accounts.items[0], scope: catalog.fundingScopes[0], form: { ...base.form, officialTools: [{ toolId: 'codex', cliModel: 'gpt-5-codex', mode: 'workspace-write' }] } })
   assert.deepEqual(wide, ['codex 尚未获准使用该执行模式，请移除或改选宿主提供的模式。'])
 })
@@ -153,4 +153,46 @@ test('binding state: Host failures are reported with their own reason', () => {
   assert.match(failureText({ code: 'BOT_SETTINGS_SCOPE_DENIED', message: 'codex 与当前模型的 CLI 身份尚未核验。' }), /CLI 身份尚未核验/)
   assert.match(failureText({ message: '宿主离线' }), /宿主离线/)
   assert.match(failureText(null), /保存失败/)
+})
+
+test('official CLI identities belong to the tool, independent of the selected chat route', () => {
+  const trusted = { ...catalog, tools: [{ ...catalog.tools[0], status: 'ready', installed: true, loginState: 'logged-in',
+    identities: [{ model: 'vendor-default', label: '厂商默认模型（由 CLI 配置决定）' }, { model: 'legacy-codex', label: '已配置模型' }] }] }
+  const chatModel = findModel(trusted, 'anthropic/claude-sonnet-4')
+  const cards = toolCards({ catalog: trusted, model: chatModel, grants: [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }] })
+  assert.equal(cards[0].available, true)
+  assert.equal(cards[0].stale, false)
+  assert.deepEqual(cards[0].identities.map(identity => identity.model), ['vendor-default', 'legacy-codex'])
+  assert.equal(toolCards({ catalog: trusted, model: chatModel, grants: [{ toolId: 'codex', cliModel: 'legacy-codex', mode: 'read-only' }] })[0].stale, false,
+    'a Host-preserved exact CLI configuration is valid across chat providers too')
+  const current = form({ enabled: true, model: 'anthropic/claude-sonnet-4', workspace: 'local-host/default',
+    fundingMode: 'subscription', dailyCalls: '1', monthlyCalls: '10', officialTools: [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }] })
+  const account = { ...accounts.items[1], enabled: true }
+  assert.deepEqual(bindingProblems({ form: current, model: chatModel, account, machine: trusted.machines[0], root: trusted.machines[0].roots[0], catalog: trusted,
+    scope: { modes: ['subscription'] } }), [])
+  const payload = buildBinding({ form: current, model: chatModel, account, machine: trusted.machines[0], root: trusted.machines[0].roots[0] })
+  assert.deepEqual(payload.model, { provider: 'anthropic', model: 'claude-sonnet-4' })
+  assert.deepEqual(payload.officialTools, [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }])
+})
+
+test('an explicit empty CLI identity catalog never falls back to a chat-model mapping', () => {
+  for (const status of ['checking', 'not-installed', 'logged-out', 'login-unknown', 'terminal-only', 'unavailable']) {
+    const trusted = { ...catalog, tools: [{ ...catalog.tools[0], identities: [], status, reason: `状态：${status}` }] }
+    const [tool] = toolCards({ catalog: trusted, model: findModel(catalog, 'openai/gpt-5'), grants: [{ toolId: 'codex', cliModel: 'gpt-5-codex', mode: 'read-only' }] })
+    assert.equal(tool.available, false, status)
+    assert.deepEqual(tool.identities, [], status)
+    assert.equal(tool.stale, true, status)
+    assert.equal(tool.reason, `状态：${status}`)
+  }
+})
+
+test('a tool that loses its offered mode is stale, and writable CLI grants require explicit workspace write access', () => {
+  const trusted = { ...catalog, tools: [{ ...catalog.tools[0], status: 'ready', installed: true, loginState: 'logged-in', identities: [{ model: 'vendor-default' }], modes: ['read-only', 'workspace-write'] }] }
+  const selected = { toolId: 'codex', cliModel: 'vendor-default', mode: 'workspace-write' }
+  assert.equal(toolCards({ catalog: trusted, grants: [selected] })[0].stale, false)
+  const current = form({ enabled: true, model: 'openai/gpt-5', workspace: 'local-host/default', workspaceMode: 'read-only', fundingMode: 'subscription', dailyCalls: '1', monthlyCalls: '10', officialTools: [selected] })
+  const input = { form: current, model: findModel(trusted, 'openai/gpt-5'), account: accounts.items[0], machine: trusted.machines[0], root: trusted.machines[0].roots[0], catalog: trusted, scope: { modes: ['subscription'] } }
+  assert.deepEqual(bindingProblems(input), ['Codex CLI 需要写入工作区，请先将工作区权限设为允许写入。'])
+  assert.deepEqual(bindingProblems({ ...input, form: { ...current, workspaceMode: 'workspace-write' } }), [])
+  assert.equal(toolCards({ catalog: { ...trusted, tools: [{ ...trusted.tools[0], modes: ['read-only'] }] }, grants: [selected] })[0].stale, true)
 })

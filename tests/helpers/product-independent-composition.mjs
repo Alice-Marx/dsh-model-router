@@ -65,7 +65,7 @@ export function productContext() {
   return ctx
 }
 
-export async function withProductIndependent(run, { beforeBoot, beforeProduct, nativeLlm = true, runtimeSettings = {}, runtimeConfig, productConfig = {}, productModules = {}, conversationEngines = [] } = {}) {
+export async function withProductIndependent(run, { beforeBoot, beforeProduct, nativeLlm = true, runtimeSettings = {}, runtimeConfig, productConfig = {}, productModules = {}, conversationEngines = [], officialTools } = {}) {
   // Packaging probes use the extracted artifact's real runtime modules with
   // this same offline owner/SDK harness, so checkout imports cannot mask a
   // missing or stale production dependency in the archive.
@@ -89,7 +89,7 @@ export async function withProductIndependent(run, { beforeBoot, beforeProduct, n
     const storageFile = join(home, 'model-router/orchestration.sqlite')
     const deferred = deferredState({ file: storageFile })
     composition = startProduct(ctx, { machineId: 'local-fixture', workspaceId: 'default',
-      accountStream: diagnosticStream(), deferredRouterState: deferred, storageFile, conversationEngines, runtimeConfig, config: productConfig,
+      accountStream: diagnosticStream(), deferredRouterState: deferred, storageFile, conversationEngines, officialTools, runtimeConfig, config: productConfig,
       legacyFile: join(home, 'legacy.json'), failClosed: false,
       mr: { executeConfiguredAssignment: async () => ({}), rerunRecordedStep: async () => ({}), routerStateStore: () => deferred.state },
     })

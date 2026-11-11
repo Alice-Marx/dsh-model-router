@@ -48,11 +48,23 @@ const record = { botId: 'writer', revision: 7, status: 'blocked', blockedReason:
   settings: { schemaVersion: 1, enabled: false, model: null, officialTools: [], machineGrants: [], capabilities: [], workspaceRef: null, routing: null,
     funding: { mode: 'api', scopeId: null, pricing: null, request: null, dailyBudgetUsd: null, monthlyBudgetUsd: null, subscription: null }, maxConcurrentTasks: 2 },
   catalog, grant: { tools: [], modelRoutes: [] } }
+if (new URLSearchParams(location.search).has('official')) {
+  catalog.tools = [
+    { toolId: 'codex', label: 'Codex CLI', vendor: 'OpenAI', installed: true, loginState: 'logged-in', status: 'ready', modes: ['read-only'], reason: '已安装、已登录，受限执行入口已就绪。', identities: [{ model: 'vendor-default', label: '厂商默认模型（由 CLI 配置决定）' }] },
+    { toolId: 'claude-code', label: 'Claude Code', installed: false, loginState: 'unknown', status: 'checking', modes: [], identities: [], reason: '正在检测安装与登录。' },
+    { toolId: 'gemini', label: 'Gemini CLI', installed: true, loginState: 'logged-in', status: 'terminal-only', modes: [], identities: [], reason: '请到官方工具终端中交互使用。' },
+    { toolId: 'dsh-tui', label: 'dsh-TUI', installed: false, loginState: 'unknown', status: 'not-installed', modes: [], identities: [], reason: '请先安装。' },
+    { toolId: 'stepcode', label: 'Step Code', installed: true, loginState: 'logged-out', status: 'logged-out', modes: [], identities: [], reason: '请先登录。' },
+    { toolId: 'opencode', label: 'OpenCode', installed: true, loginState: 'unknown', status: 'login-unknown', modes: [], identities: [], reason: '无法确认登录状态。' },
+  ]
+}
 const state = { calls: [], fail: false }
 window.__bindingFixture = state
 const dispatch = async (action, payload) => {
   state.calls.push({ action, payload: JSON.parse(JSON.stringify(payload ?? null)) })
   if (state.fail) return Promise.reject(Object.assign(new Error('codex 与当前模型的 CLI 身份尚未核验。'), { code: 'BOT_SETTINGS_SCOPE_DENIED' }))
+  if (action === 'binding.inspect') return { schemaVersion: 1, bot, record: { ...record, catalog: { ...catalog, tools: catalog.tools.map(tool => tool.toolId === 'claude-code'
+    ? { ...tool, installed: true, loginState: 'logged-in', status: 'ready', modes: ['read-only', 'workspace-write'], reason: '重新检测完成。', identities: [{ model: 'vendor-default', label: '厂商默认模型（由 CLI 配置决定）' }] } : tool) } } }
   if (action === 'binding.save') return { botId: payload.botId, revision: 8, status: 'available' }
   return { ok: true }
 }
@@ -247,6 +259,40 @@ async function verify() {
       { provider: 'native-claude', model: 'fixture-model-a', enabled: true, funding: { mode: 'subscription', scopeId: 'scope-native', pricing: null, request: null } },
     ] })
     checks.push('Main edits mixed API and subscription routes at 375px, changes the default, and saves the exact profiles and shared limits in one revision')
+    await page.goto(fixture.url + '?official=1')
+    await page.getByRole('heading', { name: '模型与工具' }).waitFor()
+    assert.match(await page.locator('[data-tool-id="claude-code"] .bb-tool-readiness').innerText(), /检测中/)
+    assert.match(await page.locator('[data-tool-id="gemini"] .bb-tool-readiness').innerText(), /仅终端交互/)
+    assert.match(await page.locator('[data-tool-id="dsh-tui"] .bb-tool-readiness').innerText(), /未安装/)
+    assert.match(await page.locator('[data-tool-id="stepcode"] .bb-tool-readiness').innerText(), /未登录/)
+    assert.match(await page.locator('[data-tool-id="opencode"] .bb-tool-readiness').innerText(), /登录状态待确认/)
+    assert.equal(await page.locator('[data-tool-id="gemini"] input[type=checkbox]').count(), 0)
+    await page.locator('[data-tool-id="codex"] input[type=checkbox]').check()
+    await route('anthropic/claude-sonnet-4').click()
+    assert.equal(await page.locator('[data-tool-id="codex"] input[type=checkbox]').isChecked(), true)
+    assert.equal(await page.locator('[data-tool-id="codex"]').getAttribute('data-stale'), 'false')
+    await page.locator('.bb-budget-config > summary').click()
+    await page.getByLabel('Bot 每日预算（USD）', { exact: true }).fill('9')
+    await page.getByRole('button', { name: '重新检测', exact: true }).click()
+    await page.getByText('工具状态已更新，未保存的修改仍然保留。', { exact: true }).waitFor()
+    assert.match(await page.locator('[data-tool-id="claude-code"] .bb-tool-readiness').innerText(), /已就绪/)
+    assert.equal(await page.locator('[data-tool-id="codex"] input[type=checkbox]').isChecked(), true)
+    assert.match(await page.locator('.bp-model-current').innerText(), /claude-sonnet-4/)
+    assert.equal(await page.getByLabel('Bot 每日预算（USD）', { exact: true }).inputValue(), '9')
+    assert.deepEqual((await calls()).map(call => call.action), ['binding.inspect'])
+    assert.deepEqual(await overflow(), { document: false, card: false })
+    images.push(await capture('binding-official-tools-mobile'))
+    await page.evaluate(() => document.body.setAttribute('data-bp-appearance', 'dark'))
+    assert.deepEqual(await overflow(), { document: false, card: false })
+    images.push(await capture('binding-official-tools-mobile-dark'))
+    await page.evaluate(() => document.body.removeAttribute('data-bp-appearance'))
+    await page.getByRole('button', { name: '保存绑定', exact: true }).click()
+    await page.locator('.bb-save > .bb-feedback[data-kind=saved]').waitFor()
+    const cliSaved = (await calls()).find(call => call.action === 'binding.save').payload.settings
+    assert.deepEqual(cliSaved.model, { provider: 'anthropic', model: 'claude-sonnet-4' })
+    assert.deepEqual(cliSaved.officialTools, [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }])
+    assert.equal(cliSaved.funding.dailyBudgetUsd, 9)
+    checks.push('official CLI status and default-model grants are independent of chat provider; rechecking at 375px retains the draft and saves the chosen CLI without inventing a model ID')
     assert.deepEqual(failures, [])
     const report = { status: 'passed', localFixture: true, checks, contrast: { light, dark }, images, pageErrors: failures }
     await writeFile(resolve(out, 'report.json'), JSON.stringify(report, null, 2))

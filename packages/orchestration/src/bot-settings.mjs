@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { OFFICIAL_TOOLS } from '../../../.dsh-plugin/shared/official-tool-registry.mjs'
 import { fundingForMainRoute, materializeMainRouteDefault, normalizeMainModelRoutes, preserveMainModelRoutes } from './main-model-routes.mjs'
+import { BOT_OFFICIAL_TOOL_STATUSES } from './bot-official-tools.mjs'
 
 export const BOT_SETTINGS_SCHEMA = 1
 export const BOT_EXECUTION_MODES = Object.freeze(['read-only', 'workspace-write', 'cli-native'])
@@ -46,10 +47,10 @@ export function normalizeBotSettings(input) {
     if (!token(value.model.provider) || !token(value.model.model)) fail('BOT_SETTINGS_INVALID', '请选择目录中的准确 provider/model。', { field: 'model' })
     value.model = { provider: value.model.provider, model: value.model.model }
   }
-  value.officialTools = list(value.officialTools, 12, 'officialTools').map(tool => {
+  value.officialTools = list(value.officialTools, registry.size, 'officialTools').map(tool => {
     keys(tool, ['toolId', 'cliModel', 'mode'], 'officialTools')
     if (!registry.has(tool.toolId)) fail('BOT_SETTINGS_UNKNOWN_TOOL', '官方工具必须来自 MR 固定注册表。', { field: 'officialTools' })
-    if (!token(tool.cliModel) || !BOT_EXECUTION_MODES.includes(tool.mode)) fail('BOT_SETTINGS_INVALID', '请选择已核验的 CLI 模型和执行模式。', { field: 'officialTools' })
+    if (!token(tool.cliModel) || !BOT_EXECUTION_MODES.includes(tool.mode)) fail('BOT_SETTINGS_INVALID', '请选择目录提供的 CLI 模型配置和执行模式。', { field: 'officialTools' })
     return { toolId: tool.toolId, cliModel: tool.cliModel, mode: tool.mode }
   }).sort((a, b) => a.toolId.localeCompare(b.toolId))
   unique(value.officialTools.map(tool => tool.toolId), 'officialTools')
@@ -132,9 +133,19 @@ function catalogOf(input) {
   unique(capabilities.map(item => item.id), 'catalog.capabilities')
   const tools = OFFICIAL_TOOLS.map(tool => {
     const configured = (input.tools ?? []).find(item => item.toolId === tool.id)
+    const hasIdentities = configured && Object.hasOwn(configured, 'identities')
+    const identities = hasIdentities ? list(configured.identities, 65, 'catalog.tools.identities').map(identity => {
+      if (!plain(identity) || !token(identity.model)) fail('BOT_SETTINGS_CATALOG_INVALID', '宿主 CLI 模型配置目录无效。')
+      return { model: identity.model, label: String(identity.label ?? identity.model).slice(0, 256) }
+    }) : null
+    if (identities) unique(identities.map(identity => identity.model), 'catalog.tools.identities')
     return { toolId: tool.id, label: tool.label, vendor: tool.vendor,
       source: ['opencode', 'pi', 'hermes'].includes(tool.id) ? '开源第三方工具' : tool.id === 'zcode' ? '社区发行版' : '厂商官方 CLI',
-      modes: (configured?.modes ?? []).filter(mode => BOT_EXECUTION_MODES.includes(mode)), grantTools: [...new Set(configured?.grantTools ?? [])].filter(token).sort() }
+      modes: (configured?.modes ?? []).filter(mode => BOT_EXECUTION_MODES.includes(mode)), grantTools: [...new Set(configured?.grantTools ?? [])].filter(token).sort(),
+      ...(hasIdentities ? { identities, installed: configured.installed === true,
+        loginState: ['logged-in', 'logged-out'].includes(configured.loginState) ? configured.loginState : 'unknown',
+        status: BOT_OFFICIAL_TOOL_STATUSES.includes(configured.status) ? configured.status : 'unavailable',
+        reason: String(configured.reason ?? '').slice(0, 500) } : {}) }
   })
   const machines = list(input.machines ?? [], 1024, 'catalog.machines').map(machine => {
     if (!ref(machine.machineId) || !['local', 'remote'].includes(machine.location)) fail('BOT_SETTINGS_CATALOG_INVALID', '宿主机器目录无效。')
@@ -166,7 +177,12 @@ export function validateBotSettings(input, catalogInput) {
   for (const tool of settings.officialTools) {
     const entry = catalog.tools.find(item => item.toolId === tool.toolId)
     if (!entry?.modes.includes(tool.mode)) denied(`${tool.toolId} 尚未获准使用该执行模式。`, 'officialTools')
-    if (!model?.cliModels.some(item => item.toolId === tool.toolId && item.model === tool.cliModel)) denied(`${tool.toolId} 与当前模型的 CLI 身份尚未核验。`, 'officialTools')
+    // New catalogs describe the CLI independently from the chat route. An empty
+    // identities array is an explicit revocation, never a legacy fallback.
+    const offered = Object.hasOwn(entry, 'identities')
+      ? entry.status === 'ready' && entry.installed && entry.loginState === 'logged-in' && entry.identities.some(item => item.model === tool.cliModel)
+      : model?.cliModels.some(item => item.toolId === tool.toolId && item.model === tool.cliModel)
+    if (!offered) denied(`${tool.toolId} 的 CLI 模型配置或执行入口当前不可用，请重新检测后授予。`, 'officialTools')
   }
   for (const grant of settings.machineGrants) {
     const root = catalog.machines.find(item => item.machineId === grant.machineId)?.roots.find(item => item.rootId === grant.rootId)
@@ -176,6 +192,12 @@ export function validateBotSettings(input, catalogInput) {
   if (settings.workspaceRef) {
     const workspace = settings.workspaceRef, machine = catalog.machines.find(item => item.machineId === workspace.machineId)
     if (!machine || machine.location !== workspace.kind || !settings.machineGrants.some(grant => grant.machineId === workspace.machineId && grant.rootId === workspace.rootId)) denied('工作区必须对应同一机器上的有效根目录授权。', 'workspaceRef')
+  }
+  if (settings.officialTools.some(tool => tool.mode !== 'read-only')) {
+    const workspace = settings.workspaceRef
+    if (!workspace || !settings.machineGrants.some(grant => grant.machineId === workspace.machineId && grant.rootId === workspace.rootId && grant.mode === 'workspace-write')) {
+      denied('CLI 写入权限需要同一已授权工作区的可写根目录，不能扩大只读工作区。', 'officialTools')
+    }
   }
   const funding = settings.funding
   if (funding.scopeId !== null) {
@@ -190,12 +212,25 @@ export function validateBotSettings(input, catalogInput) {
   return { settings, catalog }
 }
 
-function compiledGrant(settings, catalog) {
+export function compileBotSettingsGrant(settings, catalog) {
   if (!settings.enabled) return clone(EMPTY_GRANT)
   const selected = new Set([...settings.capabilities, ...settings.machineGrants.flatMap(grant => grant.capabilities)])
   const tools = [...catalog.capabilities.filter(item => selected.has(item.id)).flatMap(item => item.tools),
-    ...settings.officialTools.flatMap(tool => catalog.tools.find(item => item.toolId === tool.toolId)?.grantTools ?? [])]
+    ...settings.officialTools.filter(tool => officialToolAvailable(settings, catalog, tool)).flatMap(tool => (catalog.tools.find(item => item.toolId === tool.toolId)?.grantTools ?? [])
+      .filter(name => tool.cliModel !== 'vendor-default' || !name.startsWith('cli/')))]
   return { tools: [...new Set(tools)].sort(), modelRoutes: [{ ...settings.model }] }
+}
+
+function officialToolAvailable(settings, catalog, tool) {
+  const entry = catalog.tools.find(item => item.toolId === tool.toolId)
+  if (!entry?.modes.includes(tool.mode)) return false
+  const known = Object.hasOwn(entry, 'identities')
+    ? entry.status === 'ready' && entry.installed && entry.loginState === 'logged-in' && entry.identities.some(item => item.model === tool.cliModel)
+    : catalog.models.find(model => routeRef(model) === routeRef(settings.model))?.cliModels.some(item => item.toolId === tool.toolId && item.model === tool.cliModel)
+  if (!known) return false
+  if (tool.mode === 'read-only') return true
+  const workspace = settings.workspaceRef
+  return Boolean(workspace && settings.machineGrants.some(grant => grant.machineId === workspace.machineId && grant.rootId === workspace.rootId && grant.mode === 'workspace-write'))
 }
 
 export function checkMainRouteFunding(route, funding, catalog) {
@@ -243,9 +278,16 @@ export function openBotSettings({ Database, file, catalogFor = () => ({}), botEx
       if (!sync(botExists(record.botId), 'botExists')) fail('BOT_SETTINGS_UNKNOWN_BOT', '此 Bot 不在已提交的宿主目录。')
       if (suspended.has(record.botId)) fail('BOT_SETTINGS_SUSPENDED', '授权同步失败，此 Bot 已暂停。请修复宿主授权回调后刷新。')
       let settings=normalizeBotSettings(record.settings),catalog
-      if(settings.enabled)({settings,catalog}=validateBotSettings(settings,sync(catalogFor(record.botId),'catalogFor')))
+      if(settings.enabled){
+        // A CLI logout/upgrade revokes that CLI, not the Bot's valid chat route.
+        // Keep saved selections visible for repair; saves still validate every
+        // selection strictly, while compiled grants use only live CLI entries.
+        const officialTools=settings.officialTools
+        ;({settings,catalog}=validateBotSettings({...settings,officialTools:[]},sync(catalogFor(record.botId),'catalogFor')))
+        settings.officialTools=officialTools
+      }
       else{try{catalog=catalogOf(sync(catalogFor(record.botId),'catalogFor'))}catch{catalog={models:[],tools:[],machines:[],capabilities:[],fundingScopes:[]}}}
-      const grant = compiledGrant(settings, catalog)
+      const grant = compileBotSettingsGrant(settings, catalog)
       return { ...record, settings, catalog, grant, status: settings.enabled ? 'available' : 'blocked',
         ...(!settings.enabled ? { blockedReason: record.revision ? '此 Bot 的执行绑定已停用。' : '此 Bot 尚未配置执行绑定。', nextAction: '选择目录中的模型、工作区及资金范围，确认后启用。' } : {}) }
     } catch (error) {
@@ -347,7 +389,7 @@ export function openBotSettings({ Database, file, catalogFor = () => ({}), botEx
       if (value.status !== 'available') fail('BOT_SETTINGS_SCOPE_DENIED', value.blockedReason ?? 'Bot 绑定未启用。')
       const settings = value.settings
       if (input.provider !== settings.model.provider || input.model !== settings.model.model || input.funding !== settings.funding.mode) fail('BOT_SETTINGS_SCOPE_DENIED', '准确模型或资金渠道与 Bot 绑定不同。')
-      if (input.toolId && !settings.officialTools.some(tool => tool.toolId === input.toolId && tool.cliModel === input.cliModel && tool.mode === input.mode)) fail('BOT_SETTINGS_SCOPE_DENIED', '该工具、CLI 模型或执行模式未授予此 Bot。')
+      if (input.toolId && !settings.officialTools.some(tool => tool.toolId === input.toolId && tool.cliModel === input.cliModel && tool.mode === input.mode && officialToolAvailable(settings,value.catalog,tool))) fail('BOT_SETTINGS_SCOPE_DENIED', '该工具、CLI 模型或执行模式未授予此 Bot，或执行入口已失效。')
       if (!settings.machineGrants.some(grant => grant.machineId === input.machineId && grant.rootId === input.rootId && grant.mode === input.mode && grant.capabilities.includes(input.capability))) fail('BOT_SETTINGS_SCOPE_DENIED', '机器、根目录、能力或模式越出此 Bot 授权。')
       return { botId, revision: value.revision, settings: clone(settings) }
     },

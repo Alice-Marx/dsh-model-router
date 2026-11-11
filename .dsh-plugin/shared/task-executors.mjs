@@ -23,6 +23,7 @@ import { normalizeExecutionPreference } from './model-profiles.mjs'
 import { BILLING_MODE_LABEL, billingPlan, detectQuotaExhaustion, vendorKey } from './subscription-billing.mjs'
 import { reasoningExecutionFields, reasoningRouteForAssignment, routeForReasoningSwitch, unsupportedCliReasoning } from './reasoning-execution.mjs'
 import { parsePackageAssignments, packageSelectionFields } from './package-assignments.mjs'
+import { admittedOfficialModel, admittedOfficialSelection, officialModelId } from './bot-official-execution.mjs'
 
 export const MAX_TASK_BYTES = 64_000
 const MAX_ANSWER_CHARS = 48_000
@@ -233,7 +234,7 @@ async function checkedWorkspace(workspace) {
 function cliModelFor(route, adapter) {
   // Catalog IDs are routing recommendations, not vendor CLI aliases. Omit
   // the model argument unless the route explicitly binds a CLI model.
-  const value = route?.cliModel
+  const value = officialModelId(route?.cliModel)
   if (value === undefined || value === null || value === '') return null
   const explicit = checkedModel(value)
   if (!explicit) throw new TypeError('cliModel must be a bounded model identifier')
@@ -811,6 +812,7 @@ export async function executeAssignedTask({
   route, task, workspace, timeoutMs, signal, credentials = null, spawnImpl = spawn,
   apiFallback, runVerified = null, onChunk = null, skipOfficial = null, stopGraceMs, credentialMode = 'default',
   resolvePortableLaunch = resolvePortableToolLaunch,
+  authorizeOfficial = null,
 } = {}) {
   const prompt = checkedTask(task)
   const preference = executionPreference(route)
@@ -827,7 +829,25 @@ export async function executeAssignedTask({
       reason: '该供应商没有官方代理工具，已使用模型目录 API。',
     })
   }
+  // An authorization failure is terminal, not a reason to fall back to an API
+  // or to start a portable CLI outside the Bot's saved execution permissions.
+  const admission = await admittedOfficialSelection(authorizeOfficial, { toolId: adapter.id,
+    modelId: cliModelFor(route, adapter), mode: 'read-only', executionEnvironment: 'harness' })
+  let modelId = admission.modelId
+  const selectedCliModel = modelId ?? 'vendor-default'
+  const strictFailure = (reason, result = null) => ({ ok: false, provider, model, preference,
+    channel: 'official-cli', toolId: adapter.id, answer: '', fallback: null, noApiFallback: true,
+    requestedCliModel: modelId, actualModel: reportedCliModel(result?.actualModel ?? result?.reportedModel),
+    ...(result?.reportedModel != null ? { reportedModel: result.reportedModel } : {}),
+    ...(result?.usage ? { usage: result.usage } : {}),
+    ...(Number.isFinite(result?.reportedCostUsd) ? { reportedCostUsd: result.reportedCostUsd } : {}),
+    usageIncomplete: result?.usageIncomplete === true || !result?.usage,
+    ...(result?.status === 'timed-out' ? { timedOut: true } : {}),
+    ...(result?.status === 'cancelled' ? { cancelled: true } : {}),
+    ...(!result || result.notStarted === true || result.blocked === true || result.status === 'unsupported' ? { notStarted: true, blocked: true } : {}),
+    exitCode: result?.exitCode ?? null, error: redactDiagnostic(reason) })
   if (credentialMode === 'api-only' && !childEnvironment(adapter, credentials).secret) {
+    if (admission.botScoped) return strictFailure('所选 CLI 没有符合计费配置的 API Key；未启动 CLI，也未改用其他模型。')
     return useApi(apiFallback, {
       route, task: prompt, signal, adapter, preference, skipped: true,
       reason: `按设置只用 API Key：${adapter.label} 没有可注入的 API Key，已使用模型目录 API，未使用订阅登录。`,
@@ -838,11 +858,11 @@ export async function executeAssignedTask({
     ? skipOfficial({ toolId: adapter.id, hasApiKey: Boolean(childEnvironment(adapter, credentials, credentialMode).secret) })
     : null
   if (typeof skipReason === 'string' && skipReason) {
+    if (admission.botScoped) return strictFailure(skipReason)
     return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, reason: skipReason, skipped: true })
   }
   const cwd = await checkedWorkspace(workspace)
   const timeout = checkedTimeout(timeoutMs)
-  const modelId = cliModelFor(route, adapter)
   if (typeof runVerified === 'function' && adapter.portableOnly !== true) {
     const verified = await runVerified({
       toolId: adapter.id, task: prompt, workspace: cwd, modelId, mode: 'read-only', signal, timeoutMs: timeout,
@@ -862,6 +882,8 @@ export async function executeAssignedTask({
           usageIncomplete: verified.usageIncomplete },
       })
     }
+    if (admission.botScoped) return strictFailure(verified?.error || verified?.reason
+      || '官方 CLI 未返回有效成功结果；已停止，未改用便携入口或 API。', verified)
     if (verified && verified.status !== 'unsupported') {
       return useApi(apiFallback, {
         route, task: prompt, signal, adapter, preference, exitCode: verified.exitCode ?? null,
@@ -874,6 +896,7 @@ export async function executeAssignedTask({
       })
     }
   }
+  if (admission.botScoped) return strictFailure('Bot 官方工具必须使用已核验的受限执行入口；未启动便携入口或 API。')
   if (!adapter.portable || !adapter.executable) {
     return useApi(apiFallback, {
       route, task: prompt, signal, adapter, preference,
@@ -887,6 +910,8 @@ export async function executeAssignedTask({
   }
   if (!launch?.file) return useApi(apiFallback, { route, task: prompt, signal, adapter, preference,
     reason: launch?.reason ?? `${adapter.label} 未安装或无法启动，已回退模型目录 API。` })
+  modelId = await admittedOfficialModel(authorizeOfficial, { toolId: adapter.id,
+    cliModel: selectedCliModel, mode: 'read-only', executionEnvironment: 'harness' })
   const probe = await captureProcess(spawnImpl, launch.file, [...launch.args, '--version'], {
     cwd, env, stdin: '', timeoutMs: Math.min(PROBE_TIMEOUT_MS, timeout), signal, secret,
   })
@@ -900,6 +925,8 @@ export async function executeAssignedTask({
     }
     return useApi(apiFallback, { route, task: prompt, signal, adapter, preference, reason })
   }
+  modelId = await admittedOfficialModel(authorizeOfficial, { toolId: adapter.id,
+    cliModel: selectedCliModel, mode: 'read-only', executionEnvironment: 'harness' })
   const args = adapter.buildArgs(modelId)
   const run = await captureProcess(spawnImpl, launch.file, [...launch.args, ...args], {
     cwd, env, stdin: prompt, timeoutMs: timeout, signal, onChunk, secret,
@@ -1179,7 +1206,8 @@ ${args?.raw ?? ''}`, vendor)
     return { ...await apiFallback(args), billing: 'api' }
   }
   const result = await executeAssignedTask({ ...options, route, apiFallback: guarded, credentialMode: 'session-only' })
-  if (confirmedSubscription && result.channel === 'official-cli' && (result.ok === true || result.cancelled && !result.notStarted)) {
+  if (confirmedSubscription && result.channel === 'official-cli' && (result.ok === true || result.cancelled && !result.notStarted
+    || result.noApiFallback && !result.notStarted)) {
     await onSubscriptionResult(subscriptionReceipt(result, { provider, model, toolId: sub.toolId, channel: 'official-cli', now }))
   }
   return {
@@ -1355,8 +1383,10 @@ async function runManualTool(target, prompt, options) {
     channel: 'official-cli', preference: 'official', requestedCliModel: null,
     modelNotice: '使用所选官方工具配置的默认模型。', fallback: null }
   try {
+    const modelId = await admittedOfficialModel(options.authorizeOfficial, { toolId: target.toolId,
+      mode: 'read-only', executionEnvironment: 'harness' })
     const raw = await options.runVerified({ toolId: target.toolId, task: prompt, workspace: options.workspace,
-      mode: 'read-only', signal: options.signal })
+      modelId, mode: 'read-only', signal: options.signal })
     if (!raw || typeof raw.status !== 'string') throw new TypeError('官方工具未返回有效执行状态。')
     const answer = typeof raw.finalText === 'string' ? raw.finalText : ''
     const ok = raw.status === 'succeeded' && answer.trim().length > 0
@@ -1380,6 +1410,7 @@ async function runManualTool(target, prompt, options) {
       error: ok ? undefined : redactDiagnostic(raw.error ?? raw.reason ?? (answer.trim() ? '官方工具执行失败。' : '官方工具未返回有效文本。')) }
   } catch (error) {
     return { ...base, ok: false, answer: '', actualModel: null, usageIncomplete: true,
+      ...(error?.notStarted === true ? { notStarted: true, blocked: true } : {}),
       ...(options.signal?.aborted || error?.name === 'AbortError' ? { cancelled: true } : {}),
       error: redactDiagnostic(error?.message ?? error) }
   }

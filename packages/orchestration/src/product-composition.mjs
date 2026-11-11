@@ -58,6 +58,9 @@ import { inspectProductBotProfile, saveProductBotProfile } from './bot-profile.m
 import { openUiHostNamespace } from './ui-host-namespace.mjs'
 import { registerDataTools } from './bot-data-tools.mjs'
 import { createNativeDataTools } from './native-data-tools.mjs'
+import { createBotOfficialToolsCatalog } from './bot-official-tools.mjs'
+import { createBotOfficialAccess, DEFAULT_CLI_MODEL } from './bot-official-access.mjs'
+import { createNativeOfficialTools } from './native-official-tools.mjs'
 import { createNativeActivityService } from './native-activity-service.mjs'
 import { createTeamCoordination } from './team-bridge.mjs'
 import { createNativeTeamTools } from './native-team-tools.mjs'
@@ -233,7 +236,7 @@ export function createTaskBackends({ ctx, mr, authority, directory, store, machi
     const binding = bindingFor(botId)
     const settings = binding?.status === 'available' ? binding.settings : null
     const funding = settings?.funding ?? null
-    const tool = settings?.officialTools?.find(item => item.toolId === 'codex' && item.mode === 'read-only')
+    const tool = settings?.officialTools?.find(item => item.toolId === 'codex' && item.mode === 'read-only' && item.cliModel !== DEFAULT_CLI_MODEL)
     if (!settings?.model?.provider || !settings.model.model || !tool || !funding?.scopeId) return null
     if (funding.mode === 'api' && (!funding.pricing || !funding.request)) return null
     if (funding.mode === 'subscription' && !(funding.subscription?.dailyCalls >= 1)) return null
@@ -267,7 +270,7 @@ function createRemoteCliTaskBackend({machines,directory,store,authority,profiles
  const inners=new Map()
  const resolve=botId=>{
   const binding=bindingFor(botId),settings=binding?.status==='available'?binding.settings:null,funding=settings?.funding??null
-  const tool=settings?.officialTools?.find(item=>item.toolId==='codex'&&item.mode==='read-only')
+  const tool=settings?.officialTools?.find(item=>item.toolId==='codex'&&item.mode==='read-only'&&item.cliModel!==DEFAULT_CLI_MODEL)
   if(!settings?.model?.provider||!settings.model.model||!tool||!funding?.scopeId)return null
   if(funding.mode==='api'&&(!funding.pricing||!funding.request))return null
   if(funding.mode==='subscription'&&!(funding.subscription?.dailyCalls>=1))return null
@@ -456,6 +459,30 @@ export function startBotProduct(ctx, options = {}) {
   let journal, taskService, taskBackends, releaseTaskTools, cliSessionFactory, remoteCliBackend, sharedAdmission, taskRunnerWatchdog, notifications, dataEngine, dataAccess, releaseDataTools, uiNamespace, nativeActivity, botThreads, webPanelStore, webPanelActions, independentChat, teamCoordination, releaseTeamTools, releaseTeamGuard, releaseTeamStop
   const grantRefresh = createGrantRefreshQueue({ lifecycle: () => product?.lifecycle,
     onError: () => ctx.logger?.warn?.('Bot grant refresh failed; grants remain suspended until a successful committed-state refresh.') })
+  const officialCatalog = options.officialTools ? createBotOfficialToolsCatalog({ ...options.officialTools,
+    legacyModels: cliConfig?.models ?? [], legacyTools: cliConfig ? [{ toolId: 'codex', grantTools: [...CLI_GRANT_TOOLS] }] : [], now,
+    onChanged: async () => { botSettings?.refresh(); if (product) await product.lifecycle.refreshGrants() },
+  }) : null
+  const officialAccess = createBotOfficialAccess({ catalog: officialCatalog, identityFor: () => policy.activeIdentity(),
+    settingsFor: botId => botSettings?.get(botId, { publishChange: false }),
+    isMainBot: botId => product?.lifecycle.committedMainBotIds().includes(botId) === true,
+    assertTool: (subject, tool) => authority.assertTool(subject, tool) })
+  ctx.provide('botOfficialTools', officialAccess)
+  const nativeOfficialFor = (botId, validate) => createNativeOfficialTools({ access: officialAccess, botId, validate,
+    redact: text => product.rt.redactSecrets(text),
+    within: (signal, work) => policy.modelContext(directory.forBot(botId), signal, work, { botId }),
+    run: async (args, { signal }) => {
+      const bot = product.lifecycle.committedBot(botId)
+      const row = botSettings.get(botId, { publishChange: false }), ref = row.settings.workspaceRef
+      if (!ref || ref.kind !== 'local') throw Object.assign(new Error('此官方 CLI 入口需要本机工作区；远程 CLI 请使用已配对机器的托管任务。'), { code: 'OFFICIAL_LOCAL_WORKSPACE_REQUIRED' })
+      const folder = bot?.workDir ?? product.rt.defaultTeamFolder()
+      if (!folder || !isAbsolute(folder)) throw Object.assign(new Error('Bot 的本机工作区尚未就绪。'), { code: 'OFFICIAL_WORKSPACE_UNAVAILABLE' })
+      if (!bot?.workDir) await mkdir(folder, { recursive: true })
+      const write = product.lifecycle.committedMainBotIds().includes(botId) || row.settings.machineGrants.some(grant => grant.machineId === ref.machineId && grant.rootId === ref.rootId && grant.mode === 'workspace-write')
+      if (typeof options.officialTools?.invoke !== 'function') throw Object.assign(new Error('官方工具执行服务尚未就绪。'), { code: 'OFFICIAL_EXECUTOR_UNAVAILABLE' })
+      return options.officialTools.invoke(args, { signal, cwd: folder, root: folder, sandboxMode: write ? 'workspace-write' : 'read-only' })
+    },
+  })
   // The service resolves live dependencies at each call. It is available before
   // async boot, so connect cannot capture an absent tool service forever.
   const ordinaryIndependentTools = createIndependentToolHost({ directory, authority,
@@ -493,6 +520,8 @@ export function startBotProduct(ctx, options = {}) {
       const data = createNativeDataTools({ access: dataAccess, subject, botId, validate,
         redact: product.rt.redactSecrets })
       const entries = data.handlers.map(handler => ({ handler, validate, readonly: handler.definition.name === 'data_describe' }))
+      const official = nativeOfficialFor(botId, validate)
+      entries.push(...official.handlers.map(handler => ({ handler, validate, readonly: handler.definition.name === 'model_router_tools' })))
       if (teamCoordination?.canUse(botId)) {
         const conversationId = context?.conversationId ?? policy.activeIdentity()?.conversationId ?? ctx.get('botRuntimeAdapter')?.contextOf?.(botId)?.contextId
         const team = createNativeTeamTools({ service: teamCoordination, callerBotId: botId, conversationId,
@@ -635,7 +664,7 @@ export function startBotProduct(ctx, options = {}) {
         model.pricing = pricing
       }
     }
-    return { models, tools: cliConfig ? [{ toolId: 'codex', modes: ['read-only'], grantTools: [...CLI_GRANT_TOOLS] }] : [],
+    return { models, tools: officialCatalog ? officialCatalog.snapshot() : cliConfig ? [{ toolId: 'codex', modes: ['read-only'], grantTools: [...CLI_GRANT_TOOLS] }] : [],
       machines: [{ machineId: localMachineId, label: '本机', location: 'local', status: 'ready',
         roots: [{ rootId: 'default', label: '默认工作区', modes: ['read-only', 'workspace-write'], capabilities: [] }] },...remoteMachines.values()],
       capabilities: [
@@ -802,7 +831,8 @@ export function startBotProduct(ctx, options = {}) {
           const team = teamCoordination?.canUse(identity.botId) ? createNativeTeamTools({ service: teamCoordination,
             callerBotId: identity.botId, sessionId: identity.hostSessionId, conversationId: identity.conversationId,
             validate: actValidate, redact: product.rt.redactSecrets }) : { tools: [], handlers: [] }
-          return { tools: [...ordinary.tools, ...remote.tools, ...data.tools, ...team.tools], handlers: [...ordinary.handlers, ...remote.handlers, ...data.handlers, ...team.handlers] }
+          const official = nativeOfficialFor(identity.botId, actValidate)
+          return { tools: [...ordinary.tools, ...remote.tools, ...data.tools, ...team.tools, ...official.tools], handlers: [...ordinary.handlers, ...remote.handlers, ...data.handlers, ...team.handlers, ...official.handlers] }
         },
         requestFor: (profile, request, identity) => {
           const current = engineContext(profile, request)
@@ -1305,8 +1335,9 @@ export function startBotProduct(ctx, options = {}) {
             requesterBotId: typeof payload?.requesterBotId === 'string' ? payload.requesterBotId : '',
           }),
           ...(botSettings ? {
-            'binding.inspect': ownerOnly((payload, context) => inspectProductBinding({ runtime: product.rt, lifecycle: product.lifecycle, botSettings, fundingAccounts, signal: context?.signal }, payload)),
+            'binding.inspect': ownerOnly((payload, context) => inspectProductBinding({ runtime: product.rt, lifecycle: product.lifecycle, botSettings, fundingAccounts, refreshOfficialTools: () => officialCatalog?.refresh({ fresh: true }), signal: context?.signal }, payload)),
             'binding.save': ownerOnly(async (payload, context) => {
+            if (payload.settings?.officialTools?.length) { await officialCatalog?.refresh({ fresh: true }); context?.signal?.throwIfAborted() }
             // A Bot holds its greeting until its model is picked, and the model change releases it
             // immediately. Saving a binding changes both the model and its authority, so hold the
             // greeting across that change: otherwise the greeting turn runs before the compiled
@@ -1417,6 +1448,7 @@ export function startBotProduct(ctx, options = {}) {
       ctx.provide('botAuxiliaryModelStream', Object.freeze(auxiliaryStream))
       // Fix the initial history boundary after committed Bots are hydrated,
       // before tools can start new work. A failed read fails startup visibly.
+      await officialCatalog?.refresh()
       await product.rt.load()
       independentChat = createIndependentChatService({ Database, file: storageFile, lifecycle: product.lifecycle,
         runtime: () => { try { return ctx.get?.('botRuntimeAdapter') ?? null } catch { return null } }, now })
@@ -1467,7 +1499,9 @@ export function startBotProduct(ctx, options = {}) {
       deferredRouterState?.resolve(funding.state)
       machineHeartbeat = createMachineHeartbeat({ machines: () => machines, preferredBotIds: () => product.lifecycle.committedMainBotIds() })
       machineHeartbeat.start()
-      timer = setInterval(() => { void refresh() }, refreshIntervalMs)
+      timer = setInterval(() => { void (async () => { await officialCatalog?.refresh({ fresh: true }); await refresh() })().catch(() => {
+        ctx.logger?.warn?.('Official tool refresh failed; unavailable CLI grants remain closed.')
+      }) }, refreshIntervalMs)
       timer.unref()
       return product
     }catch(error){
@@ -1513,6 +1547,7 @@ export function startBotProduct(ctx, options = {}) {
     boot,
     async dispose() {
       if (timer) clearInterval(timer)
+      officialCatalog?.invalidate()
       const product = await boot.then(value => value, () => null)
       await grantRefresh.close()
       ctx.get?.('botIndependentToolHost')?.close?.()

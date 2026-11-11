@@ -14,6 +14,7 @@ import { toolForProvider } from './official-tool-registry.mjs'
 import { workspaceChanged, readOnlyViolation } from './read-only-guard.mjs'
 import { awaitExecutionCheckpoint, observeExecutionProgress, redactDiagnostic, verifiedDiagnostic } from './task-executors.mjs'
 import { unsupportedCliReasoning } from './reasoning-execution.mjs'
+import { admittedOfficialModel, officialModelId } from './bot-official-execution.mjs'
 
 const MAX_GIT_OUTPUT = 64_000_000
 const GIT_TIMEOUT_MS = 120_000
@@ -263,13 +264,13 @@ function checkedTeamCliModels(cliModels, assigned) {
   const checked = Object.create(null)
   for (const [key, model] of Object.entries(cliModels)) {
     const toolId = packages.get(key)?.toolId ?? (tools.has(key) ? key : null)
-    if (!toolId || toolId === 'zcode') {
+    if (!toolId || (toolId === 'zcode' && model !== 'vendor-default')) {
       throw new TypeError(`cliModels contains an unsupported package or tool id: ${key}`)
     }
     if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/.test(model)) {
       throw new TypeError(`cliModels contains an invalid model name for ${toolId}`)
     }
-    if ((toolId === 'minimax-code' || toolId === 'mimo-code') && !model.includes('/')) {
+    if (model !== 'vendor-default' && (toolId === 'minimax-code' || toolId === 'mimo-code') && !model.includes('/')) {
       throw new TypeError(`${toolId} requires a provider/model CLI name`)
     }
     checked[key] = model
@@ -281,8 +282,8 @@ function teamCliModel(item, cliModels) {
   // Harness directory IDs and vendor CLI aliases are independent namespaces.
   // Every vendor uses its own configured default unless a package or tool
   // explicitly binds the model name accepted by that CLI.
-  if (cliModels[item.id]) return cliModels[item.id]
-  if (cliModels[item.toolId]) return cliModels[item.toolId]
+  if (cliModels[item.id]) return officialModelId(cliModels[item.id])
+  if (cliModels[item.toolId]) return officialModelId(cliModels[item.toolId])
   return null
 }
 
@@ -362,6 +363,7 @@ function executionException(error, signal) {
   const detail = executionDiagnostic(error?.message ?? error)
   const cancelled = signal?.aborted === true || error?.name === 'AbortError'
   return { status: cancelled ? 'cancelled' : 'failed', exitCode: null, finalText: '',
+    ...(error?.notStarted === true ? { notStarted: true, blocked: true } : {}),
     error: `${cancelled ? '官方 CLI 执行已取消' : '官方 CLI 执行器异常'}${detail ? `：${detail}` : '。'}`,
     detail }
 }
@@ -424,7 +426,7 @@ async function seedWorktree(isolated, seedFrom, signal) {
 }
 
 /** Sequential execution preserves DAG dependencies and avoids edit conflicts. */
-export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', executionEnvironment = 'harness', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null, seedFrom = null, onPackageStart, onPackage, onStage, onCheckpointStart, onCheckpointResult, onWorkspace }) {
+export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode = 'read-only', executionEnvironment = 'harness', installedIds = [], cliModels, signal, sandbox, runtime, previous = [], onlyIds = null, seedFrom = null, onPackageStart, onPackage, onStage, onCheckpointStart, onCheckpointResult, onWorkspace, authorizeOfficial }) {
   await observeExecutionProgress(onStage, 'preparing')
   if (!['harness', 'cli-native'].includes(executionEnvironment)
     || (executionEnvironment === 'cli-native' && mode !== 'workspace-write')) throw new TypeError('invalid team CLI execution environment')
@@ -446,6 +448,11 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   if (blocking.length > 0) return { status: 'blocked', blocking, results: [] }
   if (mode !== 'read-only' && mode !== 'workspace-write') throw new TypeError('team mode must be read-only or workspace-write')
   const configuredCliModels = checkedTeamCliModels(cliModels, assigned)
+  // Check the complete team before any cost or worktree mutation, then re-read
+  // the same Host authorization immediately before each actual process launch.
+  const admittedModels = new Map()
+  for (const item of assigned) admittedModels.set(item.id, await admittedOfficialModel(authorizeOfficial, {
+    toolId: item.toolId, modelId: teamCliModel(item, configuredCliModels), mode, executionEnvironment }))
   const source = await approvedSource(workspace, allowedRoot)
   if (signal?.aborted) return { status: 'cancelled', workspace: source, results: [] }
   if (executionEnvironment === 'harness' && typeof sandbox?.confine !== 'function') return { status: 'blocked', blocking: [{ reason: '官方 Harness 进程沙箱不可用。' }], results: [] }
@@ -480,7 +487,7 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
   const readOnlyBaseline = mode === 'read-only' ? await workspaceFingerprint(source, signal) : null
   for (const item of assigned) {
     if (signal?.aborted) return cancelledRun()
-    const cliModel = teamCliModel(item, configuredCliModels)
+    let cliModel = admittedModels.get(item.id)
     const prompt = packagePrompt(task, item, [...context, ...completed])
     const startedAt = Date.now()
     const starting = { ...item, provider: item.recommendedProvider,
@@ -491,6 +498,8 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
     if (signal?.aborted) return cancelledRun()
     let result
     try {
+      cliModel = await admittedOfficialModel(authorizeOfficial, { toolId: item.toolId,
+        cliModel: cliModel ?? 'vendor-default', mode, executionEnvironment })
       result = await runTool({
         toolId: item.toolId,
         modelId: cliModel,
@@ -575,7 +584,9 @@ export async function runOfficialTeam({ plan, task, workspace, allowedRoot, mode
 }
 
 /** One editable CLI task also uses the same isolated workspace and merge gate. */
-export async function runOfficialTask({ toolId, task, workspace, allowedRoot, modelId, mode = 'read-only', signal, sandbox, runtime, onCheckpointStart, onCheckpointResult, onWorkspace }) {
+export async function runOfficialTask({ toolId, task, workspace, allowedRoot, modelId, mode = 'read-only', signal, sandbox, runtime, onCheckpointStart, onCheckpointResult, onWorkspace, authorizeOfficial }) {
+  modelId = await admittedOfficialModel(authorizeOfficial, { toolId, modelId, mode, executionEnvironment: 'harness' })
+  const selectedCliModel = modelId ?? 'vendor-default'
   const source = await approvedSource(workspace, allowedRoot)
   if (signal?.aborted) return { toolId, status: 'cancelled', notStarted: true, finalText: '' }
   if (typeof sandbox?.confine !== 'function') return { toolId, status: 'unsupported', reason: '官方 Harness 进程沙箱不可用。' }
@@ -598,6 +609,7 @@ export async function runOfficialTask({ toolId, task, workspace, allowedRoot, mo
     workspace: runWorkspace, startedAt: Date.now() }, partial, 'start')
   if (signal?.aborted) return { ...partial(), status: 'cancelled', notStarted: true }
   try {
+    modelId = await admittedOfficialModel(authorizeOfficial, { toolId, cliModel: selectedCliModel, mode, executionEnvironment: 'harness' })
     result = await (runtime?.runTool ?? runOfficialTool)({ toolId, task, modelId, workspace: runWorkspace,
       mode, isolatedRoot: isolated?.isolatedRoot, signal, sandbox })
     if (!result || typeof result.status !== 'string') throw new TypeError('官方 CLI 执行器没有返回有效状态。')

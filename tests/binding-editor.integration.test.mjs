@@ -316,7 +316,7 @@ test('binding editor: an official tool grant only offers verified identities and
     assert.equal(container.querySelector('.bb-tool select').value, 'read-only')
     // A model with no verified CLI identity cannot be granted.
     await pick('openai/gpt-5-mini')
-    assert.match(container.textContent, /当前模型没有已核验的 codex CLI 身份/)
+    assert.match(container.textContent, /宿主尚未提供此工具的可用执行身份/)
     assert.equal(container.querySelectorAll('.bb-tool input[type=checkbox]').length, 0)
     assert.match(container.textContent, /授权已失效/)
   })
@@ -368,6 +368,118 @@ test('binding editor: a Bot without a binding directory explains itself', async 
     await render({ bot, record: null, accounts, dispatch: api.dispatch, busy: false })
     assert.match(container.textContent, /尚未取得绑定目录/)
     assert.equal(api.calls.length, 0)
+  })
+})
+
+const readyCliCatalog = () => ({ ...catalog, tools: [{ ...catalog.tools[0], installed: true, status: 'ready', loginState: 'logged-in',
+  reason: '已安装、已登录，受限执行入口已就绪。', identities: [{ model: 'vendor-default', label: '厂商默认模型（由 CLI 配置决定）' }] }] })
+
+test('official tools: choosing a different chat provider preserves the explicit CLI default and saves them separately', async () => {
+  await withDom(async ({ container, render, check, pick, click, saved }) => {
+    const api = fixture()
+    await render({ bot, record: readyRecord({ catalog: readyCliCatalog() }), accounts: accountsReady, dispatch: api.dispatch, busy: false })
+    await check('厂商默认模型（由 CLI 配置决定）')
+    await pick('anthropic/claude-sonnet-4')
+    assert.equal(container.querySelector('[data-tool-id="codex"] input[type=checkbox]').checked, true)
+    assert.doesNotMatch(container.textContent, /授权已失效/)
+    assert.match(container.textContent, /使用 CLI 当前配置的模型，不改变 Bot 的聊天模型/)
+    await click('保存绑定')
+    const payload = saved(api).at(-1).payload.settings
+    assert.deepEqual(payload.model, { provider: 'anthropic', model: 'claude-sonnet-4' })
+    assert.deepEqual(payload.officialTools, [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }])
+  })
+})
+
+test('official tools: unavailable entries explain installation, login and terminal-only states without exposing grants', async () => {
+  await withDom(async ({ container, render }) => {
+    const states = [
+      ['codex', 'checking', '检测中', '正在检测安装与登录。'],
+      ['claude-code', 'not-installed', '未安装', '请先安装。'],
+      ['gemini', 'logged-out', '未登录', '请先登录。'],
+      ['dsh-tui', 'login-unknown', '登录状态待确认', '无法确认登录状态。'],
+      ['opencode', 'terminal-only', '仅终端交互', '请到官方工具终端中使用。'],
+      ['stepcode', 'unavailable', '暂不可用', '执行入口检测失败。'],
+    ]
+    const trusted = { ...catalog, tools: states.map(([toolId, status, , reason]) => ({ toolId, label: toolId, status, reason, modes: [], identities: [] })) }
+    await render({ bot, record: readyRecord({ catalog: trusted }), accounts: accountsReady, dispatch: fixture().dispatch, busy: false })
+    for (const [toolId, , label, reason] of states) {
+      const card = container.querySelector(`[data-tool-id="${toolId}"]`)
+      assert.ok(card.textContent.includes(label), `${toolId}: ${label}`)
+      assert.ok(card.textContent.includes(reason), `${toolId}: reason`)
+      assert.equal(card.querySelector('input[type=checkbox]'), null)
+    }
+    assert.doesNotMatch(container.textContent, /当前模型没有已核验/)
+  })
+})
+
+test('official tools: a writable CLI mode never silently widens the workspace permission', async () => {
+  await withDom(async ({ container, render, check, select, click, saved, submitDisabled }) => {
+    const api = fixture(), trusted = readyCliCatalog()
+    trusted.tools[0].modes = ['read-only', 'workspace-write']
+    await render({ bot, record: readyRecord({ catalog: trusted }), accounts: accountsReady, dispatch: api.dispatch, busy: false })
+    await check('厂商默认模型（由 CLI 配置决定）')
+    await select('Codex CLI 的执行模式', 'workspace-write')
+    assert.equal(container.querySelector('select[aria-label="写作 Bot 的工作区权限"]').value, 'read-only')
+    assert.match(container.textContent, /请先将工作区权限设为允许写入/)
+    assert.equal(submitDisabled(container), true)
+    await select('写作 Bot 的工作区权限', 'workspace-write')
+    await click('保存绑定')
+    assert.equal(saved(api).at(-1).payload.settings.machineGrants[0].mode, 'workspace-write')
+    assert.deepEqual(saved(api).at(-1).payload.settings.officialTools, [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'workspace-write' }])
+  })
+})
+
+test('official tools: an explicit recheck updates the catalog without replacing an unsaved model, budget or grant', async () => {
+  await withDom(async ({ container, render, check, pick, fill, click, saved }) => {
+    const before = readyRecord({ catalog: readyCliCatalog() }), inspected = readyRecord({ catalog: readyCliCatalog() })
+    inspected.catalog.tools.push({ toolId: 'claude-code', label: 'Claude Code', installed: true, loginState: 'logged-in', status: 'ready', reason: '检测完成。', modes: ['workspace-write'], identities: [{ model: 'vendor-default', label: 'Claude 厂商默认模型' }] })
+    const api = fixture(action => action === 'binding.inspect' ? { schemaVersion: 1, bot, record: inspected } : undefined)
+    await render({ bot, record: before, accounts: accountsReady, dispatch: api.dispatch, busy: false })
+    await check('厂商默认模型（由 CLI 配置决定）'); await pick('anthropic/claude-sonnet-4'); await fill('Bot 每日预算（USD）', '9')
+    await click('重新检测')
+    assert.deepEqual(api.calls[0], { action: 'binding.inspect', payload: { botId: 'writer', refreshOfficialTools: true } })
+    assert.match(container.querySelector('.bb-tools-feedback').textContent, /未保存的修改仍然保留/)
+    assert.ok(container.querySelector('[data-tool-id="claude-code"] input[type=checkbox]'))
+    assert.equal(container.querySelector('[data-tool-id="codex"] input[type=checkbox]').checked, true)
+    await click('保存绑定')
+    const payload = saved(api).at(-1).payload.settings
+    assert.equal(payload.funding.dailyBudgetUsd, 9)
+    assert.deepEqual(payload.model, { provider: 'anthropic', model: 'claude-sonnet-4' })
+    assert.deepEqual(payload.officialTools, [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }])
+  })
+})
+
+test('official tools: detection progress is visible, repeated clicks do not overlap, and a late old Host response is retired', async () => {
+  await withDom(async ({ container, render, click }) => {
+    const pending = deferred(), oldApi = fixture(action => action === 'binding.inspect' ? pending.promise : undefined), newApi = fixture()
+    const props = { bot, record: readyRecord({ catalog: readyCliCatalog() }), accounts: accountsReady, busy: false }
+    await render({ ...props, dispatch: oldApi.dispatch })
+    await click('重新检测')
+    assert.match(container.textContent, /检测安装、登录与执行能力/)
+    assert.equal([...container.querySelectorAll('button')].find(button => button.textContent === '检测中…').disabled, true)
+    await render({ ...props, dispatch: newApi.dispatch })
+    const late = readyRecord({ catalog: { ...catalog, tools: [{ toolId: 'private-old-cli', label: '旧宿主工具', status: 'ready', identities: [{ model: 'vendor-default' }], modes: ['read-only'] }] } })
+    await act(async () => { pending.resolve({ schemaVersion: 1, bot, record: late }); await new Promise(setImmediate) })
+    assert.doesNotMatch(container.textContent, /旧宿主工具/)
+    assert.equal(oldApi.calls.length, 1)
+    assert.deepEqual(newApi.calls, [])
+  })
+})
+
+test('official tools: revoked readiness remains visible as a stale explicit grant until the owner removes it', async () => {
+  await withDom(async ({ container, render, click, submitDisabled }) => {
+    const trusted = readyCliCatalog()
+    trusted.tools[0] = { ...trusted.tools[0], status: 'logged-out', loginState: 'logged-out', identities: [], modes: [], reason: '请重新登录。' }
+    const current = readyRecord({ catalog: trusted })
+    current.settings.officialTools = [{ toolId: 'codex', cliModel: 'vendor-default', mode: 'read-only' }]
+    await render({ bot, record: current, accounts: accountsReady, dispatch: fixture().dispatch, busy: false })
+    assert.match(container.textContent, /授权已失效/)
+    assert.match(container.textContent, /已保存：codex\/vendor-default/)
+    assert.equal(container.querySelector('[data-tool-id="codex"] select').disabled, true)
+    assert.equal(submitDisabled(container), true)
+    await click('移除 1 项未核验授权')
+    assert.equal(submitDisabled(container), false)
+    assert.doesNotMatch(container.textContent, /已保存：codex\/vendor-default/)
   })
 })
 

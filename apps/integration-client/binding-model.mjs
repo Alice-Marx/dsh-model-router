@@ -95,24 +95,34 @@ export function scopeAllows(scope, mode, route) {
 }
 
 /**
- * One card per official tool the Host offers. `identities` are the CLI models the
- * Host verified for the currently selected API model; a grant whose cliModel is
- * not in that list is stale and the Host would refuse it, so it is shown instead
- * of being dropped or quietly re-pointed at another model.
+ * A new Host publishes each tool's identities independently of the Bot's chat
+ * model. Only an older catalog without that field uses its legacy route mapping.
+ * An empty identity list is authoritative and never falls back to a chat model.
  */
 export function toolCards({ catalog, model, grants }) {
-  const verified = model?.cliModels ?? []
   return (catalog?.tools ?? []).map(tool => {
-    const identities = verified.filter(item => item.toolId === tool.toolId)
+    const current = Object.hasOwn(tool, 'identities')
+    const identities = current ? (Array.isArray(tool.identities) ? tool.identities : [])
+      : (model?.cliModels ?? []).filter(item => item.toolId === tool.toolId)
     const grant = (grants ?? []).find(item => item.toolId === tool.toolId) ?? null
     const modes = (tool.modes ?? []).filter(mode => EXECUTION_MODES.includes(mode))
+    const reported = tool.status ?? (identities.length && modes.length ? 'ready' : 'unavailable')
+    const status = current && reported === 'ready' && (tool.installed !== true || tool.loginState !== 'logged-in') ? 'unavailable' : reported
+    const available = status === 'ready' && identities.length > 0 && modes.length > 0
     return {
       toolId: tool.toolId, label: tool.label ?? tool.toolId, vendor: tool.vendor ?? '', source: tool.source ?? '',
-      modes, grantTools: [...(tool.grantTools ?? [])], identities, grant,
-      stale: Boolean(grant) && !identities.some(item => item.model === grant.cliModel),
+      modes, grantTools: [...(tool.grantTools ?? [])], identities: available ? identities : [], grant,
+      status, available, installed: tool.installed === true, loginState: tool.loginState ?? 'unknown',
+      reason: tool.reason ?? (available ? '' : '宿主尚未提供此工具的可用执行身份，请重新检测或前往安装与登录。'),
+      stale: Boolean(grant) && (!available || !identities.some(item => item.model === grant.cliModel) || !modes.includes(grant.mode)),
     }
   }).sort((left, right) => left.toolId.localeCompare(right.toolId))
 }
+
+export const TOOL_STATUS_LABEL = Object.freeze({
+  checking: '检测中', 'not-installed': '未安装', 'logged-out': '未登录', 'login-unknown': '登录状态待确认',
+  'terminal-only': '仅终端交互', unavailable: '暂不可用', ready: '已就绪',
+})
 
 /** The least privileged mode the Host offers for a tool: a grant never starts wide. */
 export function defaultMode(modes) {
@@ -225,10 +235,15 @@ export function bindingProblems({ form, model, account, machine, root, catalog, 
     if (!(catalog?.capabilities ?? []).some(item => item.id === id)) problems.push(`能力 ${id} 已不在宿主目录，请取消勾选。`)
   }
   for (const tool of form.officialTools ?? []) {
-    if (!(catalog?.tools ?? []).some(item => item.toolId === tool.toolId && (item.modes ?? []).includes(tool.mode))) {
+    const entry = toolCards({ catalog, model, grants: [] }).find(item => item.toolId === tool.toolId)
+    if (!entry?.available) {
+      problems.push(`${entry?.label ?? tool.toolId} 暂不可授予：${entry?.reason || '宿主目录中没有可用执行入口。'}`)
+    } else if (!entry.modes.includes(tool.mode)) {
       problems.push(`${tool.toolId} 尚未获准使用该执行模式，请移除或改选宿主提供的模式。`)
-    } else if (!(model?.cliModels ?? []).some(item => item.toolId === tool.toolId && item.model === tool.cliModel)) {
-      problems.push(`${tool.toolId} / ${tool.cliModel} 与当前模型的 CLI 身份尚未核验，请移除后重新授予。`)
+    } else if (!entry.identities.some(item => item.model === tool.cliModel)) {
+      problems.push(`${tool.toolId} / ${tool.cliModel} 的 CLI 执行身份尚未核验，请移除后重新授予。`)
+    } else if (['workspace-write', 'cli-native'].includes(tool.mode) && form.workspaceMode !== 'workspace-write') {
+      problems.push(`${entry.label} 需要写入工作区，请先将工作区权限设为允许写入。`)
     }
   }
   return problems

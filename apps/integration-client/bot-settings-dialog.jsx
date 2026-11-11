@@ -22,15 +22,15 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
     current.requests.add(controller)
     let cancel
     const deadline = new Promise((_resolve, reject) => { cancel = () => reject(new Error('REQUEST_ABORTED')); controller.signal.addEventListener('abort', cancel, { once: true }) })
-    const timer = setTimeout(() => controller.abort(), 10000)
+    const timer = setTimeout(() => controller.abort(), action === 'binding.inspect' && payload?.refreshOfficialTools === true ? 45000 : 10000)
     try { return await Promise.race([Promise.resolve().then(() => productApi.dispatch(action, payload, controller.signal)), deadline]) }
     finally { clearTimeout(timer); current.requests.delete(controller); controller.signal.removeEventListener('abort', cancel) }
   }
-  const read = async () => {
+  const read = async (refreshOfficialTools = false) => {
     const current = session.current, epoch = ++current.epoch
     setLoading(true)
     try {
-      const value = await call('binding.inspect', { botId })
+      const value = await call('binding.inspect', { botId, ...(refreshOfficialTools ? { refreshOfficialTools: true } : {}) })
       if (!current.live || epoch !== current.epoch) return
       if (value?.schemaVersion !== 1 || value.bot?.id !== botId || value.record?.botId !== botId) throw new Error('WRONG_BINDING_OWNER')
       setView(value); setError('')
@@ -43,7 +43,7 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
     const restore = document.activeElement
     const style = document.createElement('style'); style.dataset.botSettingsDialog = '1'; style.textContent = css; document.head.append(style)
     closeButton.current?.focus()
-    void read()
+    void read(true)
     return () => {
       current.live = false; current.epoch++
       for (const controller of current.requests) controller.abort()
@@ -68,14 +68,18 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
   }, [onClose])
   const dispatch = async (action, payload) => {
     const current = session.current
-    if (!current.live || current.busy || !['binding.save', 'funding.account.save'].includes(action) || (action === 'binding.save' && payload?.botId !== botId)) throw new Error('设置暂时无法保存，请重新读取。')
+    if (!current.live || current.busy || !['binding.inspect', 'binding.save', 'funding.account.save'].includes(action) || (action !== 'funding.account.save' && payload?.botId !== botId)) throw new Error('设置暂时无法保存，请重新读取。')
     current.busy = true; setBusy(true)
     try {
       const result = await call(action, payload)
-      if (current.live) await read()
+      if (action === 'binding.inspect') {
+        if (result?.schemaVersion !== 1 || result.bot?.id !== botId || result.record?.botId !== botId) throw new Error('WRONG_BINDING_OWNER')
+        if (current.live) { setView(result); setError('') }
+      } else if (current.live) await read()
       return result
     } catch (cause) {
       if (cause?.message === 'REQUEST_ABORTED') {
+        if (action === 'binding.inspect') throw new Error('工具检测超时或已取消，请重试。')
         if (current.live) setError('保存结果尚未确认，请重新读取后核对。')
         throw new Error('保存结果尚未确认，请重新读取后核对。')
       }
@@ -98,8 +102,8 @@ function SettingsDialog({ productApi, botId, onClose, onOpenTools }) {
       </div>
       <div className="bp-page bp-bot-settings-body">
         <div role="tabpanel" id={`${tabId}-binding-panel`} aria-labelledby={`${tabId}-binding`} hidden={tab !== 'binding'}>
-        {loading && !view && <p className="bp-muted" role="status">正在读取 Bot 设置…</p>}
-        {error && <div className="bp-bot-settings-error" role="alert"><p>{error}</p><button type="button" disabled={busy || loading} onClick={() => void read()}>重新读取</button></div>}
+        {loading && !view && <p className="bp-muted" role="status">正在读取 Bot 设置，检测安装、登录与执行能力…</p>}
+        {error && <div className="bp-bot-settings-error" role="alert"><p>{error}</p><button type="button" disabled={busy || loading} onClick={() => void read(true)}>重新读取</button></div>}
         {view && <BotBindingEditor bot={view.bot} record={view.record} accounts={view.accounts} dispatch={dispatch} hostScope={productApi} busy={busy || loading || Boolean(error)} onOpenTools={onOpenTools}/>}
         </div>
         <div role="tabpanel" id={`${tabId}-identity-panel`} aria-labelledby={`${tabId}-identity`} hidden={tab !== 'identity'}>

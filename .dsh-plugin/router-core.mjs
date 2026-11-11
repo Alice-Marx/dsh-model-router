@@ -56,6 +56,7 @@ import {
 } from './shared/official-tool-registry.mjs'
 import { parseInstallPreferences, resolveInstallPlan } from './shared/tool-install-preferences.mjs'
 import { officialToolExecutionCapabilities, officialToolReadiness, runOfficialTool } from './shared/official-tool-executor.mjs'
+import { authorizeOfficialRequest, botOfficialToolSnapshot, DEFAULT_OFFICIAL_MODEL, officialAdmissionAvailable } from './shared/bot-official-execution.mjs'
 import { preflightOfficialWorkspace, runOfficialTask, runOfficialTeam, sessionWorkspace } from './shared/official-team-runtime.mjs'
 import { downstreamPackageIds, executeAssignmentPlan, rerunAssignmentPackage, taskTextProblem } from './shared/task-executors.mjs'
 import {
@@ -883,6 +884,7 @@ async function reportRunProgress(options, event) {
 
 function executionHooks(ctx, options) {
   return {
+    authorizeOfficial: request => authorizeOfficialRequest(ctx, request),
     onCheckpointStart: options.onCheckpointStart,
     onCheckpointResult: options.onCheckpointResult,
     onSubscriptionResult: options.onSubscriptionResult,
@@ -907,10 +909,25 @@ function executionHooks(ctx, options) {
       if (typeof options.onPackage === 'function') await options.onPackage(result)
     },
     credentialsFor: route => credentialsForRoute(ctx, route),
-    runVerified: options.runVerified ?? (request => runOfficialTool({
-      ...request, sandbox: ctx.sandbox, mode: 'read-only',
-    })),
+    runVerified: async request => {
+      const admitted = await authorizeOfficialRequest(ctx, { toolId: request.toolId,
+        ...(request.modelId == null ? {} : { cliModel: request.modelId }), mode: 'read-only', executionEnvironment: 'harness' })
+      return (options.runVerified ?? runOfficialTool)({ ...request, modelId: admitted.modelId, sandbox: ctx.sandbox, mode: 'read-only' })
+    },
   }
+}
+
+/** Not wire data: only the Host runner can attach this admission closure. */
+function officialExecutionFor(ctx, requests) {
+  return { requests, authorize: request => authorizeOfficialRequest(ctx, request) }
+}
+
+function officialTeamFunding(ctx, plan, cliModels, mode, executionEnvironment) {
+  return officialExecutionFor(ctx, plan.team.workPackages.map(item => {
+    const toolId = toolForProvider(item.recommendedProvider)?.id
+    return { packageId: item.id, toolId, cliModel: cliModels?.[item.id] ?? cliModels?.[toolId] ?? DEFAULT_OFFICIAL_MODEL,
+      mode, executionEnvironment }
+  }))
 }
 
 /**
@@ -998,6 +1015,7 @@ async function validateManualTools(ctx, assignments, options = {}) {
   const capabilities = options.executionCapabilities ?? officialToolExecutionCapabilities()
   const knownReadiness = options.manualReadiness ?? options.readiness ?? []
   for (const id of ids) {
+    await authorizeOfficialRequest(ctx, { toolId: id, mode: 'read-only', executionEnvironment: 'harness' })
     if (!installed.includes(id)) throw new Error(`手动分配的官方工具 ${id} 尚未安装。`)
     if (!capabilities.some(item => item.id === id && item.modes?.includes('read-only'))) throw new Error(`官方工具 ${id} 不支持当前平台的只读执行。`)
     const ready = knownReadiness.find(item => item.id === id)
@@ -1430,10 +1448,12 @@ async function rerunTeamStep(ctx, { run, target, override, routes, budget, ids, 
     return next
   }
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), buildRun: buildRetry,
+    officialExecution: officialTeamFunding(ctx, plan, cliModels, mode, executionEnvironment),
     packageEstimates: reservations, settings: budgetSettings(config), confirmOverBudget })
   if (!lifecycle.accepted) return { paused: true, run, budget: pausedExecutionBudget(lifecycle) }
   let execution
   try { execution = await runTeam({ plan, task: run.task, workspace: cwd, allowedRoot: root ?? cwd, mode, executionEnvironment,
+    authorizeOfficial: request => authorizeOfficialRequest(ctx, request),
     installedIds: installed, cliModels, signal, sandbox: ctx.sandbox, previous, onlyIds: ids,
     onCheckpointStart: item => lifecycle.onCheckpointStart(item), onCheckpointResult: result => lifecycle.onCheckpointResult(result),
     onWorkspace: value => lifecycle.onWorkspace(value),
@@ -1559,11 +1579,15 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
     if (!route) throw new Error('所选 provider/model 不在官方模型目录中')
     modelId = route.cliModel && toolId !== 'zcode' ? route.cliModel : null
   }
-  if (text(args.cliModel)) {
-    if (!route) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
+  if (text(args.cliModel) === DEFAULT_OFFICIAL_MODEL) modelId = null
+  else if (text(args.cliModel)) {
+    if (!route && !officialAdmissionAvailable(ctx)) throw new Error('cliModel 需要同时提供已配置的 provider 和 model 路线')
     if (toolId === 'zcode') throw new Error('ZCode CLI 不支持在单次调用中指定模型')
     modelId = text(args.cliModel)
   }
+  const admission = await authorizeOfficialRequest(ctx, { toolId, mode, executionEnvironment: 'harness',
+    ...(text(args.cliModel) ? { cliModel: text(args.cliModel) } : modelId ? { cliModel: modelId } : {}) })
+  modelId = admission.modelId
   const estimate = route ? createPlanFromRoutes(taskText, routes, { mode: 'direct', directProvider: route.provider, directModel: route.model }).estimatedCost : null
   const funding = initialFunding(route ?? {}, { ...accountingContext(null, routes, true), toolId })
   const apiEstimate = funding.billing === 'subscription' ? 0 : estimate
@@ -1572,7 +1596,7 @@ export async function planToolRun(ctx, config, args = {}, { signal } = {}) {
   const accounting = { apiEstimatedCostUsd: apiEstimate, apiExposure: funding.billing === 'api', packages: [{ id: 'direct', billing: funding.billing,
     apiEstimatedCostUsd: apiEstimate, estimatedUsage: { inputTokens: resources?.inputTokens ?? null, outputTokens: resources?.outputTokens ?? null } }] }
   return { toolId, tool, taskText, mode, modelId, route, routes, accounting, funding: funding.billing, apiEstimate, estimate: Number.isFinite(estimate) ? estimate : null, budget,
-    provider: route?.provider ?? '', model: route?.model ?? '', cliModel: modelId }
+    provider: route?.provider ?? '', model: route?.model ?? '', cliModel: admission.cliModel }
 }
 
 /** Run a planned tool call and record it; `rerunOf` links a rerun to the original run. */
@@ -1582,14 +1606,19 @@ async function runPlannedTool(ctx, config, planned, { cwd, root, signal, rerunOf
   const makeToolRecord = (result, location = {}) => {
     const run = buildToolRunRecord({ id: runId, createdAt: startedAt, finishedAt: Date.now(),
       toolId: planned.toolId, toolLabel: planned.tool?.label ?? planned.toolId, task: planned.taskText,
-      provider: planned.provider, model: planned.model, cliModel: planned.cliModel,
+      provider: planned.provider, model: planned.model, cliModel: planned.modelId,
       mode: planned.mode, workspace: cwd, result, estimatedCost: planned.estimate, rerunOf,
       pricingFor: item => routePricing(planned.routes, item), billingFor: billingForResult, budget: planned.budget })
+    // Replay retains the selected identity, while the receipt above records
+    // null for a default CLI model rather than inventing an actual model ID.
+    run.toolRun.cliModel = planned.cliModel
     if (location.isolatedWorkspace) run.isolatedWorkspace = location.isolatedWorkspace
     if (location.baseCommit) run.baseCommit = location.baseCommit
     return run
   }
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), settings: budgetSettings(config), confirmOverBudget,
+    officialExecution: officialExecutionFor(ctx, [{ packageId: 'direct', toolId: planned.toolId,
+      cliModel: planned.cliModel ?? DEFAULT_OFFICIAL_MODEL, mode: planned.mode, executionEnvironment: 'harness' }]),
     packageEstimates: [{ id: 'direct', billing: planned.funding ?? 'api', estimatedCostUsd: planned.apiEstimate ?? planned.estimate ?? null }],
     buildRun: ({ status, results, workspace }) => makeToolRecord(results[0] ?? { status, notStarted: true }, workspace) })
   if (!lifecycle.accepted) {
@@ -1599,6 +1628,7 @@ async function runPlannedTool(ctx, config, planned, { cwd, root, signal, rerunOf
   let result
   try {
     result = await runTask({ toolId: planned.toolId, task: planned.taskText, modelId: planned.modelId, workspace: cwd, allowedRoot: root ?? cwd,
+      authorizeOfficial: request => authorizeOfficialRequest(ctx, { ...request, cliModel: request.cliModel ?? planned.cliModel }),
       mode: planned.mode, signal, sandbox: ctx.sandbox,
       onCheckpointStart: item => lifecycle.onCheckpointStart(item), onCheckpointResult: item => lifecycle.onCheckpointResult(item),
       onWorkspace: value => lifecycle.onWorkspace(value) })
@@ -1610,6 +1640,33 @@ async function runPlannedTool(ctx, config, planned, { cwd, root, signal, rerunOf
     await lifecycle.finish(recorded)
   } catch (error) { await lifecycle.interrupt(recorded); throw error }
   return { result, recorded: result.status === 'unsupported' ? null : recorded }
+}
+
+/**
+ * Shared native/integration Bot entry. Workspace and confirmation evidence are
+ * Host arguments, separate from the model request. The same admission, budget
+ * lifecycle, checkpoints and immutable ledger are used by the SDK tool below.
+ */
+export async function executeBotOfficialTool(ctx, config, args, { signal, cwd, root = cwd,
+  sandboxMode = 'read-only', confirmOverBudget = false, runTask } = {}) {
+  if (typeof cwd !== 'string' || !isAbsolute(cwd) || typeof root !== 'string' || !isAbsolute(root)) {
+    throw new TypeError('A trusted absolute CLI workspace is required')
+  }
+  const planned = await planToolRun(ctx, config, args, { signal })
+  if (planned.mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑 CLI 执行')
+  if (planned.budget.exceeded && confirmOverBudget !== true) {
+    return { status: 'paused-budget', budget: { ...planned.budget, paused: true },
+      estimateUsd: planned.apiEstimate ?? (planned.funding === 'subscription' ? 0 : planned.estimate), accounting: planned.accounting ?? null,
+      notice: `${planned.budget.message} 已暂停，未启动 ${planned.tool.label}。请先取得用户确认。` }
+  }
+  const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root, signal, confirmOverBudget,
+    ...(runTask ? { runTask } : {}) })
+  return { ...result, runId: recorded?.id ?? null,
+    estimateUsd: planned.apiEstimate ?? (planned.funding === 'subscription' ? 0 : planned.estimate), accounting: planned.accounting ?? null,
+    budget: planned.budget,
+    ...(!planned.modelId ? { modelNotice: result.modelNotice ?? '本次使用厂商 CLI 当前配置的默认模型；实际模型以厂商回报为准。' } : {}),
+    ...(planned.funding === 'subscription' ? { costNotice: '订阅单独统计用量，不占用 API 金额预算；厂商未回报的用量保持未知。' }
+      : planned.estimate === null ? { costNotice: '实际计费方式或 API 单价未知，请先核对后确认。' } : {}) }
 }
 
 /** Ledger record for model_router_tool_run. */
@@ -1854,11 +1911,13 @@ export async function executeOfficialTeamPlan(ctx, config = {}, planned, options
     return run
   }
   const lifecycle = await beginExecutionLifecycle({ state: routerStateStore(), settings: budgetSettings(config),
+    officialExecution: officialTeamFunding(ctx, planned.plan, planned.cliModels, planned.mode, executionEnvironment),
     confirmOverBudget: options.confirmOverBudget === true, packageEstimates: packageEstimates(planned.plan, planned.taskText),
     buildRun: ({ status, results, workspace: location }) => makeTeamRecord({ status, results }, location) })
   if (!lifecycle.accepted) return { ...common, status: 'paused-budget', budget: pausedExecutionBudget(lifecycle) }
   let execution
   try { execution = await (options.runTeam ?? runOfficialTeam)({ plan: planned.plan, task: planned.taskText, workspace,
+    authorizeOfficial: request => authorizeOfficialRequest(ctx, request),
     allowedRoot: options.root ?? workspace, mode: planned.mode, executionEnvironment, installedIds: planned.installed,
     cliModels: planned.cliModels, signal: options.signal, sandbox: ctx.sandbox,
     onPackageStart: item => reportRunProgress(options, { type: 'package-start', package: item }),
@@ -2533,6 +2592,9 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
     output: JSON_OUTPUT,
     async execute(_args, exec) {
       throwIfAborted(exec.signal)
+      const botTools = await botOfficialToolSnapshot(ctx)
+      if (botTools !== null) return jsonValue({ tools: botTools, source: 'bot-authorized-catalog',
+        notice: '仅列出此 Bot 的工具目录；modes 是入口支持的模式，普通 Bot 仍受已保存 grant 限制，执行前会重新检测与核验。' })
       const probes = await probeAllTools()
       return jsonValue({
         tools: probes,
@@ -2614,31 +2676,21 @@ function registerOfficialToolModels(ctx, config, assertInstallPreferences) {
   }))
   registerPolicyTool(ctx, config, defineTool({
     name: 'model_router_tool_run',
-    description: 'Run one supported official model CLI in the current Harness session workspace. Claude, Codex, MiMo and Grok support read-only; Kimi, MiniMax and ZCode require workspace-write. Write mode needs approval and a clean Git repository. Optional provider/model must match a configured Harness route and selected vendor; cliModel can specify that vendor CLI’s own configured model name. Every CLI uses its own default unless an explicit cliModel or saved route mapping is configured.',
+    description: 'Run one authorized official CLI in the Host-selected workspace, independently of the Bot chat model. Omit cliModel to use its saved CLI selection, or use vendor-default for the CLI configuration. Exact names require a matching Host-authorized identity. Optional provider/model are a configured vendor route for pricing, not the Bot chat route. Write mode needs approval and a clean Git repository. Unavailable Bot tools do not fall back to portable CLIs or APIs.',
     parameters: {
       tool: { type: 'string', required: true, description: 'Fixed registry tool id, e.g. claude-code or codex.' },
       task: { type: 'string', required: true, description: 'Concrete task for the official CLI model.' },
       provider: { type: 'string', description: 'Optional configured provider, paired with model.' },
       model: { type: 'string', description: 'Optional model ID from the Harness directory, paired with provider. This ID is advisory for CLIs except Claude/Codex.' },
-      cliModel: { type: 'string', description: 'Optional model name already configured in this vendor CLI; requires provider and model. MiniMax/MiMo require provider/model format. ZCode cannot switch models per call.' },
+      cliModel: { type: 'string', description: 'Optional Host-authorized CLI identity. vendor-default follows the CLI configuration and is never passed as a real model name. Omit to use the saved selection. Exact names without provider/model require the Host Bot authorization service. ZCode cannot switch models per call.' },
       mode: { type: 'string', enum: ['read-only', 'workspace-write'], description: 'Default is read-only. Kimi, MiniMax and ZCode require workspace-write. Write mode requires official approval and a clean Git repository.' },
       confirmOverBudget: { type: 'boolean', description: 'Set only after the user agreed to exceed the daily/monthly budget. Triggers an approval prompt.' },
     },
     output: JSON_OUTPUT,
     async execute(args, exec) {
       const { cwd, root, sandboxMode } = await sessionWorkspace(ctx, exec)
-      const planned = await planToolRun(ctx, config, args, { signal: exec.signal })
-      if (planned.mode === 'workspace-write' && sandboxMode === 'read-only') throw new Error('当前 Harness 会话为只读模式，不能请求可编辑 CLI 执行')
-      if (planned.budget.exceeded && args.confirmOverBudget !== true) {
-        return jsonValue({ status: 'paused-budget', budget: { ...planned.budget, paused: true }, estimateUsd: planned.apiEstimate ?? (planned.funding === 'subscription' ? 0 : planned.estimate), accounting: planned.accounting ?? null,
-          notice: `${planned.budget.message} 已暂停，未启动 ${planned.tool.label}。请向用户说明后，以 confirmOverBudget: true 重新调用。` })
-      }
-      const { result, recorded } = await runPlannedTool(ctx, config, planned, { cwd, root, signal: exec.signal, confirmOverBudget: args.confirmOverBudget === true })
-      return jsonValue({ ...result, runId: recorded?.id ?? null, estimateUsd: planned.apiEstimate ?? (planned.funding === 'subscription' ? 0 : planned.estimate), accounting: planned.accounting ?? null, budget: planned.budget,
-        ...(!planned.modelId && planned.model ? { modelNotice: result.modelNotice
-          ?? 'Harness 模型 ID 未经此厂商 CLI 验证；本次使用厂商 CLI 已配置的默认模型。' } : {}),
-        ...(planned.funding === 'subscription' ? { costNotice: '订阅单独统计用量，不占用 API 金额预算；厂商未回报的用量保持未知。' } : planned.estimate === null ? { costNotice: '实际计费方式或 API 单价未知，请先核对后确认。' } : {}),
-      })
+      return jsonValue(await executeBotOfficialTool(ctx, config, args, { signal: exec.signal, cwd, root, sandboxMode,
+        confirmOverBudget: args.confirmOverBudget === true }))
     },
   }))
   registerPolicyTool(ctx, config, defineTool({
